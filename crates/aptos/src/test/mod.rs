@@ -5,7 +5,9 @@ use crate::{
     account::{
         create::{CreateAccount, DEFAULT_FUNDED_COINS},
         fund::FundWithFaucet,
-        key_rotation::{LookupAddress, RotateKey, RotateSummary},
+        key_rotation::{
+            LookupAddress, NewAuthKeyOptions, NewProfileOptions, RotateKey, RotateSummary,
+        },
         list::{ListAccount, ListQuery},
         transfer::{TransferCoins, TransferSummary},
     },
@@ -264,10 +266,16 @@ impl CliTestFramework {
                 prompt_options: PromptOptions::yes(),
                 ..Default::default()
             },
-            new_private_key: Some(new_private_key),
-            save_to_profile: None,
-            new_private_key_file: None,
-            skip_saving_profile: true,
+            new_auth_key_options: NewAuthKeyOptions {
+                new_private_key: Some(new_private_key),
+                new_private_key_file: None,
+                new_derivation_path: None,
+                new_derivation_index: None,
+            },
+            new_profile_options: NewProfileOptions {
+                skip_saving_profile: true,
+                save_to_profile: None,
+            },
         }
         .execute()
         .await?;

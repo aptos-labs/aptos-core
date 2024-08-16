@@ -26,13 +26,6 @@ impl MockQuorumStoreSender {
 
 #[async_trait::async_trait]
 impl QuorumStoreSender for MockQuorumStoreSender {
-    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>) {
-        self.tx
-            .send((ConsensusMsg::BatchRequestMsg(Box::new(request)), recipients))
-            .await
-            .expect("could not send");
-    }
-
     async fn request_batch(
         &self,
         _request: BatchRequest,
@@ -40,13 +33,6 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         _timeout: Duration,
     ) -> anyhow::Result<BatchResponse> {
         unimplemented!();
-    }
-
-    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
-        self.tx
-            .send((ConsensusMsg::BatchResponse(Box::new(batch)), recipients))
-            .await
-            .expect("could not send");
     }
 
     async fn send_signed_batch_info_msg(
@@ -76,7 +62,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
                 vec![],
             ))
             .await
-            .unwrap();
+            .expect("We should be able to send the proof of store message");
     }
 
     async fn send_proof_of_store_msg_to_self(&mut self, _proof_of_stores: Vec<ProofOfStore>) {

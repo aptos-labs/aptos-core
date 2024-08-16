@@ -3,9 +3,10 @@
 
 use crate::transaction_shuffler::use_case_aware::{
     delayed_queue::DelayedQueue,
-    types::{InputIdx, OutputIdx, UseCaseAwareTransaction},
+    types::{InputIdx, OutputIdx},
     Config,
 };
+use aptos_types::transaction::use_case::UseCaseAwareTransaction;
 use std::{collections::VecDeque, fmt::Debug};
 
 #[derive(Debug)]

@@ -3,11 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::{
-    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutCertificate, wrapped_ledger_info::WrappedLedgerInfo,
+    pipelined_block::{ExecutionSummary, PipelinedBlock},
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutCertificate,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
-pub use block_store::{sync_manager::BlockRetriever, BlockStore};
+pub use block_store::{
+    sync_manager::{BlockRetriever, NeedFetchResult},
+    BlockStore,
+};
 use std::{sync::Arc, time::Duration};
 
 mod block_store;
@@ -42,6 +48,7 @@ pub trait BlockReader: Send + Sync {
     fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>>;
 
     /// Return the certified block with the highest round.
+    #[cfg(test)]
     fn highest_certified_block(&self) -> Arc<PipelinedBlock>;
 
     /// Return the quorum certificate with the highest round
@@ -64,4 +71,6 @@ pub trait BlockReader: Send + Sync {
 
     // Return time difference between last committed block and new proposal
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration;
+
+    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<ExecutionSummary>;
 }

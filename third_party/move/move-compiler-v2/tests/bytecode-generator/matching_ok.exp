@@ -3,6 +3,33 @@ module 0xc0ffee::m {
     struct Box {
         x: u64,
     }
+    enum CommonFields {
+        Foo {
+            x: u64,
+            y: u64,
+        }
+        Bar {
+            x: u64,
+            z: u64,
+        }
+    }
+    enum CommonFieldsAtDifferentOffset {
+        Foo {
+            x: u64,
+            y: u64,
+        }
+        Bar {
+            x: u64,
+            z: u64,
+        }
+        Baz {
+            z: u64,
+        }
+        Balt {
+            foo: u8,
+            z: u64,
+        }
+    }
     enum Inner {
         Inner1 {
             x: u64,
@@ -151,6 +178,26 @@ module 0xc0ffee::m {
         }
 
     }
+    private fun select_common_fields(s: m::CommonFields): u64 {
+        Add<u64>(select_variants m::CommonFields.Foo.x|m::CommonFields.Bar.x<m::CommonFields>(s), match (s) {
+          m::CommonFields::Foo{ x: _, y } => {
+            y
+          }
+          m::CommonFields::Bar{ x: _, z } => {
+            z
+          }
+        }
+        )
+    }
+    private fun select_common_fields_different_offset(s: m::CommonFieldsAtDifferentOffset): u64 {
+        select_variants m::CommonFieldsAtDifferentOffset.Bar.z|m::CommonFieldsAtDifferentOffset.Baz.z|m::CommonFieldsAtDifferentOffset.Balt.z<m::CommonFieldsAtDifferentOffset>(s)
+    }
+    private fun test_common(s: m::CommonFields): bool {
+        test_variants m::CommonFields::Foo|Bar(s)
+    }
+    private fun test_common_ref(s: &m::CommonFields): bool {
+        test_variants m::CommonFields::Foo|Bar(s)
+    }
 } // end 0xc0ffee::m
 
 ============ initial bytecode ================
@@ -275,7 +322,7 @@ public fun m::is_some_specialized($t0: &m::Option<m::Option<u64>>): bool {
   6: $t2 := test_variant m::Option<m::Option<u64>>::Some($t0)
   7: if ($t2) goto 8 else goto 15
   8: label L4
-  9: $t3 := borrow_field_variant<m::Option<m::Option<u64>>::Some>.value($t0)
+  9: $t3 := borrow_variant_field<m::Option<m::Option<u64>>::Some>.value($t0)
  10: $t2 := test_variant m::Option<u64>::None($t3)
  11: if ($t2) goto 12 else goto 15
  12: label L5
@@ -285,7 +332,7 @@ public fun m::is_some_specialized($t0: &m::Option<m::Option<u64>>): bool {
  16: $t2 := test_variant m::Option<m::Option<u64>>::Some($t0)
  17: if ($t2) goto 18 else goto 25
  18: label L7
- 19: $t4 := borrow_field_variant<m::Option<m::Option<u64>>::Some>.value($t0)
+ 19: $t4 := borrow_variant_field<m::Option<m::Option<u64>>::Some>.value($t0)
  20: $t2 := test_variant m::Option<u64>::Some($t4)
  21: if ($t2) goto 22 else goto 25
  22: label L8
@@ -372,7 +419,7 @@ public fun m::outer_value_nested($t0: m::Outer): u64 {
   8: $t3 := test_variant m::Outer::One($t2)
   9: if ($t3) goto 10 else goto 19
  10: label L4
- 11: $t4 := borrow_field_variant<m::Outer::One>.i($t2)
+ 11: $t4 := borrow_variant_field<m::Outer::One>.i($t2)
  12: $t3 := test_variant m::Inner::Inner1($t4)
  13: if ($t3) goto 14 else goto 19
  14: label L5
@@ -435,7 +482,7 @@ public fun m::outer_value_with_cond($t0: m::Outer): u64 {
   8: $t3 := test_variant m::Outer::One($t2)
   9: if ($t3) goto 10 else goto 21
  10: label L4
- 11: $t4 := borrow_field_variant<m::Outer::One>.i($t2)
+ 11: $t4 := borrow_variant_field<m::Outer::One>.i($t2)
  12: $t5 := infer($t4)
  13: $t3 := m::is_inner1($t5)
  14: if ($t3) goto 15 else goto 21
@@ -488,7 +535,7 @@ public fun m::outer_value_with_cond_ref($t0: &m::Outer): bool {
   6: $t2 := test_variant m::Outer::One($t0)
   7: if ($t2) goto 8 else goto 15
   8: label L4
-  9: $t3 := borrow_field_variant<m::Outer::One>.i($t0)
+  9: $t3 := borrow_variant_field<m::Outer::One>.i($t0)
  10: $t2 := m::is_inner1($t3)
  11: if ($t2) goto 12 else goto 15
  12: label L5
@@ -498,14 +545,14 @@ public fun m::outer_value_with_cond_ref($t0: &m::Outer): bool {
  16: $t2 := test_variant m::Outer::One($t0)
  17: if ($t2) goto 18 else goto 22
  18: label L7
- 19: $t4 := borrow_field_variant<m::Outer::One>.i($t0)
+ 19: $t4 := borrow_variant_field<m::Outer::One>.i($t0)
  20: $t1 := m::is_inner1($t4)
  21: goto 32
  22: label L6
  23: $t2 := test_variant m::Outer::Two($t0)
  24: if ($t2) goto 25 else goto 29
  25: label L9
- 26: $t5 := borrow_field_variant<m::Outer::Two>.i($t0)
+ 26: $t5 := borrow_variant_field<m::Outer::Two>.i($t0)
  27: $t1 := m::is_inner1($t5)
  28: goto 32
  29: label L8
@@ -516,57 +563,104 @@ public fun m::outer_value_with_cond_ref($t0: &m::Outer): bool {
 }
 
 
+[variant baseline]
+fun m::select_common_fields($t0: m::CommonFields): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &m::CommonFields
+     var $t4: &u64
+     var $t5: u64
+     var $t6: &m::CommonFields
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+  0: $t3 := borrow_local($t0)
+  1: $t4 := borrow_variant_field<m::CommonFields::Foo|Bar>.x($t3)
+  2: $t2 := read_ref($t4)
+  3: $t6 := borrow_local($t0)
+  4: $t7 := test_variant m::CommonFields::Foo($t6)
+  5: if ($t7) goto 6 else goto 10
+  6: label L2
+  7: ($t9, $t8) := unpack_variant m::CommonFields::Foo($t0)
+  8: $t5 := infer($t8)
+  9: goto 20
+ 10: label L1
+ 11: $t7 := test_variant m::CommonFields::Bar($t6)
+ 12: if ($t7) goto 13 else goto 17
+ 13: label L4
+ 14: ($t11, $t10) := unpack_variant m::CommonFields::Bar($t0)
+ 15: $t5 := infer($t10)
+ 16: goto 20
+ 17: label L3
+ 18: $t12 := 15621340914461310977
+ 19: abort($t12)
+ 20: label L0
+ 21: $t1 := +($t2, $t5)
+ 22: return $t1
+}
+
+
+[variant baseline]
+fun m::select_common_fields_different_offset($t0: m::CommonFieldsAtDifferentOffset): u64 {
+     var $t1: u64
+     var $t2: &m::CommonFieldsAtDifferentOffset
+     var $t3: &u64
+     var $t4: bool
+  0: $t2 := borrow_local($t0)
+  1: $t4 := test_variant m::CommonFieldsAtDifferentOffset::Bar($t2)
+  2: if ($t4) goto 8 else goto 3
+  3: label L3
+  4: $t4 := test_variant m::CommonFieldsAtDifferentOffset::Balt($t2)
+  5: if ($t4) goto 8 else goto 6
+  6: label L4
+  7: goto 11
+  8: label L2
+  9: $t3 := borrow_variant_field<m::CommonFieldsAtDifferentOffset::Bar|Balt>.z($t2)
+ 10: goto 13
+ 11: label L1
+ 12: $t3 := borrow_variant_field<m::CommonFieldsAtDifferentOffset::Baz>.z($t2)
+ 13: label L0
+ 14: $t1 := read_ref($t3)
+ 15: return $t1
+}
+
+
+[variant baseline]
+fun m::test_common($t0: m::CommonFields): bool {
+     var $t1: bool
+     var $t2: &m::CommonFields
+  0: $t2 := borrow_local($t0)
+  1: $t1 := test_variant m::CommonFields::Foo($t2)
+  2: if ($t1) goto 7 else goto 3
+  3: label L1
+  4: $t1 := test_variant m::CommonFields::Bar($t2)
+  5: if ($t1) goto 7 else goto 6
+  6: label L2
+  7: label L0
+  8: return $t1
+}
+
+
+[variant baseline]
+fun m::test_common_ref($t0: &m::CommonFields): bool {
+     var $t1: bool
+  0: $t1 := test_variant m::CommonFields::Foo($t0)
+  1: if ($t1) goto 6 else goto 2
+  2: label L1
+  3: $t1 := test_variant m::CommonFields::Bar($t0)
+  4: if ($t1) goto 6 else goto 5
+  5: label L2
+  6: label L0
+  7: return $t1
+}
+
+
 Diagnostics:
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:19:16
-   │
-19 │     public fun inner_value(self: Inner): u64 {
-   │                ^^^^^^^^^^^
-
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:27:16
-   │
-27 │     public fun is_inner1(self: &Inner): bool {
-   │                ^^^^^^^^^
-
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:35:16
-   │
-35 │     public fun outer_value(o: Outer): u64 {
-   │                ^^^^^^^^^^^
-
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:45:16
-   │
-45 │     public fun outer_value_nested(o: Outer): u64 {
-   │                ^^^^^^^^^^^^^^^^^^
-
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:56:16
-   │
-56 │     public fun outer_value_with_cond(o: Outer): u64 {
-   │                ^^^^^^^^^^^^^^^^^^^^^
-
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:67:16
-   │
-67 │     public fun outer_value_with_cond_ref(o: &Outer): bool {
-   │                ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:82:16
-   │
-82 │     public fun is_some<A>(x: &Option<A>): bool {
-   │                ^^^^^^^
-
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:89:16
-   │
-89 │     public fun is_some_specialized(x: &Option<Option<u64>>): bool {
-   │                ^^^^^^^^^^^^^^^^^^^
-
-bug: file format generator: variants not yet implemented
-   ┌─ tests/bytecode-generator/matching_ok.move:97:16
-   │
-97 │     public fun is_some_dropped<A:drop>(x: Option<A>): bool {
-   │                ^^^^^^^^^^^^^^^
+error: local `s` of type `m::CommonFields` does not have the `drop` ability
+    ┌─ tests/bytecode-generator/matching_ok.move:128:10
+    │
+128 │         (s is Foo|Bar)
+    │          ^ still borrowed but will be implicitly dropped later since it is no longer used

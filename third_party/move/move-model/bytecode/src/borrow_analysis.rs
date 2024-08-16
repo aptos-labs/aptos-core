@@ -676,7 +676,11 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                         state.add_edge(
                             src_node,
                             dest_node,
-                            BorrowEdge::Field(mid.qualified_inst(*sid, inst.to_owned()), *field),
+                            BorrowEdge::Field(
+                                mid.qualified_inst(*sid, inst.to_owned()),
+                                None,
+                                *field,
+                            ),
                         );
                     },
                     Function(mid, fid, targs) => {

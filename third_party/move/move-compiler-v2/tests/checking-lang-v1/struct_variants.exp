@@ -4,7 +4,7 @@ error: unsupported language construct
   ┌─ tests/checking-lang-v1/struct_variants.move:3:5
   │
 3 │     enum S { None, Some{x: u64} }
-  │     ^^^^ Move 2 language construct is not enabled: struct variants
+  │     ^^^^ Move 2 language construct is not enabled: enum types
 
 error: unsupported language construct
   ┌─ tests/checking-lang-v1/struct_variants.move:6:9

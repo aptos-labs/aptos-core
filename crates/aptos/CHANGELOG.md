@@ -3,8 +3,20 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
-- Upgraded indexer processors for localnet from 5244b84fa5ed872e5280dc8df032d744d62ad29d to d954cf4eef9ceabdd941b2e08923fff83984b591. Upgraded Hasura metadata accordingly.
+- Add safe methods to delete a profile, to rename a profile, and to output the private key of a profile.
+- Add `aptos update movefmt`. This installs / updates the `movefmt` binary, which is needed for the new `aptos move fmt` subcommand.
+- Integrate the Move formatter `movefmt` which is now available via `aptos move fmt`
+
+## [4.0.0] - 2024/08/13
+- **Breaking Change**: change key rotation options such that user has to either pass the name of a new profile or explicitly flag that no profile should be generated, since without this update the interactive profile generator could fail out after the key has already been rotated. This forces the check for new profile validity before doing anything onchain.
+- Add support for key rotation to/from Ledger hardware wallets.
+- Fixes a bug in the Move Prover leading to internal error in generated boogie (error 'global `#0_info` cannot be accessed')
+- **Breaking Change**: A new native function to compute serialized size of a Move value is now supported.
+
+## [3.5.1] - 2024/07/21
+- Upgraded indexer processors for localnet from 5244b84fa5ed872e5280dc8df032d744d62ad29d to fa1ce4947f4c2be57529f1c9732529e05a06cb7f. Upgraded Hasura metadata accordingly.
 - Upgraded Hasura image from 2.36.1 to 2.40.2-ce. Note that we use the Community Edition, so the console won't ask users to upgrade to enterprise anymore / hint at any enterprise features.
+- Fixes a bug in the Move compiler (both v1 and v2) which disallowed `match` as a name for a function or for a variable.
 
 ## [3.5.0] - 2024/07/06
 - Add balance command to easily get account balances for APT currently

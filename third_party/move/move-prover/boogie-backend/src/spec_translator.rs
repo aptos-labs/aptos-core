@@ -274,9 +274,11 @@ impl<'env> SpecTranslator<'env> {
             self.error(&fun.loc, "function or tuple result type not yet supported");
             return;
         }
-        let recursive = self
+        let qid = module_env.get_id().qualified(id);
+        let recursive = self.env.is_spec_fun_recursive(qid);
+        let type_reflection = self
             .env
-            .is_spec_fun_recursive(module_env.get_id().qualified(id));
+            .spec_fun_uses_generic_type_reflection(&qid.instantiate(self.type_inst.clone()));
         emitln!(
             self.writer,
             "// {}spec fun {}",
@@ -306,6 +308,18 @@ impl<'env> SpecTranslator<'env> {
             } else {
                 boogie_type
             }
+        };
+        let type_info_params = if type_reflection {
+            (0..fun.type_params.len())
+                .map(|i| {
+                    format!(
+                        "{}_info: $TypeParamInfo",
+                        boogie_type(self.env, &Type::TypeParameter(i as u16))
+                    )
+                })
+                .collect_vec()
+        } else {
+            vec![]
         };
         let result_type = ty_str_fn(bv_flag_result)(self.env, &self.inst(&fun.result_type));
         // it is possible that the spec fun may refer to the same memory after monomorphization,
@@ -352,7 +366,10 @@ impl<'env> SpecTranslator<'env> {
             });
         self.writer.set_location(&fun.loc);
         let boogie_name = boogie_spec_fun_name(module_env, id, &self.type_inst, bv_flag_result);
-        let param_list = mem_params.chain(params).join(", ");
+        let param_list = type_info_params
+            .into_iter()
+            .chain(mem_params.chain(params))
+            .join(", ");
         let attrs = if fun.uninterpreted || recursive {
             ""
         } else {
@@ -838,6 +855,14 @@ impl<'env> SpecTranslator<'env> {
             Operation::Select(module_id, struct_id, field_id) => {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
             },
+            Operation::SelectVariants(_module_id, _struct_id, _field_ids) => {
+                // TODO(#13806): implement for variants
+                self.error(&loc, "selection from variants no yet supported");
+            },
+            Operation::TestVariants(_module_id, _struct_id, _variants) => {
+                // TODO(#13806): implement for variants
+                self.error(&loc, "testing of variants no yet supported");
+            },
             Operation::UpdateField(module_id, struct_id, field_id) => {
                 self.translate_update_field(node_id, *module_id, *struct_id, *field_id, args)
             },
@@ -1031,14 +1056,69 @@ impl<'env> SpecTranslator<'env> {
         let inst = &self.get_node_instantiation(node_id);
         let module_env = &self.env.get_module(module_id);
         let fun_decl = module_env.get_spec_fun(fun_id);
+        if self.try_translate_spec_fun_reflection_call(module_env, fun_decl, inst) {
+            return;
+        }
+
+        // regular path
         let global_state = &self
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
+        let is_vector_table_module = module_env.is_std_vector() || module_env.is_table();
+        let bv_flag = if is_vector_table_module && !args.is_empty() {
+            global_state.get_node_num_oper(args[0].node_id()) == Bitwise
+        } else {
+            global_state.get_node_num_oper(node_id) == Bitwise
+        };
+        let name = boogie_spec_fun_name(module_env, fun_id, inst, bv_flag);
+        emit!(self.writer, "{}(", name);
+        let mut first = true;
+        let mut maybe_comma = || {
+            if first {
+                first = false;
+            } else {
+                emit!(self.writer, ", ");
+            }
+        };
+        // Start with type info parameters
+        if self
+            .env
+            .spec_fun_uses_generic_type_reflection(&module_id.qualified_inst(fun_id, inst.clone()))
+        {
+            for i in 0..fun_decl.type_params.len() {
+                maybe_comma();
+                emit!(
+                    self.writer,
+                    "{}_info",
+                    boogie_type(self.env, &Type::TypeParameter(i as u16))
+                )
+            }
+        }
+        // Add memory parameters.
+        let label_at = |i| memory_labels.as_ref().map(|labels| labels[i]);
+        let mut i = 0;
+        for memory in &fun_decl.used_memory {
+            let memory = &memory.to_owned().instantiate(inst);
+            maybe_comma();
+            let memory = boogie_resource_memory_name(self.env, memory, &label_at(i));
+            emit!(self.writer, &memory);
+            i = usize::saturating_add(i, 1);
+        }
+        // Finally add argument expressions
+        for exp in args {
+            maybe_comma();
+            self.translate_exp(exp);
+        }
+        emit!(self.writer, ")");
+    }
 
-        // special casing for type reflection
-        let mut processed = false;
-
+    fn try_translate_spec_fun_reflection_call(
+        &self,
+        module_env: &ModuleEnv,
+        fun_decl: &SpecFunDecl,
+        inst: &[Type],
+    ) -> bool {
         // TODO(mengxu): change it to a better address name instead of extlib
         if self.env.get_extlib_address() == *module_env.get_name().addr() {
             let qualified_name = format!(
@@ -1053,7 +1133,7 @@ impl<'env> SpecTranslator<'env> {
                     "{}",
                     boogie_reflection_type_name(self.env, &inst[0], false)
                 );
-                processed = true;
+                true
             } else if qualified_name == TYPE_INFO_SPEC {
                 assert_eq!(inst.len(), 1);
                 // TODO(mengxu): by ignoring the first return value of this function, we are
@@ -1061,7 +1141,7 @@ impl<'env> SpecTranslator<'env> {
                 // invoking `type_info` on a primitive type like: `type_info<bool>`.
                 let (_, info) = boogie_reflection_type_info(self.env, &inst[0]);
                 emit!(self.writer, "{}", info);
-                processed = true;
+                true
             } else if qualified_name == TYPE_SPEC_IS_STRUCT {
                 assert_eq!(inst.len(), 1);
                 emit!(
@@ -1069,11 +1149,11 @@ impl<'env> SpecTranslator<'env> {
                     "{}",
                     boogie_reflection_type_is_struct(self.env, &inst[0])
                 );
-                processed = true;
+                true
+            } else {
+                false
             }
-        }
-
-        if self.env.get_stdlib_address() == *module_env.get_name().addr() {
+        } else if self.env.get_stdlib_address() == *module_env.get_name().addr() {
             let qualified_name = format!(
                 "{}::{}",
                 module_env.get_name().name().display(self.env.symbol_pool()),
@@ -1086,42 +1166,12 @@ impl<'env> SpecTranslator<'env> {
                     "{}",
                     boogie_reflection_type_name(self.env, &inst[0], true)
                 );
-                processed = true;
-            }
-        }
-
-        let is_vector_table_module = module_env.is_std_vector() || module_env.is_table();
-        // regular path
-        if !processed {
-            let bv_flag = if is_vector_table_module && !args.is_empty() {
-                global_state.get_node_num_oper(args[0].node_id()) == Bitwise
+                true
             } else {
-                global_state.get_node_num_oper(node_id) == Bitwise
-            };
-            let name = boogie_spec_fun_name(module_env, fun_id, inst, bv_flag);
-            emit!(self.writer, "{}(", name);
-            let mut first = true;
-            let mut maybe_comma = || {
-                if first {
-                    first = false;
-                } else {
-                    emit!(self.writer, ", ");
-                }
-            };
-            let label_at = |i| memory_labels.as_ref().map(|labels| labels[i]);
-            let mut i = 0;
-            for memory in &fun_decl.used_memory {
-                let memory = &memory.to_owned().instantiate(inst);
-                maybe_comma();
-                let memory = boogie_resource_memory_name(self.env, memory, &label_at(i));
-                emit!(self.writer, &memory);
-                i = usize::saturating_add(i, 1);
+                false
             }
-            for exp in args {
-                maybe_comma();
-                self.translate_exp(exp);
-            }
-            emit!(self.writer, ")");
+        } else {
+            false
         }
     }
 

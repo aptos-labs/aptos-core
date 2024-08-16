@@ -2,11 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::unwrap_used)]
+
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     quorum_store,
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutorError;
+use aptos_logger::prelude::{error, warn};
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
     register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
@@ -25,6 +30,8 @@ pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
 pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
 /// Transaction commit failed (will not be retried) because of a duplicate
 pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
+/// Transaction commit failed (will not be retried) because it expired
+pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
@@ -284,11 +291,19 @@ pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
-/// Counts when chain_health backoff is triggered
+/// Counts when pipeline backpressure is triggered
 pub static PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "aptos_pipeline_backpressure_on_proposal_triggered",
-        "Counts when chain_health backoff is triggered",
+        "Counts when pipeline backpressure is triggered",
+    )
+});
+
+/// Counts when execution backpressure is triggered
+pub static EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_execution_backpressure_on_proposal_triggered",
+        "Counts when execution backpressure is triggered",
     )
 });
 
@@ -312,12 +327,11 @@ pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<DurationHistogram> = Lazy::
 });
 
 /// Amount of time (in seconds) proposal is delayed due to backpressure/backoff
-pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
-    register_gauge!(
+pub static PROPOSER_DELAY_PROPOSAL: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
         "aptos_proposer_delay_proposal",
         "Amount of time (in seconds) proposal is delayed due to backpressure/backoff",
     )
-    .unwrap()
 });
 
 /// Histogram for max number of transactions (after filtering for dedup, expirations, etc) proposer uses when creating block.
@@ -325,16 +339,6 @@ pub static PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING: Lazy<Histogram> = Lazy::new(
     register_histogram!(
         "aptos_proposer_max_block_txns_after_filtering",
         "Histogram for max number of transactions (after filtering) proposer uses when creating block.",
-        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
-    )
-    .unwrap()
-});
-
-/// Histogram for max number of transactions proposer uses when creating block.
-pub static PROPOSER_MAX_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_proposer_max_block_txns",
-        "Histogram for max number of transactions proposer uses when creating block.",
         NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
     )
     .unwrap()
@@ -364,6 +368,16 @@ pub static PROPOSER_PENDING_BLOCKS_FILL_FRACTION: Lazy<Gauge> = Lazy::new(|| {
     register_gauge!(
         "aptos_proposer_pending_blocks_fill_fraction",
         "How full is a largest recent pending block, as a fraction of max len/bytes (between 0 and 1)",
+    )
+    .unwrap()
+});
+
+/// Histogram for max number of transactions calibrated block should have, based on the proposer
+pub static PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_estimated_calibrated_block_txns",
+        "Histogram for max number of transactions calibrated block should have, based on the proposer",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -993,6 +1007,56 @@ pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the buffer manager receiving executor error
+pub static BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_buffer_manager_received_executor_error_count",
+        "Count of the buffer manager receiving executor error",
+        &["error_type"],
+    )
+    .unwrap()
+});
+
+/// Count of the executor errors pipeline discarded
+pub static PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_pipeline_discarded_executor_error_count",
+        "Count of the executor errors pipeline discarded",
+        &["error_type"],
+    )
+    .unwrap()
+});
+
+pub fn log_executor_error_occurred(
+    e: ExecutorError,
+    counter: &Lazy<IntCounterVec>,
+    block_id: HashValue,
+) {
+    match e {
+        ExecutorError::CouldNotGetData => {
+            counter.with_label_values(&["CouldNotGetData"]).inc();
+            warn!(
+                block_id = block_id,
+                "Execution error - CouldNotGetData {}", block_id
+            );
+        },
+        ExecutorError::BlockNotFound(block_id) => {
+            counter.with_label_values(&["BlockNotFound"]).inc();
+            warn!(
+                block_id = block_id,
+                "Execution error BlockNotFound {}", block_id
+            );
+        },
+        e => {
+            counter.with_label_values(&["UnexpectedError"]).inc();
+            error!(
+                block_id = block_id,
+                "Execution error {:?} for {}", e, block_id
+            );
+        },
+    }
+}
+
 const PROPSER_ELECTION_DURATION_BUCKETS: [f64; 17] = [
     0.001, 0.002, 0.003, 0.004, 0.006, 0.008, 0.01, 0.012, 0.014, 0.0175, 0.02, 0.025, 0.05, 0.25,
     0.5, 1.0, 2.0,
@@ -1116,6 +1180,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
                         TXN_COMMIT_RETRY_LABEL
                     } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
                         TXN_COMMIT_FAILED_DUPLICATE_LABEL
+                    } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
+                        TXN_COMMIT_FAILED_EXPIRED_LABEL
                     } else {
                         TXN_COMMIT_FAILED_LABEL
                     }
@@ -1160,6 +1226,24 @@ pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_rand_queue_size",
         "Number of randomness-pending blocks."
+    )
+    .unwrap()
+});
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_proposal_payload_availability_count",
+        "The availability of proposal payload locally",
+        &["status"]
+    )
+    .unwrap()
+});
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_proposal_payload_fetch_duration",
+        "Time to fetch payload behind proposal with status",
+        &["status"]
     )
     .unwrap()
 });

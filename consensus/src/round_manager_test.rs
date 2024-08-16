@@ -16,7 +16,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     persistent_liveness_storage::RecoveryData,
     pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
@@ -43,6 +43,7 @@ use aptos_consensus_types::{
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
+    utils::PayloadTxnsSize,
     vote_msg::VoteMsg,
 };
 use aptos_crypto::HashValue;
@@ -291,7 +292,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::from(PayloadManager::DirectMempool),
+            Arc::from(DirectMempoolPayloadManager::new()),
             false,
             Arc::new(Mutex::new(PendingBlocks::new())),
         ));
@@ -303,12 +304,11 @@ impl NodeSetup {
             Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
             Duration::ZERO,
-            20,
+            PayloadTxnsSize::new(20, 1000),
             10,
-            1000,
-            5,
-            500,
+            PayloadTxnsSize::new(5, 500),
             10,
+            1,
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,

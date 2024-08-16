@@ -218,34 +218,30 @@ B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: StLoc[2](loc0: u64)
 B1:
-	2: LdU64(0)
-	3: StLoc[3](loc1: u64)
-	4: CopyLoc[2](loc0: u64)
-	5: MoveLoc[3](loc1: u64)
-	6: Gt
-	7: BrFalse(21)
+	2: CopyLoc[2](loc0: u64)
+	3: LdU64(0)
+	4: Gt
+	5: BrFalse(17)
 B2:
-	8: MoveLoc[0](Arg0: u64)
-	9: StLoc[3](loc1: u64)
-	10: MoveLoc[1](Arg1: u64)
-	11: StLoc[0](Arg0: u64)
-	12: MoveLoc[3](loc1: u64)
-	13: StLoc[1](Arg1: u64)
-	14: LdU64(1)
-	15: StLoc[3](loc1: u64)
-	16: MoveLoc[2](loc0: u64)
-	17: MoveLoc[3](loc1: u64)
-	18: Sub
-	19: StLoc[2](loc0: u64)
-	20: Branch(22)
+	6: MoveLoc[0](Arg0: u64)
+	7: StLoc[3](loc1: u64)
+	8: MoveLoc[1](Arg1: u64)
+	9: StLoc[0](Arg0: u64)
+	10: MoveLoc[3](loc1: u64)
+	11: StLoc[1](Arg1: u64)
+	12: MoveLoc[2](loc0: u64)
+	13: LdU64(1)
+	14: Sub
+	15: StLoc[2](loc0: u64)
+	16: Branch(18)
 B3:
-	21: Branch(23)
+	17: Branch(19)
 B4:
-	22: Branch(2)
+	18: Branch(2)
 B5:
-	23: MoveLoc[0](Arg0: u64)
-	24: MoveLoc[1](Arg1: u64)
-	25: Ret
+	19: MoveLoc[0](Arg0: u64)
+	20: MoveLoc[1](Arg1: u64)
+	21: Ret
 }
 }
 ============ bytecode verification succeeded ========

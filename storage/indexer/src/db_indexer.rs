@@ -4,7 +4,7 @@
 use crate::utils::PrefixedStateValueIterator;
 use aptos_config::config::internal_indexer_db_config::InternalIndexerDBConfig;
 use aptos_db_indexer_schemas::{
-    metadata::{MetadataKey, MetadataValue},
+    metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
     schema::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
         indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema,
@@ -78,11 +78,40 @@ impl InternalIndexerDB {
         Self { db, config }
     }
 
-    pub fn get_persisted_version(&self) -> Result<Version> {
-        // read the latest key from the db
-        self.db
-            .get::<InternalIndexerMetadataSchema>(&MetadataKey::LatestVersion)?
-            .map_or(Ok(0), |metavalue| Ok(metavalue.expect_version()))
+    pub fn write_keys_to_indexer_db(
+        &self,
+        keys: &Vec<StateKey>,
+        snapshot_version: Version,
+        progress: StateSnapshotProgress,
+    ) -> Result<()> {
+        // add state value to internal indexer
+        let batch = SchemaBatch::new();
+        for state_key in keys {
+            batch.put::<StateKeysSchema>(state_key, &())?;
+        }
+
+        batch.put::<InternalIndexerMetadataSchema>(
+            &MetadataKey::StateSnapshotRestoreProgress(snapshot_version),
+            &MetadataValue::StateSnapshotProgress(progress),
+        )?;
+        self.db.write_schemas(batch)?;
+        Ok(())
+    }
+
+    pub fn get_persisted_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::LatestVersion)
+    }
+
+    pub fn get_event_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::EventVersion)
+    }
+
+    pub fn get_state_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::StateVersion)
+    }
+
+    pub fn get_transaction_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::TransactionVersion)
     }
 
     pub fn event_enabled(&self) -> bool {
@@ -105,13 +134,24 @@ impl InternalIndexerDB {
         Arc::clone(&self.db)
     }
 
+    pub fn get_restore_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
+        Ok(self
+            .db
+            .get::<InternalIndexerMetadataSchema>(&MetadataKey::StateSnapshotRestoreProgress(
+                version,
+            ))?
+            .map(|e| e.expect_state_snapshot_progress()))
+    }
+
     pub fn ensure_cover_ledger_version(&self, ledger_version: Version) -> Result<()> {
         let indexer_latest_version = self.get_persisted_version()?;
-        ensure!(
-            indexer_latest_version >= ledger_version,
-            "ledger version too new"
-        );
-        Ok(())
+        if let Some(indexer_latest_version) = indexer_latest_version {
+            if indexer_latest_version >= ledger_version {
+                return Ok(());
+            }
+        }
+
+        bail!("ledger version too new")
     }
 
     pub fn get_account_transaction_version_iter(
@@ -188,6 +228,24 @@ impl InternalIndexerDB {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
+    pub fn get_restore_version_and_progress(
+        &self,
+    ) -> Result<Option<(Version, StateSnapshotProgress)>> {
+        let mut iter = self.db.iter::<InternalIndexerMetadataSchema>()?;
+        iter.seek_to_first();
+        let mut last_version = None;
+        let mut last_progress = None;
+        for res in iter {
+            let (key, value) = res?;
+            if let MetadataKey::StateSnapshotRestoreProgress(version) = key {
+                last_version = Some(version);
+                last_progress = Some(value.expect_state_snapshot_progress());
+            }
+        }
+        Ok(last_version.map(|version| (version, last_progress.unwrap())))
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn get_state_keys(&self, prefix: &StateKeyPrefix) -> Result<Vec<StateKey>> {
         let mut iter = self.db.iter::<StateKeysSchema>()?;
         iter.seek_to_first();
@@ -207,6 +265,13 @@ impl InternalIndexerDB {
             let ((event_key, seq_num), (txn_version, idx)) = res.unwrap();
             (event_key, txn_version, seq_num, idx)
         })))
+    }
+
+    fn get_version(&self, key: &MetadataKey) -> Result<Option<Version>> {
+        Ok(self
+            .db
+            .get::<InternalIndexerMetadataSchema>(key)?
+            .map(|v| v.expect_version()))
     }
 }
 
@@ -248,6 +313,13 @@ impl DBIndexer {
         }
     }
 
+    pub fn get_main_db_lowest_viable_version(&self) -> Result<Version> {
+        self.main_db_reader
+            .get_first_txn_version()
+            .transpose()
+            .expect("main db lowest viable version doesn't exist")
+    }
+
     fn get_main_db_iter(
         &self,
         start_version: Version,
@@ -282,15 +354,14 @@ impl DBIndexer {
         }
         // we want to include the last transaction since the iterator interface will is right exclusive.
         let num_of_transaction = min(
-            (self.indexer_db.config.batch_size + 1) as u64,
+            self.indexer_db.config.batch_size as u64,
             highest_version + 1 - version,
         );
         Ok(num_of_transaction)
     }
 
-    pub fn process_a_batch(&self, start_version: Option<Version>) -> Result<Version> {
-        let mut version = start_version.unwrap_or(0);
-
+    pub fn process_a_batch(&self, start_version: Version) -> Result<Version> {
+        let mut version = start_version;
         let num_transactions = self.get_num_of_transactions(version)?;
         let mut db_iter = self.get_main_db_iter(version, num_transactions)?;
         let batch = SchemaBatch::new();
@@ -336,7 +407,25 @@ impl DBIndexer {
             version += 1;
             Ok::<(), AptosDbError>(())
         })?;
-        assert_eq!(num_transactions, version - start_version.unwrap_or(0));
+        assert_eq!(num_transactions, version - start_version);
+        if self.indexer_db.transaction_enabled() {
+            batch.put::<InternalIndexerMetadataSchema>(
+                &MetadataKey::TransactionVersion,
+                &MetadataValue::Version(version - 1),
+            )?;
+        }
+        if self.indexer_db.event_enabled() {
+            batch.put::<InternalIndexerMetadataSchema>(
+                &MetadataKey::EventVersion,
+                &MetadataValue::Version(version - 1),
+            )?;
+        }
+        if self.indexer_db.statekeys_enabled() {
+            batch.put::<InternalIndexerMetadataSchema>(
+                &MetadataKey::StateVersion,
+                &MetadataValue::Version(version - 1),
+            )?;
+        }
         batch.put::<InternalIndexerMetadataSchema>(
             &MetadataKey::LatestVersion,
             &MetadataValue::Version(version - 1),

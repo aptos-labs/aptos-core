@@ -7,110 +7,90 @@ module 42.loops {
 nested_loop(Arg0: u64): u64 /* def_idx: 0 */ {
 L1:	loc0: u64
 B0:
-	0: LdU64(0)
-	1: StLoc[1](loc0: u64)
-	2: CopyLoc[0](Arg0: u64)
-	3: MoveLoc[1](loc0: u64)
-	4: Gt
-	5: BrFalse(27)
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(0)
+	2: Gt
+	3: BrFalse(19)
 B1:
-	6: LdU64(10)
-	7: StLoc[1](loc0: u64)
-	8: CopyLoc[0](Arg0: u64)
-	9: MoveLoc[1](loc0: u64)
-	10: Gt
-	11: BrFalse(19)
+	4: CopyLoc[0](Arg0: u64)
+	5: LdU64(10)
+	6: Gt
+	7: BrFalse(13)
 B2:
-	12: LdU64(1)
-	13: StLoc[1](loc0: u64)
+	8: MoveLoc[0](Arg0: u64)
+	9: LdU64(1)
+	10: Sub
+	11: StLoc[0](Arg0: u64)
+	12: Branch(14)
+B3:
+	13: Branch(14)
+B4:
 	14: MoveLoc[0](Arg0: u64)
-	15: MoveLoc[1](loc0: u64)
+	15: LdU64(1)
 	16: Sub
 	17: StLoc[0](Arg0: u64)
-	18: Branch(20)
-B3:
-	19: Branch(20)
-B4:
-	20: LdU64(1)
-	21: StLoc[1](loc0: u64)
-	22: MoveLoc[0](Arg0: u64)
-	23: MoveLoc[1](loc0: u64)
-	24: Sub
-	25: StLoc[0](Arg0: u64)
-	26: Branch(0)
+	18: Branch(0)
 B5:
-	27: Branch(28)
+	19: Branch(20)
 B6:
-	28: MoveLoc[0](Arg0: u64)
-	29: Ret
+	20: MoveLoc[0](Arg0: u64)
+	21: Ret
 }
 while_loop(Arg0: u64): u64 /* def_idx: 1 */ {
 L1:	loc0: u64
 B0:
-	0: LdU64(0)
-	1: StLoc[1](loc0: u64)
-	2: CopyLoc[0](Arg0: u64)
-	3: MoveLoc[1](loc0: u64)
-	4: Gt
-	5: BrFalse(13)
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(0)
+	2: Gt
+	3: BrFalse(9)
 B1:
-	6: LdU64(1)
-	7: StLoc[1](loc0: u64)
-	8: MoveLoc[0](Arg0: u64)
-	9: MoveLoc[1](loc0: u64)
-	10: Sub
-	11: StLoc[0](Arg0: u64)
-	12: Branch(14)
+	4: MoveLoc[0](Arg0: u64)
+	5: LdU64(1)
+	6: Sub
+	7: StLoc[0](Arg0: u64)
+	8: Branch(10)
 B2:
-	13: Branch(15)
+	9: Branch(11)
 B3:
-	14: Branch(0)
+	10: Branch(0)
 B4:
-	15: MoveLoc[0](Arg0: u64)
-	16: Ret
+	11: MoveLoc[0](Arg0: u64)
+	12: Ret
 }
 while_loop_with_break_and_continue(Arg0: u64): u64 /* def_idx: 2 */ {
 L1:	loc0: u64
 B0:
-	0: LdU64(0)
-	1: StLoc[1](loc0: u64)
-	2: CopyLoc[0](Arg0: u64)
-	3: MoveLoc[1](loc0: u64)
-	4: Gt
-	5: BrFalse(27)
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(0)
+	2: Gt
+	3: BrFalse(19)
 B1:
-	6: LdU64(42)
-	7: StLoc[1](loc0: u64)
-	8: CopyLoc[0](Arg0: u64)
-	9: MoveLoc[1](loc0: u64)
-	10: Eq
-	11: BrFalse(13)
+	4: CopyLoc[0](Arg0: u64)
+	5: LdU64(42)
+	6: Eq
+	7: BrFalse(9)
 B2:
-	12: Branch(29)
+	8: Branch(21)
 B3:
-	13: LdU64(21)
-	14: StLoc[1](loc0: u64)
-	15: CopyLoc[0](Arg0: u64)
-	16: MoveLoc[1](loc0: u64)
-	17: Eq
-	18: BrFalse(20)
+	9: CopyLoc[0](Arg0: u64)
+	10: LdU64(21)
+	11: Eq
+	12: BrFalse(14)
 B4:
-	19: Branch(0)
+	13: Branch(0)
 B5:
-	20: LdU64(1)
-	21: StLoc[1](loc0: u64)
-	22: MoveLoc[0](Arg0: u64)
-	23: MoveLoc[1](loc0: u64)
-	24: Sub
-	25: StLoc[0](Arg0: u64)
-	26: Branch(28)
+	14: MoveLoc[0](Arg0: u64)
+	15: LdU64(1)
+	16: Sub
+	17: StLoc[0](Arg0: u64)
+	18: Branch(20)
 B6:
-	27: Branch(29)
+	19: Branch(21)
 B7:
-	28: Branch(0)
+	20: Branch(0)
 B8:
-	29: MoveLoc[0](Arg0: u64)
-	30: Ret
+	21: MoveLoc[0](Arg0: u64)
+	22: Ret
 }
 }
 ============ bytecode verification succeeded ========

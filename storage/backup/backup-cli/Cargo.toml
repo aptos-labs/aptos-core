@@ -18,9 +18,11 @@ aptos-backup-service = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
+aptos-db-indexer-schemas = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-indexer-grpc-table-info = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }

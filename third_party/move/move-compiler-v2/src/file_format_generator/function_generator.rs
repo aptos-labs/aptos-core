@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    experiments::Experiment,
     file_format_generator::{
         module_generator::{ModuleContext, ModuleGenerator, SOURCE_MAP_OK},
-        MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
+        peephole_optimizer, Options, MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
     },
     pipeline::livevar_analysis_processor::LiveVarAnnotation,
 };
@@ -16,6 +17,7 @@ use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, Loc, NodeId, Parameter, QualifiedId, StructId, TypeParameter},
+    symbol::Symbol,
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
@@ -135,15 +137,27 @@ impl<'a> FunctionGenerator<'a> {
                 code: vec![],
             };
             let target = ctx.targets.get_target(&fun_env, &FunctionVariant::Baseline);
-            let code = fun_gen.gen_code(&FunctionContext {
+            let mut code = fun_gen.gen_code(&FunctionContext {
                 module: ctx.clone(),
                 fun: target,
                 loc: loc.clone(),
                 type_parameters: fun_env.get_type_parameters(),
                 def_idx,
             });
-            // Write the spec block table back to the environment.
-            if !fun_gen.spec_blocks.is_empty() {
+            if fun_gen.spec_blocks.is_empty() {
+                // Currently, peephole optimizations require that there are no inline spec blocks.
+                // This is to ensure that spec-related data structures do not refer to code
+                // offsets which could be changed by the peephole optimizer.
+                let options = ctx
+                    .env
+                    .get_extension::<Options>()
+                    .expect("Options is available");
+                if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
+                    // TODO: fix source mapping (#14167)
+                    peephole_optimizer::run(&mut code);
+                }
+            } else {
+                // Write the spec block table back to the environment.
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
             }
             (fun_gen.gen, Some(code))
@@ -357,7 +371,7 @@ impl<'a> FunctionGenerator<'a> {
             .insert(offset);
     }
 
-    /// Sets the resolution of a lable to the current code offset.
+    /// Sets the resolution of a label to the current code offset.
     fn define_label(&mut self, label: Label) {
         let offset = self.code.len() as FF::CodeOffset;
         self.label_info.entry(label).or_default().resolution = Some(offset)
@@ -374,12 +388,6 @@ impl<'a> FunctionGenerator<'a> {
         self.flush_any_conflicts(ctx, dest, source);
         let fun_ctx = ctx.fun_ctx;
         match oper {
-            Operation::TestVariant(..)
-            | Operation::PackVariant(..)
-            | Operation::UnpackVariant(..)
-            | Operation::BorrowFieldVariant(..) => {
-                fun_ctx.internal_error("variants not yet implemented")
-            },
             Operation::Function(mid, fid, inst) => {
                 self.gen_call(ctx, dest, mid.qualified(*fid), inst, source);
             },
@@ -394,6 +402,18 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::PackGeneric,
                 );
             },
+            Operation::PackVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::PackVariant,
+                    FF::Bytecode::PackVariantGeneric,
+                );
+            },
             Operation::Unpack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -403,6 +423,30 @@ impl<'a> FunctionGenerator<'a> {
                     source,
                     FF::Bytecode::Unpack,
                     FF::Bytecode::UnpackGeneric,
+                );
+            },
+            Operation::UnpackVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::UnpackVariant,
+                    FF::Bytecode::UnpackVariantGeneric,
+                );
+            },
+            Operation::TestVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::TestVariant,
+                    FF::Bytecode::TestVariantGeneric,
                 );
             },
             Operation::MoveTo(mid, sid, inst) => {
@@ -453,6 +497,18 @@ impl<'a> FunctionGenerator<'a> {
                     dest,
                     mid.qualified(*sid),
                     inst.clone(),
+                    None,
+                    *offset,
+                    source,
+                );
+            },
+            Operation::BorrowVariantField(mid, sid, variants, inst, offset) => {
+                self.gen_borrow_field(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    inst.clone(),
+                    Some(variants),
                     *offset,
                     source,
                 );
@@ -637,6 +693,39 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_push_result(ctx, dest);
     }
 
+    fn gen_struct_variant_oper(
+        &mut self,
+        ctx: &BytecodeContext,
+        dest: &[TempIndex],
+        id: QualifiedId<StructId>,
+        variant: Symbol,
+        inst: &[Type],
+        source: &[TempIndex],
+        mk_simple: impl FnOnce(FF::StructVariantHandleIndex) -> FF::Bytecode,
+        mk_generic: impl FnOnce(FF::StructVariantInstantiationIndex) -> FF::Bytecode,
+    ) {
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source, None);
+        let struct_env = &fun_ctx.module.env.get_struct(id);
+        if inst.is_empty() {
+            let idx =
+                self.gen
+                    .struct_variant_index(&fun_ctx.module, &fun_ctx.loc, struct_env, variant);
+            self.emit(mk_simple(idx))
+        } else {
+            let idx = self.gen.struct_variant_inst_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                struct_env,
+                variant,
+                inst.to_vec(),
+            );
+            self.emit(mk_generic(idx))
+        }
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
     /// Generate code for the borrow-field instruction.
     fn gen_borrow_field(
         &mut self,
@@ -644,31 +733,65 @@ impl<'a> FunctionGenerator<'a> {
         dest: &[TempIndex],
         id: QualifiedId<StructId>,
         inst: Vec<Type>,
+        variants: Option<&[Symbol]>,
         offset: usize,
         source: &[TempIndex],
     ) {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source, None);
         let struct_env = &fun_ctx.module.env.get_struct(id);
-        let field_env = &struct_env.get_field_by_offset(offset);
         let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
-        if inst.is_empty() {
-            let idx = self
-                .gen
-                .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowField(idx))
+
+        if let Some(variants) = variants {
+            assert!(!variants.is_empty());
+            let field_env =
+                &struct_env.get_field_by_offset_optional_variant(Some(variants[0]), offset);
+            if inst.is_empty() {
+                let idx = self.gen.variant_field_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                );
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowVariantField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowVariantField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowField(idx))
+                let idx = self.gen.variant_field_inst_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                    inst,
+                );
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowVariantFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowVariantFieldGeneric(idx))
+                }
             }
         } else {
-            let idx = self
-                .gen
-                .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+            let field_env = &struct_env.get_field_by_offset_optional_variant(None, offset);
+            if inst.is_empty() {
+                let idx = self
+                    .gen
+                    .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                let idx = self
+                    .gen
+                    .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                }
             }
         }
         self.abstract_pop_n(ctx, source.len());

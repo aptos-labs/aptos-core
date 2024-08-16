@@ -88,6 +88,7 @@ fn end_to_end() {
                 rocksdb_opt: RocksdbOpt::default(),
                 concurrent_downloads: ConcurrentDownloadsOpt::default(),
                 replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
+                enable_state_indices: false,
             }
             .try_into()
             .unwrap(),
@@ -221,6 +222,7 @@ async fn test_trusted_waypoints_impl(
             rocksdb_opt: RocksdbOpt::default(),
             concurrent_downloads: ConcurrentDownloadsOpt::default(),
             replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
+            enable_state_indices: false,
         }
         .try_into()
         .unwrap(),
@@ -242,6 +244,7 @@ async fn test_trusted_waypoints_impl(
             rocksdb_opt: RocksdbOpt::default(),
             concurrent_downloads: ConcurrentDownloadsOpt::default(),
             replay_concurrency_level: ReplayConcurrencyLevelOpt::default(),
+            enable_state_indices: false,
         }
         .try_into()
         .unwrap(),

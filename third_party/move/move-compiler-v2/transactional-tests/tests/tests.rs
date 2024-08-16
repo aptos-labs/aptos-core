@@ -96,8 +96,12 @@ const SEPARATE_BASELINE: &[&str] = &[
     "constants/large_vectors.move",
     // Printing bytecode is different depending on optimizations
     "no-v1-comparison/print_bytecode.move",
+    "bug_14243_stack_size.move",
     // The output of the tests could be different depending on the language version
     "/operator_eval/",
+    // Creates different code if optimized
+    "no-v1-comparison/enum/enum_field_select.move",
+    "no-v1-comparison/enum/enum_field_select_different_offsets.move",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

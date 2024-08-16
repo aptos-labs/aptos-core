@@ -12,8 +12,7 @@ use processor::{
     gap_detectors::DEFAULT_GAP_DETECTION_BATCH_SIZE,
     processors::{
         objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
-        token_processor::TokenProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
-        ProcessorConfig, ProcessorName,
+        token_v2_processor::TokenV2ProcessorConfig, ProcessorConfig, ProcessorName,
     },
     utils::database::run_pending_migrations,
     IndexerGrpcProcessorConfig,
@@ -38,13 +37,11 @@ pub struct ProcessorArgs {
         value_enum,
         default_values_t = vec![
             ProcessorName::AccountTransactionsProcessor,
-            ProcessorName::CoinProcessor,
             ProcessorName::DefaultProcessor,
             ProcessorName::EventsProcessor,
             ProcessorName::FungibleAssetProcessor,
             ProcessorName::ObjectsProcessor,
             ProcessorName::StakeProcessor,
-            ProcessorName::TokenProcessor,
             ProcessorName::TokenV2Processor,
             ProcessorName::TransactionMetadataProcessor,
             ProcessorName::UserTransactionProcessor,
@@ -74,11 +71,7 @@ impl ProcessorManager {
             ProcessorName::AnsProcessor => {
                 bail!("ANS processor is not supported in the localnet")
             },
-            ProcessorName::CoinProcessor => ProcessorConfig::CoinProcessor,
             ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor,
-            ProcessorName::DefaultParquetProcessor => {
-                bail!("Default Parquet processor is not supported in the localnet")
-            },
             ProcessorName::EventsProcessor => ProcessorConfig::EventsProcessor,
             ProcessorName::FungibleAssetProcessor => ProcessorConfig::FungibleAssetProcessor,
             ProcessorName::MonitoringProcessor => {
@@ -93,16 +86,14 @@ impl ProcessorManager {
                     query_retry_delay_ms: Default::default(),
                 })
             },
+            ProcessorName::ParquetDefaultProcessor => {
+                bail!("ParquetDefaultProcessor is not supported in the localnet")
+            },
+            ProcessorName::ParquetFungibleAssetProcessor => {
+                bail!("ParquetFungibleAssetProcessor is not supported in the localnet")
+            },
             ProcessorName::StakeProcessor => {
                 ProcessorConfig::StakeProcessor(StakeProcessorConfig {
-                    query_retries: Default::default(),
-                    query_retry_delay_ms: Default::default(),
-                })
-            },
-            ProcessorName::TokenProcessor => {
-                ProcessorConfig::TokenProcessor(TokenProcessorConfig {
-                    // This NFT points contract doesn't exist on localnets.
-                    nft_points_contract: None,
                     query_retries: Default::default(),
                     query_retry_delay_ms: Default::default(),
                 })

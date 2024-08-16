@@ -60,12 +60,14 @@ async fn account_balance(
         get_block_index_from_request(&server_context, request.block_identifier.clone()).await?;
 
     // Version to grab is the last entry in the block (balance is at end of block)
+    // NOTE: In Rosetta, we always do balances by block here rather than ledger version.
     let block_info = server_context
         .block_cache()?
         .get_block_info_by_height(block_height, server_context.chain_id)
         .await?;
     let balance_version = block_info.last_version;
 
+    // Retrieve all metadata we want to provide as an on-demand lookup
     let (sequence_number, operators, balances, lockup_expiration) = get_balances(
         &rest_client,
         request.account_identifier,
@@ -100,6 +102,7 @@ async fn get_balances(
     let mut lockup_expiration: u64 = 0;
     let mut total_requested_balance: Option<u64> = None;
 
+    // Lookup the delegation pool, if it's provided in the account information
     if pool_address.is_some() {
         match get_delegation_stake_balances(
             rest_client,
@@ -135,6 +138,7 @@ async fn get_balances(
     }
 
     // Retrieve all account resources
+    // TODO: This will need to change for FungibleAssets, will need to lookup on a list of known FAs
     if let Ok(response) = rest_client
         .get_account_resources_at_version_bcs(owner_address, version)
         .await
@@ -150,10 +154,14 @@ async fn get_balances(
                 struct_tag.module.as_str(),
                 struct_tag.name.as_str(),
             ) {
+                // Retrieve the sequence number from the account resource
+                // TODO: Make a separate call for this
                 (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE) => {
                     let account: AccountResource = bcs::from_bytes(&bytes)?;
                     maybe_sequence_number = Some(account.sequence_number())
                 },
+                // Parse all associated coin stores
+                // TODO: This would need to be expanded to support other coin stores
                 (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE) => {
                     // Only show coins on the base account
                     if account.is_base_account() {
@@ -169,6 +177,7 @@ async fn get_balances(
                         }
                     }
                 },
+                // Parse all staking contract data to know the underlying balances of the pools
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE) => {
                     if account.is_base_account() || pool_address.is_some() {
                         continue;
@@ -229,6 +238,8 @@ async fn get_balances(
             }
         }
 
+        // Retrieves the sequence number accordingly
+        // TODO: Sequence number should be 0 if it isn't retrieved probably
         let sequence_number = if let Some(sequence_number) = maybe_sequence_number {
             sequence_number
         } else {
@@ -266,6 +277,8 @@ async fn get_balances(
             lockup_expiration,
         ))
     } else {
+        // If it fails, we return 0
+        // TODO: This should probably be fixed to check if the account exists.  Then if the account doesn't exist, return empty balance, otherwise error
         Ok((
             0,
             None,

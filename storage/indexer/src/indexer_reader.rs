@@ -47,6 +47,13 @@ impl IndexerReader for IndexerReaders {
         anyhow::bail!("Table info reader is not available")
     }
 
+    fn get_latest_internal_indexer_ledger_version(&self) -> anyhow::Result<Option<Version>> {
+        if let Some(db_indexer) = &self.db_indexer_reader {
+            return Ok(db_indexer.indexer_db.get_persisted_version()?);
+        }
+        anyhow::bail!("DB indexer reader is not available")
+    }
+
     fn get_events(
         &self,
         event_key: &EventKey,

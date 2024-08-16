@@ -17,6 +17,7 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{
         Bytecode as MoveBytecode, CodeOffset, CompiledModule, FieldHandleIndex, SignatureIndex,
+        VariantFieldHandleIndex,
     },
     views::{FunctionHandleView, ViewInternals},
 };
@@ -28,6 +29,7 @@ use move_model::{
     ast::{Address, Condition, ConditionKind, ExpData, PropertyValue, Spec, TempIndex, Value},
     model::{FunId, FunctionEnv, Loc, ModuleId, NodeId, StructId},
     pragmas::CONDITION_UNROLL_PROP,
+    symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
 };
 use num::ToPrimitive;
@@ -190,6 +192,33 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         let struct_env = self.func_env.module_env.get_struct(struct_id);
         let field_env = struct_env.get_field_by_offset(field_handle.field as usize);
         (struct_id, field_handle.field as usize, field_env.get_type())
+    }
+
+    fn get_variant_field_info(
+        &self,
+        field_handle_index: VariantFieldHandleIndex,
+    ) -> (StructId, usize, Type, Vec<Symbol>) {
+        let field_handle = self.module.variant_field_handle_at(field_handle_index);
+        let struct_id = self
+            .func_env
+            .module_env
+            .get_struct_id(field_handle.struct_index);
+        let struct_env = self.func_env.module_env.get_struct(struct_id);
+        let variant_names = field_handle
+            .variants
+            .iter()
+            .map(|idx| struct_env.get_variant_name_by_idx(*idx).unwrap())
+            .collect_vec();
+        let field_env = struct_env.get_field_by_offset_optional_variant(
+            variant_names.first().cloned(),
+            field_handle.field as usize,
+        );
+        (
+            struct_id,
+            field_handle.field as usize,
+            field_env.get_type(),
+            variant_names,
+        )
     }
 
     fn get_type_params(&self, type_params_index: SignatureIndex) -> Vec<Type> {
@@ -410,6 +439,63 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 ));
                 self.temp_count += 1;
                 let is_mut = matches!(bytecode, MoveBytecode::MutBorrowFieldGeneric(..));
+                self.local_types.push(Type::Reference(
+                    ReferenceKind::from_is_mut(is_mut),
+                    Box::new(field_type),
+                ));
+            },
+
+            MoveBytecode::ImmBorrowVariantField(field_handle_index)
+            | MoveBytecode::MutBorrowVariantField(field_handle_index) => {
+                let struct_ref_index = self.temp_stack.pop().unwrap();
+                let (struct_id, field_offset, field_type, variant_names) =
+                    self.get_variant_field_info(*field_handle_index);
+                let field_ref_index = self.temp_count;
+                self.temp_stack.push(field_ref_index);
+                self.code.push(mk_call(
+                    Operation::BorrowVariantField(
+                        self.func_env.module_env.get_id(),
+                        struct_id,
+                        variant_names,
+                        vec![],
+                        field_offset,
+                    ),
+                    vec![field_ref_index],
+                    vec![struct_ref_index],
+                ));
+                self.temp_count += 1;
+                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowField(..));
+                self.local_types.push(Type::Reference(
+                    ReferenceKind::from_is_mut(is_mut),
+                    Box::new(field_type),
+                ));
+            },
+
+            MoveBytecode::ImmBorrowVariantFieldGeneric(field_handle_index)
+            | MoveBytecode::MutBorrowVariantFieldGeneric(field_handle_index) => {
+                let inst_handle = self
+                    .module
+                    .variant_field_instantiation_at(*field_handle_index);
+                let actuals = self.get_type_params(inst_handle.type_parameters);
+                let struct_ref_index = self.temp_stack.pop().unwrap();
+                let (struct_id, field_offset, base_field_type, variant_names) =
+                    self.get_variant_field_info(inst_handle.handle);
+                let field_type = base_field_type.instantiate(&actuals);
+                let field_ref_index = self.temp_count;
+                self.temp_stack.push(field_ref_index);
+                self.code.push(mk_call(
+                    Operation::BorrowVariantField(
+                        self.func_env.module_env.get_id(),
+                        struct_id,
+                        variant_names,
+                        actuals,
+                        field_offset,
+                    ),
+                    vec![field_ref_index],
+                    vec![struct_ref_index],
+                ));
+                self.temp_count += 1;
+                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowField(..));
                 self.local_types.push(Type::Reference(
                     ReferenceKind::from_is_mut(is_mut),
                     Box::new(field_type),
@@ -773,6 +859,78 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 self.temp_count += 1;
             },
 
+            MoveBytecode::PackVariant(idx) => {
+                let variant_handle = self.module.struct_variant_handle_at(*idx);
+                let struct_env = self
+                    .func_env
+                    .module_env
+                    .get_struct_by_def_idx(variant_handle.struct_index);
+                let variant_name = struct_env
+                    .get_variant_name_by_idx(variant_handle.variant)
+                    .expect("variant index");
+                let mut field_temp_indices = vec![];
+                let struct_temp_index = self.temp_count;
+                for _ in struct_env.get_fields_of_variant(variant_name) {
+                    let field_temp_index = self.temp_stack.pop().unwrap();
+                    field_temp_indices.push(field_temp_index);
+                }
+                self.local_types.push(Type::Struct(
+                    struct_env.module_env.get_id(),
+                    struct_env.get_id(),
+                    vec![],
+                ));
+                self.temp_stack.push(struct_temp_index);
+                field_temp_indices.reverse();
+                self.code.push(mk_call(
+                    Operation::PackVariant(
+                        struct_env.module_env.get_id(),
+                        struct_env.get_id(),
+                        variant_name,
+                        vec![],
+                    ),
+                    vec![struct_temp_index],
+                    field_temp_indices,
+                ));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::PackVariantGeneric(idx) => {
+                let inst_handle = self.module.struct_variant_instantiation_at(*idx);
+                let actuals = self.get_type_params(inst_handle.type_parameters);
+                let variant_handle = self.module.struct_variant_handle_at(inst_handle.handle);
+                let struct_env = self
+                    .func_env
+                    .module_env
+                    .get_struct_by_def_idx(variant_handle.struct_index);
+                let variant_name = struct_env
+                    .get_variant_name_by_idx(variant_handle.variant)
+                    .expect("variant index");
+                let mut field_temp_indices = vec![];
+                let struct_temp_index = self.temp_count;
+                for _ in struct_env.get_fields_of_variant(variant_name) {
+                    let field_temp_index = self.temp_stack.pop().unwrap();
+                    field_temp_indices.push(field_temp_index);
+                }
+                self.local_types.push(Type::Struct(
+                    struct_env.module_env.get_id(),
+                    struct_env.get_id(),
+                    actuals.clone(),
+                ));
+                self.temp_stack.push(struct_temp_index);
+                field_temp_indices.reverse();
+                self.code.push(mk_call(
+                    Operation::PackVariant(
+                        struct_env.module_env.get_id(),
+                        struct_env.get_id(),
+                        variant_name,
+                        actuals,
+                    ),
+                    vec![struct_temp_index],
+                    field_temp_indices,
+                ));
+                self.temp_count += 1;
+            },
+
             MoveBytecode::Unpack(idx) => {
                 let struct_env = self.func_env.module_env.get_struct_by_def_idx(*idx);
                 let mut field_temp_indices = vec![];
@@ -813,6 +971,122 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     field_temp_indices,
                     vec![struct_temp_index],
                 ));
+            },
+
+            MoveBytecode::UnpackVariant(idx) => {
+                let variant_handle = self.module.struct_variant_handle_at(*idx);
+                let struct_env = self
+                    .func_env
+                    .module_env
+                    .get_struct_by_def_idx(variant_handle.struct_index);
+                let variant_name = struct_env
+                    .get_variant_name_by_idx(variant_handle.variant)
+                    .expect("variant index");
+                let mut field_temp_indices = vec![];
+                let struct_temp_index = self.temp_stack.pop().unwrap();
+                for field_env in struct_env.get_fields_of_variant(variant_name) {
+                    let field_temp_index = self.temp_count;
+                    field_temp_indices.push(field_temp_index);
+                    self.temp_stack.push(field_temp_index);
+                    self.local_types.push(field_env.get_type());
+                    self.temp_count += 1;
+                }
+                self.code.push(mk_call(
+                    Operation::UnpackVariant(
+                        struct_env.module_env.get_id(),
+                        struct_env.get_id(),
+                        variant_name,
+                        vec![],
+                    ),
+                    field_temp_indices,
+                    vec![struct_temp_index],
+                ));
+            },
+            MoveBytecode::UnpackVariantGeneric(idx) => {
+                let inst_handle = self.module.struct_variant_instantiation_at(*idx);
+                let actuals = self.get_type_params(inst_handle.type_parameters);
+                let variant_handle = self.module.struct_variant_handle_at(inst_handle.handle);
+                let struct_env = self
+                    .func_env
+                    .module_env
+                    .get_struct_by_def_idx(variant_handle.struct_index);
+                let variant_name = struct_env
+                    .get_variant_name_by_idx(variant_handle.variant)
+                    .expect("variant index to name mapping must be defined");
+                let mut field_temp_indices = vec![];
+                let struct_temp_index = self.temp_stack.pop().unwrap();
+                for field_env in struct_env.get_fields_of_variant(variant_name) {
+                    let field_type = field_env.get_type().instantiate(&actuals);
+                    let field_temp_index = self.temp_count;
+                    field_temp_indices.push(field_temp_index);
+                    self.temp_stack.push(field_temp_index);
+                    self.local_types.push(field_type);
+                    self.temp_count += 1;
+                }
+                self.code.push(mk_call(
+                    Operation::UnpackVariant(
+                        struct_env.module_env.get_id(),
+                        struct_env.get_id(),
+                        variant_name,
+                        actuals,
+                    ),
+                    field_temp_indices,
+                    vec![struct_temp_index],
+                ));
+            },
+
+            MoveBytecode::TestVariant(idx) => {
+                let variant_handle = self.module.struct_variant_handle_at(*idx);
+                let struct_env = self
+                    .func_env
+                    .module_env
+                    .get_struct_by_def_idx(variant_handle.struct_index);
+                let variant_name = struct_env
+                    .get_variant_name_by_idx(variant_handle.variant)
+                    .expect("variant index");
+                let struct_ref_temp_index = self.temp_stack.pop().unwrap();
+                let result_temp_index = self.temp_count;
+                self.local_types.push(Type::new_prim(PrimitiveType::Bool));
+                self.temp_stack.push(result_temp_index);
+                self.code.push(mk_call(
+                    Operation::TestVariant(
+                        struct_env.module_env.get_id(),
+                        struct_env.get_id(),
+                        variant_name,
+                        vec![],
+                    ),
+                    vec![result_temp_index],
+                    vec![struct_ref_temp_index],
+                ));
+                self.temp_count += 1;
+            },
+
+            MoveBytecode::TestVariantGeneric(idx) => {
+                let inst_handle = self.module.struct_variant_instantiation_at(*idx);
+                let actuals = self.get_type_params(inst_handle.type_parameters);
+                let variant_handle = self.module.struct_variant_handle_at(inst_handle.handle);
+                let struct_env = self
+                    .func_env
+                    .module_env
+                    .get_struct_by_def_idx(variant_handle.struct_index);
+                let variant_name = struct_env
+                    .get_variant_name_by_idx(variant_handle.variant)
+                    .expect("variant index");
+                let struct_ref_temp_index = self.temp_stack.pop().unwrap();
+                let result_temp_index = self.temp_count;
+                self.local_types.push(Type::new_prim(PrimitiveType::Bool));
+                self.temp_stack.push(result_temp_index);
+                self.code.push(mk_call(
+                    Operation::TestVariant(
+                        struct_env.module_env.get_id(),
+                        struct_env.get_id(),
+                        variant_name,
+                        actuals,
+                    ),
+                    vec![result_temp_index],
+                    vec![struct_ref_temp_index],
+                ));
+                self.temp_count += 1;
             },
 
             MoveBytecode::ReadRef => {

@@ -165,6 +165,17 @@ pub enum EntryFunctionCall {
         auth_key: AccountAddress,
     },
 
+    /// APT Primary Fungible Store specific specialized functions,
+    /// Utilized internally once migration of APT to FungibleAsset is complete.
+    /// Convenient function to transfer APT to a recipient account that might not exist.
+    /// This would create the recipient APT PFS first, which also registers it to receive APT, before transferring.
+    /// TODO: once migration is complete, rename to just "transfer_only" and make it an entry function (for cheapest way
+    /// to transfer APT) - if we want to allow APT PFS without account itself
+    AptosAccountFungibleTransferOnly {
+        to: AccountAddress,
+        amount: u64,
+    },
+
     /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
     AptosAccountSetAllowDirectCoinTransfers {
         allow: bool,
@@ -1097,6 +1108,9 @@ impl EntryFunctionCall {
                 amounts,
             } => aptos_account_batch_transfer_coins(coin_type, recipients, amounts),
             AptosAccountCreateAccount { auth_key } => aptos_account_create_account(auth_key),
+            AptosAccountFungibleTransferOnly { to, amount } => {
+                aptos_account_fungible_transfer_only(to, amount)
+            },
             AptosAccountSetAllowDirectCoinTransfers { allow } => {
                 aptos_account_set_allow_direct_coin_transfers(allow)
             },
@@ -1954,6 +1968,27 @@ pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayl
         ident_str!("create_account").to_owned(),
         vec![],
         vec![bcs::to_bytes(&auth_key).unwrap()],
+    ))
+}
+
+/// APT Primary Fungible Store specific specialized functions,
+/// Utilized internally once migration of APT to FungibleAsset is complete.
+/// Convenient function to transfer APT to a recipient account that might not exist.
+/// This would create the recipient APT PFS first, which also registers it to receive APT, before transferring.
+/// TODO: once migration is complete, rename to just "transfer_only" and make it an entry function (for cheapest way
+/// to transfer APT) - if we want to allow APT PFS without account itself
+pub fn aptos_account_fungible_transfer_only(to: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_account").to_owned(),
+        ),
+        ident_str!("fungible_transfer_only").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
     ))
 }
 
@@ -4782,6 +4817,19 @@ mod decoder {
         }
     }
 
+    pub fn aptos_account_fungible_transfer_only(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosAccountFungibleTransferOnly {
+                to: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_set_allow_direct_coin_transfers(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6412,6 +6460,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_account_create_account".to_string(),
             Box::new(decoder::aptos_account_create_account),
+        );
+        map.insert(
+            "aptos_account_fungible_transfer_only".to_string(),
+            Box::new(decoder::aptos_account_fungible_transfer_only),
         );
         map.insert(
             "aptos_account_set_allow_direct_coin_transfers".to_string(),

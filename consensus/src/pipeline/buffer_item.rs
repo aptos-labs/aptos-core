@@ -174,10 +174,16 @@ impl BufferItem {
                 for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
                     assert_eq!(b1.id(), b2.id());
                 }
-                let mut commit_info = executed_blocks.last().unwrap().block_info();
+                let mut commit_info = executed_blocks
+                    .last()
+                    .expect("execute_blocks should not be empty!")
+                    .block_info();
                 match epoch_end_timestamp {
                     Some(timestamp) if commit_info.timestamp_usecs() != timestamp => {
-                        assert!(executed_blocks.last().unwrap().is_reconfiguration_suffix());
+                        assert!(executed_blocks
+                            .last()
+                            .expect("")
+                            .is_reconfiguration_suffix());
                         commit_info.change_timestamp(timestamp);
                     },
                     _ => (),
@@ -392,7 +398,10 @@ impl BufferItem {
     }
 
     pub fn block_id(&self) -> HashValue {
-        self.get_blocks().last().unwrap().id()
+        self.get_blocks()
+            .last()
+            .expect("Vec<PipelinedBlock> should not be empty")
+            .id()
     }
 
     pub fn add_signature_if_matched(&mut self, vote: CommitVote) -> anyhow::Result<()> {

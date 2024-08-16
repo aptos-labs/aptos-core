@@ -12,8 +12,10 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
+    payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
+    utils::PayloadTxnsSize,
 };
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
@@ -24,6 +26,7 @@ use std::{
     cmp::min,
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
+    time::Duration,
 };
 
 #[derive(Debug)]
@@ -79,13 +82,11 @@ impl BatchQueue {
 
     pub fn pull_batches(
         &mut self,
-        max_txns: u64,
-        max_bytes: u64,
+        max_txns: PayloadTxnsSize,
         excluded_batches: Vec<BatchInfo>,
-    ) -> Vec<(BatchInfo, Vec<SignedTransaction>)> {
+    ) -> (Vec<(BatchInfo, Vec<SignedTransaction>)>, PayloadTxnsSize) {
         let mut result: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
-        let mut num_txns = 0;
-        let mut num_bytes = 0;
+        let mut num_txns = PayloadTxnsSize::zero();
         let mut iters = vec![];
         let mut full = false;
         for (_, batches) in self.author_to_batches.iter() {
@@ -100,15 +101,13 @@ impl BatchQueue {
                 if let Some((_sort_key, batch)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         true
-                    } else if num_txns + batch.num_txns() <= max_txns
-                        && num_bytes + batch.num_bytes() <= max_bytes
+                    } else if num_txns + batch.size() <= max_txns
                     {
                         if let Ok(mut persisted_value) =
                             self.batch_store.get_batch_from_local(batch.digest())
                         {
                             if let Some(txns) = persisted_value.take_payload() {
-                                num_txns += batch.num_txns();
-                                num_bytes += batch.num_bytes();
+                                num_txns += batch.size();
                                 result.push((batch.clone(), txns.clone()));
                             }
                         } else {
@@ -124,7 +123,7 @@ impl BatchQueue {
                 }
             })
         }
-        result
+        (result, num_txns)
     }
 }
 
@@ -136,6 +135,7 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
+    enable_opt_quorum_store: bool,
 }
 
 impl ProofManager {
@@ -145,6 +145,7 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
+        enable_opt_quorum_store: bool,
     ) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(my_peer_id),
@@ -154,6 +155,7 @@ impl ProofManager {
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
+            enable_opt_quorum_store,
         }
     }
 
@@ -203,18 +205,8 @@ impl ProofManager {
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         match msg {
-            GetPayloadCommand::GetPayloadRequest(
-                max_txns,
-                max_txns_after_filtering,
-                max_bytes,
-                max_inline_txns,
-                max_inline_bytes,
-                return_non_full,
-                filter,
-                callback,
-                block_timestamp,
-            ) => {
-                let excluded_batches: HashSet<_> = match filter {
+            GetPayloadCommand::GetPayloadRequest(request) => {
+                let excluded_batches: HashSet<_> = match request.filter {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
                         unreachable!()
@@ -222,73 +214,101 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let (proof_block, cur_unique_txns, proof_queue_fully_utilized) =
-                    self.proofs_for_consensus.pull_proofs(
-                        &excluded_batches,
-                        max_txns,
-                        max_txns_after_filtering,
-                        max_bytes,
-                        return_non_full,
-                        block_timestamp,
-                    );
+                let max_txns_with_proof = request
+                    .max_txns
+                    .compute_pct(100 - request.opt_batch_txns_pct);
+
+                let (
+                    proof_block,
+                    txns_with_proof_size,
+                    cur_unique_txns,
+                    proof_queue_fully_utilized,
+                ) = self.proofs_for_consensus.pull_proofs(
+                    &excluded_batches,
+                    max_txns_with_proof,
+                    request.max_txns_after_filtering,
+                    request.soft_max_txns_after_filtering,
+                    request.return_non_full,
+                    request.block_timestamp,
+                );
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
                 counters::PROOF_QUEUE_FULLY_UTILIZED
                     .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-                let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
-                let cur_all_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
-                let cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
+                let excluded_batches: Vec<_> = excluded_batches.iter().cloned().collect();
 
-                if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
-                    inline_block = self.batch_queue.pull_batches(
-                        min(
-                            min(
-                                max_txns.saturating_sub(cur_all_txns),
-                                max_txns_after_filtering.saturating_sub(cur_unique_txns),
-                            ),
-                            max_inline_txns,
-                        ),
-                        min(max_bytes - cur_bytes, max_inline_bytes),
-                        excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                let (opt_batches, opt_batch_txns_size) = if self.enable_opt_quorum_store {
+                    // TODO(ibalajiarun): Support unique txn calculation
+                    let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
+                    let (opt_batches, size) = self
+                        .batch_queue
+                        .pull_batches(max_opt_batch_txns_size, excluded_batches.clone());
+
+                    (
+                        opt_batches
+                            .into_iter()
+                            .map(|(batch_info, _)| batch_info)
                             .collect(),
-                    );
-                }
-                let inline_txns = inline_block
-                    .iter()
-                    .map(|(_, txns)| txns.len())
-                    .sum::<usize>();
-                counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
-                counters::NUM_INLINE_TXNS.observe(inline_txns as f64);
+                        size,
+                    )
+                } else {
+                    (Vec::new(), PayloadTxnsSize::zero())
+                };
 
-                let res = GetPayloadResponse::GetPayloadResponse(
-                    if proof_block.is_empty() && inline_block.is_empty() {
-                        Payload::empty(true, self.allow_batches_without_pos_in_proposal)
-                    } else if inline_block.is_empty() {
-                        trace!(
-                            "QS: GetBlockRequest excluded len {}, block len {}",
-                            excluded_batches.len(),
-                            proof_block.len()
-                        );
-                        Payload::InQuorumStore(ProofWithData::new(proof_block))
-                    } else {
-                        trace!(
-                            "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",
-                            excluded_batches.len(),
-                            proof_block.len(),
-                            inline_block.len()
-                        );
-                        Payload::QuorumStoreInlineHybrid(
-                            inline_block,
-                            ProofWithData::new(proof_block),
-                            None,
+                let cur_txns = txns_with_proof_size + opt_batch_txns_size;
+                let (inline_block, inline_block_size) =
+                    if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
+                        let mut max_inline_txns_to_pull = request
+                            .max_txns
+                            .saturating_sub(cur_txns)
+                            .minimum(request.max_inline_txns);
+                        max_inline_txns_to_pull.set_count(min(
+                            max_inline_txns_to_pull.count(),
+                            request
+                                .max_txns_after_filtering
+                                .saturating_sub(cur_unique_txns),
+                        ));
+                        self.batch_queue.pull_batches(
+                            max_inline_txns_to_pull,
+                            excluded_batches
+                                .iter()
+                                .cloned()
+                                .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                                .collect(),
                         )
-                    },
-                );
-                match callback.send(Ok(res)) {
+                    } else {
+                        (Vec::new(), PayloadTxnsSize::zero())
+                    };
+                counters::NUM_INLINE_BATCHES.observe(inline_block_size.count() as f64);
+                counters::NUM_INLINE_TXNS.observe(inline_block_size.size_in_bytes() as f64);
+
+                let response = if self.enable_opt_quorum_store {
+                    let inline_batches = inline_block.into();
+                    Payload::OptQuorumStore(OptQuorumStorePayload::new(
+                        inline_batches,
+                        opt_batches.into(),
+                        proof_block.into(),
+                        PayloadExecutionLimit::None,
+                    ))
+                } else if proof_block.is_empty() && inline_block.is_empty() {
+                    Payload::empty(true, self.allow_batches_without_pos_in_proposal)
+                } else {
+                    trace!(
+                        "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",
+                        excluded_batches.len(),
+                        proof_block.len(),
+                        inline_block.len()
+                    );
+                    Payload::QuorumStoreInlineHybrid(
+                        inline_block,
+                        ProofWithData::new(proof_block),
+                        None,
+                    )
+                };
+
+                let res = GetPayloadResponse::GetPayloadResponse(response);
+                match request.callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),
                 }
@@ -298,6 +318,21 @@ impl ProofManager {
 
     /// return true when quorum store is back pressured
     pub(crate) fn qs_back_pressure(&self) -> BackPressure {
+        if self.remaining_total_txn_num > self.back_pressure_total_txn_limit
+            || self.remaining_total_proof_num > self.back_pressure_total_proof_limit
+        {
+            sample!(
+                SampleRate::Duration(Duration::from_millis(200)),
+                info!(
+                    "Quorum store is back pressured with {} txns, limit: {}, proofs: {}, limit: {}",
+                    self.remaining_total_txn_num,
+                    self.back_pressure_total_txn_limit,
+                    self.remaining_total_proof_num,
+                    self.back_pressure_total_proof_limit
+                );
+            );
+        }
+
         BackPressure {
             txn_count: self.remaining_total_txn_num > self.back_pressure_total_txn_limit,
             proof_count: self.remaining_total_proof_num > self.back_pressure_total_proof_limit,

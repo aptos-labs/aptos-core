@@ -9,16 +9,18 @@ use crate::{
     Swarm, SwarmExt, TestReport,
 };
 use anyhow::{bail, Context};
-use aptos::node::analyze::fetch_metadata::FetchMetadata;
-use aptos_sdk::types::PeerId;
+use aptos::node::analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata};
+use aptos_logger::info;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
 use prometheus_http_query::response::Sample;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
-    pub max_no_progress_secs: f32,
-    pub max_round_gap: u64,
+    pub max_non_epoch_no_progress_secs: f32,
+    pub max_epoch_no_progress_secs: f32,
+    pub max_non_epoch_round_gap: u64,
+    pub max_epoch_round_gap: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -159,13 +161,13 @@ impl LatencyBreakdownThreshold {
 
 #[derive(Default, Clone, Debug)]
 pub struct SuccessCriteria {
-    pub min_avg_tps: usize,
+    pub min_avg_tps: f64,
     latency_thresholds: Vec<(Duration, LatencyType)>,
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
     check_no_errors: bool,
-    max_expired_tps: Option<usize>,
-    max_failed_submission_tps: Option<usize>,
+    max_expired_tps: Option<f64>,
+    max_failed_submission_tps: Option<f64>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
     system_metrics_threshold: Option<SystemMetricsThreshold>,
@@ -174,6 +176,10 @@ pub struct SuccessCriteria {
 
 impl SuccessCriteria {
     pub fn new(min_avg_tps: usize) -> Self {
+        Self::new_float(min_avg_tps as f64)
+    }
+
+    pub fn new_float(min_avg_tps: f64) -> Self {
         Self {
             min_avg_tps,
             latency_thresholds: Vec::new(),
@@ -198,12 +204,12 @@ impl SuccessCriteria {
         self
     }
 
-    pub fn add_max_expired_tps(mut self, max_expired_tps: usize) -> Self {
+    pub fn add_max_expired_tps(mut self, max_expired_tps: f64) -> Self {
         self.max_expired_tps = Some(max_expired_tps);
         self
     }
 
-    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: usize) -> Self {
+    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: f64) -> Self {
         self.max_failed_submission_tps = Some(max_failed_submission_tps);
         self
     }
@@ -279,7 +285,7 @@ impl SuccessCriteriaChecker {
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<()> {
-        println!(
+        info!(
             "End to end duration: {}s, performance measured for: {}s",
             window.as_secs(),
             stats.lasted.as_secs()
@@ -377,93 +383,73 @@ impl SuccessCriteriaChecker {
             .await
             .unwrap();
 
-        let mut max_round_gap = 0;
-        let mut max_round_gap_version = 0;
-        let mut max_time_gap = 0;
-        let mut max_time_gap_version = 0;
-
-        let mut prev_block = None;
-        let mut prev_ts = 0;
-        let mut failed_from_nil = 0;
-        let mut previous_epooch = 0;
-        let mut previous_round = 0;
-        for block in epochs
-            .iter()
-            .flat_map(|epoch| epoch.blocks.iter())
-            .filter(|b| b.version > start_version && b.version < end_version)
-        {
-            let is_nil = block.event.proposer() == PeerId::ZERO;
-
-            let current_gap = if previous_epooch == block.event.epoch() {
-                block.event.round() - previous_round - 1
-            } else {
-                u64::from(!is_nil) + block.event.failed_proposer_indices().len() as u64
-            };
-
-            if is_nil {
-                failed_from_nil += current_gap;
-            } else {
-                if prev_ts > 0 {
-                    let round_gap = current_gap + failed_from_nil;
-                    let time_gap = block.event.proposed_time() as i64 - prev_ts as i64;
-
-                    if time_gap < 0 {
-                        println!(
-                            "Clock went backwards? {}, {:?}, {:?}",
-                            time_gap, block, prev_block
-                        );
-                    }
-
-                    if round_gap > max_round_gap {
-                        max_round_gap = round_gap;
-                        max_round_gap_version = block.version;
-                    }
-                    if time_gap > max_time_gap as i64 {
-                        max_time_gap = time_gap as u64;
-                        max_time_gap_version = block.version;
-                    }
-                }
-
-                failed_from_nil = 0;
-                prev_ts = block.event.proposed_time();
-                prev_block = Some(block);
-            }
-
-            previous_epooch = block.event.epoch();
-            previous_round = block.event.round();
-        }
-
-        let max_time_gap_secs = Duration::from_micros(max_time_gap).as_secs_f32();
-
-        let gap_text = format!(
-            "Max round gap was {} [limit {}] at version {}. Max no progress secs was {} [limit {}] at version {}.",
-            max_round_gap,
-            chain_progress_threshold.max_round_gap,
-            max_round_gap_version,
-            max_time_gap_secs,
-            chain_progress_threshold.max_no_progress_secs,
-            max_time_gap_version,
+        let gap_info = AnalyzeValidators::analyze_gap(
+            epochs
+                .iter()
+                .flat_map(|epoch| epoch.blocks.iter())
+                .filter(|b| b.version > start_version && b.version < end_version),
         );
 
-        if max_round_gap > chain_progress_threshold.max_round_gap
-            || max_time_gap_secs > chain_progress_threshold.max_no_progress_secs
+        let gap_text = format!(
+            "Max non-epoch-change gap was: {} [limit {}], {} [limit {}].",
+            gap_info.non_epoch_round_gap.to_string_as_round(),
+            chain_progress_threshold.max_non_epoch_round_gap,
+            gap_info.non_epoch_time_gap.to_string_as_time(),
+            chain_progress_threshold.max_non_epoch_no_progress_secs,
+        );
+
+        let epoch_gap_text = format!(
+            "Max epoch-change gap was: {} [limit {}], {} [limit {}].",
+            gap_info.epoch_round_gap.to_string_as_round(),
+            chain_progress_threshold.max_epoch_round_gap,
+            gap_info.epoch_time_gap.to_string_as_time(),
+            chain_progress_threshold.max_epoch_no_progress_secs,
+        );
+
+        info!(
+            max_non_epoch_round_gap = gap_info.non_epoch_round_gap.max_gap,
+            max_epoch_round_gap = gap_info.epoch_round_gap.max_gap,
+            max_non_epoch_time_gap = gap_info.non_epoch_time_gap.max_gap,
+            max_epoch_time_gap = gap_info.epoch_time_gap.max_gap,
+            "Max gap values",
+        );
+
+        report.report_text(gap_text.clone());
+        report.report_text(epoch_gap_text.clone());
+
+        if gap_info.non_epoch_round_gap.max_gap.round() as u64
+            > chain_progress_threshold.max_non_epoch_round_gap
+            || gap_info.non_epoch_time_gap.max_gap
+                > chain_progress_threshold.max_non_epoch_no_progress_secs
         {
-            bail!("Failed chain progress check. {}", gap_text);
-        } else {
-            println!("Passed progress check. {}", gap_text);
-            report.report_text(gap_text);
+            bail!(
+                "Failed non-epoch-change chain progress check. {}",
+                &gap_text
+            );
         }
+        info!("Passed non-epoch-change progress check. {}", gap_text);
+
+        if gap_info.epoch_round_gap.max_gap.round() as u64
+            > chain_progress_threshold.max_epoch_round_gap
+            || gap_info.epoch_time_gap.max_gap > chain_progress_threshold.max_epoch_no_progress_secs
+        {
+            bail!(
+                "Failed epoch-change chain progress check. {}",
+                &epoch_gap_text
+            );
+        }
+        info!("Passed epoch-change progress check. {}", epoch_gap_text);
 
         Ok(())
     }
 
     pub fn check_tps(
-        min_avg_tps: usize,
+        min_avg_tps: f64,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         let avg_tps = stats_rate.committed;
-        if avg_tps < min_avg_tps as f64 {
+        if avg_tps < min_avg_tps {
             bail!(
                 "TPS requirement{} failed. Average TPS {}, minimum TPS requirement {}. Full stats: {}",
                 traffic_name_addition,
@@ -472,7 +458,7 @@ impl SuccessCriteriaChecker {
                 stats_rate,
             )
         } else {
-            println!(
+            info!(
                 "TPS is {} and is within limit of {}",
                 stats_rate.committed, min_avg_tps
             );
@@ -481,14 +467,14 @@ impl SuccessCriteriaChecker {
     }
 
     fn check_max_value(
-        max_config: Option<usize>,
+        max_config: Option<f64>,
         stats_rate: &TxnStatsRate,
         value: f64,
         value_desc: &str,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         if let Some(max) = max_config {
-            if value > max as f64 {
+            if value > max {
                 bail!(
                     "{} requirement{} failed. {} TPS: average {}, maximum requirement {}. Full stats: {}",
                     value_desc,
@@ -499,7 +485,7 @@ impl SuccessCriteriaChecker {
                     stats_rate,
                 )
             } else {
-                println!(
+                info!(
                     "{} TPS is {} and is below max limit of {}",
                     value_desc, value, max
                 );
@@ -511,9 +497,9 @@ impl SuccessCriteriaChecker {
     }
 
     pub fn check_throughput(
-        min_avg_tps: usize,
-        max_expired_config: Option<usize>,
-        max_failed_submission_config: Option<usize>,
+        min_avg_tps: f64,
+        max_expired_config: Option<f64>,
+        max_failed_submission_config: Option<f64>,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
@@ -561,7 +547,7 @@ impl SuccessCriteriaChecker {
                     .to_string(),
                 );
             } else {
-                println!(
+                info!(
                     "{:?} latency{} is {}s and is within limit of {}s",
                     latency_type,
                     traffic_name_addition,
@@ -587,7 +573,7 @@ impl SuccessCriteriaChecker {
                 error_count
             );
         } else {
-            println!("No error!() found in validator logs");
+            info!("No error!() found in validator logs");
             Ok(())
         }
     }

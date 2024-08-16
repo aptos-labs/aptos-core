@@ -6,6 +6,7 @@
 
 use crate::{
     access::ModuleAccess,
+    errors::{PartialVMError, PartialVMResult},
     file_format::{
         AbilitySet, CompiledModule, FieldDefinition, FunctionDefinition, SignatureToken,
         StructDefinition, StructFieldInformation, StructTypeParameter, TypeParameterIndex,
@@ -16,6 +17,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    vm_status::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -115,9 +117,13 @@ impl Module {
     /// Extract a normalized module from a `CompiledModule`. The module `m` should be verified.
     /// Nothing will break here if that is not the case, but there is little point in computing a
     /// normalized representation of a module that won't verify (since it can't be published).
-    pub fn new(m: &CompiledModule) -> Self {
+    pub fn new(m: &CompiledModule) -> PartialVMResult<Self> {
         let friends = m.immediate_friends();
-        let structs = m.struct_defs().iter().map(|d| Struct::new(m, d)).collect();
+        let structs = m
+            .struct_defs()
+            .iter()
+            .map(|d| Struct::new(m, d))
+            .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
         let exposed_functions = m
             .function_defs()
             .iter()
@@ -132,14 +138,14 @@ impl Module {
             .map(|func_def| Function::new(m, func_def))
             .collect();
 
-        Self {
+        Ok(Self {
             file_format_version: m.version(),
             address: *m.address(),
             name: m.name().to_owned(),
             friends,
             structs,
             exposed_functions,
-        }
+        })
     }
 
     pub fn module_id(&self) -> ModuleId {
@@ -302,7 +308,7 @@ impl Field {
 impl Struct {
     /// Create a `Struct` for `StructDefinition` `def` in module `m`. Panics if `def` is a
     /// a native struct definition.
-    pub fn new(m: &CompiledModule, def: &StructDefinition) -> (Identifier, Self) {
+    pub fn new(m: &CompiledModule, def: &StructDefinition) -> PartialVMResult<(Identifier, Self)> {
         let handle = m.struct_handle_at(def.struct_handle);
         let fields = match &def.field_information {
             StructFieldInformation::Native => {
@@ -312,6 +318,13 @@ impl Struct {
             StructFieldInformation::Declared(fields) => {
                 fields.iter().map(|f| Field::new(m, f)).collect()
             },
+            StructFieldInformation::DeclaredVariants(..) => {
+                // If we run into this it means that the legacy compatibility checker is run
+                // which is based on deprecated normalized representation since the new one
+                // is feature gated.
+                return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+                    .with_message("enum types".to_string()));
+            },
         };
         let name = m.identifier_at(handle.name).to_owned();
         let s = Struct {
@@ -319,7 +332,7 @@ impl Struct {
             type_parameters: handle.type_parameters.clone(),
             fields,
         };
-        (name, s)
+        Ok((name, s))
     }
 
     pub fn type_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
