@@ -1,9 +1,9 @@
 
-============ bytecode verification failed ========
-
 Diagnostics:
-bug: bytecode verification failed with unexpected status code `FREEZEREF_EXISTS_MUTABLE_BORROW_ERROR`. This is a compiler bug, consider reporting it.
-  ┌─ tests/reference-safety/bug_13927.move:9:28
-  │
-9 │         let returned_ref = foo(result);
-  │                            ^^^^^^^^^^^
+error: cannot freeze local `result` since other mutable usages for this reference exist
+   ┌─ tests/reference-safety/bug_13927.move:10:9
+   │
+10 │         freeze(result);
+   │         ^^^^^^^^^^^^^^ frozen here
+11 │         returned_ref
+   │         ------------ used here

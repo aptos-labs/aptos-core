@@ -43,6 +43,7 @@ use aptos_consensus_types::{
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
+    utils::PayloadTxnsSize,
     vote_msg::VoteMsg,
 };
 use aptos_crypto::HashValue;
@@ -303,11 +304,9 @@ impl NodeSetup {
             Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
             Duration::ZERO,
-            20,
+            PayloadTxnsSize::new(20, 1000),
             10,
-            1000,
-            5,
-            500,
+            PayloadTxnsSize::new(5, 500),
             10,
             1,
             PipelineBackpressureConfig::new_no_backoff(),

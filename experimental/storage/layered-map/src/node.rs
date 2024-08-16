@@ -26,7 +26,18 @@ pub(crate) enum LeafContent<K, V> {
 }
 
 impl<K, V> LeafContent<K, V> {
-    fn into_iter(self, layer: u64) -> impl Iterator<Item = (K, CollisionCell<V>)> {
+    pub fn into_iter(self, min_layer: u64) -> impl Iterator<Item = (K, V)> {
+        match self {
+            LeafContent::UniqueLatest { key, value } => Either::Left(std::iter::once((key, value))),
+            LeafContent::Collision(map) => {
+                Either::Right(map.into_iter().filter_map(move |(key, cell)| {
+                    (cell.layer >= min_layer).then_some((key, cell.value))
+                }))
+            },
+        }
+    }
+
+    fn into_cell_iter(self, layer: u64) -> impl Iterator<Item = (K, CollisionCell<V>)> {
         match self {
             LeafContent::UniqueLatest { key, value } => {
                 Either::Left(std::iter::once((key, CollisionCell { value, layer })))
@@ -51,8 +62,8 @@ impl<K, V> LeafContent<K, V> {
                 let _timer = TIMER.timer_with(&["_", "leaf_content_collision"]);
 
                 let map: BTreeMap<_, _> = myself
-                    .into_iter(layer)
-                    .chain(other.into_iter(other_layer))
+                    .into_cell_iter(layer)
+                    .chain(other.into_cell_iter(other_layer))
                     // retire entries that's older than the base_layer
                     .filter(|(_key, cell)| cell.layer >= base_layer)
                     .collect();

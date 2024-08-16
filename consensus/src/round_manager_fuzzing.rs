@@ -28,7 +28,7 @@ use aptos_config::{
     config::{ConsensusConfig, QcAggregatorType},
     network_id::NetworkId,
 };
-use aptos_consensus_types::proposal_msg::ProposalMsg;
+use aptos_consensus_types::{proposal_msg::ProposalMsg, utils::PayloadTxnsSize};
 use aptos_infallible::Mutex;
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
@@ -184,11 +184,9 @@ fn create_node_for_fuzzing() -> RoundManager {
         Arc::new(MockPayloadManager::new(None)),
         time_service,
         Duration::ZERO,
+        PayloadTxnsSize::new(1, 1024),
         1,
-        1,
-        1024,
-        1,
-        1024,
+        PayloadTxnsSize::new(1, 1024),
         10,
         1,
         PipelineBackpressureConfig::new_no_backoff(),
