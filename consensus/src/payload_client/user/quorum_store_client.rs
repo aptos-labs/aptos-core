@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED, error::QuorumStoreError, monitor,
-    payload_client::user::UserPayloadClient,
+    counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED,
+    error::QuorumStoreError,
+    monitor,
+    payload_client::{user::UserPayloadClient, PayloadPullParameters},
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
+    request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
+    utils::PayloadTxnsSize,
 };
 use aptos_logger::info;
 use fail::fail_point;
@@ -45,27 +48,27 @@ impl QuorumStoreClient {
 
     async fn pull_internal(
         &self,
-        max_items: u64,
-        max_unique_items: u64,
-        max_bytes: u64,
-        max_inline_items: u64,
-        max_inline_bytes: u64,
+        max_txns: PayloadTxnsSize,
+        max_txns_after_filtering: u64,
+        soft_max_txns_after_filtering: u64,
+        max_inline_txns: PayloadTxnsSize,
+        txns_with_proofs_pct: u8,
         return_non_full: bool,
         exclude_payloads: PayloadFilter,
         block_timestamp: Duration,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
-        let req = GetPayloadCommand::GetPayloadRequest(
-            max_items,
-            max_unique_items,
-            max_bytes,
-            max_inline_items,
-            max_inline_bytes,
+        let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
+            max_txns,
+            max_txns_after_filtering,
+            soft_max_txns_after_filtering,
+            opt_batch_txns_pct: txns_with_proofs_pct,
+            max_inline_txns,
+            filter: exclude_payloads,
             return_non_full,
-            exclude_payloads.clone(),
             callback,
             block_timestamp,
-        );
+        });
         // send to shared mempool
         self.consensus_to_quorum_store_sender
             .clone()
@@ -90,23 +93,13 @@ impl QuorumStoreClient {
 impl UserPayloadClient for QuorumStoreClient {
     async fn pull(
         &self,
-        max_poll_time: Duration,
-        max_items: u64,
-        max_unique_items: u64,
-        max_bytes: u64,
-        max_inline_items: u64,
-        max_inline_bytes: u64,
-        exclude: PayloadFilter,
+        params: PayloadPullParameters,
         wait_callback: BoxFuture<'static, ()>,
-        pending_ordering: bool,
-        pending_uncommitted_blocks: usize,
-        recent_max_fill_fraction: f32,
-        block_timestamp: Duration,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
-        let return_non_full = recent_max_fill_fraction
+        let return_non_full = params.recent_max_fill_fraction
             < self.wait_for_full_blocks_above_recent_fill_threshold
-            && pending_uncommitted_blocks < self.wait_for_full_blocks_above_pending_blocks;
-        let return_empty = pending_ordering && return_non_full;
+            && params.pending_uncommitted_blocks < self.wait_for_full_blocks_above_pending_blocks;
+        let return_empty = params.pending_ordering && return_non_full;
 
         WAIT_FOR_FULL_BLOCKS_TRIGGERED.observe(if !return_non_full { 1.0 } else { 0.0 });
 
@@ -119,17 +112,17 @@ impl UserPayloadClient for QuorumStoreClient {
 
         let payload = loop {
             // Make sure we don't wait more than expected, due to thread scheduling delays/processing time consumed
-            let done = start_time.elapsed() >= max_poll_time;
+            let done = start_time.elapsed() >= params.max_poll_time;
             let payload = self
                 .pull_internal(
-                    max_items,
-                    max_unique_items,
-                    max_bytes,
-                    max_inline_items,
-                    max_inline_bytes,
+                    params.max_txns,
+                    params.max_txns_after_filtering,
+                    params.soft_max_txns_after_filtering,
+                    params.max_inline_txns,
+                    params.opt_batch_txns_pct,
                     return_non_full || return_empty || done,
-                    exclude.clone(),
-                    block_timestamp,
+                    params.user_txn_filter.clone(),
+                    params.block_timestamp,
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
@@ -142,15 +135,9 @@ impl UserPayloadClient for QuorumStoreClient {
             break payload;
         };
         info!(
+            pull_params = ?params,
             elapsed_time_ms = start_time.elapsed().as_millis() as u64,
-            max_poll_time_ms = max_poll_time.as_millis() as u64,
             payload_len = payload.len(),
-            max_items = max_items,
-            max_unique_items = max_unique_items,
-            max_bytes = max_bytes,
-            max_inline_items = max_inline_items,
-            max_inline_bytes = max_inline_bytes,
-            pending_ordering = pending_ordering,
             return_empty = return_empty,
             return_non_full = return_non_full,
             duration_ms = start_time.elapsed().as_millis() as u64,

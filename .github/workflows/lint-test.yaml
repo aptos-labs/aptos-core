@@ -132,6 +132,24 @@ jobs:
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
+  # Check the freshess of the merge base. This is a PR required job.
+  rust-check-merge-base:
+    if: | # Don't run on release branches
+      (
+        !contains(github.event.pull_request.base.ref, '-release-')
+      )
+    needs: file_change_determinator
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # Fetch all git history for accurate target determination
+      - name: Run the merge base freshness check
+        uses: ./.github/actions/rust-check-merge-base
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
   # Run only the targeted rust unit tests. This is a PR required job.
   rust-targeted-unit-tests:
     if: | # Don't run on release branches. Instead, all unit tests will be triggered.

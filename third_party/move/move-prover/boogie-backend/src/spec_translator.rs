@@ -855,6 +855,14 @@ impl<'env> SpecTranslator<'env> {
             Operation::Select(module_id, struct_id, field_id) => {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
             },
+            Operation::SelectVariants(_module_id, _struct_id, _field_ids) => {
+                // TODO(#13806): implement for variants
+                self.error(&loc, "selection from variants no yet supported");
+            },
+            Operation::TestVariants(_module_id, _struct_id, _variants) => {
+                // TODO(#13806): implement for variants
+                self.error(&loc, "testing of variants no yet supported");
+            },
             Operation::UpdateField(module_id, struct_id, field_id) => {
                 self.translate_update_field(node_id, *module_id, *struct_id, *field_id, args)
             },

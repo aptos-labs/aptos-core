@@ -18,11 +18,17 @@ pub mod op_counters;
 
 pub trait TimerHelper {
     fn timer_with(&self, labels: &[&str]) -> HistogramTimer;
+
+    fn observe_with(&self, labels: &[&str], val: f64);
 }
 
 impl TimerHelper for HistogramVec {
     fn timer_with(&self, vals: &[&str]) -> HistogramTimer {
         self.with_label_values(vals).start_timer()
+    }
+
+    fn observe_with(&self, labels: &[&str], val: f64) {
+        self.with_label_values(labels).observe(val)
     }
 }
 

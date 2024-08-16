@@ -30,6 +30,8 @@ pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
 pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
 /// Transaction commit failed (will not be retried) because of a duplicate
 pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
+/// Transaction commit failed (will not be retried) because it expired
+pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
@@ -1178,6 +1180,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
                         TXN_COMMIT_RETRY_LABEL
                     } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
                         TXN_COMMIT_FAILED_DUPLICATE_LABEL
+                    } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
+                        TXN_COMMIT_FAILED_EXPIRED_LABEL
                     } else {
                         TXN_COMMIT_FAILED_LABEL
                     }
@@ -1230,6 +1234,15 @@ pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::
     register_int_counter_vec!(
         "aptos_consensus_proposal_payload_availability_count",
         "The availability of proposal payload locally",
+        &["status"]
+    )
+    .unwrap()
+});
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_proposal_payload_fetch_duration",
+        "Time to fetch payload behind proposal with status",
         &["status"]
     )
     .unwrap()

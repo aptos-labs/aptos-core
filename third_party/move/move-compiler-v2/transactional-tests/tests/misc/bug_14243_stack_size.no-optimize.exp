@@ -1,0 +1,47 @@
+comparison between v1 and v2 failed:
+= processed 1 task
+= 
+= task 0 'print-bytecode'. lines 2-14:
+- // Move bytecode v6
++ // Move bytecode v7
+= module c0ffee.m {
+= 
+= 
+= id_mut<Ty0>(Arg0: &mut Ty0): &mut Ty0 /* def_idx: 0 */ {
++ L1:	loc0: &mut Ty0
+= B0:
+= 	0: MoveLoc[0](Arg0: &mut Ty0)
+- 	1: Ret
++ 	1: StLoc[1](loc0: &mut Ty0)
++ 	2: MoveLoc[1](loc0: &mut Ty0)
++ 	3: Ret
+= }
+= t0() /* def_idx: 1 */ {
+= L0:	loc0: u64
+= L1:	loc1: &mut u64
++ L2:	loc2: &mut u64
+= B0:
+= 	0: LdU64(0)
+= 	1: StLoc[0](loc0: u64)
+= 	2: MutBorrowLoc[0](loc0: u64)
+= 	3: StLoc[1](loc1: &mut u64)
+= 	4: CopyLoc[1](loc1: &mut u64)
+- 	5: Call id_mut<u64>(&mut u64): &mut u64
+- 	6: ReadRef
+- 	7: Pop
+- 	8: MoveLoc[1](loc1: &mut u64)
+- 	9: ReadRef
+- 	10: Pop
+- 	11: Ret
++ 	5: StLoc[2](loc2: &mut u64)
++ 	6: MoveLoc[2](loc2: &mut u64)
++ 	7: Call id_mut<u64>(&mut u64): &mut u64
++ 	8: ReadRef
++ 	9: MoveLoc[1](loc1: &mut u64)
++ 	10: ReadRef
++ 	11: Pop
++ 	12: Pop
++ 	13: Ret
+= }
+= }
+= 
