@@ -34,4 +34,8 @@ impl HexyOverlay {
     pub fn root_hash(&self) -> HashValue {
         self.root_hash
     }
+
+    pub fn is_the_same(&self, other: &Self) -> bool {
+        self.overlay.is_the_same(&other.overlay)
+    }
 }

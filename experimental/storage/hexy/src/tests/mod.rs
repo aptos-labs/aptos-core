@@ -10,17 +10,24 @@ use aptos_crypto::{
     hash::{CryptoHasher, HexyHasher, HOT_STATE_PLACE_HOLDER_HASH},
     HashValue,
 };
+use aptos_infallible::Mutex;
 use itertools::Itertools;
 use proptest::{collection::vec, prelude::*};
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 fn arb_test_case() -> impl Strategy<Value = (LeafIdx, Vec<Vec<(LeafIdx, HashValue)>>)> {
-    (1u32..1000).prop_flat_map(|num_leaves| {
+    (1u32..1000, 1usize..100).prop_flat_map(|(num_leaves, num_batches)| {
         (
             Just(num_leaves),
             vec(
                 vec((0..(num_leaves as LeafIdx), any::<HashValue>()), 0..100),
-                0..100,
+                num_batches,
             ),
         )
     })
@@ -68,6 +75,50 @@ fn naive_root_hash(num_leaves: LeafIdx, updates: &[Vec<(LeafIdx, HashValue)>]) -
         .unwrap_or(*HOT_STATE_PLACE_HOLDER_HASH)
 }
 
+fn sleep_random() {
+    let micros = rand::random::<u64>() % 100;
+    std::thread::sleep(std::time::Duration::from_micros(micros));
+}
+
+fn update_fn(
+    base: Arc<HexyBase>,
+    first_pending: Arc<Mutex<HexyOverlay>>,
+    latest: Arc<Mutex<HexyOverlay>>,
+    updates: Vec<Vec<(LeafIdx, HashValue)>>,
+) -> impl FnOnce() {
+    move || {
+        for batch in updates.into_iter() {
+            let view = latest.lock().view(&base, &first_pending.lock());
+            sleep_random();
+            *latest.lock() = view.new_overlay(batch.clone()).unwrap();
+        }
+    }
+}
+
+fn merge_fn(
+    base: Arc<HexyBase>,
+    first_pending: Arc<Mutex<HexyOverlay>>,
+    latest: Arc<Mutex<HexyOverlay>>,
+    quit_signal: Arc<AtomicBool>,
+) -> impl FnOnce() {
+    move || {
+        let mut quit = false;
+        while !quit {
+            quit = quit_signal.load(Ordering::Acquire);
+            sleep_random();
+
+            let bottom = first_pending.lock().clone();
+            let top = latest.lock().clone();
+            if top.is_the_same(&bottom) {
+                continue;
+            }
+            base.merge(top.overlay.into_layers_view_since(bottom.overlay.clone()))
+                .unwrap();
+            *first_pending.lock() = bottom;
+        }
+    }
+}
+
 proptest! {
     #[test]
     fn test_sort_dedup(data in vec(any::<(u16, u16)>(), 0..100)) {
@@ -80,17 +131,25 @@ proptest! {
     #[test]
     fn test_update((num_leaves, updates) in arb_test_case()) {
         let base = Arc::new(HexyBase::allocate(num_leaves));
-        let bottom_overlay = HexyOverlay::new_empty(&base);
-        let mut top_overlay = bottom_overlay.clone();
+        let root_overlay = HexyOverlay::new_empty(&base);
+        let first_pending = Arc::new(Mutex::new(root_overlay.clone()));
+        let latest = Arc::new(Mutex::new(root_overlay));
+        let quit_signal = Arc::new(AtomicBool::new(false));
 
-        for batch in updates.iter() {
-            let view = top_overlay.view(&base, &bottom_overlay);
-            top_overlay = view.new_overlay(batch.clone()).unwrap();
-        }
+        let root_hash = naive_root_hash(num_leaves, &updates);
 
-        prop_assert_eq!(
-            top_overlay.root_hash,
-            naive_root_hash(num_leaves, &updates)
-        )
+        let update_thread = std::thread::spawn(
+            update_fn(base.clone(), first_pending.clone(), latest.clone(), updates)
+        );
+        let merge_thread = std::thread::spawn(
+            merge_fn(base.clone(), first_pending.clone(), latest.clone(), quit_signal.clone())
+        );
+
+        update_thread.join().unwrap();
+        prop_assert_eq!(latest.lock().root_hash, root_hash);
+
+        quit_signal.store(true, Ordering::Release);
+        merge_thread.join().unwrap();
+        prop_assert_eq!(base.root_hash(), root_hash);
     }
 }
