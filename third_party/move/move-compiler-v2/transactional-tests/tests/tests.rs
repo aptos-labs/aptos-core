@@ -99,7 +99,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "bug_14243_stack_size.move",
     // The output of the tests could be different depending on the language version
     "/operator_eval/",
-    // Creates different code if optimized
+    // Creates different code if optimized or not
     "no-v1-comparison/enum/enum_field_select.move",
     "no-v1-comparison/enum/enum_field_select_different_offsets.move",
 ];

@@ -9,19 +9,18 @@
 //! - It infers the `AssignKind` in the assign statement. This will be `Move` if
 //!   the source is not used after the assignment and is not borrowed. It will
 //!   be Copy otherwise.
-//! - It inserts a `Copy` assignment for every function argument which is used later or borrowed
-//!   (same condition as above)
+//! - It inserts a `Copy` assignment for every function or operator argument which is not
+//!   borrowed.
 //! - It inserts a `Drop` instruction for values which go out of scope and are not
 //!   consumed by any call and no longer borrowed.
 //!
 //! For the checking part, consider the transformation to have happened,
 //! then:
 //!
-//! - Every copied value must have the `copy` ability
+//! - Every copied value must have the `copy` ability. This includes values for which we do
+//!   not generate a `Copy` instruction, but generally every temporary which is used later
+//!   or is borrowed.
 //! - Every dropped value must have the `drop` ability
-//! - Every type used in storage operations must have the `key` ability (TODO(#12036): this check should
-//!   go the frontend where also `store` is checked)
-//! - All type instantiations in the program must satisfy ability constraints (TODO: also frontend)
 //!
 //! Precondition: LiveVarAnnotation, LifetimeAnnotation, ExitStateAnnotation
 
