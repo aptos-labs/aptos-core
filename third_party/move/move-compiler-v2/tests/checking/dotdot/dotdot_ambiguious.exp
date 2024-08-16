@@ -4,4 +4,4 @@ error: unexpected token
   ┌─ tests/checking/dotdot/dotdot_ambiguious.move:5:22
   │
 5 │         let S(.., x, ..) = x;
-  │                      ^^ Ambiguous `..`
+  │                      ^^ there can be at most one `..` per sturct or variant pattern

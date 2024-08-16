@@ -2979,7 +2979,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                             if dot_seen {
                                 context.env.add_diag(diag!(
                                     Syntax::UnexpectedToken,
-                                    (loc, "Ambiguous `..`")
+                                    (loc, "there can be at most one `..` per sturct or variant pattern")
                                 ));
                                 None
                             } else {
