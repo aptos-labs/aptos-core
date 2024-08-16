@@ -45,6 +45,12 @@ module 0x42::test {
         2: u32,
         3: u64,
     }
+    private inline fun lambda_param(f: |test::S2|bool): bool {
+        {
+          let x: test::S2 = pack test::S2(true, pack test::S0(false));
+          (f)(x)
+        }
+    }
     private fun nested1(x: test::S4<bool>) {
         {
           let test::S4<bool>{ x: _x, y: _ } = x;
@@ -278,6 +284,15 @@ module 0x42::test {
         {
           let test::S7{ 0: _w, 1: _, 2: _, 3: _z } = x;
           Tuple()
+        }
+    }
+    private fun test_lambda_param(): bool {
+        {
+          let x: test::S2 = pack test::S2(true, pack test::S0(false));
+          {
+            let (test::S2{ 0: x, 1: _ }): (test::S2) = Tuple(x);
+            x
+          }
         }
     }
 } // end 0x42::test

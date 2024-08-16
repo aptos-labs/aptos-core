@@ -845,6 +845,7 @@ fn parse_bind_list(context: &mut Context) -> Result<BindList, Box<Diagnostic>> {
 fn parse_bind_field_or_dotdot(context: &mut Context) -> Result<BindFieldOrDotdot, Box<Diagnostic>> {
     if context.tokens.peek() == Tok::PeriodPeriod {
         let loc = current_token_loc(context.tokens);
+        require_move_2(context, loc, "`..` patterns");
         context.tokens.advance()?;
         Ok(sp(loc, BindFieldOrDotdot_::Dotdot))
     } else {
@@ -858,6 +859,7 @@ fn parse_bind_field_or_dotdot(context: &mut Context) -> Result<BindFieldOrDotdot
 fn parse_bind_or_dotdot(context: &mut Context) -> Result<BindOrDotdot, Box<Diagnostic>> {
     if context.tokens.peek() == Tok::PeriodPeriod {
         let loc = current_token_loc(context.tokens);
+        require_move_2(context, loc, "`..` patterns");
         context.tokens.advance()?;
         Ok(sp(loc, BindOrDotdot_::Dotdot))
     } else {
