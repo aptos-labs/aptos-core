@@ -131,6 +131,10 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         self.inner.family == other.inner.family
     }
 
+    pub fn is_the_same(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
     pub(crate) fn layer(&self) -> u64 {
         self.inner.layer
     }

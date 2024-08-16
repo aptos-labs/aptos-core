@@ -1819,6 +1819,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 {
                     continue;
                 }
+                // Apart from the same memory location, locations mutably borrowed from label also need to be included
                 if other_label == label
                     || self.state.transitive_children(label).contains(other_label)
                 {

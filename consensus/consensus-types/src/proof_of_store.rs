@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::payload::TDataInfo;
+use crate::{payload::TDataInfo, utils::PayloadTxnsSize};
 use anyhow::{bail, ensure, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -129,6 +129,10 @@ impl BatchInfo {
 
     pub fn num_bytes(&self) -> u64 {
         self.num_bytes
+    }
+
+    pub fn size(&self) -> PayloadTxnsSize {
+        PayloadTxnsSize::new(self.num_txns, self.num_bytes)
     }
 
     pub fn gas_bucket_start(&self) -> u64 {

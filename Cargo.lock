@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.5.1"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -333,6 +333,7 @@ dependencies = [
  "poem",
  "processor",
  "rand 0.7.3",
+ "regex",
  "reqwest 0.11.23",
  "self_update",
  "serde",
@@ -1542,6 +1543,23 @@ dependencies = [
  "once_cell",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-experimental-hexy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-experimental-layered-map",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "criterion",
+ "itertools 0.13.0",
+ "jemallocator",
+ "once_cell",
+ "proptest",
+ "rand 0.7.3",
 ]
 
 [[package]]

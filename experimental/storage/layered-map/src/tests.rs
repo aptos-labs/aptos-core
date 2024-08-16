@@ -87,13 +87,16 @@ proptest! {
 
         let layered_map = top_layer.into_layers_view_since(bottom_layer);
 
-        for (key, value_opt) in naive_view_layers(
-            items_per_layer.drain(bottom..=top)
-        ) {
-            prop_assert_eq!(layered_map.get(&key), Some(value_opt));
+        let all = naive_view_layers(items_per_layer.drain(bottom..=top));
+
+        // get() individually
+        for (k, v) in &all {
+            prop_assert_eq!(layered_map.get(k), Some(*v));
         }
 
-        // TODO(aldenhu): test that layered_map doesn't have any unexpected keys -- need ability to traverse
+        // traversed via iterator
+        let traversed = layered_map.iter().collect();
+        prop_assert_eq!(all, traversed);
     }
 
     #[test]

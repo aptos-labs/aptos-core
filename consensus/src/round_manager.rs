@@ -250,7 +250,9 @@ pub struct RoundManager {
     // To avoid duplicate broadcasts for the same block, we keep track of blocks for
     // which we recently broadcasted fast shares.
     blocks_with_broadcasted_fast_shares: LruCache<HashValue, ()>,
-    futures: FuturesUnordered<Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block)> + Send>>>,
+    futures: FuturesUnordered<
+        Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
+    >,
 }
 
 impl RoundManager {
@@ -894,8 +896,15 @@ impl RoundManager {
             counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
                 .with_label_values(&["missing"])
                 .inc();
-            let future =
-                async move { (block_store.wait_for_payload(&proposal).await, proposal) }.boxed();
+            let start_time = Instant::now();
+            let future = async move {
+                (
+                    block_store.wait_for_payload(&proposal).await,
+                    proposal,
+                    start_time,
+                )
+            }
+            .boxed();
             self.futures.push(future);
             return Ok(());
         }
@@ -1248,6 +1257,15 @@ impl RoundManager {
                         qc
                     ))?;
                 if self.onchain_config.order_vote_enabled() {
+                    // This check is already done in safety rules. As printing the "failed to broadcast order vote"
+                    // in humio logs could sometimes look scary, we are doing the same check again here.
+                    if let Some(last_sent_vote) = self.round_state.vote_sent() {
+                        if let Some((two_chain_timeout, _)) = last_sent_vote.two_chain_timeout() {
+                            if round <= two_chain_timeout.round() {
+                                return Ok(());
+                            }
+                        }
+                    }
                     // Broadcast order vote if the QC is successfully aggregated
                     // Even if broadcast order vote fails, the function will return Ok
                     if let Err(e) = self.broadcast_order_vote(vote, qc.clone()).await {
@@ -1506,14 +1524,19 @@ impl RoundManager {
                         }
                     }
                 },
-                Some((result, block)) = self.futures.next() => {
+                Some((result, block, start_time)) = self.futures.next() => {
+                    let elapsed = start_time.elapsed().as_secs_f64();
                     match result {
-                        Ok(_) => {
-                            if let Err(e) = self.check_backpressure_and_process_proposal(block).await {
+                        Ok(()) => {
+                            counters::CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION.with_label_values(&["success"]).observe(elapsed);
+                            if let Err(e) = monitor!("payload_fetch_proposal_process", self.check_backpressure_and_process_proposal(block)).await {
                                 warn!("error {}", e);
                             }
                         },
-                        Err(err) => warn!("unable to get transactions: {}", err),
+                        Err(err) => {
+                            counters::CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION.with_label_values(&["error"]).observe(elapsed);
+                            warn!("unable to get transactions: {}", err);
+                        },
                     };
                 },
                 (peer_id, event) = event_rx.select_next_some() => {
