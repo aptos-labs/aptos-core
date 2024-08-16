@@ -223,6 +223,7 @@ async fn test_keyless_groth16_verifies() {
     if let Err(e) = result {
         panic!("Error with keyless Groth16 TXN verification: {:?}", e)
     }
+    assert!(false);
 }
 
 #[tokio::test]
