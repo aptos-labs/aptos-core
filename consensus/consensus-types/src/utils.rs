@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::ensure;
-use aptos_logger::error;
+use aptos_logger::warn;
 use core::fmt;
 use serde::Serialize;
 use std::cmp::{max, Ordering};
@@ -21,7 +21,7 @@ impl PayloadTxnsSize {
         match Self::try_new(count, bytes) {
             Ok(txns_size) => txns_size,
             Err(err) => {
-                error!(
+                warn!(
                     "Invalid input for PayloadTxnsSize. Normalizing. Count: {}, Bytes: {}, Err: {}",
                     count, bytes, err
                 );
@@ -75,9 +75,9 @@ impl PayloadTxnsSize {
 
     pub fn set_count(&mut self, new_count: u64) {
         if let Err(e) = self.try_set_count(new_count) {
-            error!(
-                "Invalid set count. Resetting bytes. new_count: {}, Error: {}",
-                new_count, e
+            warn!(
+                "Invalid set count. Resetting bytes. new_count: {}, Self: {}, Error: {}",
+                new_count, self, e
             );
             *self = Self::new_normalized(new_count, new_count);
         }

@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::utils::ProofQueue;
+use crate::quorum_store::{
+    batch_proof_queue::BatchProofQueue, tests::batch_store_test::batch_store_for_test,
+};
 use aptos_consensus_types::{
     common::TxnSummaryWithExpiration,
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
@@ -59,7 +61,8 @@ fn proof_of_store_with_size(
 #[test]
 fn test_proof_queue_sorting() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id);
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
@@ -71,7 +74,7 @@ fn test_proof_queue_sorting() {
         proof_of_store(author_0, BatchId::new_for_test(3), 300, 1),
     ];
     for batch in author_0_batches {
-        proof_queue.push(batch);
+        proof_queue.insert_proof(batch);
     }
     let author_1_batches = vec![
         proof_of_store(author_1, BatchId::new_for_test(4), 500, 1),
@@ -80,7 +83,7 @@ fn test_proof_queue_sorting() {
         proof_of_store(author_1, BatchId::new_for_test(7), 50, 1),
     ];
     for batch in author_1_batches {
-        proof_queue.push(batch);
+        proof_queue.insert_proof(batch);
     }
 
     // Expect: [600, 300]
@@ -145,7 +148,8 @@ fn test_proof_queue_sorting() {
 #[test]
 fn test_proof_calculate_remaining_txns_and_proofs() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id);
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
     let author_0 = PeerId::random();
@@ -210,33 +214,33 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     let info_7 = author_1_batches[2].info().clone();
     let info_8 = author_1_batches[3].info().clone();
 
-    proof_queue.add_batch_summaries(vec![(info_1.clone(), vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(info_1.clone(), vec![txns[0]])]);
     // batch_summaries: [1 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (0, 0));
     assert_eq!(proof_queue.batch_summaries_len(), 1);
 
-    proof_queue.push(author_0_batches[0].clone());
+    proof_queue.insert_proof(author_0_batches[0].clone());
     // txns: [txn_0]
     // proofs: [1]
     // batch_summaries: [1 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (1, 1));
     assert_eq!(proof_queue.batch_summaries_len(), 1);
 
-    proof_queue.push(author_0_batches[1].clone());
+    proof_queue.insert_proof(author_0_batches[1].clone());
     // txns: [txn_0] + txns(proof_2)
     // proofs: [1, 2]
     // batch_summaries: [1 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
     assert_eq!(proof_queue.batch_summaries_len(), 1);
 
-    proof_queue.add_batch_summaries(vec![(info_2, vec![txns[1]])]);
+    proof_queue.insert_batches(vec![(info_2, vec![txns[1]])]);
     // txns: [txn_0, txn_1]
     // proofs: [1, 2]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
     assert_eq!(proof_queue.batch_summaries_len(), 2);
 
-    proof_queue.add_batch_summaries(vec![(info_3.clone(), vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(info_3.clone(), vec![txns[0]])]);
     // txns: [txn_0, txn_1]
     // proofs: [1, 2]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
@@ -244,14 +248,14 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     assert_eq!(proof_queue.batch_summaries_len(), 3);
 
     // Adding the batch again shouldn't have an effect
-    proof_queue.add_batch_summaries(vec![(info_3.clone(), vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(info_3.clone(), vec![txns[0]])]);
     // txns: [txn_0, txn_1]
     // proofs: [1, 2]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
     assert_eq!(proof_queue.batch_summaries_len(), 3);
 
-    proof_queue.push(author_0_batches[2].clone());
+    proof_queue.insert_proof(author_0_batches[2].clone());
     // txns: [txn_0, txn_1]
     // proofs: [1, 2, 3]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
@@ -259,35 +263,35 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     assert_eq!(proof_queue.batch_summaries_len(), 3);
 
     // Adding the batch again shouldn't have an effect
-    proof_queue.add_batch_summaries(vec![(info_3.clone(), vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(info_3.clone(), vec![txns[0]])]);
     // txns: [txn_0, txn_1]
     // proofs: [1, 2, 3]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 3));
     assert_eq!(proof_queue.batch_summaries_len(), 3);
 
-    proof_queue.push(author_1_batches[0].clone());
+    proof_queue.insert_proof(author_1_batches[0].clone());
     // txns: [txn_0, txn_1] + txns(proof_5)
     // proofs: [1, 2, 3, 5]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (3, 4));
     assert_eq!(proof_queue.batch_summaries_len(), 3);
 
-    proof_queue.add_batch_summaries(vec![(info_5, vec![txns[1]])]);
+    proof_queue.insert_batches(vec![(info_5, vec![txns[1]])]);
     // txns: [txn_0, txn_1]
     // proofs: [1, 2, 3, 5]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0, 5 -> txn_1]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 4));
     assert_eq!(proof_queue.batch_summaries_len(), 4);
 
-    proof_queue.add_batch_summaries(vec![(info_4, vec![txns[2]])]);
+    proof_queue.insert_batches(vec![(info_4, vec![txns[2]])]);
     // txns: [txn_0, txn_1]
     // proofs: [1, 2, 3, 5]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0, 4 -> txn_2, 5 -> txn_1]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 4));
     assert_eq!(proof_queue.batch_summaries_len(), 5);
 
-    proof_queue.push(author_0_batches[3].clone());
+    proof_queue.insert_proof(author_0_batches[3].clone());
     // txns: [txn_0, txn_1, txn_2]
     // proofs: [1, 2, 3, 4, 5]
     // batch_summaries: [1 -> txn_0, 2 -> txn_1, 3 -> txn_0, 4 -> txn_2, 5 -> txn_1]
@@ -301,7 +305,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (3, 4));
     assert_eq!(proof_queue.batch_summaries_len(), 4);
 
-    proof_queue.push(author_1_batches[1].clone());
+    proof_queue.insert_proof(author_1_batches[1].clone());
     // txns: [txn_0, txn_1, txn_2] + txns(proof_6)
     // proofs: [2, 3, 4, 5, 6]
     // batch_summaries: [2 -> txn_1, 3 -> txn_0, 4 -> txn_2, 5 -> txn_1]
@@ -317,7 +321,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     assert_eq!(proof_queue.batch_summaries_len(), 1);
 
     // Adding an expired batch again
-    proof_queue.add_batch_summaries(vec![(info_3, vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(info_3, vec![txns[0]])]);
     // txns: [txn_1] + txns(proof_6)
     // proofs: [2, 6]
     // batch_summaries: [2 -> txn_1, 3 -> txn_0]
@@ -325,14 +329,14 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     assert_eq!(proof_queue.batch_summaries_len(), 2);
 
     // Adding an expired proof again. Should have no effect
-    proof_queue.push(author_0_batches[2].clone());
+    proof_queue.insert_proof(author_0_batches[2].clone());
     // txns: [txn_1] + txns(proof_6)
     // proofs: [2, 6]
     // batch_summaries: [2 -> txn_1, 3 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
     assert_eq!(proof_queue.batch_summaries_len(), 2);
 
-    proof_queue.add_batch_summaries(vec![(info_7, vec![txns[3]])]);
+    proof_queue.insert_batches(vec![(info_7, vec![txns[3]])]);
     // txns: [txn_1] + txns(proof_6)
     // proofs: [2, 6]
     // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
@@ -340,57 +344,57 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     assert_eq!(proof_queue.batch_summaries_len(), 3);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 30000);
-    // Expires info_6
+    // Expires info_6, info_3
     // txns: [txn_1]
     // proofs: [2]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (1, 1));
-    assert_eq!(proof_queue.batch_summaries_len(), 3);
+    assert_eq!(proof_queue.batch_summaries_len(), 2);
 
-    proof_queue.add_batch_summaries(vec![(info_6, vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(info_6, vec![txns[0]])]);
     // Expired batch not added to batch summaries
     // txns: [txn_1]
     // proofs: [2]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0, 6 -> txn_0]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 6 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (1, 1));
-    assert_eq!(proof_queue.batch_summaries_len(), 4);
+    assert_eq!(proof_queue.batch_summaries_len(), 3);
 
-    proof_queue.push(author_1_batches[2].clone());
+    proof_queue.insert_proof(author_1_batches[2].clone());
     // txns: [txn_1, txn_3]
     // proofs: [2, 7]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0, 6 -> txn_0]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 6 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
-    assert_eq!(proof_queue.batch_summaries_len(), 4);
+    assert_eq!(proof_queue.batch_summaries_len(), 3);
 
-    proof_queue.push(author_1_batches[3].clone());
+    proof_queue.insert_proof(author_1_batches[3].clone());
     // txns: [txn_1, txn_3] + txns(proof_8)
     // proofs: [2, 7, 8]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0, 6 -> txn_0]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 6 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (3, 3));
-    assert_eq!(proof_queue.batch_summaries_len(), 4);
+    assert_eq!(proof_queue.batch_summaries_len(), 3);
 
     proof_queue.mark_committed(vec![info_8.clone()]);
     // txns: [txn_1, txn_3]
     // proofs: [2, 7]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0, 6 -> txn_0]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 6 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
-    assert_eq!(proof_queue.batch_summaries_len(), 4);
+    assert_eq!(proof_queue.batch_summaries_len(), 3);
 
-    proof_queue.add_batch_summaries(vec![(info_8, vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(info_8, vec![txns[0]])]);
     // Committed batch not added to batch summaries
     // txns: [txn_1, txn_3]
     // proofs: [2, 7]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0, 6 -> txn_0, 8 -> txn_0]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 6 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
-    assert_eq!(proof_queue.batch_summaries_len(), 5);
+    assert_eq!(proof_queue.batch_summaries_len(), 3);
 
-    proof_queue.push(author_1_batches[3].clone());
+    proof_queue.insert_proof(author_1_batches[3].clone());
     // Committed proof added again. Should have no effect
     // txns: [txn_1, txn_3]
     // proofs: [2, 7, 8]
-    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 3 -> txn_0, 6 -> txn_0, 8 -> txn_0]
+    // batch_summaries: [2 -> txn_1, 7 -> txn_3, 6 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (2, 2));
-    assert_eq!(proof_queue.batch_summaries_len(), 5);
+    assert_eq!(proof_queue.batch_summaries_len(), 3);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 70000);
     // Expires info_2, info_7
@@ -398,13 +402,14 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     // proofs: []
     // batch_summaries: [3 -> txn_0, 6 -> txn_0, 8 -> txn_0]
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (0, 0));
-    assert_eq!(proof_queue.batch_summaries_len(), 3);
+    assert_eq!(proof_queue.batch_summaries_len(), 0);
 }
 
 #[test]
 fn test_proof_pull_proofs_with_duplicates() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id);
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = now_in_secs * 1_000_000;
     let txns = vec![
@@ -474,22 +479,22 @@ fn test_proof_pull_proofs_with_duplicates() {
     let info_0 = author_0_batches[0].info().clone();
     let info_7 = author_1_batches[2].info().clone();
 
-    proof_queue.add_batch_summaries(vec![(author_0_batches[0].info().clone(), vec![txns[0]])]);
-    proof_queue.add_batch_summaries(vec![(author_0_batches[1].info().clone(), vec![txns[1]])]);
-    proof_queue.add_batch_summaries(vec![(author_0_batches[2].info().clone(), vec![txns[2]])]);
-    proof_queue.add_batch_summaries(vec![(author_0_batches[3].info().clone(), vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(author_0_batches[0].info().clone(), vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(author_0_batches[1].info().clone(), vec![txns[1]])]);
+    proof_queue.insert_batches(vec![(author_0_batches[2].info().clone(), vec![txns[2]])]);
+    proof_queue.insert_batches(vec![(author_0_batches[3].info().clone(), vec![txns[0]])]);
 
     for batch in author_0_batches {
-        proof_queue.push(batch);
+        proof_queue.insert_proof(batch);
     }
 
-    proof_queue.add_batch_summaries(vec![(author_1_batches[0].info().clone(), vec![txns[1]])]);
-    proof_queue.add_batch_summaries(vec![(author_1_batches[1].info().clone(), vec![txns[2]])]);
-    proof_queue.add_batch_summaries(vec![(author_1_batches[2].info().clone(), vec![txns[3]])]);
-    proof_queue.add_batch_summaries(vec![(author_1_batches[3].info().clone(), vec![txns[0]])]);
+    proof_queue.insert_batches(vec![(author_1_batches[0].info().clone(), vec![txns[1]])]);
+    proof_queue.insert_batches(vec![(author_1_batches[1].info().clone(), vec![txns[2]])]);
+    proof_queue.insert_batches(vec![(author_1_batches[2].info().clone(), vec![txns[3]])]);
+    proof_queue.insert_batches(vec![(author_1_batches[3].info().clone(), vec![txns[0]])]);
 
     for batch in author_1_batches {
-        proof_queue.push(batch);
+        proof_queue.insert_proof(batch);
     }
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (4, 8));
 
@@ -651,7 +656,8 @@ fn test_proof_pull_proofs_with_duplicates() {
 #[test]
 fn test_proof_queue_soft_limit() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id);
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
 
     let author = PeerId::random();
 
@@ -661,7 +667,7 @@ fn test_proof_queue_soft_limit() {
         proof_of_store_with_size(author, BatchId::new_for_test(2), 200, 1, 10),
     ];
     for batch in author_batches {
-        proof_queue.push(batch);
+        proof_queue.insert_proof(batch);
     }
 
     let (pulled, _, num_unique_txns, _) = proof_queue.pull_proofs(
