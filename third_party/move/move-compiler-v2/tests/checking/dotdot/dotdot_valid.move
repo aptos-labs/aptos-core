@@ -171,4 +171,12 @@ module 0x42::test {
         let S7(_w, .., _z) = x;
     }
 
+    inline fun lambda_param(f: |S2| bool): bool {
+        let x = S2(true, S0());
+        f(x)
+    }
+
+    fun test_lambda_param(): bool {
+        lambda_param(|S2(x, ..)| x)
+    }
 }
