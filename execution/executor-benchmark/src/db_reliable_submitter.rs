@@ -8,7 +8,7 @@ use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderW
 use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{lite_account, lite_account::LiteAccountGroup},
+    account_config::lite_account,
     state_store::MoveResourceExt,
     transaction::{SignedTransaction, Transaction},
 };
@@ -19,6 +19,8 @@ use std::{
     sync::{atomic::AtomicUsize, mpsc},
     time::Duration,
 };
+use aptos_types::account_config::ObjectGroupResource;
+use aptos_types::transaction::authenticator::AuthenticationKey;
 
 pub struct DbReliableTransactionSubmitter {
     pub db: DbReaderWriter,
@@ -42,9 +44,11 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
         Ok(
             match lite_account::AccountResource::fetch_move_resource_from_group(
                 &db_state_view,
-                &address,
-                &LiteAccountGroup::struct_tag(),
-            )? {
+                &AuthenticationKey::object_address_from_object(&address, &AccountAddress::TEN).account_address(),
+                &ObjectGroupResource::struct_tag(),
+            )
+                .unwrap()
+            {
                 Some(account_resource) => account_resource.sequence_number,
                 None => 0,
             },

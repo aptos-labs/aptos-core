@@ -801,10 +801,10 @@ impl TransactionGenerator {
                 assert_eq!(
                     match lite_account::AccountResource::fetch_move_resource_from_group(
                         &db_state_view,
-                        &address,
-                        &LiteAccountGroup::struct_tag(),
+                        &AuthenticationKey::object_address_from_object(&address, &AccountAddress::TEN).account_address(),
+                        &ObjectGroupResource::struct_tag(),
                     )
-                    .unwrap()
+                        .unwrap()
                     {
                         Some(account_resource) => account_resource.sequence_number,
                         None => 0,
