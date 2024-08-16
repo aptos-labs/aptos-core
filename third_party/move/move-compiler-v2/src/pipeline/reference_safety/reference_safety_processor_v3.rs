@@ -11,7 +11,7 @@
 //!
 //! A main difference between the bytecode verifier and this implementation
 //! is that we are dealing with a register machine whereas the bytecode
-//! verifier with a stack machine. Therefor we need to move or copy
+//! verifier with a stack machine. Therefore, we need to move or copy
 //! parameters to instructions explicitly out of their registers, whereas
 //! in the stack machine they are put on the stack in independent instructions.
 //! Another difference is the need for generating good error messages which
@@ -1018,7 +1018,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     }
 
     fn comparison(&mut self, dest: TempIndex, srcs: &[TempIndex]) {
-        // Difference in comparison to regular callr is that we allow mutable references
+        // Difference in comparison to regular call is that we allow mutable references
         // without write check.
         let mut refs = vec![];
         for (pos, src) in srcs.iter().enumerate() {
