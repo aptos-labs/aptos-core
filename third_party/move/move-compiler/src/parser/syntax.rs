@@ -759,8 +759,8 @@ fn parse_bind_field(context: &mut Context) -> Result<(Field, Bind), Box<Diagnost
 // Parse a binding:
 //      Bind =
 //          <Var>
-//          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindField> "}"
-//          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<Bind> "," ")"
+//          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindFieldOrDotdot> "}"
+//          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<BindOrDotdot> "," ")"
 //          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
