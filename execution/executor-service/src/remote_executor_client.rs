@@ -238,13 +238,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let mut results = vec![TransactionOutput::default(); total_expected_outputs as usize];
         let results_ptr = Pointer(results.as_mut_ptr());
         let num_deser_threads = self.num_shards();
-        // let deser_thread_pool = Arc::new(
-        //     rayon::ThreadPoolBuilder::new()
-        //         .thread_name(move |index| format!("rmt-exe-cli-res-rx-{}", index))
-        //         .num_threads(num_deser_threads)
-        //         .build()
-        //         .unwrap(),
-        // );
+
         let (deser_tx, deser_rx) = crossbeam_channel::unbounded();
         let (deser_finished_tx, deser_finished_rx) = crossbeam_channel::unbounded();
         let deser_finished_tx = Arc::new(deser_finished_tx);
@@ -271,7 +265,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             let mut num_outputs_received: u64 = 0;
             loop {
                 let received_msg = self.result_rxs[shard_id].recv().unwrap();
-                let num_txn = received_msg.shard_id.unwrap();
+                let num_txn = received_msg.seq_num.unwrap(); // seq_num field is used to pass num_txn in the network message
                 num_outputs_received += num_txn;
                 deser_tx.send(received_msg).unwrap();
                 if num_outputs_received == expected_outputs[shard_id] {

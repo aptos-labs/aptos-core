@@ -343,7 +343,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 .with_label_values(&[&shard_id_clone.to_string(), "result_tx_send"])
                 .start_timer();
             outbound_rpc_scheduler_clone.send(
-                Message::create_with_metadata(output_message, 0, seq_num, num_txn as u64),
+                Message::create_with_metadata(output_message, 0, num_txn as u64, shard_id_clone as u64),
                 MessageType::new(execute_result_type),
                 result_tx_clone[rand_result_rx_thread % result_tx_clone.len()].clone(),
                 seq_num);
