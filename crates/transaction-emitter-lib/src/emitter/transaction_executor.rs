@@ -82,6 +82,7 @@ impl RestApiReliableTransactionSubmitter {
                 rest_client,
                 txn,
                 self.retry_after,
+                i == 0,
                 &mut failed_submit,
                 &mut failed_wait,
             )
@@ -211,6 +212,7 @@ async fn submit_and_check(
     rest_client: &RestClient,
     txn: &SignedTransaction,
     wait_duration: Duration,
+    first_try: bool,
     failed_submit: &mut bool,
     failed_wait: &mut bool,
 ) -> Result<()> {
@@ -221,7 +223,11 @@ async fn submit_and_check(
             warn_detailed_error("submitting", rest_client, txn, Err(&err)).await
         );
         *failed_submit = true;
-        if format!("{}", err).contains("SEQUENCE_NUMBER_TOO_OLD") {
+        if first_try && format!("{}", err).contains("SEQUENCE_NUMBER_TOO_OLD") {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(2)),
+                warn_detailed_error("submitting on first try", rest_client, txn, Err(&err)).await
+            );
             // There's no point to wait or retry on this error.
             // TODO: find a better way to propogate this error to the caller.
             Err(err)?
