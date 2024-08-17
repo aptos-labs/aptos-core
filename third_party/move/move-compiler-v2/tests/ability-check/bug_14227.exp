@@ -1,13 +1,10 @@
 
-============ bytecode verification failed ========
-
 Diagnostics:
-bug: bytecode verification failed with unexpected status code `MOVELOC_UNAVAILABLE_ERROR`. This is a compiler bug, consider reporting it.
-   ┌─ tests/ability-check/bug_14227.move:19:32
+error: local `_common_fields` of type `m::CommonFields` does not have the `copy` ability
+   ┌─ tests/ability-check/bug_14227.move:21:16
    │
-19 │           let _common_vector_2 = CommonFieldsVector::Bar {
-   │ ╭────────────────────────────────^
-20 │ │             x: vector[2],
-21 │ │             y: vector[_common_fields]
-22 │ │         };
-   │ ╰─────────^
+21 │             y: vector[_common_fields]
+   │                ^^^^^^ copy needed here because value is still in use
+   ·
+25 │             y: vector[_common_fields]
+   │                ------ used here

@@ -9,7 +9,6 @@ error: global memory invariant does not hold
     =         ballot_account = <redacted>
     =         proposal = <redacted>
     =     at tests/sources/regression/type_param_bug_121721.move:84: create_ballot
-    =         <redacted> = <redacted>
     =     at ../move-stdlib/sources/signer.move:12: address_of
     =         s = <redacted>
     =     at ../move-stdlib/sources/signer.move:13: address_of

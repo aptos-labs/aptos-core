@@ -1,9 +1,0 @@
-
-============ bytecode verification failed ========
-
-Diagnostics:
-bug: bytecode verification failed with unexpected status code `MOVELOC_EXISTS_BORROW_ERROR`. This is a compiler bug, consider reporting it.
-  ┌─ tests/reference-safety/bug_13488.move:8:9
-  │
-8 │         x + copy x;
-  │         ^^^^^^^^^^

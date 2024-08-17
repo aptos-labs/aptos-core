@@ -332,6 +332,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             Some(vec![
                 INITIAL_BYTECODE_STAGE,
                 "ReferenceSafetyProcessor",
+                "AbilityProcessor",
                 "DeadStoreElimination",
                 FILE_FORMAT_STAGE,
             ]),

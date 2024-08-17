@@ -1170,17 +1170,22 @@ impl LifetimeInfo for LifetimeState {
 // ===============================================================================
 // Display
 
-struct LabelDisplay<'a>(&'a FunctionTarget<'a>, &'a Label);
+struct LabelDisplay<'a>(&'a FunctionTarget<'a>, &'a Label, /*raw*/ bool);
 
 impl Label {
     fn display<'a>(&'a self, fun: &'a FunctionTarget) -> LabelDisplay<'a> {
-        LabelDisplay(fun, self)
+        LabelDisplay(fun, self, false)
+    }
+
+    fn display_raw<'a>(&'a self, fun: &'a FunctionTarget) -> LabelDisplay<'a> {
+        LabelDisplay(fun, self, false) // TODO: turn on in different commit
     }
 }
 
 impl<'a> Display for LabelDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.1 {
+            Label::Local(local) if /*raw*/self.2 => write!(f, "$t{}", local),
             Label::Local(local) => write!(f, "{}", self.0.get_local_name_for_error_message(*local)),
             Label::Global(struct_id) => {
                 let struct_env = self.0.global_env().get_struct(*struct_id);
@@ -1271,10 +1276,10 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
                         if is_strong { "=" } else { "-" },
                         mut_str,
                         fmt_ref_id(target),
-                        path.iter().map(|l| l.display(self.0)).join(", "),
+                        path.iter().map(|l| l.display_raw(self.0)).join(", "),
                         self.0
                             .get_bytecode_loc(code_id)
-                            .display_line_only(self.0.global_env())
+                            .display_line_only(self.0.global_env()),
                     )?
                 }
             }

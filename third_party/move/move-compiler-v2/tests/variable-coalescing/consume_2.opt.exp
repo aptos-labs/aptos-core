@@ -58,12 +58,10 @@ public fun m::test1($t0: u64) {
 [variant baseline]
 public fun m::test2($t0: m::W) {
      var $t1: m::W
-     var $t2: m::W
   0: $t1 := move($t0)
-  1: $t2 := copy($t1)
-  2: m::consume_($t2)
-  3: m::consume_($t1)
-  4: return ()
+  1: m::consume_($t1)
+  2: m::consume_($t1)
+  3: return ()
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -103,21 +101,16 @@ public fun m::test1($t0: u64) {
 [variant baseline]
 public fun m::test2($t0: m::W) {
      var $t1: m::W
-     var $t2: m::W
      # live vars: $t0
      # events: b:$t0, e:$t0, b:$t1
   0: $t1 := move($t0)
      # live vars: $t1
-     # events: b:$t2
-  1: $t2 := copy($t1)
-     # live vars: $t1, $t2
-     # events: e:$t2
-  2: m::consume_($t2)
+  1: m::consume_($t1)
      # live vars: $t1
      # events: e:$t1
-  3: m::consume_($t1)
+  2: m::consume_($t1)
      # live vars:
-  4: return ()
+  3: return ()
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -147,12 +140,10 @@ public fun m::test1($t0: u64) {
 [variant baseline]
 public fun m::test2($t0: m::W) {
      var $t1: m::W [unused]
-     var $t2: m::W
   0: $t0 := move($t0)
-  1: $t2 := copy($t0)
-  2: m::consume_($t2)
-  3: m::consume_($t0)
-  4: return ()
+  1: m::consume_($t0)
+  2: m::consume_($t0)
+  3: return ()
 }
 
 ============ after DeadStoreElimination: ================
@@ -181,11 +172,9 @@ public fun m::test1($t0: u64) {
 [variant baseline]
 public fun m::test2($t0: m::W) {
      var $t1: m::W [unused]
-     var $t2: m::W
-  0: $t2 := copy($t0)
-  1: m::consume_($t2)
-  2: m::consume_($t0)
-  3: return ()
+  0: m::consume_($t0)
+  1: m::consume_($t0)
+  2: return ()
 }
 
 
@@ -213,7 +202,6 @@ B0:
 	4: Ret
 }
 public test2(Arg0: W) /* def_idx: 3 */ {
-L1:	loc0: W
 B0:
 	0: CopyLoc[0](Arg0: W)
 	1: Call consume_(W)

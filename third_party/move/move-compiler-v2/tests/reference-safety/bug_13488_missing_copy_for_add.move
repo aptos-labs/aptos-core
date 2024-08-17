@@ -1,4 +1,3 @@
-// TODO(#13488): after fix, rename file to reflect issue (`bug_nnn.move` to `bug_nnn_<issue>.move`)
 module 0x8675309::Tester {
     fun t() {
         let x = 0;
