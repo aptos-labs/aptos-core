@@ -27,7 +27,7 @@
 
 use crate::pipeline::{
     exit_state_analysis::ExitStateAnnotation, livevar_analysis_processor::LiveVarAnnotation,
-    reference_safety_processor::LifetimeAnnotation,
+    reference_safety::LifetimeAnnotation,
 };
 use abstract_domain_derive::AbstractDomain;
 use codespan_reporting::diagnostic::Severity;
@@ -168,7 +168,7 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
         };
         // Only temps which are used after or borrowed need a copy
         let temp_needs_copy = |temp, instr| {
-            live_var.is_temp_used_after(temp, instr) || lifetime.before.is_borrowed(*temp)
+            live_var.is_temp_used_after(temp, instr) || lifetime.borrow_kind_before(*temp).is_some()
         };
         // References always need to be dropped to satisfy bytecode verifier borrow analysis, other values
         // only if this execution path can return.
@@ -450,8 +450,8 @@ impl<'a> Transformer<'a> {
                 let is_borrowed = self
                     .lifetime
                     .get_info_at(code_offset)
-                    .after
-                    .is_borrowed(*temp);
+                    .borrow_kind_after(*temp)
+                    .is_some();
                 self.check_drop(bytecode.get_attr_id(), *temp, || {
                     (
                         if is_borrowed {

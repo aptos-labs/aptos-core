@@ -1,9 +1,11 @@
 
 Diagnostics:
-error: cannot freeze local `result` since other mutable usages for this reference exist
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/reference-safety/freeze_mutable.move:9:9
    │
+ 8 │         let returned_ref = foo(result);
+   │                            ----------- previously mutably borrowed here
  9 │         freeze(result);
    │         ^^^^^^^^^^^^^^ frozen here
 10 │         returned_ref
-   │         ------------ used here
+   │         ------------ conflicting reference `returned_ref` used here

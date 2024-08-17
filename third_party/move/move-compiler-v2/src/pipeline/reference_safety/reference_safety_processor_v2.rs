@@ -3,6 +3,8 @@
 
 //! Implements memory safety analysis.
 //!
+//! NOTE: this implementation is experimental and currently not used.
+//!
 //! Prerequisite: livevar annotation is available by performing liveness analysis.
 //!
 //! This is an intra functional, forward-directed data flow analysis over the domain
@@ -109,7 +111,10 @@
 //!    states that the same mutable reference in `temps` cannot be used twice.
 
 use crate::{
-    pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
+    pipeline::{
+        livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
+        reference_safety::{LifetimeAnnotation, LifetimeInfo, LifetimeInfoAtCodeOffset},
+    },
     Experiment, Options,
 };
 use abstract_domain_derive::AbstractDomain;
@@ -121,7 +126,7 @@ use move_model::{
     ast::TempIndex,
     model::{FieldId, FunId, FunctionEnv, GlobalEnv, Loc, Parameter, QualifiedInstId, StructId},
     symbol::Symbol,
-    ty::Type,
+    ty::{ReferenceKind, Type},
 };
 use move_stackless_bytecode::{
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
@@ -136,6 +141,7 @@ use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     fmt::{Display, Formatter},
     iter,
+    rc::Rc,
 };
 
 const DEBUG: bool = false;
@@ -862,16 +868,6 @@ impl LifetimeState {
             todo.extend(get_children(&l));
         }
         result
-    }
-
-    /// Returns the temporaries borrowed
-    pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> + '_ {
-        self.temp_to_label_map.keys().cloned()
-    }
-
-    /// Checks if the given local is borrowed
-    pub fn is_borrowed(&self, temp: TempIndex) -> bool {
-        self.label_for_temp_with_children(temp).is_some()
     }
 }
 
@@ -2077,38 +2073,6 @@ impl<'env> DataflowAnalysis for LifeTimeAnalysis<'env> {}
 
 pub struct ReferenceSafetyProcessor {}
 
-/// Annotation produced by this processor
-#[derive(Clone, Debug)]
-pub struct LifetimeAnnotation(BTreeMap<CodeOffset, LifetimeInfoAtCodeOffset>);
-
-impl LifetimeAnnotation {
-    /// Returns information for code offset.
-    pub fn get_info_at(&self, code_offset: CodeOffset) -> &LifetimeInfoAtCodeOffset {
-        self.0.get(&code_offset).expect("lifetime info")
-    }
-}
-
-/// Annotation present at each code offset
-#[derive(Debug, Clone, Default)]
-pub struct LifetimeInfoAtCodeOffset {
-    pub before: LifetimeState,
-    pub after: LifetimeState,
-}
-
-/// Public functions on lifetime info
-impl LifetimeInfoAtCodeOffset {
-    /// Returns the temporaries which are released at the give code offset since they are not borrowed
-    /// any longer. Notice that this is only for temporaries which are actually borrowed, other
-    /// temporaries being released need to be determined from livevar analysis results.
-    pub fn released_temps(&self) -> impl Iterator<Item = TempIndex> + '_ {
-        self.before
-            .temp_to_label_map
-            .keys()
-            .filter(|t| !self.after.temp_to_label_map.contains_key(t))
-            .cloned()
-    }
-}
-
 impl FunctionTargetProcessor for ReferenceSafetyProcessor {
     fn process(
         &self,
@@ -2163,9 +2127,8 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
             state_map,
             target.get_bytecode(),
             &cfg,
-            |before, after| LifetimeInfoAtCodeOffset {
-                before: before.clone(),
-                after: after.clone(),
+            |before, after| {
+                LifetimeInfoAtCodeOffset::new(Rc::new(before.clone()), Rc::new(after.clone()))
             },
         );
         let annotation = LifetimeAnnotation(state_map_per_instr);
@@ -2178,16 +2141,19 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
     }
 }
 
-// ===============================================================================================
-// Display
+impl LifetimeInfo for LifetimeState {
+    fn borrow_kind(&self, temp: TempIndex) -> Option<ReferenceKind> {
+        self.label_for_temp_with_children(temp)
+            .map(|label| ReferenceKind::from_is_mut(self.is_mut(label)))
+    }
 
-impl ReferenceSafetyProcessor {
-    /// Registers annotation formatter at the given function target. This is for debugging and
-    /// testing.
-    pub fn register_formatters(target: &FunctionTarget) {
-        target.register_annotation_formatter(Box::new(format_lifetime_annotation))
+    fn display(&self, target: &FunctionTarget) -> Option<String> {
+        Some(self.display(target).to_string())
     }
 }
+
+// ===============================================================================================
+// Display
 
 struct BorrowEdgeDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdge, bool);
 impl<'a> Display for BorrowEdgeDisplay<'a> {
@@ -2354,16 +2320,4 @@ impl LifetimeState {
     fn display<'a>(&'a self, fun: &'a FunctionTarget) -> LifetimeStateDisplay<'a> {
         LifetimeStateDisplay(fun, self)
     }
-}
-
-fn format_lifetime_annotation(
-    target: &FunctionTarget<'_>,
-    code_offset: CodeOffset,
-) -> Option<String> {
-    if let Some(LifetimeAnnotation(map)) = target.get_annotations().get::<LifetimeAnnotation>() {
-        if let Some(at) = map.get(&code_offset) {
-            return Some(at.before.display(target).to_string());
-        }
-    }
-    None
 }
