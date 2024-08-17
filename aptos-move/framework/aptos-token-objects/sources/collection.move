@@ -18,6 +18,7 @@
 /// * Add aggregator support when added to framework
 module aptos_token_objects::collection {
     use std::error;
+    use std::features;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
@@ -49,6 +50,8 @@ module aptos_token_objects::collection {
     const EINVALID_MAX_SUPPLY: u64 = 9;
     /// The collection does not have a max supply
     const ENO_MAX_SUPPLY_IN_COLLECTION: u64 = 10;
+    /// The collection owner feature is not supported
+    const ECOLLECTION_OWNER_NOT_SUPPORTED: u64 = 11;
 
     const MAX_COLLECTION_NAME_LENGTH: u64 = 128;
     const MAX_URI_LENGTH: u64 = 512;
@@ -210,6 +213,31 @@ module aptos_token_objects::collection {
         )
     }
 
+    /// Same functionality as `create_fixed_collection`, but the caller is the owner of the collection.
+    /// This means that the caller can transfer the collection to another address.
+    /// This transfers ownership and minting permissions to the new address.
+    public fun create_fixed_collection_as_owner(
+        creator: &signer,
+        description: String,
+        max_supply: u64,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ): ConstructorRef {
+        assert!(features::is_collection_owner_enabled(), error::unavailable(ECOLLECTION_OWNER_NOT_SUPPORTED));
+
+        let constructor_ref = create_fixed_collection(
+            creator,
+            description,
+            max_supply,
+            name,
+            royalty,
+            uri,
+        );
+        enable_ungated_transfer(&constructor_ref);
+        constructor_ref
+    }
+
     /// Creates an unlimited collection. This has support for supply tracking but does not limit
     /// the supply of tokens.
     public fun create_unlimited_collection(
@@ -236,6 +264,29 @@ module aptos_token_objects::collection {
             uri,
             option::some(supply),
         )
+    }
+
+    /// Same functionality as `create_unlimited_collection`, but the caller is the owner of the collection.
+    /// This means that the caller can transfer the collection to another address.
+    /// This transfers ownership and minting permissions to the new address.
+    public fun create_unlimited_collection_as_owner(
+        creator: &signer,
+        description: String,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ): ConstructorRef {
+        assert!(features::is_collection_owner_enabled(), error::unavailable(ECOLLECTION_OWNER_NOT_SUPPORTED));
+
+        let constructor_ref = create_unlimited_collection(
+            creator,
+            description,
+            name,
+            royalty,
+            uri,
+        );
+        enable_ungated_transfer(&constructor_ref);
+        constructor_ref
     }
 
     /// Creates an untracked collection, or a collection that supports an arbitrary amount of
@@ -296,7 +347,15 @@ module aptos_token_objects::collection {
             royalty::init(&constructor_ref, option::extract(&mut royalty))
         };
 
+        let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+        object::disable_ungated_transfer(&transfer_ref);
+
         constructor_ref
+    }
+
+    inline fun enable_ungated_transfer(constructor_ref: &ConstructorRef) {
+        let transfer_ref = object::generate_transfer_ref(constructor_ref);
+        object::enable_ungated_transfer(&transfer_ref);
     }
 
     /// Generates the collections address based upon the creators address and the collection's name
@@ -747,6 +806,7 @@ module aptos_token_objects::collection {
     }
 
     #[test(creator = @0x123, trader = @0x456)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::object)]
     entry fun test_create_and_transfer(creator: &signer, trader: &signer) {
         let creator_address = signer::address_of(creator);
         let trader_address = signer::address_of(trader);
@@ -757,7 +817,22 @@ module aptos_token_objects::collection {
             create_collection_address(&creator_address, &collection_name),
         );
         assert!(object::owner(collection) == creator_address, 1);
-        // Transferring collections is allowed
+        object::transfer(creator, collection, trader_address);
+    }
+
+    #[test(creator = @0x123, trader = @0x456, aptos_framework = @aptos_framework)]
+    entry fun test_create_and_transfer_as_owner(creator: &signer, trader: &signer, aptos_framework: &signer) {
+        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_collection_owner_feature()], vector[]);
+        let creator_address = signer::address_of(creator);
+        let trader_address = signer::address_of(trader);
+        let collection_name = string::utf8(b"collection name");
+        create_unlimited_collection_as_owner_helper(creator, collection_name);
+
+        let collection = object::address_to_object<Collection>(
+            create_collection_address(&creator_address, &collection_name),
+        );
+        assert!(object::owner(collection) == creator_address, 1);
+        // Transferring owned collections are allowed
         object::transfer(creator, collection, trader_address);
         assert!(object::owner(collection) == trader_address, 1);
     }
@@ -938,6 +1013,17 @@ module aptos_token_objects::collection {
             creator,
             string::utf8(b"description"),
             max_supply,
+            name,
+            option::none(),
+            string::utf8(b"uri"),
+        )
+    }
+
+    #[test_only]
+    fun create_unlimited_collection_as_owner_helper(creator: &signer, name: String): ConstructorRef {
+        create_unlimited_collection_as_owner(
+            creator,
+            string::utf8(b"description"),
             name,
             option::none(),
             string::utf8(b"uri"),
