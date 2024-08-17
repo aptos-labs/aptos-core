@@ -2,27 +2,22 @@
 // Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod acquires_checker;
-pub mod ast_simplifier;
 mod bytecode_generator;
-pub mod cyclic_instantiation_checker;
 pub mod env_pipeline;
 mod experiments;
 mod file_format_generator;
-pub mod flow_insensitive_checkers;
-pub mod function_checker;
-pub mod inliner;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
-pub mod recursive_struct_checker;
-pub mod unused_params_checker;
 
 use crate::{
     env_pipeline::{
-        lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
-        seqs_in_binop_checker, spec_checker, spec_rewriter, EnvProcessorPipeline,
+        acquires_checker, ast_simplifier, cyclic_instantiation_checker, flow_insensitive_checkers,
+        function_checker, inliner, lambda_lifter, lambda_lifter::LambdaLiftingOptions,
+        model_ast_lints, recursive_struct_checker, rewrite_target::RewritingScope,
+        seqs_in_binop_checker, spec_checker, spec_rewriter, unused_params_checker,
+        EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -325,6 +320,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
+    if !for_v1_model && options.experiment_on(Experiment::LINT_CHECKS) {
+        // Perform all the model AST lint checks before AST transformations, to be closer
+        // in form to the user code.
+        env_pipeline.add("model AST lints", model_ast_lints::checker);
+    }
+
     if options.experiment_on(Experiment::INLINING) {
         let keep_inline_funs = options.experiment_on(Experiment::KEEP_INLINE_FUNS);
         env_pipeline.add("inlining", {
@@ -347,11 +348,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
 
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
         env_pipeline.add("simplifier with code elimination", {
-            move |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, true)
+            |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, true)
         });
     } else if options.experiment_on(Experiment::AST_SIMPLIFY) {
         env_pipeline.add("simplifier", {
-            move |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, false)
+            |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, false)
         });
     }
 
@@ -383,7 +384,7 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
     env_pipeline
 }
 
-/// Returns the bytecode processing pipeline.
+/// Returns the stackless bytecode processing pipeline.
 pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
     let mut pipeline = FunctionTargetPipeline::default();
