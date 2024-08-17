@@ -9,7 +9,7 @@
 //! - It infers the `AssignKind` in the assign statement. This will be `Move` if
 //!   the source is not used after the assignment and is not borrowed. It will
 //!   be Copy otherwise.
-//! - It inserts a `Copy` assignment for every function or operator argument which is not
+//! - It inserts a `Copy` assignment for every function or operator argument which is
 //!   borrowed.
 //! - It inserts a `Drop` instruction for values which go out of scope and are not
 //!   consumed by any call and no longer borrowed.
@@ -18,7 +18,7 @@
 //! then:
 //!
 //! - Every copied value must have the `copy` ability. This includes values for which we do
-//!   not generate a `Copy` instruction, but generally every temporary which is used later
+//!   not generate a `Copy` instruction, but for every temporary which is used later
 //!   or is borrowed.
 //! - Every dropped value must have the `drop` ability
 //!

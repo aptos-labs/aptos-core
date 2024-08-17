@@ -1170,7 +1170,7 @@ impl LifetimeInfo for LifetimeState {
 // ===============================================================================
 // Display
 
-struct LabelDisplay<'a>(&'a FunctionTarget<'a>, &'a Label, bool);
+struct LabelDisplay<'a>(&'a FunctionTarget<'a>, &'a Label, /*raw*/ bool);
 
 impl Label {
     fn display<'a>(&'a self, fun: &'a FunctionTarget) -> LabelDisplay<'a> {

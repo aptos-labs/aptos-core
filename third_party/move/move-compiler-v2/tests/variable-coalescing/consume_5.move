@@ -22,9 +22,9 @@ module 0xc0ffee::m {
     public fun test_struct(p: bool, a: W) {
         let b = copy a;
         if (p) {
-            consume_(copy b);
+            consume_(b);
         } else {
-            consume_(copy a);
+            consume_(a);
         };
         if (!p) {
             consume_(a);
