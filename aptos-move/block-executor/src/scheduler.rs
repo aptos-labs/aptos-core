@@ -5,7 +5,7 @@
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
 use aptos_aggregator::types::code_invariant_error;
 use aptos_infallible::Mutex;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::delayed_fields::PanicError;
 use concurrent_queue::{ConcurrentQueue, PopError};
@@ -94,29 +94,49 @@ pub enum SchedulerTask {
     Done,
 }
 
+///all transactions have initial flag equal to Main by default
+///if last committed transaction is i, the thread A which commited i, starts executing i+1, and changes the flag to Backup
+/// to signal that backup has started
+/// some other thread - called B, can also start executing transaction i+1, we will say that it is executing Main
+/// A and B compete for the write permission, for A to win it simply needs to set flag to Writing
+/// for B to win, it will need to reviladate its read set to make sure that Validation will not fail later
+/// if validation succeeds it attempts to set flag to Writing
+/// note that regardless the winner, it is guaranteed that transaction i+1 is ready to commit
+/// once it finishes execution
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum ExecutingFlag {
+    Main,
+    Backup,
+    Writing,
+}
+
 /////////////////////////////// Explanation for ExecutionStatus ///////////////////////////////
 /// All possible execution status for each transaction. In the explanation below, we abbreviate
 /// 'execution status' as 'status'. Each status contains the latest incarnation number,
 /// where incarnation = i means it is the i-th execution instance of the transaction.
+/// 'ReadyToExecute' means that the corresponding incarnation should be executed and the scheduler
+/// must eventually create a corresponding execution task. The scheduler ensures that at most two
+/// versions of the transaction are executed (one of them Main and one of them Backup),
+/// if Backup is successfully triggered by calling try_backup(),
+/// ReadyToExecute(i) is changed to Executing(i, Execution, Backup) via try_incarnate(),
+/// and otherwise, if only Main execution is running, the status becomes Executing(i, Execution, Main)
+/// once Writing flag is set it will be changed to Executing(i, Executing, Writing)
 ///
-/// 'Ready' means that the corresponding incarnation should be executed and the scheduler
-/// must eventually create a corresponding execution task. The scheduler ensures that exactly one
-/// execution task gets created, changing the status to 'Executing' in the process. 'Ready' status
-/// contains an ExecutionTaskType, which is either Execution or Wakeup. If it is Execution, then
-/// the scheduler creates an execution task for the corresponding incarnation. If it is Wakeup,
-/// a dependency condition variable is set in ExecutionTaskType::Wakeup(DependencyCondvar): an execution
-/// of a prior incarnation is waiting on it with a read dependency resolved (when dependency was
-/// encountered, the status changed to Suspended, and suspended changed to Ready when the dependency
-/// finished its execution). In this case the caller need not create a new execution task, but
-/// just notify the suspended execution via the dependency condition variable.
+/// if thread encounters unresolved dependency, it is suspended, and its status becomes Suspended(i, DependencyCondvar)
+/// DependencyCondvar is used for waking up thread.
+/// Note that Backup execution can never be suspended, since all previous transactions are committed
+/// Also, once flag is changed to Backup, Main execution should have all dependencies resolved
+/// Once the dependency is resolved, The status is changed to ReadyToWakeup(i, DependencyCondvar, _),
+/// where we keep the ExecutingFlag value unchanged,
+/// and after try_incarnate is called it is changed to Executing(i, Wakeup(DependencyCondvar), _)
 ///
-/// 'Executing' status of an incarnation turns into 'Executed' if the execution task finishes, or
-/// if a dependency is encountered, it becomes 'Ready(incarnation)' once the
-/// dependency is resolved. An 'Executed' status allows creation of validation tasks for the
+/// 'Executing' status of an incarnation turns into 'Executed' if the execution task finishes.
+/// An 'Executed' status allows creation of validation tasks for the
 /// corresponding incarnation, and a validation failure leads to an abort. The scheduler ensures
 /// that there is exactly one abort, changing the status to 'Aborting' in the process. Once the
 /// thread that successfully aborted performs everything that's required, it sets the status
-/// to 'Ready(incarnation + 1)', allowing the scheduler to create an execution
+/// to 'ReadyToExecute(incarnation + 1)', allowing the scheduler to create an execution
 /// task for the next incarnation of the transaction.
 ///
 /// 'ExecutionHalted' is a transaction status marking that parallel execution is halted, due to
@@ -124,11 +144,11 @@ pub enum SchedulerTask {
 /// this status during the transaction invariant checks, e.g., suspend(), resume(), set_executed_status().
 ///
 /// Status transition diagram:
-/// Ready(i)                                                                               ---
+/// ReadyToExecute(i)                                                                               ---
 ///    |  try_incarnate (incarnate successfully)                                             |
 ///    |                                                                                     |
 ///    ↓         suspend (waiting on dependency)                resume                       |
-/// Executing(i) -----------------------------> Suspended(i) ------------> Ready(i)          |
+/// Executing(i) -----------------------------> Suspended(i) ------------> ReadyToWakeUp(i)          |
 ///    |                                                                                     | halt_transaction_execution
 ///    |  finish_execution                                                                   |-----------------> ExecutionHalted
 ///    ↓                                                                                     |
@@ -136,12 +156,13 @@ pub enum SchedulerTask {
 ///    |                                                                                     |
 ///    |  try_abort (abort successfully)                                                     |
 ///    ↓                finish_abort                                                         |
-/// Aborting(i) ---------------------------------------------------------> Ready(i+1)      ---
+/// Aborting(i) ---------------------------------------------------------> ReadyToExecute(i+1)      ---
 ///
 #[derive(Debug)]
 enum ExecutionStatus {
-    Ready(Incarnation, ExecutionTaskType),
-    Executing(Incarnation, ExecutionTaskType),
+    ReadyToExecute(Incarnation),
+    ReadyToWakeUp(Incarnation, DependencyCondvar, ExecutingFlag),
+    Executing(Incarnation, ExecutionTaskType, ExecutingFlag),
     Suspended(Incarnation, DependencyCondvar),
     Executed(Incarnation),
     // TODO[agg_v2](cleanup): rename to Finalized or ReadyToCommit / CommitReady?
@@ -155,27 +176,46 @@ impl PartialEq for ExecutionStatus {
     fn eq(&self, other: &Self) -> bool {
         use ExecutionStatus::*;
         match (self, other) {
-            (
-                &Ready(ref a, ExecutionTaskType::Execution),
-                &Ready(ref b, ExecutionTaskType::Execution),
-            )
-            | (
-                &Executing(ref a, ExecutionTaskType::Execution),
-                &Executing(ref b, ExecutionTaskType::Execution),
-            )
-            | (
-                &Ready(ref a, ExecutionTaskType::Wakeup(_)),
-                &Ready(ref b, ExecutionTaskType::Wakeup(_)),
-            )
-            | (
-                &Executing(ref a, ExecutionTaskType::Wakeup(_)),
-                &Executing(ref b, ExecutionTaskType::Wakeup(_)),
-            )
+            (&ReadyToExecute(ref a), &ReadyToExecute(ref b))
             | (&Suspended(ref a, _), &Suspended(ref b, _))
             | (&Executed(ref a), &Executed(ref b))
             | (&Committed(ref a), &Committed(ref b))
             | (&Aborting(ref a), &Aborting(ref b)) => a == b,
+            (&ReadyToWakeUp(ref a, _, ref flag_a), &ReadyToWakeUp(ref b, _, ref flag_b))
+            | (
+                &Executing(ref a, ExecutionTaskType::Wakeup(_), ref flag_a),
+                &Executing(ref b, ExecutionTaskType::Wakeup(_), ref flag_b),
+            )
+            | (
+                &Executing(ref a, ExecutionTaskType::Execution, ref flag_a),
+                &Executing(ref b, ExecutionTaskType::Execution, ref flag_b),
+            ) => a == b && flag_a == flag_b,
             _ => false,
+        }
+    }
+}
+
+/// Describes different validation requirements (modes) that might occur after transaction
+/// execution finishes. Whether or not suffix requires (re-)validation depends on whether
+/// certain output predicates (e.g. write outside or size of resource group) from a prior
+/// incarnation (if applicable). Whether the transaction itself requires further validation
+/// is determined by factors such as ExecutionFlag - e.g. a backup execution that starts
+/// after the prefix is committed never needs to be re-validated.
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum ValidationMode {
+    None,
+    SelfOnly,
+    SuffixOnly,
+    SuffixAndSelf,
+}
+
+impl ValidationMode {
+    pub(crate) fn add_suffix(self) -> Self {
+        match self {
+            ValidationMode::None => ValidationMode::SuffixOnly,
+            ValidationMode::SelfOnly => ValidationMode::SuffixAndSelf,
+            ValidationMode::SuffixAndSelf => ValidationMode::SuffixAndSelf,
+            ValidationMode::SuffixOnly => ValidationMode::SuffixOnly,
         }
     }
 }
@@ -317,7 +357,7 @@ impl Scheduler {
             txn_status: (0..num_txns)
                 .map(|_| {
                     CachePadded::new((
-                        RwLock::new(ExecutionStatus::Ready(0, ExecutionTaskType::Execution)),
+                        RwLock::new(ExecutionStatus::ReadyToExecute(0)),
                         RwLock::new(ValidationStatus::new()),
                     ))
                 })
@@ -536,7 +576,7 @@ impl Scheduler {
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        revalidate_suffix: bool,
+        validation_mode: ValidationMode,
     ) -> Result<SchedulerTask, PanicError> {
         // Note: It is preferable to hold the validation lock throughout the finish_execution,
         // in particular before updating execution status. The point was that we don't want
@@ -553,9 +593,11 @@ impl Scheduler {
         let (cur_val_idx, mut cur_wave) =
             Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
 
-        // Needs to be re-validated in a new wave
         if cur_val_idx > txn_idx {
-            if revalidate_suffix {
+            if matches!(
+                validation_mode,
+                ValidationMode::SuffixOnly | ValidationMode::SuffixAndSelf
+            ) {
                 // The transaction execution required revalidating all higher txns (not
                 // only itself), currently happens when incarnation writes to a new path
                 // (w.r.t. the write-set of its previous completed incarnation).
@@ -563,13 +605,25 @@ impl Scheduler {
                     cur_wave = wave;
                 };
             }
-            // Update the minimum wave this txn needs to pass.
-            validation_status.required_wave = cur_wave;
-            return Ok(SchedulerTask::ValidationTask(
-                txn_idx,
-                incarnation,
-                cur_wave,
-            ));
+
+            if matches!(
+                validation_mode,
+                ValidationMode::SelfOnly | ValidationMode::SuffixAndSelf
+            ) {
+                // Update the minimum wave this txn needs to pass.
+                validation_status.required_wave = cur_wave;
+
+                return Ok(SchedulerTask::ValidationTask(
+                    txn_idx,
+                    incarnation,
+                    cur_wave,
+                ));
+            } else {
+                //this is the same as call to update_on_validation, but validity is guaranteed
+                //self.finish_validation(txn_idx, cur_wave);
+                validation_status.maybe_max_validated_wave = Some(cur_wave);
+                self.queueing_commits_arm();
+            }
         }
 
         Ok(SchedulerTask::Retry)
@@ -584,6 +638,177 @@ impl Scheduler {
         self.decrease_validation_idx(txn_idx + 1);
 
         Ok(())
+    }
+
+    pub(crate) fn has_lost_execution_flag_writing(&self, txn_idx: TxnIndex) -> bool {
+        let status = self.txn_status[txn_idx as usize].0.write();
+        match *status {
+            ExecutionStatus::Executing(_, _, ref flag)
+            | ExecutionStatus::ReadyToWakeUp(_, _, ref flag)
+                if *flag == ExecutingFlag::Writing =>
+            {
+                true
+            },
+            ExecutionStatus::Committed(_) => true,
+            _ => false,
+        }
+    }
+
+    fn post_validation_try_set_writing(
+        &self,
+        status: &mut parking_lot::lock_api::RwLockWriteGuard<
+            parking_lot::RawRwLock,
+            ExecutionStatus,
+        >,
+        expected_incarnation: Option<Incarnation>,
+    ) -> Option<bool> {
+        match &mut **status {
+            ExecutionStatus::Executing(incarnation, _, ref mut flag)
+            | ExecutionStatus::ReadyToWakeUp(incarnation, _, ref mut flag)
+                if (expected_incarnation.is_none()
+                    || *incarnation == expected_incarnation.unwrap()) =>
+            {
+                match flag {
+                    ExecutingFlag::Main => unreachable!("Should never be Main after backup"),
+                    ExecutingFlag::Backup => {
+                        *flag = ExecutingFlag::Writing;
+                        // In the backup, no validation needed.
+                        Some(true)
+                    },
+                    ExecutingFlag::Writing => None,
+                }
+            },
+            ExecutionStatus::Suspended(_, _)
+            | ExecutionStatus::ReadyToExecute(_)
+            | ExecutionStatus::Aborting(_) => {
+                // All dependencies should be committed (caller invariant), can not be suspended
+                // neither can it be aborted, since we know that it can not fail validation
+                // Since we are inside backup, status can not go back to ReadyToExecute
+                //
+                unreachable!("May not be suspended, Aborting or ReadyToExecute");
+            },
+            ExecutionStatus::Committed(_)
+            | ExecutionStatus::Executed(_)
+            | ExecutionStatus::ExecutionHalted => {
+                // Transaction is Commited, Executed/about to be Committed, or Execution is Halted
+                None
+            },
+            _ => None,
+        }
+    }
+
+    // TODO: comment, explain output convension: None -> lost.
+    // Some(true) -> won, no need to validate. Some(false) -> won, need to validate
+    pub(crate) fn try_set_execution_flag_writing<F>(
+        &self,
+        txn_idx: TxnIndex,
+        maybe_validation_f: Option<F>,
+    ) -> Option<bool>
+    where
+        F: Fn() -> bool,
+    {
+        let mut status: parking_lot::lock_api::RwLockWriteGuard<
+            parking_lot::RawRwLock,
+            ExecutionStatus,
+        > = self.txn_status[txn_idx as usize].0.write();
+        match maybe_validation_f {
+            Some(validation_f) => {
+                match &mut *status {
+                    ExecutionStatus::Executing(incarnation, _, ref mut flag)
+                    | ExecutionStatus::ReadyToWakeUp(incarnation, _, ref mut flag) => match flag {
+                        ExecutingFlag::Main => {
+                            *flag = ExecutingFlag::Writing;
+                            Some(false)
+                        },
+                        ExecutingFlag::Backup => {
+                            let old_incarnation = *incarnation;
+                            drop(status);
+                            if validation_f() {
+                                let mut status = self.txn_status[txn_idx as usize].0.write();
+                                self.post_validation_try_set_writing(
+                                    &mut status,
+                                    Some(old_incarnation),
+                                )
+                            } else {
+                                info!("TXN {} failed validation, deferring to backup", txn_idx);
+                                None
+                            }
+                        },
+                        ExecutingFlag::Writing => None,
+                    },
+                    ExecutionStatus::Suspended(_, _)
+                    | ExecutionStatus::ReadyToExecute(_)
+                    | ExecutionStatus::Aborting(_) => {
+                        // This function is called either by transaction which is ready to be written => can not be suspended
+                        // or transaction after commited one => All dependencies should be committed
+                        // which starts from Executed/ReadyToWakeUp status, hence the original (main) transaction should never
+                        // get suspended once it is backup is called
+                        // for the same reason it can not be ReadyToExecute or Aborting
+                        unreachable!("May not be Suspended, Aborting or ReadyToExecute");
+                    },
+                    ExecutionStatus::Committed(_) => None,
+                    ExecutionStatus::Executed(_) => None,
+                    ExecutionStatus::ExecutionHalted => {
+                        // Transaction is Commited, Executed/about to be Committed, or Execution is Halted
+                        None
+                    },
+                }
+            },
+            None => {
+                // Already inside backup, no need to revalidate
+                self.post_validation_try_set_writing(&mut status, None)
+            },
+        }
+    }
+
+    // the function is called by transaction after commmitted one.
+    // In case transaction is already being executed
+    // or is ready to be executed after getting back from susspend to ReadyToWakeUp
+    // we try to set flag from Main to backup, to signal that transaction is candidate for a next commit
+    pub(crate) fn try_backup(&self, txn_idx: TxnIndex) -> Option<Incarnation> {
+        if txn_idx >= self.num_txns {
+            return None;
+        }
+
+        let mut status = self.txn_status[txn_idx as usize].0.write();
+
+        match &mut *status {
+            ExecutionStatus::Executing(incarnation, _, ref mut flag)
+            | ExecutionStatus::ReadyToWakeUp(incarnation, _, ref mut flag) => {
+                *flag = match flag {
+                    ExecutingFlag::Main => ExecutingFlag::Backup,
+                    ExecutingFlag::Backup => unreachable!("May not be in backup"),
+                    ExecutingFlag::Writing => {
+                        return None;
+                    },
+                };
+                Some(*incarnation)
+            },
+            ExecutionStatus::Suspended(_, _) => {
+                // All dependencies should be committed
+                // => transaction could move from Suspended to ReadyToWakeUp => Executing => Executed => Aborting/Committed
+                // or finally execution should be halted, but it should never be suspended
+                unreachable!("May not be suspended");
+            },
+            ExecutionStatus::ReadyToExecute(incarnation) => {
+                let ret = *incarnation;
+                *status = ExecutionStatus::Executing(
+                    *incarnation,
+                    ExecutionTaskType::Execution,
+                    ExecutingFlag::Backup,
+                );
+                Some(ret)
+            },
+            ExecutionStatus::Aborting(_)
+            | ExecutionStatus::Committed(_)
+            | ExecutionStatus::Executed(_)
+            | ExecutionStatus::ExecutionHalted => {
+                // if execution is halted, or transaction already committed/executed no need to backup
+                // otherwise we know that transaction will be eventually executed
+                // => no need to backup either
+                None
+            },
+        }
     }
 
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
@@ -647,7 +872,7 @@ impl Scheduler {
     /// 6. All transactions have been committed.
     ///
     /// For scenarios 1, 2 & 3, the output of the block execution will be an error, leading
-    /// to a fallback with sequential execution. For scenarios 4, 5 & 6, execution outputs
+    /// to a backup with sequential execution. For scenarios 4, 5 & 6, execution outputs
     /// of the committed txn prefix will be returned from block execution.
     pub(crate) fn halt(&self) -> bool {
         // The first thread that sets done_marker to be true will be responsible for
@@ -764,8 +989,8 @@ impl Scheduler {
         // Always replace the status.
         match std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted) {
             ExecutionStatus::Suspended(_, condvar)
-            | ExecutionStatus::Ready(_, ExecutionTaskType::Wakeup(condvar))
-            | ExecutionStatus::Executing(_, ExecutionTaskType::Wakeup(condvar)) => {
+            | ExecutionStatus::ReadyToWakeUp(_, condvar, _)
+            | ExecutionStatus::Executing(_, ExecutionTaskType::Wakeup(condvar), _) => {
                 // Condvar lock must always be taken inner-most.
                 let (lock, cvar) = &*condvar;
 
@@ -842,12 +1067,27 @@ impl Scheduler {
         // However, it is likely an overkill (and overhead to actually upgrade),
         // while unlikely there would be much contention on a specific index lock.
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        if let ExecutionStatus::Ready(incarnation, execution_task_type) = &*status {
-            let ret: (u32, ExecutionTaskType) = (*incarnation, (*execution_task_type).clone());
-            *status = ExecutionStatus::Executing(*incarnation, (*execution_task_type).clone());
-            Some(ret)
-        } else {
-            None
+        match &*status {
+            ExecutionStatus::ReadyToWakeUp(incarnation, condvar, flag) => {
+                let ret: (u32, ExecutionTaskType) =
+                    (*incarnation, ExecutionTaskType::Wakeup(condvar.clone()));
+                *status = ExecutionStatus::Executing(
+                    *incarnation,
+                    ExecutionTaskType::Wakeup(condvar.clone()),
+                    *flag,
+                );
+                Some(ret)
+            },
+            ExecutionStatus::ReadyToExecute(incarnation) => {
+                let ret: (u32, ExecutionTaskType) = (*incarnation, ExecutionTaskType::Execution);
+                *status = ExecutionStatus::Executing(
+                    *incarnation,
+                    ExecutionTaskType::Execution,
+                    ExecutingFlag::Main,
+                );
+                Some(ret)
+            },
+            _ => None,
         }
     }
 
@@ -883,9 +1123,10 @@ impl Scheduler {
         let status = self.txn_status[txn_idx as usize].0.read();
         matches!(
             *status,
-            ExecutionStatus::Ready(0, _)
-                | ExecutionStatus::Executing(0, _)
+            ExecutionStatus::ReadyToExecute(0)
+                | ExecutionStatus::Executing(0, _, _)
                 | ExecutionStatus::Suspended(0, _)
+                | ExecutionStatus::ReadyToWakeUp(0, _, _)
         )
     }
 
@@ -962,7 +1203,7 @@ impl Scheduler {
     ) -> Result<bool, PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
-            ExecutionStatus::Executing(incarnation, _) => {
+            ExecutionStatus::Executing(incarnation, _, _) => {
                 *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
                 Ok(true)
             },
@@ -980,9 +1221,10 @@ impl Scheduler {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match &*status {
             ExecutionStatus::Suspended(incarnation, dep_condvar) => {
-                *status = ExecutionStatus::Ready(
+                *status = ExecutionStatus::ReadyToWakeUp(
                     *incarnation,
-                    ExecutionTaskType::Wakeup(dep_condvar.clone()),
+                    dep_condvar.clone(),
+                    ExecutingFlag::Main, // IMPORTANT: backup should never be suspended
                 );
                 Ok(())
             },
@@ -994,6 +1236,24 @@ impl Scheduler {
         }
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn debug_print_status(&self) {
+        let temp = self.commit_state().0;
+        if temp == self.num_txns - 1 {
+            return;
+        }
+
+        let status = self.txn_status[(temp + 1) as usize].0.read();
+
+        debug!(
+            "commit idx={}, validation_idx={}, execution_idx={}, status={:?}",
+            temp,
+            Self::unpack_validation_idx(self.validation_idx.load(Ordering::SeqCst)).0,
+            self.execution_idx.load(Ordering::SeqCst),
+            *status,
+        );
+    }
+
     /// Set status of the transaction to Executed(incarnation).
     fn set_executed_status(
         &self,
@@ -1002,9 +1262,30 @@ impl Scheduler {
     ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
-            ExecutionStatus::Executing(stored_incarnation, _)
+            ExecutionStatus::Executing(stored_incarnation, ExecutionTaskType::Execution, _)
                 if stored_incarnation == incarnation =>
             {
+                *status = ExecutionStatus::Executed(incarnation);
+                Ok(())
+            },
+            ExecutionStatus::ReadyToWakeUp(stored_incarnation, ref mut condvar, _)
+            | ExecutionStatus::Executing(
+                stored_incarnation,
+                ExecutionTaskType::Wakeup(ref mut condvar),
+                _,
+            ) => {
+                {
+                    let (lock, cvar) = &**condvar;
+                    // Mark dependency resolved.
+                    let mut lock = lock.lock();
+                    *lock = if incarnation == stored_incarnation {
+                        DependencyStatus::ExecutionHalted
+                    } else {
+                        DependencyStatus::Resolved
+                    };
+                    // Wake up the process waiting for dependency.
+                    cvar.notify_one();
+                }
                 *status = ExecutionStatus::Executed(incarnation);
                 Ok(())
             },
@@ -1029,7 +1310,7 @@ impl Scheduler {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
             ExecutionStatus::Aborting(stored_incarnation) if stored_incarnation == incarnation => {
-                *status = ExecutionStatus::Ready(incarnation + 1, ExecutionTaskType::Execution);
+                *status = ExecutionStatus::ReadyToExecute(incarnation + 1);
                 Ok(())
             },
             ExecutionStatus::ExecutionHalted => {
@@ -1044,7 +1325,7 @@ impl Scheduler {
     }
 
     /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.
-    fn done(&self) -> bool {
+    pub(crate) fn done(&self) -> bool {
         self.done_marker.load(Ordering::Acquire)
     }
 }
@@ -1061,6 +1342,80 @@ mod tests {
         assert!(s.halt());
         assert!(s.done());
         assert!(!s.halt());
+    }
+
+    #[test]
+    fn test_backup_transactions() {
+        let s = Scheduler::new(2);
+        assert_matches!(s.try_backup(0), Some(0));
+        assert_matches!(s.try_incarnate(0), None);
+
+        let backup_v = if true {
+            None
+        } else {
+            Some(|| -> bool { false })
+        };
+
+        assert_matches!(s.has_lost_execution_flag_writing(0), false);
+
+        assert_matches!(s.try_set_execution_flag_writing(0, backup_v), Some(true)); //no need to validate
+
+        let not_backup_win_validation = Some(|| -> bool { true });
+        let not_backup_lose_validation = Some(|| -> bool { false });
+
+        assert_matches!(s.has_lost_execution_flag_writing(0), true); //no need to validate
+        assert_matches!(
+            s.try_set_execution_flag_writing(0, not_backup_win_validation),
+            None
+        );
+
+        assert_matches!(s.set_executed_status(0, 0), Ok(()));
+        s.try_abort(0, 0);
+        assert_matches!(s.set_aborted_status(0, 0), Ok(()));
+
+        s.try_incarnate(0);
+
+        assert_matches!(s.try_backup(0), Some(1));
+
+        assert_matches!(
+            s.try_set_execution_flag_writing(0, not_backup_lose_validation),
+            None
+        ); //no need to validate
+        assert_matches!(
+            s.try_set_execution_flag_writing(0, not_backup_win_validation),
+            Some(true)
+        );
+        assert_matches!(s.try_backup(0), None);
+
+        assert_matches!(s.set_executed_status(0, 1), Ok(()));
+        s.try_abort(0, 1);
+        assert_matches!(s.set_aborted_status(0, 1), Ok(()));
+        s.try_incarnate(0);
+
+        assert_matches!(
+            s.try_set_execution_flag_writing(0, not_backup_lose_validation),
+            Some(false)
+        ); //n
+
+        assert_matches!(s.set_executed_status(0, 2), Ok(()));
+
+        s.try_abort(0, 2);
+        assert_matches!(s.set_aborted_status(0, 2), Ok(()));
+        s.try_incarnate(0);
+
+        let condvar = Condvar::new();
+        let dep = Arc::new((Mutex::new(DependencyStatus::Unresolved), condvar));
+        let dep_2 = Arc::clone(&dep);
+        assert_matches!(s.suspend(0, dep), Ok(true));
+        assert_matches!(s.resume(0), Ok(()));
+
+        assert_matches!(s.try_backup(0), Some(3));
+
+        assert_matches!(s.set_executed_status(0, 3), Ok(()));
+
+        assert_matches!(&*dep_2.0.lock(), DependencyStatus::ExecutionHalted);
+
+        assert_matches!(s.try_backup(0), None);
     }
 
     #[test]

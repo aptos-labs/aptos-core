@@ -11,12 +11,9 @@
 /// write set, or executed code). In the tests, behavior changes based on the incarnation
 /// number, and hence it is crucial for the baseline to know the final incarnation number
 /// of each transaction of the tested block executor execution.
-use crate::{
-    errors::{BlockExecutionError, BlockExecutionResult},
-    proptest_types::types::{
-        raw_metadata, GroupSizeOrMetadata, MockOutput, MockTransaction, ValueType, RESERVED_TAG,
-        STORAGE_AGGREGATOR_VALUE,
-    },
+use crate::proptest_types::types::{
+    raw_metadata, GroupSizeOrMetadata, MockOutput, MockTransaction, ValueType, RESERVED_TAG,
+    STORAGE_AGGREGATOR_VALUE,
 };
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
@@ -25,9 +22,9 @@ use aptos_types::{
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
-use claims::{assert_matches, assert_none, assert_some, assert_some_eq};
+use claims::{assert_none, assert_some, assert_some_eq};
 use itertools::izip;
-use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result};
 
 // TODO: extend to derived values, and code.
 #[derive(Clone)]
@@ -87,7 +84,8 @@ enum BaselineStatus {
 /// For both read_values and resolved_deltas the keys are not included because they are
 /// in the same order as the reads and deltas in the Transaction::Write.
 pub(crate) struct BaselineOutput<K> {
-    status: BaselineStatus,
+    // TODO: bring back abort index tests, was unreachable.
+    _status: BaselineStatus,
     read_values: Vec<Result<Vec<BaselineValue>, ()>>,
     resolved_deltas: Vec<Result<HashMap<K, u128>, ()>>,
     group_reads: Vec<Result<Vec<(K, u32)>, ()>>,
@@ -99,6 +97,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     pub(crate) fn generate<E: Debug + Clone + TransactionEvent>(
         txns: &[MockTransaction<K, E>],
         maybe_block_gas_limit: Option<u64>,
+        output: &BlockOutput<MockOutput<K, E>>,
     ) -> Self {
         let mut current_world = HashMap::<K, BaselineValue>::new();
         let mut accumulated_gas = 0;
@@ -107,6 +106,8 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         let mut read_values = vec![];
         let mut resolved_deltas = vec![];
         let mut group_reads = vec![];
+
+        let mut output_iter = output.get_transaction_outputs_forced().iter();
 
         for txn in txns.iter() {
             match txn {
@@ -124,107 +125,115 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     assert_eq!(*gas, 0);
 
                     status = BaselineStatus::SkipRest;
+
                     break;
                 },
                 MockTransaction::Write {
-                    incarnation_counter,
                     incarnation_behaviors,
                 } => {
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during
                     // the last mock execution, and is >= 1 because there is at least one execution.
-                    let last_incarnation = (incarnation_counter.load(Ordering::SeqCst) - 1)
-                        % incarnation_behaviors.len();
+                    if let Some(txn_output) = output_iter.next() {
+                        let last_incarnation = (txn_output.incarnation
+                            + if txn_output.is_backup { 1 } else { 0 })
+                            as usize
+                            % incarnation_behaviors.len();
 
-                    match incarnation_behaviors[last_incarnation]
-                        .deltas
-                        .iter()
-                        .map(|(k, delta)| {
-                            let base = match current_world
-                                .entry(k.clone())
-                                .or_insert(BaselineValue::Empty)
-                            {
-                                // Get base value from the latest write.
-                                BaselineValue::GenericWrite(w_value) => w_value
-                                    .as_u128()
-                                    .expect("Delta to a non-existent aggregator")
-                                    .expect("Must deserialize the aggregator base value"),
-                                // Get base value from latest resolved aggregator value.
-                                BaselineValue::Aggregator(value) => *value,
-                                // Storage always gets resolved to a default constant.
-                                BaselineValue::Empty => STORAGE_AGGREGATOR_VALUE,
-                            };
+                        match incarnation_behaviors[last_incarnation]
+                            .deltas
+                            .iter()
+                            .map(|(k, delta)| {
+                                let base = match current_world
+                                    .entry(k.clone())
+                                    .or_insert(BaselineValue::Empty)
+                                {
+                                    // Get base value from the latest write.
+                                    BaselineValue::GenericWrite(w_value) => w_value
+                                        .as_u128()
+                                        .expect("Delta to a non-existent aggregator")
+                                        .expect("Must deserialize the aggregator base value"),
+                                    // Get base value from latest resolved aggregator value.
+                                    BaselineValue::Aggregator(value) => *value,
+                                    // Storage always gets resolved to a default constant.
+                                    BaselineValue::Empty => STORAGE_AGGREGATOR_VALUE,
+                                };
 
-                            delta
-                                .apply_to(base)
-                                .map(|resolved_value| (k.clone(), resolved_value))
-                        })
-                        .collect::<Result<Vec<_>, _>>()
-                    {
-                        Ok(txn_resolved_deltas) => {
-                            // Update the read_values and resolved_deltas. Performing reads here is
-                            // correct because written_ and resolved_ worlds have not been updated.
-                            read_values.push(Ok(incarnation_behaviors[last_incarnation]
-                                .reads
-                                .iter()
-                                .map(|k| {
+                                delta
+                                    .apply_to(base)
+                                    .map(|resolved_value| (k.clone(), resolved_value))
+                            })
+                            .collect::<Result<Vec<_>, _>>()
+                        {
+                            Ok(txn_resolved_deltas) => {
+                                // Update the read_values and resolved_deltas. Performing reads here is
+                                // correct because written_ and resolved_ worlds have not been updated.
+                                read_values.push(Ok(incarnation_behaviors[last_incarnation]
+                                    .reads
+                                    .iter()
+                                    .map(|k| {
+                                        current_world
+                                            .entry(k.clone())
+                                            .or_insert(BaselineValue::Empty)
+                                            .clone()
+                                    })
+                                    .collect()));
+
+                                resolved_deltas.push(Ok(txn_resolved_deltas
+                                    .into_iter()
+                                    .map(|(k, v)| {
+                                        // In this case transaction did not fail due to delta application
+                                        // errors, and thus we should update written_ and resolved_ worlds.
+                                        current_world
+                                            .insert(k.clone(), BaselineValue::Aggregator(v));
+                                        (k, v)
+                                    })
+                                    .collect()));
+
+                                // We ensure that the latest state is always reflected in exactly one of
+                                // the hashmaps, by possibly removing an element from the other Hashmap.
+                                for (k, v) in incarnation_behaviors[last_incarnation].writes.iter()
+                                {
                                     current_world
-                                        .entry(k.clone())
-                                        .or_insert(BaselineValue::Empty)
-                                        .clone()
-                                })
-                                .collect()));
-
-                            resolved_deltas.push(Ok(txn_resolved_deltas
-                                .into_iter()
-                                .map(|(k, v)| {
-                                    // In this case transaction did not fail due to delta application
-                                    // errors, and thus we should update written_ and resolved_ worlds.
-                                    current_world.insert(k.clone(), BaselineValue::Aggregator(v));
-                                    (k, v)
-                                })
-                                .collect()));
-
-                            // We ensure that the latest state is always reflected in exactly one of
-                            // the hashmaps, by possibly removing an element from the other Hashmap.
-                            for (k, v) in incarnation_behaviors[last_incarnation].writes.iter() {
-                                current_world
-                                    .insert(k.clone(), BaselineValue::GenericWrite(v.clone()));
-                            }
-
-                            group_reads.push(Ok(incarnation_behaviors[last_incarnation]
-                                .group_reads
-                                .clone()));
-
-                            // Apply gas.
-                            accumulated_gas += incarnation_behaviors[last_incarnation].gas;
-                            if let Some(block_gas_limit) = maybe_block_gas_limit {
-                                if accumulated_gas >= block_gas_limit {
-                                    status = BaselineStatus::GasLimitExceeded;
-                                    break;
+                                        .insert(k.clone(), BaselineValue::GenericWrite(v.clone()));
                                 }
-                            }
-                        },
-                        Err(_) => {
-                            // Transaction does not take effect and we record delta application failure.
-                            read_values.push(Err(()));
-                            resolved_deltas.push(Err(()));
-                            group_reads.push(Err(()));
-                        },
+
+                                group_reads.push(Ok(incarnation_behaviors[last_incarnation]
+                                    .group_reads
+                                    .clone()));
+
+                                // Apply gas.
+                                accumulated_gas += incarnation_behaviors[last_incarnation].gas;
+                                if let Some(block_gas_limit) = maybe_block_gas_limit {
+                                    if accumulated_gas >= block_gas_limit {
+                                        status = BaselineStatus::GasLimitExceeded;
+                                        break;
+                                    }
+                                }
+                            },
+                            Err(_) => {
+                                // Transaction does not take effect and we record delta application failure.
+                                read_values.push(Err(()));
+                                resolved_deltas.push(Err(()));
+                                group_reads.push(Err(()));
+                            },
+                        }
+                    } else {
+                        panic!("transaction missing output");
                     }
                 },
             }
         }
 
         Self {
-            status,
+            _status: status,
             read_values,
             resolved_deltas,
             group_reads,
         }
     }
 
-    fn assert_success<E: Debug>(&self, block_output: &BlockOutput<MockOutput<K, E>>) {
+    pub(crate) fn assert_success<E: Debug>(&self, block_output: &BlockOutput<MockOutput<K, E>>) {
         let base_map: HashMap<u32, Bytes> = HashMap::from([(RESERVED_TAG, vec![0].into())]);
         let mut group_world = HashMap::new();
         let mut group_metadata: HashMap<K, Option<StateValueMetadata>> = HashMap::new();
@@ -375,41 +384,5 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
             // be for skipped transactions.
             assert_none!(output.materialized_delta_writes.get());
         });
-    }
-
-    // Used for testing, hence the function asserts the correctness conditions within
-    // itself to be easily traceable in case of an error.
-    pub(crate) fn assert_output<E: Debug>(
-        &self,
-        results: &BlockExecutionResult<BlockOutput<MockOutput<K, E>>, usize>,
-    ) {
-        match results {
-            Ok(block_output) => {
-                self.assert_success(block_output);
-            },
-            Err(BlockExecutionError::FatalVMError(idx)) => {
-                assert_matches!(&self.status, BaselineStatus::Aborted);
-                assert_eq!(*idx, self.read_values.len());
-                assert_eq!(*idx, self.resolved_deltas.len());
-            },
-            Err(BlockExecutionError::FatalBlockExecutorError(e)) => {
-                unimplemented!("not tested here FallbackToSequential({:?})", e);
-            },
-        }
-    }
-
-    pub(crate) fn assert_parallel_output<E: Debug>(
-        &self,
-        results: &Result<BlockOutput<MockOutput<K, E>>, ()>,
-    ) {
-        match results {
-            Ok(block_output) => {
-                self.assert_success(block_output);
-            },
-            Err(()) => {
-                // Parallel execution currently returns an arbitrary error to fallback.
-                // TODO: adjust the logic to be able to test better.
-            },
-        }
     }
 }

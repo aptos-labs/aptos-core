@@ -53,7 +53,7 @@ impl Clone for VMValidator {
 impl VMValidator {
     fn new_vm_for_validation(state_view: &impl StateView) -> AptosVM {
         info!(
-            AdapterLogSchema::new(state_view.id(), 0),
+            AdapterLogSchema::new(state_view.id(), 0, false),
             "AptosVM created for Validation"
         );
         AptosVM::new(state_view)

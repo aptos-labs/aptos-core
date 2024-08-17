@@ -475,6 +475,12 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
             .module_reads
             .push(key.clone());
 
+        if self.scheduler.has_lost_execution_flag_writing(txn_idx) {
+            return Err(PartialVMError::new(
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+            ));
+        }
+
         match self
             .versioned_map
             .modules()
@@ -1005,7 +1011,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for VMInitView<
                 if ret.is_err() {
                     // Reading from base view should not return an error.
                     // Thus, this critical error log and count does not need to be buffered.
-                    let log_context = AdapterLogSchema::new(self.base_view.id(), 0);
+                    let log_context = AdapterLogSchema::new(self.base_view.id(), 0, false);
                     alert!(
                         log_context,
                         "[VM, StateView] Error getting data from storage for {:?}",
@@ -1094,6 +1100,7 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     pub(crate) latest_view: ViewState<'a, T>,
     txn_idx: TxnIndex,
     incarnation: Incarnation,
+    is_backup: bool,
     worker_id: usize,
     maybe_profiler_state: Option<RefCell<ViewProfilerState>>,
 }
@@ -1104,6 +1111,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         latest_view: ViewState<'a, T>,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
+        is_backup: bool,
         worker_id: usize,
         profile_callbacks: bool,
     ) -> Self {
@@ -1112,6 +1120,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             latest_view,
             txn_idx,
             incarnation,
+            is_backup,
             worker_id,
             maybe_profiler_state: profile_callbacks.then(|| RefCell::new(ViewProfilerState::new())),
         }
@@ -1175,7 +1184,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
             // Thus, this critical error log and count does not need to be buffered.
-            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+            let log_context =
+                AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize, self.is_backup);
             alert!(
                 log_context,
                 "[VM, StateView] Error getting data from storage for {:?}",
@@ -1205,8 +1215,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 match res {
                     Ok((value, _)) => Some(value),
                     Err(err) => {
-                        let log_context =
-                            AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+                        let log_context = AdapterLogSchema::new(
+                            self.base_view.id(),
+                            self.txn_idx as usize,
+                            self.is_backup,
+                        );
                         alert!(
                             log_context,
                             "[VM, ResourceView] Error during value to id replacement: {}",
@@ -2691,6 +2704,7 @@ mod test {
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
             0,
+            false,
             0,
             false,
         );
@@ -2979,6 +2993,7 @@ mod test {
             ViewState::Unsync(sequential_state),
             1,
             0,
+            false,
             0,
             false,
         )
@@ -3023,6 +3038,7 @@ mod test {
                 )),
                 1,
                 0,
+                false,
                 0,
                 false,
             );

@@ -606,7 +606,7 @@ pub async fn simulate_multistep_proposal(
         // patches we performed.
         flush_warm_vm_cache();
         let vm = AptosVM::new_for_gov_sim(&state_view);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
         let resolver = state_view.as_move_resolver();
         let (_vm_status, vm_output) = vm.execute_user_transaction(
             &resolver,

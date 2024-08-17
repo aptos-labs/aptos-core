@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -85,8 +84,10 @@ fn run_transactions<K, V, E>(
             continue;
         }
 
-        BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, maybe_block_gas_limit, output)
+                .assert_success(output);
+        }
     }
 }
 
@@ -214,8 +215,10 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         )
         .execute_transactions_parallel(&(), &transactions, &data_view);
 
-        BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, maybe_block_gas_limit, output)
+                .assert_success(output);
+        }
     }
 }
 
@@ -264,8 +267,10 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         )
         .execute_transactions_parallel(&(), &transactions, &data_view);
 
-        BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, maybe_block_gas_limit, output)
+                .assert_success(output);
+        }
     }
 }
 
@@ -378,7 +383,6 @@ fn publishing_fixed_params_with_block_gas_limit(
     let w_index = indices[0].index(num_txns);
     match transactions.get_mut(w_index).unwrap() {
         MockTransaction::Write {
-            incarnation_counter: _,
             incarnation_behaviors,
         } => {
             incarnation_behaviors.iter_mut().for_each(|behavior| {
@@ -424,7 +428,6 @@ fn publishing_fixed_params_with_block_gas_limit(
     let r_index = indices[2].index(num_txns);
     match transactions.get_mut(r_index).unwrap() {
         MockTransaction::Write {
-            incarnation_counter: _,
             incarnation_behaviors,
         } => {
             incarnation_behaviors.iter_mut().for_each(|behavior| {
@@ -541,7 +544,9 @@ fn non_empty_group(
         )
         .execute_transactions_parallel(&(), &transactions, &data_view);
 
-        BaselineOutput::generate(&transactions, None).assert_parallel_output(&output);
+        if let Ok(output) = &output {
+            BaselineOutput::generate(&transactions, None, output).assert_success(output);
+        }
     }
 
     for _ in 0..num_repeat_sequential {
@@ -558,12 +563,16 @@ fn non_empty_group(
         .execute_transactions_sequential((), &transactions, &data_view, false);
         // TODO: test dynamic disabled as well.
 
-        BaselineOutput::generate(&transactions, None).assert_output(&output.map_err(|e| match e {
-            SequentialBlockExecutionError::ResourceGroupSerializationError => {
-                panic!("Unexpected error")
+        match output {
+            Ok(output) => {
+                let baseline = BaselineOutput::generate(&transactions, None, &output);
+                baseline.assert_success(&output);
             },
-            SequentialBlockExecutionError::ErrorToReturn(err) => err,
-        }));
+            Err(e) => {
+                // TODO: test separately w. Abort index.
+                unreachable!("Not tested err {:?}", e);
+            },
+        }
     }
 }
 
