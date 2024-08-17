@@ -262,11 +262,14 @@ fn compute_delayed_field_try_add_delta_outcome_from_history(
         true
     };
 
-    Ok((result, DelayedFieldRead::HistoryBounded {
-        restriction: history,
-        max_value,
-        inner_aggregator_value: base_aggregator_value,
-    }))
+    Ok((
+        result,
+        DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value,
+            inner_aggregator_value: base_aggregator_value,
+        },
+    ))
 }
 
 fn compute_delayed_field_try_add_delta_outcome_first_time(
@@ -294,11 +297,14 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         true
     };
 
-    Ok((result, DelayedFieldRead::HistoryBounded {
-        restriction: history,
-        max_value,
-        inner_aggregator_value: base_aggregator_value,
-    }))
+    Ok((
+        result,
+        DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value,
+            inner_aggregator_value: base_aggregator_value,
+        },
+    ))
 }
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
@@ -471,7 +477,26 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
             .module_reads
             .push(key.clone());
 
-        self.versioned_map.modules().fetch_module(key, txn_idx)
+        if self.scheduler.has_lost_execution_flag_writing(txn_idx) {
+            return Err(PartialVMError::new(
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+            ));
+        }
+
+        match self
+            .versioned_map
+            .modules()
+            .fetch_module(key, txn_idx, init_base)
+        {
+            Ok(Module(v)) => Ok(v.as_state_value()),
+            Ok(BaseModule(maybe_state_value)) => Ok(maybe_state_value),
+            Err(StorageError(e)) => base_value_or_partial_err::<T>(key, Err(e)),
+            Err(Dependency(_)) => {
+                // Return anything (e.g. module does not exist) to avoid waiting,
+                // because parallel execution will fall back to sequential anyway.
+                Ok(None)
+            },
+        }
     }
 
     fn read_group_size(
@@ -955,6 +980,18 @@ impl<'a, T: Transaction> ViewState<'a, T> {
     }
 }
 
+fn base_value_or_partial_err<T: Transaction>(
+    state_key: &T::Key,
+    base_or_storage_err: Result<Option<StateValue>, StateviewError>,
+) -> PartialVMResult<Option<StateValue>> {
+    base_or_storage_err.map_err(|e| {
+        PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+            "Unexpected storage error for {:?}: {:?}",
+            state_key, e
+        ))
+    })
+}
+
 /// A struct that represents a single block execution worker thread's view into the state,
 /// some of which (in Sync case) might be shared with other workers / threads. By implementing
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
@@ -965,6 +1002,7 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     pub(crate) latest_view: ViewState<'a, T>,
     txn_idx: TxnIndex,
     incarnation: Incarnation,
+    is_backup: bool,
     worker_id: usize,
     maybe_profiler_state: Option<RefCell<ViewProfilerState>>,
 }
@@ -975,6 +1013,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         latest_view: ViewState<'a, T>,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
+        is_backup: bool,
         worker_id: usize,
         profile_callbacks: bool,
     ) -> Self {
@@ -983,6 +1022,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             latest_view,
             txn_idx,
             incarnation,
+            is_backup,
             worker_id,
             maybe_profiler_state: profile_callbacks.then(|| RefCell::new(ViewProfilerState::new())),
         }
@@ -1048,7 +1088,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
             // Thus, this critical error log and count does not need to be buffered.
-            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+            let log_context =
+                AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize, self.is_backup);
             alert!(
                 log_context,
                 "[VM, StateView] Error getting data from storage for {:?}",
@@ -1071,8 +1112,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 match res {
                     Ok((value, _)) => Some(value),
                     Err(err) => {
-                        let log_context =
-                            AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+                        let log_context = AdapterLogSchema::new(
+                            self.base_view.id(),
+                            self.txn_idx as usize,
+                            self.is_backup,
+                        );
                         alert!(
                             log_context,
                             "[VM, ResourceView] Error during value to id replacement: {}",
@@ -2475,6 +2519,7 @@ mod test {
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
             0,
+            false,
             0,
             false,
         );
@@ -2763,6 +2808,7 @@ mod test {
             ViewState::Unsync(sequential_state),
             1,
             0,
+            false,
             0,
             false,
         )
@@ -2807,6 +2853,7 @@ mod test {
                 )),
                 1,
                 0,
+                false,
                 0,
                 false,
             );

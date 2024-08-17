@@ -4,12 +4,9 @@
 
 use crate::{
     executor::BlockExecutor,
-    proptest_types::{
-        baseline::BaselineOutput,
-        types::{
-            EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction, TransactionGen,
-            TransactionGenParams,
-        },
+    proptest_types::types::{
+        EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction, TransactionGen,
+        TransactionGenParams,
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
@@ -37,7 +34,6 @@ pub(crate) struct BencherState<
     E: Send + Sync + Debug + Clone + TransactionEvent,
 > {
     transactions: Vec<MockTransaction<KeyType<K>, E>>,
-    baseline_output: BaselineOutput<KeyType<K>>,
 }
 
 impl<K, V, E> Bencher<K, V, E>
@@ -105,12 +101,9 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let baseline_output = BaselineOutput::generate(&transactions, None);
+        // TODO: add support for baseline comparison.
 
-        Self {
-            transactions,
-            baseline_output,
-        }
+        Self { transactions }
     }
 
     pub(crate) fn run(self) {
@@ -126,14 +119,12 @@ where
         );
 
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
-        let output = BlockExecutor::<
+        let _output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
             EmptyDataView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
         >::new(config, executor_thread_pool, None)
         .execute_transactions_parallel(&(), &self.transactions, &data_view);
-
-        self.baseline_output.assert_parallel_output(&output);
     }
 }

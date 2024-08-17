@@ -8,7 +8,7 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
     resolver::TAggregatorV1View,
 };
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
@@ -23,6 +23,7 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
+    vm_status::StatusCode,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
@@ -38,10 +39,7 @@ use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
 
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
@@ -407,10 +405,6 @@ impl<K, E> MockIncarnation<K, E> {
 #[derive(Clone, Debug)]
 pub(crate) enum MockTransaction<K, E> {
     Write {
-        /// Incarnation counter, increased during each mock (re-)execution. Allows tracking the final
-        /// incarnation for each mock transaction, whose behavior should be reproduced for baseline.
-        /// Arc-ed only due to Clone, TODO: clean up the Clone requirement.
-        incarnation_counter: Arc<AtomicUsize>,
         /// A vector of mock behaviors prescribed for each incarnation of the transaction, chosen
         /// round robin depending on the incarnation counter value).
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
@@ -424,14 +418,12 @@ pub(crate) enum MockTransaction<K, E> {
 impl<K, E> MockTransaction<K, E> {
     pub(crate) fn from_behavior(behavior: MockIncarnation<K, E>) -> Self {
         Self::Write {
-            incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
         }
     }
 
     pub(crate) fn from_behaviors(behaviors: Vec<MockIncarnation<K, E>>) -> Self {
         Self::Write {
-            incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
         }
     }
@@ -864,17 +856,18 @@ where
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        is_backup: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             MockTransaction::Write {
-                incarnation_counter,
                 incarnation_behaviors,
             } => {
-                // Use incarnation counter value as an index to determine the read-
+                // Use incarnation counter+is_backup value as an index to determine the read-
                 // and write-sets of the execution. Increment incarnation counter to
                 // simulate dynamic behavior when there are multiple possible read-
                 // and write-sets (i.e. each are selected round-robin).
-                let idx = incarnation_counter.fetch_add(1, Ordering::SeqCst);
+                let idx = (incarnation + if is_backup { 1 } else { 0 }) as usize;
 
                 let behavior = &incarnation_behaviors[idx % incarnation_behaviors.len()];
 
@@ -904,35 +897,58 @@ where
                     }
                 }
 
-                let read_group_size_or_metadata = behavior
-                    .group_queries
-                    .iter()
-                    .map(|(group_key, query_metadata)| {
-                        let res = if *query_metadata {
-                            GroupSizeOrMetadata::Metadata(
-                                view.get_resource_state_value_metadata(group_key)
-                                    .expect("Group must exist and size computation must succeed"),
-                            )
-                        } else {
-                            GroupSizeOrMetadata::Size(
-                                view.resource_group_size(group_key)
-                                    .expect("Group must exist and size computation must succeed")
-                                    .get(),
-                            )
-                        };
+                let mut read_group_size_or_metadata =
+                    Vec::with_capacity(behavior.group_queries.len());
+                for (group_key, query_metadata) in behavior.group_queries.iter() {
+                    let res = if *query_metadata {
+                        GroupSizeOrMetadata::Metadata(
+                            match view.get_resource_state_value_metadata(group_key) {
+                                Err(e) => {
+                                    assert!(
+                                        e.major_status()
+                                            == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                                    );
+                                    return ExecutionStatus::SpeculativeExecutionAbortError(
+                                        "Test execution speculation stopped".to_string(),
+                                    );
+                                },
+                                Ok(v) => v,
+                            },
+                        )
+                    } else {
+                        GroupSizeOrMetadata::Size(match view.resource_group_size(group_key) {
+                            Err(e) => {
+                                assert!(
+                                    e.major_status()
+                                        == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                                );
+                                return ExecutionStatus::SpeculativeExecutionAbortError(
+                                    "Test execution speculation stopped".to_string(),
+                                );
+                            },
+                            Ok(v) => v.get(),
+                        })
+                    };
 
-                        (group_key.clone(), res)
-                    })
-                    .collect();
+                    read_group_size_or_metadata.push((group_key.clone(), res));
+                }
 
                 let mut group_writes = vec![];
                 for (key, metadata, inner_ops) in behavior.group_writes.iter() {
                     let mut new_inner_ops = HashMap::new();
                     for (tag, inner_op) in inner_ops.iter() {
-                        let exists = view
-                            .get_resource_from_group(key, tag, None)
-                            .unwrap()
-                            .is_some();
+                        let exists: bool = match view.get_resource_from_group(key, tag, None) {
+                            Err(e) => {
+                                assert!(
+                                    e.major_status()
+                                        == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                                );
+                                return ExecutionStatus::SpeculativeExecutionAbortError(
+                                    "Test execution speculation stopped".to_string(),
+                                );
+                            },
+                            Ok(v) => v.is_some(),
+                        };
                         assert!(
                             *tag != RESERVED_TAG || exists,
                             "RESERVED_TAG must always be present in groups in tests"
@@ -994,6 +1010,8 @@ where
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
                     skipped: false,
+                    incarnation,
+                    is_backup,
                 })
             },
             MockTransaction::SkipRest(gas) => {
@@ -1032,6 +1050,8 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) total_gas: u64,
     pub(crate) skipped: bool,
+    pub(crate) incarnation: Incarnation,
+    pub(crate) is_backup: bool,
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -1137,6 +1157,8 @@ where
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
             skipped: true,
+            incarnation: 0,
+            is_backup: false,
         }
     }
 
@@ -1151,6 +1173,8 @@ where
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
             skipped: true,
+            incarnation: 0,
+            is_backup: false,
         }
     }
 

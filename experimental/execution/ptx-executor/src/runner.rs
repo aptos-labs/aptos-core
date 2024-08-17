@@ -258,7 +258,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     trace!("worker {} gonna run txn {}", self.worker_index, txn_idx);
                     let state_view =
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
-                    let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
+                    let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx, false);
 
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
