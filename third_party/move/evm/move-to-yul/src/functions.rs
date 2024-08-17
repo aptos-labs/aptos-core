@@ -298,7 +298,7 @@ impl<'a> FunctionGenerator<'a> {
                     get_block(if_t),
                 )
             },
-            Assign(_, dest, src, _) => {
+            Assign(_, dest, src, _, _) => {
                 print_loc();
                 self.assign(ctx, target, *dest, local(src))
             },
