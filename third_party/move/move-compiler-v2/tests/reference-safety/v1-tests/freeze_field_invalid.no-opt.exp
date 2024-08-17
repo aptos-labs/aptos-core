@@ -18,6 +18,5 @@ error: cannot freeze value which is still mutably borrowed
 19 │         freeze(s);
    │         ^^^^^^^^^ frozen here
 20 │         *f;
-   │         -- conflicting reference `f` used here
 21 │         *g;
    │         -- conflicting reference `g` used here

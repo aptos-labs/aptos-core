@@ -58,7 +58,7 @@ pub struct LifetimeState {
     /// (and location) which created it, and `Vec<Label>` for describing the operations
     /// via which the edge was established.
     borrow_graph: BorrowGraph<AttrId, Label>,
-    /// Locals and there associated abstract values, to be indexed by TempIndex.
+    /// Locals and their associated abstract values, to be indexed by TempIndex.
     locals: Vec<AbstractValue>,
     /// Next available free id for fresh reference ids in the borrow graph.
     next_ref_id: usize,
@@ -79,6 +79,7 @@ impl Default for LifetimeState {
 enum Label {
     Local(TempIndex),
     Global(QualifiedId<StructId>),
+    /// Field selection at offset.
     Field(QualifiedId<StructId>, usize),
 }
 
@@ -593,7 +594,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.collect_usage_info(&mut result, |id| {
             self.state
                 .borrow_graph
-                .is_borrowed_via(id, Label::Global(struct_id))
+                .is_borrowed_via(id, &Label::Global(struct_id))
         });
         result
     }
@@ -608,7 +609,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.collect_usage_info(&mut result, |id| {
             self.state
                 .borrow_graph
-                .is_borrowed_via(id, Label::Local(local))
+                .is_borrowed_via(id, &Label::Local(local))
         });
         result
     }

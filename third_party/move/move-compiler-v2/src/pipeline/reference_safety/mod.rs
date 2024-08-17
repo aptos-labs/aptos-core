@@ -7,6 +7,7 @@ use move_model::{ast::TempIndex, ty::ReferenceKind};
 use move_stackless_bytecode::function_target::FunctionTarget;
 use std::{collections::BTreeMap, rc::Rc};
 
+pub mod reference_safety_processor_v2;
 pub mod reference_safety_processor_v3;
 
 /// Annotation produced by implementations
@@ -23,7 +24,8 @@ impl LifetimeAnnotation {
 /// Information present at each code offset
 #[derive(Clone)]
 pub struct LifetimeInfoAtCodeOffset {
-    /// Information hidden via a trait, specific to the processor.
+    /// Information hidden via a trait, specific to the processor. This is stored
+    /// in an Rc so we can keep this clonable, even if the underlying data is a trait.
     before: Rc<dyn LifetimeInfo>,
     after: Rc<dyn LifetimeInfo>,
 }
@@ -42,10 +44,15 @@ impl LifetimeInfoAtCodeOffset {
         Self { before, after }
     }
 
+    /// Returns information about the borrow state of the given temporary
+    /// before the program point. If there are any references active,
+    /// the returned reference kind will determine whether there are only
+    /// immutable or at least one mutable reference.
     pub fn borrow_kind_before(&self, temp: TempIndex) -> Option<ReferenceKind> {
         self.before.borrow_kind(temp)
     }
 
+    /// Same as `borrow_kind_before` but after the given program point.
     pub fn borrow_kind_after(&self, temp: TempIndex) -> Option<ReferenceKind> {
         self.after.borrow_kind(temp)
     }
@@ -54,9 +61,12 @@ impl LifetimeInfoAtCodeOffset {
 /// A trait to be implemented by reference safety processors
 pub trait LifetimeInfo {
     fn borrow_kind(&self, temp: TempIndex) -> Option<ReferenceKind>;
+
+    // For debugging
     fn display(&self, target: &FunctionTarget) -> Option<String>;
 }
 
+/// Needed to implement Default
 struct NoLifetimeInfo();
 
 impl LifetimeInfo for NoLifetimeInfo {

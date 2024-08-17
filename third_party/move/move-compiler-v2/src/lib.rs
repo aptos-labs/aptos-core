@@ -25,11 +25,13 @@ use crate::{
         seqs_in_binop_checker, spec_checker, spec_rewriter, EnvProcessorPipeline,
     },
     pipeline::{
-        ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
-        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+        ability_processor::AbilityProcessor,
+        avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        copy_propagation::CopyPropagation,
+        dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
-        reference_safety::reference_safety_processor_v3, reference_safety_processor,
+        reference_safety::{reference_safety_processor_v2, reference_safety_processor_v3},
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
@@ -404,16 +406,16 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         pipeline.add_processor(Box::new(UnusedAssignmentChecker {}));
     }
 
-    // Reference check is always run, but the processor decides internally
-    // based on `Experiment::REFERENCE_SAFETY` whether to report errors.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
     if options.experiment_on(Experiment::REFERENCE_SAFETY_V3) {
         pipeline.add_processor(Box::new(
             reference_safety_processor_v3::ReferenceSafetyProcessor {},
         ));
     } else {
+        // Reference check is always run, but the legacy processor decides internally
+        // based on `Experiment::REFERENCE_SAFETY` whether to report errors.
         pipeline.add_processor(Box::new(
-            reference_safety_processor::ReferenceSafetyProcessor {},
+            reference_safety_processor_v2::ReferenceSafetyProcessor {},
         ));
     }
 

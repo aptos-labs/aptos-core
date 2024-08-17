@@ -321,7 +321,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             // Some reference tests create different errors since variable names are
             // known without optimizations, so we need to have a different exp file
-            exp_suffix:Some("no-opt.exp"),
+            exp_suffix: Some("no-opt.exp"),
             options: opts.clone().set_experiment(Experiment::OPTIMIZE, false)
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::FileFormat,
