@@ -1,9 +1,0 @@
-
-============ bytecode verification failed ========
-
-Diagnostics:
-bug: bytecode verification failed with unexpected status code `READREF_EXISTS_MUTABLE_BORROW_ERROR`. This is a compiler bug, consider reporting it.
-  ┌─ tests/reference-safety/bug_14096.move:6:9
-  │
-6 │         (copy x == copy x);
-  │         ^^^^^^^^^^^^^^^^^^
