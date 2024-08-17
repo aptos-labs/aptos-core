@@ -90,7 +90,7 @@ pub fn init_speculative_logs(num_txns: usize) {
 /// to speculative buffer. Logs directly and logs a separate (new error) if the speculative
 /// events storage is not initialized or appropriately sized.
 pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String) {
-    let txn_idx = context.get_txn_idx();
+    let speculative_log_idx = context.get_speculative_log_idx();
 
     if !context.speculation_supported() || speculation_disabled() {
         // Speculation isn't supported in the current mode, or disabled globally.
@@ -102,7 +102,7 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
         match &*BUFFERED_LOG_EVENTS.load() {
             Some(log_events) => {
                 let log_event = VMLogEntry::new(level, context.clone(), message);
-                if let Err(e) = log_events.record(txn_idx, log_event) {
+                if let Err(e) = log_events.record(speculative_log_idx, log_event) {
                     speculative_alert!("{:?}", e);
                 };
             },
@@ -116,14 +116,15 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
     }
 }
 
-/// Flushes the first num_to_flush logs in the currently stored logs, and swaps the speculative
+/// Flushes the logs coresponding to first num_to_flush txns, and swaps the speculative
 /// log / event storage with None. Must be called after block execution is complete as it
-/// removes the storage from Arc.
+/// removes the storage from Arc. Note that each transaction corresponds to two consecutive
+/// slots, odd index for a fallback execution (one of these two slots must be empty).
 pub fn flush_speculative_logs(num_to_flush: usize) {
     match BUFFERED_LOG_EVENTS.swap(None) {
         Some(log_events_ptr) => {
             match Arc::try_unwrap(log_events_ptr) {
-                Ok(log_events) => log_events.flush(num_to_flush),
+                Ok(log_events) => log_events.flush(num_to_flush * 2),
                 Err(_) => {
                     speculative_alert!("Speculative log storage must be uniquely owned to flush");
                 },
@@ -142,13 +143,18 @@ pub fn flush_speculative_logs(num_to_flush: usize) {
 
 /// Clear speculative logs recorded for a specific transction, useful when transaction
 /// execution fails validation and aborts - setting stage for the re-execution.
-pub fn clear_speculative_txn_logs(txn_idx: usize) {
+pub fn clear_speculative_txn_logs(txn_idx: usize, is_backup: bool) {
     if speculation_disabled() {
         return;
     }
+    let speculative_log_idx = if is_backup {
+        txn_idx * 2 + 1
+    } else {
+        txn_idx * 2
+    };
     match &*BUFFERED_LOG_EVENTS.load() {
         Some(log_events) => {
-            if let Err(e) = log_events.clear_txn_events(txn_idx) {
+            if let Err(e) = log_events.clear_txn_events(speculative_log_idx) {
                 speculative_alert!("{:?}", e);
             };
         },

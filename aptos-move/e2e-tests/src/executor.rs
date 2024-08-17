@@ -769,7 +769,7 @@ impl FakeExecutor {
             .check_signature()
             .expect("invalid signature for transaction");
 
-        let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
+        let log_context = AdapterLogSchema::new(self.data_store.id(), 0, false);
 
         // TODO(Gas): revisit this.
         let vm = AptosVM::new(self.get_state_view());
