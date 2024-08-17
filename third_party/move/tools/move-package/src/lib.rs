@@ -170,6 +170,10 @@ pub struct CompilerConfig {
     #[clap(long = SKIP_ATTRIBUTE_CHECKS, default_value = "false")]
     pub skip_attribute_checks: bool,
 
+    /// Treat warnings as errors.
+    #[clap(long = "warnings-as-errors", default_value = "false")]
+    pub warnings_as_errors: bool,
+
     /// Compiler version to use
     #[clap(long = "compiler-version", global = true,
            value_parser = clap::value_parser!(CompilerVersion))]

@@ -15,6 +15,9 @@ pub struct ModelBuilderOptions {
     /// The language version to use.
     pub language_version: LanguageVersion,
 
+    /// Whether to treat warnings as errors.
+    pub warnings_as_errors: bool,
+
     /// Ignore the "opaque" pragma on internal function (i.e., functions with no unknown callers)
     /// specs when possible. The opaque can be ignored as long as the function spec has no property
     /// marked as `[concrete]` or `[abstract]`.

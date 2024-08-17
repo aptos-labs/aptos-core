@@ -28,6 +28,7 @@ ResolutionGraph {
                 "verify_only",
             },
             skip_attribute_checks: false,
+            warnings_as_errors: false,
             compiler_version: Some(
                 V1,
             ),

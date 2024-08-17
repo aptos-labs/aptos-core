@@ -67,6 +67,7 @@ impl CliCommand<Vec<EntryABI>> for ShowAbi {
                     self.move_options.bytecode_version,
                     self.move_options.compiler_version,
                     self.move_options.language_version,
+                    self.move_options.warnings_as_errors,
                     self.move_options.skip_attribute_checks,
                     self.move_options.check_test_code,
                 )

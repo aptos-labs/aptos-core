@@ -393,6 +393,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.bytecode_version,
                     self.move_options.compiler_version,
                     self.move_options.language_version,
+                    self.move_options.warnings_as_errors,
                     self.move_options.skip_attribute_checks,
                     self.move_options.check_test_code,
                 )
@@ -457,6 +458,7 @@ impl CompileScript {
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
+                self.move_options.warnings_as_errors,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             )
@@ -627,6 +629,7 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.bytecode_version,
                 move_options.compiler_version,
                 move_options.language_version,
+                move_options.warnings_as_errors,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],
@@ -679,6 +682,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             bytecode_version: move_options.bytecode_version,
             compiler_version: move_options.compiler_version,
             language_version: move_options.language_version,
+            warnings_as_errors: false,
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -750,6 +754,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
+                self.move_options.warnings_as_errors,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             );
@@ -822,6 +827,7 @@ impl IncludedArtifacts {
         bytecode_version: Option<u32>,
         compiler_version: Option<CompilerVersion>,
         language_version: Option<LanguageVersion>,
+        warnings_as_errors: bool,
         skip_attribute_checks: bool,
         check_test_code: bool,
     ) -> BuildOptions {
@@ -840,6 +846,7 @@ impl IncludedArtifacts {
                 bytecode_version,
                 compiler_version,
                 language_version,
+                warnings_as_errors,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -857,6 +864,7 @@ impl IncludedArtifacts {
                 bytecode_version,
                 compiler_version,
                 language_version,
+                warnings_as_errors,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -874,6 +882,7 @@ impl IncludedArtifacts {
                 bytecode_version,
                 compiler_version,
                 language_version,
+                warnings_as_errors,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -996,6 +1005,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
+                self.move_options.warnings_as_errors,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             );
@@ -1074,6 +1084,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
+                self.move_options.warnings_as_errors,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             );
@@ -1281,6 +1292,7 @@ fn build_package_options(
         move_options.bytecode_version,
         move_options.compiler_version,
         move_options.language_version,
+        move_options.warnings_as_errors,
         move_options.skip_attribute_checks,
         move_options.check_test_code,
     );
@@ -1381,6 +1393,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.bytecode_version,
             move_options.compiler_version,
             move_options.language_version,
+            move_options.warnings_as_errors,
             move_options.skip_attribute_checks,
             move_options.check_test_code,
         );
@@ -1534,6 +1547,7 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
+                self.move_options.warnings_as_errors,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             )

@@ -90,6 +90,8 @@ pub struct BuildOptions {
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
+    pub warnings_as_errors: bool,
+    #[clap(long)]
     pub skip_attribute_checks: bool,
     #[clap(long)]
     pub check_test_code: bool,
@@ -120,6 +122,7 @@ impl Default for BuildOptions {
             bytecode_version: None,
             compiler_version: None,
             language_version: None,
+            warnings_as_errors: false,
             skip_attribute_checks: false,
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -165,6 +168,7 @@ pub fn build_model(
     bytecode_version: Option<u32>,
     compiler_version: Option<CompilerVersion>,
     language_version: Option<LanguageVersion>,
+    warnings_as_errors: bool,
     skip_attribute_checks: bool,
     known_attributes: BTreeSet<String>,
     experiments: Vec<String>,
@@ -192,6 +196,7 @@ pub fn build_model(
             bytecode_version,
             compiler_version,
             language_version,
+            warnings_as_errors,
             skip_attribute_checks,
             known_attributes,
             experiments,
@@ -217,6 +222,7 @@ impl BuiltPackage {
         let bytecode_version = Some(options.inferred_bytecode_version());
         let compiler_version = options.compiler_version;
         let language_version = options.language_version;
+        let warnings_as_errors = options.warnings_as_errors;
         Self::check_versions(&compiler_version, &language_version)?;
         let skip_attribute_checks = options.skip_attribute_checks;
         let build_config = BuildConfig {
@@ -237,6 +243,7 @@ impl BuiltPackage {
                 bytecode_version,
                 compiler_version,
                 language_version,
+                warnings_as_errors,
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),

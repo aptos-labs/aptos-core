@@ -61,6 +61,10 @@ pub struct Options {
     #[clap(long)]
     pub testing: bool,
 
+    /// Whether warnings should be emitted as errors.
+    #[clap(long)]
+    pub warnings_as_errors: bool,
+
     /// Active experiments. Experiments alter default behavior of the compiler.
     /// See `Experiment` struct.
     #[clap(short)]
@@ -146,6 +150,14 @@ impl Options {
     pub fn set_language_version(self, version: LanguageVersion) -> Self {
         Self {
             language_version: Some(version),
+            ..self
+        }
+    }
+
+    /// Turns on or off warnings-as-errors
+    pub fn set_warnings_as_errors(self, on: bool) -> Self {
+        Self {
+            warnings_as_errors: on,
             ..self
         }
     }

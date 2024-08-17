@@ -117,16 +117,9 @@ impl ModelBuilder {
             ),
         };
 
-        let skip_attribute_checks = self
-            .resolution_graph
-            .build_options
-            .compiler_config
-            .skip_attribute_checks;
-        let known_attributes = &self
-            .resolution_graph
-            .build_options
-            .compiler_config
-            .known_attributes;
+        let compiler_config = &self.resolution_graph.build_options.compiler_config;
+        let skip_attribute_checks = compiler_config.skip_attribute_checks;
+        let known_attributes = &compiler_config.known_attributes;
         match self.model_config.compiler_version {
             CompilerVersion::V1 => run_model_builder_with_options(
                 all_targets,
@@ -138,13 +131,10 @@ impl ModelBuilder {
             ),
             CompilerVersion::V2_0 => {
                 let mut options = make_options_for_v2_compiler(all_targets, all_deps);
-                options.language_version = self
-                    .resolution_graph
-                    .build_options
-                    .compiler_config
-                    .language_version;
+                options.language_version = compiler_config.language_version;
                 options.known_attributes.clone_from(known_attributes);
                 options.skip_attribute_checks = skip_attribute_checks;
+                options.warnings_as_errors = compiler_config.warnings_as_errors;
                 let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
                 move_compiler_v2::run_move_compiler_for_analysis(&mut error_writer, options)
             },

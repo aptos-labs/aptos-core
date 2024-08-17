@@ -1075,6 +1075,10 @@ pub struct MovePackageDir {
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
 
+    /// Treat warnings as errors
+    #[clap(long, env = "APTOS_WARNINGS_AS_ERRORS")]
+    pub warnings_as_errors: bool,
+
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -1098,6 +1102,7 @@ impl MovePackageDir {
             bytecode_version: None,
             compiler_version: None,
             language_version: None,
+            warnings_as_errors: false,
             skip_attribute_checks: false,
             check_test_code: false,
         }

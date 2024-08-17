@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: [warning as error] Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/warnings-as-errors/unused.move:2:21
+  │
+2 │     public fun test(x: u64) {
+  │                     ^

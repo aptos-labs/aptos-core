@@ -90,6 +90,7 @@ pub fn run_model_builder_in_compiler_mode(
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
+    warnings_as_errors: bool,
     warn_of_deprecation_use: bool,
     warn_of_deprecation_use_in_aptos_libs: bool,
     compile_test_code: bool,
@@ -110,6 +111,7 @@ pub fn run_model_builder_in_compiler_mode(
         ModelBuilderOptions {
             compile_via_model: true,
             language_version,
+            warnings_as_errors,
             ..ModelBuilderOptions::default()
         },
         Flags::model_compilation()
@@ -165,6 +167,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
     env.set_language_version(options.language_version);
+    env.set_warning_as_error(options.warnings_as_errors);
     let compile_via_model = options.compile_via_model;
     env.set_extension(options);
 

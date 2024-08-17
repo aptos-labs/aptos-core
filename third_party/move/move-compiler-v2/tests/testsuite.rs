@@ -159,6 +159,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
         },
+        TestConfig {
+            name: "warnings-as-errors",
+            runner: |p| run_test(p, get_config_by_name("warnings-as-errors")),
+            include: vec!["/warnings-as-errors/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_warnings_as_errors(true),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
         // Tests for lambda lifting
         TestConfig {
             name: "lambda-lifting",

@@ -52,6 +52,7 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
             .parse::<usize>()
             .unwrap_or(options.vc_timeout);
         let skip_attribute_checks = false;
+        let warnings_as_errors = false;
         options
             .prove(
                 false,
@@ -60,6 +61,7 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
                 None,
                 None,
                 None,
+                warnings_as_errors,
                 skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
                 &[],

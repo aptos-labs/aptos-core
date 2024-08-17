@@ -546,6 +546,9 @@ pub struct GlobalEnv {
     /// A special constant location representing an opaque location.
     /// In difference to an `unknown_loc`, this is a well-known but undisclosed location.
     pub(crate) internal_loc: Loc,
+    /// A boolean indicating whether warnings are treated as error. In a RefCell we can turn
+    /// it on/off on demands. Effects subsequent `self.add_diag` calls which also work on RefCell.
+    pub(crate) warnings_as_errors: RefCell<bool>,
     /// Accumulated diagnosis. In a RefCell so we can add to it without needing a mutable GlobalEnv.
     /// The boolean indicates whether the diag was reported.
     pub(crate) diags: RefCell<Vec<(Diagnostic<FileId>, bool)>>,
@@ -628,6 +631,7 @@ impl GlobalEnv {
             file_idx_to_id,
             file_id_is_target: BTreeSet::new(),
             file_id_is_primary_target: BTreeSet::new(),
+            warnings_as_errors: RefCell::new(false),
             diags: RefCell::new(vec![]),
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
@@ -887,8 +891,17 @@ impl GlobalEnv {
         self.doc_comments.insert(file_id, docs);
     }
 
+    /// Indicates whether warnings should be treated as errors.
+    pub fn set_warning_as_error(&self, on: bool) {
+        *self.warnings_as_errors.borrow_mut() = on
+    }
+
     /// Adds diagnostic to the environment.
-    pub fn add_diag(&self, diag: Diagnostic<FileId>) {
+    pub fn add_diag(&self, mut diag: Diagnostic<FileId>) {
+        if *self.warnings_as_errors.borrow() && diag.severity == Severity::Warning {
+            diag.severity = Severity::Error;
+            diag.message = format!("[warning as error] {}", diag.message)
+        }
         self.diags.borrow_mut().push((diag, false));
     }
 

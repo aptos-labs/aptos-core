@@ -584,16 +584,11 @@ impl CompiledPackage {
         } else {
             Flags::empty()
         };
-        let skip_attribute_checks = resolution_graph
-            .build_options
-            .compiler_config
-            .skip_attribute_checks;
+        let compiler_config = &resolution_graph.build_options.compiler_config;
+        let skip_attribute_checks = compiler_config.skip_attribute_checks;
+        let warnings_as_errors = compiler_config.warnings_as_errors;
         flags = flags.set_skip_attribute_checks(skip_attribute_checks);
-        let mut known_attributes = resolution_graph
-            .build_options
-            .compiler_config
-            .known_attributes
-            .clone();
+        let mut known_attributes = compiler_config.known_attributes.clone();
         match &resolution_graph.build_options.architecture {
             Some(x) => {
                 match x {
@@ -687,6 +682,7 @@ impl CompiledPackage {
                         .collect(),
                     skip_attribute_checks,
                     known_attributes: known_attributes.clone(),
+                    warnings_as_errors,
                     language_version: Some(effective_language_version),
                     compile_test_code: flags.keep_testing_functions(),
                     ..Default::default()
