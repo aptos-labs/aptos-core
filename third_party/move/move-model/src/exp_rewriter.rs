@@ -227,7 +227,7 @@ pub trait ExpRewriterFunctions {
     // (So all parameters here have already been processed.)
     fn rewrite_match_arm(
         &mut self,
-        id: NodeId, // id of the paremt match expression
+        id: NodeId, // id of the parent match expression
         loc: &Loc,
         pat: &Pattern,
         condition: &Option<Exp>,
