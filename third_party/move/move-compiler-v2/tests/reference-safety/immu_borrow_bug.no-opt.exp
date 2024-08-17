@@ -1,15 +1,9 @@
 
+============ bytecode verification failed ========
+
 Diagnostics:
-error: cannot immutably borrow since mutable references exist
-   ┌─ tests/reference-safety/immu_borrow_bug.move:15:9
+bug: bytecode verification failed with unexpected status code `STLOC_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
+   ┌─ tests/reference-safety/immu_borrow_bug.move:14:9
    │
 14 │         common.x = 15;
-   │         --------
-   │         │
-   │         used by field borrow
-   │         previous mutable local borrow
-15 │         common.x
-   │         ^^^^^^--
-   │         │
-   │         requirement enforced here
-   │         immutable borrow attempted here
+   │         ^^^^^^^^
