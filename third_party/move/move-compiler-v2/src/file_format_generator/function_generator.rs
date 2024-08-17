@@ -943,8 +943,7 @@ impl<'a> FunctionGenerator<'a> {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
                     if fun_ctx.is_copyable(*temp)
-                        && (ctx.is_alive_after(*temp, true)
-                            || temps_to_push[pos + 1..].contains(temp))
+                        && ctx.is_alive_after(*temp, &temps_to_push[pos + 1..], true)
                     {
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
@@ -981,9 +980,9 @@ impl<'a> FunctionGenerator<'a> {
     /// point are saved to locals. This flushes the stack as deep as needed for this.
     fn save_used_after(&mut self, ctx: &BytecodeContext, temps: &[TempIndex]) {
         let mut stack_to_flush = self.stack.len();
-        for temp in temps {
+        for (i, temp) in temps.iter().enumerate() {
             if let Some(pos) = self.stack.iter().position(|t| t == temp) {
-                if ctx.is_alive_after(*temp, true) {
+                if ctx.is_alive_after(*temp, &temps[i + 1..], true) {
                     // Determine new lowest point to which we need to flush
                     stack_to_flush = std::cmp::min(stack_to_flush, pos);
                 }
@@ -1017,7 +1016,7 @@ impl<'a> FunctionGenerator<'a> {
         while self.stack.len() > top {
             let temp = self.stack.pop().unwrap();
             if before && ctx.is_alive_before(temp)
-                || !before && ctx.is_alive_after(temp, false)
+                || !before && ctx.is_alive_after(temp, &[], false)
                 || self.pinned.contains(&temp)
             {
                 // Only need to save to a local if the temp is still used afterwards
@@ -1148,7 +1147,17 @@ impl<'env> BytecodeContext<'env> {
     /// When `dest_check` is true, we additionally check if `temp` is also written to
     /// by the current instruction; if it is, then the definition of `temp` being
     /// considered here is killed, making it not alive after this point.
-    pub fn is_alive_after(&self, temp: TempIndex, dest_check: bool) -> bool {
+    pub fn is_alive_after(
+        &self,
+        temp: TempIndex,
+        remaining_args: &[TempIndex],
+        dest_check: bool,
+    ) -> bool {
+        if remaining_args.contains(&temp) {
+            // Temp is used another time in the same argument list of this instruction, and
+            // is alive after even if it is a destination
+            return true;
+        }
         let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
         if dest_check && bc.dests().contains(&temp) {
             return false;
