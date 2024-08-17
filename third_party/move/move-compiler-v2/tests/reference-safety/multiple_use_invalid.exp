@@ -13,7 +13,7 @@ error: cannot transfer mutable local `r` since it is borrowed
    ┌─ tests/reference-safety/multiple_use_invalid.move:11:9
    │
 10 │         let x = r;
-   │                 - previously mutably borrowed here
+   │             - previously mutably borrowed here
 11 │         s(r, x)
    │         ^^^^^^^ transfer attempted here
 

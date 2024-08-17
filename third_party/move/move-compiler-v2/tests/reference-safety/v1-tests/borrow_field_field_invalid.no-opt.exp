@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
+error: cannot borrow field `f1` of value which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:14:18
    │
 13 │         let c = &mut inner.f1;
@@ -11,7 +11,7 @@ error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
 16 │         *c;
    │         -- conflicting reference `c` used here
 
-error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
+error: cannot borrow field `f1` of value which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:21:18
    │
 20 │         let c = id_mut(&mut inner.f1);

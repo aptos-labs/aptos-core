@@ -186,7 +186,7 @@ impl<'a> TransferFunctions for ReachingDefAnalysis<'a> {
         use Bytecode::*;
         use Operation::*;
         match instr {
-            Assign(_, dest, src, _) => {
+            Assign(_, dest, src, _, _) => {
                 state.kill(*dest);
                 if !self.borrowed_locals.contains(dest) && !self.borrowed_locals.contains(src) {
                     state.def_alias(*dest, *src);

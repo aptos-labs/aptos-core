@@ -44,14 +44,14 @@ impl FunctionTargetProcessor for MutRefInstrumenter {
             use Bytecode::*;
             use Operation::*;
             match bc {
-                Assign(attr_id, dest, src, AssignKind::Move)
+                Assign(attr_id, dest, src, AssignKind::Move, def_or_assign)
                     if src < param_count && is_mut_ref(&builder, src) =>
                 {
                     // Do not allow a move of a &mut parameter. This would make it hard
                     // to return the right version of it at return. Instead turn this into
                     // a copy, which will ensure any value updated will be written back
                     // to the original parameter before returned (via borrow semantics).
-                    builder.emit(Assign(attr_id, dest, src, AssignKind::Copy))
+                    builder.emit(Assign(attr_id, dest, src, AssignKind::Copy, def_or_assign))
                 },
                 Ret(attr_id, rets) => {
                     // Emit traces for &mut params at exit.

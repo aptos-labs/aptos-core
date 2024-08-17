@@ -20,7 +20,7 @@ use move_model::{
 use move_stackless_bytecode::{
     function_target::FunctionData,
     stackless_bytecode::{
-        AssignKind, AttrId, Bytecode, Constant, Label, Operation as BytecodeOperation,
+        AssignKind, AttrId, Bytecode, Constant, DefOrAssign, Label, Operation as BytecodeOperation,
     },
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
@@ -367,15 +367,7 @@ impl<'env> Generator<'env> {
                 }
                 // If there is a binding, assign the pattern
                 if let Some(binding) = opt_binding {
-                    if let Pattern::Var(var_id, sym) = pat {
-                        // For the common case `let x = binding; ...` avoid introducing a
-                        // temporary for `binding` and directly pass the temp for `x` into
-                        // translation.
-                        let local = self.find_local_for_pattern(*var_id, *sym, Some(&scope));
-                        self.without_reference_mode(|s| s.gen(vec![local], binding))
-                    } else {
-                        self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
-                    }
+                    self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
                 }
                 // Compile the body
                 self.scopes.push(scope);
@@ -565,12 +557,12 @@ impl<'env> Generator<'env> {
     fn gen_local(&mut self, targets: Vec<TempIndex>, id: NodeId, name: Symbol) {
         let target = self.require_unary_target(id, targets);
         let temp = self.find_local(id, name);
-        self.emit_assign_with_convert(id, target, temp, AssignKind::Inferred)
+        self.emit_assign_with_convert(id, target, temp, AssignKind::Inferred, false)
     }
 
     fn gen_temporary(&mut self, targets: Vec<TempIndex>, id: NodeId, temp: TempIndex) {
         let target = self.require_unary_target(id, targets);
-        self.emit_assign_with_convert(id, target, temp, AssignKind::Inferred)
+        self.emit_assign_with_convert(id, target, temp, AssignKind::Inferred, false)
     }
 
     fn emit_assign_with_convert(
@@ -579,6 +571,7 @@ impl<'env> Generator<'env> {
         target: TempIndex,
         mut temp: TempIndex,
         kind: AssignKind,
+        is_definition: bool,
     ) {
         let temp_ty = self.temp_type(temp).clone();
         let target_ty = self.temp_type(target).clone();
@@ -586,7 +579,10 @@ impl<'env> Generator<'env> {
             self.emit_call(id, vec![new_temp], oper, vec![temp]);
             temp = new_temp
         }
-        self.emit_with(id, |attr| Bytecode::Assign(attr, target, temp, kind))
+        let def_or_assign = DefOrAssign::new(is_definition);
+        self.emit_with(id, |attr| {
+            Bytecode::Assign(attr, target, temp, kind, def_or_assign)
+        })
     }
 
     fn get_conversion(
@@ -751,7 +747,7 @@ impl<'env> Generator<'env> {
                 } else {
                     AssignKind::Move
                 };
-                self.emit_assign_with_convert(id, target, arg, assign_kind)
+                self.emit_assign_with_convert(id, target, arg, assign_kind, false)
             },
             Operation::Borrow(kind) => {
                 let target = self.require_unary_target(id, targets);
@@ -1543,6 +1539,7 @@ impl<'env> Generator<'env> {
     /// Generate code for assignment of an expression to a pattern. This involves
     /// flattening nested patterns as needed. The optional `next_scope` is a
     /// scope to enter after the rhs exp has been compiled.
+    /// Note that if we are in a var definition situation, then `next_scope` is not `None`.
     fn gen_assign(&mut self, id: NodeId, pat: &Pattern, exp: &Exp, next_scope: Option<&Scope>) {
         if let Pattern::Tuple(_, pat_args) = pat {
             self.gen_tuple_assign(id, pat_args, exp, next_scope)
@@ -1781,6 +1778,7 @@ impl<'env> Generator<'env> {
     }
 
     /// Generate match of values against pattern.
+    /// Note that if we are in a binding situation, then `next_scope` is not `None`.
     fn gen_match_from_temp(
         &mut self,
         id: NodeId,
@@ -1798,13 +1796,19 @@ impl<'env> Generator<'env> {
                 let pat_ty = self.env().get_node_type(*id);
                 if !match_mode.is_probing() {
                     let temp = self.new_temp(pat_ty);
-                    self.emit_assign_with_convert(*id, temp, values[0], AssignKind::Inferred)
+                    self.emit_assign_with_convert(*id, temp, values[0], AssignKind::Inferred, false)
                 }
             },
             Pattern::Var(var_id, sym) => {
                 if match_mode.shall_bind_var(*sym) {
                     let local = self.find_local_for_pattern(*var_id, *sym, next_scope);
-                    self.emit_assign_with_convert(id, local, values[0], AssignKind::Inferred)
+                    self.emit_assign_with_convert(
+                        id,
+                        local,
+                        values[0],
+                        AssignKind::Inferred,
+                        next_scope.is_some(),
+                    )
                 }
             },
             Pattern::Struct(id, str, variant, args) => {

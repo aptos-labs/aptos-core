@@ -653,7 +653,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
         let cur_mid = self.func_target.func_env.module_env.get_id();
         let cur_fid = self.func_target.func_env.get_id();
         match instr {
-            Assign(id, dest, src, _) => {
+            Assign(id, dest, src, _, _) => {
                 self.check_and_propagate(
                     id,
                     state,

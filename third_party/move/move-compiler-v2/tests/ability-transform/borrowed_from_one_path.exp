@@ -4,27 +4,29 @@
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t2: u64
      var $t3: &vector<u64>
-     var $t4: bool
-     var $t5: u8
-     var $t6: &m::R
-     var $t7: address
-     var $t8: &u64
-     var $t9: u64
-  0: $t5 := 0
-  1: $t4 := ==($t0, $t5)
-  2: if ($t4) goto 3 else goto 8
+     var $t4: &vector<u64>
+     var $t5: bool
+     var $t6: u8
+     var $t7: &m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: u64
+  0: $t6 := 0
+  1: $t5 := ==($t0, $t6)
+  2: if ($t5) goto 3 else goto 8
   3: label L0
-  4: $t7 := 0x1
-  5: $t6 := borrow_global<m::R>($t7)
-  6: $t3 := borrow_field<m::R>.data($t6)
+  4: $t8 := 0x1
+  5: $t7 := borrow_global<m::R>($t8)
+  6: $t4 := borrow_field<m::R>.data($t7)
   7: goto 10
   8: label L1
-  9: $t3 := infer($t1)
+  9: $t4 := infer($t1)
  10: label L2
- 11: $t9 := 0
- 12: $t8 := vector::borrow<u64>($t3, $t9)
- 13: $t2 := read_ref($t8)
- 14: return $t2
+ 11: $t3 := infer($t4)
+ 12: $t10 := 0
+ 13: $t9 := vector::borrow<u64>($t3, $t10)
+ 14: $t2 := read_ref($t9)
+ 15: return $t2
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -33,42 +35,45 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t2: u64
      var $t3: &vector<u64>
-     var $t4: bool
-     var $t5: u8
-     var $t6: &m::R
-     var $t7: address
-     var $t8: &u64
-     var $t9: u64
+     var $t4: &vector<u64>
+     var $t5: bool
+     var $t6: u8
+     var $t7: &m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: u64
      # live vars: $t0, $t1
-  0: $t5 := 0
-     # live vars: $t0, $t1, $t5
-  1: $t4 := ==($t0, $t5)
-     # live vars: $t1, $t4
-  2: if ($t4) goto 3 else goto 8
+  0: $t6 := 0
+     # live vars: $t0, $t1, $t6
+  1: $t5 := ==($t0, $t6)
+     # live vars: $t1, $t5
+  2: if ($t5) goto 3 else goto 8
      # live vars: $t1
   3: label L0
      # live vars:
-  4: $t7 := 0x1
+  4: $t8 := 0x1
+     # live vars: $t8
+  5: $t7 := borrow_global<m::R>($t8)
      # live vars: $t7
-  5: $t6 := borrow_global<m::R>($t7)
-     # live vars: $t6
-  6: $t3 := borrow_field<m::R>.data($t6)
-     # live vars: $t3
+  6: $t4 := borrow_field<m::R>.data($t7)
+     # live vars: $t4
   7: goto 10
      # live vars: $t1
   8: label L1
      # live vars: $t1
-  9: $t3 := infer($t1)
-     # live vars: $t3
+  9: $t4 := infer($t1)
+     # live vars: $t4
  10: label L2
+     # live vars: $t4
+ 11: $t3 := infer($t4)
      # live vars: $t3
- 11: $t9 := 0
-     # live vars: $t3, $t9
- 12: $t8 := vector::borrow<u64>($t3, $t9)
-     # live vars: $t8
- 13: $t2 := read_ref($t8)
+ 12: $t10 := 0
+     # live vars: $t3, $t10
+ 13: $t9 := vector::borrow<u64>($t3, $t10)
+     # live vars: $t9
+ 14: $t2 := read_ref($t9)
      # live vars: $t2
- 14: return $t2
+ 15: return $t2
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -77,42 +82,45 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t2: u64
      var $t3: &vector<u64>
-     var $t4: bool
-     var $t5: u8
-     var $t6: &m::R
-     var $t7: address
-     var $t8: &u64
-     var $t9: u64
+     var $t4: &vector<u64>
+     var $t5: bool
+     var $t6: u8
+     var $t7: &m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: u64
      # live vars: $t0, $t1
-  0: $t5 := 0
-     # live vars: $t0, $t1, $t5
-  1: $t4 := ==($t0, $t5)
-     # live vars: $t1, $t4
-  2: if ($t4) goto 3 else goto 8
+  0: $t6 := 0
+     # live vars: $t0, $t1, $t6
+  1: $t5 := ==($t0, $t6)
+     # live vars: $t1, $t5
+  2: if ($t5) goto 3 else goto 8
      # live vars: $t1
   3: label L0
      # live vars:
-  4: $t7 := 0x1
+  4: $t8 := 0x1
+     # live vars: $t8
+  5: $t7 := borrow_global<m::R>($t8)
      # live vars: $t7
-  5: $t6 := borrow_global<m::R>($t7)
-     # live vars: $t6
-  6: $t3 := borrow_field<m::R>.data($t6)
-     # live vars: $t3
+  6: $t4 := borrow_field<m::R>.data($t7)
+     # live vars: $t4
   7: goto 10
      # live vars: $t1
   8: label L1
      # live vars: $t1
-  9: $t3 := infer($t1)
-     # live vars: $t3
+  9: $t4 := infer($t1)
+     # live vars: $t4
  10: label L2
+     # live vars: $t4
+ 11: $t3 := infer($t4)
      # live vars: $t3
- 11: $t9 := 0
-     # live vars: $t3, $t9
- 12: $t8 := vector::borrow<u64>($t3, $t9)
-     # live vars: $t8
- 13: $t2 := read_ref($t8)
+ 12: $t10 := 0
+     # live vars: $t3, $t10
+ 13: $t9 := vector::borrow<u64>($t3, $t10)
+     # live vars: $t9
+ 14: $t2 := read_ref($t9)
      # live vars: $t2
- 14: return $t2
+ 15: return $t2
 }
 
 ============ after ReferenceSafetyProcessor: ================
@@ -121,12 +129,13 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t2: u64
      var $t3: &vector<u64>
-     var $t4: bool
-     var $t5: u8
-     var $t6: &m::R
-     var $t7: address
-     var $t8: &u64
-     var $t9: u64
+     var $t4: &vector<u64>
+     var $t5: bool
+     var $t6: u8
+     var $t7: &m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: u64
      # live vars: $t0, $t1
      # refs: [$t1 => #1]
      # #1
@@ -134,23 +143,23 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # #root
      #   <no edges>
      #
-  0: $t5 := 0
-     # live vars: $t0, $t1, $t5
+  0: $t6 := 0
+     # live vars: $t0, $t1, $t6
      # refs: [$t1 => #1]
      # #1
      #   <no edges>
      # #root
      #   <no edges>
      #
-  1: $t4 := ==($t0, $t5)
-     # live vars: $t1, $t4
+  1: $t5 := ==($t0, $t6)
+     # live vars: $t1, $t5
      # refs: [$t1 => #1]
      # #1
      #   <no edges>
      # #root
      #   <no edges>
      #
-  2: if ($t4) goto 3 else goto 8
+  2: if ($t5) goto 3 else goto 8
      # live vars: $t1
      # refs: [$t1 => #1]
      # #1
@@ -162,25 +171,25 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # live vars:
      # refs: []
      #
-  4: $t7 := 0x1
-     # live vars: $t7
+  4: $t8 := 0x1
+     # live vars: $t8
      # refs: []
      #
-  5: $t6 := borrow_global<m::R>($t7)
-     # live vars: $t6
-     # refs: [$t6 => #6]
-     # #6
+  5: $t7 := borrow_global<m::R>($t8)
+     # live vars: $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   -> #6 via [struct `m::R`] at line 12
+     #   -> #7 via [struct `m::R`] at line 12
      #
-  6: $t3 := borrow_field<m::R>.data($t6)
-     # live vars: $t3
-     # refs: [$t3 => #3]
-     # #3
+  6: $t4 := borrow_field<m::R>.data($t7)
+     # live vars: $t4
+     # refs: [$t4 => #4]
+     # #4
      #   <no edges>
      # #root
-     #   -> #3 via [struct `m::R`] at line 12
+     #   -> #4 via [struct `m::R`] at line 12
      #
   7: goto 10
      # live vars: $t1
@@ -198,15 +207,23 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # #root
      #   <no edges>
      #
-  9: $t3 := infer($t1)
-     # live vars: $t3
-     # refs: [$t3 => #3]
-     # #3
+  9: $t4 := infer($t1)
+     # live vars: $t4
+     # refs: [$t4 => #4]
+     # #4
      #   <no edges>
      # #root
-     #   -> #3 via [struct `m::R`] at line 12
+     #   -> #4 via [struct `m::R`] at line 12
      #
  10: label L2
+     # live vars: $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `m::R`] at line 12
+     #
+ 11: $t3 := infer($t4)
      # live vars: $t3
      # refs: [$t3 => #3]
      # #3
@@ -214,27 +231,27 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # #root
      #   -> #3 via [struct `m::R`] at line 12
      #
- 11: $t9 := 0
-     # live vars: $t3, $t9
+ 12: $t10 := 0
+     # live vars: $t3, $t10
      # refs: [$t3 => #3]
      # #3
      #   <no edges>
      # #root
      #   -> #3 via [struct `m::R`] at line 12
      #
- 12: $t8 := vector::borrow<u64>($t3, $t9)
-     # live vars: $t8
-     # refs: [$t8 => #8]
-     # #8
+ 13: $t9 := vector::borrow<u64>($t3, $t10)
+     # live vars: $t9
+     # refs: [$t9 => #9]
+     # #9
      #   <no edges>
      # #root
-     #   -> #8 via [struct `m::R`] at line 16
+     #   -> #9 via [struct `m::R`] at line 16
      #
- 13: $t2 := read_ref($t8)
+ 14: $t2 := read_ref($t9)
      # live vars: $t2
      # refs: []
      #
- 14: return $t2
+ 15: return $t2
 }
 
 ============ after AbortAnalysisProcessor: ================
@@ -243,12 +260,13 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t2: u64
      var $t3: &vector<u64>
-     var $t4: bool
-     var $t5: u8
-     var $t6: &m::R
-     var $t7: address
-     var $t8: &u64
-     var $t9: u64
+     var $t4: &vector<u64>
+     var $t5: bool
+     var $t6: u8
+     var $t7: &m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: u64
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
      # refs: [$t1 => #1]
@@ -257,25 +275,25 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # #root
      #   <no edges>
      #
-  0: $t5 := 0
+  0: $t6 := 0
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t5
+     # live vars: $t0, $t1, $t6
      # refs: [$t1 => #1]
      # #1
      #   <no edges>
      # #root
      #   <no edges>
      #
-  1: $t4 := ==($t0, $t5)
+  1: $t5 := ==($t0, $t6)
      # abort state: {returns,aborts}
-     # live vars: $t1, $t4
+     # live vars: $t1, $t5
      # refs: [$t1 => #1]
      # #1
      #   <no edges>
      # #root
      #   <no edges>
      #
-  2: if ($t4) goto 3 else goto 8
+  2: if ($t5) goto 3 else goto 8
      # abort state: {returns,aborts}
      # live vars: $t1
      # refs: [$t1 => #1]
@@ -289,28 +307,28 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # live vars:
      # refs: []
      #
-  4: $t7 := 0x1
+  4: $t8 := 0x1
      # abort state: {returns,aborts}
-     # live vars: $t7
+     # live vars: $t8
      # refs: []
      #
-  5: $t6 := borrow_global<m::R>($t7)
+  5: $t7 := borrow_global<m::R>($t8)
      # abort state: {returns,aborts}
-     # live vars: $t6
-     # refs: [$t6 => #6]
-     # #6
+     # live vars: $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   -> #6 via [struct `m::R`] at line 12
+     #   -> #7 via [struct `m::R`] at line 12
      #
-  6: $t3 := borrow_field<m::R>.data($t6)
+  6: $t4 := borrow_field<m::R>.data($t7)
      # abort state: {returns,aborts}
-     # live vars: $t3
-     # refs: [$t3 => #3]
-     # #3
+     # live vars: $t4
+     # refs: [$t4 => #4]
+     # #4
      #   <no edges>
      # #root
-     #   -> #3 via [struct `m::R`] at line 12
+     #   -> #4 via [struct `m::R`] at line 12
      #
   7: goto 10
      # abort state: {returns,aborts}
@@ -330,17 +348,26 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # #root
      #   <no edges>
      #
-  9: $t3 := infer($t1)
+  9: $t4 := infer($t1)
      # abort state: {returns,aborts}
-     # live vars: $t3
-     # refs: [$t3 => #3]
-     # #3
+     # live vars: $t4
+     # refs: [$t4 => #4]
+     # #4
      #   <no edges>
      # #root
-     #   -> #3 via [struct `m::R`] at line 12
+     #   -> #4 via [struct `m::R`] at line 12
      #
  10: label L2
      # abort state: {returns,aborts}
+     # live vars: $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `m::R`] at line 12
+     #
+ 11: $t3 := infer($t4)
+     # abort state: {returns,aborts}
      # live vars: $t3
      # refs: [$t3 => #3]
      # #3
@@ -348,30 +375,30 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # #root
      #   -> #3 via [struct `m::R`] at line 12
      #
- 11: $t9 := 0
+ 12: $t10 := 0
      # abort state: {returns,aborts}
-     # live vars: $t3, $t9
+     # live vars: $t3, $t10
      # refs: [$t3 => #3]
      # #3
      #   <no edges>
      # #root
      #   -> #3 via [struct `m::R`] at line 12
      #
- 12: $t8 := vector::borrow<u64>($t3, $t9)
+ 13: $t9 := vector::borrow<u64>($t3, $t10)
      # abort state: {returns}
-     # live vars: $t8
-     # refs: [$t8 => #8]
-     # #8
+     # live vars: $t9
+     # refs: [$t9 => #9]
+     # #9
      #   <no edges>
      # #root
-     #   -> #8 via [struct `m::R`] at line 16
+     #   -> #9 via [struct `m::R`] at line 16
      #
- 13: $t2 := read_ref($t8)
+ 14: $t2 := read_ref($t9)
      # abort state: {returns}
      # live vars: $t2
      # refs: []
      #
- 14: return $t2
+ 15: return $t2
 }
 
 ============ after AbilityProcessor: ================
@@ -380,26 +407,28 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t2: u64
      var $t3: &vector<u64>
-     var $t4: bool
-     var $t5: u8
-     var $t6: &m::R
-     var $t7: address
-     var $t8: &u64
-     var $t9: u64
-  0: $t5 := 0
-  1: $t4 := ==($t0, $t5)
-  2: if ($t4) goto 3 else goto 9
+     var $t4: &vector<u64>
+     var $t5: bool
+     var $t6: u8
+     var $t7: &m::R
+     var $t8: address
+     var $t9: &u64
+     var $t10: u64
+  0: $t6 := 0
+  1: $t5 := ==($t0, $t6)
+  2: if ($t5) goto 3 else goto 9
   3: label L0
   4: drop($t1)
-  5: $t7 := 0x1
-  6: $t6 := borrow_global<m::R>($t7)
-  7: $t3 := borrow_field<m::R>.data($t6)
+  5: $t8 := 0x1
+  6: $t7 := borrow_global<m::R>($t8)
+  7: $t4 := borrow_field<m::R>.data($t7)
   8: goto 11
   9: label L1
- 10: $t3 := move($t1)
+ 10: $t4 := move($t1)
  11: label L2
- 12: $t9 := 0
- 13: $t8 := vector::borrow<u64>($t3, $t9)
- 14: $t2 := read_ref($t8)
- 15: return $t2
+ 12: $t3 := move($t4)
+ 13: $t10 := 0
+ 14: $t9 := vector::borrow<u64>($t3, $t10)
+ 15: $t2 := read_ref($t9)
+ 16: return $t2
 }

@@ -82,7 +82,7 @@ impl ReducedDefUseGraph {
         for (offset, instr) in code.iter().enumerate() {
             use Bytecode::*;
             match instr {
-                Assign(_, dst, src, _) if dst == src => {
+                Assign(_, dst, src, _, _) if dst == src => {
                     self_assigns.push(offset as CodeOffset);
                     self.incorporate_definition(*dst, offset as CodeOffset, live_vars);
                 },

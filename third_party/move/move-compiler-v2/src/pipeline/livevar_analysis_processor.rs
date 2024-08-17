@@ -343,7 +343,7 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
     fn execute(&self, state: &mut LiveVarState, instr: &Bytecode, offset: CodeOffset) {
         use Bytecode::*;
         match instr {
-            Assign(id, dst, src, _) => {
+            Assign(id, dst, src, _, _) => {
                 state.livevars.remove(dst);
                 state.insert_or_update(*src, self.livevar_info(id, offset), self.track_all_usages);
             },

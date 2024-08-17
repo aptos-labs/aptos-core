@@ -4,7 +4,7 @@ error: cannot write local `a` since it is borrowed
   ┌─ tests/reference-safety/multiple_use_bug_12301.move:8:9
   │
 6 │         let b = a;
-  │                 - previously mutably borrowed here
+  │             - previously mutably borrowed here
 7 │         let c = b;
 8 │         *a = 0;
   │         ^^^^^^ write attempted here
@@ -15,7 +15,7 @@ error: cannot write local `a` since it is borrowed
    ┌─ tests/reference-safety/multiple_use_bug_12301.move:17:9
    │
 15 │         let b = a;
-   │                 - previously mutably borrowed here
+   │             - previously mutably borrowed here
 16 │         let c = b;
 17 │         *a = 0;
    │         ^^^^^^ write attempted here
@@ -27,7 +27,7 @@ error: cannot write local `k` since it is borrowed
    ┌─ tests/reference-safety/multiple_use_bug_12301.move:18:9
    │
 15 │         let b = a;
-   │                 - previously mutably borrowed here
+   │             - previously mutably borrowed here
    ·
 18 │         *k = 1;
    │         ^^^^^^ write attempted here

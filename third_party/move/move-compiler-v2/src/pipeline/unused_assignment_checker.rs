@@ -11,7 +11,7 @@ use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AttrId, Bytecode},
+    stackless_bytecode::{AttrId, Bytecode, DefOrAssign},
 };
 
 pub struct UnusedAssignmentChecker {}
@@ -64,8 +64,13 @@ impl FunctionTargetProcessor for UnusedAssignmentChecker {
             let offset = offset as u16;
             use Bytecode::*;
             match bytecode {
-                Load(id, dst, _) | Assign(id, dst, _, _) => {
+                Load(id, dst, _) => {
                     UnusedAssignmentChecker::check_unused_assignment(&target, *id, offset, *dst)
+                },
+                Assign(id, dst, _, _, def_or_assign) => {
+                    if matches!(def_or_assign, DefOrAssign::Assign) {
+                        UnusedAssignmentChecker::check_unused_assignment(&target, *id, offset, *dst)
+                    }
                 },
                 Call(id, dsts, _, _, _) => {
                     for dst in dsts {

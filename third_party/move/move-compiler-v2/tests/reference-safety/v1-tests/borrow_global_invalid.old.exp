@@ -46,6 +46,18 @@ error: cannot mutably borrow since immutable references exist
 23 │         let r2 = borrow_global<R>(addr);
    │                  ---------------------- previous global borrow
 24 │         let r1 = borrow_global_mut<R>(addr);
+   │             --   ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+   │             │
+   │             requirement enforced here
+25 │         r1.f = r2.f
+   │                ---- conflicting reference `r2` used here
+
+error: cannot mutably borrow since immutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_global_invalid.move:24:18
+   │
+23 │         let r2 = borrow_global<R>(addr);
+   │                  ---------------------- previous global borrow
+24 │         let r1 = borrow_global_mut<R>(addr);
    │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 25 │         r1.f = r2.f
    │                ----

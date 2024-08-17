@@ -1071,7 +1071,7 @@ impl<'env> FunctionTranslator<'env> {
                 then_target.as_usize(),
                 else_target.as_usize(),
             ),
-            Assign(_, dest, src, _) => {
+            Assign(_, dest, src, _, _) => {
                 emitln!(writer, "{} := {};", str_local(*dest), str_local(*src));
             },
             Ret(_, rets) => {

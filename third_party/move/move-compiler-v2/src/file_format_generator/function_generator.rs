@@ -265,7 +265,7 @@ impl<'a> FunctionGenerator<'a> {
             )
             .expect(SOURCE_MAP_OK);
         match bc {
-            Bytecode::Assign(_, dest, source, mode) => {
+            Bytecode::Assign(_, dest, source, mode, _) => {
                 self.flush_any_conflicts(
                     ctx,
                     std::slice::from_ref(dest),

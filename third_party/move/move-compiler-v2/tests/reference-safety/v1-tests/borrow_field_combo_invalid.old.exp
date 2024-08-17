@@ -98,6 +98,14 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 30 │         *c;
    │         -- conflicting reference `c` used here
 
+error: mutable reference in value requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:36:13
+   │
+36 │         let f1 = &mut inner.f1;
+   │             ^^ requirement enforced here
+37 │         *c;
+   │         -- conflicting reference `c` used here
+
 error: mutable reference in local `c` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:37:9
    │
@@ -135,6 +143,18 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 40 │         *inner;
    │         ^^^^^^ requirement enforced here
 41 │         *c;
+   │         -- conflicting reference `c` used here
+
+error: cannot mutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:47:18
+   │
+46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                              ------------------ previous mutable call result
+47 │         let f1 = &mut inner.f1;
+   │             --   ^^^^^^^^^^^^^ mutable borrow attempted here
+   │             │
+   │             requirement enforced here
+48 │         *c;
    │         -- conflicting reference `c` used here
 
 error: cannot mutably borrow since mutable references exist

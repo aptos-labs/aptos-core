@@ -80,6 +80,29 @@ pub enum AssignKind {
     Inferred,
 }
 
+/// Whether assignment corresponds to a var definition or an assignment to an existing var
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DefOrAssign {
+    Def,
+    Assign,
+}
+
+impl DefOrAssign {
+    pub fn new(is_declaration: bool) -> Self {
+        if is_declaration {
+            Self::Def
+        } else {
+            Self::Assign
+        }
+    }
+}
+
+impl Default for DefOrAssign {
+    fn default() -> Self {
+        Self::Assign
+    }
+}
+
 /// The type of variable that is being havoc-ed
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HavocKind {
@@ -415,7 +438,7 @@ pub struct AbortAction(pub Label, pub TempIndex);
 /// The stackless bytecode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Bytecode {
-    Assign(AttrId, TempIndex, TempIndex, AssignKind),
+    Assign(AttrId, TempIndex, TempIndex, AssignKind, DefOrAssign),
 
     Call(
         AttrId,
@@ -520,7 +543,7 @@ impl Bytecode {
     /// If the instruction is spec-only instruction, this function panics.
     pub fn sources(&self) -> Vec<TempIndex> {
         match self {
-            Bytecode::Assign(_, _, src, _) => {
+            Bytecode::Assign(_, _, src, _, _) => {
                 vec![*src]
             },
             Bytecode::Call(_, _, _, srcs, _) => srcs.clone(),
@@ -553,7 +576,7 @@ impl Bytecode {
     /// Return the destinations of the instruction.
     pub fn dests(&self) -> Vec<TempIndex> {
         match self {
-            Bytecode::Assign(_, dst, _, _) => {
+            Bytecode::Assign(_, dst, _, _, _) => {
                 vec![*dst]
             },
             Bytecode::Load(_, dst, _) => {
@@ -693,7 +716,9 @@ impl Bytecode {
         };
         match self {
             Load(attr, dst, cons) => Load(attr, f(false, dst), cons),
-            Assign(attr, dest, src, kind) => Assign(attr, f(false, dest), f(true, src), kind),
+            Assign(attr, dest, src, kind, decl_or_assign) => {
+                Assign(attr, f(false, dest), f(true, src), kind, decl_or_assign)
+            },
             Call(attr, _, WriteBack(node, edge), srcs, aa) => Call(
                 attr,
                 vec![],
@@ -842,7 +867,7 @@ impl Bytecode {
         };
 
         match self {
-            Assign(_, dest, _, _) => {
+            Assign(_, dest, _, _, _) => {
                 if func_target.get_local_type(*dest).is_mutable_reference() {
                     // reference assignment completely distorts the reference (value + pointer)
                     (vec![], vec![(*dest, true)])
@@ -936,16 +961,16 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Bytecode::*;
         match &self.bytecode {
-            Assign(_, dst, src, AssignKind::Copy) => {
+            Assign(_, dst, src, AssignKind::Copy, _def_or_assign) => {
                 write!(f, "{} := copy({})", self.lstr(*dst), self.lstr(*src))?
             },
-            Assign(_, dst, src, AssignKind::Move) => {
+            Assign(_, dst, src, AssignKind::Move, _def_or_assign) => {
                 write!(f, "{} := move({})", self.lstr(*dst), self.lstr(*src))?
             },
-            Assign(_, dst, src, AssignKind::Store) => {
+            Assign(_, dst, src, AssignKind::Store, _def_or_assign) => {
                 write!(f, "{} := {}", self.lstr(*dst), self.lstr(*src))?
             },
-            Assign(_, dst, src, AssignKind::Inferred) => {
+            Assign(_, dst, src, AssignKind::Inferred, _def_or_assign) => {
                 write!(f, "{} := infer({})", self.lstr(*dst), self.lstr(*src))?
             },
             Call(_, dsts, oper, args, aa) => {

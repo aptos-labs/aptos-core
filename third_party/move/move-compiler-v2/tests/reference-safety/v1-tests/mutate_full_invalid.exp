@@ -4,7 +4,7 @@ error: cannot write local `x` since it is borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_full_invalid.move:13:9
    │
 12 │         let f = x; // error in v2 because of copy
-   │                 - previously mutably borrowed here
+   │             - previously mutably borrowed here
 13 │         *x = 0;
    │         ^^^^^^ write attempted here
 14 │         *f;

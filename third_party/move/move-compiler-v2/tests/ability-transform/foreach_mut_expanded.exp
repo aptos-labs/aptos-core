@@ -3,49 +3,59 @@
 [variant baseline]
 fun m::test_for_each_mut() {
      var $t0: vector<u64>
-     var $t1: u64
+     var $t1: vector<u64>
      var $t2: u64
-     var $t3: &vector<u64>
-     var $t4: &mut vector<u64>
-     var $t5: bool
-     var $t6: &mut u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: bool
-     var $t11: vector<u64>
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &vector<u64>
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: bool
+     var $t10: &mut u64
+     var $t11: &mut u64
      var $t12: u64
-  0: $t0 := ["1", "2", "3"]
-  1: $t1 := 0
-  2: $t3 := borrow_local($t0)
-  3: $t2 := vector::length<u64>($t3)
-  4: $t4 := borrow_local($t0)
-  5: label L0
-  6: $t5 := <($t1, $t2)
-  7: if ($t5) goto 8 else goto 16
-  8: label L2
-  9: $t6 := vector::borrow_mut<u64>($t4, $t1)
- 10: $t7 := 2
- 11: write_ref($t6, $t7)
- 12: $t9 := 1
- 13: $t8 := +($t1, $t9)
- 14: $t1 := infer($t8)
- 15: goto 18
- 16: label L3
- 17: goto 20
- 18: label L4
- 19: goto 5
- 20: label L1
- 21: $t11 := ["2", "3", "4"]
- 22: $t10 := ==($t0, $t11)
- 23: if ($t10) goto 24 else goto 26
- 24: label L5
- 25: goto 29
- 26: label L6
- 27: $t12 := 0
- 28: abort($t12)
- 29: label L7
- 30: return ()
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: vector<u64>
+     var $t17: u64
+  0: $t1 := ["1", "2", "3"]
+  1: $t0 := infer($t1)
+  2: $t3 := 0
+  3: $t2 := infer($t3)
+  4: $t6 := borrow_local($t0)
+  5: $t5 := vector::length<u64>($t6)
+  6: $t4 := infer($t5)
+  7: $t8 := borrow_local($t0)
+  8: $t7 := infer($t8)
+  9: label L0
+ 10: $t9 := <($t2, $t4)
+ 11: if ($t9) goto 12 else goto 21
+ 12: label L2
+ 13: $t11 := vector::borrow_mut<u64>($t7, $t2)
+ 14: $t10 := infer($t11)
+ 15: $t12 := 2
+ 16: write_ref($t10, $t12)
+ 17: $t14 := 1
+ 18: $t13 := +($t2, $t14)
+ 19: $t2 := infer($t13)
+ 20: goto 23
+ 21: label L3
+ 22: goto 25
+ 23: label L4
+ 24: goto 9
+ 25: label L1
+ 26: $t16 := ["2", "3", "4"]
+ 27: $t15 := ==($t0, $t16)
+ 28: if ($t15) goto 29 else goto 31
+ 29: label L5
+ 30: goto 34
+ 31: label L6
+ 32: $t17 := 0
+ 33: abort($t17)
+ 34: label L7
+ 35: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -53,80 +63,95 @@ fun m::test_for_each_mut() {
 [variant baseline]
 fun m::test_for_each_mut() {
      var $t0: vector<u64>
-     var $t1: u64
+     var $t1: vector<u64>
      var $t2: u64
-     var $t3: &vector<u64>
-     var $t4: &mut vector<u64>
-     var $t5: bool
-     var $t6: &mut u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: bool
-     var $t11: vector<u64>
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &vector<u64>
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: bool
+     var $t10: &mut u64
+     var $t11: &mut u64
      var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: vector<u64>
+     var $t17: u64
      # live vars:
-  0: $t0 := ["1", "2", "3"]
+  0: $t1 := ["1", "2", "3"]
+     # live vars: $t1
+  1: $t0 := infer($t1)
      # live vars: $t0
-  1: $t1 := 0
-     # live vars: $t0, $t1
-  2: $t3 := borrow_local($t0)
-     # live vars: $t0, $t1, $t3
-  3: $t2 := vector::length<u64>($t3)
-     # live vars: $t0, $t1, $t2
-  4: $t4 := borrow_local($t0)
-     # live vars: $t0, $t1, $t2, $t4
-  5: label L0
-     # live vars: $t0, $t1, $t2, $t4
-  6: $t5 := <($t1, $t2)
-     # live vars: $t0, $t1, $t2, $t4, $t5
-  7: if ($t5) goto 8 else goto 16
-     # live vars: $t0, $t1, $t2, $t4
-  8: label L2
-     # live vars: $t0, $t1, $t2, $t4
-  9: $t6 := vector::borrow_mut<u64>($t4, $t1)
-     # live vars: $t0, $t1, $t2, $t4, $t6
- 10: $t7 := 2
-     # live vars: $t0, $t1, $t2, $t4, $t6, $t7
- 11: write_ref($t6, $t7)
-     # live vars: $t0, $t1, $t2, $t4
- 12: $t9 := 1
-     # live vars: $t0, $t1, $t2, $t4, $t9
- 13: $t8 := +($t1, $t9)
+  2: $t3 := 0
+     # live vars: $t0, $t3
+  3: $t2 := infer($t3)
+     # live vars: $t0, $t2
+  4: $t6 := borrow_local($t0)
+     # live vars: $t0, $t2, $t6
+  5: $t5 := vector::length<u64>($t6)
+     # live vars: $t0, $t2, $t5
+  6: $t4 := infer($t5)
+     # live vars: $t0, $t2, $t4
+  7: $t8 := borrow_local($t0)
      # live vars: $t0, $t2, $t4, $t8
- 14: $t1 := infer($t8)
-     # live vars: $t0, $t1, $t2, $t4
- 15: goto 18
-     # live vars: $t0, $t1, $t2, $t4
- 16: label L3
+  8: $t7 := infer($t8)
+     # live vars: $t0, $t2, $t4, $t7
+  9: label L0
+     # live vars: $t0, $t2, $t4, $t7
+ 10: $t9 := <($t2, $t4)
+     # live vars: $t0, $t2, $t4, $t7, $t9
+ 11: if ($t9) goto 12 else goto 21
+     # live vars: $t0, $t2, $t4, $t7
+ 12: label L2
+     # live vars: $t0, $t2, $t4, $t7
+ 13: $t11 := vector::borrow_mut<u64>($t7, $t2)
+     # live vars: $t0, $t2, $t4, $t7, $t11
+ 14: $t10 := infer($t11)
+     # live vars: $t0, $t2, $t4, $t7, $t10
+ 15: $t12 := 2
+     # live vars: $t0, $t2, $t4, $t7, $t10, $t12
+ 16: write_ref($t10, $t12)
+     # live vars: $t0, $t2, $t4, $t7
+ 17: $t14 := 1
+     # live vars: $t0, $t2, $t4, $t7, $t14
+ 18: $t13 := +($t2, $t14)
+     # live vars: $t0, $t4, $t7, $t13
+ 19: $t2 := infer($t13)
+     # live vars: $t0, $t2, $t4, $t7
+ 20: goto 23
+     # live vars: $t0, $t2, $t4, $t7
+ 21: label L3
      # live vars: $t0
- 17: goto 20
-     # live vars: $t0, $t1, $t2, $t4
- 18: label L4
-     # live vars: $t0, $t1, $t2, $t4
- 19: goto 5
+ 22: goto 25
+     # live vars: $t0, $t2, $t4, $t7
+ 23: label L4
+     # live vars: $t0, $t2, $t4, $t7
+ 24: goto 9
      # live vars: $t0
- 20: label L1
+ 25: label L1
      # live vars: $t0
- 21: $t11 := ["2", "3", "4"]
-     # live vars: $t0, $t11
- 22: $t10 := ==($t0, $t11)
-     # live vars: $t10
- 23: if ($t10) goto 24 else goto 26
+ 26: $t16 := ["2", "3", "4"]
+     # live vars: $t0, $t16
+ 27: $t15 := ==($t0, $t16)
+     # live vars: $t15
+ 28: if ($t15) goto 29 else goto 31
      # live vars:
- 24: label L5
+ 29: label L5
      # live vars:
- 25: goto 29
+ 30: goto 34
      # live vars:
- 26: label L6
+ 31: label L6
      # live vars:
- 27: $t12 := 0
-     # live vars: $t12
- 28: abort($t12)
+ 32: $t17 := 0
+     # live vars: $t17
+ 33: abort($t17)
      # live vars:
- 29: label L7
+ 34: label L7
      # live vars:
- 30: return ()
+ 35: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -134,80 +159,95 @@ fun m::test_for_each_mut() {
 [variant baseline]
 fun m::test_for_each_mut() {
      var $t0: vector<u64>
-     var $t1: u64
+     var $t1: vector<u64>
      var $t2: u64
-     var $t3: &vector<u64>
-     var $t4: &mut vector<u64>
-     var $t5: bool
-     var $t6: &mut u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: bool
-     var $t11: vector<u64>
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &vector<u64>
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: bool
+     var $t10: &mut u64
+     var $t11: &mut u64
      var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: vector<u64>
+     var $t17: u64
      # live vars:
-  0: $t0 := ["1", "2", "3"]
+  0: $t1 := ["1", "2", "3"]
+     # live vars: $t1
+  1: $t0 := infer($t1)
      # live vars: $t0
-  1: $t1 := 0
-     # live vars: $t0, $t1
-  2: $t3 := borrow_local($t0)
-     # live vars: $t0, $t1, $t3
-  3: $t2 := vector::length<u64>($t3)
-     # live vars: $t0, $t1, $t2
-  4: $t4 := borrow_local($t0)
-     # live vars: $t0, $t1, $t2, $t4
-  5: label L0
-     # live vars: $t0, $t1, $t2, $t4
-  6: $t5 := <($t1, $t2)
-     # live vars: $t0, $t1, $t2, $t4, $t5
-  7: if ($t5) goto 8 else goto 16
-     # live vars: $t0, $t1, $t2, $t4
-  8: label L2
-     # live vars: $t0, $t1, $t2, $t4
-  9: $t6 := vector::borrow_mut<u64>($t4, $t1)
-     # live vars: $t0, $t1, $t2, $t4, $t6
- 10: $t7 := 2
-     # live vars: $t0, $t1, $t2, $t4, $t6, $t7
- 11: write_ref($t6, $t7)
-     # live vars: $t0, $t1, $t2, $t4
- 12: $t9 := 1
-     # live vars: $t0, $t1, $t2, $t4, $t9
- 13: $t8 := +($t1, $t9)
+  2: $t3 := 0
+     # live vars: $t0, $t3
+  3: $t2 := infer($t3)
+     # live vars: $t0, $t2
+  4: $t6 := borrow_local($t0)
+     # live vars: $t0, $t2, $t6
+  5: $t5 := vector::length<u64>($t6)
+     # live vars: $t0, $t2, $t5
+  6: $t4 := infer($t5)
+     # live vars: $t0, $t2, $t4
+  7: $t8 := borrow_local($t0)
      # live vars: $t0, $t2, $t4, $t8
- 14: $t1 := infer($t8)
-     # live vars: $t0, $t1, $t2, $t4
- 15: goto 18
-     # live vars: $t0, $t1, $t2, $t4
- 16: label L3
+  8: $t7 := infer($t8)
+     # live vars: $t0, $t2, $t4, $t7
+  9: label L0
+     # live vars: $t0, $t2, $t4, $t7
+ 10: $t9 := <($t2, $t4)
+     # live vars: $t0, $t2, $t4, $t7, $t9
+ 11: if ($t9) goto 12 else goto 21
+     # live vars: $t0, $t2, $t4, $t7
+ 12: label L2
+     # live vars: $t0, $t2, $t4, $t7
+ 13: $t11 := vector::borrow_mut<u64>($t7, $t2)
+     # live vars: $t0, $t2, $t4, $t7, $t11
+ 14: $t10 := infer($t11)
+     # live vars: $t0, $t2, $t4, $t7, $t10
+ 15: $t12 := 2
+     # live vars: $t0, $t2, $t4, $t7, $t10, $t12
+ 16: write_ref($t10, $t12)
+     # live vars: $t0, $t2, $t4, $t7
+ 17: $t14 := 1
+     # live vars: $t0, $t2, $t4, $t7, $t14
+ 18: $t13 := +($t2, $t14)
+     # live vars: $t0, $t4, $t7, $t13
+ 19: $t2 := infer($t13)
+     # live vars: $t0, $t2, $t4, $t7
+ 20: goto 23
+     # live vars: $t0, $t2, $t4, $t7
+ 21: label L3
      # live vars: $t0
- 17: goto 20
-     # live vars: $t0, $t1, $t2, $t4
- 18: label L4
-     # live vars: $t0, $t1, $t2, $t4
- 19: goto 5
+ 22: goto 25
+     # live vars: $t0, $t2, $t4, $t7
+ 23: label L4
+     # live vars: $t0, $t2, $t4, $t7
+ 24: goto 9
      # live vars: $t0
- 20: label L1
+ 25: label L1
      # live vars: $t0
- 21: $t11 := ["2", "3", "4"]
-     # live vars: $t0, $t11
- 22: $t10 := ==($t0, $t11)
-     # live vars: $t10
- 23: if ($t10) goto 24 else goto 26
+ 26: $t16 := ["2", "3", "4"]
+     # live vars: $t0, $t16
+ 27: $t15 := ==($t0, $t16)
+     # live vars: $t15
+ 28: if ($t15) goto 29 else goto 31
      # live vars:
- 24: label L5
+ 29: label L5
      # live vars:
- 25: goto 29
+ 30: goto 34
      # live vars:
- 26: label L6
+ 31: label L6
      # live vars:
- 27: $t12 := 0
-     # live vars: $t12
- 28: abort($t12)
+ 32: $t17 := 0
+     # live vars: $t17
+ 33: abort($t17)
      # live vars:
- 29: label L7
+ 34: label L7
      # live vars:
- 30: return ()
+ 35: return ()
 }
 
 ============ after ReferenceSafetyProcessor: ================
@@ -215,206 +255,241 @@ fun m::test_for_each_mut() {
 [variant baseline]
 fun m::test_for_each_mut() {
      var $t0: vector<u64>
-     var $t1: u64
+     var $t1: vector<u64>
      var $t2: u64
-     var $t3: &vector<u64>
-     var $t4: &mut vector<u64>
-     var $t5: bool
-     var $t6: &mut u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: bool
-     var $t11: vector<u64>
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &vector<u64>
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: bool
+     var $t10: &mut u64
+     var $t11: &mut u64
      var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: vector<u64>
+     var $t17: u64
      # live vars:
      # refs: []
      #
-  0: $t0 := ["1", "2", "3"]
+  0: $t1 := ["1", "2", "3"]
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := infer($t1)
      # live vars: $t0
      # refs: []
      #
-  1: $t1 := 0
-     # live vars: $t0, $t1
+  2: $t3 := 0
+     # live vars: $t0, $t3
      # refs: []
      #
-  2: $t3 := borrow_local($t0)
-     # live vars: $t0, $t1, $t3
-     # refs: [$t3 => #3]
-     # #3
-     #   <no edges>
-     # #root
-     #   => #3 via [local `v`] at line 8
-     #
-  3: $t2 := vector::length<u64>($t3)
-     # live vars: $t0, $t1, $t2
+  3: $t2 := infer($t3)
+     # live vars: $t0, $t2
      # refs: []
      #
-  4: $t4 := borrow_local($t0)
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  5: label L0
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  6: $t5 := <($t1, $t2)
-     # live vars: $t0, $t1, $t2, $t4, $t5
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  7: if ($t5) goto 8 else goto 16
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  8: label L2
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  9: $t6 := vector::borrow_mut<u64>($t4, $t1)
-     # live vars: $t0, $t1, $t2, $t4, $t6
-     # refs: [$t4 => #4, $t6 => #6]
-     # #4
-     #   -> (mut) #6 via [] at line 11
+  4: $t6 := borrow_local($t0)
+     # live vars: $t0, $t2, $t6
+     # refs: [$t6 => #6]
      # #6
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => #6 via [local `v`] at line 8
      #
- 10: $t7 := 2
-     # live vars: $t0, $t1, $t2, $t4, $t6, $t7
-     # refs: [$t4 => #4, $t6 => #6]
-     # #4
-     #   -> (mut) #6 via [] at line 11
-     # #6
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
+  5: $t5 := vector::length<u64>($t6)
+     # live vars: $t0, $t2, $t5
+     # refs: []
      #
- 11: write_ref($t6, $t7)
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
+  6: $t4 := infer($t5)
+     # live vars: $t0, $t2, $t4
+     # refs: []
      #
- 12: $t9 := 1
-     # live vars: $t0, $t1, $t2, $t4, $t9
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
- 13: $t8 := +($t1, $t9)
+  7: $t8 := borrow_local($t0)
      # live vars: $t0, $t2, $t4, $t8
-     # refs: [$t4 => #4]
-     # #4
+     # refs: [$t8 => #8]
+     # #8
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #8 via [local `v`] at line 9
      #
- 14: $t1 := infer($t8)
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
+  8: $t7 := infer($t8)
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #7 via [local `v`] at line 9
      #
- 15: goto 18
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
+  9: label L0
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #7 via [local `v`] at line 9
      #
- 16: label L3
+ 10: $t9 := <($t2, $t4)
+     # live vars: $t0, $t2, $t4, $t7, $t9
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 11: if ($t9) goto 12 else goto 21
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 12: label L2
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 13: $t11 := vector::borrow_mut<u64>($t7, $t2)
+     # live vars: $t0, $t2, $t4, $t7, $t11
+     # refs: [$t7 => #7, $t11 => #11]
+     # #7
+     #   -> (mut) #11 via [] at line 11
+     # #11
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 14: $t10 := infer($t11)
+     # live vars: $t0, $t2, $t4, $t7, $t10
+     # refs: [$t7 => #7, $t10 => #10]
+     # #7
+     #   -> (mut) #10 via [] at line 11
+     # #10
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 15: $t12 := 2
+     # live vars: $t0, $t2, $t4, $t7, $t10, $t12
+     # refs: [$t7 => #7, $t10 => #10]
+     # #7
+     #   -> (mut) #10 via [] at line 11
+     # #10
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 16: write_ref($t10, $t12)
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 17: $t14 := 1
+     # live vars: $t0, $t2, $t4, $t7, $t14
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 18: $t13 := +($t2, $t14)
+     # live vars: $t0, $t4, $t7, $t13
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 19: $t2 := infer($t13)
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 20: goto 23
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 21: label L3
      # live vars: $t0
      # refs: []
      #
- 17: goto 20
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
+ 22: goto 25
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #7 via [local `v`] at line 9
      #
- 18: label L4
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
+ 23: label L4
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #7 via [local `v`] at line 9
      #
- 19: goto 5
+ 24: goto 9
      # live vars: $t0
      # refs: []
      #
- 20: label L1
+ 25: label L1
      # live vars: $t0
      # refs: []
      #
- 21: $t11 := ["2", "3", "4"]
-     # live vars: $t0, $t11
+ 26: $t16 := ["2", "3", "4"]
+     # live vars: $t0, $t16
      # refs: []
      #
- 22: $t10 := ==($t0, $t11)
-     # live vars: $t10
+ 27: $t15 := ==($t0, $t16)
+     # live vars: $t15
      # refs: []
      #
- 23: if ($t10) goto 24 else goto 26
+ 28: if ($t15) goto 29 else goto 31
      # live vars:
      # refs: []
      #
- 24: label L5
+ 29: label L5
      # live vars:
      # refs: []
      #
- 25: goto 29
+ 30: goto 34
      # live vars:
      # refs: []
      #
- 26: label L6
+ 31: label L6
      # live vars:
      # refs: []
      #
- 27: $t12 := 0
-     # live vars: $t12
+ 32: $t17 := 0
+     # live vars: $t17
      # refs: []
      #
- 28: abort($t12)
+ 33: abort($t17)
      # live vars:
      # refs: []
      #
- 29: label L7
+ 34: label L7
      # live vars:
      # refs: []
      #
- 30: return ()
+ 35: return ()
 }
 
 ============ after AbortAnalysisProcessor: ================
@@ -422,237 +497,277 @@ fun m::test_for_each_mut() {
 [variant baseline]
 fun m::test_for_each_mut() {
      var $t0: vector<u64>
-     var $t1: u64
+     var $t1: vector<u64>
      var $t2: u64
-     var $t3: &vector<u64>
-     var $t4: &mut vector<u64>
-     var $t5: bool
-     var $t6: &mut u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: bool
-     var $t11: vector<u64>
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &vector<u64>
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: bool
+     var $t10: &mut u64
+     var $t11: &mut u64
      var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: vector<u64>
+     var $t17: u64
      # abort state: {returns,aborts}
      # live vars:
      # refs: []
      #
-  0: $t0 := ["1", "2", "3"]
+  0: $t1 := ["1", "2", "3"]
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := infer($t1)
      # abort state: {returns,aborts}
      # live vars: $t0
      # refs: []
      #
-  1: $t1 := 0
+  2: $t3 := 0
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1
+     # live vars: $t0, $t3
      # refs: []
      #
-  2: $t3 := borrow_local($t0)
+  3: $t2 := infer($t3)
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t3
-     # refs: [$t3 => #3]
-     # #3
-     #   <no edges>
-     # #root
-     #   => #3 via [local `v`] at line 8
-     #
-  3: $t2 := vector::length<u64>($t3)
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2
+     # live vars: $t0, $t2
      # refs: []
      #
-  4: $t4 := borrow_local($t0)
+  4: $t6 := borrow_local($t0)
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  5: label L0
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  6: $t5 := <($t1, $t2)
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4, $t5
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  7: if ($t5) goto 8 else goto 16
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  8: label L2
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
-  9: $t6 := vector::borrow_mut<u64>($t4, $t1)
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4, $t6
-     # refs: [$t4 => #4, $t6 => #6]
-     # #4
-     #   -> (mut) #6 via [] at line 11
+     # live vars: $t0, $t2, $t6
+     # refs: [$t6 => #6]
      # #6
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => #6 via [local `v`] at line 8
      #
- 10: $t7 := 2
+  5: $t5 := vector::length<u64>($t6)
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4, $t6, $t7
-     # refs: [$t4 => #4, $t6 => #6]
-     # #4
-     #   -> (mut) #6 via [] at line 11
-     # #6
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     # live vars: $t0, $t2, $t5
+     # refs: []
      #
- 11: write_ref($t6, $t7)
+  6: $t4 := infer($t5)
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     # live vars: $t0, $t2, $t4
+     # refs: []
      #
- 12: $t9 := 1
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4, $t9
-     # refs: [$t4 => #4]
-     # #4
-     #   <no edges>
-     # #root
-     #   => (mut) #4 via [local `v`] at line 9
-     #
- 13: $t8 := +($t1, $t9)
+  7: $t8 := borrow_local($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4, $t8
-     # refs: [$t4 => #4]
-     # #4
+     # refs: [$t8 => #8]
+     # #8
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #8 via [local `v`] at line 9
      #
- 14: $t1 := infer($t8)
+  8: $t7 := infer($t8)
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #7 via [local `v`] at line 9
      #
- 15: goto 18
+  9: label L0
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #7 via [local `v`] at line 9
      #
- 16: label L3
+ 10: $t9 := <($t2, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7, $t9
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 11: if ($t9) goto 12 else goto 21
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 12: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 13: $t11 := vector::borrow_mut<u64>($t7, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7, $t11
+     # refs: [$t7 => #7, $t11 => #11]
+     # #7
+     #   -> (mut) #11 via [] at line 11
+     # #11
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 14: $t10 := infer($t11)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7, $t10
+     # refs: [$t7 => #7, $t10 => #10]
+     # #7
+     #   -> (mut) #10 via [] at line 11
+     # #10
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 15: $t12 := 2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7, $t10, $t12
+     # refs: [$t7 => #7, $t10 => #10]
+     # #7
+     #   -> (mut) #10 via [] at line 11
+     # #10
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 16: write_ref($t10, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 17: $t14 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7, $t14
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 18: $t13 := +($t2, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4, $t7, $t13
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 19: $t2 := infer($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 20: goto 23
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => (mut) #7 via [local `v`] at line 9
+     #
+ 21: label L3
      # abort state: {returns,aborts}
      # live vars: $t0
      # refs: []
      #
- 17: goto 20
+ 22: goto 25
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #7 via [local `v`] at line 9
      #
- 18: label L4
+ 23: label L4
      # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t2, $t4
-     # refs: [$t4 => #4]
-     # #4
+     # live vars: $t0, $t2, $t4, $t7
+     # refs: [$t7 => #7]
+     # #7
      #   <no edges>
      # #root
-     #   => (mut) #4 via [local `v`] at line 9
+     #   => (mut) #7 via [local `v`] at line 9
      #
- 19: goto 5
+ 24: goto 9
      # abort state: {returns,aborts}
      # live vars: $t0
      # refs: []
      #
- 20: label L1
+ 25: label L1
      # abort state: {returns,aborts}
      # live vars: $t0
      # refs: []
      #
- 21: $t11 := ["2", "3", "4"]
+ 26: $t16 := ["2", "3", "4"]
      # abort state: {returns,aborts}
-     # live vars: $t0, $t11
+     # live vars: $t0, $t16
      # refs: []
      #
- 22: $t10 := ==($t0, $t11)
+ 27: $t15 := ==($t0, $t16)
      # abort state: {returns,aborts}
-     # live vars: $t10
+     # live vars: $t15
      # refs: []
      #
- 23: if ($t10) goto 24 else goto 26
+ 28: if ($t15) goto 29 else goto 31
      # abort state: {returns}
      # live vars:
      # refs: []
      #
- 24: label L5
+ 29: label L5
      # abort state: {returns}
      # live vars:
      # refs: []
      #
- 25: goto 29
+ 30: goto 34
      # abort state: {aborts}
      # live vars:
      # refs: []
      #
- 26: label L6
+ 31: label L6
      # abort state: {aborts}
      # live vars:
      # refs: []
      #
- 27: $t12 := 0
+ 32: $t17 := 0
      # abort state: {aborts}
-     # live vars: $t12
+     # live vars: $t17
      # refs: []
      #
- 28: abort($t12)
+ 33: abort($t17)
      # abort state: {returns}
      # live vars:
      # refs: []
      #
- 29: label L7
+ 34: label L7
      # abort state: {returns}
      # live vars:
      # refs: []
      #
- 30: return ()
+ 35: return ()
 }
 
 ============ after AbilityProcessor: ================
@@ -660,48 +775,58 @@ fun m::test_for_each_mut() {
 [variant baseline]
 fun m::test_for_each_mut() {
      var $t0: vector<u64>
-     var $t1: u64
+     var $t1: vector<u64>
      var $t2: u64
-     var $t3: &vector<u64>
-     var $t4: &mut vector<u64>
-     var $t5: bool
-     var $t6: &mut u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: bool
-     var $t11: vector<u64>
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: &vector<u64>
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: bool
+     var $t10: &mut u64
+     var $t11: &mut u64
      var $t12: u64
-  0: $t0 := ["1", "2", "3"]
-  1: $t1 := 0
-  2: $t3 := borrow_local($t0)
-  3: $t2 := vector::length<u64>($t3)
-  4: $t4 := borrow_local($t0)
-  5: label L0
-  6: $t5 := <($t1, $t2)
-  7: if ($t5) goto 8 else goto 16
-  8: label L2
-  9: $t6 := vector::borrow_mut<u64>($t4, $t1)
- 10: $t7 := 2
- 11: write_ref($t6, $t7)
- 12: $t9 := 1
- 13: $t8 := +($t1, $t9)
- 14: $t1 := move($t8)
- 15: goto 19
- 16: label L3
- 17: drop($t4)
- 18: goto 21
- 19: label L4
- 20: goto 5
- 21: label L1
- 22: $t11 := ["2", "3", "4"]
- 23: $t10 := ==($t0, $t11)
- 24: if ($t10) goto 25 else goto 27
- 25: label L5
- 26: goto 30
- 27: label L6
- 28: $t12 := 0
- 29: abort($t12)
- 30: label L7
- 31: return ()
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: vector<u64>
+     var $t17: u64
+  0: $t1 := ["1", "2", "3"]
+  1: $t0 := move($t1)
+  2: $t3 := 0
+  3: $t2 := move($t3)
+  4: $t6 := borrow_local($t0)
+  5: $t5 := vector::length<u64>($t6)
+  6: $t4 := move($t5)
+  7: $t8 := borrow_local($t0)
+  8: $t7 := move($t8)
+  9: label L0
+ 10: $t9 := <($t2, $t4)
+ 11: if ($t9) goto 12 else goto 21
+ 12: label L2
+ 13: $t11 := vector::borrow_mut<u64>($t7, $t2)
+ 14: $t10 := move($t11)
+ 15: $t12 := 2
+ 16: write_ref($t10, $t12)
+ 17: $t14 := 1
+ 18: $t13 := +($t2, $t14)
+ 19: $t2 := move($t13)
+ 20: goto 24
+ 21: label L3
+ 22: drop($t7)
+ 23: goto 26
+ 24: label L4
+ 25: goto 9
+ 26: label L1
+ 27: $t16 := ["2", "3", "4"]
+ 28: $t15 := ==($t0, $t16)
+ 29: if ($t15) goto 30 else goto 32
+ 30: label L5
+ 31: goto 35
+ 32: label L6
+ 33: $t17 := 0
+ 34: abort($t17)
+ 35: label L7
+ 36: return ()
 }

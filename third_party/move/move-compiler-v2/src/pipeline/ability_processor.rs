@@ -43,7 +43,7 @@ use move_stackless_bytecode::{
     function_data_builder::FunctionDataBuilder,
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AssignKind, AttrId, Bytecode, Operation},
+    stackless_bytecode::{AssignKind, AttrId, Bytecode, DefOrAssign, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::BTreeMap;
@@ -170,14 +170,14 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
             self.target.get_local_type(*temp).is_reference() || exit_state.may_return()
         };
         match instr {
-            Assign(_, _, src, AssignKind::Inferred) => {
+            Assign(_, _, src, AssignKind::Inferred, _) => {
                 if temp_needs_copy(src, instr) {
                     state.needs_copy.insert(*src);
                 } else {
                     state.moved.insert(*src);
                 }
             },
-            Assign(_, _, src, AssignKind::Move) => {
+            Assign(_, _, src, AssignKind::Move, _) => {
                 state.moved.insert(*src);
             },
             Call(_, _, Operation::BorrowLoc, _, _) => {
@@ -266,23 +266,27 @@ impl<'a> Transformer<'a> {
         use Bytecode::*;
         // Transform and check bytecode
         match bc.clone() {
-            Assign(id, dst, src, kind) => match kind {
+            Assign(id, dst, src, kind, def_or_assign) => match kind {
                 AssignKind::Inferred => {
                     let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
                     if copy_drop_at.needs_copy.contains(&src) {
                         self.check_implicit_copy(code_offset, id, src);
-                        self.builder.emit(Assign(id, dst, src, AssignKind::Copy))
+                        self.builder
+                            .emit(Assign(id, dst, src, AssignKind::Copy, def_or_assign))
                     } else {
-                        self.builder.emit(Assign(id, dst, src, AssignKind::Move))
+                        self.builder
+                            .emit(Assign(id, dst, src, AssignKind::Move, def_or_assign))
                     }
                 },
                 AssignKind::Copy | AssignKind::Store => {
                     self.check_explicit_copy(id, src);
-                    self.builder.emit(Assign(id, dst, src, AssignKind::Copy))
+                    self.builder
+                        .emit(Assign(id, dst, src, AssignKind::Copy, def_or_assign))
                 },
                 AssignKind::Move => {
                     self.check_explicit_move(code_offset, id, src);
-                    self.builder.emit(Assign(id, dst, src, AssignKind::Move))
+                    self.builder
+                        .emit(Assign(id, dst, src, AssignKind::Move, def_or_assign))
                 },
             },
             Call(id, dests, op, srcs, ai) => {
@@ -373,7 +377,13 @@ impl<'a> Transformer<'a> {
                 {
                     let ty = self.builder.get_local_type(*src);
                     let temp = self.builder.new_temp(ty);
-                    self.builder.emit(Assign(id, temp, *src, AssignKind::Copy));
+                    self.builder.emit(Assign(
+                        id,
+                        temp,
+                        *src,
+                        AssignKind::Copy,
+                        DefOrAssign::Assign,
+                    ));
                     new_srcs.push(temp)
                 } else {
                     new_srcs.push(*src)

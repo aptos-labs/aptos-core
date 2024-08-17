@@ -38,12 +38,6 @@ warning: Unused assignment to `x`. Consider removing or prefixing with an unders
 4 │         x = x + 1;
   │         ^^^^^^^^^
 
-warning: Unused assignment to `w`. Consider removing or prefixing with an underscore: `_w`
-  ┌─ tests/unused-assignment/unused_call_assign_shadow.move:8:17
-  │
-8 │         let w = bar(false);
-  │                 ^^^^^^^^^^
-
 warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
    ┌─ tests/unused-assignment/unused_call_assign_shadow.move:14:13
    │

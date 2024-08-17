@@ -7,7 +7,7 @@ use crate::{
     stackless_bytecode::{
         AssignKind, AttrId,
         Bytecode::{self},
-        Constant, Label, Operation, PropKind,
+        Constant, DefOrAssign, Label, Operation, PropKind,
     },
     COMPILED_MODULE_AVAILABLE,
 };
@@ -330,6 +330,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     *idx as TempIndex,
                     operand_index,
                     AssignKind::Store,
+                    DefOrAssign::default(),
                 ));
             },
 
@@ -669,6 +670,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     temp_index,
                     *idx as TempIndex,
                     AssignKind::Copy,
+                    DefOrAssign::default(),
                 ));
                 self.temp_count += 1;
             },
@@ -686,6 +688,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     temp_index,
                     *idx as TempIndex,
                     AssignKind::Move,
+                    DefOrAssign::default(),
                 ));
                 self.temp_count += 1;
             },

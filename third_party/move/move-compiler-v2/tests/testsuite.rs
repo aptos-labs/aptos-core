@@ -155,8 +155,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .clone()
                 .set_experiment(Experiment::UNUSED_ASSIGNMENT_CHECK, true),
             stop_after: StopAfter::BytecodePipeline(Some("UnusedAssignmentChecker")),
-            dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::None,
+            dump_ast: DumpLevel::None,      // EndStage,
+            dump_bytecode: DumpLevel::None, // AllStages,
             dump_bytecode_filter: None,
         },
         // Tests for lambda lifting
@@ -373,7 +373,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exp_suffix: None,
             options: opts.clone(),
             stop_after: StopAfter::BytecodePipeline(Some("AbilityProcessor")),
-            dump_ast: DumpLevel::None,
+            dump_ast: DumpLevel::None, // EndStage,
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![
                 INITIAL_BYTECODE_STAGE,

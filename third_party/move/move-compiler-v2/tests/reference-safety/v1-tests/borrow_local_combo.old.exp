@@ -9,9 +9,41 @@ error: cannot mutably borrow since immutable references exist
    │                       │previous local borrow
    │                       used by field borrow
 13 │         let x = &mut s;
+   │             -   ^^^^^^ mutable borrow attempted here
+   │             │
+   │             requirement enforced here
+14 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot mutably borrow since immutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo.move:13:17
+   │
+12 │         if (cond) f = &s.f else f = &other.f;
+   │                       ----
+   │                       ││
+   │                       │previous local borrow
+   │                       used by field borrow
+13 │         let x = &mut s;
    │                 ^^^^^^ mutable borrow attempted here
 14 │         *f;
    │         -- requirement enforced here
+
+error: cannot mutably borrow since immutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo.move:21:17
+   │
+20 │         if (cond) f = &s.f else f = &s.g;
+   │                       ----          ----
+   │                       ││            ││
+   │                       ││            │previous local borrow
+   │                       ││            used by field borrow
+   │                       │previous local borrow
+   │                       used by field borrow
+21 │         let x = &mut s;
+   │             -   ^^^^^^ mutable borrow attempted here
+   │             │
+   │             requirement enforced here
+22 │         *f;
+   │         -- conflicting reference `f` used here
 
 error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_local_combo.move:21:17

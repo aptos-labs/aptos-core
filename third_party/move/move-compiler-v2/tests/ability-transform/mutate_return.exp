@@ -4,12 +4,14 @@
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
-     var $t3: &mut vector<#0>
-  0: $t2 := vector($t0)
-  1: $t3 := borrow_local($t2)
-  2: m::g<#0>($t3)
-  3: $t1 := infer($t2)
-  4: return $t1
+     var $t3: vector<#0>
+     var $t4: &mut vector<#0>
+  0: $t3 := vector($t0)
+  1: $t2 := infer($t3)
+  2: $t4 := borrow_local($t2)
+  3: m::g<#0>($t4)
+  4: $t1 := infer($t2)
+  5: return $t1
 }
 
 
@@ -24,17 +26,20 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
-     var $t3: &mut vector<#0>
+     var $t3: vector<#0>
+     var $t4: &mut vector<#0>
      # live vars: $t0
-  0: $t2 := vector($t0)
+  0: $t3 := vector($t0)
+     # live vars: $t3
+  1: $t2 := infer($t3)
      # live vars: $t2
-  1: $t3 := borrow_local($t2)
-     # live vars: $t2, $t3
-  2: m::g<#0>($t3)
+  2: $t4 := borrow_local($t2)
+     # live vars: $t2, $t4
+  3: m::g<#0>($t4)
      # live vars: $t2
-  3: $t1 := infer($t2)
+  4: $t1 := infer($t2)
      # live vars: $t1
-  4: return $t1
+  5: return $t1
 }
 
 
@@ -50,17 +55,20 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
-     var $t3: &mut vector<#0>
+     var $t3: vector<#0>
+     var $t4: &mut vector<#0>
      # live vars: $t0
-  0: $t2 := vector($t0)
+  0: $t3 := vector($t0)
+     # live vars: $t3
+  1: $t2 := infer($t3)
      # live vars: $t2
-  1: $t3 := borrow_local($t2)
-     # live vars: $t2, $t3
-  2: m::g<#0>($t3)
+  2: $t4 := borrow_local($t2)
+     # live vars: $t2, $t4
+  3: m::g<#0>($t4)
      # live vars: $t2
-  3: $t1 := infer($t2)
+  4: $t1 := infer($t2)
      # live vars: $t1
-  4: return $t1
+  5: return $t1
 }
 
 
@@ -76,31 +84,36 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
-     var $t3: &mut vector<#0>
+     var $t3: vector<#0>
+     var $t4: &mut vector<#0>
      # live vars: $t0
      # refs: []
      #
-  0: $t2 := vector($t0)
+  0: $t3 := vector($t0)
+     # live vars: $t3
+     # refs: []
+     #
+  1: $t2 := infer($t3)
      # live vars: $t2
      # refs: []
      #
-  1: $t3 := borrow_local($t2)
-     # live vars: $t2, $t3
-     # refs: [$t3 => #3]
-     # #3
+  2: $t4 := borrow_local($t2)
+     # live vars: $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
      #   <no edges>
      # #root
-     #   => (mut) #3 via [local `v`] at line 6
+     #   => (mut) #4 via [local `v`] at line 6
      #
-  2: m::g<#0>($t3)
+  3: m::g<#0>($t4)
      # live vars: $t2
      # refs: []
      #
-  3: $t1 := infer($t2)
+  4: $t1 := infer($t2)
      # live vars: $t1
      # refs: []
      #
-  4: return $t1
+  5: return $t1
 }
 
 
@@ -122,36 +135,42 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
-     var $t3: &mut vector<#0>
+     var $t3: vector<#0>
+     var $t4: &mut vector<#0>
      # abort state: {returns,aborts}
      # live vars: $t0
      # refs: []
      #
-  0: $t2 := vector($t0)
+  0: $t3 := vector($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3
+     # refs: []
+     #
+  1: $t2 := infer($t3)
      # abort state: {returns,aborts}
      # live vars: $t2
      # refs: []
      #
-  1: $t3 := borrow_local($t2)
+  2: $t4 := borrow_local($t2)
      # abort state: {returns,aborts}
-     # live vars: $t2, $t3
-     # refs: [$t3 => #3]
-     # #3
+     # live vars: $t2, $t4
+     # refs: [$t4 => #4]
+     # #4
      #   <no edges>
      # #root
-     #   => (mut) #3 via [local `v`] at line 6
+     #   => (mut) #4 via [local `v`] at line 6
      #
-  2: m::g<#0>($t3)
+  3: m::g<#0>($t4)
      # abort state: {returns}
      # live vars: $t2
      # refs: []
      #
-  3: $t1 := infer($t2)
+  4: $t1 := infer($t2)
      # abort state: {returns}
      # live vars: $t1
      # refs: []
      #
-  4: return $t1
+  5: return $t1
 }
 
 
@@ -174,12 +193,14 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
-     var $t3: &mut vector<#0>
-  0: $t2 := vector($t0)
-  1: $t3 := borrow_local($t2)
-  2: m::g<#0>($t3)
-  3: $t1 := move($t2)
-  4: return $t1
+     var $t3: vector<#0>
+     var $t4: &mut vector<#0>
+  0: $t3 := vector($t0)
+  1: $t2 := move($t3)
+  2: $t4 := borrow_local($t2)
+  3: m::g<#0>($t4)
+  4: $t1 := move($t2)
+  5: return $t1
 }
 
 

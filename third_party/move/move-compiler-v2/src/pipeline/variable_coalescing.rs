@@ -226,7 +226,7 @@ impl VariableCoalescing {
                         if !avail_locals.is_empty() {
                             // There are dead locals available with matching types.
                             // Let's use one of them to replace occurrences of `local`.
-                            if let Bytecode::Assign(_, _, src, _) = bytecode[offset as usize] {
+                            if let Bytecode::Assign(_, _, src, _, _) = bytecode[offset as usize] {
                                 let src_coalesced = coalesceable_locals.get(&src).unwrap_or(&src);
                                 // Special case: `local := src_coalesced`, where `src_coalesced` is available.
                                 // Let's reuse the RHS to create a self-assignment, which can be optimized away.

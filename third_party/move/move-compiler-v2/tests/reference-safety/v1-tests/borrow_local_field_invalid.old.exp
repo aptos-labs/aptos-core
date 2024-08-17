@@ -9,6 +9,22 @@ error: cannot mutably borrow since immutable references exist
    │                 │previous local borrow
    │                 used by field borrow
 13 │         let s = &mut v;
+   │             -   ^^^^^^ mutable borrow attempted here
+   │             │
+   │             requirement enforced here
+14 │         *s = S { f: 0, g: 0 };
+15 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot mutably borrow since immutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_field_invalid.move:13:17
+   │
+12 │         let f = &v.f;
+   │                 ----
+   │                 ││
+   │                 │previous local borrow
+   │                 used by field borrow
+13 │         let s = &mut v;
    │                 ^^^^^^ mutable borrow attempted here
 14 │         *s = S { f: 0, g: 0 };
    │         --------------------- requirement enforced here
