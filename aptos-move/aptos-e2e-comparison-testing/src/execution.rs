@@ -15,7 +15,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::state_key::{inner::StateKeyInner, StateKey},
-    transaction::{Transaction, Transaction::UserTransaction, TransactionStatus, Version},
+    transaction::{Transaction, TransactionStatus, Version},
     vm_status::VMStatus,
     write_set::{WriteSet, TOTAL_SUPPLY_STATE_KEY},
 };
@@ -401,12 +401,12 @@ impl Execution {
         // We use executor only to get access to block executor and avoid some of
         // the initializations, but ignore its internal state, i.e., FakeDataStore.
         let executor = FakeExecutor::no_genesis();
-        let mut txns = vec![txn.clone()];
-        for txn in &mut txns {
-            if let UserTransaction(_signed_transaction) = txn {
-                // signed_transaction.set_max_gmount(min(100_000, signed_transaction.max_gas_amount() * 2));
-            }
-        }
+        let txns = vec![txn.clone()];
+        // for txn in &mut txns {
+        // if let UserTransaction(_signed_transaction) = txn {
+        // signed_transaction.set_max_gmount(min(100_000, signed_transaction.max_gas_amount() * 2));
+        // }
+        // }
         if let Some(debugger) = debugger_opt {
             let data_view = DataStateView::new(debugger, version, state);
             executor
@@ -420,12 +420,12 @@ impl Execution {
                 .execute_transaction_block_with_state_view(txns, &state, false)
                 .map(|mut res| {
                     let res_i = res.pop().unwrap();
-                    println!(
-                        "v2 flag:{} gas used:{}, status:{:?}",
-                        v2_flag,
-                        res_i.gas_used(),
-                        res_i.status()
-                    );
+                    // println!(
+                    //     "v2 flag:{} gas used:{}, status:{:?}",
+                    //     v2_flag,
+                    //     res_i.gas_used(),
+                    //     res_i.status()
+                    // );
                     (res_i.clone().into(), res_i.status().clone())
                 });
             res
