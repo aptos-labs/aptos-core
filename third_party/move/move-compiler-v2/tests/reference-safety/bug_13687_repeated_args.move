@@ -1,4 +1,3 @@
-// TODO(#13912): after fix, rename file to reflect issue (`bug_nnn.move` to `bug_nnn_<issue>.move`)
 module 0xCAFE::Module1 {
     struct Struct3 has drop, copy {
         var32: u16,
