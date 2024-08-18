@@ -341,8 +341,8 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Balance the stack such that it exactly contains the `result` temps and nothing else. This
-    /// is used for instructions like `brancg`, `return` or `abort` which terminate a block
-    /// und must leave the stack empty at end.
+    /// is used for instructions like `branch`, `return` or `abort` which terminate a block
+    /// and must leave the stack empty at end.
     fn balance_stack_end_of_block(
         &mut self,
         ctx: &BytecodeContext,
