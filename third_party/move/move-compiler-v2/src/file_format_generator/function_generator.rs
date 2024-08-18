@@ -942,9 +942,13 @@ impl<'a> FunctionGenerator<'a> {
                 None => {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
-                    if fun_ctx.is_copyable(*temp)
-                        && ctx.is_alive_after(*temp, &temps_to_push[pos + 1..], true)
-                    {
+                    if ctx.is_alive_after(*temp, &temps_to_push[pos + 1..], true) {
+                        if !fun_ctx.is_copyable(*temp) {
+                            fun_ctx.module.internal_error(
+                                &ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id),
+                                format!("value in `$t{}` expected to be copyable", temp),
+                            )
+                        }
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
                         self.emit(FF::Bytecode::MoveLoc(local));
@@ -1143,10 +1147,10 @@ impl<'env> FunctionContext<'env> {
 }
 
 impl<'env> BytecodeContext<'env> {
-    /// Determine whether `temp` is alive (used) in the reachable code after this point.
-    /// When `dest_check` is true, we additionally check if `temp` is also written to
-    /// by the current instruction; if it is, then the definition of `temp` being
-    /// considered here is killed, making it not alive after this point.
+    /// Determine whether `temp` is alive (used) in the reachable code after this point,
+    /// or is part of the remaining argument list. When `dest_check` is true, we additionally
+    /// check if `temp` is also written to by the current instruction; if it is, then the
+    /// definition of `temp` being considered here is killed, making it not alive after this point.
     pub fn is_alive_after(
         &self,
         temp: TempIndex,
