@@ -7,12 +7,12 @@ pub use map::LayeredMap;
 use std::hash::Hash;
 
 mod dropper;
+pub mod iterator;
 mod layer;
 mod map;
 mod metrics;
 mod node;
 pub(crate) mod r#ref;
-
 #[cfg(test)]
 mod tests;
 

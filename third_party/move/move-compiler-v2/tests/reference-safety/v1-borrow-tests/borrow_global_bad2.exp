@@ -1,9 +1,11 @@
 
 Diagnostics:
-error: cannot extract resource `A::T` which is still borrowed
+error: cannot extract `A::T` which is still borrowed
   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_bad2.move:8:22
   │
 7 │         let t_ref = borrow_global_mut<T>(sender);
-  │                     ---------------------------- previous mutable global borrow
+  │                     ---------------------------- struct `A::T` previously mutably borrowed here
 8 │         T { v: _ } = move_from<T>(sender);
-  │                      ^^^^^^^^^^^^^^^^^^^^ extracted here
+  │                      ^^^^^^^^^^^^^^^^^^^^ extraction attempted here
+9 │         t_ref;
+  │         ----- conflicting reference `t_ref` used here

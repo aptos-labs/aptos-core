@@ -45,7 +45,11 @@ pub fn crypto_group(c: &mut Criterion) {
         fft_assign_bench(thresh, &mut group);
 
         gt_multiexp_naive(thresh, &mut group);
+        g1_multiexp_naive(thresh, &mut group);
+        g2_multiexp_naive(thresh, &mut group);
+
         g1_multiexp(thresh, &mut group);
+        n_g1_double_exp(thresh, &mut group);
         g2_multiexp(thresh, &mut group);
 
         accumulator_poly(thresh, &mut group);
@@ -54,7 +58,7 @@ pub fn crypto_group(c: &mut Criterion) {
 
     // Derived from `print_best_worst_avg_case_subsets` in `tests/secret_sharing_config.rs`.
     const AVG_CASE: usize = 74;
-    for n in [1, 2, 4, 8, 16, 32, 64, AVG_CASE, 128] {
+    for n in [1, 2, 3, 4, 8, 16, 32, 64, AVG_CASE, 128] {
         multipairing(n, &mut group);
         for num_threads in [1, 2, 4, 8, 16, 32] {
             parallel_multipairing(n, &mut group, num_threads);
@@ -460,6 +464,31 @@ fn g1_multiexp<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
     });
 }
 
+fn n_g1_double_exp<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(n as u64));
+
+    g.bench_function(BenchmarkId::new("n_g1_double_exp", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let mut points_and_scalars = Vec::with_capacity(n);
+                for _ in 0..n {
+                    points_and_scalars
+                        .push((random_g1_points(2, &mut rng), random_scalars(2, &mut rng)));
+                }
+
+                points_and_scalars
+            },
+            |points_and_scalars| {
+                for (points, scalars) in points_and_scalars {
+                    g1_multi_exp(points.as_slice(), scalars.as_ref());
+                }
+            },
+        )
+    });
+}
+
 fn g2_multiexp<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
     let mut rng = thread_rng();
 
@@ -501,6 +530,56 @@ fn gt_multiexp_naive<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
                     .zip(scalars.into_iter())
                     .map(|(p, s)| p.mul(s))
                     .sum::<Gt>()
+            },
+        )
+    });
+}
+
+fn g1_multiexp_naive<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(n as u64));
+
+    g.bench_function(BenchmarkId::new("g1_multiexp_naive", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let points = random_g1_points(n, &mut rng);
+
+                let scalars = random_scalars(n, &mut rng);
+
+                (points, scalars)
+            },
+            |(points, scalars)| {
+                points
+                    .into_iter()
+                    .zip(scalars.into_iter())
+                    .map(|(p, s)| p.mul(s))
+                    .sum::<G1Projective>()
+            },
+        )
+    });
+}
+
+fn g2_multiexp_naive<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(n as u64));
+
+    g.bench_function(BenchmarkId::new("g2_multiexp_naive", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let points = random_g2_points(n, &mut rng);
+
+                let scalars = random_scalars(n, &mut rng);
+
+                (points, scalars)
+            },
+            |(points, scalars)| {
+                points
+                    .into_iter()
+                    .zip(scalars.into_iter())
+                    .map(|(p, s)| p.mul(s))
+                    .sum::<G2Projective>()
             },
         )
     });

@@ -545,7 +545,7 @@ impl Modifiers {
 // Parse module member modifiers: visiblility and native.
 // The modifiers are also used for script-functions
 //      ModuleMemberModifiers = <ModuleMemberModifier>*
-//      ModuleMemberModifier = <Visibility> | "native"
+//      ModuleMemberModifier = <Visibility> | "native" | "entry"
 // ModuleMemberModifiers checks for uniqueness, meaning each individual ModuleMemberModifier can
 // appear only once
 fn parse_module_member_modifiers(context: &mut Context) -> Result<Modifiers, Box<Diagnostic>> {
@@ -761,6 +761,7 @@ fn parse_bind_field(context: &mut Context) -> Result<(Field, Bind), Box<Diagnost
 //          <Var>
 //          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindField> "}"
 //          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<Bind> "," ")"
+//          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     if context.tokens.peek() == Tok::Identifier {
@@ -1037,6 +1038,7 @@ fn parse_sequence(context: &mut Context) -> Result<Sequence, Box<Diagnostic>> {
 //          | "abort" "{" <Exp> "}"
 //          | "abort" <Exp>
 //          | "for" "(" <Exp> "in" <Exp> ".." <Exp> ")" "{" <Exp> "}"
+//          | <NameExp>
 fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     const VECTOR_IDENT: &str = "vector";
     const FOR_IDENT: &str = "for";
@@ -1135,6 +1137,7 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         // "(" Comma<Exp> ")"
         // "(" <Exp> ":" <Type> ")"
         // "(" <Exp> "as" <Type> ")"
+        // "(" <Exp> "is" <Type> ( "|" <Type> )* ")"
         Tok::LParen => {
             let list_loc = context.tokens.start_loc();
             context.tokens.advance()?; // consume the LParen
@@ -1142,7 +1145,8 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                 Exp_::Unit
             } else {
                 // If there is a single expression inside the parens,
-                // then it may be followed by a colon and a type annotation.
+                // then it may be followed by a colon and a type annotation, an 'as' and a type,
+                // or an 'is' and a list of variants.
                 let e = parse_exp(context)?;
                 if match_token(context.tokens, Tok::Colon)? {
                     let ty = parse_type(context)?;
@@ -1152,6 +1156,22 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                     let ty = parse_type(context)?;
                     consume_token(context.tokens, Tok::RParen)?;
                     Exp_::Cast(Box::new(e), ty)
+                } else if context.tokens.peek() == Tok::Identifier
+                    && context.tokens.content() == "is"
+                {
+                    require_move_2(
+                        context,
+                        current_token_loc(context.tokens),
+                        "`is` expression",
+                    );
+                    context.tokens.advance()?;
+                    let types = parse_list(
+                        context,
+                        |ctx| match_token(ctx.tokens, Tok::Pipe),
+                        parse_type,
+                    )?;
+                    consume_token(context.tokens, Tok::RParen)?;
+                    Exp_::Test(Box::new(e), types)
                 } else {
                     if context.tokens.peek() != Tok::RParen {
                         consume_token(context.tokens, Tok::Comma)?;
@@ -1522,7 +1542,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
 }
 
 // Match = "match" "(" <Exp> ")" "{" ( <MatchArm> ","? )* "}"
-// MatchArm = <Bind> ( "if" <Exp> )? "=>" <Exp>
+// MatchArm = <BindList> ( "if" <Exp> )? "=>" <Exp>
 // If called, we know we are looking at `match (`.
 fn parse_match_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     // We cannot uniquely determine this is actually a match expression
@@ -1632,8 +1652,8 @@ fn parse_match_arms(
 // Parse a pack, call, or other reference to a name:
 //      NameExp =
 //          <NameAccessChain> <OptionalTypeArgs> "{" Comma<ExpField> "}"
-//          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<Exp> ")"
-//          | <NameAccessChain> "!" "(" Comma<Exp> ")"
+//          | <NameAccessChain> <OptionalTypeArgs> <CallArgs>
+//          | <NameAccessChain> "!" <CallArgs>
 //          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     let n = parse_name_access_chain(context, false, || {
@@ -1670,7 +1690,7 @@ fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
             Ok(Exp_::Pack(n, tys, fs))
         },
 
-        // Call: "(" Comma<Exp> ")"
+        // Call: <CallArgs>
         Tok::Exclaim | Tok::LParen => {
             let rhs = parse_call_args(context)?;
             Ok(Exp_::Call(n, CallKind::Regular, tys, rhs))
@@ -1681,7 +1701,9 @@ fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     }
 }
 
-// Parse the arguments to a call: "(" Comma<Exp> ")"
+// Parse the arguments to a call:
+//      CallArgs =
+//          "(" Comma<Exp> ")"
 fn parse_call_args(context: &mut Context) -> Result<Spanned<Vec<Exp>>, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let args = parse_comma_list(
@@ -1946,7 +1968,7 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 
 // Parse an expression term optionally followed by a chain of dot or index accesses:
 //      DotOrIndexChain =
-//          <DotOrIndexChain> "." <Identifier> [  "(" Comma<Exp> ")" ]
+//          <DotOrIndexChain> "." <Identifier> [ ["::" "<" Comma<Type> ">"]? <CallArgs> ]?
 //          | <DotOrIndexChain> "[" <Exp> "]"
 //          | <Term>
 fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
@@ -2019,7 +2041,7 @@ fn is_quant(context: &mut Context) -> bool {
 // Parses a quantifier expressions, assuming is_quant(context) is true.
 //
 //   <Quantifier> =
-//       ( "forall" | "exists" ) <QuantifierBindings> ({ (<Exp>)* })* ("where" <Exp>)? ":" Exp
+//       ( "forall" | "exists" ) <QuantifierBindings> ("{" Comma<Exp> "}")* ("where" <Exp>)? ":" <Exp>
 //     | ( "choose" [ "min" ] ) <QuantifierBind> "where" <Exp>
 //   <QuantifierBindings> = <QuantifierBind> ("," <QuantifierBind>)*
 //   <QuantifierBind> = <Identifier> ":" <Type> | <Identifier> "in" <Exp>
@@ -2180,7 +2202,7 @@ fn make_builtin_call(loc: Loc, name: Symbol, type_args: Option<Vec<Type>>, args:
 //          <NameAccessChain> ('<' Comma<Type> ">")?
 //          | "&" <Type>
 //          | "&mut" <Type>
-//          | "|" Comma<Type> "|" Type
+//          | "|" Comma<Type> "|" <Type>?
 //          | "(" Comma<Type> ")"
 fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -2403,7 +2425,8 @@ fn parse_struct_type_parameters(
 //          (":" <Type>)?
 //          ("acquires" <NameAccessChain> ("," <NameAccessChain>)*)?
 //          ("{" <Sequence> "}" | ";")
-//
+//      FunctionDefName =
+//          <Identifier> <OptionalTypeParameters>
 fn parse_function_decl(
     attributes: Vec<Attributes>,
     start_loc: usize,
@@ -2459,7 +2482,7 @@ fn parse_function_decl(
         sp(name.loc(), Type_::Unit)
     };
 
-    // ( ( "!" )? ("acquires" | "reads" | "writes" ) <AccessSpecifierList> )*
+    // "pure" | ( ( "!" )? ("acquires" | "reads" | "writes" ) <AccessSpecifierList> )*
     let mut access_specifiers = vec![];
     let mut pure_loc = None;
     loop {
@@ -2605,7 +2628,7 @@ fn parse_access_specifier_list(
 }
 
 // Parse an access specifier:
-//   AccessSpecifier = <NameAccessChainWithWildcard> <AddressSpecifier>
+//   AccessSpecifier = <NameAccessChainWithWildcard> <OptionalTypeArgs> <AddressSpecifier>
 fn parse_access_specifier(
     context: &mut Context,
     negated: bool,
@@ -2625,7 +2648,7 @@ fn parse_access_specifier(
 
 // Parse an address specifier:
 //   AddressSpecifier = <empty> | "(" <AddressSpecifierArg> ")"
-//   AddressSpecifierArg = "*" | <Identifier> | <NameAccessChain> "(" <Identifier> ")"
+//   AddressSpecifierArg = "*" | <AddressBytes> | <NameAccessChain> ( <TypeArgs>? "(" <Identifier> ")" )?
 fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Box<Diagnostic>> {
     let start = context.tokens.start_loc();
     let (spec, end) = if match_token(context.tokens, Tok::LParen)? {
@@ -2680,10 +2703,11 @@ fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Bo
 //        | "struct" <StructDefName> "(" Comma<Type> ")" <Abilities>?";"
 //        | "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}" (<Abilities> ";")?
 //      StructDefName =
-//          <Identifier> <OptionalTypeParameters>
+//          <Identifier> <StructTypeParameter>
 //      EnumVariant =
 //          <Identifier> "{" Comma<FieldAnnot> "}"
 //          <Identifier> "(" Comma<Type> ")"
+//          <Identifier>
 //      Abilities =
 //          "has" <Ability> (, <Ability>)+
 fn parse_struct_decl(
@@ -3133,7 +3157,7 @@ fn parse_use_alias(context: &mut Context) -> Result<Option<Name>, Box<Diagnostic
 //      Module =
 //          <DocComments> ( "spec" | "module") (<LeadingNameAccess>::)?<ModuleName> "{"
 //              ( <Attributes>
-//                  ( <UseDecl> | <FriendDecl> | <SpecBlock> |
+//                  ( <UseDecl> | <FriendDecl> | <SpecBlock> | <Invariant> |
 //                    <DocComments> <ModuleMemberModifiers>
 //                        (<ConstantDecl> | <StructDecl> | <FunctionDecl>) )
 //                  )
@@ -3347,7 +3371,7 @@ fn parse_script(
 
 // Parse an optional specification block:
 //     SpecBlockTarget =
-//          <Identifier>
+//          <Identifier> <SpecTargetSignatureOpt>
 //        |  "fun" <Identifier>  # deprecated
 //        | "struct <Identifier> # deprecated
 //        | "module"
@@ -3432,6 +3456,9 @@ fn parse_spec_block(
     ))
 }
 
+// Parse an optional specification target signature block:
+//      SpecTargetSignatureOpt = <TypeParameters>? "(" Comma<Parameter> ")" (":" <Type>)?
+//                             | <empty>
 fn parse_spec_target_signature_opt(
     loc: &Loc,
     context: &mut Context,
@@ -3501,7 +3528,7 @@ fn parse_spec_block_member(context: &mut Context) -> Result<SpecBlockMember, Box
 //    SpecCondition =
 //        ("assert" | "assume" | "ensures" | "requires" ) <ConditionProperties> <Exp> ";"
 //      | "aborts_if" <ConditionProperties> <Exp> ["with" <Exp>] ";"
-//      | "aborts_with" <ConditionProperties> <Exp> [Comma <Exp>]* ";"
+//      | ("aborts_with" | "modifies") <ConditionProperties> <Exp> [Comma <Exp>]* ";"
 //      | "decreases" <ConditionProperties> <Exp> ";"
 //      | "emits" <ConditionProperties> <Exp> "to" <Exp> [If <Exp>] ";"
 fn parse_condition(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
@@ -3660,8 +3687,8 @@ fn parse_invariant(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnos
 }
 
 // Parse a specification function.
-//     SpecFunction = "define" <SpecFunctionSignature> ( "{" <Sequence> "}" | ";" )
-//                  | "native" "define" <SpecFunctionSignature> ";"
+//     SpecFunction = "fun" <SpecFunctionSignature> ( "{" <Sequence> "}" | ";" )
+//                  | "native" "fun" <SpecFunctionSignature> ";"
 //     SpecFunctionSignature =
 //         <Identifier> <OptionalTypeParameters> "(" Comma<Parameter> ")" ":" <Type>
 fn parse_spec_function(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
@@ -3765,7 +3792,7 @@ fn parse_spec_variable(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
 }
 
 // Parse a specification update.
-//     SpecUpdate = "update" <Exp> = <Exp> ";"
+//     SpecUpdate = "update" <UnaryExp> "=" <Exp> ";"
 fn parse_spec_update(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     consume_token(context.tokens, Tok::Identifier)?;
@@ -3810,7 +3837,7 @@ fn parse_spec_let(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnost
 }
 
 // Parse a specification schema include.
-//    SpecInclude = "include" <Exp>
+//    SpecInclude = "include" <ConditionProperties> <Exp> ";"
 fn parse_spec_include(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     consume_identifier(context.tokens, "include")?;
@@ -3869,7 +3896,7 @@ fn parse_spec_apply(context: &mut Context) -> Result<SpecBlockMember, Box<Diagno
 }
 
 // Parse a function pattern:
-//     SpecApplyPattern = <SpecApplyFragment>+ <OptionalTypeArgs>
+//     SpecApplyPattern = ( "public" | "internal" )? <SpecApplyFragment>+ <OptionalTypeArgs>
 fn parse_spec_apply_pattern(context: &mut Context) -> Result<SpecApplyPattern, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     // TODO: update the visibility parsing in the spec as well
@@ -3957,7 +3984,7 @@ fn parse_spec_pragma(context: &mut Context) -> Result<SpecBlockMember, Box<Diagn
 }
 
 // Parse a specification pragma property:
-//    SpecPragmaProperty = <Identifier> ( "=" <Value> | <NameAccessChain> )?
+//    SpecPragmaProperty = <Identifier> ( "=" ( <Value> | <NameAccessChain> ) )?
 fn parse_spec_property(context: &mut Context) -> Result<PragmaProperty, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let name = match consume_optional_token_with_loc(context.tokens, Tok::Friend)? {

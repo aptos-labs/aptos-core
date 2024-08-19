@@ -1,11 +1,11 @@
 
 Diagnostics:
-error: cannot mutably borrow since mutable references exist
+error: cannot mutably borrow `A::T` since it is already borrowed
   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_bad1.move:8:17
   │
 7 │         let x = borrow_global_mut<T>(sender);
-  │                 ---------------------------- previous mutable global borrow
+  │                 ---------------------------- struct `A::T` previously mutably borrowed here
 8 │         let y = borrow_global_mut<T>(addr);
   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 9 │         x;
-  │         - requirement enforced here
+  │         - conflicting reference `x` used here

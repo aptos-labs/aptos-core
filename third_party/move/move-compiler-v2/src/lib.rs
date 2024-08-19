@@ -25,11 +25,13 @@ use crate::{
         seqs_in_binop_checker, spec_checker, spec_rewriter, EnvProcessorPipeline,
     },
     pipeline::{
-        ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
-        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+        ability_processor::AbilityProcessor,
+        avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        copy_propagation::CopyPropagation,
+        dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
-        reference_safety_processor::ReferenceSafetyProcessor,
+        reference_safety::{reference_safety_processor_v2, reference_safety_processor_v3},
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
@@ -57,7 +59,7 @@ use move_compiler::{
     diagnostics::FilesSourceText,
     shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
 };
-use move_core_types::vm_status::{StatusCode, StatusType};
+use move_core_types::vm_status::StatusType;
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
 use move_model::{
@@ -404,10 +406,18 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         pipeline.add_processor(Box::new(UnusedAssignmentChecker {}));
     }
 
-    // Reference check is always run, but the processor decides internally
-    // based on `Experiment::REFERENCE_SAFETY` whether to report errors.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
-    pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    if options.experiment_on(Experiment::REFERENCE_SAFETY_V3) {
+        pipeline.add_processor(Box::new(
+            reference_safety_processor_v3::ReferenceSafetyProcessor {},
+        ));
+    } else {
+        // Reference check is always run, but the legacy processor decides internally
+        // based on `Experiment::REFERENCE_SAFETY` whether to report errors.
+        pipeline.add_processor(Box::new(
+            reference_safety_processor_v2::ReferenceSafetyProcessor {},
+        ));
+    }
 
     if options.experiment_on(Experiment::ABILITY_CHECK) {
         pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
@@ -530,38 +540,16 @@ fn report_bytecode_verification_error(
         } else {
             "".to_string()
         };
-        use StatusCode::*;
-        match e.major_status() {
-            // Only treat verification errors known to be an issue here
-            BORROWFIELD_EXISTS_MUTABLE_BORROW_ERROR
-            | MOVELOC_EXISTS_BORROW_ERROR
-            | BORROWLOC_EXISTS_BORROW_ERROR
-            | READREF_EXISTS_MUTABLE_BORROW_ERROR
-                if precise_loc =>
-            {
-                env.diag(
-                    Severity::Error,
-                    loc,
-                    &format!(
-                        "reference safety check failed on bytecode level. \
-                This is a known issue, to be fixed later, resulting from differences between \
-                safety rules of the v1 and v2 compiler. Try to rewrite your code \
-                 to workaround this problem.{}",
-                        debug_info
-                    ),
-                )
-            },
-            _ => env.diag(
-                Severity::Bug,
-                loc,
-                &format!(
-                    "bytecode verification failed with \
+        env.diag(
+            Severity::Bug,
+            loc,
+            &format!(
+                "bytecode verification failed with \
                 unexpected status code `{:?}`. This is a compiler bug, consider reporting it.{}",
-                    e.major_status(),
-                    debug_info
-                ),
+                e.major_status(),
+                debug_info
             ),
-        }
+        )
     }
 }
 
