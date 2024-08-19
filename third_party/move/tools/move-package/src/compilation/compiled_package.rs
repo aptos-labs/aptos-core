@@ -813,11 +813,11 @@ impl CompiledPackage {
                 .iter()
                 .map(|package| {
                     let name = package.name.unwrap();
-                    // Package address of the bytecode dep is required for publication. It must be
-                    // provided as a named address in the dep package's Move.toml or through CLI arg
-                    // `--named-addresses`, with the same name as the dep package.
+                    // Package address of the bytecode dep is required for publication.
                     let address = package.named_address_map.get(&name).ok_or(anyhow::anyhow!(
-                        "address unknown for bytecode dependency {}",
+                        "address unknown for bytecode dependency {}. It must be provided as a named \
+                        address in the dependency's Move.toml or through CLI arg --named-addresses, \
+                        with name {0}",
                         name
                     ));
 
