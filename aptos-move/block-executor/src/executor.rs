@@ -926,6 +926,7 @@ where
                 };
                 scheduler.queueing_commits_mark_done();
             }
+
             if config.worker_should_backup(&scheduler_task) {
                 if let Some(last_commit_idx) = last_commit_idx {
                     let next_commit_idx = last_commit_idx + 1;
