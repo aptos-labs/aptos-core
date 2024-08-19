@@ -87,7 +87,7 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2 + 1/*  Rendezvous channel */)
     * 2;
 
-pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
+pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
