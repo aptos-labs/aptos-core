@@ -5,7 +5,7 @@ module 0x42::LambdaTest1 {
     }
     public inline fun inline_apply1(f: |u64|u64,b: u64): u64 {
         {
-          let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>((f)(b), 1), 12);
+          let (a: u64, _: u64): (u64, u64) = Tuple(Add<u64>((f)(b), 1), 12);
           Mul<u64>(a, 12)
         }
     }
@@ -33,11 +33,11 @@ module 0x42::LambdaTest2 {
     public inline fun inline_apply2(g: |u64|u64,c: u64): u64 {
         Add<u64>({
           let (b: u64): (u64) = Tuple((g)({
-            let (a: u64, b: u64): (u64, u64) = Tuple(c, 3);
+            let (a: u64, _: u64): (u64, u64) = Tuple(c, 3);
             Mul<u64>(a, 3)
           }));
           {
-            let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>({
+            let (a: u64, _: u64): (u64, u64) = Tuple(Add<u64>({
               let (z: u64): (u64) = Tuple(b);
               z
             }, 1), 12);

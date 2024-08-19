@@ -132,16 +132,16 @@ error: use of unassigned local `r`
    │             ^^^^^^^^^^^^^^^^
 
 error: use of unassigned local `y`
-   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:30:17
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:30:13
    │
 30 │         let z = y;
-   │                 ^
+   │             ^
 
 error: use of unassigned local `x`
-   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:31:17
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:31:13
    │
 31 │         let q = x;
-   │                 ^
+   │             ^
 
 ============ after uninitialized_use_checker: ================
 

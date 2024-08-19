@@ -93,7 +93,7 @@ module 0x42::freeze_mut_ref {
     }
     private fun t8(cond: bool,s: &mut freeze_mut_ref::S,other: &freeze_mut_ref::S) {
         {
-          let _x: &freeze_mut_ref::S = if cond {
+          let _: &freeze_mut_ref::S = if cond {
             Freeze(false)(s)
           } else {
             other
@@ -283,6 +283,7 @@ fun freeze_mut_ref::t7($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_
 [variant baseline]
 fun freeze_mut_ref::t8($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_ref::S) {
      var $t3: &freeze_mut_ref::S
+     var $t4: &freeze_mut_ref::S
   0: if ($t0) goto 1 else goto 4
   1: label L0
   2: $t3 := freeze_ref(implicit)($t1)
@@ -290,7 +291,8 @@ fun freeze_mut_ref::t8($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_
   4: label L1
   5: $t3 := infer($t2)
   6: label L2
-  7: return ()
+  7: $t4 := infer($t3)
+  8: return ()
 }
 
 

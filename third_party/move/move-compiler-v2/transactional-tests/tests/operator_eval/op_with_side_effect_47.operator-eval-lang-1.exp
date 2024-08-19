@@ -1,8 +1,7 @@
 comparison between v1 and v2 failed:
-- processed 2 tasks
-+ processed 2 tasks
+= processed 2 tasks
 = 
-- task 0 'publish'. lines 1-16:
+= task 0 'publish'. lines 1-16:
 - Error: error[E07003]: invalid operation, could create dangling a reference
 -    ┌─ TEMPFILE:4:9
 -    │
@@ -11,7 +10,29 @@ comparison between v1 and v2 failed:
 -    ·
 - 12 │         x + inc(&mut x) + inc(&mut x)
 -    │                 ------ It is still being mutably borrowed by this reference
-- 
++ Error: compilation errors:
++  error: A sequence within an operand of binary operation `+` can obscure program logic and is not allowed by this compiler.
++    ┌─ TEMPFILE:12:9
++    │  
++  3 │       inline fun inc(x: &mut u64): u64 {
++    │ ╭──────────────────────────────────────'
++  4 │ │         *x = *x + 1;
++  5 │ │         *x
++  6 │ │     }
++    │ ╰─────' non-empty sequence
++    · │
++ 12 │           x + inc(&mut x) + inc(&mut x)
++    │           ^^^^^^^^^^^^^^^
++    │           │   │
++    │           │   from a call inlined at this callsite
++    │           binary operation `+`
++    │  
++    = To compile this code, either:
++    = 1. upgrade to language version 2.0 or later (which uses strict left-to-right evaluation order),
++    = 2. rewrite the code to remove sequences from directly within binary operations,
++    =    e.g., save intermediate results providing explicit order.
++    = In either of these cases, please ensure to check the code does what you expect it to, because of changed semantics.
+= 
 - error[E07002]: mutable ownership violated
 -    ┌─ TEMPFILE:4:14
 -    │
@@ -22,7 +43,8 @@ comparison between v1 and v2 failed:
 -    │                 ------ It is still being mutably borrowed by this reference
 - 
 - error[E07006]: ambiguous usage of variable
--    ┌─ TEMPFILE:12:9
++ error: A sequence within an operand of binary operation `+` can obscure program logic and is not allowed by this compiler.
+=    ┌─ TEMPFILE:12:9
 -    │
 - 12 │         x + inc(&mut x) + inc(&mut x)
 -    │         ^                     ------ It is still being mutably borrowed by this reference
@@ -31,16 +53,34 @@ comparison between v1 and v2 failed:
 -    │         Try an explicit annotation, e.g. 'move x' or 'copy x'
 -    │
 -    = Ambiguous inference of 'move' or 'copy' for a borrowed variable's last usage: A 'move' would invalidate the borrowing reference, but a 'copy' might not be the expected implicit behavior since this the last direct usage of the variable.
-- 
-- 
-- 
++    │  
++  3 │       inline fun inc(x: &mut u64): u64 {
++    │ ╭──────────────────────────────────────'
++  4 │ │         *x = *x + 1;
++  5 │ │         *x
++  6 │ │     }
++    │ ╰─────' non-empty sequence
++    · │
++ 12 │           x + inc(&mut x) + inc(&mut x)
++    │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++    │           │                 │
++    │           │                 from a call inlined at this callsite
++    │           binary operation `+`
++    │  
++    = To compile this code, either:
++    = 1. upgrade to language version 2.0 or later (which uses strict left-to-right evaluation order),
++    = 2. rewrite the code to remove sequences from directly within binary operations,
++    =    e.g., save intermediate results providing explicit order.
++    = In either of these cases, please ensure to check the code does what you expect it to, because of changed semantics.
+= 
+= 
+= 
 = task 1 'run'. lines 18-18:
-- Error: Function execution failed with VMError: {
--     major_status: LINKER_ERROR,
--     sub_status: None,
--     location: undefined,
--     indices: redacted,
--     offsets: redacted,
-- }
-+ return values: 6
+= Error: Function execution failed with VMError: {
+=     major_status: LINKER_ERROR,
+=     sub_status: None,
+=     location: undefined,
+=     indices: redacted,
+=     offsets: redacted,
+= }
 = 

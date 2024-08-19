@@ -74,7 +74,7 @@ module 0x8675309::M {
     }
     private fun t2() {
         {
-          let M::S{ f, g };
+          let M::S{ f: _, g: _ };
           Tuple()
         }
     }

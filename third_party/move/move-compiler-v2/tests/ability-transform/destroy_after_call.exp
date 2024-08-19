@@ -14,12 +14,14 @@ fun m::g() {
      var $t1: &mut u64
      var $t2: &mut u64
      var $t3: &u64
+     var $t4: &u64
   0: $t0 := 22
   1: $t1 := borrow_local($t0)
   2: $t2 := m::f($t1)
   3: $t1 := infer($t2)
   4: $t3 := borrow_local($t0)
-  5: return ()
+  5: $t4 := infer($t3)
+  6: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -40,6 +42,7 @@ fun m::g() {
      var $t1: &mut u64
      var $t2: &mut u64
      var $t3: &u64
+     var $t4: &u64
      # live vars:
   0: $t0 := 22
      # live vars: $t0
@@ -50,8 +53,10 @@ fun m::g() {
   3: $t1 := infer($t2)
      # live vars: $t0
   4: $t3 := borrow_local($t0)
+     # live vars: $t3
+  5: $t4 := infer($t3)
      # live vars:
-  5: return ()
+  6: return ()
 }
 
 
@@ -80,6 +85,7 @@ fun m::g() {
      var $t1: &mut u64
      var $t2: &mut u64
      var $t3: &u64
+     var $t4: &u64
      # live vars:
   0: $t0 := 22
      # live vars: $t0
@@ -90,8 +96,10 @@ fun m::g() {
   3: $t1 := infer($t2)
      # live vars: $t0
   4: $t3 := borrow_local($t0)
+     # live vars: $t3
+  5: $t4 := infer($t3)
      # live vars:
-  5: return ()
+  6: return ()
 }
 
 ============ after ReferenceSafetyProcessor: ================
@@ -124,6 +132,7 @@ fun m::g() {
      var $t1: &mut u64
      var $t2: &mut u64
      var $t3: &u64
+     var $t4: &u64
      # live vars:
      # refs: []
      #
@@ -152,10 +161,18 @@ fun m::g() {
      # refs: []
      #
   4: $t3 := borrow_local($t0)
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `v`] at line 9
+     #
+  5: $t4 := infer($t3)
      # live vars:
      # refs: []
      #
-  5: return ()
+  6: return ()
 }
 
 ============ after AbortAnalysisProcessor: ================
@@ -190,6 +207,7 @@ fun m::g() {
      var $t1: &mut u64
      var $t2: &mut u64
      var $t3: &u64
+     var $t4: &u64
      # abort state: {returns,aborts}
      # live vars:
      # refs: []
@@ -224,10 +242,19 @@ fun m::g() {
      #
   4: $t3 := borrow_local($t0)
      # abort state: {returns}
+     # live vars: $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `v`] at line 9
+     #
+  5: $t4 := infer($t3)
+     # abort state: {returns}
      # live vars:
      # refs: []
      #
-  5: return ()
+  6: return ()
 }
 
 ============ after AbilityProcessor: ================
@@ -246,12 +273,14 @@ fun m::g() {
      var $t1: &mut u64
      var $t2: &mut u64
      var $t3: &u64
+     var $t4: &u64
   0: $t0 := 22
   1: $t1 := borrow_local($t0)
   2: $t2 := m::f($t1)
   3: $t1 := move($t2)
   4: drop($t1)
   5: $t3 := borrow_local($t0)
-  6: drop($t3)
-  7: return ()
+  6: $t4 := move($t3)
+  7: drop($t4)
+  8: return ()
 }

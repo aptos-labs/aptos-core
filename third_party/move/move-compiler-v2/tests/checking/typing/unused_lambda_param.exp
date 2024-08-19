@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Unused anonymous function parameter `x`. Consider removing or prefixing with an underscore: `_x`
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ tests/checking/typing/unused_lambda_param.move:7:18
   │
 7 │         test(0, |x| 1);

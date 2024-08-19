@@ -3,7 +3,7 @@ module 0x42::m {
     use std::vector;
     public entry fun init() {
         {
-          let _x: vector<u64> = {
+          let _: vector<u64> = {
             let result: vector<u64> = Vector<u64>();
             {
               let (v: vector<vector<u8>>): (vector<vector<u8>>) = Tuple([Vector([Number(1)])]);
@@ -33,7 +33,7 @@ module 0x42::m {
             result
           };
           {
-            let _y: vector<u64> = {
+            let _: vector<u64> = {
               let result: vector<u64> = Vector<u64>();
               {
                 let (v: vector<u64>): (vector<u64>) = Tuple([Number(3)]);
