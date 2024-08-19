@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/unused-assignment/unused_assign_to_var.move:3:17
+  │
+3 │         let y = x;
+  │                 ^
+
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/unused-assignment/unused_assign_to_var.move:4:9
+  │
+4 │         y = 43;
+  │         ^^^^^^
