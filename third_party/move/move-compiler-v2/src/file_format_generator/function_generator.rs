@@ -350,13 +350,12 @@ impl<'a> FunctionGenerator<'a> {
     ) {
         let result = result.as_ref();
         // If the stack contains already exactly the result and none of the temps is used after,
-        // nothing to do
+        // nothing to do.
         let stack_ready = self.stack == result
             && self
                 .stack
                 .iter()
-                .enumerate()
-                .all(|(pos, temp)| !ctx.is_alive_after(*temp, &result[pos + 1..], false));
+                .all(|temp| !ctx.is_alive_after(*temp, &[], false));
         if !stack_ready {
             // Flush the stack and push the result
             self.abstract_flush_stack_before(ctx, 0);
