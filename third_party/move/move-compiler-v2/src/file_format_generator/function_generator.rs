@@ -230,7 +230,7 @@ impl<'a> FunctionGenerator<'a> {
                         FF::Bytecode::Branch(_) => *code_ref = FF::Bytecode::Branch(label_offs),
                         FF::Bytecode::BrTrue(_) => *code_ref = FF::Bytecode::BrTrue(label_offs),
                         FF::Bytecode::BrFalse(_) => *code_ref = FF::Bytecode::BrFalse(label_offs),
-                        _ => {}
+                        _ => {},
                     }
                 }
             } else {
@@ -275,15 +275,15 @@ impl<'a> FunctionGenerator<'a> {
                 let local = self.temp_to_local(ctx.fun_ctx, Some(ctx.attr_id), *dest);
                 self.emit(FF::Bytecode::StLoc(local));
                 self.abstract_pop(ctx)
-            }
+            },
             Bytecode::Ret(_, result) => {
                 self.balance_stack_end_of_block(ctx, result);
                 self.emit(FF::Bytecode::Ret);
                 self.abstract_pop_n(ctx, result.len());
-            }
+            },
             Bytecode::Call(_, dest, oper, source, None) => {
                 self.gen_operation(ctx, dest, oper, source)
-            }
+            },
             Bytecode::Load(_, dest, cons) => self.gen_load(ctx, dest, cons),
             Bytecode::Label(_, label) => self.define_label(*label),
             Bytecode::Branch(_, if_true, if_false, cond) => {
@@ -316,27 +316,27 @@ impl<'a> FunctionGenerator<'a> {
                     self.emit(FF::Bytecode::Branch(0))
                 }
                 self.abstract_pop(ctx);
-            }
+            },
             Bytecode::Jump(_, label) => {
                 self.abstract_flush_stack_before(ctx, 0);
                 self.add_label_reference(*label);
                 self.emit(FF::Bytecode::Branch(0));
-            }
+            },
             Bytecode::Abort(_, temp) => {
                 self.balance_stack_end_of_block(ctx, &vec![*temp]);
                 self.emit(FF::Bytecode::Abort);
                 self.abstract_pop(ctx)
-            }
+            },
             Bytecode::Nop(_) => {
                 // do nothing -- labels are relative
-            }
+            },
             Bytecode::SpecBlock(_, spec) => self.gen_spec_block(ctx, spec),
             Bytecode::SaveMem(_, _, _)
             | Bytecode::Call(_, _, _, _, Some(_))
             | Bytecode::SaveSpecVar(_, _, _)
             | Bytecode::Prop(_, _, _) => {
                 // do nothing -- skip specification ops
-            }
+            },
         }
     }
 
@@ -353,9 +353,9 @@ impl<'a> FunctionGenerator<'a> {
         // nothing to do.
         let stack_ready = self.stack == result
             && self
-            .stack
-            .iter()
-            .all(|temp| !ctx.is_alive_after(*temp, &[], false));
+                .stack
+                .iter()
+                .all(|temp| !ctx.is_alive_after(*temp, &[], false));
         if !stack_ready {
             // Flush the stack and push the result
             self.abstract_flush_stack_before(ctx, 0);
@@ -393,7 +393,7 @@ impl<'a> FunctionGenerator<'a> {
         match oper {
             Operation::Function(mid, fid, inst) => {
                 self.gen_call(ctx, dest, mid.qualified(*fid), inst, source);
-            }
+            },
             Operation::Pack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -404,7 +404,7 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::Pack,
                     FF::Bytecode::PackGeneric,
                 );
-            }
+            },
             Operation::PackVariant(mid, sid, variant, inst) => {
                 self.gen_struct_variant_oper(
                     ctx,
@@ -416,7 +416,7 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::PackVariant,
                     FF::Bytecode::PackVariantGeneric,
                 );
-            }
+            },
             Operation::Unpack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -427,7 +427,7 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::Unpack,
                     FF::Bytecode::UnpackGeneric,
                 );
-            }
+            },
             Operation::UnpackVariant(mid, sid, variant, inst) => {
                 self.gen_struct_variant_oper(
                     ctx,
@@ -439,7 +439,7 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::UnpackVariant,
                     FF::Bytecode::UnpackVariantGeneric,
                 );
-            }
+            },
             Operation::TestVariant(mid, sid, variant, inst) => {
                 self.gen_struct_variant_oper(
                     ctx,
@@ -451,7 +451,7 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::TestVariant,
                     FF::Bytecode::TestVariantGeneric,
                 );
-            }
+            },
             Operation::MoveTo(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -462,7 +462,7 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::MoveTo,
                     FF::Bytecode::MoveToGeneric,
                 );
-            }
+            },
             Operation::MoveFrom(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -473,7 +473,7 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::MoveFrom,
                     FF::Bytecode::MoveFromGeneric,
                 );
-            }
+            },
             Operation::Exists(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -484,7 +484,7 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::Exists,
                     FF::Bytecode::ExistsGeneric,
                 );
-            }
+            },
             Operation::BorrowLoc => {
                 let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), source[0]);
                 if fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference() {
@@ -493,7 +493,7 @@ impl<'a> FunctionGenerator<'a> {
                     self.emit(FF::Bytecode::ImmBorrowLoc(local))
                 }
                 self.abstract_push_result(ctx, dest)
-            }
+            },
             Operation::BorrowField(mid, sid, inst, offset) => {
                 self.gen_borrow_field(
                     ctx,
@@ -504,7 +504,7 @@ impl<'a> FunctionGenerator<'a> {
                     *offset,
                     source,
                 );
-            }
+            },
             Operation::BorrowVariantField(mid, sid, variants, inst, offset) => {
                 self.gen_borrow_field(
                     ctx,
@@ -515,7 +515,7 @@ impl<'a> FunctionGenerator<'a> {
                     *offset,
                     source,
                 );
-            }
+            },
             Operation::BorrowGlobal(mid, sid, inst) => {
                 let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
                 self.gen_struct_oper(
@@ -535,7 +535,7 @@ impl<'a> FunctionGenerator<'a> {
                         FF::Bytecode::ImmBorrowGlobalGeneric
                     },
                 )
-            }
+            },
             Operation::Vector => {
                 let elem_type = if let Type::Vector(el) = fun_ctx.fun.get_local_type(dest[0]) {
                     el.as_ref().clone()
@@ -552,17 +552,17 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::VecPack(sign, source.len() as u64),
                     source,
                 )
-            }
+            },
             Operation::ReadRef => self.gen_builtin(ctx, dest, FF::Bytecode::ReadRef, source),
             Operation::WriteRef => {
                 // TODO: WriteRef in FF bytecode and in stackless bytecode use different operand
                 // order, perhaps we should fix this.
                 self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
-            }
+            },
             Operation::Release => {
                 // Move bytecode does not process release, values are released indirectly
                 // when the borrowed head of the borrow chain is destroyed
-            }
+            },
             Operation::Drop => {
                 // Currently Destroy is only translated for references. It may also make
                 // sense for other values, as we may figure later. Its known to be required
@@ -571,7 +571,7 @@ impl<'a> FunctionGenerator<'a> {
                 if ty.is_reference() {
                     self.gen_builtin(ctx, dest, FF::Bytecode::Pop, source)
                 }
-            }
+            },
             Operation::FreezeRef(_) => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
             Operation::CastU8 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU8, source),
             Operation::CastU16 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU16, source),
@@ -831,7 +831,7 @@ impl<'a> FunctionGenerator<'a> {
                 } else {
                     self.emit(FF::Bytecode::LdFalse)
                 }
-            }
+            },
             U8(n) => self.emit(FF::Bytecode::LdU8(*n)),
             U16(n) => self.emit(FF::Bytecode::LdU16(*n)),
             U32(n) => self.emit(FF::Bytecode::LdU32(*n)),
@@ -842,13 +842,13 @@ impl<'a> FunctionGenerator<'a> {
             )),
             Vector(vec) if vec.is_empty() => {
                 self.gen_vector_load_push(ctx, vec, dest_type);
-            }
+            },
             _ => {
                 let cons =
                     self.gen
                         .constant_index(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, cons, dest_type);
                 self.emit(FF::Bytecode::LdConst(cons));
-            }
+            },
         }
     }
 
@@ -883,7 +883,7 @@ impl<'a> FunctionGenerator<'a> {
                         id,
                         self.temps.get(&temp).expect("temp has mapping").local as TempIndex,
                     )
-                        .into_exp(),
+                    .into_exp(),
                 )
             } else {
                 None
@@ -934,14 +934,14 @@ impl<'a> FunctionGenerator<'a> {
             match push_kind {
                 Some(AssignKind::Move) => {
                     self.emit(FF::Bytecode::MoveLoc(local));
-                }
+                },
                 Some(AssignKind::Copy) => {
                     self.emit(FF::Bytecode::CopyLoc(local));
-                }
+                },
                 Some(AssignKind::Inferred) | Some(AssignKind::Store) => {
                     fun_ctx
                         .internal_error("Inferred and Store AssignKind should be not appear here.");
-                }
+                },
                 None => {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
@@ -956,7 +956,7 @@ impl<'a> FunctionGenerator<'a> {
                     } else {
                         self.emit(FF::Bytecode::MoveLoc(local));
                     }
-                }
+                },
             }
             self.stack.push(*temp)
         }
