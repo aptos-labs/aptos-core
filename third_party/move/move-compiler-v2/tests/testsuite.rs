@@ -283,11 +283,11 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter:
             // For debugging (dump_bytecode set DumpLevel::AllStages)
-             Some(vec![
-               INITIAL_BYTECODE_STAGE,
-               "ReferenceSafetyProcessor",
-               "DeadStoreElimination",
-               FILE_FORMAT_STAGE,
+            Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "ReferenceSafetyProcessor",
+                "DeadStoreElimination",
+                FILE_FORMAT_STAGE,
             ]),
         },
         // Reference safety tests (with optimizations on)
