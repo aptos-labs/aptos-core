@@ -23,7 +23,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, trace, warn};
+use aptos_logger::{info, spawn_named, trace, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -440,7 +440,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .remote_peer(*aug_data.author()));
                             match self.aug_data_store.add_aug_data(aug_data) {
                                 Ok(sig) => self.process_response(protocol, response_sender, RandMessage::AugDataSignature(sig)),
-                                Err(e) => error!("[RandManager] Failed to add aug data: {}", e),
+                                Err(e) => warn!("[RandManager] Failed to add aug data: {}", e),
                             }
                         }
                         RandMessage::CertifiedAugData(certified_aug_data) => {
@@ -450,7 +450,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .remote_peer(*certified_aug_data.author()));
                             match self.aug_data_store.add_certified_aug_data(certified_aug_data) {
                                 Ok(ack) => self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack)),
-                                Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
+                                Err(e) => warn!("[RandManager] Failed to add certified aug data: {}", e),
                             }
                         }
                         _ => unreachable!("[RandManager] Unexpected message type after verification"),
