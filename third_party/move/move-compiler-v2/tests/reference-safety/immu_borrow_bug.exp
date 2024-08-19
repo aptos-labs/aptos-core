@@ -1,9 +1,0 @@
-
-============ bytecode verification failed ========
-
-Diagnostics:
-bug: bytecode verification failed with unexpected status code `STLOC_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
-   ┌─ tests/reference-safety/immu_borrow_bug.move:14:9
-   │
-14 │         common.x = 15;
-   │         ^^^^^^^^
