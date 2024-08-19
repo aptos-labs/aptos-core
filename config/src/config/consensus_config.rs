@@ -88,6 +88,8 @@ pub struct ConsensusConfig {
     pub proof_cache_capacity: u64,
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
+    pub optimistic_sig_verification_for_votes: bool,
+    pub optimistic_sig_verification_for_order_votes: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -352,6 +354,8 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             num_bounded_executor_tasks: 16,
+            optimistic_sig_verification_for_votes: false,
+            optimistic_sig_verification_for_order_votes: false,
         }
     }
 }

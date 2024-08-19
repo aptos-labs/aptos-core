@@ -15,7 +15,6 @@ use std::{
     sync::Arc,
 };
 use lru::LruCache;
-use aptos_bounded_executor::BoundedExecutor;
 
 pub enum VerificationResult<VoteType> {
     Verified((HashMap<AccountAddress, VoteType>, AggregateSignature)),
@@ -140,20 +139,20 @@ impl<VoteType: Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> 
         let has_enough_voting_power = self.validator_verifier.check_voting_power(authors, true).is_ok();
         if has_enough_voting_power || signature_data.unverified_votes.len() as u64 >= self.verification_frequency {
             let aggregated_signature = self.validator_verifier.aggregate_signatures(
-                &PartialSignatures::new(signature_data.unverified_votes.iter().map(|(account_address, (signature, vote))| (account_address.clone(), signature.clone())).collect()),
+                &PartialSignatures::new(signature_data.unverified_votes.iter().map(|(account_address, (signature, vote))| (*account_address, signature.clone())).collect()),
                 signature_data.aggregated_signature.clone()
             )?;
             match self.validator_verifier.verify_multi_signatures(block, &aggregated_signature) {
                 Ok(_) => {
                     signature_data.aggregated_signature = Some(aggregated_signature.clone());
-                    signature_data.verified_votes.extend(signature_data.unverified_votes.iter().map(|(account_address, (_signature, vote))| (account_address.clone(), vote.clone())).collect::<Vec<_>>());
+                    signature_data.verified_votes.extend(signature_data.unverified_votes.iter().map(|(account_address, (_signature, vote))| (*account_address, vote.clone())).collect::<Vec<_>>());
                     signature_data.unverified_votes.clear();
                 },
                 Err(err) => {
                     // self.verify_each_unverified_vote(block, signature_data)?;
-                    let unverified_votes = signature_data.unverified_votes.iter().map(|(author, (signature, _vote))| (author.clone(), signature.clone())).collect::<Vec<_>>();
-                    let verification_result = unverified_votes.into_par_iter().map(|(author, signature)| {
-                        self.validator_verifier.verify(author, block, &signature)
+                    let unverified_votes = signature_data.unverified_votes.iter().map(|(account_address, (signature, _vote))| (*account_address, signature.clone())).collect::<Vec<_>>();
+                    let verification_result = unverified_votes.into_par_iter().map(|(account_address, signature)| {
+                        self.validator_verifier.verify(account_address, block, &signature)
                     }).collect::<Vec<_>>();
                 }
             }
