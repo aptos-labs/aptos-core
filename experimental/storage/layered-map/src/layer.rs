@@ -20,8 +20,8 @@ struct LayerInner<K: ArcAsyncDrop, V: ArcAsyncDrop> {
     use_case: &'static str,
     family: HashValue,
     layer: u64,
-    // Oldest layer viewable when self is created -- self won't even weak-link to a node created in
-    // a layer older than this.
+    // Base layer when self is created -- `self` won't even weak-link to a node created in
+    // the base or an older layer.
     base_layer: u64,
 }
 
@@ -108,19 +108,19 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         }
     }
 
-    pub fn into_layers_view_since(self, bottom_layer: MapLayer<K, V>) -> LayeredMap<K, V> {
-        assert!(bottom_layer.is_family(&self));
-        assert!(bottom_layer.inner.layer >= self.inner.base_layer);
-        assert!(bottom_layer.inner.layer <= self.inner.layer);
+    pub fn into_layers_view_after(self, base_layer: MapLayer<K, V>) -> LayeredMap<K, V> {
+        assert!(base_layer.is_family(&self));
+        assert!(base_layer.inner.layer >= self.inner.base_layer);
+        assert!(base_layer.inner.layer <= self.inner.layer);
 
         self.log_layer("view");
-        bottom_layer.log_layer("ancestor_ref");
+        base_layer.log_layer("as_view_base");
 
-        LayeredMap::new(bottom_layer, self)
+        LayeredMap::new(base_layer, self)
     }
 
-    pub fn view_layers_since(&self, bottom_layer: &MapLayer<K, V>) -> LayeredMap<K, V> {
-        self.clone().into_layers_view_since(bottom_layer.clone())
+    pub fn view_layers_after(&self, base_layer: &MapLayer<K, V>) -> LayeredMap<K, V> {
+        self.clone().into_layers_view_after(base_layer.clone())
     }
 
     pub fn log_layer(&self, name: &'static str) {
