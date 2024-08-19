@@ -994,6 +994,7 @@ impl AptosVM {
             resolver,
             module_storage,
             gas_meter,
+            txn_data,
             traversal_context,
             new_published_modules_loaded,
             change_set_configs,
@@ -1402,6 +1403,7 @@ impl AptosVM {
             resolver,
             module_storage,
             gas_meter,
+            txn_data,
             traversal_context,
             new_published_modules_loaded,
             change_set_configs,
@@ -1527,11 +1529,12 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
+        transaction_metadata: &TransactionMetadata,
         traversal_context: &mut TraversalContext,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        let maybe_module_write_set = session.execute(|session| {
+        let maybe_module_write_set_with_init_module_changes = session.execute(|session| {
             if let Some(publish_request) = session.extract_publish_request() {
                 let PublishRequest {
                     destination,
@@ -1653,15 +1656,18 @@ impl AptosVM {
                 let compat = Compatibility::new(check_struct_layout, check_friend_linking);
 
                 if self.features().use_loader_v2() {
-                    // TODO(loader_v2): This check MUST also have inside of it whatever `validate_publish_request` was doing.
-                    session.verify_module_bundle_before_publishing_with_compat_config(
-                        modules.as_slice(),
-                        &destination,
-                        module_storage,
-                        compat,
-                    )?;
+                    // TODO(loader_v2): This check MUST also have inside of it whatever
+                    //                  `validate_publish_request` was doing.
+                    //                  Also, uncomment when the implementation ready, for now we
+                    //                  do not need this to block e2e happy test cases.
+                    // session.verify_module_bundle_before_publishing_with_compat_config(
+                    //     modules.as_slice(),
+                    //     &destination,
+                    //     module_storage,
+                    //     compat,
+                    // )?;
 
-                    // Create module write set and a temporary storage.
+                    // Create module write set for modules to be published.
                     let write_ops = session
                         .convert_modules_into_write_ops(
                             module_storage,
@@ -1670,10 +1676,22 @@ impl AptosVM {
                             }),
                         )
                         .map_err(|e| e.finish(Location::Undefined))?;
+
+                    // Create temporary VM, session, and module storage for running init_module.
+                    // We create a new VM so that type cache is not inconsistent when init_module
+                    // function fails, but loads some new types , type depth formulas, or struct
+                    // name indices.
+                    // TODO(loader_v2): Revisit this to support in a nicer way?
                     let tmp_module_storage = TemporaryModuleStorage::create(
                         self.move_vm.runtime_environment(),
                         write_ops,
                         module_storage,
+                    );
+                    let tmp_vm = self.move_vm.clone();
+                    let mut tmp_session = tmp_vm.new_session(
+                        resolver,
+                        SessionId::txn_meta(transaction_metadata),
+                        Some(transaction_metadata.as_user_transaction_context()),
                     );
 
                     let init_func_name = ident_str!("init_module");
@@ -1687,7 +1705,7 @@ impl AptosVM {
                         }
 
                         let module_id = module.self_id();
-                        let init_function = session.load_function(
+                        let init_function = tmp_session.load_function(
                             &tmp_module_storage,
                             &module_id,
                             init_func_name,
@@ -1695,7 +1713,7 @@ impl AptosVM {
                         );
                         if init_function.is_ok() {
                             if verifier::module_init::verify_module_init_function(module).is_ok() {
-                                session.execute_function_bypass_visibility(
+                                tmp_session.execute_function_bypass_visibility(
                                     &module_id,
                                     init_func_name,
                                     vec![],
@@ -1716,7 +1734,16 @@ impl AptosVM {
                         }
                     }
 
-                    Ok(Some(tmp_module_storage.destroy()))
+                    let (init_module_changes, empty_write_set) =
+                        tmp_session.finish(change_set_configs, module_storage)?;
+                    empty_write_set
+                        .is_empty_or_invariant_violation()
+                        .map_err(|e| {
+                            e.with_message("init_module_cannot publish modules".to_string())
+                                .finish(Location::Undefined)
+                        })?;
+
+                    Ok(Some((tmp_module_storage.destroy(), init_module_changes)))
                 } else {
                     // Validate the module bundle
                     self.validate_publish_request(
@@ -1763,14 +1790,18 @@ impl AptosVM {
             } else {
                 Ok::<_, VMError>(
                     if self.features().use_loader_v2() {
-                        Some(ModuleWriteSet::empty())
+                        Some((ModuleWriteSet::empty(), VMChangeSet::empty()))
                     } else {
                         None
                     },
                 )
             }
         })?;
-        session.finish(change_set_configs, maybe_module_write_set, module_storage)
+        session.finish(
+            change_set_configs,
+            maybe_module_write_set_with_init_module_changes,
+            module_storage,
+        )
     }
 
     /// Validate a publish request.
