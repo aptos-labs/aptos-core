@@ -9,7 +9,7 @@ comparison between v1 and v2 failed:
 +   ┌─ TEMPFILE:8:9
 =   │
 = 8 │         x + call(|_x: u64| {x = x + 1; x}) + call(|_x: u64| {x = x + 7; x})
--   │                   ^^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │                   ^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 +   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 +   │         │                  │
 +   │         │                  non-empty sequence
@@ -27,7 +27,7 @@ comparison between v1 and v2 failed:
 +   ┌─ TEMPFILE:8:9
 =   │
 = 8 │         x + call(|_x: u64| {x = x + 1; x}) + call(|_x: u64| {x = x + 7; x})
--   │                                                    ^^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │                                                    ^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 +   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 +   │         │                                                   │
 +   │         │                                                   non-empty sequence

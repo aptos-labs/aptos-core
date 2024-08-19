@@ -7,7 +7,7 @@ comparison between v1 and v2 failed:
 -    ┌─ TEMPFILE:14:27
 -    │
 - 14 │         foreach<u64>(&v, |e: &u64| sum = sum + *e);
--    │                           ^^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                           ^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - 
 - 

@@ -6,7 +6,7 @@ comparison between v1 and v2 failed:
 -    ┌─ TEMPFILE:13:29
 -    │
 - 13 │         map_ref(&map.data, |e: &Element<Key, Value>| {
--    │                             ^^^^^^^^^^^^^^^^^^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                             ^^^^^^^^^^^^^^^^^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E04010]: cannot infer type
 -    ┌─ TEMPFILE:14:13
@@ -20,7 +20,7 @@ comparison between v1 and v2 failed:
 -    ┌─ TEMPFILE:22:26
 -    │
 - 22 │         for_each_ref(v, |elem: &Element| vector::push_back(&mut result, f(elem)));
--    │                          ^^^^^^^^^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                          ^^^^^^^^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - 
 - 

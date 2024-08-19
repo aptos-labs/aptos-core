@@ -31,7 +31,7 @@ module 0x8675309::M {
     public fun corrected_nested() {
         let v = vector[vector[1,2], vector[3]];
         let sum = 0;
-        foreach(&v, |e: &vector<u64>| sum = sum + reduce!(*e, 0, |t: u64, r: u64| t + r));
+        foreach(&v, |e: &vector<u64>| sum = sum + reduce(*e, 0, |t: u64, r: u64| t + r));
     }
 
     public inline fun wrong_local_call_arg_count<T>(v: &vector<T>, action: |&T|) {
@@ -90,6 +90,16 @@ module 0x8675309::M {
         abort (1)
     }
 
+    public fun correct_reduce2(): u64 {
+        let v = vector[1, 2, 3];
+        reduce(v, 0, |t: u64, r| t + r)
+    }
+
+    public fun corrected_nested2() {
+        let v = vector[vector[1,2], vector[3]];
+        let sum = 0;
+        foreach(&v, |e: &vector<u64>| sum = sum + reduce(*e, 0, |t, r: u64| t + r));
+    }
 }
 
 module 0x1::XVector {

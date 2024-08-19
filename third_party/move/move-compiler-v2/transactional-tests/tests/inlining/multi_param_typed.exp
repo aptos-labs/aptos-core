@@ -9,7 +9,7 @@ comparison between v1 and v2 failed:
 +    ┌─ TEMPFILE:24:82
 =    │
 - 17 │         for_each_ref_mut(v, |elem: &mut Elem<K, V>| {
--    │                              ^^^^^^^^^^^^^^^^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                              ^^^^^^^^^^^^^^^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 + 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
 +    │                                                                                  ^
 = 
@@ -19,7 +19,7 @@ comparison between v1 and v2 failed:
 +    ┌─ TEMPFILE:24:87
 =    │
 = 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
--    │                                                                 ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                                                                 ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 +    │                                                                                       ^
 = 
 - error[E01013]: unsupported language construct
@@ -28,7 +28,7 @@ comparison between v1 and v2 failed:
 +    ┌─ TEMPFILE:24:64
 =    │
 = 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
--    │                                                                         ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                                                                         ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 +    │                                                                ^^^^^^^^^^^^^^^^^^^^^^^^
 = 
 = 

@@ -426,6 +426,7 @@ pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
 pub type LValueList = Spanned<LValueList_>;
 
+/// These represent LValues with user-specified explicit types.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedLValue_(pub LValue, pub Option<Type>);
 pub type TypedLValue = Spanned<TypedLValue_>;

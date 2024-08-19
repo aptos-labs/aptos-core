@@ -6,13 +6,13 @@ comparison between v1 and v2 failed:
 -   ┌─ TEMPFILE:7:22
 -   │
 - 7 │         assert!(foo(|_: u64| 3, |_: u64| 10, 10, 100) == 13, 0);
--   │                      ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │                      ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E01013]: unsupported language construct
 -   ┌─ TEMPFILE:7:34
 -   │
 - 7 │         assert!(foo(|_: u64| 3, |_: u64| 10, 10, 100) == 13, 0);
--   │                                  ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │                                  ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - 
 - 

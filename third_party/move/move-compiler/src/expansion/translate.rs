@@ -2904,20 +2904,6 @@ fn typed_bind(context: &mut Context, sp!(loc, tpb_): P::TypedBind) -> Option<E::
     Some(sp(loc, E::TypedLValue_(b, ot)))
 }
 
-// Some(E::TypedLValue_(sp(loc, b_));
-
-//     if let Some(sp!(ty_loc, _ty)) = opt_type {
-//         context.env.add_diag(diag!(
-//                 Syntax::UnsupportedLanguageItem,
-//                 (
-//                     ty_loc,
-//                     "Typed lambda parameter only allowed in Move 2 and beyond"
-//                 )
-//             ))
-//         };
-//     };
-// }
-
 fn bind_list(context: &mut Context, sp!(loc, pbs_): P::BindList) -> Option<E::LValueList> {
     let bs_: Option<Vec<E::LValue>> = pbs_.into_iter().map(|pb| bind(context, pb)).collect();
     Some(sp(loc, bs_?))

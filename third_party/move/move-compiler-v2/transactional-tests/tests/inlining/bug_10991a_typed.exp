@@ -6,49 +6,49 @@ comparison between v1 and v2 failed:
 -   ┌─ TEMPFILE:9:22
 -   │
 - 9 │         assert!(foo(|x: u64, _: u64| x, |_: u64, y: u64| y,
--   │                      ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │                      ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E01013]: unsupported language construct
 -   ┌─ TEMPFILE:9:30
 -   │
 - 9 │         assert!(foo(|x: u64, _: u64| x, |_: u64, y: u64| y,
--   │                              ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │                              ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E01013]: unsupported language construct
 -   ┌─ TEMPFILE:9:42
 -   │
 - 9 │         assert!(foo(|x: u64, _: u64| x, |_: u64, y: u64| y,
--   │                                          ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │                                          ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E01013]: unsupported language construct
 -   ┌─ TEMPFILE:9:50
 -   │
 - 9 │         assert!(foo(|x: u64, _: u64| x, |_: u64, y: u64| y,
--   │                                                  ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │                                                  ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E01013]: unsupported language construct
 -    ┌─ TEMPFILE:10:7
 -    │
 - 10 │         |a: u64, _b: u64| a, |_c: u64, d: u64| d,
--    │          ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │          ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E01013]: unsupported language construct
 -    ┌─ TEMPFILE:10:15
 -    │
 - 10 │         |a: u64, _b: u64| a, |_c: u64, d: u64| d,
--    │                  ^^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                  ^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E01013]: unsupported language construct
 -    ┌─ TEMPFILE:10:28
 -    │
 - 10 │         |a: u64, _b: u64| a, |_c: u64, d: u64| d,
--    │                               ^^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                               ^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - error[E01013]: unsupported language construct
 -    ┌─ TEMPFILE:10:37
 -    │
 - 10 │         |a: u64, _b: u64| a, |_c: u64, d: u64| d,
--    │                                        ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-    │                                        ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - 
 - 

@@ -1,11 +1,5 @@
 
 Diagnostics:
-error: `reduce` is a function and not a macro
-   ┌─ tests/checking/typing/lambda_typed.move:34:51
-   │
-34 │         foreach(&v, |e: &vector<u64>| sum = sum + reduce!(*e, 0, |t: u64, r: u64| t + r));
-   │                                                   ^^^^^^
-
 error: expected `|(&T, u64)|_` but found a value of type `|&T|`
    ┌─ tests/checking/typing/lambda_typed.move:40:13
    │

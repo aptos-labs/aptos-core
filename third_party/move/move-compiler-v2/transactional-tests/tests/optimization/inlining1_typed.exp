@@ -6,7 +6,7 @@ comparison between v1 and v2 failed:
 -   ┌─ TEMPFILE:7:14
 -   │
 - 7 │         foo(|_: u64| 3, 10)
--   │              ^^^^^^ Typed parameter to lambda is only allowed in Move 2 and beyond
+-   │              ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
 - 
 - 
 - 

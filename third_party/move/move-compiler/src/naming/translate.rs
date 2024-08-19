@@ -1236,7 +1236,7 @@ fn typed_lvalue_list(
                         Syntax::UnsupportedLanguageItem,
                         (
                             loc,
-                            "Typed parameter to lambda is only allowed in Move 2 and beyond"
+                            "Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond"
                         )
                     ))
                 }
