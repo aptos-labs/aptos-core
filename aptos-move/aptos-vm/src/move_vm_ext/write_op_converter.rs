@@ -89,7 +89,6 @@ impl<'r> WriteOpConverter<'r> {
         for (bytes, compiled_module) in code_and_modules.into_iter() {
             let addr = compiled_module.self_addr();
             let name = compiled_module.self_name();
-            let state_key = StateKey::module(addr, name);
 
             let module_exists = module_storage.check_module_exists(addr, name)?;
             let op = if module_exists {
@@ -98,8 +97,15 @@ impl<'r> WriteOpConverter<'r> {
                 Op::New(bytes)
             };
 
-            // TODO(loader_v2): Query state value metadata from module storage.
-            let write_op = self.convert_module(&state_key, op, false)?;
+            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
+            let write_op = self.convert(
+                state_value_metadata,
+                op,
+                // For modules, creation is never a modification.
+                false,
+            )?;
+
+            let state_key = StateKey::module(addr, name);
             write_ops.insert(state_key, write_op);
         }
         Ok(write_ops)
