@@ -81,8 +81,11 @@ fn speculation_disabled() -> bool {
 
 /// Initializes the storage of speculative logs for num_txns many transactions.
 pub fn init_speculative_logs(num_txns: usize) {
+    // Every second (odd indexed) slot is dedicated to corresponding fallback executions.
+    let num_slots = num_txns * 2;
+
     if !speculation_disabled() {
-        BUFFERED_LOG_EVENTS.swap(Some(Arc::new(SpeculativeEvents::new(num_txns))));
+        BUFFERED_LOG_EVENTS.swap(Some(Arc::new(SpeculativeEvents::new(num_slots))));
     }
 }
 
@@ -121,6 +124,7 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
 /// removes the storage from Arc. Note that each transaction corresponds to two consecutive
 /// slots, odd index for a fallback execution (one of these two slots must be empty).
 pub fn flush_speculative_logs(num_to_flush: usize) {
+    println!("flush speculative logs {num_to_flush}");
     match BUFFERED_LOG_EVENTS.swap(None) {
         Some(log_events_ptr) => {
             match Arc::try_unwrap(log_events_ptr) {

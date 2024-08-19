@@ -262,14 +262,11 @@ fn compute_delayed_field_try_add_delta_outcome_from_history(
         true
     };
 
-    Ok((
-        result,
-        DelayedFieldRead::HistoryBounded {
-            restriction: history,
-            max_value,
-            inner_aggregator_value: base_aggregator_value,
-        },
-    ))
+    Ok((result, DelayedFieldRead::HistoryBounded {
+        restriction: history,
+        max_value,
+        inner_aggregator_value: base_aggregator_value,
+    }))
 }
 
 fn compute_delayed_field_try_add_delta_outcome_first_time(
@@ -297,14 +294,11 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         true
     };
 
-    Ok((
-        result,
-        DelayedFieldRead::HistoryBounded {
-            restriction: history,
-            max_value,
-            inner_aggregator_value: base_aggregator_value,
-        },
-    ))
+    Ok((result, DelayedFieldRead::HistoryBounded {
+        restriction: history,
+        max_value,
+        inner_aggregator_value: base_aggregator_value,
+    }))
 }
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
@@ -470,27 +464,29 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         &self,
         key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<Arc<T::Value>, MVModulesError> {
+        incarnation: Incarnation,
+        base_f: &impl Fn() -> PartialVMResult<Option<StateValue>>,
+    ) -> PartialVMResult<Option<StateValue>> {
+        use MVModulesError::*;
+
         // Record for the R/W path intersection fallback for modules.
         self.captured_reads
             .borrow_mut()
             .module_reads
             .push(key.clone());
 
-        if self.scheduler.has_lost_execution_flag_writing(txn_idx) {
+        if self
+            .scheduler
+            .has_lost_execution_flag_writing(txn_idx, incarnation)
+        {
             return Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
             ));
         }
 
-        match self
-            .versioned_map
-            .modules()
-            .fetch_module(key, txn_idx, init_base)
-        {
-            Ok(Module(v)) => Ok(v.as_state_value()),
-            Ok(BaseModule(maybe_state_value)) => Ok(maybe_state_value),
-            Err(StorageError(e)) => base_value_or_partial_err::<T>(key, Err(e)),
+        match self.versioned_map.modules().fetch_module(key, txn_idx) {
+            Ok(v) => Ok(v.as_state_value()),
+            Err(NotFound) => base_f(),
             Err(Dependency(_)) => {
                 // Return anything (e.g. module does not exist) to avoid waiting,
                 // because parallel execution will fall back to sequential anyway.
@@ -978,18 +974,6 @@ impl<'a, T: Transaction> ViewState<'a, T> {
             ViewState::Unsync(state) => state,
         }
     }
-}
-
-fn base_value_or_partial_err<T: Transaction>(
-    state_key: &T::Key,
-    base_or_storage_err: Result<Option<StateValue>, StateviewError>,
-) -> PartialVMResult<Option<StateValue>> {
-    base_or_storage_err.map_err(|e| {
-        PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-            "Unexpected storage error for {:?}: {:?}",
-            state_key, e
-        ))
-    })
 }
 
 /// A struct that represents a single block execution worker thread's view into the state,
@@ -1605,17 +1589,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView
 
         match &self.latest_view {
             ViewState::Sync(state) => {
-                use MVModulesError::*;
+                let base_f = || -> PartialVMResult<Option<StateValue>> {
+                    let ret = self.base_view.get_state_value(state_key);
 
-                match state.fetch_module(state_key, self.txn_idx) {
-                    Ok(v) => Ok(v.as_state_value()),
-                    Err(Dependency(_)) => {
-                        // Return anything (e.g. module does not exist) to avoid waiting,
-                        // because parallel execution will fall back to sequential anyway.
-                        Ok(None)
-                    },
-                    Err(NotFound) => self.get_raw_base_value(state_key),
-                }
+                    if ret.is_err() {
+                        // Reading from base view should not return an error.
+                        // Thus, this critical error log and count does not need to be buffered.
+                        let log_context =
+                            AdapterLogSchema::new(self.base_view.id(), 0, self.is_backup);
+                        alert!(
+                            log_context,
+                            "[VM, StateView] Error getting data from storage for {:?}",
+                            state_key
+                        );
+                    }
+
+                    ret.map_err(|e| {
+                        PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                            "Unexpected storage error for {:?}: {:?}",
+                            state_key, e
+                        ))
+                    })
+                };
+
+                state.fetch_module(state_key, self.txn_idx, self.incarnation, &base_f)
             },
             ViewState::Unsync(state) => {
                 state
