@@ -81,6 +81,8 @@ pub struct CompiledPackage {
     pub root_compiled_units: Vec<CompiledUnitWithSource>,
     /// The output compiled bytecode for dependencies
     pub deps_compiled_units: Vec<(PackageName, CompiledUnitWithSource)>,
+    /// Bytecode dependencies of this compiled package
+    pub bytecode_deps: Vec<(PackageName, NumericalAddress)>,
 
     // Optional artifacts from compilation
     //
@@ -198,6 +200,7 @@ impl OnDiskCompiledPackage {
             compiled_package_info: self.package.compiled_package_info.clone(),
             root_compiled_units,
             deps_compiled_units,
+            bytecode_deps: Vec::new(), // TODO
             compiled_docs,
             compiled_abis,
         })
@@ -631,73 +634,76 @@ impl CompiledPackage {
         let effective_language_version = config.language_version.unwrap_or_default();
         effective_compiler_version.check_language_support(effective_language_version)?;
 
-        let (file_map, all_compiled_units, optional_global_env) = match config
-            .compiler_version
-            .unwrap_or_default()
-        {
-            CompilerVersion::V1 => {
-                let mut paths = src_deps;
-                paths.push(sources_package_paths.clone());
-                let compiler =
-                    Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
-                compiler_driver_v1(compiler)?
-            },
-            CompilerVersion::V2_0 => {
-                let to_str_vec = |ps: &[Symbol]| {
-                    ps.iter()
-                        .map(move |s| s.as_str().to_owned())
-                        .collect::<Vec<_>>()
-                };
-                let mut global_address_map = BTreeMap::new();
-                for pack in std::iter::once(&sources_package_paths)
-                    .chain(src_deps.iter())
-                    .chain(bytecode_deps.iter())
-                {
-                    for (name, val) in &pack.named_address_map {
-                        if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val)
-                        {
-                            if old != *val {
-                                let pack_name = pack
-                                    .name
-                                    .map(|s| s.as_str().to_owned())
-                                    .unwrap_or_else(|| "<unnamed>".to_owned());
-                                bail!(
+        let (file_map, all_compiled_units, optional_global_env) =
+            match config.compiler_version.unwrap_or_default() {
+                CompilerVersion::V1 => {
+                    let mut paths = src_deps;
+                    paths.push(sources_package_paths.clone());
+                    let compiler = Compiler::from_package_paths(
+                        paths,
+                        bytecode_deps.clone(),
+                        flags,
+                        &known_attributes,
+                    );
+                    compiler_driver_v1(compiler)?
+                },
+                CompilerVersion::V2_0 => {
+                    let to_str_vec = |ps: &[Symbol]| {
+                        ps.iter()
+                            .map(move |s| s.as_str().to_owned())
+                            .collect::<Vec<_>>()
+                    };
+                    let mut global_address_map = BTreeMap::new();
+                    for pack in std::iter::once(&sources_package_paths)
+                        .chain(src_deps.iter())
+                        .chain(bytecode_deps.iter())
+                    {
+                        for (name, val) in &pack.named_address_map {
+                            if let Some(old) =
+                                global_address_map.insert(name.as_str().to_owned(), *val)
+                            {
+                                if old != *val {
+                                    let pack_name = pack
+                                        .name
+                                        .map(|s| s.as_str().to_owned())
+                                        .unwrap_or_else(|| "<unnamed>".to_owned());
+                                    bail!(
                                     "found remapped address alias `{}` (`{} != {}`) in package `{}`\
                                     , please use unique address aliases across dependencies",
                                     name, old, val, pack_name
                                 )
+                                }
                             }
                         }
                     }
-                }
-                let mut options = move_compiler_v2::Options {
-                    sources: sources_package_paths
-                        .paths
-                        .iter()
-                        .map(|path| path.as_str().to_owned())
-                        .collect(),
-                    sources_deps: src_deps.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
-                    dependencies: bytecode_deps
-                        .iter()
-                        .flat_map(|x| to_str_vec(&x.paths))
-                        .collect(),
-                    named_address_mapping: global_address_map
-                        .into_iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect(),
-                    skip_attribute_checks,
-                    known_attributes: known_attributes.clone(),
-                    language_version: Some(effective_language_version),
-                    compile_test_code: flags.keep_testing_functions(),
-                    ..Default::default()
-                };
-                for experiment in &config.experiments {
-                    options = options.set_experiment(experiment, true)
-                }
-                options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-                compiler_driver_v2(options)?
-            },
-        };
+                    let mut options = move_compiler_v2::Options {
+                        sources: sources_package_paths
+                            .paths
+                            .iter()
+                            .map(|path| path.as_str().to_owned())
+                            .collect(),
+                        sources_deps: src_deps.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
+                        dependencies: bytecode_deps
+                            .iter()
+                            .flat_map(|x| to_str_vec(&x.paths))
+                            .collect(),
+                        named_address_mapping: global_address_map
+                            .into_iter()
+                            .map(|(k, v)| format!("{}={}", k, v))
+                            .collect(),
+                        skip_attribute_checks,
+                        known_attributes: known_attributes.clone(),
+                        language_version: Some(effective_language_version),
+                        compile_test_code: flags.keep_testing_functions(),
+                        ..Default::default()
+                    };
+                    for experiment in &config.experiments {
+                        options = options.set_experiment(experiment, true)
+                    }
+                    options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
+                    compiler_driver_v2(options)?
+                },
+            };
         let mut root_compiled_units = vec![];
         let mut deps_compiled_units = vec![];
         let obtain_package_name =
@@ -803,6 +809,21 @@ impl CompiledPackage {
             },
             root_compiled_units,
             deps_compiled_units,
+            bytecode_deps: bytecode_deps
+                .iter()
+                .map(|package| {
+                    let name = package.name.unwrap();
+                    // Package address of the bytecode dep is required for publication. It must be
+                    // provided as a named address in the dep package's Move.toml or through CLI arg
+                    // `--named-addresses`, with the same name as the dep package.
+                    let address = package.named_address_map.get(&name).ok_or(anyhow::anyhow!(
+                        "address unknown for bytecode dependency {}",
+                        name
+                    ));
+
+                    address.map(|&a| (name, a))
+                })
+                .try_collect()?,
             compiled_docs,
             compiled_abis,
         };
@@ -882,6 +903,7 @@ impl CompiledPackage {
             root_path: under_path.join(root_package.as_str()),
             package: OnDiskPackage {
                 compiled_package_info: self.compiled_package_info.clone(),
+                // TODO - bytecode deps
                 dependencies: self
                     .deps_compiled_units
                     .iter()
