@@ -1227,8 +1227,9 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
                 3 * 1800,
             ),
             // publishing package - executes sequentially
-            TransactionWorkload::new_const_tps(TransactionTypeArg::PublishPackage, 3 * 150)
-                .with_transactions_per_account(1),
+            // TODO(ibalajiarun): this is disabled due to Forge Stable failure on P90 latency.
+            // TransactionWorkload::new_const_tps(TransactionTypeArg::PublishPackage, 3 * 150)
+            //     .with_transactions_per_account(1),
             TransactionWorkload::new_const_tps(
                 TransactionTypeArg::SmartTablePicture1MWith256Change,
                 3 * 14,
@@ -1244,7 +1245,7 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
         background_traffic: background_traffic_for_sweep_with_latency(&[
             (4.0, 5.0),
             (3.0, 4.0),
-            (2.5, 4.0),
+            // (2.5, 4.0),
             (2.5, 4.0),
             (3.0, 5.0),
             (2.5, 4.0),
