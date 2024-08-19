@@ -51,4 +51,5 @@ pub const RECEIVER_PARAM_NAME: &str = "self";
 /// TODO: add a check at runtime that user is not clashing with reserved
 /// codes?
 pub const WELL_KNOWN_ABORT_CODE_BASE: u64 = 0xD8CA26CBD9BE << 16;
+pub const UNSPECIFIED_ABORT_CODE: u64 = WELL_KNOWN_ABORT_CODE_BASE;
 pub const INCOMPLETE_MATCH_ABORT_CODE: u64 = WELL_KNOWN_ABORT_CODE_BASE | 0x1;
