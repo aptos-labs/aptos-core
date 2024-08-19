@@ -4,7 +4,7 @@
 use crate::module_and_script_storage::{
     module_storage::AptosModuleStorage, script_storage::AptosScriptStorage,
 };
-use aptos_types::state_store::{state_key::StateKey, StateView};
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView};
 use bytes::Bytes;
 use move_binary_format::{errors::PartialVMResult, file_format::CompiledScript, CompiledModule};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
@@ -90,7 +90,23 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {}
+impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
+    fn fetch_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
+        let state_key = StateKey::module(address, module_name);
+        Ok(self
+            .storage
+            .module_storage()
+            .byte_storage()
+            .state_view
+            .get_state_value(&state_key)
+            .map_err(|e| module_storage_error!(address, module_name, e))?
+            .map(|s| s.into_metadata()))
+    }
+}
 
 impl<'s, S: StateView> ScriptStorage for AptosCodeStorageAdapter<'s, S> {
     fn fetch_deserialized_script(
