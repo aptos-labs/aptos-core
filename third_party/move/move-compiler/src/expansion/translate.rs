@@ -2947,7 +2947,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                         if i != pfields.len() - 1 {
                             context.env.add_diag(diag!(
                                 Syntax::UnexpectedToken,
-                                (pfield.loc, "`..` must be at the end in a field list")
+                                (pfield.loc, "`..` must be at the end in a named field list")
                             ));
                         } else {
                             dotdot = Some(sp(pfield.loc, E::Dotdot_));
