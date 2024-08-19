@@ -427,8 +427,6 @@ impl ProposalGenerator {
                 tokio::time::sleep(proposal_delay).await;
             }
 
-            info!("[ProposalGeneration] Round {} pull txns 1 took: {:?} ms", round, self.time_service.get_current_timestamp() - timestamp);
-
             let max_pending_block_size = pending_blocks
                 .iter()
                 .map(|block| {
@@ -480,8 +478,6 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            info!("[ProposalGeneration] Round {} pull txns 2 took: {:?} ms", round, self.time_service.get_current_timestamp() - timestamp);
-
             if !payload.is_direct()
                 && max_txns_from_block_to_execute.is_some()
                 && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
@@ -491,7 +487,7 @@ impl ProposalGenerator {
                 all_txns = all_txns[..len].to_vec();
             }
 
-            info!("[ProposalGeneration] Round {} pull txns 3 took: {:?} ms", round, self.time_service.get_current_timestamp() - timestamp);
+            info!("[ProposalGeneration] Pull txns took: {:?}, round {}", self.time_service.get_current_timestamp() - timestamp, round);
 
             (validator_txns, payload, all_txns, timestamp.as_micros() as u64)
         };
@@ -512,15 +508,13 @@ impl ProposalGenerator {
             let parent_block_id = self.block_store.commit_root().id();
             match self.execution_proxy.get_state_view(block_id, parent_block_id) {
                 Ok(stale_state_view) => {
-                    info!("[ProposalGeneration] rand Round {} check randomness get_state_view took: {:?} ms", round, self.time_service.get_current_timestamp() - start_time);
-
                     let vm = AptosVM::new(&stale_state_view);
 
-                    info!("[ProposalGeneration] rand Round {} check randomness vm took: {:?} ms", round, self.time_service.get_current_timestamp() - start_time);
+                    info!("[ProposalGeneration] init vm took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
 
                     let mut counter = 0;
                     for txn in all_txns.iter() {
-                        info!("[ProposalGeneration] rand Round {} check randomness {} took: {:?} ms", round, counter, self.time_service.get_current_timestamp() - start_time);
+                        info!("[ProposalGeneration] check randomness txn {} took: {:?}, round {}", counter, self.time_service.get_current_timestamp() - start_time, round);
 
                         if vm.require_randomness(&stale_state_view, txn, 0) {
                             require_randomness = true;
@@ -538,7 +532,7 @@ impl ProposalGenerator {
             None
         };
 
-        info!("[ProposalGeneration] rand Round {} check randomness took: {:?} ms", round, self.time_service.get_current_timestamp() - start_time);
+        info!("[ProposalGeneration] check randomness took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
 
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(
