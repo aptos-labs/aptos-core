@@ -640,16 +640,29 @@ impl Scheduler {
         Ok(())
     }
 
-    pub(crate) fn has_lost_execution_flag_writing(&self, txn_idx: TxnIndex) -> bool {
+    pub(crate) fn has_lost_execution_flag_writing(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+    ) -> bool {
         let status = self.txn_status[txn_idx as usize].0.write();
         match *status {
             ExecutionStatus::Executing(_, _, ref flag)
             | ExecutionStatus::ReadyToWakeUp(_, _, ref flag)
                 if *flag == ExecutingFlag::Writing =>
             {
+                // Only when back-up execution happens, another execution of the
+                // same transaction could have set the flag to Writing stage (while
+                // current call is a call-back from the VM). Writing flag is the
+                // tie breaker, so the caller need not continue.
                 true
             },
-            ExecutionStatus::Committed(_) => true,
+            ExecutionStatus::Committed(committed_incarnation) => {
+                // Committed status with the same incarnation means the ongoing
+                // execution is deprecated and the caller need not continue.
+                // Note: this means back-up execution was active.
+                incarnation == committed_incarnation
+            },
             _ => false,
         }
     }
@@ -697,8 +710,11 @@ impl Scheduler {
         }
     }
 
-    // TODO: comment, explain output convension: None -> lost.
-    // Some(true) -> won, no need to validate. Some(false) -> won, need to validate
+    // If no validation function is provided, the caller is doing backup execution.
+    // None: worker lost the try, i.e. some other worker won the right to perform the writing phase.
+    // Some(bool): worker won. true means backup, or winning vs backup after a successful validation,
+    // so no further validation of this output is necessary. false means validation is necessary,
+    // this happens when backup is not observed.
     pub(crate) fn try_set_execution_flag_writing<F>(
         &self,
         txn_idx: TxnIndex,
@@ -1356,14 +1372,15 @@ mod tests {
             Some(|| -> bool { false })
         };
 
-        assert_matches!(s.has_lost_execution_flag_writing(0), false);
-
-        assert_matches!(s.try_set_execution_flag_writing(0, backup_v), Some(true)); //no need to validate
+        assert_matches!(s.has_lost_execution_flag_writing(0, 0), false);
+        // no need to validate
+        assert_matches!(s.try_set_execution_flag_writing(0, backup_v), Some(true));
 
         let not_backup_win_validation = Some(|| -> bool { true });
         let not_backup_lose_validation = Some(|| -> bool { false });
 
-        assert_matches!(s.has_lost_execution_flag_writing(0), true); //no need to validate
+        //no need to validate
+        assert_matches!(s.has_lost_execution_flag_writing(0, 0), true);
         assert_matches!(
             s.try_set_execution_flag_writing(0, not_backup_win_validation),
             None

@@ -465,6 +465,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         &self,
         key: &T::Key,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
         init_base: &impl Fn() -> Result<T::Value, StateviewError>,
     ) -> PartialVMResult<Option<StateValue>> {
         use MVModulesError::*;
@@ -475,7 +476,10 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
             .module_reads
             .push(key.clone());
 
-        if self.scheduler.has_lost_execution_flag_writing(txn_idx) {
+        if self
+            .scheduler
+            .has_lost_execution_flag_writing(txn_idx, incarnation)
+        {
             return Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
             ));
@@ -1743,6 +1747,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView
             ViewState::Sync(state) => state.fetch_module(
                 state_key,
                 self.txn_idx,
+                self.incarnation,
                 &|| -> Result<T::Value, StateviewError> {
                     Ok(TransactionWrite::from_state_value(
                         self.get_raw_base_value_or_storage_err(state_key)?,

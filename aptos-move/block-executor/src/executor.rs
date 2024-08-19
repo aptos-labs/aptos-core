@@ -102,6 +102,7 @@ where
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         is_backup: bool,
+        called_after_commit: bool,
         scheduler: &Scheduler,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -114,6 +115,7 @@ where
     ) -> Result<Option<ValidationMode>, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
+        let mut is_backup_validated = is_backup;
 
         // VM execution.
         let sync_view = LatestView::new(
@@ -134,27 +136,40 @@ where
 
         let mut read_set = sync_view.take_parallel_reads();
 
-        let validation_function = if is_backup {
-            None
-        } else {
-            Some(|| -> bool {
-                !read_set.is_incorrect_use()
-                    && read_set.validate_data_reads(versioned_cache.data(), idx_to_execute)
-                    && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_execute)
-            })
-        };
+        let mut ret_mode = ValidationMode::SelfOnly;
 
-        let mut ret_mode = if let Some(is_validated) =
-            scheduler.try_set_execution_flag_writing(idx_to_execute, validation_function)
-        {
-            if is_validated {
-                ValidationMode::None
+        if !called_after_commit {
+            let validation_function = if is_backup {
+                None
             } else {
-                ValidationMode::SelfOnly
-            }
-        } else {
-            return Ok(None);
-        };
+                Some(|| -> bool {
+                    !read_set.is_incorrect_use()
+                        && read_set.validate_data_reads(versioned_cache.data(), idx_to_execute)
+                        && read_set
+                            .validate_group_reads(versioned_cache.group_data(), idx_to_execute)
+                        && matches!(
+                            read_set.validate_delayed_field_reads(
+                                versioned_cache.delayed_fields(),
+                                idx_to_execute
+                            ),
+                            Ok(true)
+                        )
+                })
+            };
+
+            ret_mode = if let Some(is_validated) =
+                scheduler.try_set_execution_flag_writing(idx_to_execute, validation_function)
+            {
+                if is_validated {
+                    is_backup_validated = true;
+                    ValidationMode::None
+                } else {
+                    ValidationMode::SelfOnly
+                }
+            } else {
+                return Ok(None);
+            };
+        }
 
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
@@ -354,7 +369,7 @@ where
         if !last_input_output.record(
             idx_to_execute,
             incarnation,
-            is_backup,
+            is_backup_validated,
             read_set,
             result,
             resource_write_set,
@@ -375,10 +390,22 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
     ) -> Result<bool, PanicError> {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
-        let read_set = last_input_output
-            .read_set(idx_to_validate)
+
+        let recorded_input = last_input_output
+            .recorded_input(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
+        if recorded_input.as_ref().is_backup_validated {
+            // The execution with this input was either backup, or a concurrent execution
+            // that passed validation and won against the backup. In both cases, validation
+            // is not required. Note: this is not just performance optimization, as currently
+            // validation may fail due to delayed fields incorrect use (TODO: audit and fix).
+            // But for backup execution, there is no need to abort, as the rolling commit
+            // will re-execute the transaction in the correct setting.
+            return Ok(true);
+        }
+
+        let read_set = &recorded_input.input;
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(
                 "Incorrect use detected in CapturedReads",
@@ -407,7 +434,13 @@ where
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
         // Backup should never abort.
-        debug_assert!(!last_input_output.txn_output(txn_idx).unwrap().is_backup);
+        debug_assert!(
+            !last_input_output
+                .recorded_input(txn_idx)
+                .unwrap()
+                .as_ref()
+                .is_backup_validated
+        );
         // Any logs from the aborted execution should be cleared and not reported.
         clear_speculative_txn_logs(txn_idx as usize, false);
 
@@ -470,26 +503,14 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
     ) -> Result<bool, PanicError> {
-        let is_backup = last_input_output
-            .txn_output(txn_idx)
-            .ok_or_else(|| {
-                code_invariant_error(
-                    "Output must be set during prepare_and_queue_commit_ready_txns",
-                )
-            })?
-            .is_backup;
+        let recorded_input = last_input_output
+            .recorded_input(txn_idx)
+            .expect("Read set must be recorded");
 
-        let mut execution_still_valid = if is_backup {
-            true
-        } else {
-            let read_set = last_input_output
-                .read_set(txn_idx)
-                .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
-
-            read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?
-        };
-
-        if is_backup || execution_still_valid {
+        let read_set = &recorded_input.input;
+        let mut execution_still_valid =
+            read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?;
+        if execution_still_valid {
             if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
                 if let Err(e) = versioned_cache
                     .delayed_fields()
@@ -548,6 +569,13 @@ where
                 last_input_output,
             )? {
                 // Transaction needs to be re-executed, one final time.
+                /*let recorded_input = last_input_output
+                    .recorded_input(txn_idx)
+                    .expect("[BlockSTM]: Prior read-set must be recorded");
+
+                if recorded_input.as_ref().is_backup_validated {
+                    panic!("still failed ha?");
+                }*/
                 Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
@@ -557,6 +585,7 @@ where
                     txn_idx,
                     incarnation + 1,
                     false,
+                    true,
                     scheduler,
                     block,
                     last_input_output,
@@ -771,7 +800,7 @@ where
             ViewState::Sync(parallel_state),
             txn_idx,
             recorded_output.incarnation,
-            recorded_output.is_backup,
+            false,
             worker_id,
             false, // profile view callbacks
         );
@@ -893,7 +922,6 @@ where
             }
             Ok(())
         };
-
         loop {
             // If not enabled, everyone tries to commit. o.w., first num_commiters workers.
             if !enable_special_committers || worker_id < num_committers {
@@ -920,14 +948,14 @@ where
                     scheduler.queueing_commits_mark_done();
                 }
                 if enable_special_committers
-		    // Backup execution might resume some executions and liveness may depend
-                    // on the current worker picking up the highest priority task that might
-                    // be the newly awaken txn. If the current worker had previously picked
-                    // an execution task, it might suspend on resumed txn and lead to deadlock.
-                    && !matches!(
-                        scheduler_task,
-                        SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Execution)
-                    )
+                // Backup execution might resume some executions and liveness may depend
+                        // on the current worker picking up the highest priority task that might
+                        // be the newly awaken txn. If the current worker had previously picked
+                        // an execution task, it might suspend on resumed txn and lead to deadlock.
+                        && !matches!(
+                            scheduler_task,
+                            SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Execution)
+                        )
                 {
                     if let Some(last_commit_idx) = last_commit_idx {
                         let next_commit_idx = last_commit_idx + 1;
@@ -936,6 +964,7 @@ where
                                 next_commit_idx,
                                 incarnation,
                                 true,
+                                false,
                                 scheduler,
                                 block,
                                 last_input_output,
@@ -999,6 +1028,7 @@ where
                     if let Some(validation_mode) = Self::execute(
                         txn_idx,
                         incarnation,
+                        false,
                         false,
                         scheduler,
                         block,

@@ -53,29 +53,38 @@ pub(crate) enum KeyKind {
 pub(crate) struct RecordedOutput<O, E> {
     pub(crate) status: ExecutionStatus<O, E>,
     pub(crate) incarnation: Incarnation,
-    pub(crate) is_backup: bool,
+}
+
+pub(crate) struct RecordedInput<T: Transaction> {
+    pub(crate) input: TxnInput<T>,
+    pub(crate) is_backup_validated: bool,
 }
 
 impl<O, E> RecordedOutput<O, E> {
-    pub(crate) fn new(
-        status: ExecutionStatus<O, E>,
-        incarnation: Incarnation,
-        is_backup: bool,
-    ) -> Self {
+    pub(crate) fn new(status: ExecutionStatus<O, E>, incarnation: Incarnation) -> Self {
         Self {
             status,
             incarnation,
-            is_backup,
         }
     }
 
-    pub(crate) fn take(self) -> (ExecutionStatus<O, E>, Incarnation, bool) {
-        (self.status, self.incarnation, self.is_backup)
+    pub(crate) fn take(self) -> (ExecutionStatus<O, E>, Incarnation) {
+        (self.status, self.incarnation)
+    }
+}
+
+impl<T: Transaction> RecordedInput<T> {
+    pub(crate) fn new(input: TxnInput<T>, is_backup_validated: bool) -> Self {
+        Self {
+            input,
+            is_backup_validated,
+        }
     }
 }
 
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
+    // txn_idx -> RecordedInput
+    inputs: Vec<CachePadded<ArcSwapOption<RecordedInput<T>>>>,
     // Set once when the group outputs are committed sequentially, to be processed later by
     // concurrent materialization / output preparation.
     finalized_groups: Vec<
@@ -84,8 +93,7 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
         >,
     >,
 
-    // TODO: Consider breaking down the outputs when storing (avoid traversals, cache below).
-    // txn_idx -> (output, is_backup).
+    // txn_idx -> RecordedOutput
     outputs: Vec<CachePadded<ArcSwapOption<RecordedOutput<O, E>>>>,
     // Cache to avoid expensive clones of data.
     // TODO(clean-up): be consistent with naming resource writes: here it means specifically
@@ -155,7 +163,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        is_backup: bool,
+        is_backup_validated: bool,
         input: CapturedReads<T>,
         output: ExecutionStatus<O, E>,
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
@@ -176,12 +184,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
 
         *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
-        self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
-        self.outputs[txn_idx as usize].store(Some(Arc::new(RecordedOutput::new(
-            output,
-            incarnation,
-            is_backup,
+        self.inputs[txn_idx as usize].store(Some(Arc::new(RecordedInput::new(
+            input,
+            is_backup_validated,
         ))));
+        self.outputs[txn_idx as usize]
+            .store(Some(Arc::new(RecordedOutput::new(output, incarnation))));
 
         true
     }
@@ -196,7 +204,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             || Self::append_and_check(module_writes_keys, &self.module_writes, &self.module_reads)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
+    pub(crate) fn recorded_input(&self, txn_idx: TxnIndex) -> Option<Arc<RecordedInput<T>>> {
         self.inputs[txn_idx as usize].load_full()
     }
 
@@ -289,13 +297,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
         // check_execution_status_during_commit must be used for checks re:status.
         // Hence, since the status is not SkipRest, it must be Success.
-        if let (ExecutionStatus::Success(output), incarnation, is_backup) =
-            self.take_output(txn_idx).take()
-        {
+        if let (ExecutionStatus::Success(output), incarnation) = self.take_output(txn_idx).take() {
             self.outputs[txn_idx as usize].store(Some(Arc::new(RecordedOutput::new(
                 ExecutionStatus::SkipRest(output),
                 incarnation,
-                is_backup,
             ))));
         } else {
             unreachable!("Unexpected status, must be Success");
@@ -458,7 +463,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {
-        let read_set = self.read_set(txn_idx).expect("Read set must be recorded");
+        let read_set = &self
+            .recorded_input(txn_idx)
+            .expect("Read set must be recorded")
+            .input;
 
         let reads = read_set.get_read_summary();
         let writes = self.get_write_summary(txn_idx);
