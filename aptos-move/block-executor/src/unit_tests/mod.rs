@@ -40,6 +40,8 @@ use std::{
     sync::Arc,
 };
 
+mod backup;
+
 #[test]
 fn resource_group_bcs_backup() {
     let no_group_incarnation_1: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(

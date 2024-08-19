@@ -895,9 +895,8 @@ where
         };
 
         loop {
-            if !enable_special_committers // If not enabled, everyone tries to commit
-                || (worker_id < num_committers && !matches!(scheduler_task, SchedulerTask::ExecutionTask(_, _, _)))
-            {
+            // If not enabled, everyone tries to commit. o.w., first num_commiters workers.
+            if !enable_special_committers || worker_id < num_committers {
                 let mut last_commit_idx = None;
                 while scheduler.should_coordinate_commits() {
                     if let Some(last_idx) = self.prepare_and_queue_commit_ready_txns(
@@ -920,7 +919,16 @@ where
                     };
                     scheduler.queueing_commits_mark_done();
                 }
-                if enable_special_committers {
+                if enable_special_committers
+		    // Backup execution might resume some executions and liveness may depend
+                    // on the current worker picking up the highest priority task that might
+                    // be the newly awaken txn. If the current worker had previously picked
+                    // an execution task, it might suspend on resumed txn and lead to deadlock.
+                    && !matches!(
+                        scheduler_task,
+                        SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Execution)
+                    )
+                {
                     if let Some(last_commit_idx) = last_commit_idx {
                         let next_commit_idx = last_commit_idx + 1;
                         if let Some(incarnation) = scheduler.try_backup(next_commit_idx) {
