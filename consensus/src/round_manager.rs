@@ -26,7 +26,7 @@ use aptos_consensus_types::{
     block::{self, Block}, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
 };
 use aptos_crypto::HashValue;
-use aptos_infallible::{checked, Mutex};
+use aptos_infallible::{checked, duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
 use aptos_safety_rules::ConsensusState;
@@ -501,6 +501,7 @@ impl RoundManager {
         let signed_proposal =
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
         observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);
+        info!("[ProposalGeneration] Round {} in total took: {:?} ms", signed_proposal.round(), duration_since_epoch().checked_sub(Duration::from_micros(signed_proposal.timestamp_usecs())).unwrap());
         info!(
             Self::new_log_with_round_epoch(LogEvent::Propose, new_round_event.round, epoch),
             "{}", signed_proposal

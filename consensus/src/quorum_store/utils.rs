@@ -474,6 +474,8 @@ impl ProofQueue {
         let mut cur_all_txns = PayloadTxnsSize::zero();
         let mut excluded_txns = 0;
         let mut full = false;
+        let mut proof_with_data = 0;
+        let mut proof_without_data = 0;
         // Set of all the excluded transactions and all the transactions included in the result
         let mut filtered_txns = HashSet::new();
         for batch_info in excluded_batches {
@@ -507,6 +509,7 @@ impl ProofQueue {
                         if let Some(batch_store) = batch_store_ref {
                             if batch_store.get_batch_from_local(proof.info().digest()).is_err() {
                                 // The batch is not in the local batch store, skip it.
+                                proof_without_data += 1;
                                 return false;
                             }
                         }
@@ -562,6 +565,7 @@ impl ProofQueue {
                         };
                         ret.push(proof.clone());
                         if let Some(transactions) = transactions {
+                            proof_with_data += 1;
                             ret_transactions.extend(transactions);
                         }
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
@@ -589,6 +593,8 @@ impl ProofQueue {
             batch_count = ret.len(),
             full = full,
             return_non_full = return_non_full,
+            proof_with_data = proof_with_data,
+            proof_without_data = proof_without_data,
             "Pull payloads from QuorumStore: internal"
         );
 

@@ -247,7 +247,7 @@ impl OnChainRandomnessConfig {
         match self {
             OnChainRandomnessConfig::Off => false,
             OnChainRandomnessConfig::V1(_) => false,
-            OnChainRandomnessConfig::V2(_) => false,
+            OnChainRandomnessConfig::V2(_) => true,
         }
     }
 }

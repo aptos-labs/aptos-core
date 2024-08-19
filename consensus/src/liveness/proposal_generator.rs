@@ -427,6 +427,8 @@ impl ProposalGenerator {
                 tokio::time::sleep(proposal_delay).await;
             }
 
+            info!("[ProposalGeneration] Round {} pull txns 1 took: {:?} ms", round, self.time_service.get_current_timestamp() - timestamp);
+
             let max_pending_block_size = pending_blocks
                 .iter()
                 .map(|block| {
@@ -478,6 +480,8 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
+            info!("[ProposalGeneration] Round {} pull txns 2 took: {:?} ms", round, self.time_service.get_current_timestamp() - timestamp);
+
             if !payload.is_direct()
                 && max_txns_from_block_to_execute.is_some()
                 && max_txns_from_block_to_execute.map_or(false, |v| payload.len() as u64 > v)
@@ -486,8 +490,13 @@ impl ProposalGenerator {
                 let len = max_txns_from_block_to_execute.unwrap_or(all_txns.len() as u64) as usize;
                 all_txns = all_txns[..len].to_vec();
             }
+
+            info!("[ProposalGeneration] Round {} pull txns 3 took: {:?} ms", round, self.time_service.get_current_timestamp() - timestamp);
+
             (validator_txns, payload, all_txns, timestamp.as_micros() as u64)
         };
+
+        let start_time = self.time_service.get_current_timestamp();
 
         let quorum_cert = hqc.as_ref().clone();
         let failed_authors = self.compute_failed_authors(
@@ -519,6 +528,8 @@ impl ProposalGenerator {
         } else {
             None
         };
+
+        info!("[ProposalGeneration] Round {} check randomness took: {:?} ms", round, self.time_service.get_current_timestamp() - start_time);
 
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(
