@@ -341,22 +341,25 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Balance the stack such that it exactly contains the `result` temps and nothing else. This
-    /// is used for instructions like `return` or `abort` which terminate a block und must leave
-    /// the stack empty at end.
+    /// is used for instructions like `branch`, `return` or `abort` which terminate a block
+    /// and must leave the stack empty at end.
     fn balance_stack_end_of_block(
         &mut self,
         ctx: &BytecodeContext,
         result: impl AsRef<[TempIndex]>,
     ) {
         let result = result.as_ref();
-        // First ensure the arguments are on the stack.
-        self.abstract_push_args(ctx, result, None);
-        if self.stack.len() != result.len() {
-            // Unfortunately, there is more on the stack than needed.
-            // Need to flush and push again so the stack is empty after return.
+        // If the stack contains already exactly the result and none of the temps is used after,
+        // nothing to do.
+        let stack_ready = self.stack == result
+            && self
+                .stack
+                .iter()
+                .all(|temp| !ctx.is_alive_after(*temp, &[], false));
+        if !stack_ready {
+            // Flush the stack and push the result
             self.abstract_flush_stack_before(ctx, 0);
-            self.abstract_push_args(ctx, result.as_ref(), None);
-            assert_eq!(self.stack.len(), result.len())
+            self.abstract_push_args(ctx, result, None);
         }
     }
 
