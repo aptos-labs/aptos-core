@@ -512,12 +512,21 @@ impl ProposalGenerator {
             let parent_block_id = self.block_store.commit_root().id();
             match self.execution_proxy.get_state_view(block_id, parent_block_id) {
                 Ok(stale_state_view) => {
+                    info!("[ProposalGeneration] rand Round {} check randomness get_state_view took: {:?} ms", round, self.time_service.get_current_timestamp() - start_time);
+
                     let vm = AptosVM::new(&stale_state_view);
+
+                    info!("[ProposalGeneration] rand Round {} check randomness vm took: {:?} ms", round, self.time_service.get_current_timestamp() - start_time);
+
+                    let mut counter = 0;
                     for txn in all_txns.iter() {
+                        info!("[ProposalGeneration] rand Round {} check randomness {} took: {:?} ms", round, counter, self.time_service.get_current_timestamp() - start_time);
+
                         if vm.require_randomness(&stale_state_view, txn, 0) {
                             require_randomness = true;
                             break;
                         }
+                        counter += 1;
                     }
                 }
                 Err(e) => {
@@ -529,7 +538,7 @@ impl ProposalGenerator {
             None
         };
 
-        info!("[ProposalGeneration] Round {} check randomness took: {:?} ms", round, self.time_service.get_current_timestamp() - start_time);
+        info!("[ProposalGeneration] rand Round {} check randomness took: {:?} ms", round, self.time_service.get_current_timestamp() - start_time);
 
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(

@@ -6,6 +6,7 @@
 use crate::{counters::TIMER, move_vm_ext::AptosMoveResolver, natives::aptos_natives_with_builder};
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_infallible::RwLock;
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
@@ -73,10 +74,12 @@ impl WarmVmCache {
 
         if let Some(vm) = self.cache.read().get(&id) {
             let _timer = TIMER.timer_with(&["warm_vm_cache_hit"]);
+            info!("Warm VM cache hit");
             return Ok(vm.clone());
         }
 
         {
+            info!("Warm VM cache miss");
             let _timer = TIMER.timer_with(&["warm_vm_cache_miss"]);
             let mut cache_locked = self.cache.write();
             if let Some(vm) = cache_locked.get(&id) {
