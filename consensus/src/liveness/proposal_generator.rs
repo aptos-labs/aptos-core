@@ -509,6 +509,7 @@ impl ProposalGenerator {
             match self.execution_proxy.get_state_view(block_id, parent_block_id) {
                 Ok(stale_state_view) => {
                     let vm = AptosVM::new(&stale_state_view);
+                    let resolver = vm.as_move_resolver(&stale_state_view);
 
                     info!("[ProposalGeneration] init vm took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
 
@@ -516,7 +517,7 @@ impl ProposalGenerator {
                     for txn in all_txns.iter() {
                         info!("[ProposalGeneration] check randomness txn {} took: {:?}, round {}", counter, self.time_service.get_current_timestamp() - start_time, round);
 
-                        if vm.require_randomness(&stale_state_view, txn, 0) {
+                        if vm.require_randomness(&resolver, txn, 0) {
                             require_randomness = true;
                             break;
                         }

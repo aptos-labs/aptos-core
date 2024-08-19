@@ -2704,58 +2704,17 @@ impl VMValidator for AptosVM {
 impl AptosVM {
     pub fn require_randomness(
         &self,
-        state_view: &impl StateView,
+        resolver: &impl AptosMoveResolver,
         signed_transaction: &SignedTransaction,
         txn_idx: TxnIndex,
     ) -> bool {
-        // we don't need resource group here?
-        // let resolver = self.as_move_resolver_with_group_view(state_view);
-        let resolver = state_view.as_move_resolver();
-
-        // assert!(!self.is_simulation, "VM has to be created for checking randomness");
-        //
-        // // daniel todo: not sure if all these are necessary
-        // let log_context = AdapterLogSchema::new(state_view.id(), txn_idx as usize);
-        //
-        // let txn_data = TransactionMetadata::new(signed_transaction);
-        // let mut prologue_session = PrologueSession::new(self, &txn_data, &resolver);
-        // let exec_result = prologue_session.execute(|session| {
-        //     self.validate_signed_transaction(
-        //         session,
-        //         &resolver,
-        //         txn,
-        //         &txn_data,
-        //         log_context,
-        //         is_approved_gov_script,
-        //         &mut traversal_context,
-        //     )
-        // });
-        // unwrap_or_discard!(exec_result);
-        // let storage_gas_params = match get_or_vm_startup_failure(&self.storage_gas_params, &log_context) {
-        //     Ok(params) => params,
-        //     Err(_) => return false,
-        // };
-        //
-        // let change_set_configs = &storage_gas_params.change_set_configs;
-        // let (prologue_change_set, mut user_session) = match prologue_session
-        //     .into_user_session(
-        //         self,
-        //         &txn_data,
-        //         &resolver,
-        //         self.gas_feature_version,
-        //         change_set_configs,
-        //     ) {
-        //         Ok((change_set, session)) => (change_set, session),
-        //         Err(_) => return false,
-        //     };
-        //
         let entry_fn = match signed_transaction.payload() {
             TransactionPayload::EntryFunction(entry) => entry,
             TransactionPayload::Multisig(_) => return false, // daniel todo fix
             _ => return false,
         };
-        let mut session = self.new_session(&resolver, SessionId::Void, None);
-        match get_randomness_annotation(&resolver, &mut session, entry_fn) {
+        let mut session = self.new_session(resolver, SessionId::Void, None);
+        match get_randomness_annotation(resolver, &mut session, entry_fn) {
             Ok(annotation) => {
                 println!("daniel require_randomness annotation: {:?}", annotation);
                 annotation.is_some()
@@ -2765,18 +2724,6 @@ impl AptosVM {
                 false
             },
         }
-        // return match user_session.execute(|session| {
-        //     get_randomness_annotation(&resolver, session, entry_fn)
-        // }) {
-        //     Ok(annotation) => {
-        //         println!("daniel require_randomness annotation: {:?}", annotation);
-        //         annotation.is_some()
-        //     },
-        //     Err(err) => {
-        //         println!("daniel require_randomness error: {:?}", err);
-        //         false
-        //     },
-        // };
     }
 }
 
