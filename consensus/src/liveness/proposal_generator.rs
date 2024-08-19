@@ -456,7 +456,7 @@ impl ProposalGenerator {
                         soft_max_txns_after_filtering: max_txns_from_block_to_execute
                             .unwrap_or(max_block_txns_after_filtering),
                         max_inline_txns: self.max_inline_txns,
-                        opt_batch_txns_pct: 0,
+                        opt_batch_txns_pct: 30,
                         user_txn_filter: payload_filter,
                         pending_ordering,
                         pending_uncommitted_blocks: pending_blocks.len(),
