@@ -398,9 +398,7 @@ impl BlockAptosVM {
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
-
-            // Every second (odd indexed) slot is dedicated to corresponding fallback executions.
-            init_speculative_logs(2 * num_txns);
+            init_speculative_logs(num_txns);
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);

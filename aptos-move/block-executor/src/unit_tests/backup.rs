@@ -13,7 +13,7 @@ use aptos_aggregator::{
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::{BlockExecutorConfig, BlockSTMCommitterBackup},
+    block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     delayed_fields::PanicError,
     executable::ModulePath,
@@ -31,7 +31,6 @@ use bytes::Bytes;
 use claims::assert_none;
 use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use num_cpus;
 use std::{
     collections::{BTreeMap, HashSet},
     marker::PhantomData,
@@ -132,6 +131,7 @@ impl TransactionEvent for TestEvent {
     fn get_event_data(&self) -> &[u8] {
         unimplemented!("Unused in the test")
     }
+
     fn set_event_data(&mut self, _event_data: Vec<u8>) {
         unimplemented!("Unused in the test")
     }
@@ -139,7 +139,8 @@ impl TransactionEvent for TestEvent {
 
 impl BlockExecutableTransaction for TestTransaction {
     type Event = TestEvent;
-    type Identifier = DelayedFieldID; // To satisfy the trait requirements.
+    type Identifier = DelayedFieldID;
+    // To satisfy the trait requirements.
     type Key = TestKey;
     type Tag = ();
     type Value = TestValue;
@@ -315,7 +316,7 @@ impl ExecutorTask for TestExecutor {
                 assert_eq!(txn_idx, 0, "Algorithm for TXN 0");
 
                 assert_eq!(incarnation, 0);
-                assert_eq!(is_backup, false);
+                assert!(!is_backup);
 
                 let target_mask = TXN1_READ_FLAG + TXN2_READ_FLAG;
                 loop {
@@ -330,7 +331,7 @@ impl ExecutorTask for TestExecutor {
             },
             1 => {
                 assert_eq!(txn_idx, 1, "Algorithm for TXN 1");
-                assert_eq!(is_backup, false);
+                assert!(!is_backup);
 
                 match incarnation {
                     0 => {
@@ -526,11 +527,6 @@ fn test_commit_backup(with_commit_hook: bool) {
             .unwrap(),
     );
 
-    let mut config = BlockExecutorConfig::new_no_block_limit(num_workers);
-    // Set a setting that allows commits to happen despite the test suspending
-    // transaction execution by some (unpredictable) workers.
-    config.local.block_stm_committer_backup = BlockSTMCommitterBackup::All;
-
     let synchronization_status = Arc::new(AtomicU64::new(DEFAULT_STATUS));
 
     let binding = BlockExecutor::<
@@ -538,10 +534,14 @@ fn test_commit_backup(with_commit_hook: bool) {
         TestExecutor,
         EmptyDataView<TestKey>,
         TestCommitHook,
-    >::new(config, executor_thread_pool.clone(), maybe_commit_hook)
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_workers),
+        executor_thread_pool.clone(),
+        maybe_commit_hook,
+    )
     .execute_transactions_parallel(
         &(
-            with_commit_hook.then(|| next_to_commit_idx_local),
+            with_commit_hook.then_some(next_to_commit_idx_local),
             synchronization_status,
         ),
         &transactions,
