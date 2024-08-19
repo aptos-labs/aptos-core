@@ -56,18 +56,26 @@ impl<'r, 'l> UserSession<'r, 'l> {
     pub fn finish(
         self,
         change_set_configs: &ChangeSetConfigs,
-        maybe_module_write_set: Option<ModuleWriteSet>,
+        maybe_module_write_set_with_init_module_changes: Option<(ModuleWriteSet, VMChangeSet)>,
         module_storage: &impl AptosModuleStorage,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let Self { session } = self;
-        let (change_set, module_write_set_if_use_loader_v1) =
+        let (mut change_set, module_write_set_if_use_loader_v1) =
             session.finish_with_squashed_change_set(change_set_configs, module_storage, false)?;
 
-        let module_write_set = if let Some(module_write_set) = maybe_module_write_set {
+        let module_write_set = if let Some((module_write_set, init_module_change_set)) =
+            maybe_module_write_set_with_init_module_changes
+        {
             // This means we are using V2 flow, which does not store modules inside the MoveVM.
             module_write_set_if_use_loader_v1
                 .is_empty_or_invariant_violation()
                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+
+            // Also, merge init_module changes to the rest of change set.
+            change_set
+                .squash_additional_change_set(init_module_change_set)
+                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+
             module_write_set
         } else {
             module_write_set_if_use_loader_v1
