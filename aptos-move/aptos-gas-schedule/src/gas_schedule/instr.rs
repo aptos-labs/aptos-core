@@ -15,7 +15,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
     VMGasParameters => .instr,
     [
         // nop
-        [nop: InternalGas, "nop", 36],
+        [nop: InternalGas, "nop", 40],
         // control flow
         [ret: InternalGas, "ret", 220],
         [abort: InternalGas, "abort", 220],
