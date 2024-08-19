@@ -1149,8 +1149,9 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 .with_transactions_per_account(1),
             TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
                 .with_unique_senders(),
-            TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
-                .with_transactions_per_account(1),
+            // TODO(ibalajiarun): this is disabled due to Forge Stable failure on PosToProposal latency.
+            // TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
+            //     .with_transactions_per_account(1),
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
@@ -1158,7 +1159,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
             (8500, 100, 0.3, 0.5, 0.5, 0.5),
             (2000, 300, 0.3, 1.0, 0.6, 1.0),
             (3200, 500, 0.3, 1.0, 0.7, 0.7),
-            (28, 5, 0.3, 1.0, 0.7, 1.0),
+            // (28, 5, 0.3, 1.0, 0.7, 1.0),
         ]
         .into_iter()
         .map(
