@@ -288,7 +288,14 @@ impl BatchProofQueue {
     fn gc_expired_batch_summaries_without_proofs(&mut self) {
         let timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
         self.items.retain(|_, item| {
-            item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp
+            if item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp {
+                true
+            } else {
+                self.author_to_batches
+                    .get_mut(&item.info.author())
+                    .map(|queue| queue.remove(&BatchSortKey::from_info(&item.info)));
+                false
+            }
         });
     }
 
