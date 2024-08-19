@@ -440,7 +440,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .remote_peer(*aug_data.author()));
                             match self.aug_data_store.add_aug_data(aug_data) {
                                 Ok(sig) => self.process_response(protocol, response_sender, RandMessage::AugDataSignature(sig)),
-                                Err(e) => error!("[RandManager] Failed to add aug data: {}", e),
+                                Err(e) => warn!("[RandManager] Failed to add aug data: {}", e),
                             }
                         }
                         RandMessage::CertifiedAugData(certified_aug_data) => {
