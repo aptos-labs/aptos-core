@@ -34,7 +34,8 @@ use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures, proof::accumulator::InMemoryTransactionAccumulator,
+    account_config::NewBlockEvent, ledger_info::LedgerInfoWithSignatures,
+    proof::accumulator::InMemoryTransactionAccumulator, transaction::Version,
 };
 use futures::executor::block_on;
 #[cfg(test)]
@@ -253,9 +254,21 @@ impl BlockStore {
         };
 
         for block in blocks {
-            block_store.insert_block(block).await.unwrap_or_else(|e| {
-                panic!("[BlockStore] failed to insert block during build {:?}", e)
-            });
+            if block.round() <= root_block.round() {
+                block_store
+                    .insert_committed_block(block)
+                    .await
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "[BlockStore] failed to insert committed block during build {:?}",
+                            e
+                        )
+                    });
+            } else {
+                block_store.insert_block(block).await.unwrap_or_else(|e| {
+                    panic!("[BlockStore] failed to insert block during build {:?}", e)
+                });
+            }
         }
         for qc in quorum_certs {
             block_store
@@ -380,6 +393,88 @@ impl BlockStore {
         self.try_send_for_execution().await;
     }
 
+    pub async fn insert_committed_block(
+        &self,
+        block: Block,
+    ) -> anyhow::Result<Arc<PipelinedBlock>> {
+        // TODO: factor out repeated code
+
+        // ensure local time past the block time
+        let block_time = Duration::from_micros(block.timestamp_usecs());
+        let current_timestamp = self.time_service.get_current_timestamp();
+        if let Some(t) = block_time.checked_sub(current_timestamp) {
+            if t > Duration::from_secs(1) {
+                warn!("Long wait time {}ms for block {}", t.as_millis(), block);
+            }
+            self.time_service.wait_until(block_time).await;
+        }
+        if let Some(payload) = block.payload() {
+            self.payload_manager
+                .prefetch_payload_data(payload, block.timestamp_usecs());
+        }
+        self.storage
+            .save_tree(vec![block.clone()], vec![])
+            .context("Insert block failed when saving block")?;
+        let mut block_tree = self.inner.write();
+
+        info!(
+            "recovering committed transactions for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+        );
+        let aptos_db = self.storage.aptos_db();
+        let latest_block_event = aptos_db
+            .get_latest_block_events(1)
+            .expect("at least one block");
+        let latest_block_event_with_version =
+            latest_block_event.first().expect("at least one block");
+        let latest_new_block_event = latest_block_event_with_version
+            .event
+            .expect_new_block_event()
+            .expect("new block event");
+        let mut height = latest_new_block_event.height();
+        let committed_transactions;
+        loop {
+            let (start_version, end_version, new_block_event): (Version, Version, NewBlockEvent) =
+                self.storage
+                    .aptos_db()
+                    .get_block_info_by_height(height)
+                    .expect("block id by height");
+            if new_block_event.epoch() < block.epoch() {
+                panic!(
+                    "the epoch of the latest block event {} is less than the block epoch {}",
+                    new_block_event.epoch(),
+                    block.epoch(),
+                );
+            }
+            if new_block_event.round() < block.round() {
+                info!(
+                    "the round of the latest block event {} is less than the block round {}",
+                    new_block_event.round(),
+                    block.round(),
+                );
+                committed_transactions = vec![];
+                break;
+            }
+            if new_block_event.epoch() == block.epoch() && new_block_event.round() == block.round()
+            {
+                let iter = aptos_db
+                    .get_transaction_info_iterator(start_version, end_version - start_version + 1)
+                    .expect("iterator");
+                committed_transactions = iter
+                    .map(|info| info.expect("info").transaction_hash())
+                    .collect();
+                break;
+            }
+            height -= 1;
+        }
+
+        let pipelined_block = PipelinedBlock::new_recovered(block.clone(), committed_transactions);
+        block_tree.insert_block(pipelined_block)
+    }
+
     /// Insert a block if it passes all validation tests.
     /// Returns the Arc to the block kept in the block store after persisting it to storage
     ///
@@ -423,7 +518,7 @@ impl BlockStore {
                 block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
                 now.elapsed().as_millis()
             );
-            PipelinedBlock::new_ordered(block.clone(), block_window)
+            PipelinedBlock::new_with_window(block.clone(), block_window)
         } else {
             info!(
                 "no block_window for PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}",
@@ -433,8 +528,26 @@ impl BlockStore {
                 block.epoch(),
             );
             // TODO: assert that this is an older block than commit root
-            PipelinedBlock::new_ordered(block.clone(), OrderedBlockWindow::empty())
+            PipelinedBlock::new_with_window(block.clone(), OrderedBlockWindow::empty())
         };
+
+        // ensure local time past the block time
+        let block_time = Duration::from_micros(pipelined_block.timestamp_usecs());
+        let current_timestamp = self.time_service.get_current_timestamp();
+        if let Some(t) = block_time.checked_sub(current_timestamp) {
+            if t > Duration::from_secs(1) {
+                warn!(
+                    "Long wait time {}ms for block {}",
+                    t.as_millis(),
+                    pipelined_block.block()
+                );
+            }
+            self.time_service.wait_until(block_time).await;
+        }
+        self.storage
+            .save_tree(vec![pipelined_block.block().clone()], vec![])
+            .context("Insert block failed when saving block")?;
+        let stored_pipelined_block = self.inner.write().insert_block(pipelined_block)?;
 
         // build pipeline
         if let Some(pipeline_builder) = &self.pipeline_builder {
@@ -460,7 +573,7 @@ impl BlockStore {
                 }
             });
             pipeline_builder.build(
-                &pipelined_block,
+                stored_pipelined_block.clone(),
                 parent_block
                     .pipeline_futs()
                     .expect("Futures should exist when pipeline enabled"),
@@ -468,23 +581,7 @@ impl BlockStore {
             );
         }
 
-        // ensure local time past the block time
-        let block_time = Duration::from_micros(block.timestamp_usecs());
-        let current_timestamp = self.time_service.get_current_timestamp();
-        if let Some(t) = block_time.checked_sub(current_timestamp) {
-            if t > Duration::from_secs(1) {
-                warn!("Long wait time {}ms for block {}", t.as_millis(), block);
-            }
-            self.time_service.wait_until(block_time).await;
-        }
-        if let Some(payload) = block.payload() {
-            self.payload_manager
-                .prefetch_payload_data(payload, block.timestamp_usecs());
-        }
-        self.storage
-            .save_tree(vec![block.clone()], vec![])
-            .context("Insert block failed when saving block")?;
-        self.inner.write().insert_block(pipelined_block)
+        Ok(stored_pipelined_block)
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.
@@ -616,6 +713,10 @@ impl BlockReader for BlockStore {
         self.inner.read().commit_root()
     }
 
+    fn window_root(&self) -> Arc<PipelinedBlock> {
+        self.inner.read().window_root()
+    }
+
     fn get_quorum_cert_for_block(&self, block_id: HashValue) -> Option<Arc<QuorumCert>> {
         self.inner.read().get_quorum_cert_for_block(&block_id)
     }
@@ -626,6 +727,10 @@ impl BlockReader for BlockStore {
 
     fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
         self.inner.read().path_from_commit_root(block_id)
+    }
+
+    fn path_from_window_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
+        self.inner.read().path_from_window_root(block_id)
     }
 
     #[cfg(test)]

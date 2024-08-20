@@ -139,7 +139,6 @@ impl UserPayloadClient for QuorumStoreClient {
             payload_len = payload.len(),
             return_empty = return_empty,
             return_non_full = return_non_full,
-            duration_ms = start_time.elapsed().as_millis() as u64,
             "Pull payloads from QuorumStore: proposal"
         );
 

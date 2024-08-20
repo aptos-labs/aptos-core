@@ -16,6 +16,7 @@ use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{transaction::SignedTransaction, PeerId};
+use dashmap::DashSet;
 use rand::{prelude::SliceRandom, thread_rng};
 use std::{
     cmp::Reverse,
@@ -522,7 +523,7 @@ impl BatchProofQueue {
         return_non_full: bool,
         block_timestamp: Duration,
     ) -> (
-        Vec<(BatchInfo, Vec<SignedTransaction>)>,
+        Vec<(BatchInfo, Arc<Vec<SignedTransaction>>)>,
         PayloadTxnsSize,
         u64,
     ) {
@@ -571,25 +572,36 @@ impl BatchProofQueue {
         block_timestamp: Duration,
         min_batch_age_usecs: Option<u64>,
     ) -> (Vec<&QueueItem>, PayloadTxnsSize, u64, bool) {
+        let start_time = Instant::now();
+
         let mut result = Vec::new();
         let mut cur_unique_txns = 0;
         let mut cur_all_txns = PayloadTxnsSize::zero();
         let mut excluded_txns = 0;
         let mut full = false;
-        // Set of all the excluded transactions and all the transactions included in the result
-        let mut filtered_txns = HashSet::new();
-        for batch_info in excluded_batches {
-            let batch_key = BatchKey::from_info(batch_info);
-            if let Some(txn_summaries) = self
-                .items
-                .get(&batch_key)
-                .and_then(|item| item.txn_summaries.as_ref())
-            {
-                for txn_summary in txn_summaries {
-                    filtered_txns.insert(*txn_summary);
-                }
-            }
-        }
+
+        let filtered_txns: DashSet<TxnSummaryWithExpiration> = DashSet::new();
+        // let num_all_txns = excluded_batches
+        //     .iter()
+        //     .map(|batch| batch.num_txns() as usize)
+        //     .sum();
+        // let filtered_txns = DashSet::with_capacity(num_all_txns);
+        // excluded_batches.par_iter().for_each(|batch_info| {
+        //     let batch_key = BatchKey::from_info(batch_info);
+        //     if let Some(txn_summaries) = self
+        //         .items
+        //         .get(&batch_key)
+        //         .and_then(|item| item.txn_summaries.as_ref())
+        //     {
+        //         for txn_summary in txn_summaries {
+        //             filtered_txns.insert(*txn_summary);
+        //         }
+        //     }
+        // });
+        info!(
+            "Pull payloads from QuorumStore: building filtered_txns took {} ms",
+            start_time.elapsed().as_millis()
+        );
 
         let max_batch_creation_ts_usecs = min_batch_age_usecs
             .map(|min_age| aptos_infallible::duration_since_epoch().as_micros() as u64 - min_age);
@@ -700,6 +712,7 @@ impl BatchProofQueue {
             result_count = result.len(),
             full = full,
             return_non_full = return_non_full,
+            elapsed_time_ms = start_time.elapsed().as_millis() as u64,
             "Pull payloads from QuorumStore: internal"
         );
 

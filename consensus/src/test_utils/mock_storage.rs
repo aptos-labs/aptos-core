@@ -94,10 +94,11 @@ impl MockStorage {
     }
 
     pub fn get_ledger_recovery_data(&self) -> LedgerRecoveryData {
-        LedgerRecoveryData::new(LedgerInfoWithSignatures::new(
+        let ledger_info = LedgerInfoWithSignatures::new(
             self.storage_ledger.lock().clone(),
             AggregateSignature::empty(),
-        ))
+        );
+        LedgerRecoveryData::new(ledger_info.clone(), ledger_info)
     }
 
     pub fn try_start(&self, order_vote_enabled: bool, window_size: usize) -> Result<RecoveryData> {
@@ -204,6 +205,13 @@ impl PersistentLivenessStorage for MockStorage {
         self.get_ledger_recovery_data()
     }
 
+    fn recover_from_ledger_with_ledger_info(
+        &self,
+        _latest_ledger_info: LedgerInfoWithSignatures,
+    ) -> LedgerRecoveryData {
+        self.recover_from_ledger()
+    }
+
     fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData {
         match self.try_start(order_vote_enabled, window_size) {
             Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
@@ -274,10 +282,18 @@ impl PersistentLivenessStorage for EmptyStorage {
     }
 
     fn recover_from_ledger(&self) -> LedgerRecoveryData {
-        LedgerRecoveryData::new(LedgerInfoWithSignatures::new(
+        let ledger_info = LedgerInfoWithSignatures::new(
             LedgerInfo::mock_genesis(None),
             AggregateSignature::empty(),
-        ))
+        );
+        LedgerRecoveryData::new(ledger_info.clone(), ledger_info)
+    }
+
+    fn recover_from_ledger_with_ledger_info(
+        &self,
+        _latest_ledger_info: LedgerInfoWithSignatures,
+    ) -> LedgerRecoveryData {
+        self.recover_from_ledger()
     }
 
     fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData {

@@ -12,12 +12,13 @@ use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
     ops::Deref,
+    sync::Arc,
 };
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub struct PersistedValue {
     info: BatchInfo,
-    maybe_payload: Option<Vec<SignedTransaction>>,
+    maybe_payload: Option<Arc<Vec<SignedTransaction>>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -27,7 +28,7 @@ pub(crate) enum StorageMode {
 }
 
 impl PersistedValue {
-    pub(crate) fn new(info: BatchInfo, maybe_payload: Option<Vec<SignedTransaction>>) -> Self {
+    pub(crate) fn new(info: BatchInfo, maybe_payload: Option<Arc<Vec<SignedTransaction>>>) -> Self {
         Self {
             info,
             maybe_payload,
@@ -41,7 +42,7 @@ impl PersistedValue {
         }
     }
 
-    pub(crate) fn take_payload(&mut self) -> Option<Vec<SignedTransaction>> {
+    pub(crate) fn take_payload(&mut self) -> Option<Arc<Vec<SignedTransaction>>> {
         self.maybe_payload.take()
     }
 
@@ -54,7 +55,7 @@ impl PersistedValue {
         &self.info
     }
 
-    pub fn payload(&self) -> &Option<Vec<SignedTransaction>> {
+    pub fn payload(&self) -> &Option<Arc<Vec<SignedTransaction>>> {
         &self.maybe_payload
     }
 
@@ -75,7 +76,7 @@ impl PersistedValue {
         vec![]
     }
 
-    pub fn unpack(self) -> (BatchInfo, Option<Vec<SignedTransaction>>) {
+    pub fn unpack(self) -> (BatchInfo, Option<Arc<Vec<SignedTransaction>>>) {
         (self.info, self.maybe_payload)
     }
 }
@@ -97,9 +98,12 @@ impl TryFrom<PersistedValue> for Batch {
             batch_info: value.info,
             payload: BatchPayload::new(
                 author,
+                // TODO: can this clone be avoided as well?
                 value
                     .maybe_payload
-                    .ok_or_else(|| anyhow::anyhow!("Payload not exist"))?,
+                    .ok_or_else(|| anyhow::anyhow!("Payload not exist"))?
+                    .as_ref()
+                    .clone(),
             ),
         })
     }
@@ -263,7 +267,7 @@ impl From<Batch> for PersistedValue {
             batch_info,
             payload,
         } = value;
-        PersistedValue::new(batch_info, Some(payload.into_transactions()))
+        PersistedValue::new(batch_info, Some(Arc::new(payload.into_transactions())))
     }
 }
 

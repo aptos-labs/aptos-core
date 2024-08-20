@@ -1,19 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::txn_provider::TxnProvider;
-use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::transaction::BlockExecutableTransaction as Transaction;
+use crate::{
+    transaction::BlockExecutableTransaction as Transaction,
+    txn_provider::{TxnIndex, TxnProvider},
+};
 use once_cell::sync::OnceCell;
+use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct BlockingTxnProvider<T: Transaction + std::fmt::Debug> {
-    txns: Vec<OnceCell<T>>,
+    txns: Arc<Vec<OnceCell<T>>>,
 }
 
 #[allow(dead_code)]
 impl<T: Transaction + std::fmt::Debug> BlockingTxnProvider<T> {
     pub fn new(num_txns: usize) -> Self {
-        let txns = vec![OnceCell::new(); num_txns];
+        let txns = Arc::new(vec![OnceCell::new(); num_txns]);
         Self { txns }
     }
 
@@ -30,6 +33,16 @@ impl<T: Transaction + std::fmt::Debug> TxnProvider<T> for BlockingTxnProvider<T>
     }
 
     fn get_txn(&self, idx: TxnIndex) -> &T {
-        self.txns[idx as usize].wait()
+        let res = self.txns[idx as usize].wait();
+        res
+    }
+
+    fn to_vec(&self) -> Vec<T> {
+        let mut txns = vec![];
+        for i in 0..self.num_txns() as TxnIndex {
+            let txn = self.get_txn(i).clone();
+            txns.push(txn);
+        }
+        txns
     }
 }

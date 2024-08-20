@@ -33,7 +33,7 @@ pub trait TDataInfo {
 
 pub struct DataFetchFut {
     pub iteration: u32,
-    pub fut: Shared<BoxFuture<'static, ExecutorResult<Vec<SignedTransaction>>>>,
+    pub fut: Shared<BoxFuture<'static, ExecutorResult<Vec<(Arc<Vec<SignedTransaction>>, u64)>>>>,
 }
 
 impl fmt::Debug for DataFetchFut {
@@ -172,11 +172,11 @@ impl PayloadExecutionLimit {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct InlineBatch {
     batch_info: BatchInfo,
-    transactions: Vec<SignedTransaction>,
+    transactions: Arc<Vec<SignedTransaction>>,
 }
 
 impl InlineBatch {
-    pub fn new(batch_info: BatchInfo, transactions: Vec<SignedTransaction>) -> Self {
+    pub fn new(batch_info: BatchInfo, transactions: Arc<Vec<SignedTransaction>>) -> Self {
         Self {
             batch_info,
             transactions,
@@ -210,10 +210,15 @@ impl InlineBatches {
         self.0.is_empty()
     }
 
-    pub fn transactions(&self) -> Vec<SignedTransaction> {
+    pub fn transactions(&self) -> Vec<(Arc<Vec<SignedTransaction>>, u64)> {
         self.0
             .iter()
-            .flat_map(|inline_batch| inline_batch.transactions.clone())
+            .map(|inline_batch| {
+                (
+                    inline_batch.transactions.clone(),
+                    inline_batch.batch_info.gas_bucket_start(),
+                )
+            })
             .collect()
     }
 
@@ -231,8 +236,8 @@ impl From<Vec<InlineBatch>> for InlineBatches {
     }
 }
 
-impl From<Vec<(BatchInfo, Vec<SignedTransaction>)>> for InlineBatches {
-    fn from(value: Vec<(BatchInfo, Vec<SignedTransaction>)>) -> Self {
+impl From<Vec<(BatchInfo, Arc<Vec<SignedTransaction>>)>> for InlineBatches {
+    fn from(value: Vec<(BatchInfo, Arc<Vec<SignedTransaction>>)>) -> Self {
         value
             .into_iter()
             .map(|(batch_info, transactions)| InlineBatch::new(batch_info, transactions))

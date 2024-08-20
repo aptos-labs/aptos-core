@@ -14,7 +14,7 @@ use aptos_aggregator::{
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager, errors::BlockExecutionError,
     executor::BlockExecutor, task::TransactionOutput as BlockExecutorTransactionOutput,
-    txn_commit_hook::TransactionCommitHook, txn_provider::TxnProvider, types::InputOutputKey,
+    txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -28,6 +28,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
+    txn_provider::TxnProvider,
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
@@ -391,7 +392,7 @@ impl BlockAptosVM {
     pub fn execute_block_on_thread_pool<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
-        TP: TxnProvider<SignatureVerifiedTransaction> + Sync,
+        TP: TxnProvider<SignatureVerifiedTransaction> + Sync + ?Sized,
     >(
         executor_thread_pool: Arc<rayon::ThreadPool>,
         signature_verified_block: &TP,
@@ -466,7 +467,7 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
-        TP: TxnProvider<SignatureVerifiedTransaction> + Sync,
+        TP: TxnProvider<SignatureVerifiedTransaction> + Sync + ?Sized,
     >(
         signature_verified_block: &TP,
         state_view: &S,
