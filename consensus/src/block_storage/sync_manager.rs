@@ -20,7 +20,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::TPayloadManager,
-    persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
+    persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
 };
 use anyhow::{anyhow, bail, Context};
@@ -431,7 +431,8 @@ impl BlockStore {
         }
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
-        LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
+        storage
+            .recover_from_ledger_with_ledger_info(highest_commit_cert.ledger_info().clone())
             .find_root(
                 &mut blocks.clone(),
                 &mut quorum_certs.clone(),

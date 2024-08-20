@@ -11,7 +11,7 @@ use crate::{
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorError;
-use aptos_logger::{debug, info};
+use aptos_logger::info;
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use std::{
@@ -83,7 +83,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             let fut = self
                 .execution_proxy
                 .schedule_compute(
-                    b.block(),
+                    b,
                     b.block_window(),
                     b.parent_id(),
                     b.randomness().cloned(),
@@ -96,8 +96,14 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         // In the future being returned, wait for the compute results in order.
         let fut = tokio::task::spawn(async move {
             let mut results = vec![];
+            // wait for all futs so that lifetime_guard is guaranteed to be dropped only
+            // after all executor calls are over
             for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
-                debug!("try to receive compute result for block {}", block.id());
+                info!(
+                    "try to receive compute result for round {} block {}",
+                    block.round(),
+                    block.id()
+                );
                 results.push(block.set_execution_result(fut.await?));
             }
             Ok(results)

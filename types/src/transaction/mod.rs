@@ -77,7 +77,12 @@ pub use script::{
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
-use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
+use std::{
+    collections::BTreeSet,
+    hash::Hash,
+    ops::Deref,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -463,7 +468,7 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
     raw_txn: RawTransaction,
@@ -483,7 +488,11 @@ pub struct SignedTransaction {
 
     /// A cached hash of the transaction.
     #[serde(skip)]
-    committed_hash: OnceCell<HashValue>,
+    committed_hash: Arc<OnceCell<HashValue>>,
+
+    /// A cached signature verification result of the transaction.
+    #[serde(skip)]
+    valid_signature: Arc<OnceCell<bool>>,
 }
 
 /// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
@@ -492,6 +501,8 @@ impl PartialEq for SignedTransaction {
         self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
     }
 }
+
+impl Eq for SignedTransaction {}
 
 /// A transaction for which the signature has been verified. Created by
 /// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
@@ -542,7 +553,8 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
+            committed_hash: Arc::new(OnceCell::new()),
+            valid_signature: Arc::new(OnceCell::new()),
         }
     }
 
@@ -557,7 +569,8 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
+            committed_hash: Arc::new(OnceCell::new()),
+            valid_signature: Arc::new(OnceCell::new()),
         }
     }
 
@@ -716,6 +729,12 @@ impl SignedTransaction {
     pub fn verify_signature(&self) -> Result<()> {
         self.authenticator.verify(&self.raw_txn)?;
         Ok(())
+    }
+
+    pub fn is_valid_signature(&self) -> bool {
+        *self
+            .valid_signature
+            .get_or_init(|| self.verify_signature().is_ok())
     }
 
     pub fn contains_duplicate_signers(&self) -> bool {

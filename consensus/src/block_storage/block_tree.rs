@@ -276,11 +276,18 @@ impl BlockTree {
                     );
                     break;
                 }
+                if current_block.is_genesis_block() {
+                    info!(
+                        "Break at genesis block: {}, for window of block: {}",
+                        current_block, block
+                    );
+                    break;
+                }
                 info!(
                     "Added block: {}, for window of block: {}",
                     current_block, block
                 );
-                window.push(current_block.clone());
+                window.push(parent_block);
             } else {
                 info!(
                     "Visiting block: {} was not found, parent of block: {}, for window of block: {}",

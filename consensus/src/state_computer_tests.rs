@@ -171,6 +171,7 @@ async fn schedule_compute_should_discover_validator_txns() {
         ]),
         None,
     );
+    let pipelined_block = PipelinedBlock::new_with_window(block, OrderedBlockWindow::empty());
 
     let epoch_state = EpochState::empty();
 
@@ -186,7 +187,7 @@ async fn schedule_compute_should_discover_validator_txns() {
     // Ensure the dummy executor has received the txns.
     let _ = execution_policy
         .schedule_compute(
-            &block,
+            &pipelined_block,
             &OrderedBlockWindow::empty(),
             HashValue::zero(),
             None,

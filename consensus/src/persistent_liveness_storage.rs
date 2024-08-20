@@ -41,6 +41,11 @@ pub trait PersistentLivenessStorage: Send + Sync {
     /// Construct data that can be recovered from ledger
     fn recover_from_ledger(&self) -> LedgerRecoveryData;
 
+    fn recover_from_ledger_with_ledger_info(
+        &self,
+        latest_ledger_info: LedgerInfoWithSignatures,
+    ) -> LedgerRecoveryData;
+
     /// Construct necessary data to start consensus.
     fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData;
 
@@ -86,11 +91,18 @@ impl Debug for RootInfo {
 #[derive(Clone)]
 pub struct LedgerRecoveryData {
     storage_ledger: LedgerInfoWithSignatures,
+    latest_epoch_ending_ledger: LedgerInfoWithSignatures,
 }
 
 impl LedgerRecoveryData {
-    pub fn new(storage_ledger: LedgerInfoWithSignatures) -> Self {
-        LedgerRecoveryData { storage_ledger }
+    pub fn new(
+        storage_ledger: LedgerInfoWithSignatures,
+        latest_epoch_ending_ledger: LedgerInfoWithSignatures,
+    ) -> Self {
+        LedgerRecoveryData {
+            storage_ledger,
+            latest_epoch_ending_ledger,
+        }
     }
 
     pub fn committed_round(&self) -> Round {
@@ -113,20 +125,24 @@ impl LedgerRecoveryData {
             self.storage_ledger
         );
 
+        // We always generate the virtual genesis block,
+        // as block window could extend to the beginning of the epoch.
+        let genesis = Block::make_genesis_block_from_ledger_info(
+            self.latest_epoch_ending_ledger.ledger_info(),
+        );
+        let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
+            self.latest_epoch_ending_ledger.ledger_info(),
+            genesis.id(),
+        );
+        let genesis_ledger_info = genesis_qc.ledger_info().clone();
+        let genesis_id = genesis.id();
+        blocks.push(genesis);
+        quorum_certs.push(genesis_qc);
+
         // We start from the block that storage's latest ledger info, if storage has end-epoch
-        // LedgerInfo, we generate the virtual genesis block
+        // LedgerInfo, we use info from the  virtual genesis block
         let (latest_commit_id, latest_ledger_info_sig) =
             if self.storage_ledger.ledger_info().ends_epoch() {
-                let genesis =
-                    Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
-                let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
-                    self.storage_ledger.ledger_info(),
-                    genesis.id(),
-                );
-                let genesis_ledger_info = genesis_qc.ledger_info().clone();
-                let genesis_id = genesis.id();
-                blocks.push(genesis);
-                quorum_certs.push(genesis_qc);
                 (genesis_id, genesis_ledger_info)
             } else {
                 (
@@ -434,10 +450,45 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .aptos_db
             .get_latest_ledger_info()
             .expect("Failed to get latest ledger info.");
-        LedgerRecoveryData::new(latest_ledger_info)
+        self.recover_from_ledger_with_ledger_info(latest_ledger_info)
+    }
+
+    fn recover_from_ledger_with_ledger_info(
+        &self,
+        latest_ledger_info: LedgerInfoWithSignatures,
+    ) -> LedgerRecoveryData {
+        if latest_ledger_info.ledger_info().ends_epoch() {
+            return LedgerRecoveryData::new(latest_ledger_info.clone(), latest_ledger_info);
+        }
+
+        info!(
+            "Recover from ledger info: {}",
+            latest_ledger_info.ledger_info()
+        );
+        let latest_epoch_change_proof: EpochChangeProof = self
+            .aptos_db
+            .get_epoch_ending_ledger_infos(
+                latest_ledger_info.ledger_info().next_block_epoch() - 1,
+                latest_ledger_info.ledger_info().next_block_epoch(),
+            )
+            .expect("Failed to get latest epoch ending ledger info.");
+        assert_eq!(
+            latest_epoch_change_proof.ledger_info_with_sigs.len(),
+            1,
+            "Expected exactly one epoch ending ledger info, found {}",
+            latest_epoch_change_proof.ledger_info_with_sigs.len()
+        );
+        let latest_epoch_ending_ledger_info = latest_epoch_change_proof
+            .ledger_info_with_sigs
+            .first()
+            .expect("Expected exactly one epoch ending ledger info.")
+            .clone();
+        LedgerRecoveryData::new(latest_ledger_info, latest_epoch_ending_ledger_info)
     }
 
     fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData {
+        // TODO: during consensus recovery, set committed transactions for any blocks in the window
+        // TODO: where it is missing. at this point aptos_db should be up to date.
         info!("Start consensus recovery.");
         let raw_data = self
             .db
@@ -467,6 +518,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             qc_repr.concat()
         );
         // find the block corresponding to storage latest ledger info
+        let ledger_recovery_data = self.recover_from_ledger();
         let latest_ledger_info = self
             .aptos_db
             .get_latest_ledger_info()
@@ -475,7 +527,6 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .aptos_db
             .get_accumulator_summary(latest_ledger_info.ledger_info().version())
             .expect("Failed to get accumulator summary.");
-        let ledger_recovery_data = LedgerRecoveryData::new(latest_ledger_info);
 
         match RecoveryData::new(
             last_vote,

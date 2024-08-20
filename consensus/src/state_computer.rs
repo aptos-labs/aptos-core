@@ -155,7 +155,7 @@ impl StateComputer for ExecutionProxy {
     async fn schedule_compute(
         &self,
         // The block to be executed.
-        block: &Block,
+        block: &PipelinedBlock,
         block_window: &OrderedBlockWindow,
         // The parent block id.
         parent_block_id: HashValue,
@@ -194,9 +194,11 @@ impl StateComputer for ExecutionProxy {
 
         let timestamp = block.timestamp_usecs();
         let metadata = if is_randomness_enabled {
-            block.new_metadata_with_randomness(&validators, randomness)
+            block
+                .block()
+                .new_metadata_with_randomness(&validators, randomness)
         } else {
-            block.new_block_metadata(&validators).into()
+            block.block().new_block_metadata(&validators).into()
         };
 
         let pipeline_entry_time = Instant::now();

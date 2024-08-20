@@ -13,7 +13,6 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_types::{
-    block::Block,
     pipeline_execution_result::PipelineExecutionResult,
     pipelined_block::{OrderedBlockWindow, PipelinedBlock},
 };
@@ -109,7 +108,7 @@ impl RandomComputeResultStateComputer {
 impl StateComputer for RandomComputeResultStateComputer {
     async fn schedule_compute(
         &self,
-        _block: &Block,
+        _block: &PipelinedBlock,
         _block_window: &OrderedBlockWindow,
         parent_block_id: HashValue,
         _randomness: Option<Randomness>,

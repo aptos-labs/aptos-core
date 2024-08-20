@@ -33,11 +33,11 @@ use std::{
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct OrderedBlockWindow {
-    blocks: Vec<Block>,
+    blocks: Vec<Arc<PipelinedBlock>>,
 }
 
 impl OrderedBlockWindow {
-    pub fn new(blocks: Vec<Block>) -> Self {
+    pub fn new(blocks: Vec<Arc<PipelinedBlock>>) -> Self {
         Self { blocks }
     }
 
@@ -45,7 +45,12 @@ impl OrderedBlockWindow {
         Self { blocks: vec![] }
     }
 
-    pub fn blocks(&self) -> &Vec<Block> {
+    // TODO: clone required?
+    pub fn blocks(&self) -> Vec<Block> {
+        self.blocks.iter().map(|b| b.block().clone()).collect()
+    }
+
+    pub fn pipelined_blocks(&self) -> &Vec<Arc<PipelinedBlock>> {
         &self.blocks
     }
 }
@@ -71,6 +76,7 @@ pub struct PipelinedBlock {
     execution_summary: Arc<OnceCell<ExecutionSummary>>,
     #[derivative(PartialEq = "ignore")]
     pre_commit_fut: Arc<Mutex<Option<BoxFuture<'static, ExecutorResult<()>>>>>,
+    committed_transactions: Arc<OnceCell<Vec<HashValue>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -122,6 +128,12 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
 
+        info!(
+            "Deserialized PipelinedBlock: ({}, {}) {}",
+            block.epoch(),
+            block.round(),
+            block.id()
+        );
         let block = PipelinedBlock {
             block,
             block_window,
@@ -131,6 +143,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
             pre_commit_fut: Arc::new(Mutex::new(None)),
+            committed_transactions: Arc::new(OnceCell::new()),
         };
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -257,10 +270,11 @@ impl PipelinedBlock {
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
             pre_commit_fut: Arc::new(Mutex::new(None)),
+            committed_transactions: Arc::new(OnceCell::new()),
         }
     }
 
-    pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
+    pub fn new_with_window(block: Block, window: OrderedBlockWindow) -> Self {
         info!(
             "New Ordered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
             block.id(),
@@ -278,6 +292,30 @@ impl PipelinedBlock {
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
             pre_commit_fut: Arc::new(Mutex::new(None)),
+            committed_transactions: Arc::new(OnceCell::new()),
+        }
+    }
+
+    pub fn new_recovered(block: Block, committed_transactions: Vec<HashValue>) -> Self {
+        info!(
+            "New Recovered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}, committed_txns: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block.payload().map_or(0, |p| p.len()),
+            committed_transactions.len(),
+        );
+        Self {
+            block,
+            block_window: OrderedBlockWindow::empty(),
+            input_transactions: vec![],
+            state_compute_result: StateComputeResult::new_dummy(),
+            randomness: OnceCell::new(),
+            pipeline_insertion_time: OnceCell::new(),
+            execution_summary: Arc::new(OnceCell::new()),
+            pre_commit_fut: Arc::new(Mutex::new(None)),
+            committed_transactions: Arc::new(OnceCell::with_value(committed_transactions)),
         }
     }
 
@@ -383,6 +421,49 @@ impl PipelinedBlock {
 
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
+    }
+
+    pub fn set_committed_transactions(&self, committed_transactions: Vec<HashValue>) {
+        info!(
+            "Setting committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        self.committed_transactions
+            .set(committed_transactions)
+            .unwrap();
+    }
+
+    pub fn cancel_committed_transactions(&self) {
+        info!(
+            "Cancelled committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        self.committed_transactions.set(vec![]).unwrap();
+    }
+
+    pub fn wait_for_committed_transactions(&self) -> &[HashValue] {
+        if self.block().is_genesis_block() || self.block.is_nil_block() {
+            return &[];
+        }
+
+        info!(
+            "Waiting for committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        let result = self.committed_transactions.wait();
+        info!(
+            "Done waiting for committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        result
     }
 }
 
