@@ -11,6 +11,7 @@ use crate::{
 use anyhow::bail;
 use aptos_consensus_types::{
     block::Block,
+    common::Round,
     pipelined_block::{OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeoutCertificate,
@@ -444,21 +445,34 @@ impl BlockTree {
         self.window_root_id = root_id;
     }
 
-    pub(super) fn find_window_root(&self, commit_root_id: HashValue) -> HashValue {
+    pub(super) fn find_window_root(
+        &self,
+        commit_round: Round,
+        commit_root_id: HashValue,
+    ) -> HashValue {
+        let window_start_round = commit_round
+            .saturating_add(1)
+            .saturating_sub(self.window_size as u64);
+        let mut window_start_id = HashValue::zero();
         let mut curr_block_id = commit_root_id;
+        info!("Start at commit_root_id: {}", curr_block_id);
         while let Some(block) = self.get_block(&curr_block_id) {
-            if block.round()
-                <= self
-                    .commit_root()
-                    .round()
-                    .saturating_add(1)
-                    .saturating_sub(self.window_size as u64)
-            {
+            if block.round() < window_start_round {
+                window_start_id = curr_block_id;
                 break;
             }
+
+            window_start_id = curr_block_id;
             curr_block_id = block.parent_id();
         }
-        curr_block_id
+        // TODO: panic or bail?
+        assert_ne!(
+            window_start_id,
+            HashValue::zero(),
+            "Window start block not found"
+        );
+
+        window_start_id
     }
 
     /// Process the data returned by the prune_tree, they're separated because caller might
@@ -560,7 +574,7 @@ impl BlockTree {
             block_id = block_to_commit.id(),
         );
 
-        let window_root_id = self.find_window_root(block_to_commit.id());
+        let window_root_id = self.find_window_root(committed_round, block_to_commit.id());
         info!("Updating to window_root_id: {}", window_root_id);
         let ids_to_remove = self.find_blocks_to_prune(window_root_id);
         info!("Pruning blocks: {:?}", ids_to_remove);
