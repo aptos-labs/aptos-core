@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: unexpected token
-   ┌─ tests/checking/dotdot/assign.move:11:6
+   ┌─ tests/checking/dotdot/assign0.move:11:6
    │
 11 │         S1(..) = x;
    │            ^^
