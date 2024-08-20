@@ -111,23 +111,15 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                 debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 if let Some((_, fut)) = execution_futures.remove(&block.id()) {
                     results.push(fut.await)
+                } else {
+                    return Err(ExecutorError::internal_err(format!(
+                        "Failed to find compute result for block {}",
+                        block.id()
+                    )));
                 }
             }
             let results = itertools::zip_eq(ordered_blocks, results)
                 .map(|(block, res)| {
-                    // if let Some((_, fut)) = execution_futures.remove(&block.id()) {
-                    //     let PipelineExecutionResult {
-                    //         input_txns,
-                    //         result,
-                    //         execution_time,
-                    //     } = res?;
-                    //     Ok(block.set_execution_result(input_txns, result, execution_time))
-                    // } else {
-                    //     return Err(ExecutorError::internal_err(format!(
-                    //         "Failed to find compute result for block {}",
-                    //         block.id()
-                    //     )));
-                    // }
                     let PipelineExecutionResult {
                         input_txns,
                         result,

@@ -521,29 +521,29 @@ impl ProposalGenerator {
             let parent_block_id = self.block_store.commit_root().id();
             match self.execution_proxy.get_state_view(block_id, parent_block_id) {
                 Ok(stale_state_view) => {
-                    // let vm = AptosVM::new(&stale_state_view);
-                    // let resolver = vm.as_move_resolver(&stale_state_view);
+                    let vm = AptosVM::new(&stale_state_view);
+                    let resolver = vm.as_move_resolver(&stale_state_view);
 
-                    // info!("[ProposalGeneration] init vm took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
+                    info!("[ProposalGeneration] init vm took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
 
-                    // for txn in all_txns.iter() {
-                    //     if vm.require_randomness(&resolver, txn, 0) {
-                    //         require_randomness = true;
-                    //         break;
-                    //     }
-                    // }
+                    for txn in all_txns.iter() {
+                        if vm.require_randomness(&resolver, txn, 0) {
+                            require_randomness = true;
+                            break;
+                        }
+                    }
 
-                    let num_txns = all_txns.len();
-                    require_randomness = RAND_CHECKER_POOL.install(|| {
-                        all_txns
-                            .into_par_iter()
-                            .with_min_len(optimal_min_len(num_txns, 32))
-                            .any(|txn| {
-                                let vm = AptosVM::new(&stale_state_view);
-                                let resolver = vm.as_move_resolver(&stale_state_view);
-                                vm.require_randomness(&resolver, &txn, 0)
-                            })
-                    });
+                    // let num_txns = all_txns.len();
+                    // require_randomness = RAND_CHECKER_POOL.install(|| {
+                    //     all_txns
+                    //         .into_par_iter()
+                    //         .with_min_len(optimal_min_len(num_txns, 32))
+                    //         .any(|txn| {
+                    //             let vm = AptosVM::new(&stale_state_view);
+                    //             let resolver = vm.as_move_resolver(&stale_state_view);
+                    //             vm.require_randomness(&resolver, &txn, 0)
+                    //         })
+                    // });
                 },
                 Err(e) => {
                     error!("[ProposalGenerator] Failed to get stale state view of block {}, error: {:?}", parent_block_id, e);
