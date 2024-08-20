@@ -335,7 +335,7 @@ fn function_acquires(context: &mut Context, acqs: &[E::ModuleAccess]) {
 //**************************************************************************************************
 
 fn struct_def(context: &mut Context, sdef: &E::StructDefinition) {
-    if let E::StructFields::Defined(fields) = &sdef.fields {
+    if let E::StructLayout::Singleton(fields, _) = &sdef.layout {
         fields.iter().for_each(|(_, _, (_, bt))| type_(context, bt));
     }
 }
@@ -345,7 +345,7 @@ fn struct_def(context: &mut Context, sdef: &E::StructDefinition) {
 //**************************************************************************************************
 
 fn module_access(context: &mut Context, sp!(loc, ma_): &E::ModuleAccess) {
-    if let E::ModuleAccess_::ModuleAccess(m, _) = ma_ {
+    if let E::ModuleAccess_::ModuleAccess(m, _, _) = ma_ {
         context.add_usage(*m, *loc)
     }
 }
@@ -460,6 +460,17 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             exp(context, ef)
         },
 
+        E::Match(ed, arms) => {
+            exp(context, ed);
+            for arm in arms {
+                lvalues(context, &arm.value.0.value);
+                if let Some(e) = &arm.value.1 {
+                    exp(context, e)
+                }
+                exp(context, &arm.value.2)
+            }
+        },
+
         E::BinopExp(e1, _, e2) | E::Mutate(e1, e2) | E::While(e1, e2) | E::Index(e1, e2) => {
             exp(context, e1);
             exp(context, e2)
@@ -488,6 +499,10 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         E::Cast(e, ty) | E::Annotate(e, ty) => {
             exp(context, e);
             type_(context, ty)
+        },
+        E::Test(e, tys) => {
+            exp(context, e);
+            tys.iter().for_each(|ty| type_(context, ty))
         },
 
         E::Lambda(ll, e) => {
@@ -568,7 +583,7 @@ fn spec_block_member(context: &mut Context, sp!(_, sbm_): &E::SpecBlockMember) {
                         Some(E::PragmaValue::Literal(_)) => (),
                         Some(E::PragmaValue::Ident(maccess)) => match &maccess.value {
                             E::ModuleAccess_::Name(_) => (),
-                            E::ModuleAccess_::ModuleAccess(mident, _) => {
+                            E::ModuleAccess_::ModuleAccess(mident, _, _) => {
                                 context.add_friend(*mident, maccess.loc);
                             },
                         },

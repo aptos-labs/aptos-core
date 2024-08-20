@@ -62,45 +62,29 @@ fun Test::test0() {
      var $t1: bool
      # abort state: {}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t1 := false
      # abort state: {}
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t0 := pack Test::Impotent($t1)
      # abort state: {}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: label L0
      # abort state: {}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   3: goto 2
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
   4: label L1
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
   5: return ()
 }
 
@@ -112,93 +96,67 @@ fun Test::test1() {
      var $t2: bool
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t1 := false
      # abort state: {returns}
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t0 := pack Test::Impotent($t1)
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: label L0
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   3: $t2 := true
      # abort state: {returns}
      # live vars: $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   4: if ($t2) goto 5 else goto 7
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   5: label L2
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   6: goto 9
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   7: label L3
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   8: goto 11
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   9: label L4
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
  10: goto 2
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
  11: label L1
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
  12: return ()
 }
@@ -211,93 +169,59 @@ fun Test::test2($t0: bool) {
      var $t3: u64
      # abort state: {aborts}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t2 := false
      # abort state: {aborts}
      # live vars: $t0, $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t1 := pack Test::Impotent($t2)
      # abort state: {aborts}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: if ($t0) goto 3 else goto 8
      # abort state: {}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   3: label L0
      # abort state: {}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   4: label L3
      # abort state: {}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   5: goto 4
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
   6: label L4
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
   7: goto 11
      # abort state: {aborts}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   8: label L1
      # abort state: {aborts}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   9: $t3 := 42
      # abort state: {aborts}
      # live vars: $t3
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
  10: abort($t3)
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
  11: label L2
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
  12: return ()
 }

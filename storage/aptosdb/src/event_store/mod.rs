@@ -8,10 +8,7 @@
 
 use super::AptosDB;
 use crate::{
-    schema::{
-        event::EventSchema, event_accumulator::EventAccumulatorSchema,
-        event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
-    },
+    schema::{event::EventSchema, event_accumulator::EventAccumulatorSchema},
     utils::iterators::EventsByVersionIter,
 };
 use anyhow::anyhow;
@@ -19,6 +16,9 @@ use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
+};
+use aptos_db_indexer_schemas::schema::{
+    event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
 };
 use aptos_schemadb::{iterator::SchemaIterator, schema::ValueCodec, ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};

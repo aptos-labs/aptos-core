@@ -14,6 +14,7 @@ abstract-domain-derive = { path = "../move-model/bytecode/abstract_domain_derive
 anyhow = { workspace = true }
 bcs = { workspace = true }
 move-binary-format = { path = "../move-binary-format" }
+move-borrow-graph = { path = "../move-borrow-graph" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
 move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 move-command-line-common = { path = "../move-command-line-common" }

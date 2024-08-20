@@ -22,7 +22,7 @@ module 0x8675309::M {
         } else {
           false
         };
-        M::R{ dummy_field: _ }: M::R = if cond {
+        M::R{ dummy_field: _ } = if cond {
           pack M::R(false)
         } else {
           pack M::R(false)
@@ -45,7 +45,7 @@ module 0x8675309::M {
         } else {
           Tuple(1, true)
         };
-        (_, _, _, M::R{ dummy_field: _ }): (u64, u64, &u64, M::R) = if cond {
+        (_: u64, _: u64, _: &u64, M::R{ dummy_field: _ }): (u64, u64, &u64, M::R) = if cond {
           Tuple(0, 0, Borrow(Immutable)(0), pack M::R(false))
         } else {
           Tuple(1, 1, Borrow(Immutable)(1), pack M::R(false))

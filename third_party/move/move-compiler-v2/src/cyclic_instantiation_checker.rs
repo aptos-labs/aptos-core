@@ -187,7 +187,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
                     "`{}` calls `{}` {}",
                     self.display_call(caller, root),
                     self.display_call(callee, root),
-                    callee_loc.display_line_only(self.mod_env.env)
+                    callee_loc.display_file_name_and_line(self.mod_env.env)
                 )
             })
             .collect_vec();
@@ -197,7 +197,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
             "`{}` calls `{}` {}",
             self.display_call(caller, root),
             self.display_call(&callee, root),
-            callee_loc.display_line_only(self.mod_env.env)
+            callee_loc.display_file_name_and_line(self.mod_env.env)
         ));
         let root_loc = self
             .mod_env

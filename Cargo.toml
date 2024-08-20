@@ -41,7 +41,6 @@ members = [
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
     "aptos-move/vm-genesis",
-    "aptos-move/writeset-transaction-generator",
     "aptos-node",
     "aptos-utils",
     "config",
@@ -117,12 +116,13 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
+    "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
     "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark",
-    "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
+    "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
@@ -134,6 +134,7 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
+    "experimental/storage/hexy",
     "experimental/storage/layered-map",
     "keyless/circuit",
     "keyless/common",
@@ -172,14 +173,12 @@ members = [
     "storage/db-tool",
     "storage/executable-store",
     "storage/indexer",
+    "storage/indexer_schemas",
     "storage/jellyfish-merkle",
     "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
     "storage/storage-interface",
-    "testsuite/dos/http_test",
-    "testsuite/dos/listener",
-    "testsuite/dos/sender",
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/fuzzer",
@@ -196,6 +195,7 @@ members = [
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
+    "third_party/move/move-bytecode-spec",
     "third_party/move/move-bytecode-verifier",
     "third_party/move/move-bytecode-verifier/bytecode-verifier-tests",
     "third_party/move/move-bytecode-verifier/fuzz",
@@ -246,6 +246,7 @@ members = [
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
+    "tools/compute-module-expansion-size",
     "types",
     "vm-validator",
 ]
@@ -314,6 +315,7 @@ aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
+aptos-db-indexer-schemas = { path = "storage/indexer_schemas" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-dkg = { path = "crates/aptos-dkg" }
@@ -327,6 +329,7 @@ aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-experimental-hexy = { path = "experimental/storage/hexy" }
 aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
@@ -353,6 +356,7 @@ aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
+aptos-indexer-grpc-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
@@ -428,6 +432,7 @@ aptos-storage-service-notifications = { path = "state-sync/inter-component/stora
 aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
 aptos-system-utils = { path = "crates/aptos-system-utils" }
+aptos-transaction-filter = { path = "ecosystem/indexer-grpc/transaction-filter" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
@@ -449,7 +454,6 @@ aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
-aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
@@ -480,7 +484,7 @@ async-mutex = "1.4.0"
 async-recursion = "1.0.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
-axum = "0.5.16"
+axum = "0.7.5"
 base64 = "0.13.0"
 base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
@@ -534,6 +538,7 @@ datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 derivation-path = "0.2.0"
+derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
 diesel = "2.1"
@@ -567,6 +572,7 @@ fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 file_diff = "1.0.0"
+firestore = "0.43.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
 flexi_logger = "0.27.4"
@@ -604,7 +610,7 @@ indoc = "1.0.6"
 inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
-itertools = "0.12"
+itertools = "0.13"
 jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",
@@ -619,7 +625,7 @@ libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
 lru = "0.7.5"
-lz4 = "1.24.0"
+lz4 = "1.25.0"
 maplit = "1.0.2"
 merlin = "3"
 memory-stats = "1.0.0"
@@ -638,7 +644,6 @@ num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
 num-traits = "0.2.15"
-number_range = "0.3.2"
 once_cell = "1.10.0"
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"
@@ -660,9 +665,10 @@ percent-encoding = "2.1.0"
 petgraph = "0.5.1"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
-poem = { version = "=1.3.59", features = ["anyhow", "rustls"] }
-poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
-poem-openapi-derive = "=2.0.11"
+# We're using git deps until https://github.com/poem-web/poem/pull/829 gets formally released.
+poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["anyhow", "rustls"] }
+poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["swagger-ui", "url"] }
+poem-openapi-derive = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b" }
 poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
 pretty = "0.10.0"
@@ -696,6 +702,7 @@ reqwest = { version = "0.11.11", features = [
     "blocking",
     "cookies",
     "json",
+    "multipart",
     "stream",
 ] }
 reqwest-middleware = "0.2.0"
@@ -798,6 +805,7 @@ z3tracer = "0.8.0"
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
+move-bytecode-spec = { path = "third_party/move/move-bytecode-spec" }
 move-bytecode-verifier = { path = "third_party/move/move-bytecode-verifier" }
 move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
 move-cli = { path = "third_party/move/tools/move-cli" }

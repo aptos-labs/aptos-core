@@ -89,7 +89,6 @@ impl ConsensusObserverNetworkEvents {
                 };
                 Some(network_message)
             },
-            _ => None, // We don't care about connection events
         }
     }
 }
@@ -110,6 +109,14 @@ pub struct ResponseSender {
 impl ResponseSender {
     pub fn new(response_tx: oneshot::Sender<Result<Bytes, RpcError>>) -> Self {
         Self { response_tx }
+    }
+
+    #[cfg(test)]
+    /// Creates a new response sender for testing purposes.
+    pub fn new_for_test() -> Self {
+        Self {
+            response_tx: oneshot::channel().0,
+        }
     }
 
     /// Send the response to the pending RPC request

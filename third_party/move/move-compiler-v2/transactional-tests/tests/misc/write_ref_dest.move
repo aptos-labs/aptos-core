@@ -20,6 +20,6 @@ module 0x42::m {
 
 }
 
-//# run 0x42::m::test_call --check-runtime-types
+//# run 0x42::m::test_call
 
-//# run 0x42::m::test_assign --check-runtime-types
+//# run 0x42::m::test_assign

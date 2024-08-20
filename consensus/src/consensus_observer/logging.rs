@@ -13,7 +13,6 @@ pub struct LogSchema<'a> {
     error: Option<&'a Error>,
     event: Option<LogEvent>,
     message: Option<&'a str>,
-    message_content: Option<&'a str>,
     message_type: Option<&'a str>,
     #[schema(display)]
     peer: Option<&'a PeerNetworkId>,
@@ -28,7 +27,6 @@ impl<'a> LogSchema<'a> {
             error: None,
             event: None,
             message: None,
-            message_content: None,
             message_type: None,
             peer: None,
             request_id: None,
@@ -41,6 +39,7 @@ impl<'a> LogSchema<'a> {
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
     ConsensusObserver,
+    ConsensusPublisher,
     GetDownstreamPeers,
     SendDirectSendMessage,
     SendRpcRequest,
@@ -53,5 +52,6 @@ pub enum LogEvent {
     NetworkError,
     SendDirectSendMessage,
     SendRpcRequest,
+    Subscription,
     UnexpectedError,
 }

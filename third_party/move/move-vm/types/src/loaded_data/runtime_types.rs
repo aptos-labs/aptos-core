@@ -10,6 +10,7 @@ use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Ability, AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
+        VariantIndex,
     },
 };
 #[cfg(test)]
@@ -128,8 +129,7 @@ impl DepthFormula {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
     pub idx: StructNameIndex,
-    pub field_tys: Vec<Type>,
-    pub field_names: Vec<Identifier>,
+    pub layout: StructLayout,
     pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub ty_params: Vec<StructTypeParameter>,
@@ -137,7 +137,83 @@ pub struct StructType {
     pub module: ModuleId,
 }
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub enum StructLayout {
+    Single(Vec<(Identifier, Type)>),
+    Variants(Vec<(Identifier, Vec<(Identifier, Type)>)>),
+}
+
 impl StructType {
+    /// Get the fields from this struct type. If this is a proper struct, the `variant`
+    /// must be None. Otherwise if its a variant struct, the variant for which the fields
+    /// are requested must be given. For non-matching parameters, the function returns
+    /// an empty list.
+    pub fn fields(&self, variant: Option<VariantIndex>) -> PartialVMResult<&[(Identifier, Type)]> {
+        match (&self.layout, variant) {
+            (StructLayout::Single(fields), None) => Ok(fields.as_slice()),
+            (StructLayout::Variants(variants), Some(variant))
+                if (variant as usize) < variants.len() =>
+            {
+                Ok(variants[variant as usize].1.as_slice())
+            },
+            _ => Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    "inconsistent struct field query: not a variant struct, or variant index out bounds"
+                        .to_string(),
+                ),
+            ),
+        }
+    }
+
+    /// Selects the field information from this struct type at the given offset. Returns
+    /// error if field is not defined.
+    pub fn field_at(
+        &self,
+        variant: Option<VariantIndex>,
+        offset: usize,
+    ) -> PartialVMResult<&(Identifier, Type)> {
+        let slice = self.fields(variant)?;
+        if offset < slice.len() {
+            Ok(&slice[offset])
+        } else {
+            Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "field offset out of bounds -- len {} got {}",
+                        slice.len(),
+                        offset
+                    ),
+                ),
+            )
+        }
+    }
+
+    /// Same as `struct_type.fields(variant_opt).len()`
+    pub fn field_count(&self, variant: Option<VariantIndex>) -> u16 {
+        match (&self.layout, variant) {
+            (StructLayout::Single(fields), None) => fields.len() as u16,
+            (StructLayout::Variants(variants), Some(variant))
+                if (variant as usize) < variants.len() =>
+            {
+                variants[variant as usize].1.len() as u16
+            },
+            _ => 0,
+        }
+    }
+
+    /// Returns a string for the variant for error messages. If this is
+    /// not a type with this variant, returns a string anyway indicating
+    /// its undefined.
+    pub fn variant_name_for_message(&self, variant: VariantIndex) -> String {
+        let variant = variant as usize;
+        match &self.layout {
+            StructLayout::Variants(variants) if variant < variants.len() => {
+                variants[variant].0.to_string()
+            },
+            _ => "<undefined>".to_string(),
+        }
+    }
+
     pub fn ty_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
         self.ty_params.iter().map(|param| &param.constraints)
     }
@@ -174,8 +250,7 @@ impl StructType {
     pub fn for_test() -> StructType {
         Self {
             idx: StructNameIndex(0),
-            field_tys: vec![],
-            field_names: vec![],
+            layout: StructLayout::Single(vec![]),
             phantom_ty_params_mask: SmallBitVec::new(),
             abilities: AbilitySet::EMPTY,
             ty_params: vec![],
@@ -692,36 +767,19 @@ impl fmt::Display for Type {
 /// Controls creation of runtime types, i.e., methods offered by this struct
 /// should be the only way to construct any type.
 #[derive(Clone, Serialize)]
-pub enum TypeBuilder {
-    // Legacy configurations only limits type depth during type substitution. Will
-    // be removed in the nearest future when the new one stabilizes. The enum can
-    // be converted into the struct at that point.
-    Legacy,
-    WithLimits {
-        // Maximum number of nodes a fully-instantiated type has.
-        max_ty_size: u64,
-        // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
-        max_ty_depth: u64,
-    },
+pub struct TypeBuilder {
+    // Maximum number of nodes a fully-instantiated type has.
+    max_ty_size: u64,
+    // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
+    max_ty_depth: u64,
 }
 
 impl TypeBuilder {
-    pub const LEGACY_MAX_TYPE_INSTANTIATION_NODES: u64 = 128;
-    const LEGACY_TYPE_DEPTH_MAX: u64 = 256;
-
-    pub fn is_legacy(&self) -> bool {
-        matches!(self, Self::Legacy)
-    }
-
     pub fn with_limits(max_ty_size: u64, max_ty_depth: u64) -> Self {
-        Self::WithLimits {
+        Self {
             max_ty_size,
             max_ty_depth,
         }
-    }
-
-    pub fn legacy() -> Self {
-        Self::Legacy
     }
 
     #[inline]
@@ -763,58 +821,45 @@ impl TypeBuilder {
     /// Returns an error if the type size or depth are too large.
     #[inline]
     pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
-        if self.is_legacy() {
-            let inner_ty = Box::new(inner_ty.clone());
-            Ok(if is_mut {
-                Type::MutableReference(inner_ty)
-            } else {
-                Type::Reference(inner_ty)
-            })
+        let mut count = 1;
+        let check = |c: &mut u64, d: u64| self.check(c, d);
+        let inner_ty = self
+            .clone_impl(inner_ty, &mut count, 2, check)
+            .map_err(|e| {
+                e.append_message_with_separator(
+                    '.',
+                    format!(
+                        "Failed to create a (mutable: {}) reference type with inner type {}",
+                        is_mut, inner_ty
+                    ),
+                )
+            })?;
+        let inner_ty = Box::new(inner_ty);
+        Ok(if is_mut {
+            Type::MutableReference(inner_ty)
         } else {
-            let mut count = 1;
-            let check = |c: &mut u64, d: u64| self.check(c, d);
-            let inner_ty = self
-                .clone_impl(inner_ty, &mut count, 2, check)
-                .map_err(|e| {
-                    e.append_message_with_separator(
-                        '.',
-                        format!(
-                            "Failed to create a (mutable: {}) reference type with inner type {}",
-                            is_mut, inner_ty
-                        ),
-                    )
-                })?;
-            let inner_ty = Box::new(inner_ty);
-            Ok(if is_mut {
-                Type::MutableReference(inner_ty)
-            } else {
-                Type::Reference(inner_ty)
-            })
-        }
+            Type::Reference(inner_ty)
+        })
     }
 
     /// Creates a vector type with the given element type, returning an error
     /// if the type size or depth are too large.
     #[inline]
     pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
-        if self.is_legacy() {
-            Ok(Type::Vector(TriompheArc::new(elem_ty.clone())))
-        } else {
-            let mut count = 1;
-            let check = |c: &mut u64, d: u64| self.check(c, d);
-            let elem_ty = self
-                .clone_impl(elem_ty, &mut count, 2, check)
-                .map_err(|e| {
-                    e.append_message_with_separator(
-                        '.',
-                        format!(
-                            "Failed to create a vector type with element type {}",
-                            elem_ty
-                        ),
-                    )
-                })?;
-            Ok(Type::Vector(TriompheArc::new(elem_ty)))
-        }
+        let mut count = 1;
+        let check = |c: &mut u64, d: u64| self.check(c, d);
+        let elem_ty = self
+            .clone_impl(elem_ty, &mut count, 2, check)
+            .map_err(|e| {
+                e.append_message_with_separator(
+                    '.',
+                    format!(
+                        "Failed to create a vector type with element type {}",
+                        elem_ty
+                    ),
+                )
+            })?;
+        Ok(Type::Vector(TriompheArc::new(elem_ty)))
     }
 
     #[inline]
@@ -831,80 +876,37 @@ impl TypeBuilder {
         ty_params: &[Type],
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
-        if self.is_legacy() {
-            Ok(Type::StructInstantiation {
-                idx: struct_ty.idx,
-                ty_args: triomphe::Arc::new(
-                    ty_params
-                        .iter()
-                        .map(|ty| self.create_ty_with_subst(ty, ty_args))
-                        .collect::<PartialVMResult<Vec<_>>>()?,
-                ),
-                ability: AbilityInfo::generic_struct(
-                    struct_ty.abilities,
-                    struct_ty.phantom_ty_params_mask.clone(),
-                ),
-            })
-        } else {
-            // We cannot call substitution API directly because we have to take into
-            // account struct type itself. We simply shift count and depth by 1 and
-            // call inner APIs, to save extra cloning.
-            let mut count = 1;
-            let check = |c: &mut u64, d: u64| self.check(c, d);
+        // We cannot call substitution API directly because we have to take into
+        // account struct type itself. We simply shift count and depth by 1 and
+        // call inner APIs, to save extra cloning.
+        let mut count = 1;
+        let check = |c: &mut u64, d: u64| self.check(c, d);
 
-            let ty_args = ty_params
-                .iter()
-                .map(|ty| {
-                    // Note that depth is 2 because we accounted for the parent struct type.
-                    self.subst_impl(ty, ty_args, &mut count, 2, check)
-                        .map_err(|e| {
-                            e.append_message_with_separator(
-                                '.',
-                                format!(
-                                    "Failed to instantiate a type {} with type arguments {:?}",
-                                    ty, ty_args
-                                ),
-                            )
-                        })
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?;
-
-            Ok(Type::StructInstantiation {
-                idx: struct_ty.idx,
-                ty_args: triomphe::Arc::new(ty_args),
-                ability: AbilityInfo::generic_struct(
-                    struct_ty.abilities,
-                    struct_ty.phantom_ty_params_mask.clone(),
-                ),
+        let ty_args = ty_params
+            .iter()
+            .map(|ty| {
+                // Note that depth is 2 because we accounted for the parent struct type.
+                self.subst_impl(ty, ty_args, &mut count, 2, check)
+                    .map_err(|e| {
+                        e.append_message_with_separator(
+                            '.',
+                            format!(
+                                "Failed to instantiate a type {} with type arguments {:?}",
+                                ty, ty_args
+                            ),
+                        )
+                    })
             })
-        }
-    }
+            .collect::<PartialVMResult<Vec<_>>>()?;
 
-    // This has to be a separate method because there are two different legacy instantiation
-    // constructions, where one uses the legacy checks and the other does not.
-    pub fn create_struct_instantiation_ty_with_legacy_check(
-        &self,
-        struct_ty: &StructType,
-        ty_params: &[Type],
-        ty_args: &[Type],
-    ) -> PartialVMResult<Type> {
-        if self.is_legacy() {
-            Ok(Type::StructInstantiation {
-                idx: struct_ty.idx,
-                ty_args: triomphe::Arc::new(
-                    ty_params
-                        .iter()
-                        .map(|ty| self.create_ty_with_subst_with_legacy_check(ty, ty_args))
-                        .collect::<PartialVMResult<_>>()?,
-                ),
-                ability: AbilityInfo::generic_struct(
-                    struct_ty.abilities,
-                    struct_ty.phantom_ty_params_mask.clone(),
-                ),
-            })
-        } else {
-            self.create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
-        }
+        Ok(Type::StructInstantiation {
+            idx: struct_ty.idx,
+            ty_args: triomphe::Arc::new(ty_args),
+            ability: AbilityInfo::generic_struct(
+                struct_ty.abilities,
+                struct_ty.phantom_ty_params_mask.clone(),
+            ),
+        })
     }
 
     /// Creates a type for a Move constant. Note that constant types can be
@@ -913,17 +915,13 @@ impl TypeBuilder {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 1)
             .map_err(|e| {
-                if self.is_legacy() {
-                    e
-                } else {
-                    e.append_message_with_separator(
-                        '.',
-                        format!(
-                            "Failed to construct a type for constant token {:?}",
-                            const_tok
-                        ),
-                    )
-                }
+                e.append_message_with_separator(
+                    '.',
+                    format!(
+                        "Failed to construct a type for constant token {:?}",
+                        const_tok
+                    ),
+                )
             })
     }
 
@@ -939,96 +937,26 @@ impl TypeBuilder {
     /// Clones the given type, at the same time instantiating all its type parameters.
     pub fn create_ty_with_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
         let mut count = 0;
-
-        let check = |c: &mut u64, d: u64| {
-            if self.is_legacy() {
-                self.legacy_check_in_subst(c, d)
-            } else {
-                self.check(c, d)
-            }
-        };
-
+        let check = |c: &mut u64, d: u64| self.check(c, d);
         self.subst_impl(ty, ty_args, &mut count, 1, check)
     }
 
-    // This has to be a separate method because legacy type construction used both:
-    //  1) depth check only,
-    //  2) no checks
-    // in different places. When legacy implementation is removed, this function can
-    // be removed in favour of "normal" type substitution.
-    pub fn create_ty_with_subst_with_legacy_check(
-        &self,
-        ty: &Type,
-        ty_args: &[Type],
-    ) -> PartialVMResult<Type> {
-        if self.is_legacy() {
-            match ty {
-                Type::MutableReference(_) | Type::Reference(_) | Type::Vector(_) => {
-                    if legacy_count_type_nodes(ty) > Self::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
-                        return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-                    }
-                },
-                Type::StructInstantiation {
-                    ty_args: struct_inst,
-                    ..
-                } => {
-                    let mut sum_nodes = 1u64;
-                    for ty in ty_args.iter().chain(struct_inst.iter()) {
-                        sum_nodes = sum_nodes.saturating_add(legacy_count_type_nodes(ty));
-                        if sum_nodes > Self::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
-                            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-                        }
-                    }
-                },
-                Type::Address
-                | Type::Bool
-                | Type::Signer
-                | Type::Struct { .. }
-                | Type::TyParam(_)
-                | Type::U8
-                | Type::U16
-                | Type::U32
-                | Type::U64
-                | Type::U128
-                | Type::U256 => (),
-            };
-        }
-        self.create_ty_with_subst(ty, ty_args)
-    }
-
-    fn legacy_check_in_subst(&self, _count: &mut u64, depth: u64) -> PartialVMResult<()> {
-        if depth > Self::LEGACY_TYPE_DEPTH_MAX {
-            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
-        }
-        Ok(())
-    }
-
     fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
-        match self {
-            Self::WithLimits {
-                max_ty_size,
-                max_ty_depth,
-            } => {
-                if *count >= *max_ty_size {
-                    return Err(
-                        PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                            "Type size is larger than maximum {}",
-                            *max_ty_size
-                        )),
-                    );
-                }
-                if depth > *max_ty_depth {
-                    return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED)
-                        .with_message(format!(
-                            "Type depth is larger than maximum {}",
-                            *max_ty_depth
-                        )));
-                }
-            },
-
-            // No checks in legacy implementation. Depth check for substitution
-            // is handled separately.
-            Self::Legacy => {},
+        if *count >= self.max_ty_size {
+            return Err(
+                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+                    "Type size is larger than maximum {}",
+                    self.max_ty_size
+                )),
+            );
+        }
+        if depth > self.max_ty_depth {
+            return Err(
+                PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED).with_message(format!(
+                    "Type depth is larger than maximum {}",
+                    self.max_ty_depth
+                )),
+            );
         }
         Ok(())
     }
@@ -1059,29 +987,19 @@ impl TypeBuilder {
             },
 
             S::Struct(_) | S::StructInstantiation(_, _) => {
-                let msg = if self.is_legacy() {
-                    "Unable to load const type signature".to_string()
-                } else {
-                    "Struct constants are not supported".to_string()
-                };
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg),
+                        .with_message("Struct constants are not supported".to_string()),
                 );
             },
 
             tok => {
-                let msg = if self.is_legacy() {
-                    "Unable to load const type signature".to_string()
-                } else {
-                    format!(
-                        "{:?} is not allowed or is not a meaningful token for a constant",
-                        tok
-                    )
-                };
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg),
+                        .with_message(format!(
+                            "{:?} is not allowed or is not a meaningful token for a constant",
+                            tok
+                        )),
                 );
             },
         })
@@ -1102,25 +1020,14 @@ impl TypeBuilder {
             ty,
             |idx, c, d| match ty_args.get(idx as usize) {
                 Some(ty) => self.clone_impl(ty, c, d, check),
-                None => {
-                    let msg = if self.is_legacy() {
-                        format!(
-                            "type substitution failed: index out of bounds -- len {} got {}",
-                            ty_args.len(),
-                            idx
-                        )
-                    } else {
-                        format!(
-                            "Type substitution failed: index {} is out of bounds for {} type arguments",
-                            idx,
-                            ty_args.len()
-                        )
-                    };
-                    Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(msg),
-                    )
-                },
+                None => Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                        "Type substitution failed: index {} is out of bounds for {} type arguments",
+                        idx,
+                        ty_args.len()
+                    )),
+                ),
             },
             count,
             depth,
@@ -1293,31 +1200,6 @@ impl TypeBuilder {
     }
 }
 
-pub fn legacy_count_type_nodes(ty: &Type) -> u64 {
-    let mut todo = vec![ty];
-    let mut result = 0;
-    while let Some(ty) = todo.pop() {
-        match ty {
-            Type::Vector(ty) => {
-                result += 1;
-                todo.push(ty);
-            },
-            Type::Reference(ty) | Type::MutableReference(ty) => {
-                result += 1;
-                todo.push(ty);
-            },
-            Type::StructInstantiation { ty_args, .. } => {
-                result += 1;
-                todo.extend(ty_args.iter())
-            },
-            _ => {
-                result += 1;
-            },
-        }
-    }
-    result
-}
-
 #[cfg(test)]
 mod unit_tests {
     use super::*;
@@ -1465,28 +1347,14 @@ mod unit_tests {
 
         // Limits are irrelevant here.
         let ty_builder = TypeBuilder::with_limits(1, 1);
-        let legacy_ty_builder = TypeBuilder::legacy();
 
         assert_eq!(ty_builder.create_u8_ty(), U8);
-        assert_eq!(legacy_ty_builder.create_u8_ty(), U8);
-
         assert_eq!(ty_builder.create_u16_ty(), U16);
-        assert_eq!(legacy_ty_builder.create_u16_ty(), U16);
-
         assert_eq!(ty_builder.create_u32_ty(), U32);
-        assert_eq!(legacy_ty_builder.create_u32_ty(), U32);
-
         assert_eq!(ty_builder.create_u64_ty(), U64);
-        assert_eq!(legacy_ty_builder.create_u64_ty(), U64);
-
         assert_eq!(ty_builder.create_u128_ty(), U128);
-        assert_eq!(legacy_ty_builder.create_u128_ty(), U128);
-
         assert_eq!(ty_builder.create_u256_ty(), U256);
-        assert_eq!(legacy_ty_builder.create_u256_ty(), U256);
-
         assert_eq!(ty_builder.create_bool_ty(), Bool);
-        assert_eq!(legacy_ty_builder.create_bool_ty(), Bool);
     }
 
     #[test]
@@ -1496,9 +1364,6 @@ mod unit_tests {
 
         // Limits are not relevant here.
         let struct_ty = TypeBuilder::with_limits(1, 1).create_struct_ty(idx, ability_info.clone());
-        let legacy_struct_ty = TypeBuilder::legacy().create_struct_ty(idx, ability_info);
-
-        assert_eq!(&struct_ty, &legacy_struct_ty);
         assert_matches!(struct_ty, Type::Struct { .. });
     }
 
@@ -1512,12 +1377,7 @@ mod unit_tests {
         // Should succeed, type size limit is 5, and we have 5 nodes.
         let ty_builder = TypeBuilder::with_limits(5, 100);
         let ty_args = [Bool, Vector(TriompheArc::new(Bool))];
-        let ty =
-            assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
-        let legacy_ty =
-            assert_ok!(TypeBuilder::legacy()
-                .create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
-        assert_eq!(ty, legacy_ty);
+        assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
         // Should fail, we have size of 6 now.
         let ty_args = [
@@ -1533,12 +1393,7 @@ mod unit_tests {
         let nested_vec = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
         let ty_args = vec![Bool, nested_vec.clone()];
         let ty_builder = TypeBuilder::with_limits(100, 4);
-        let ty =
-            assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
-        let legacy_ty =
-            assert_ok!(TypeBuilder::legacy()
-                .create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
-        assert_eq!(ty, legacy_ty);
+        assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
         // Should fail, we have depth of 5 now.
         let ty_params = vec![Bool, Vector(TriompheArc::new(nested_vec))];
@@ -1552,26 +1407,19 @@ mod unit_tests {
     fn test_create_vec_ty() {
         let max_ty_depth = 5;
         let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
-        let legacy_ty_builder = TypeBuilder::legacy();
 
-        // Make sure the new type builder creates vector types in the same way as the legacy once.
         let mut depth = 1;
         let mut ty = Type::Bool;
         while depth < max_ty_depth {
-            let legacy_ty = assert_ok!(legacy_ty_builder.create_vec_ty(&ty));
             ty = assert_ok!(ty_builder.create_vec_ty(&ty));
-
-            assert_eq!(&ty, &legacy_ty);
             assert_matches!(ty, Type::Vector(_));
             depth += 1;
         }
         assert_eq!(depth, max_ty_depth);
 
-        // New type builder fails on exceeding the depth, but not the legacy one.
+        // Type creation fails on exceeding the depth.
         let err = assert_err!(ty_builder.create_vec_ty(&ty));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
-        let legacy_ty = assert_ok!(legacy_ty_builder.create_vec_ty(&ty));
-        assert_matches!(legacy_ty, Type::Vector(_));
 
         // The checks are always ordered: first number of nodes, then depth. Using
         // a type builder with smaller than depth size limit must return a different
@@ -1586,15 +1434,11 @@ mod unit_tests {
     fn test_create_ref_ty() {
         let max_ty_depth = 5;
         let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
-        let legacy_ty_builder = TypeBuilder::legacy();
 
         let mut depth = 1;
         let mut ty = Type::Bool;
         while depth < max_ty_depth {
-            let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, false));
             ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
-
-            assert_eq!(&ty, &legacy_ty);
             assert_matches!(ty, Type::Reference(_));
             depth += 1;
         }
@@ -1602,8 +1446,6 @@ mod unit_tests {
 
         let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
-        let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, false));
-        assert_matches!(legacy_ty, Type::Reference(_));
 
         let max_ty_size = 5;
         let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
@@ -1615,15 +1457,11 @@ mod unit_tests {
     fn test_create_mut_ref_ty() {
         let max_ty_depth = 5;
         let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
-        let legacy_ty_builder = TypeBuilder::legacy();
 
         let mut depth = 1;
         let mut ty = Type::Bool;
         while depth < max_ty_depth {
-            let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, true));
             ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
-
-            assert_eq!(&ty, &legacy_ty);
             assert_matches!(ty, Type::MutableReference(_));
             depth += 1;
         }
@@ -1631,8 +1469,6 @@ mod unit_tests {
 
         let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
-        let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, true));
-        assert_matches!(legacy_ty, Type::MutableReference(_));
 
         let max_ty_size = 5;
         let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
@@ -1647,53 +1483,16 @@ mod unit_tests {
 
         let max_ty_depth = 5;
         let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
-        let legacy_ty_builder = TypeBuilder::legacy();
 
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U8)), U8);
-        assert_eq!(assert_ok!(legacy_ty_builder.create_constant_ty(&S::U8)), U8);
-
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U16)), U16);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U16)),
-            U16
-        );
-
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U32)), U32);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U32)),
-            U32
-        );
-
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U64)), U64);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U64)),
-            U64
-        );
-
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U128)), U128);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U128)),
-            U128
-        );
-
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U256)), U256);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U256)),
-            U256
-        );
-
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::Bool)), Bool);
         assert_eq!(
-            assert_ok!(legacy_ty_builder.create_constant_ty(&S::Bool)),
-            Bool
-        );
-
-        assert_eq!(
             assert_ok!(ty_builder.create_constant_ty(&S::Address)),
-            Address
-        );
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_constant_ty(&S::Address)),
             Address
         );
 
@@ -1703,18 +1502,12 @@ mod unit_tests {
         for depth in [max_ty_depth - 1, max_ty_depth] {
             let (expected_ty, vec_tok, _) = nested_vec_for_test(depth);
             let ty = assert_ok!(ty_builder.create_constant_ty(&vec_tok));
-            let legacy_ty = assert_ok!(legacy_ty_builder.create_constant_ty(&vec_tok));
-            assert_eq!(&ty, &legacy_ty);
             assert_eq!(&ty, &expected_ty);
         }
 
-        let (expected_legacy_ty, vec_tok, _) = nested_vec_for_test(max_ty_depth + 1);
+        let (_, vec_tok, _) = nested_vec_for_test(max_ty_depth + 1);
         let err = assert_err!(ty_builder.create_constant_ty(&vec_tok));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_constant_ty(&vec_tok)),
-            expected_legacy_ty
-        );
 
         let max_ty_size = 5;
         let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
@@ -1722,8 +1515,6 @@ mod unit_tests {
         for size in [max_ty_size - 1, max_ty_size] {
             let (expected_ty, vec_tok, _) = nested_vec_for_test(size);
             let ty = assert_ok!(ty_builder.create_constant_ty(&vec_tok));
-            let legacy_ty = assert_ok!(legacy_ty_builder.create_constant_ty(&vec_tok));
-            assert_eq!(&ty, &legacy_ty);
             assert_eq!(&ty, &expected_ty);
         }
 
@@ -1735,26 +1526,20 @@ mod unit_tests {
 
         let struct_tok = S::Struct(StructHandleIndex::new(0));
         assert_err!(ty_builder.create_constant_ty(&struct_tok));
-        assert_err!(legacy_ty_builder.create_constant_ty(&struct_tok));
 
         let struct_instantiation_tok = S::StructInstantiation(StructHandleIndex::new(0), vec![]);
         assert_err!(ty_builder.create_constant_ty(&struct_instantiation_tok));
-        assert_err!(legacy_ty_builder.create_constant_ty(&struct_instantiation_tok));
 
         assert_err!(ty_builder.create_constant_ty(&S::Signer));
-        assert_err!(legacy_ty_builder.create_constant_ty(&S::Signer));
 
         let ref_tok = S::Reference(Box::new(S::U8));
         assert_err!(ty_builder.create_constant_ty(&ref_tok));
-        assert_err!(legacy_ty_builder.create_constant_ty(&ref_tok));
 
         let mut_ref_tok = S::Reference(Box::new(S::U8));
         assert_err!(ty_builder.create_constant_ty(&mut_ref_tok));
-        assert_err!(legacy_ty_builder.create_constant_ty(&mut_ref_tok));
 
         let ty_param_tok = S::TypeParameter(0);
         assert_err!(ty_builder.create_constant_ty(&ty_param_tok));
-        assert_err!(legacy_ty_builder.create_constant_ty(&ty_param_tok));
     }
 
     #[test]
@@ -1765,74 +1550,35 @@ mod unit_tests {
         let max_ty_size = 11;
         let max_ty_depth = 5;
         let ty_builder = TypeBuilder::with_limits(max_ty_size, max_ty_depth);
-        let legacy_ty_builder = TypeBuilder::legacy();
 
         let no_op = |_: &StructTag| unreachable!("Should not be called");
 
         // Primitive types.
 
         assert_eq!(assert_ok!(ty_builder.create_ty(&T::U8, no_op)), U8);
-        assert_eq!(assert_ok!(legacy_ty_builder.create_ty(&T::U8, no_op)), U8);
-
         assert_eq!(assert_ok!(ty_builder.create_ty(&T::U16, no_op)), U16);
-        assert_eq!(assert_ok!(legacy_ty_builder.create_ty(&T::U16, no_op)), U16);
-
         assert_eq!(assert_ok!(ty_builder.create_ty(&T::U32, no_op)), U32);
-        assert_eq!(assert_ok!(legacy_ty_builder.create_ty(&T::U32, no_op)), U32);
-
         assert_eq!(assert_ok!(ty_builder.create_ty(&T::U64, no_op)), U64);
-        assert_eq!(assert_ok!(legacy_ty_builder.create_ty(&T::U64, no_op)), U64);
-
         assert_eq!(assert_ok!(ty_builder.create_ty(&T::U128, no_op)), U128);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_ty(&T::U128, no_op)),
-            U128
-        );
-
         assert_eq!(assert_ok!(ty_builder.create_ty(&T::U256, no_op)), U256);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_ty(&T::U256, no_op)),
-            U256
-        );
-
         assert_eq!(assert_ok!(ty_builder.create_ty(&T::Bool, no_op)), Bool);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_ty(&T::Bool, no_op)),
-            Bool
-        );
-
         assert_eq!(
             assert_ok!(ty_builder.create_ty(&T::Address, no_op)),
             Address
         );
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_ty(&T::Address, no_op)),
-            Address
-        );
-
         assert_eq!(assert_ok!(ty_builder.create_ty(&T::Signer, no_op)), Signer);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_ty(&T::Signer, no_op)),
-            Signer
-        );
 
         // Vectors.
 
         for depth in [max_ty_depth - 1, max_ty_depth] {
             let (expected_ty, _, vec_tag) = nested_vec_for_test(depth);
             let ty = assert_ok!(ty_builder.create_ty(&vec_tag, no_op));
-            let legacy_ty = assert_ok!(legacy_ty_builder.create_ty(&vec_tag, no_op));
-            assert_eq!(&ty, &legacy_ty);
             assert_eq!(&ty, &expected_ty);
         }
 
-        let (expected_legacy_ty, _, vec_tag) = nested_vec_for_test(max_ty_depth + 1);
+        let (_, _, vec_tag) = nested_vec_for_test(max_ty_depth + 1);
         let err = assert_err!(ty_builder.create_ty(&vec_tag, no_op));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
-        assert_eq!(
-            assert_ok!(legacy_ty_builder.create_ty(&vec_tag, no_op)),
-            expected_legacy_ty
-        );
 
         let max_ty_size = 5;
         let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
@@ -1840,8 +1586,6 @@ mod unit_tests {
         for size in [max_ty_size - 1, max_ty_size] {
             let (expected_ty, _, vec_tag) = nested_vec_for_test(size);
             let ty = assert_ok!(ty_builder.create_ty(&vec_tag, no_op));
-            let legacy_ty = assert_ok!(legacy_ty_builder.create_ty(&vec_tag, no_op));
-            assert_eq!(&ty, &legacy_ty);
             assert_eq!(&ty, &expected_ty);
         }
 

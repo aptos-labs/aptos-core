@@ -14,10 +14,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    move_vm::MoveVM,
-};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -100,16 +97,25 @@ fn instantiation_err() {
                 ],
             }),
         }],
+        // TODO(#13806): followup on whether we need specific tests for variants here
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
 
     move_bytecode_verifier::verify_module(&cm).expect("verify failed");
-    let vm = MoveVM::new(vec![]).unwrap();
+
+    let vm_config = VMConfig {
+        paranoid_type_checks: false,
+        ..VMConfig::default()
+    };
+    let vm = MoveVM::new_with_config(vec![], vm_config);
 
     let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);
     let mut mod_bytes = vec![];
     cm.serialize(&mut mod_bytes).unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     session
         .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
@@ -117,7 +123,6 @@ fn instantiation_err() {
 
     let mut ty_arg = TypeTag::U128;
     for _ in 0..4 {
-        // ty_arg = TypeTag::Vector(Box::new(ty_arg));
         ty_arg = TypeTag::Struct(Box::new(StructTag {
             address: addr,
             module: Identifier::new("m").unwrap(),
@@ -127,18 +132,12 @@ fn instantiation_err() {
     }
 
     let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
-    assert!(res.is_ok());
-    let function = res.unwrap();
-
-    let err = session.execute_entry_function(
-        function,
-        Vec::<Vec<u8>>::new(),
-        &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
+    assert!(
+        res.is_err(),
+        "Instantiation must fail at load time when converting from type tag to type "
     );
-    assert!(err.is_err(), "Instantiation must fail at runtime");
     assert_eq!(
-        err.err().unwrap().major_status(),
-        StatusCode::VERIFICATION_ERROR
+        res.err().unwrap().major_status(),
+        StatusCode::TOO_MANY_TYPE_NODES
     );
 }

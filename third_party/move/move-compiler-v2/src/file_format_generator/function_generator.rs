@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    experiments::Experiment,
     file_format_generator::{
         module_generator::{ModuleContext, ModuleGenerator, SOURCE_MAP_OK},
-        MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
+        peephole_optimizer, Options, MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
     },
     pipeline::livevar_analysis_processor::LiveVarAnnotation,
 };
@@ -16,6 +17,7 @@ use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, Loc, NodeId, Parameter, QualifiedId, StructId, TypeParameter},
+    symbol::Symbol,
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
@@ -135,15 +137,27 @@ impl<'a> FunctionGenerator<'a> {
                 code: vec![],
             };
             let target = ctx.targets.get_target(&fun_env, &FunctionVariant::Baseline);
-            let code = fun_gen.gen_code(&FunctionContext {
+            let mut code = fun_gen.gen_code(&FunctionContext {
                 module: ctx.clone(),
                 fun: target,
                 loc: loc.clone(),
                 type_parameters: fun_env.get_type_parameters(),
                 def_idx,
             });
-            // Write the spec block table back to the environment.
-            if !fun_gen.spec_blocks.is_empty() {
+            if fun_gen.spec_blocks.is_empty() {
+                // Currently, peephole optimizations require that there are no inline spec blocks.
+                // This is to ensure that spec-related data structures do not refer to code
+                // offsets which could be changed by the peephole optimizer.
+                let options = ctx
+                    .env
+                    .get_extension::<Options>()
+                    .expect("Options is available");
+                if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
+                    // TODO: fix source mapping (#14167)
+                    peephole_optimizer::run(&mut code);
+                }
+            } else {
+                // Write the spec block table back to the environment.
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
             }
             (fun_gen.gen, Some(code))
@@ -327,22 +341,25 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Balance the stack such that it exactly contains the `result` temps and nothing else. This
-    /// is used for instructions like `return` or `abort` which terminate a block und must leave
-    /// the stack empty at end.
+    /// is used for instructions like `branch`, `return` or `abort` which terminate a block
+    /// and must leave the stack empty at end.
     fn balance_stack_end_of_block(
         &mut self,
         ctx: &BytecodeContext,
         result: impl AsRef<[TempIndex]>,
     ) {
         let result = result.as_ref();
-        // First ensure the arguments are on the stack.
-        self.abstract_push_args(ctx, result, None);
-        if self.stack.len() != result.len() {
-            // Unfortunately, there is more on the stack than needed.
-            // Need to flush and push again so the stack is empty after return.
+        // If the stack contains already exactly the result and none of the temps is used after,
+        // nothing to do.
+        let stack_ready = self.stack == result
+            && self
+                .stack
+                .iter()
+                .all(|temp| !ctx.is_alive_after(*temp, &[], false));
+        if !stack_ready {
+            // Flush the stack and push the result
             self.abstract_flush_stack_before(ctx, 0);
-            self.abstract_push_args(ctx, result.as_ref(), None);
-            assert_eq!(self.stack.len(), result.len())
+            self.abstract_push_args(ctx, result, None);
         }
     }
 
@@ -357,7 +374,7 @@ impl<'a> FunctionGenerator<'a> {
             .insert(offset);
     }
 
-    /// Sets the resolution of a lable to the current code offset.
+    /// Sets the resolution of a label to the current code offset.
     fn define_label(&mut self, label: Label) {
         let offset = self.code.len() as FF::CodeOffset;
         self.label_info.entry(label).or_default().resolution = Some(offset)
@@ -388,6 +405,18 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::PackGeneric,
                 );
             },
+            Operation::PackVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::PackVariant,
+                    FF::Bytecode::PackVariantGeneric,
+                );
+            },
             Operation::Unpack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -397,6 +426,30 @@ impl<'a> FunctionGenerator<'a> {
                     source,
                     FF::Bytecode::Unpack,
                     FF::Bytecode::UnpackGeneric,
+                );
+            },
+            Operation::UnpackVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::UnpackVariant,
+                    FF::Bytecode::UnpackVariantGeneric,
+                );
+            },
+            Operation::TestVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::TestVariant,
+                    FF::Bytecode::TestVariantGeneric,
                 );
             },
             Operation::MoveTo(mid, sid, inst) => {
@@ -447,6 +500,18 @@ impl<'a> FunctionGenerator<'a> {
                     dest,
                     mid.qualified(*sid),
                     inst.clone(),
+                    None,
+                    *offset,
+                    source,
+                );
+            },
+            Operation::BorrowVariantField(mid, sid, variants, inst, offset) => {
+                self.gen_borrow_field(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    inst.clone(),
+                    Some(variants),
                     *offset,
                     source,
                 );
@@ -631,6 +696,39 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_push_result(ctx, dest);
     }
 
+    fn gen_struct_variant_oper(
+        &mut self,
+        ctx: &BytecodeContext,
+        dest: &[TempIndex],
+        id: QualifiedId<StructId>,
+        variant: Symbol,
+        inst: &[Type],
+        source: &[TempIndex],
+        mk_simple: impl FnOnce(FF::StructVariantHandleIndex) -> FF::Bytecode,
+        mk_generic: impl FnOnce(FF::StructVariantInstantiationIndex) -> FF::Bytecode,
+    ) {
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source, None);
+        let struct_env = &fun_ctx.module.env.get_struct(id);
+        if inst.is_empty() {
+            let idx =
+                self.gen
+                    .struct_variant_index(&fun_ctx.module, &fun_ctx.loc, struct_env, variant);
+            self.emit(mk_simple(idx))
+        } else {
+            let idx = self.gen.struct_variant_inst_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                struct_env,
+                variant,
+                inst.to_vec(),
+            );
+            self.emit(mk_generic(idx))
+        }
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
     /// Generate code for the borrow-field instruction.
     fn gen_borrow_field(
         &mut self,
@@ -638,31 +736,65 @@ impl<'a> FunctionGenerator<'a> {
         dest: &[TempIndex],
         id: QualifiedId<StructId>,
         inst: Vec<Type>,
+        variants: Option<&[Symbol]>,
         offset: usize,
         source: &[TempIndex],
     ) {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source, None);
         let struct_env = &fun_ctx.module.env.get_struct(id);
-        let field_env = &struct_env.get_field_by_offset(offset);
         let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
-        if inst.is_empty() {
-            let idx = self
-                .gen
-                .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowField(idx))
+
+        if let Some(variants) = variants {
+            assert!(!variants.is_empty());
+            let field_env =
+                &struct_env.get_field_by_offset_optional_variant(Some(variants[0]), offset);
+            if inst.is_empty() {
+                let idx = self.gen.variant_field_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                );
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowVariantField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowVariantField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowField(idx))
+                let idx = self.gen.variant_field_inst_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                    inst,
+                );
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowVariantFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowVariantFieldGeneric(idx))
+                }
             }
         } else {
-            let idx = self
-                .gen
-                .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+            let field_env = &struct_env.get_field_by_offset_optional_variant(None, offset);
+            if inst.is_empty() {
+                let idx = self
+                    .gen
+                    .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                let idx = self
+                    .gen
+                    .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                }
             }
         }
         self.abstract_pop_n(ctx, source.len());
@@ -813,10 +945,13 @@ impl<'a> FunctionGenerator<'a> {
                 None => {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
-                    if fun_ctx.is_copyable(*temp)
-                        && (ctx.is_alive_after(*temp, true)
-                            || temps_to_push[pos + 1..].contains(temp))
-                    {
+                    if ctx.is_alive_after(*temp, &temps_to_push[pos + 1..], true) {
+                        if !fun_ctx.is_copyable(*temp) {
+                            fun_ctx.module.internal_error(
+                                &ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id),
+                                format!("value in `$t{}` expected to be copyable", temp),
+                            )
+                        }
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
                         self.emit(FF::Bytecode::MoveLoc(local));
@@ -852,9 +987,9 @@ impl<'a> FunctionGenerator<'a> {
     /// point are saved to locals. This flushes the stack as deep as needed for this.
     fn save_used_after(&mut self, ctx: &BytecodeContext, temps: &[TempIndex]) {
         let mut stack_to_flush = self.stack.len();
-        for temp in temps {
+        for (i, temp) in temps.iter().enumerate() {
             if let Some(pos) = self.stack.iter().position(|t| t == temp) {
-                if ctx.is_alive_after(*temp, true) {
+                if ctx.is_alive_after(*temp, &temps[i + 1..], true) {
                     // Determine new lowest point to which we need to flush
                     stack_to_flush = std::cmp::min(stack_to_flush, pos);
                 }
@@ -888,10 +1023,12 @@ impl<'a> FunctionGenerator<'a> {
         while self.stack.len() > top {
             let temp = self.stack.pop().unwrap();
             if before && ctx.is_alive_before(temp)
-                || !before && ctx.is_alive_after(temp, false)
+                || !before && ctx.is_alive_after(temp, &[], false)
                 || self.pinned.contains(&temp)
+                || !ctx.fun_ctx.is_droppable(temp)
             {
-                // Only need to save to a local if the temp is still used afterwards
+                // Only need to save to a local if the temp is still used afterwards, is pinned,
+                // or if it is not droppable
                 let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), temp);
                 self.emit(FF::Bytecode::StLoc(local));
             } else {
@@ -992,7 +1129,10 @@ impl<'a> FunctionGenerator<'a> {
 impl<'env> FunctionContext<'env> {
     /// Emits an internal error for this function.
     pub fn internal_error(&self, msg: impl AsRef<str>) {
-        self.module.internal_error(&self.loc, msg)
+        self.module.internal_error(
+            &self.loc,
+            format!("file format generator: {}", msg.as_ref()),
+        )
     }
 
     /// Gets the type of the temporary.
@@ -1009,14 +1149,32 @@ impl<'env> FunctionContext<'env> {
             .type_abilities(self.temp_type(temp), &self.type_parameters)
             .has_ability(FF::Ability::Copy)
     }
+
+    /// Returns true of the given temporary can/should be dropped when flushing the stack.
+    pub fn is_droppable(&self, temp: TempIndex) -> bool {
+        self.module
+            .env
+            .type_abilities(self.temp_type(temp), &self.type_parameters)
+            .has_ability(FF::Ability::Drop)
+    }
 }
 
 impl<'env> BytecodeContext<'env> {
-    /// Determine whether `temp` is alive (used) in the reachable code after this point.
-    /// When `dest_check` is true, we additionally check if `temp` is also written to
-    /// by the current instruction; if it is, then the definition of `temp` being
-    /// considered here is killed, making it not alive after this point.
-    pub fn is_alive_after(&self, temp: TempIndex, dest_check: bool) -> bool {
+    /// Determine whether `temp` is alive (used) in the reachable code after this point,
+    /// or is part of the remaining argument list. When `dest_check` is true, we additionally
+    /// check if `temp` is also written to by the current instruction; if it is, then the
+    /// definition of `temp` being considered here is killed, making it not alive after this point.
+    pub fn is_alive_after(
+        &self,
+        temp: TempIndex,
+        remaining_args: &[TempIndex],
+        dest_check: bool,
+    ) -> bool {
+        if remaining_args.contains(&temp) {
+            // Temp is used another time in the same argument list of this instruction, and
+            // is alive after even if it is a destination
+            return true;
+        }
         let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
         if dest_check && bc.dests().contains(&temp) {
             return false;

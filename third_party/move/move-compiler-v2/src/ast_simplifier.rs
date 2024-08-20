@@ -407,6 +407,28 @@ fn find_possibly_modified_vars(
                     _ => {},
                 };
             },
+            Match(node_id, _, arms) => {
+                match pos {
+                    VisitorPosition::Pre => {
+                        modifying_stack.push(modifying);
+                        modifying = false;
+                    }
+                    VisitorPosition::BeforeMatchBody(idx) => {
+                        let arm = &arms[idx];
+                        visiting_binding.enter_scope();
+                        for (_, sym) in arm.pattern.vars() {
+                            visiting_binding.insert(sym, *node_id);
+                        }
+                    }
+                    VisitorPosition::AfterMatchBody(_) => {
+                        visiting_binding.exit_scope();
+                    }
+                    VisitorPosition::Post => {
+                        modifying = modifying_stack.pop().expect("unbalanced visit 8");
+                    }
+                    _ => {}
+                }
+            }
             IfElse(..) | Sequence(..) => {
                 match pos {
                     VisitorPosition::Pre => {
@@ -887,7 +909,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             trace!(
                 "Starting rewrite_block(id={}, pat={}, opt_binding={}, body={}, pat_type={}, exp_type={}, {})",
                 id.as_usize(),
-                pat.to_string(self.env(), &type_display_context),
+                pat.to_string(self.func_env),
                 exp.display_verbose(self.env()),
                 body.display_verbose(self.env()),
                 pat_type.display(&type_display_context),
@@ -898,7 +920,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             trace!(
                 "Starting rewrite_block(id={}, pat={}, opt_binding={}, body={})",
                 id.as_usize(),
-                pat.to_string(self.env(), &TypeDisplayContext::new(self.env())),
+                pat.to_string(self.func_env),
                 "None",
                 body.display_verbose(self.env())
             );

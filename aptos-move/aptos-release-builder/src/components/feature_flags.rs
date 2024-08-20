@@ -121,6 +121,12 @@ pub enum FeatureFlag {
     DefaultToConcurrentFungibleBalance,
     LimitVMTypeSize,
     AbortIfMultisigPayloadMismatch,
+    DisallowUserNative,
+    AllowSerializedScriptArgs,
+    UseCompatibilityCheckerV2,
+    EnableEnumTypes,
+    EnableResourceAccessControl,
+    RejectUnstableBytecodeForScript,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -316,6 +322,20 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AbortIfMultisigPayloadMismatch => {
                 AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
             },
+            FeatureFlag::DisallowUserNative => AptosFeatureFlag::DISALLOW_USER_NATIVES,
+            FeatureFlag::AllowSerializedScriptArgs => {
+                AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS
+            },
+            FeatureFlag::UseCompatibilityCheckerV2 => {
+                AptosFeatureFlag::USE_COMPATIBILITY_CHECKER_V2
+            },
+            FeatureFlag::EnableEnumTypes => AptosFeatureFlag::ENABLE_ENUM_TYPES,
+            FeatureFlag::EnableResourceAccessControl => {
+                AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL
+            },
+            FeatureFlag::RejectUnstableBytecodeForScript => {
+                AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT
+            },
         }
     }
 }
@@ -439,6 +459,20 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::LIMIT_VM_TYPE_SIZE => FeatureFlag::LimitVMTypeSize,
             AptosFeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH => {
                 FeatureFlag::AbortIfMultisigPayloadMismatch
+            },
+            AptosFeatureFlag::DISALLOW_USER_NATIVES => FeatureFlag::DisallowUserNative,
+            AptosFeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS => {
+                FeatureFlag::AllowSerializedScriptArgs
+            },
+            AptosFeatureFlag::USE_COMPATIBILITY_CHECKER_V2 => {
+                FeatureFlag::UseCompatibilityCheckerV2
+            },
+            AptosFeatureFlag::ENABLE_ENUM_TYPES => FeatureFlag::EnableEnumTypes,
+            AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL => {
+                FeatureFlag::EnableResourceAccessControl
+            },
+            AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT => {
+                FeatureFlag::RejectUnstableBytecodeForScript
             },
         }
     }

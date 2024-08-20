@@ -1,5 +1,4 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]

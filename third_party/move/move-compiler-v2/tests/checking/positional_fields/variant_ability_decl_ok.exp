@@ -1,0 +1,21 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    enum Bar {
+        A {
+            0: #0,
+        }
+        B {
+            0: u8,
+            1: bool,
+        }
+    }
+    enum Foo {
+        A {
+            0: #0,
+        }
+        B {
+            0: u8,
+            1: bool,
+        }
+    }
+} // end 0x42::test

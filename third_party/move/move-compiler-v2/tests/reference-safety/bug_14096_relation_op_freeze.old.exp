@@ -1,0 +1,11 @@
+
+Diagnostics:
+error: mutable reference in local `x` requires exclusive access but is borrowed
+  ┌─ tests/reference-safety/bug_14096_relation_op_freeze.move:5:20
+  │
+5 │         (copy x == copy x);
+  │         -----------^^^^^^-
+  │         ││         │
+  │         ││         requirement enforced here
+  │         │previous freeze
+  │         conflicting reference used here

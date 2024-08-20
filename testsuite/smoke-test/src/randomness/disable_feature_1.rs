@@ -21,7 +21,7 @@ use std::{sync::Arc, time::Duration};
 async fn disable_feature_1() {
     let epoch_duration_secs = 20;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {

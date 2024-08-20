@@ -56,13 +56,11 @@ pub const SEND_AMOUNT: u64 = 1;
 
 #[derive(Debug, Copy, Clone)]
 pub enum TransactionType {
-    NonConflictingCoinTransfer {
-        invalid_transaction_ratio: usize,
-        sender_use_account_pool: bool,
-    },
     CoinTransfer {
         invalid_transaction_ratio: usize,
         sender_use_account_pool: bool,
+        non_conflicting: bool,
+        use_fa_transfer: bool,
     },
     AccountGeneration {
         add_created_accounts_to_pool: bool,
@@ -213,15 +211,15 @@ impl CounterState {
 pub trait RootAccountHandle: Send + Sync {
     async fn approve_funds(&self, amount: u64, reason: &str);
 
-    fn get_root_account(&self) -> &LocalAccount;
+    fn get_root_account(&self) -> Arc<LocalAccount>;
 }
 
-pub struct AlwaysApproveRootAccountHandle<'t> {
-    pub root_account: &'t LocalAccount,
+pub struct AlwaysApproveRootAccountHandle {
+    pub root_account: Arc<LocalAccount>,
 }
 
 #[async_trait::async_trait]
-impl<'t> RootAccountHandle for AlwaysApproveRootAccountHandle<'t> {
+impl RootAccountHandle for AlwaysApproveRootAccountHandle {
     async fn approve_funds(&self, amount: u64, reason: &str) {
         println!(
             "Consuming funds from root/source account: up to {} for {}",
@@ -229,8 +227,8 @@ impl<'t> RootAccountHandle for AlwaysApproveRootAccountHandle<'t> {
         );
     }
 
-    fn get_root_account(&self) -> &LocalAccount {
-        self.root_account
+    fn get_root_account(&self) -> Arc<LocalAccount> {
+        self.root_account.clone()
     }
 }
 
@@ -283,30 +281,23 @@ pub async fn create_txn_generator_creator(
         for (transaction_type, weight) in transaction_mix {
             let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
             {
-                TransactionType::NonConflictingCoinTransfer {
-                    invalid_transaction_ratio,
-                    sender_use_account_pool,
-                } => wrap_accounts_pool(
-                    Box::new(P2PTransactionGeneratorCreator::new(
-                        txn_factory.clone(),
-                        SEND_AMOUNT,
-                        addresses_pool.clone(),
-                        *invalid_transaction_ratio,
-                        SamplingMode::BurnAndRecycle(addresses_pool.len() / 2),
-                    )),
-                    *sender_use_account_pool,
-                    &accounts_pool,
-                ),
                 TransactionType::CoinTransfer {
                     invalid_transaction_ratio,
                     sender_use_account_pool,
+                    non_conflicting,
+                    use_fa_transfer,
                 } => wrap_accounts_pool(
                     Box::new(P2PTransactionGeneratorCreator::new(
                         txn_factory.clone(),
                         SEND_AMOUNT,
                         addresses_pool.clone(),
                         *invalid_transaction_ratio,
-                        SamplingMode::Basic,
+                        *use_fa_transfer,
+                        if *non_conflicting {
+                            SamplingMode::BurnAndRecycle(addresses_pool.len() / 2)
+                        } else {
+                            SamplingMode::Basic
+                        },
                     )),
                     *sender_use_account_pool,
                     &accounts_pool,

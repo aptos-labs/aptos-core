@@ -175,24 +175,11 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// and only `C` and `E` have signatures, we will send `A`, `B` and `C` in the first batch,
     /// then `D` and `E` later in the another batch.
     /// Commits a block and all its ancestors in a batch manner.
-    fn commit_blocks_ext(
-        &self,
-        block_ids: Vec<HashValue>,
-        ledger_info_with_sigs: LedgerInfoWithSignatures,
-        save_state_snapshots: bool,
-    ) -> ExecutorResult<()>;
-
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> ExecutorResult<()> {
-        self.commit_blocks_ext(
-            block_ids,
-            ledger_info_with_sigs,
-            true, /* save_state_snapshots */
-        )
-    }
+    ) -> ExecutorResult<()>;
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
@@ -427,8 +414,11 @@ impl StateComputeResult {
     }
 
     pub fn transactions_to_commit_len(&self) -> usize {
-        // StateCheckpoint/BlockEpilogue is added if there is no reconfiguration
-        self.compute_status_for_input_txns().len()
+        self.compute_status_for_input_txns()
+            .iter()
+            .filter(|status| matches!(status, TransactionStatus::Keep(_)))
+            .count()
+            // StateCheckpoint/BlockEpilogue is added if there is no reconfiguration
             + (if self.has_reconfiguration() { 0 } else { 1 })
     }
 

@@ -291,23 +291,35 @@ impl PendingVotes {
         vote: Vote,
     ) -> VoteReceptionResult {
         let li_digest = vote.ledger_info().hash();
-        let (_, li_with_sig) = self.li_digest_to_votes.get_mut(&li_digest).unwrap();
-        match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
-            // a quorum of signature was reached, a new QC is formed
-            Ok(_) => Self::aggregate_qc_now(validator_verifier, li_with_sig, vote.vote_data()),
+        match self.li_digest_to_votes.get_mut(&li_digest) {
+            Some((_, li_with_sig)) => {
+                match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
+                    // a quorum of signature was reached, a new QC is formed
+                    Ok(_) => {
+                        Self::aggregate_qc_now(validator_verifier, li_with_sig, vote.vote_data())
+                    },
 
-            // not enough votes
-            Err(VerifyError::TooLittleVotingPower { .. }) => {
-                panic!("Delayed QC aggregation should not be triggered if we don't have enough votes to form a QC");
+                    // not enough votes
+                    Err(VerifyError::TooLittleVotingPower { .. }) => {
+                        panic!("Delayed QC aggregation should not be triggered if we don't have enough votes to form a QC");
+                    },
+
+                    // error
+                    Err(error) => {
+                        error!(
+                            "MUST_FIX: vote received could not be added: {}, vote: {}",
+                            error, vote
+                        );
+                        VoteReceptionResult::ErrorAddingVote(error)
+                    },
+                }
             },
-
-            // error
-            Err(error) => {
+            None => {
                 error!(
-                    "MUST_FIX: vote received could not be added: {}, vote: {}",
-                    error, vote
+                    "No LedgerInfoWithSignatures found for the given digest: {}",
+                    li_digest
                 );
-                VoteReceptionResult::ErrorAddingVote(error)
+                VoteReceptionResult::ErrorAddingVote(VerifyError::EmptySignature)
             },
         }
     }

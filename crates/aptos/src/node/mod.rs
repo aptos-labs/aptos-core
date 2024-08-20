@@ -1215,7 +1215,7 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
             || self.analyze_mode == AnalyzeMode::All;
         let print_max_tps =
             self.analyze_mode == AnalyzeMode::MaxTps || self.analyze_mode == AnalyzeMode::All;
-        for epoch_info in epochs {
+        for epoch_info in &epochs {
             let mut epoch_stats =
                 AnalyzeValidators::analyze(&epoch_info.blocks, &epoch_info.validators);
             if !self.pool_addresses.is_empty() {
@@ -1313,6 +1313,8 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
                 stats.keys().max().unwrap()
             );
             AnalyzeValidators::print_network_health_over_time(&stats, &all_validators);
+
+            AnalyzeValidators::print_gap(epochs.iter().flat_map(|epoch| epoch.blocks.iter()));
         }
         Ok(())
     }
@@ -1466,6 +1468,7 @@ pub struct Time {
 
 impl Time {
     pub fn new(time: Duration) -> Self {
+        #[allow(deprecated)]
         let date_time =
             NaiveDateTime::from_timestamp_opt(time.as_secs() as i64, time.subsec_nanos()).unwrap();
         #[allow(deprecated)]

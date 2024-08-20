@@ -13,7 +13,8 @@ use crate::{
     sample,
     sample::SampleRate,
     telemetry_log_writer::{TelemetryLog, TelemetryLogWriter},
-    Event, Filter, Key, Level, LevelFilter, Metadata,
+    Event, Filter, Key, Level, LevelFilter, Metadata, ERROR_LOG_COUNT, INFO_LOG_COUNT,
+    WARN_LOG_COUNT,
 };
 use aptos_infallible::RwLock;
 use backtrace::Backtrace;
@@ -203,8 +204,21 @@ impl LogEntry {
 
         let hostname = HOSTNAME.as_deref();
         let namespace = NAMESPACE.as_deref();
-        let peer_id = aptos_node_identity::peer_id_as_str();
-        let chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
+
+        let peer_id: Option<&str>;
+        let chain_id: Option<u8>;
+
+        #[cfg(node_identity)]
+        {
+            peer_id = aptos_node_identity::peer_id_as_str();
+            chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
+        }
+
+        #[cfg(not(node_identity))]
+        {
+            peer_id = None;
+            chain_id = None;
+        }
 
         let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
             let mut backtrace = Backtrace::new();
@@ -604,6 +618,12 @@ impl LoggerService {
             match event {
                 LoggerServiceEvent::LogEntry(entry) => {
                     PROCESSED_STRUCT_LOG_COUNT.inc();
+                    match entry.metadata.level() {
+                        Level::Error => ERROR_LOG_COUNT.inc(),
+                        Level::Warn => WARN_LOG_COUNT.inc(),
+                        Level::Info => INFO_LOG_COUNT.inc(),
+                        _ => {},
+                    }
 
                     if let Some(printer) = &mut self.printer {
                         if self

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: field `b` not declared in struct `Test::T`
+error: field `b` not declared in `Test::T`
    ┌─ tests/checking/typing/v1-commands/unpack_extra_binding.move:11:23
    │
 11 │         let T { i, x, b: flag } = t;

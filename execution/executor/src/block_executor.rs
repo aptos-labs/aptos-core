@@ -137,17 +137,16 @@ where
             .ledger_update(block_id, parent_block_id, state_checkpoint_output)
     }
 
-    fn commit_blocks_ext(
+    fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-        save_state_snapshots: bool,
     ) -> ExecutorResult<()> {
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .commit_blocks_ext(block_ids, ledger_info_with_sigs, save_state_snapshots)
+            .commit_blocks(block_ids, ledger_info_with_sigs)
     }
 
     fn finish(&self) {
@@ -329,11 +328,10 @@ where
         Ok(state_compute_result)
     }
 
-    fn commit_blocks_ext(
+    fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-        sync_commit: bool,
     ) -> ExecutorResult<()> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
 
@@ -405,7 +403,7 @@ where
                 } else {
                     None
                 },
-                sync_commit,
+                false, // sync_commit
                 result_in_memory_state,
                 // TODO(grao): Avoid this clone.
                 block

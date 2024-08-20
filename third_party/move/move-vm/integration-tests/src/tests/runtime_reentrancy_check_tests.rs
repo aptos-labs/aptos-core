@@ -157,7 +157,7 @@ fn runtime_reentrancy_check() {
     let args: Vec<Vec<u8>> = vec![];
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
 
-    let vm = MoveVM::new(natives).unwrap();
+    let vm = MoveVM::new(natives);
     let mut sess = vm.new_session(&storage);
     let traversal_storage = TraversalStorage::new();
 

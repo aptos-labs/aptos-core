@@ -380,6 +380,16 @@ The URI is over the maximum length
 
 
 
+<a id="0x4_token_ENOT_OWNER"></a>
+
+The calling signer is not the owner
+
+
+<pre><code><b>const</b> <a href="token.md#0x4_token_ENOT_OWNER">ENOT_OWNER</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x4_token_EDESCRIPTION_TOO_LONG"></a>
 
 The description is over the maximum length
@@ -542,7 +552,7 @@ The token name is over the maximum length
     <a href="royalty.md#0x4_royalty">royalty</a>: Option&lt;Royalty&gt;,
     uri: String,
 ) {
-    <b>assert</b>!(<a href="collection.md#0x4_collection_creator">collection::creator</a>(<a href="collection.md#0x4_collection">collection</a>) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="token.md#0x4_token_ENOT_CREATOR">ENOT_CREATOR</a>));
+    <b>assert</b>!(<a href="../../aptos-framework/doc/object.md#0x1_object_owner">object::owner</a>(<a href="collection.md#0x4_collection">collection</a>) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="token.md#0x4_token_ENOT_OWNER">ENOT_OWNER</a>));
 
     <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&name_with_index_suffix)) {
         // Be conservative, <b>as</b> we don't know what length the index will be, and <b>assume</b> worst case (20 chars in MAX_U64)

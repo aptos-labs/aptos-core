@@ -10468,6 +10468,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - ed25519_signature
             example: ed25519_signature
       - $ref: '#/components/schemas/Ed25519Signature'
     AccountSignature_MultiEd25519Signature:
@@ -10478,6 +10480,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multi_ed25519_signature
             example: multi_ed25519_signature
       - $ref: '#/components/schemas/MultiEd25519Signature'
     AccountSignature_MultiKeySignature:
@@ -10488,6 +10492,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multi_key_signature
             example: multi_key_signature
       - $ref: '#/components/schemas/MultiKeySignature'
     AccountSignature_SingleKeySignature:
@@ -10498,6 +10504,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - single_key_signature
             example: single_key_signature
       - $ref: '#/components/schemas/SingleKeySignature'
     Address:
@@ -10725,6 +10733,55 @@ components:
             format: uint32
         timestamp:
           $ref: '#/components/schemas/U64'
+    DKGResultTransaction:
+      type: object
+      required:
+      - version
+      - hash
+      - state_change_hash
+      - event_root_hash
+      - gas_used
+      - success
+      - vm_status
+      - accumulator_root_hash
+      - changes
+      - events
+      - timestamp
+      - dkg_transcript
+      properties:
+        version:
+          $ref: '#/components/schemas/U64'
+        hash:
+          $ref: '#/components/schemas/HashValue'
+        state_change_hash:
+          $ref: '#/components/schemas/HashValue'
+        event_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        state_checkpoint_hash:
+          $ref: '#/components/schemas/HashValue'
+        gas_used:
+          $ref: '#/components/schemas/U64'
+        success:
+          type: boolean
+          description: Whether the transaction was successful
+        vm_status:
+          type: string
+          description: The VM status of the transaction, can tell useful information in a failure
+        accumulator_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        changes:
+          type: array
+          description: Final state of resources changed by the transaction
+          items:
+            $ref: '#/components/schemas/WriteSetChange'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        timestamp:
+          $ref: '#/components/schemas/U64'
+        dkg_transcript:
+          $ref: '#/components/schemas/ExportedDKGTranscript'
     DecodedTableData:
       type: object
       description: Decoded table data
@@ -10919,6 +10976,60 @@ components:
           $ref: '#/components/schemas/U64'
         account_address:
           $ref: '#/components/schemas/Address'
+    ExportedAggregateSignature:
+      type: object
+      description: A more API-friendly representation of the on-chain `aptos_types::aggregate_signature::AggregateSignature`.
+      required:
+      - signer_indices
+      properties:
+        signer_indices:
+          type: array
+          items:
+            type: integer
+            format: uint64
+        sig:
+          $ref: '#/components/schemas/HexEncodedBytes'
+    ExportedDKGTranscript:
+      type: object
+      required:
+      - epoch
+      - author
+      - payload
+      properties:
+        epoch:
+          $ref: '#/components/schemas/U64'
+        author:
+          $ref: '#/components/schemas/Address'
+        payload:
+          $ref: '#/components/schemas/HexEncodedBytes'
+    ExportedProviderJWKs:
+      type: object
+      description: A more API-friendly representation of the on-chain `aptos_types::jwks::ProviderJWKs`.
+      required:
+      - issuer
+      - version
+      - jwks
+      properties:
+        issuer:
+          type: string
+        version:
+          type: integer
+          format: uint64
+        jwks:
+          type: array
+          items:
+            $ref: '#/components/schemas/JWK'
+    ExportedQuorumCertifiedUpdate:
+      type: object
+      description: A more API-friendly representation of the on-chain `aptos_types::jwks::QuorumCertifiedUpdate`.
+      required:
+      - update
+      - multi_sig
+      properties:
+        update:
+          $ref: '#/components/schemas/ExportedProviderJWKs'
+        multi_sig:
+          $ref: '#/components/schemas/ExportedAggregateSignature'
     FeePayerSignature:
       type: object
       description: |-
@@ -10987,6 +11098,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - write_set_payload
             example: write_set_payload
       - $ref: '#/components/schemas/WriteSetPayload'
     GenesisTransaction:
@@ -11110,6 +11223,61 @@ components:
           format: uint8
         signature:
           $ref: '#/components/schemas/Signature'
+    JWK:
+      type: object
+      description: The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.
+      anyOf:
+      - $ref: '#/components/schemas/RSA_JWK'
+      - $ref: '#/components/schemas/UnsupportedJWK'
+    JWKUpdateTransaction:
+      type: object
+      required:
+      - version
+      - hash
+      - state_change_hash
+      - event_root_hash
+      - gas_used
+      - success
+      - vm_status
+      - accumulator_root_hash
+      - changes
+      - events
+      - timestamp
+      - quorum_certified_update
+      properties:
+        version:
+          $ref: '#/components/schemas/U64'
+        hash:
+          $ref: '#/components/schemas/HashValue'
+        state_change_hash:
+          $ref: '#/components/schemas/HashValue'
+        event_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        state_checkpoint_hash:
+          $ref: '#/components/schemas/HashValue'
+        gas_used:
+          $ref: '#/components/schemas/U64'
+        success:
+          type: boolean
+          description: Whether the transaction was successful
+        vm_status:
+          type: string
+          description: The VM status of the transaction, can tell useful information in a failure
+        accumulator_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        changes:
+          type: array
+          description: Final state of resources changed by the transaction
+          items:
+            $ref: '#/components/schemas/WriteSetChange'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        timestamp:
+          $ref: '#/components/schemas/U64'
+        quorum_certified_update:
+          $ref: '#/components/schemas/ExportedQuorumCertifiedUpdate'
     Keyless:
       type: object
       required:
@@ -11251,6 +11419,7 @@ components:
       required:
       - name
       - is_native
+      - is_event
       - abilities
       - generic_type_params
       - fields
@@ -11260,6 +11429,9 @@ components:
         is_native:
           type: boolean
           description: Whether the struct is a native struct of Move
+        is_event:
+          type: boolean
+          description: 'Whether the struct is marked with the #[event] annotation'
         abilities:
           type: array
           description: Abilities associated with the struct
@@ -11519,6 +11691,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - entry_function_payload
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
     PendingTransaction:
@@ -11571,6 +11745,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - ed25519
             example: ed25519
       - $ref: '#/components/schemas/Ed25519'
     PublicKey_Keyless:
@@ -11581,6 +11757,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - keyless
             example: keyless
       - $ref: '#/components/schemas/Keyless'
     PublicKey_Secp256k1Ecdsa:
@@ -11591,6 +11769,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - secp256k1_ecdsa
             example: secp256k1_ecdsa
       - $ref: '#/components/schemas/Secp256k1Ecdsa'
     PublicKey_Secp256r1Ecdsa:
@@ -11601,8 +11781,32 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - secp256r1_ecdsa
             example: secp256r1_ecdsa
       - $ref: '#/components/schemas/Secp256r1Ecdsa'
+    RSA_JWK:
+      type: object
+      description: |-
+        Move type `0x1::jwks::RSA_JWK` in rust.
+        See its doc in Move for more details.
+      required:
+      - kid
+      - kty
+      - alg
+      - e
+      - n
+      properties:
+        kid:
+          type: string
+        kty:
+          type: string
+        alg:
+          type: string
+        e:
+          type: string
+        n:
+          type: string
     RawTableItemRequest:
       type: object
       description: Table Item request for the GetTableItemRaw API
@@ -11681,6 +11885,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - ed25519
             example: ed25519
       - $ref: '#/components/schemas/Ed25519'
     Signature_Keyless:
@@ -11691,6 +11897,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - keyless
             example: keyless
       - $ref: '#/components/schemas/Keyless'
     Signature_Secp256k1Ecdsa:
@@ -11701,6 +11909,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - secp256k1_ecdsa
             example: secp256k1_ecdsa
       - $ref: '#/components/schemas/Secp256k1Ecdsa'
     Signature_WebAuthn:
@@ -11711,6 +11921,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - web_authn
             example: web_authn
       - $ref: '#/components/schemas/WebAuthn'
     SingleKeySignature:
@@ -11858,6 +12070,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - module_bundle_payload
             example: module_bundle_payload
       - $ref: '#/components/schemas/DeprecatedModuleBundlePayload'
     TransactionPayload_EntryFunctionPayload:
@@ -11868,6 +12082,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - entry_function_payload
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
     TransactionPayload_MultisigPayload:
@@ -11878,6 +12094,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multisig_payload
             example: multisig_payload
       - $ref: '#/components/schemas/MultisigPayload'
     TransactionPayload_ScriptPayload:
@@ -11888,6 +12106,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - script_payload
             example: script_payload
       - $ref: '#/components/schemas/ScriptPayload'
     TransactionSignature:
@@ -11915,6 +12135,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - single_sender
             example: single_sender
       - $ref: '#/components/schemas/AccountSignature'
     TransactionSignature_Ed25519Signature:
@@ -11925,6 +12147,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - ed25519_signature
             example: ed25519_signature
       - $ref: '#/components/schemas/Ed25519Signature'
     TransactionSignature_FeePayerSignature:
@@ -11935,6 +12159,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - fee_payer_signature
             example: fee_payer_signature
       - $ref: '#/components/schemas/FeePayerSignature'
     TransactionSignature_MultiAgentSignature:
@@ -11945,6 +12171,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multi_agent_signature
             example: multi_agent_signature
       - $ref: '#/components/schemas/MultiAgentSignature'
     TransactionSignature_MultiEd25519Signature:
@@ -11955,6 +12183,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - multi_ed25519_signature
             example: multi_ed25519_signature
       - $ref: '#/components/schemas/MultiEd25519Signature'
     Transaction_BlockEpilogueTransaction:
@@ -11965,6 +12195,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - block_epilogue_transaction
             example: block_epilogue_transaction
       - $ref: '#/components/schemas/BlockEpilogueTransaction'
     Transaction_BlockMetadataTransaction:
@@ -11975,6 +12207,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - block_metadata_transaction
             example: block_metadata_transaction
       - $ref: '#/components/schemas/BlockMetadataTransaction'
     Transaction_GenesisTransaction:
@@ -11985,6 +12219,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - genesis_transaction
             example: genesis_transaction
       - $ref: '#/components/schemas/GenesisTransaction'
     Transaction_PendingTransaction:
@@ -11995,6 +12231,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - pending_transaction
             example: pending_transaction
       - $ref: '#/components/schemas/PendingTransaction'
     Transaction_StateCheckpointTransaction:
@@ -12005,6 +12243,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - state_checkpoint_transaction
             example: state_checkpoint_transaction
       - $ref: '#/components/schemas/StateCheckpointTransaction'
     Transaction_UserTransaction:
@@ -12015,6 +12255,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - user_transaction
             example: user_transaction
       - $ref: '#/components/schemas/UserTransaction'
     Transaction_ValidatorTransaction:
@@ -12025,6 +12267,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - validator_transaction
             example: validator_transaction
       - $ref: '#/components/schemas/ValidatorTransaction'
     TransactionsBatchSingleSubmissionFailure:
@@ -12081,6 +12325,25 @@ components:
         We represent u64 values as a string to ensure compatibility with languages such
         as JavaScript that do not parse u64s in JSON natively.
       example: '32425224034'
+    UnsupportedJWK:
+      type: object
+      description: |-
+        Move type `0x1::jwks::UnsupportedJWK` in rust.
+        See its doc in Move for more details.
+      required:
+      - id
+      - payload
+      properties:
+        id:
+          type: array
+          items:
+            type: integer
+            format: uint8
+        payload:
+          type: array
+          items:
+            type: integer
+            format: uint8
     UserTransaction:
       type: object
       description: A transaction submitted by a user to change the state of the blockchain
@@ -12151,50 +12414,38 @@ components:
           $ref: '#/components/schemas/U64'
     ValidatorTransaction:
       type: object
-      required:
-      - version
-      - hash
-      - state_change_hash
-      - event_root_hash
-      - gas_used
-      - success
-      - vm_status
-      - accumulator_root_hash
-      - changes
-      - events
-      - timestamp
-      properties:
-        version:
-          $ref: '#/components/schemas/U64'
-        hash:
-          $ref: '#/components/schemas/HashValue'
-        state_change_hash:
-          $ref: '#/components/schemas/HashValue'
-        event_root_hash:
-          $ref: '#/components/schemas/HashValue'
-        state_checkpoint_hash:
-          $ref: '#/components/schemas/HashValue'
-        gas_used:
-          $ref: '#/components/schemas/U64'
-        success:
-          type: boolean
-          description: Whether the transaction was successful
-        vm_status:
-          type: string
-          description: The VM status of the transaction, can tell useful information in a failure
-        accumulator_root_hash:
-          $ref: '#/components/schemas/HashValue'
-        changes:
-          type: array
-          description: Final state of resources changed by the transaction
-          items:
-            $ref: '#/components/schemas/WriteSetChange'
-        events:
-          type: array
-          items:
-            $ref: '#/components/schemas/Event'
-        timestamp:
-          $ref: '#/components/schemas/U64'
+      oneOf:
+      - $ref: '#/components/schemas/ValidatorTransaction_JWKUpdateTransaction'
+      - $ref: '#/components/schemas/ValidatorTransaction_DKGResultTransaction'
+      discriminator:
+        propertyName: validator_transaction_type
+        mapping:
+          observed_jwk_update: '#/components/schemas/ValidatorTransaction_JWKUpdateTransaction'
+          dkg_result: '#/components/schemas/ValidatorTransaction_DKGResultTransaction'
+    ValidatorTransaction_DKGResultTransaction:
+      allOf:
+      - type: object
+        required:
+        - validator_transaction_type
+        properties:
+          validator_transaction_type:
+            type: string
+            enum:
+            - dkg_result
+            example: dkg_result
+      - $ref: '#/components/schemas/DKGResultTransaction'
+    ValidatorTransaction_JWKUpdateTransaction:
+      allOf:
+      - type: object
+        required:
+        - validator_transaction_type
+        properties:
+          validator_transaction_type:
+            type: string
+            enum:
+            - observed_jwk_update
+            example: observed_jwk_update
+      - $ref: '#/components/schemas/JWKUpdateTransaction'
     VersionedEvent:
       type: object
       description: An event from a transaction with a version
@@ -12309,6 +12560,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - delete_module
             example: delete_module
       - $ref: '#/components/schemas/DeleteModule'
     WriteSetChange_DeleteResource:
@@ -12319,6 +12572,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - delete_resource
             example: delete_resource
       - $ref: '#/components/schemas/DeleteResource'
     WriteSetChange_DeleteTableItem:
@@ -12329,6 +12584,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - delete_table_item
             example: delete_table_item
       - $ref: '#/components/schemas/DeleteTableItem'
     WriteSetChange_WriteModule:
@@ -12339,6 +12596,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - write_module
             example: write_module
       - $ref: '#/components/schemas/WriteModule'
     WriteSetChange_WriteResource:
@@ -12349,6 +12608,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - write_resource
             example: write_resource
       - $ref: '#/components/schemas/WriteResource'
     WriteSetChange_WriteTableItem:
@@ -12359,6 +12620,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - write_table_item
             example: write_table_item
       - $ref: '#/components/schemas/WriteTableItem'
     WriteSetPayload:
@@ -12377,6 +12640,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - direct_write_set
             example: direct_write_set
       - $ref: '#/components/schemas/DirectWriteSet'
     WriteSet_ScriptWriteSet:
@@ -12387,6 +12652,8 @@ components:
         properties:
           type:
             type: string
+            enum:
+            - script_write_set
             example: script_write_set
       - $ref: '#/components/schemas/ScriptWriteSet'
     WriteTableItem:

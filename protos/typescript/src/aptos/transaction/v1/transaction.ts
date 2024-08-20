@@ -297,6 +297,7 @@ export function transaction_TransactionTypeToJSON(object: Transaction_Transactio
   }
 }
 
+/** Transaction types. */
 export interface BlockMetadataTransaction {
   id?: string | undefined;
   round?: bigint | undefined;
@@ -315,6 +316,60 @@ export interface StateCheckpointTransaction {
 }
 
 export interface ValidatorTransaction {
+  observedJwkUpdate?: ValidatorTransaction_ObservedJwkUpdate | undefined;
+  dkgUpdate?: ValidatorTransaction_DkgUpdate | undefined;
+  events?: Event[] | undefined;
+}
+
+export interface ValidatorTransaction_ObservedJwkUpdate {
+  quorumCertifiedUpdate?: ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate | undefined;
+}
+
+export interface ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs {
+  issuer?: string | undefined;
+  version?: bigint | undefined;
+  jwks?: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK[] | undefined;
+}
+
+export interface ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK {
+  unsupportedJwk?: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK | undefined;
+  rsa?: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA | undefined;
+}
+
+export interface ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA {
+  kid?: string | undefined;
+  kty?: string | undefined;
+  alg?: string | undefined;
+  e?: string | undefined;
+  n?: string | undefined;
+}
+
+export interface ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK {
+  id?: Uint8Array | undefined;
+  payload?: Uint8Array | undefined;
+}
+
+export interface ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature {
+  signerIndices?:
+    | bigint[]
+    | undefined;
+  /** HexToBytes. */
+  sig?: Uint8Array | undefined;
+}
+
+export interface ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate {
+  update?: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs | undefined;
+  multiSig?: ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature | undefined;
+}
+
+export interface ValidatorTransaction_DkgUpdate {
+  dkgTranscript?: ValidatorTransaction_DkgUpdate_DkgTranscript | undefined;
+}
+
+export interface ValidatorTransaction_DkgUpdate_DkgTranscript {
+  epoch?: bigint | undefined;
+  author?: string | undefined;
+  payload?: Uint8Array | undefined;
 }
 
 export interface BlockEpilogueTransaction {
@@ -739,6 +794,7 @@ export function moveFunction_VisibilityToJSON(object: MoveFunction_Visibility): 
 export interface MoveStruct {
   name?: string | undefined;
   isNative?: boolean | undefined;
+  isEvent?: boolean | undefined;
   abilities?: MoveAbility[] | undefined;
   genericTypeParams?: MoveStructGenericTypeParam[] | undefined;
   fields?: MoveStructField[] | undefined;
@@ -1973,11 +2029,22 @@ export const StateCheckpointTransaction = {
 };
 
 function createBaseValidatorTransaction(): ValidatorTransaction {
-  return {};
+  return { observedJwkUpdate: undefined, dkgUpdate: undefined, events: [] };
 }
 
 export const ValidatorTransaction = {
-  encode(_: ValidatorTransaction, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+  encode(message: ValidatorTransaction, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.observedJwkUpdate !== undefined) {
+      ValidatorTransaction_ObservedJwkUpdate.encode(message.observedJwkUpdate, writer.uint32(10).fork()).ldelim();
+    }
+    if (message.dkgUpdate !== undefined) {
+      ValidatorTransaction_DkgUpdate.encode(message.dkgUpdate, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.events !== undefined && message.events.length !== 0) {
+      for (const v of message.events) {
+        Event.encode(v!, writer.uint32(26).fork()).ldelim();
+      }
+    }
     return writer;
   },
 
@@ -1988,6 +2055,27 @@ export const ValidatorTransaction = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.observedJwkUpdate = ValidatorTransaction_ObservedJwkUpdate.decode(reader, reader.uint32());
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.dkgUpdate = ValidatorTransaction_DkgUpdate.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.events!.push(Event.decode(reader, reader.uint32()));
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2031,20 +2119,1242 @@ export const ValidatorTransaction = {
     }
   },
 
-  fromJSON(_: any): ValidatorTransaction {
-    return {};
+  fromJSON(object: any): ValidatorTransaction {
+    return {
+      observedJwkUpdate: isSet(object.observedJwkUpdate)
+        ? ValidatorTransaction_ObservedJwkUpdate.fromJSON(object.observedJwkUpdate)
+        : undefined,
+      dkgUpdate: isSet(object.dkgUpdate) ? ValidatorTransaction_DkgUpdate.fromJSON(object.dkgUpdate) : undefined,
+      events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
+    };
   },
 
-  toJSON(_: ValidatorTransaction): unknown {
+  toJSON(message: ValidatorTransaction): unknown {
     const obj: any = {};
+    if (message.observedJwkUpdate !== undefined) {
+      obj.observedJwkUpdate = ValidatorTransaction_ObservedJwkUpdate.toJSON(message.observedJwkUpdate);
+    }
+    if (message.dkgUpdate !== undefined) {
+      obj.dkgUpdate = ValidatorTransaction_DkgUpdate.toJSON(message.dkgUpdate);
+    }
+    if (message.events?.length) {
+      obj.events = message.events.map((e) => Event.toJSON(e));
+    }
     return obj;
   },
 
   create(base?: DeepPartial<ValidatorTransaction>): ValidatorTransaction {
     return ValidatorTransaction.fromPartial(base ?? {});
   },
-  fromPartial(_: DeepPartial<ValidatorTransaction>): ValidatorTransaction {
+  fromPartial(object: DeepPartial<ValidatorTransaction>): ValidatorTransaction {
     const message = createBaseValidatorTransaction();
+    message.observedJwkUpdate = (object.observedJwkUpdate !== undefined && object.observedJwkUpdate !== null)
+      ? ValidatorTransaction_ObservedJwkUpdate.fromPartial(object.observedJwkUpdate)
+      : undefined;
+    message.dkgUpdate = (object.dkgUpdate !== undefined && object.dkgUpdate !== null)
+      ? ValidatorTransaction_DkgUpdate.fromPartial(object.dkgUpdate)
+      : undefined;
+    message.events = object.events?.map((e) => Event.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_ObservedJwkUpdate(): ValidatorTransaction_ObservedJwkUpdate {
+  return { quorumCertifiedUpdate: undefined };
+}
+
+export const ValidatorTransaction_ObservedJwkUpdate = {
+  encode(message: ValidatorTransaction_ObservedJwkUpdate, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.quorumCertifiedUpdate !== undefined) {
+      ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.encode(
+        message.quorumCertifiedUpdate,
+        writer.uint32(10).fork(),
+      ).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ValidatorTransaction_ObservedJwkUpdate {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.quorumCertifiedUpdate = ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_ObservedJwkUpdate, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<ValidatorTransaction_ObservedJwkUpdate | ValidatorTransaction_ObservedJwkUpdate[]>
+      | Iterable<ValidatorTransaction_ObservedJwkUpdate | ValidatorTransaction_ObservedJwkUpdate[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_ObservedJwkUpdate>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_ObservedJwkUpdate> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_ObservedJwkUpdate {
+    return {
+      quorumCertifiedUpdate: isSet(object.quorumCertifiedUpdate)
+        ? ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.fromJSON(object.quorumCertifiedUpdate)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_ObservedJwkUpdate): unknown {
+    const obj: any = {};
+    if (message.quorumCertifiedUpdate !== undefined) {
+      obj.quorumCertifiedUpdate = ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.toJSON(
+        message.quorumCertifiedUpdate,
+      );
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ValidatorTransaction_ObservedJwkUpdate>): ValidatorTransaction_ObservedJwkUpdate {
+    return ValidatorTransaction_ObservedJwkUpdate.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ValidatorTransaction_ObservedJwkUpdate>): ValidatorTransaction_ObservedJwkUpdate {
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate();
+    message.quorumCertifiedUpdate =
+      (object.quorumCertifiedUpdate !== undefined && object.quorumCertifiedUpdate !== null)
+        ? ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.fromPartial(object.quorumCertifiedUpdate)
+        : undefined;
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs(): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs {
+  return { issuer: "", version: BigInt("0"), jwks: [] };
+}
+
+export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs = {
+  encode(
+    message: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs,
+    writer: _m0.Writer = _m0.Writer.create(),
+  ): _m0.Writer {
+    if (message.issuer !== undefined && message.issuer !== "") {
+      writer.uint32(10).string(message.issuer);
+    }
+    if (message.version !== undefined && message.version !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.version) !== message.version) {
+        throw new globalThis.Error("value provided for field message.version of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.version.toString());
+    }
+    if (message.jwks !== undefined && message.jwks.length !== 0) {
+      for (const v of message.jwks) {
+        ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.encode(v!, writer.uint32(26).fork()).ldelim();
+      }
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.issuer = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.version = longToBigint(reader.uint64() as Long);
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.jwks!.push(
+            ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.decode(reader, reader.uint32()),
+          );
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs[]
+      >
+      | Iterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs[]
+      >,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs {
+    return {
+      issuer: isSet(object.issuer) ? globalThis.String(object.issuer) : "",
+      version: isSet(object.version) ? BigInt(object.version) : BigInt("0"),
+      jwks: globalThis.Array.isArray(object?.jwks)
+        ? object.jwks.map((e: any) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs): unknown {
+    const obj: any = {};
+    if (message.issuer !== undefined && message.issuer !== "") {
+      obj.issuer = message.issuer;
+    }
+    if (message.version !== undefined && message.version !== BigInt("0")) {
+      obj.version = message.version.toString();
+    }
+    if (message.jwks?.length) {
+      obj.jwks = message.jwks.map((e) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs {
+    return ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs {
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs();
+    message.issuer = object.issuer ?? "";
+    message.version = object.version ?? BigInt("0");
+    message.jwks =
+      object.jwks?.map((e) => ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK(): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK {
+  return { unsupportedJwk: undefined, rsa: undefined };
+}
+
+export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK = {
+  encode(
+    message: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK,
+    writer: _m0.Writer = _m0.Writer.create(),
+  ): _m0.Writer {
+    if (message.unsupportedJwk !== undefined) {
+      ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.encode(
+        message.unsupportedJwk,
+        writer.uint32(10).fork(),
+      ).ldelim();
+    }
+    if (message.rsa !== undefined) {
+      ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.encode(message.rsa, writer.uint32(18).fork())
+        .ldelim();
+    }
+    return writer;
+  },
+
+  decode(
+    input: _m0.Reader | Uint8Array,
+    length?: number,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.unsupportedJwk = ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK
+            .decode(reader, reader.uint32());
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.rsa = ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK[]
+      >
+      | Iterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK[]
+      >,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK {
+    return {
+      unsupportedJwk: isSet(object.unsupportedJwk)
+        ? ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.fromJSON(object.unsupportedJwk)
+        : undefined,
+      rsa: isSet(object.rsa)
+        ? ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.fromJSON(object.rsa)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK): unknown {
+    const obj: any = {};
+    if (message.unsupportedJwk !== undefined) {
+      obj.unsupportedJwk = ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.toJSON(
+        message.unsupportedJwk,
+      );
+    }
+    if (message.rsa !== undefined) {
+      obj.rsa = ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.toJSON(message.rsa);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK {
+    return ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK {
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK();
+    message.unsupportedJwk = (object.unsupportedJwk !== undefined && object.unsupportedJwk !== null)
+      ? ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.fromPartial(
+        object.unsupportedJwk,
+      )
+      : undefined;
+    message.rsa = (object.rsa !== undefined && object.rsa !== null)
+      ? ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.fromPartial(object.rsa)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA(): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA {
+  return { kid: "", kty: "", alg: "", e: "", n: "" };
+}
+
+export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA = {
+  encode(
+    message: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA,
+    writer: _m0.Writer = _m0.Writer.create(),
+  ): _m0.Writer {
+    if (message.kid !== undefined && message.kid !== "") {
+      writer.uint32(10).string(message.kid);
+    }
+    if (message.kty !== undefined && message.kty !== "") {
+      writer.uint32(18).string(message.kty);
+    }
+    if (message.alg !== undefined && message.alg !== "") {
+      writer.uint32(26).string(message.alg);
+    }
+    if (message.e !== undefined && message.e !== "") {
+      writer.uint32(34).string(message.e);
+    }
+    if (message.n !== undefined && message.n !== "") {
+      writer.uint32(42).string(message.n);
+    }
+    return writer;
+  },
+
+  decode(
+    input: _m0.Reader | Uint8Array,
+    length?: number,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.kid = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.kty = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.alg = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.e = reader.string();
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.n = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA[]
+      >
+      | Iterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA[]
+      >,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA {
+    return {
+      kid: isSet(object.kid) ? globalThis.String(object.kid) : "",
+      kty: isSet(object.kty) ? globalThis.String(object.kty) : "",
+      alg: isSet(object.alg) ? globalThis.String(object.alg) : "",
+      e: isSet(object.e) ? globalThis.String(object.e) : "",
+      n: isSet(object.n) ? globalThis.String(object.n) : "",
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA): unknown {
+    const obj: any = {};
+    if (message.kid !== undefined && message.kid !== "") {
+      obj.kid = message.kid;
+    }
+    if (message.kty !== undefined && message.kty !== "") {
+      obj.kty = message.kty;
+    }
+    if (message.alg !== undefined && message.alg !== "") {
+      obj.alg = message.alg;
+    }
+    if (message.e !== undefined && message.e !== "") {
+      obj.e = message.e;
+    }
+    if (message.n !== undefined && message.n !== "") {
+      obj.n = message.n;
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA {
+    return ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA {
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_RSA();
+    message.kid = object.kid ?? "";
+    message.kty = object.kty ?? "";
+    message.alg = object.alg ?? "";
+    message.e = object.e ?? "";
+    message.n = object.n ?? "";
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK(): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK {
+  return { id: new Uint8Array(0), payload: new Uint8Array(0) };
+}
+
+export const ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK = {
+  encode(
+    message: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK,
+    writer: _m0.Writer = _m0.Writer.create(),
+  ): _m0.Writer {
+    if (message.id !== undefined && message.id.length !== 0) {
+      writer.uint32(10).bytes(message.id);
+    }
+    if (message.payload !== undefined && message.payload.length !== 0) {
+      writer.uint32(18).bytes(message.payload);
+    }
+    return writer;
+  },
+
+  decode(
+    input: _m0.Reader | Uint8Array,
+    length?: number,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.bytes();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.payload = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK[]
+      >
+      | Iterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK[]
+      >,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.encode(p).finish()];
+        }
+      } else {
+        yield* [
+          ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.encode(pkt as any).finish(),
+        ];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK {
+    return {
+      id: isSet(object.id) ? bytesFromBase64(object.id) : new Uint8Array(0),
+      payload: isSet(object.payload) ? bytesFromBase64(object.payload) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK): unknown {
+    const obj: any = {};
+    if (message.id !== undefined && message.id.length !== 0) {
+      obj.id = base64FromBytes(message.id);
+    }
+    if (message.payload !== undefined && message.payload.length !== 0) {
+      obj.payload = base64FromBytes(message.payload);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK {
+    return ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK {
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs_JWK_UnsupportedJWK();
+    message.id = object.id ?? new Uint8Array(0);
+    message.payload = object.payload ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature(): ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature {
+  return { signerIndices: [], sig: new Uint8Array(0) };
+}
+
+export const ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature = {
+  encode(
+    message: ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature,
+    writer: _m0.Writer = _m0.Writer.create(),
+  ): _m0.Writer {
+    if (message.signerIndices !== undefined && message.signerIndices.length !== 0) {
+      writer.uint32(10).fork();
+      for (const v of message.signerIndices) {
+        if (BigInt.asUintN(64, v) !== v) {
+          throw new globalThis.Error("a value provided in array field signerIndices of type uint64 is too large");
+        }
+        writer.uint64(v.toString());
+      }
+      writer.ldelim();
+    }
+    if (message.sig !== undefined && message.sig.length !== 0) {
+      writer.uint32(18).bytes(message.sig);
+    }
+    return writer;
+  },
+
+  decode(
+    input: _m0.Reader | Uint8Array,
+    length?: number,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag === 8) {
+            message.signerIndices!.push(longToBigint(reader.uint64() as Long));
+
+            continue;
+          }
+
+          if (tag === 10) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.signerIndices!.push(longToBigint(reader.uint64() as Long));
+            }
+
+            continue;
+          }
+
+          break;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sig = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature[]
+      >
+      | Iterable<
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature
+        | ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature[]
+      >,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature {
+    return {
+      signerIndices: globalThis.Array.isArray(object?.signerIndices)
+        ? object.signerIndices.map((e: any) => BigInt(e))
+        : [],
+      sig: isSet(object.sig) ? bytesFromBase64(object.sig) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature): unknown {
+    const obj: any = {};
+    if (message.signerIndices?.length) {
+      obj.signerIndices = message.signerIndices.map((e) => e.toString());
+    }
+    if (message.sig !== undefined && message.sig.length !== 0) {
+      obj.sig = base64FromBytes(message.sig);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature {
+    return ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature>,
+  ): ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature {
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature();
+    message.signerIndices = object.signerIndices?.map((e) => e) || [];
+    message.sig = object.sig ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate(): ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate {
+  return { update: undefined, multiSig: undefined };
+}
+
+export const ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate = {
+  encode(
+    message: ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate,
+    writer: _m0.Writer = _m0.Writer.create(),
+  ): _m0.Writer {
+    if (message.update !== undefined) {
+      ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.encode(message.update, writer.uint32(10).fork())
+        .ldelim();
+    }
+    if (message.multiSig !== undefined) {
+      ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.encode(
+        message.multiSig,
+        writer.uint32(18).fork(),
+      ).ldelim();
+    }
+    return writer;
+  },
+
+  decode(
+    input: _m0.Reader | Uint8Array,
+    length?: number,
+  ): ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.update = ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.decode(reader, reader.uint32());
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.multiSig = ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.decode(
+            reader,
+            reader.uint32(),
+          );
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<
+        | ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate
+        | ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate[]
+      >
+      | Iterable<
+        | ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate
+        | ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate[]
+      >,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate {
+    return {
+      update: isSet(object.update)
+        ? ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.fromJSON(object.update)
+        : undefined,
+      multiSig: isSet(object.multiSig)
+        ? ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.fromJSON(object.multiSig)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate): unknown {
+    const obj: any = {};
+    if (message.update !== undefined) {
+      obj.update = ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.toJSON(message.update);
+    }
+    if (message.multiSig !== undefined) {
+      obj.multiSig = ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.toJSON(message.multiSig);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate>,
+  ): ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate {
+    return ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate>,
+  ): ValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate {
+    const message = createBaseValidatorTransaction_ObservedJwkUpdate_QuorumCertifiedUpdate();
+    message.update = (object.update !== undefined && object.update !== null)
+      ? ValidatorTransaction_ObservedJwkUpdate_ExportedProviderJWKs.fromPartial(object.update)
+      : undefined;
+    message.multiSig = (object.multiSig !== undefined && object.multiSig !== null)
+      ? ValidatorTransaction_ObservedJwkUpdate_ExportedAggregateSignature.fromPartial(object.multiSig)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_DkgUpdate(): ValidatorTransaction_DkgUpdate {
+  return { dkgTranscript: undefined };
+}
+
+export const ValidatorTransaction_DkgUpdate = {
+  encode(message: ValidatorTransaction_DkgUpdate, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.dkgTranscript !== undefined) {
+      ValidatorTransaction_DkgUpdate_DkgTranscript.encode(message.dkgTranscript, writer.uint32(10).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ValidatorTransaction_DkgUpdate {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_DkgUpdate();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.dkgTranscript = ValidatorTransaction_DkgUpdate_DkgTranscript.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_DkgUpdate, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<ValidatorTransaction_DkgUpdate | ValidatorTransaction_DkgUpdate[]>
+      | Iterable<ValidatorTransaction_DkgUpdate | ValidatorTransaction_DkgUpdate[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_DkgUpdate.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction_DkgUpdate.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_DkgUpdate>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_DkgUpdate> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_DkgUpdate.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_DkgUpdate.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_DkgUpdate {
+    return {
+      dkgTranscript: isSet(object.dkgTranscript)
+        ? ValidatorTransaction_DkgUpdate_DkgTranscript.fromJSON(object.dkgTranscript)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_DkgUpdate): unknown {
+    const obj: any = {};
+    if (message.dkgTranscript !== undefined) {
+      obj.dkgTranscript = ValidatorTransaction_DkgUpdate_DkgTranscript.toJSON(message.dkgTranscript);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ValidatorTransaction_DkgUpdate>): ValidatorTransaction_DkgUpdate {
+    return ValidatorTransaction_DkgUpdate.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ValidatorTransaction_DkgUpdate>): ValidatorTransaction_DkgUpdate {
+    const message = createBaseValidatorTransaction_DkgUpdate();
+    message.dkgTranscript = (object.dkgTranscript !== undefined && object.dkgTranscript !== null)
+      ? ValidatorTransaction_DkgUpdate_DkgTranscript.fromPartial(object.dkgTranscript)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseValidatorTransaction_DkgUpdate_DkgTranscript(): ValidatorTransaction_DkgUpdate_DkgTranscript {
+  return { epoch: BigInt("0"), author: "", payload: new Uint8Array(0) };
+}
+
+export const ValidatorTransaction_DkgUpdate_DkgTranscript = {
+  encode(message: ValidatorTransaction_DkgUpdate_DkgTranscript, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.epoch !== undefined && message.epoch !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.epoch) !== message.epoch) {
+        throw new globalThis.Error("value provided for field message.epoch of type uint64 too large");
+      }
+      writer.uint32(8).uint64(message.epoch.toString());
+    }
+    if (message.author !== undefined && message.author !== "") {
+      writer.uint32(18).string(message.author);
+    }
+    if (message.payload !== undefined && message.payload.length !== 0) {
+      writer.uint32(26).bytes(message.payload);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ValidatorTransaction_DkgUpdate_DkgTranscript {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseValidatorTransaction_DkgUpdate_DkgTranscript();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.epoch = longToBigint(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.author = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.payload = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ValidatorTransaction_DkgUpdate_DkgTranscript, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<ValidatorTransaction_DkgUpdate_DkgTranscript | ValidatorTransaction_DkgUpdate_DkgTranscript[]>
+      | Iterable<ValidatorTransaction_DkgUpdate_DkgTranscript | ValidatorTransaction_DkgUpdate_DkgTranscript[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_DkgUpdate_DkgTranscript.encode(p).finish()];
+        }
+      } else {
+        yield* [ValidatorTransaction_DkgUpdate_DkgTranscript.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ValidatorTransaction_DkgUpdate_DkgTranscript>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ValidatorTransaction_DkgUpdate_DkgTranscript> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ValidatorTransaction_DkgUpdate_DkgTranscript.decode(p)];
+        }
+      } else {
+        yield* [ValidatorTransaction_DkgUpdate_DkgTranscript.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ValidatorTransaction_DkgUpdate_DkgTranscript {
+    return {
+      epoch: isSet(object.epoch) ? BigInt(object.epoch) : BigInt("0"),
+      author: isSet(object.author) ? globalThis.String(object.author) : "",
+      payload: isSet(object.payload) ? bytesFromBase64(object.payload) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ValidatorTransaction_DkgUpdate_DkgTranscript): unknown {
+    const obj: any = {};
+    if (message.epoch !== undefined && message.epoch !== BigInt("0")) {
+      obj.epoch = message.epoch.toString();
+    }
+    if (message.author !== undefined && message.author !== "") {
+      obj.author = message.author;
+    }
+    if (message.payload !== undefined && message.payload.length !== 0) {
+      obj.payload = base64FromBytes(message.payload);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ValidatorTransaction_DkgUpdate_DkgTranscript>,
+  ): ValidatorTransaction_DkgUpdate_DkgTranscript {
+    return ValidatorTransaction_DkgUpdate_DkgTranscript.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ValidatorTransaction_DkgUpdate_DkgTranscript>,
+  ): ValidatorTransaction_DkgUpdate_DkgTranscript {
+    const message = createBaseValidatorTransaction_DkgUpdate_DkgTranscript();
+    message.epoch = object.epoch ?? BigInt("0");
+    message.author = object.author ?? "";
+    message.payload = object.payload ?? new Uint8Array(0);
     return message;
   },
 };
@@ -5932,7 +7242,7 @@ export const MoveFunction = {
 };
 
 function createBaseMoveStruct(): MoveStruct {
-  return { name: "", isNative: false, abilities: [], genericTypeParams: [], fields: [] };
+  return { name: "", isNative: false, isEvent: false, abilities: [], genericTypeParams: [], fields: [] };
 }
 
 export const MoveStruct = {
@@ -5942,6 +7252,9 @@ export const MoveStruct = {
     }
     if (message.isNative === true) {
       writer.uint32(16).bool(message.isNative);
+    }
+    if (message.isEvent === true) {
+      writer.uint32(48).bool(message.isEvent);
     }
     if (message.abilities !== undefined && message.abilities.length !== 0) {
       writer.uint32(26).fork();
@@ -5983,6 +7296,13 @@ export const MoveStruct = {
           }
 
           message.isNative = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isEvent = reader.bool();
           continue;
         case 3:
           if (tag === 24) {
@@ -6060,6 +7380,7 @@ export const MoveStruct = {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       isNative: isSet(object.isNative) ? globalThis.Boolean(object.isNative) : false,
+      isEvent: isSet(object.isEvent) ? globalThis.Boolean(object.isEvent) : false,
       abilities: globalThis.Array.isArray(object?.abilities)
         ? object.abilities.map((e: any) => moveAbilityFromJSON(e))
         : [],
@@ -6080,6 +7401,9 @@ export const MoveStruct = {
     if (message.isNative === true) {
       obj.isNative = message.isNative;
     }
+    if (message.isEvent === true) {
+      obj.isEvent = message.isEvent;
+    }
     if (message.abilities?.length) {
       obj.abilities = message.abilities.map((e) => moveAbilityToJSON(e));
     }
@@ -6099,6 +7423,7 @@ export const MoveStruct = {
     const message = createBaseMoveStruct();
     message.name = object.name ?? "";
     message.isNative = object.isNative ?? false;
+    message.isEvent = object.isEvent ?? false;
     message.abilities = object.abilities?.map((e) => e) || [];
     message.genericTypeParams = object.genericTypeParams?.map((e) => MoveStructGenericTypeParam.fromPartial(e)) || [];
     message.fields = object.fields?.map((e) => MoveStructField.fromPartial(e)) || [];

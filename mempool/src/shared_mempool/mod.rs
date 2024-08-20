@@ -11,3 +11,4 @@ pub use runtime::bootstrap;
 pub(crate) use runtime::start_shared_mempool;
 mod coordinator;
 pub(crate) mod tasks;
+pub(crate) mod use_case_history;

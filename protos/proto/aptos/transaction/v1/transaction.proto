@@ -71,6 +71,7 @@ message Transaction {
   TransactionSizeInfo size_info = 22;
 }
 
+// Transaction types.
 message BlockMetadataTransaction {
   string id = 1;
   uint64 round = 2 [jstype = JS_STRING];
@@ -85,10 +86,60 @@ message GenesisTransaction {
   repeated Event events = 2;
 }
 
-message StateCheckpointTransaction {
-}
+message StateCheckpointTransaction {}
 
 message ValidatorTransaction {
+  oneof ValidatorTransactionType {
+    ObservedJwkUpdate observed_jwk_update = 1;
+    DkgUpdate dkg_update = 2;
+  }
+
+  message ObservedJwkUpdate {
+    message ExportedProviderJWKs {
+      string issuer = 1;
+      uint64 version = 2;
+      message JWK {
+        message RSA {
+          string kid = 1;
+          string kty = 2;
+          string alg = 3;
+          string e = 4;
+          string n = 5;
+        }
+        message UnsupportedJWK {
+          bytes id = 1;
+          bytes payload = 2;
+        }
+        oneof JwkType {
+          UnsupportedJWK unsupported_jwk = 1;
+          RSA rsa = 2;
+        }
+      }
+
+      repeated JWK jwks = 3;
+    }
+    message ExportedAggregateSignature {
+      repeated uint64 signer_indices = 1;
+      // HexToBytes.
+      bytes sig = 2;
+    }
+    message QuorumCertifiedUpdate {
+      ExportedProviderJWKs update = 1;
+      ExportedAggregateSignature multi_sig = 2;
+    }
+    QuorumCertifiedUpdate quorum_certified_update = 1;
+  }
+
+  message DkgUpdate {
+    message DkgTranscript {
+      uint64 epoch = 1;
+      string author = 2;
+      bytes payload = 3;
+    }
+    DkgTranscript dkg_transcript = 1;
+  }
+
+  repeated Event events = 3;
 }
 
 message BlockEpilogueTransaction {
@@ -143,7 +194,6 @@ message UserTransactionRequest {
 }
 
 message WriteSet {
-
   enum WriteSetType {
     WRITE_SET_TYPE_UNSPECIFIED = 0;
     WRITE_SET_TYPE_SCRIPT_WRITE_SET = 1;
@@ -168,7 +218,6 @@ message DirectWriteSet {
 }
 
 message WriteSetChange {
-
   enum Type {
     TYPE_UNSPECIFIED = 0;
     TYPE_DELETE_MODULE = 1;
@@ -331,12 +380,13 @@ message MoveFunction {
 message MoveStruct {
   string name = 1;
   bool is_native = 2;
+  bool is_event = 6;
   repeated MoveAbility abilities = 3;
   repeated MoveStructGenericTypeParam generic_type_params = 4;
   repeated MoveStructField fields = 5;
 }
 
-message MoveStructGenericTypeParam{
+message MoveStructGenericTypeParam {
   repeated MoveAbility constraints = 1;
   bool is_phantom = 2;
 }
@@ -368,8 +418,7 @@ enum MoveTypes {
   MOVE_TYPES_UNPARSABLE = 11; // `(String)`,
 }
 
-message MoveType{
-
+message MoveType {
   message ReferenceType {
     bool mutable = 1;
     MoveType to = 2;
@@ -415,7 +464,6 @@ message MoveStructTag {
 }
 
 message Signature {
-
   enum Type {
     TYPE_UNSPECIFIED = 0;
     TYPE_ED25519 = 1;

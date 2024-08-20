@@ -211,8 +211,10 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
                     .with_message(format!("Module {} doesn't exist", module))
             })?;
 
-        self.resolver
+        let (_, function) = self
+            .resolver
             .module_store()
-            .resolve_function_by_name(function_name, module)
+            .resolve_module_and_function_by_name(module, function_name)?;
+        Ok(function)
     }
 }

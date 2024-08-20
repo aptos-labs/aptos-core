@@ -1,5 +1,8 @@
 name: "Ad-hoc Forge Run"
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/adhoc-forge.yaml"
   workflow_dispatch:
     inputs:
       GIT_SHA:
@@ -28,6 +31,19 @@ on:
         required: false
         type: string
         description: The Forge k8s cluster to be used for test
+      FORGE_ENABLE_HAPROXY:
+        required: false
+        default: false
+        type: boolean
+        description: enable haproxy for the forge test
+      FORGE_NUM_VALIDATORS:
+        required: false
+        type: string
+        description: Number of validators to use for the forge test
+      FORGE_NUM_VALIDATOR_FULLNODES:
+        required: false
+        type: string
+        description: Number of validator fullnodes to use for the forge test
 
 permissions:
   contents: read
@@ -47,13 +63,19 @@ jobs:
           echo "FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}"
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
           echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
+          echo "FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}"
+          echo "FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}"
+          echo "FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}"
     outputs:
       gitSha: ${{ inputs.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
       forgeImageTag: ${{ inputs.FORGE_IMAGE_TAG }}
-      forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
+      forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS || 600 }}
       forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
       forgeClusterName: ${{ inputs.FORGE_CLUSTER_NAME }}
+      forgeEnableHaproxy: ${{ inputs.FORGE_ENABLE_HAPROXY }}
+      forgeNumValidators: ${{ inputs.FORGE_NUM_VALIDATORS }}
+      forgeNumValidatorFullnodes: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
 
   adhoc-forge-test:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
@@ -66,3 +88,6 @@ jobs:
       FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }}
       FORGE_RUNNER_DURATION_SECS: ${{ fromJSON(needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs) }} # fromJSON converts to integer
       FORGE_CLUSTER_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeClusterName }}
+      FORGE_ENABLE_HAPROXY: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableHaproxy }}
+      FORGE_NUM_VALIDATORS: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidators }}
+      FORGE_NUM_VALIDATOR_FULLNODES: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidatorFullnodes }}

@@ -23,7 +23,10 @@ use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features},
+    vm::configs::set_paranoid_type_checks,
+};
 use aptos_vm::AptosVM;
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
@@ -558,7 +561,7 @@ fn main() {
     }
 
     if opt.skip_paranoid_checks {
-        AptosVM::set_paranoid_type_checks(false);
+        set_paranoid_type_checks(false);
     }
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);

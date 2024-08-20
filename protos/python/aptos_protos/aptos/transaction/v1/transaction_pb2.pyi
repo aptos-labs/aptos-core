@@ -201,8 +201,174 @@ class StateCheckpointTransaction(_message.Message):
     def __init__(self) -> None: ...
 
 class ValidatorTransaction(_message.Message):
-    __slots__ = []
-    def __init__(self) -> None: ...
+    __slots__ = ["observed_jwk_update", "dkg_update", "events"]
+
+    class ObservedJwkUpdate(_message.Message):
+        __slots__ = ["quorum_certified_update"]
+
+        class ExportedProviderJWKs(_message.Message):
+            __slots__ = ["issuer", "version", "jwks"]
+
+            class JWK(_message.Message):
+                __slots__ = ["unsupported_jwk", "rsa"]
+
+                class RSA(_message.Message):
+                    __slots__ = ["kid", "kty", "alg", "e", "n"]
+                    KID_FIELD_NUMBER: _ClassVar[int]
+                    KTY_FIELD_NUMBER: _ClassVar[int]
+                    ALG_FIELD_NUMBER: _ClassVar[int]
+                    E_FIELD_NUMBER: _ClassVar[int]
+                    N_FIELD_NUMBER: _ClassVar[int]
+                    kid: str
+                    kty: str
+                    alg: str
+                    e: str
+                    n: str
+                    def __init__(
+                        self,
+                        kid: _Optional[str] = ...,
+                        kty: _Optional[str] = ...,
+                        alg: _Optional[str] = ...,
+                        e: _Optional[str] = ...,
+                        n: _Optional[str] = ...,
+                    ) -> None: ...
+
+                class UnsupportedJWK(_message.Message):
+                    __slots__ = ["id", "payload"]
+                    ID_FIELD_NUMBER: _ClassVar[int]
+                    PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+                    id: bytes
+                    payload: bytes
+                    def __init__(
+                        self,
+                        id: _Optional[bytes] = ...,
+                        payload: _Optional[bytes] = ...,
+                    ) -> None: ...
+                UNSUPPORTED_JWK_FIELD_NUMBER: _ClassVar[int]
+                RSA_FIELD_NUMBER: _ClassVar[int]
+                unsupported_jwk: ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK
+                rsa: ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA
+                def __init__(
+                    self,
+                    unsupported_jwk: _Optional[
+                        _Union[
+                            ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.UnsupportedJWK,
+                            _Mapping,
+                        ]
+                    ] = ...,
+                    rsa: _Optional[
+                        _Union[
+                            ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK.RSA,
+                            _Mapping,
+                        ]
+                    ] = ...,
+                ) -> None: ...
+            ISSUER_FIELD_NUMBER: _ClassVar[int]
+            VERSION_FIELD_NUMBER: _ClassVar[int]
+            JWKS_FIELD_NUMBER: _ClassVar[int]
+            issuer: str
+            version: int
+            jwks: _containers.RepeatedCompositeFieldContainer[
+                ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK
+            ]
+            def __init__(
+                self,
+                issuer: _Optional[str] = ...,
+                version: _Optional[int] = ...,
+                jwks: _Optional[
+                    _Iterable[
+                        _Union[
+                            ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs.JWK,
+                            _Mapping,
+                        ]
+                    ]
+                ] = ...,
+            ) -> None: ...
+
+        class ExportedAggregateSignature(_message.Message):
+            __slots__ = ["signer_indices", "sig"]
+            SIGNER_INDICES_FIELD_NUMBER: _ClassVar[int]
+            SIG_FIELD_NUMBER: _ClassVar[int]
+            signer_indices: _containers.RepeatedScalarFieldContainer[int]
+            sig: bytes
+            def __init__(
+                self,
+                signer_indices: _Optional[_Iterable[int]] = ...,
+                sig: _Optional[bytes] = ...,
+            ) -> None: ...
+
+        class QuorumCertifiedUpdate(_message.Message):
+            __slots__ = ["update", "multi_sig"]
+            UPDATE_FIELD_NUMBER: _ClassVar[int]
+            MULTI_SIG_FIELD_NUMBER: _ClassVar[int]
+            update: ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs
+            multi_sig: ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature
+            def __init__(
+                self,
+                update: _Optional[
+                    _Union[
+                        ValidatorTransaction.ObservedJwkUpdate.ExportedProviderJWKs,
+                        _Mapping,
+                    ]
+                ] = ...,
+                multi_sig: _Optional[
+                    _Union[
+                        ValidatorTransaction.ObservedJwkUpdate.ExportedAggregateSignature,
+                        _Mapping,
+                    ]
+                ] = ...,
+            ) -> None: ...
+        QUORUM_CERTIFIED_UPDATE_FIELD_NUMBER: _ClassVar[int]
+        quorum_certified_update: ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate
+        def __init__(
+            self,
+            quorum_certified_update: _Optional[
+                _Union[
+                    ValidatorTransaction.ObservedJwkUpdate.QuorumCertifiedUpdate,
+                    _Mapping,
+                ]
+            ] = ...,
+        ) -> None: ...
+
+    class DkgUpdate(_message.Message):
+        __slots__ = ["dkg_transcript"]
+
+        class DkgTranscript(_message.Message):
+            __slots__ = ["epoch", "author", "payload"]
+            EPOCH_FIELD_NUMBER: _ClassVar[int]
+            AUTHOR_FIELD_NUMBER: _ClassVar[int]
+            PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+            epoch: int
+            author: str
+            payload: bytes
+            def __init__(
+                self,
+                epoch: _Optional[int] = ...,
+                author: _Optional[str] = ...,
+                payload: _Optional[bytes] = ...,
+            ) -> None: ...
+        DKG_TRANSCRIPT_FIELD_NUMBER: _ClassVar[int]
+        dkg_transcript: ValidatorTransaction.DkgUpdate.DkgTranscript
+        def __init__(
+            self,
+            dkg_transcript: _Optional[
+                _Union[ValidatorTransaction.DkgUpdate.DkgTranscript, _Mapping]
+            ] = ...,
+        ) -> None: ...
+    OBSERVED_JWK_UPDATE_FIELD_NUMBER: _ClassVar[int]
+    DKG_UPDATE_FIELD_NUMBER: _ClassVar[int]
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    observed_jwk_update: ValidatorTransaction.ObservedJwkUpdate
+    dkg_update: ValidatorTransaction.DkgUpdate
+    events: _containers.RepeatedCompositeFieldContainer[Event]
+    def __init__(
+        self,
+        observed_jwk_update: _Optional[
+            _Union[ValidatorTransaction.ObservedJwkUpdate, _Mapping]
+        ] = ...,
+        dkg_update: _Optional[_Union[ValidatorTransaction.DkgUpdate, _Mapping]] = ...,
+        events: _Optional[_Iterable[_Union[Event, _Mapping]]] = ...,
+    ) -> None: ...
 
 class BlockEpilogueTransaction(_message.Message):
     __slots__ = ["block_end_info"]
@@ -783,14 +949,23 @@ class MoveFunction(_message.Message):
     ) -> None: ...
 
 class MoveStruct(_message.Message):
-    __slots__ = ["name", "is_native", "abilities", "generic_type_params", "fields"]
+    __slots__ = [
+        "name",
+        "is_native",
+        "is_event",
+        "abilities",
+        "generic_type_params",
+        "fields",
+    ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     IS_NATIVE_FIELD_NUMBER: _ClassVar[int]
+    IS_EVENT_FIELD_NUMBER: _ClassVar[int]
     ABILITIES_FIELD_NUMBER: _ClassVar[int]
     GENERIC_TYPE_PARAMS_FIELD_NUMBER: _ClassVar[int]
     FIELDS_FIELD_NUMBER: _ClassVar[int]
     name: str
     is_native: bool
+    is_event: bool
     abilities: _containers.RepeatedScalarFieldContainer[MoveAbility]
     generic_type_params: _containers.RepeatedCompositeFieldContainer[
         MoveStructGenericTypeParam
@@ -800,6 +975,7 @@ class MoveStruct(_message.Message):
         self,
         name: _Optional[str] = ...,
         is_native: bool = ...,
+        is_event: bool = ...,
         abilities: _Optional[_Iterable[_Union[MoveAbility, str]]] = ...,
         generic_type_params: _Optional[
             _Iterable[_Union[MoveStructGenericTypeParam, _Mapping]]

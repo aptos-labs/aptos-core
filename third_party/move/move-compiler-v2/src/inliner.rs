@@ -1191,9 +1191,14 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 .map(|new_sym| Pattern::Var(new_id, new_sym))
                 .or_else(|| new_id_opt.map(|id| Pattern::Var(id, *sym))),
             Pattern::Tuple(_, pattern_vec) => Some(Pattern::Tuple(new_id, pattern_vec.clone())),
-            Pattern::Struct(_, struct_id, pattern_vec) => {
+            Pattern::Struct(_, struct_id, variant, pattern_vec) => {
                 let new_struct_id = struct_id.clone().instantiate(self.type_args);
-                Some(Pattern::Struct(new_id, new_struct_id, pattern_vec.clone()))
+                Some(Pattern::Struct(
+                    new_id,
+                    new_struct_id,
+                    *variant,
+                    pattern_vec.clone(),
+                ))
             },
             Pattern::Wildcard(_) => None,
             Pattern::Error(_) => None,
