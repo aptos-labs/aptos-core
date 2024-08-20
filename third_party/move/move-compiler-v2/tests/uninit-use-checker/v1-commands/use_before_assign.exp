@@ -10,28 +10,15 @@ warning: Unused local variable `y`. Consider removing or prefixing with an under
 
 [variant baseline]
 fun <SELF>_0::main() {
-     var $t0: u64
-     var $t1: u64
-  0: $t1 := infer($t0)
-  1: return ()
+     var $t0: u64 [unused]
+  0: return ()
 }
-
-
-Diagnostics:
-error: use of unassigned local `x`
-  ┌─ tests/uninit-use-checker/v1-commands/use_before_assign.move:4:9
-  │
-4 │     let y = x;
-  │         ^
 
 ============ after uninitialized_use_checker: ================
 
 [variant baseline]
 fun <SELF>_0::main() {
-     var $t0: u64
-     var $t1: u64
-     # before: { no: $t0, $t1 }, after: { no: $t0 }
-  0: $t1 := infer($t0)
+     var $t0: u64 [unused]
      # before: { no: $t0 }, after: { no: $t0 }
-  1: return ()
+  0: return ()
 }

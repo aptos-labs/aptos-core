@@ -68,14 +68,40 @@ error: use of unassigned local `r`
 23 │         let R { f: x, g: y } = r;
    │             ^^^^^^^^^^^^^^^^
 
-error: use of unassigned local `y`
-   ┌─ tests/unused-assignment/v1-locals/struct_use_before_assign.move:30:13
-   │
-30 │         let z = y;
-   │             ^
 
-error: use of unassigned local `x`
-   ┌─ tests/unused-assignment/v1-locals/struct_use_before_assign.move:31:13
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/v1-locals/struct_use_before_assign.move:7:13
+  │
+7 │         let R { f: x, g: y } = r;
+  │             ^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/unused-assignment/v1-locals/struct_use_before_assign.move:7:13
+  │
+7 │         let R { f: x, g: y } = r;
+  │             ^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/v1-locals/struct_use_before_assign.move:16:13
    │
-31 │         let q = x;
-   │             ^
+16 │         let R { f: x, g: y } = r;
+   │             ^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/unused-assignment/v1-locals/struct_use_before_assign.move:16:13
+   │
+16 │         let R { f: x, g: y } = r;
+   │             ^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/v1-locals/struct_use_before_assign.move:23:13
+   │
+23 │         let R { f: x, g: y } = r;
+   │             ^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/unused-assignment/v1-locals/struct_use_before_assign.move:23:13
+   │
+23 │         let R { f: x, g: y } = r;
+   │             ^^^^^^^^^^^^^^^^

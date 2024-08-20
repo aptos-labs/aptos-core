@@ -1548,7 +1548,11 @@ impl<'env> Generator<'env> {
             self.gen_tuple_assign(id, pat_args, exp, next_scope)
         } else {
             let arg = self.gen_escape_auto_ref_arg(exp, false);
-            self.gen_match_from_temp(id, pat, &[arg], &MatchMode::Irrefutable, next_scope)
+            if !matches!(pat, Pattern::Wildcard(..)) {
+                self.gen_match_from_temp(id, pat, &[arg], &MatchMode::Irrefutable, next_scope)
+            } else {
+                // This is a Wildcard, just drop the computed value.
+            }
         }
     }
 

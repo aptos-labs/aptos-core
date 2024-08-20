@@ -15,11 +15,4 @@ module 0xc0ffee::m {
 } // end 0xc0ffee::m
 
 
-Diagnostics:
-error: cannot move local `x` since it is still in use
-  ┌─ tests/simplifier/moved_var_not_simplified2.move:4:17
-  │
-4 │         let y = move x;
-  │                 ^^^^^^ attempted to move here
-5 │         let _z = x;
-  │             -- used here
+============ bytecode verification succeeded ========

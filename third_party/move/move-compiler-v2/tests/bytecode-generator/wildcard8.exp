@@ -15,24 +15,9 @@ module 0xc0ffee::m {
 
 [variant baseline]
 public fun m::test() {
-     var $t0: u64
-     var $t1: u64
-     var $t2: u64
-  0: $t1 := infer($t0)
-  1: $t2 := infer($t0)
-  2: return ()
+     var $t0: u64 [unused]
+  0: return ()
 }
 
 
-Diagnostics:
-error: use of unassigned local `x`
-  ┌─ tests/bytecode-generator/wildcard8.move:4:14
-  │
-4 │         let (_, _) = (x, x);
-  │              ^
-
-error: use of unassigned local `x`
-  ┌─ tests/bytecode-generator/wildcard8.move:4:17
-  │
-4 │         let (_, _) = (x, x);
-  │                 ^
+============ bytecode verification succeeded ========
