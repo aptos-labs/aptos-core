@@ -17,6 +17,7 @@ petgraph = { workspace = true }
 regex = { workspace = true }
 sha3 = { workspace = true }
 tempfile = { workspace = true }
+stacker = { workspace = true }
 
 bcs = { workspace = true }
 

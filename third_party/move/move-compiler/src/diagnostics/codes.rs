@@ -99,6 +99,7 @@ codes!(
     // bucket for random one off errors. unlikely to be used
     Uncategorized: [
         DeprecatedWillBeRemoved: { msg: "DEPRECATED. will be removed", severity: Warning },
+        ResourcesExceeded: { msg: "Compiler resources exceeded", severity: BlockingError },
     ],
     // syntax errors
     Syntax: [
