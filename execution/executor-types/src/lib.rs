@@ -17,7 +17,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
-        Version,
+        TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -145,7 +145,7 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<()>;
+    ) -> ExecutorResult<Vec<TransactionStatus>>;
 
     fn ledger_update(
         &self,

@@ -36,6 +36,7 @@ use aptos_types::{
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
+    transaction::TransactionStatus,
 };
 use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
@@ -95,7 +96,7 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<()> {
+    ) -> ExecutorResult<Vec<TransactionStatus>> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "execute_and_state_checkpoint"]);
 
         self.maybe_initialize()?;
@@ -181,7 +182,7 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<()> {
+    ) -> ExecutorResult<Vec<TransactionStatus>> {
         let _timer = BLOCK_EXECUTION_WORKFLOW_WHOLE.start_timer();
         let ExecutableBlock {
             block_id,
@@ -260,11 +261,12 @@ where
             };
         let output = PartialStateComputeResult::new(execution_output);
         output.set_state_checkpoint_output(state_checkpoint_output);
+        let statuses_for_input_txns = output.execution_output.statuses_for_input_txns.clone();
 
         let _ = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
-        Ok(())
+        Ok(statuses_for_input_txns)
     }
 
     fn ledger_update(

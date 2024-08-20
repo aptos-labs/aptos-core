@@ -219,6 +219,11 @@ impl BlockTree {
             .expect("Commit root must exist")
     }
 
+    pub(super) fn window_root(&self) -> Arc<PipelinedBlock> {
+        self.get_block(&self.window_root_id)
+            .expect("Window root must exist")
+    }
+
     pub(super) fn highest_certified_block(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.highest_certified_block_id)
             .expect("Highest cerfified block must exist")
@@ -250,11 +255,6 @@ impl BlockTree {
         block_id: &HashValue,
     ) -> Option<Arc<QuorumCert>> {
         self.id_to_quorum_cert.get(block_id).cloned()
-    }
-
-    pub(super) fn window_root(&self) -> Arc<PipelinedBlock> {
-        self.get_block(&self.window_root_id)
-            .expect("Window root not found")
     }
 
     // TODO: return an error when not enough blocks?
@@ -630,6 +630,13 @@ impl BlockTree {
         block_id: HashValue,
     ) -> Option<Vec<Arc<PipelinedBlock>>> {
         self.path_from_root_to_block(block_id, self.commit_root_id, self.commit_root().round())
+    }
+
+    pub(super) fn path_from_window_root(
+        &self,
+        block_id: HashValue,
+    ) -> Option<Vec<Arc<PipelinedBlock>>> {
+        self.path_from_root_to_block(block_id, self.window_root_id, self.window_root().round())
     }
 
     pub(super) fn max_pruned_blocks_in_mem(&self) -> usize {

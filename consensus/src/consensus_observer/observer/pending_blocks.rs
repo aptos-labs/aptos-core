@@ -965,7 +965,7 @@ mod test {
                 BlockType::Genesis,
             );
             let block = Block::new_for_testing(block_info.id(), block_data, None);
-            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(
+            let pipelined_block = Arc::new(PipelinedBlock::new_with_window(
                 block,
                 // TODO revisit this, not sure how i would do this right now...
                 OrderedBlockWindow::empty(),

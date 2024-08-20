@@ -128,11 +128,12 @@ pub struct RejectedTransactionSummary {
 
 #[derive(Debug)]
 pub enum DataStatus {
-    Cached(Vec<SignedTransaction>),
+    Cached(Vec<(Arc<Vec<SignedTransaction>>, u64)>),
     Requested(
         Vec<(
             HashValue,
-            oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
+            u64,
+            oneshot::Receiver<ExecutorResult<Arc<Vec<SignedTransaction>>>>,
         )>,
     ),
 }
@@ -255,7 +256,7 @@ pub enum Payload {
     InQuorumStore(ProofWithData),
     InQuorumStoreWithLimit(ProofWithDataWithTxnLimit),
     QuorumStoreInlineHybrid(
-        Vec<(BatchInfo, Vec<SignedTransaction>)>,
+        Vec<(BatchInfo, Arc<Vec<SignedTransaction>>)>,
         ProofWithData,
         Option<u64>,
     ),
@@ -507,7 +508,8 @@ impl Payload {
                 Self::verify_with_cache(&proof_with_data.proofs, validator, proof_cache)?;
                 for (batch, payload) in inline_batches.iter() {
                     // TODO: Can cloning be avoided here?
-                    if BatchPayload::new(batch.author(), payload.clone()).hash() != *batch.digest()
+                    if BatchPayload::new(batch.author(), payload.as_ref().clone()).hash()
+                        != *batch.digest()
                     {
                         return Err(anyhow::anyhow!(
                             "Hash of the received inline batch doesn't match the digest value",

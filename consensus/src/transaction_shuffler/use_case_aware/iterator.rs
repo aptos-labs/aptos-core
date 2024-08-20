@@ -10,7 +10,7 @@ use aptos_types::transaction::use_case::UseCaseAwareTransaction;
 use std::{collections::VecDeque, fmt::Debug};
 
 #[derive(Debug)]
-pub(super) struct ShuffledTransactionIterator<Txn> {
+pub struct ShuffledTransactionIterator<Txn> {
     input_queue: VecDeque<Txn>,
     delayed_queue: DelayedQueue<Txn>,
     input_idx: InputIdx,
@@ -21,7 +21,7 @@ impl<Txn> ShuffledTransactionIterator<Txn>
 where
     Txn: UseCaseAwareTransaction + Debug,
 {
-    pub(super) fn new(config: Config) -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
             input_queue: VecDeque::new(),
             delayed_queue: DelayedQueue::new(config),
@@ -30,7 +30,7 @@ where
         }
     }
 
-    pub(super) fn extended_with(mut self, txns: impl IntoIterator<Item = Txn>) -> Self {
+    pub fn extended_with(mut self, txns: impl IntoIterator<Item = Txn>) -> Self {
         self.input_queue.extend(txns);
         self
     }

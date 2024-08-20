@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::txn_provider::TxnProvider;
-use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::transaction::BlockExecutableTransaction as Transaction;
+use crate::{
+    transaction::BlockExecutableTransaction as Transaction,
+    txn_provider::{TxnIndex, TxnProvider},
+};
 
 pub struct DefaultTxnProvider<T: Transaction> {
     pub txns: Vec<T>,
@@ -26,6 +27,10 @@ impl<T: Transaction> TxnProvider<T> for DefaultTxnProvider<T> {
 
     fn get_txn(&self, idx: TxnIndex) -> &T {
         &self.txns[idx as usize]
+    }
+
+    fn to_vec(&self) -> Vec<T> {
+        self.txns.clone()
     }
 }
 

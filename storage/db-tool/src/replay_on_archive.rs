@@ -4,7 +4,6 @@
 
 use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
     StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
@@ -18,6 +17,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
         Version,
     },
+    txn_provider::default::DefaultTxnProvider,
     write_set::WriteSet,
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
@@ -30,6 +30,7 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
     time::Instant,
 };
+
 // Replay Verify controller is responsible for providing legit range with start and end versions.
 #[derive(Parser)]
 pub struct Opt {

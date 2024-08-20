@@ -126,7 +126,6 @@ pub mod verifier;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
@@ -137,6 +136,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         SignedTransaction, TransactionOutput, VMValidatorResult,
     },
+    txn_provider::TxnProvider,
     vm_status::VMStatus,
 };
 use aptos_vm_types::module_and_script_storage::code_storage::AptosCodeStorage;
@@ -169,7 +169,7 @@ pub trait VMBlockExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -179,7 +179,7 @@ pub trait VMBlockExecutor: Send + Sync {
     /// any block limit.
     fn execute_block_no_limit(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         self.execute_block(

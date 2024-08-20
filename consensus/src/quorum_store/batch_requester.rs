@@ -22,7 +22,7 @@ use tokio::{sync::oneshot, time};
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
-    ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
+    ret_tx: oneshot::Sender<ExecutorResult<Arc<Vec<SignedTransaction>>>>,
     num_retries: usize,
     retry_limit: usize,
 }
@@ -30,7 +30,7 @@ struct BatchRequesterState {
 impl BatchRequesterState {
     fn new(
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
+        ret_tx: oneshot::Sender<ExecutorResult<Arc<Vec<SignedTransaction>>>>,
         retry_limit: usize,
     ) -> Self {
         Self {
@@ -68,7 +68,7 @@ impl BatchRequesterState {
         }
     }
 
-    fn serve_request(self, digest: HashValue, maybe_payload: Option<Vec<SignedTransaction>>) {
+    fn serve_request(self, digest: HashValue, maybe_payload: Option<Arc<Vec<SignedTransaction>>>) {
         if let Some(payload) = maybe_payload {
             trace!(
                 "QS: batch to oneshot, digest {}, tx {:?}",
@@ -133,9 +133,9 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         digest: HashValue,
         expiration: u64,
         responders: Vec<PeerId>,
-        ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
+        ret_tx: oneshot::Sender<ExecutorResult<Arc<Vec<SignedTransaction>>>>,
         mut subscriber_rx: oneshot::Receiver<PersistedValue>,
-    ) -> Option<(BatchInfo, Vec<SignedTransaction>)> {
+    ) -> Option<(BatchInfo, Arc<Vec<SignedTransaction>>)> {
         let validator_verifier = self.validator_verifier.clone();
         let mut request_state = BatchRequesterState::new(responders, ret_tx, self.retry_limit);
         let network_sender = self.network_sender.clone();
@@ -168,7 +168,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 counters::RECEIVED_BATCH_RESPONSE_COUNT.inc();
                                 let digest = *batch.digest();
                                 let batch_info = batch.batch_info().clone();
-                                let payload = batch.into_transactions();
+                                let payload = Arc::new(batch.into_transactions());
                                 request_state.serve_request(digest, Some(payload.clone()));
                                 return Some((batch_info, payload));
                             }
