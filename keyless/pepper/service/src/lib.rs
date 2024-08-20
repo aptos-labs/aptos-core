@@ -131,9 +131,10 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         )
         .await?;
 
-    Ok(SignatureResponse {
-        signature: pepper_base,
-    })
+        Ok(SignatureResponse {
+            signature: pepper_base,
+        })
+    }
 }
 
 #[macro_export]
@@ -143,119 +144,124 @@ macro_rules! invalid_signature {
     };
 }
 
-pub fn verify_v0(request: VerifyRequest) -> Result<VerifyResponse, ProcessingFailure> {
-    let VerifyRequest {
-        public_key,
-        signature,
-        message,
-    } = request;
-    if let (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) =
-        (&public_key, &signature)
-    {
-        let KeylessPublicKey { idc: _, iss_val } = public_key;
-        let KeylessSignature {
-            cert,
-            jwt_header_json: _,
-            exp_date_secs: _,
-            ephemeral_pubkey,
-            ephemeral_signature,
-        } = signature;
-        ephemeral_signature
-            .verify_arbitrary_msg(&message, ephemeral_pubkey)
-            .map_err(|e| BadRequest(format!("Ephemeral sig check failed: {e}")))?;
-        let jwt_header = signature
-            .parse_jwt_header()
-            .map_err(|e| BadRequest(format!("JWT header decoding error: {e}")))?;
-        let jwk = jwk::cached_decoding_key_as_rsa(&iss_val, &jwt_header.kid)
-            .map_err(|e| BadRequest(format!("JWK not found: {e}")))?;
-        let config = Configuration::new_for_devnet();
-        let training_wheels_pk = match &config.training_wheels_pubkey {
-            None => None,
-            // This takes ~4.4 microseconds, so we are not too concerned about speed here.
-            // (Run `cargo bench -- ed25519/pk_deserialize` in `crates/aptos-crypto`.)
-            Some(bytes) => Some(EphemeralPublicKey::ed25519(
-                Ed25519PublicKey::try_from(bytes.as_slice()).map_err(|_| {
-                    // println!("[aptos-vm][groth16] On chain TW PK is invalid");
-                    invalid_signature!("The training wheels PK set on chain is not a valid PK")
-                })?,
-            )),
-        };
-        match cert {
-            EphemeralCertificate::ZeroKnowledgeSig(zksig) => {
-                if zksig.exp_horizon_secs > config.max_exp_horizon_secs {
-                    // println!("[aptos-vm][groth16] Expiration horizon is too long");
-                    return Err(invalid_signature!("The expiration horizon is too long"));
-                }
-                if zksig.override_aud_val.is_some() {
-                    config
-                        .is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())
-                        .map_err(|_| {
-                            // println!("[aptos-vm][groth16] PIH computation failed");
-                            invalid_signature!("Could not compute public inputs hash")
-                        })?;
-                }
-                match &zksig.proof {
-                    ZKP::Groth16(groth16proof) => {
-                        // let start = std::time::Instant::now();
-                        let public_inputs_hash =
-                            get_public_inputs_hash(&signature, &public_key, &jwk, &config)
-                                .map_err(|_| {
-                                    // println!("[aptos-vm][groth16] PIH computation failed");
-                                    invalid_signature!("Could not compute public inputs hash")
-                                })?;
-                        // println!("Public inputs hash time: {:?}", start.elapsed());
+pub struct V0VerifyHandler;
 
-                        let groth16_and_stmt =
-                            Groth16ProofAndStatement::new(*groth16proof, public_inputs_hash);
+#[async_trait]
+impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
+    async fn handle(&self, request: VerifyRequest) -> Result<VerifyResponse, ProcessingFailure> {
+        let VerifyRequest {
+            public_key,
+            signature,
+            message,
+        } = request;
+        if let (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) =
+            (&public_key, &signature)
+        {
+            let KeylessPublicKey { idc: _, iss_val } = public_key;
+            let KeylessSignature {
+                cert,
+                jwt_header_json: _,
+                exp_date_secs: _,
+                ephemeral_pubkey,
+                ephemeral_signature,
+            } = signature;
+            ephemeral_signature
+                .verify_arbitrary_msg(&message, ephemeral_pubkey)
+                .map_err(|e| BadRequest(format!("Ephemeral sig check failed: {e}")))?;
+            let jwt_header = signature
+                .parse_jwt_header()
+                .map_err(|e| BadRequest(format!("JWT header decoding error: {e}")))?;
+            let jwk = jwk::cached_decoding_key_as_rsa(&iss_val, &jwt_header.kid)
+                .map_err(|e| BadRequest(format!("JWK not found: {e}")))?;
+            let config = Configuration::new_for_devnet();
+            let training_wheels_pk = match &config.training_wheels_pubkey {
+                None => None,
+                // This takes ~4.4 microseconds, so we are not too concerned about speed here.
+                // (Run `cargo bench -- ed25519/pk_deserialize` in `crates/aptos-crypto`.)
+                Some(bytes) => Some(EphemeralPublicKey::ed25519(
+                    Ed25519PublicKey::try_from(bytes.as_slice()).map_err(|_| {
+                        // println!("[aptos-vm][groth16] On chain TW PK is invalid");
+                        invalid_signature!("The training wheels PK set on chain is not a valid PK")
+                    })?,
+                )),
+            };
+            match cert {
+                EphemeralCertificate::ZeroKnowledgeSig(zksig) => {
+                    if zksig.exp_horizon_secs > config.max_exp_horizon_secs {
+                        // println!("[aptos-vm][groth16] Expiration horizon is too long");
+                        return Err(invalid_signature!("The expiration horizon is too long"));
+                    }
+                    if zksig.override_aud_val.is_some() {
+                        config
+                            .is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())
+                            .map_err(|_| {
+                                // println!("[aptos-vm][groth16] PIH computation failed");
+                                invalid_signature!("Could not compute public inputs hash")
+                            })?;
+                    }
+                    match &zksig.proof {
+                        ZKP::Groth16(groth16proof) => {
+                            // let start = std::time::Instant::now();
+                            let public_inputs_hash =
+                                get_public_inputs_hash(&signature, &public_key, &jwk, &config)
+                                    .map_err(|_| {
+                                        // println!("[aptos-vm][groth16] PIH computation failed");
+                                        invalid_signature!("Could not compute public inputs hash")
+                                    })?;
+                            // println!("Public inputs hash time: {:?}", start.elapsed());
 
-                        // The training wheels signature is only checked if a training wheels PK is set on chain
-                        if training_wheels_pk.is_some() {
-                            match &zksig.training_wheels_signature {
-                                Some(training_wheels_sig) => {
-                                    training_wheels_sig
-                                        .verify(
-                                            &groth16_and_stmt,
-                                            training_wheels_pk.as_ref().unwrap(),
-                                        )
-                                        .map_err(|_| {
-                                            // println!("[aptos-vm][groth16] TW sig verification failed");
-                                            invalid_signature!(
-                                                "Could not verify training wheels signature"
+                            let groth16_and_stmt =
+                                Groth16ProofAndStatement::new(*groth16proof, public_inputs_hash);
+
+                            // The training wheels signature is only checked if a training wheels PK is set on chain
+                            if training_wheels_pk.is_some() {
+                                match &zksig.training_wheels_signature {
+                                    Some(training_wheels_sig) => {
+                                        training_wheels_sig
+                                            .verify(
+                                                &groth16_and_stmt,
+                                                training_wheels_pk.as_ref().unwrap(),
                                             )
-                                        })?;
-                                },
-                                None => {
-                                    // println!("[aptos-vm][groth16] Expected TW sig to be set");
-                                    return Err(invalid_signature!(
-                                        "Training wheels signature expected but it is missing"
-                                    ));
-                                },
+                                            .map_err(|_| {
+                                                // println!("[aptos-vm][groth16] TW sig verification failed");
+                                                invalid_signature!(
+                                                    "Could not verify training wheels signature"
+                                                )
+                                            })?;
+                                    },
+                                    None => {
+                                        // println!("[aptos-vm][groth16] Expected TW sig to be set");
+                                        return Err(invalid_signature!(
+                                            "Training wheels signature expected but it is missing"
+                                        ));
+                                    },
+                                }
                             }
-                        }
 
-                        let result = zksig
-                            .verify_groth16_proof(public_inputs_hash, &DEVNET_VERIFICATION_KEY);
-                        result.map_err(|_| {
-                            // println!("[aptos-vm][groth16] ZKP verification failed");
-                            // println!("[aptos-vm][groth16] PIH: {}", public_inputs_hash);
-                            // match zksig.proof {
-                            //     ZKP::Groth16(proof) => {
-                            //         println!("[aptos-vm][groth16] ZKP: {}", proof.hash());
-                            //     },
-                            // }
-                            // println!(
-                            //     "[aptos-vm][groth16] PVK: {}",
-                            //     Groth16VerificationKey::from(pvk).hash()
-                            // );
-                            invalid_signature!("Proof verification failed")
-                        })?;
-                    },
-                }
-            },
-            EphemeralCertificate::OpenIdSig(_) => todo!(),
+                            let result = zksig
+                                .verify_groth16_proof(public_inputs_hash, &DEVNET_VERIFICATION_KEY);
+                            result.map_err(|_| {
+                                // println!("[aptos-vm][groth16] ZKP verification failed");
+                                // println!("[aptos-vm][groth16] PIH: {}", public_inputs_hash);
+                                // match zksig.proof {
+                                //     ZKP::Groth16(proof) => {
+                                //         println!("[aptos-vm][groth16] ZKP: {}", proof.hash());
+                                //     },
+                                // }
+                                // println!(
+                                //     "[aptos-vm][groth16] PVK: {}",
+                                //     Groth16VerificationKey::from(pvk).hash()
+                                // );
+                                invalid_signature!("Proof verification failed")
+                            })?;
+                        },
+                    }
+                },
+                EphemeralCertificate::OpenIdSig(_) => todo!(),
+            }
         }
+        Ok(VerifyResponse { success: true })
     }
-    Ok(VerifyResponse { success: true })
 }
 
 async fn process_common(

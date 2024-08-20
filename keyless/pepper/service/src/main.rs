@@ -11,7 +11,7 @@ use aptos_keyless_pepper_service::{
     vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     HandlerTrait,
     ProcessingFailure::{BadRequest, InternalError},
-    V0FetchHandler, V0SignatureHandler,
+    V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
 };
 use aptos_logger::{error, info};
 use aptos_types::keyless::test_utils::get_sample_iss;
@@ -45,7 +45,7 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
         (&Method::POST, "/v0/signature") => {
             generate_response(origin, req, &V0SignatureHandler).await
         },
-        (&Method::POST, "/v0/verify") => handle_verify(origin, req, verify_v0).await,
+        (&Method::POST, "/v0/verify") => generate_response(origin, req, &V0VerifyHandler).await,
         (&Method::POST, "/v0/fetch") => generate_response(origin, req, &V0FetchHandler).await,
         (&Method::OPTIONS, _) => hyper::Response::builder()
             .status(StatusCode::OK)
@@ -156,47 +156,6 @@ where
                 .unwrap(),
             )
         },
-    };
-
-    build_response(origin, status_code, body_json)
-}
-
-async fn handle_verify<PREQ, PRES>(
-    origin: String,
-    req: Request<Body>,
-    handler: &HDLR,
-) -> Response<Body>
-where
-    PREQ: Debug + Serialize + DeserializeOwned,
-    PRES: Debug + Serialize,
-    HDLR: HandlerTrait<PREQ, PRES> + Send + Sync,
-{
-    let body = req.into_body();
-    let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
-    let verify_request = serde_json::from_slice::<PREQ>(&body_bytes);
-    info!("verify_request={:?}", verify_request);
-    let verify_response = verify_request.map(process_func);
-    info!("verify_response={:?}", verify_response);
-    let (status_code, body_json) = match verify_response {
-        Ok(Ok(verify_response)) => (
-            StatusCode::OK,
-            serde_json::to_string_pretty(&verify_response).unwrap(),
-        ),
-        Ok(Err(BadRequest(err))) => (
-            StatusCode::BAD_REQUEST,
-            serde_json::to_string_pretty(&BadPepperRequestError {
-                message: err.to_string(),
-            })
-            .unwrap(),
-        ),
-        Ok(Err(InternalError(_))) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
-        Err(err) => (
-            StatusCode::BAD_REQUEST,
-            serde_json::to_string_pretty(&BadPepperRequestError {
-                message: err.to_string(),
-            })
-            .unwrap(),
-        ),
     };
 
     build_response(origin, status_code, body_json)
