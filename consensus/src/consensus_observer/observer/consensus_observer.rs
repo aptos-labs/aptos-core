@@ -703,7 +703,7 @@ impl ConsensusObserver {
             .await;
 
         // Fetch the new epoch state
-        let epoch_state = self.active_observer_state.epoch_state();
+        let epoch_state = self.get_epoch_state();
 
         // Start the new epoch
         let sk = Arc::new(bls12381::PrivateKey::genesis());

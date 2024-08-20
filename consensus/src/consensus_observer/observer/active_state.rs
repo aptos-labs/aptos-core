@@ -16,6 +16,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
@@ -65,6 +66,16 @@ impl ActiveObserverState {
             .expect("Failed to read latest ledger info from storage!");
 
         // Create the active observer state
+        ActiveObserverState::new_with_root(node_config, reconfig_events, consensus_publisher, root)
+    }
+
+    /// Creates a returns a new active observer state with the given root ledger info
+    fn new_with_root(
+        node_config: NodeConfig,
+        reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        root: LedgerInfoWithSignatures,
+    ) -> Self {
         Self {
             node_config,
             consensus_publisher,
@@ -98,29 +109,13 @@ impl ActiveObserverState {
 
         // Create the commit callback
         Box::new(move |blocks, ledger_info: LedgerInfoWithSignatures| {
-            // Remove the committed blocks from the payload and pending stores
-            block_payload_store.remove_committed_blocks(blocks);
-            pending_ordered_blocks.remove_blocks_for_commit(&ledger_info);
-
-            // Verify the ledger info is for the same epoch
-            let mut root = root.lock();
-            if ledger_info.commit_info().epoch() != root.commit_info().epoch() {
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Received commit callback for a different epoch! Ledger info: {:?}, Root: {:?}",
-                        ledger_info.commit_info(),
-                        root.commit_info()
-                    ))
-                );
-                return;
-            }
-
-            // Update the root ledger info. Note: we only want to do this if
-            // the new ledger info round is greater than the current root
-            // round. Otherwise, this can race with the state sync process.
-            if ledger_info.commit_info().round() > root.commit_info().round() {
-                *root = ledger_info;
-            }
+            handle_committed_blocks(
+                pending_ordered_blocks,
+                block_payload_store,
+                root,
+                blocks,
+                ledger_info,
+            );
         })
     }
 
@@ -282,4 +277,311 @@ async fn extract_on_chain_configs(
         execution_config,
         onchain_randomness_config,
     )
+}
+
+/// A simple helper function that handles the committed blocks
+/// (as part of the commit callback).
+fn handle_committed_blocks(
+    pending_ordered_blocks: OrderedBlockStore,
+    block_payload_store: BlockPayloadStore,
+    root: Arc<Mutex<LedgerInfoWithSignatures>>,
+    blocks: &[Arc<PipelinedBlock>],
+    ledger_info: LedgerInfoWithSignatures,
+) {
+    // Remove the committed blocks from the payload and pending stores
+    block_payload_store.remove_committed_blocks(blocks);
+    pending_ordered_blocks.remove_blocks_for_commit(&ledger_info);
+
+    // Verify the ledger info is for the same epoch
+    let mut root = root.lock();
+    if ledger_info.commit_info().epoch() != root.commit_info().epoch() {
+        warn!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Received commit callback for a different epoch! Ledger info: {:?}, Root: {:?}",
+                ledger_info.commit_info(),
+                root.commit_info()
+            ))
+        );
+        return;
+    }
+
+    // Update the root ledger info. Note: we only want to do this if
+    // the new ledger info round is greater than the current root
+    // round. Otherwise, this can race with the state sync process.
+    if ledger_info.commit_info().round() > root.commit_info().round() {
+        *root = ledger_info;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::consensus_observer::network::observer_message::{
+        BlockPayload, BlockTransactionPayload, OrderedBlock,
+    };
+    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+    use aptos_consensus_types::{
+        block::Block,
+        block_data::{BlockData, BlockType},
+        quorum_cert::QuorumCert,
+    };
+    use aptos_crypto::HashValue;
+    use aptos_event_notifications::ReconfigNotification;
+    use aptos_types::{
+        aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
+        transaction::Version,
+    };
+
+    #[test]
+    fn test_check_root_epoch_and_round() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the active observer state
+        let (_, reconfig_events) = create_reconfig_notifier_and_listener();
+        let observer_state =
+            ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
+
+        // Check the root epoch and round
+        assert!(observer_state.check_root_epoch_and_round(epoch, round));
+        assert!(!observer_state.check_root_epoch_and_round(epoch, round + 1));
+        assert!(!observer_state.check_root_epoch_and_round(epoch + 1, round));
+
+        // Update the root ledger info
+        let new_epoch = epoch + 10;
+        let new_round = round + 100;
+        let new_root = create_ledger_info(new_epoch, new_round);
+        observer_state.update_root(new_root.clone());
+
+        // Check the updated root epoch and round
+        assert!(!observer_state.check_root_epoch_and_round(epoch, round));
+        assert!(observer_state.check_root_epoch_and_round(new_epoch, new_round));
+    }
+
+    #[test]
+    fn test_get_and_update_root() {
+        // Create a root ledger info
+        let epoch = 100;
+        let round = 50;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the active observer state
+        let (_, reconfig_events) = create_reconfig_notifier_and_listener();
+        let observer_state = ActiveObserverState::new_with_root(
+            NodeConfig::default(),
+            reconfig_events,
+            None,
+            root.clone(),
+        );
+
+        // Check the root ledger info
+        assert_eq!(observer_state.root(), root);
+
+        // Update the root ledger info
+        let new_root = create_ledger_info(epoch, round + 1000);
+        observer_state.update_root(new_root.clone());
+
+        // Check the updated root ledger info
+        assert_eq!(observer_state.root(), new_root);
+    }
+
+    #[test]
+    fn test_handle_committed_blocks() {
+        // Create a node config
+        let node_config = NodeConfig::default();
+
+        // Create the root ledger info
+        let epoch = 1000;
+        let round = 100;
+        let root = Arc::new(Mutex::new(create_ledger_info(epoch, round)));
+
+        // Create the ordered block store and block payload store
+        let ordered_block_store = OrderedBlockStore::new(node_config.consensus_observer);
+        let mut block_payload_store = BlockPayloadStore::new(node_config.consensus_observer);
+
+        // Handle the committed blocks at the wrong epoch and verify the root is not updated
+        handle_committed_blocks(
+            ordered_block_store.clone(),
+            block_payload_store.clone(),
+            root.clone(),
+            &[],
+            create_ledger_info(epoch + 1, round + 1),
+        );
+        assert_eq!(root.lock().commit_info().epoch(), epoch);
+
+        // Handle the committed blocks at the wrong round and verify the root is not updated
+        handle_committed_blocks(
+            ordered_block_store.clone(),
+            block_payload_store.clone(),
+            root.clone(),
+            &[],
+            create_ledger_info(epoch, round - 1),
+        );
+        assert_eq!(root.lock().commit_info().round(), round);
+
+        // Add pending ordered blocks
+        let num_ordered_blocks = 10;
+        let ordered_blocks =
+            create_and_add_ordered_blocks(&ordered_block_store, num_ordered_blocks, epoch, round);
+
+        // Add block payloads for the ordered blocks
+        for ordered_block in &ordered_blocks {
+            create_and_add_payloads_for_ordered_block(&mut block_payload_store, ordered_block);
+        }
+
+        // Create the commit ledger info (for the second to last block)
+        let commit_round = round + (num_ordered_blocks as Round) - 2;
+        let committed_ledger_info = create_ledger_info(epoch, commit_round);
+
+        // Create the committed blocks and ledger info
+        let mut committed_blocks = vec![];
+        for ordered_block in ordered_blocks.iter().take(num_ordered_blocks - 1) {
+            let pipelined_block = create_pipelined_block(ordered_block.blocks()[0].block_info());
+            committed_blocks.push(pipelined_block);
+        }
+
+        // Handle the committed blocks
+        handle_committed_blocks(
+            ordered_block_store.clone(),
+            block_payload_store.clone(),
+            root.clone(),
+            &committed_blocks,
+            committed_ledger_info.clone(),
+        );
+
+        // Verify the committed blocks are removed from the stores
+        assert_eq!(ordered_block_store.get_all_ordered_blocks().len(), 1);
+        assert_eq!(block_payload_store.get_block_payloads().lock().len(), 1);
+
+        // Verify the root is updated
+        assert_eq!(root.lock().clone(), committed_ledger_info);
+    }
+
+    #[test]
+    fn test_simple_epoch_state() {
+        // Create a root ledger info
+        let epoch = 10;
+        let round = 5;
+        let root = create_ledger_info(epoch, round);
+
+        // Create the active observer state
+        let (_, reconfig_events) = create_reconfig_notifier_and_listener();
+        let mut observer_state =
+            ActiveObserverState::new_with_root(NodeConfig::default(), reconfig_events, None, root);
+
+        // Verify that quorum store is not enabled
+        assert!(!observer_state.is_quorum_store_enabled());
+
+        // Manually update the epoch state and quorum store flag
+        let epoch_state = Arc::new(EpochState::empty());
+        observer_state.epoch_state = Some(epoch_state.clone());
+        observer_state.quorum_store_enabled = true;
+
+        // Verify the epoch state and quorum store flag are updated
+        assert_eq!(observer_state.epoch_state(), epoch_state);
+        assert!(observer_state.is_quorum_store_enabled());
+    }
+
+    /// Creates and adds the specified number of ordered blocks to the ordered blocks
+    fn create_and_add_ordered_blocks(
+        ordered_block_store: &OrderedBlockStore,
+        num_ordered_blocks: usize,
+        epoch: u64,
+        starting_round: Round,
+    ) -> Vec<OrderedBlock> {
+        let mut ordered_blocks = vec![];
+        for i in 0..num_ordered_blocks {
+            // Create a new block info
+            let round = starting_round + (i as Round);
+            let block_info = BlockInfo::new(
+                epoch,
+                round,
+                HashValue::random(),
+                HashValue::random(),
+                i as Version,
+                i as u64,
+                None,
+            );
+
+            // Create a pipelined block
+            let block_data = BlockData::new_for_testing(
+                block_info.epoch(),
+                block_info.round(),
+                block_info.timestamp_usecs(),
+                QuorumCert::dummy(),
+                BlockType::Genesis,
+            );
+            let block = Block::new_for_testing(block_info.id(), block_data, None);
+            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(block));
+
+            // Create an ordered block
+            let blocks = vec![pipelined_block];
+            let ordered_proof =
+                create_ledger_info(epoch, i as aptos_consensus_types::common::Round);
+            let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+
+            // Insert the block into the ordered block store
+            ordered_block_store.insert_ordered_block(ordered_block.clone());
+
+            // Add the block to the ordered blocks
+            ordered_blocks.push(ordered_block);
+        }
+
+        ordered_blocks
+    }
+
+    /// Creates and adds payloads for the ordered block
+    fn create_and_add_payloads_for_ordered_block(
+        block_payload_store: &mut BlockPayloadStore,
+        ordered_block: &OrderedBlock,
+    ) {
+        for block in ordered_block.blocks() {
+            let block_payload =
+                BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
+            block_payload_store.insert_block_payload(block_payload, true);
+        }
+    }
+
+    /// Creates and returns a new ledger info with the specified epoch and round
+    fn create_ledger_info(
+        epoch: u64,
+        round: aptos_consensus_types::common::Round,
+    ) -> LedgerInfoWithSignatures {
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(
+                BlockInfo::random_with_epoch(epoch, round),
+                HashValue::random(),
+            ),
+            AggregateSignature::empty(),
+        )
+    }
+
+    /// Creates and returns a new pipelined block with the given block info
+    fn create_pipelined_block(block_info: BlockInfo) -> Arc<PipelinedBlock> {
+        let block_data = BlockData::new_for_testing(
+            block_info.epoch(),
+            block_info.round(),
+            block_info.timestamp_usecs(),
+            QuorumCert::dummy(),
+            BlockType::Genesis,
+        );
+        let block = Block::new_for_testing(block_info.id(), block_data, None);
+        Arc::new(PipelinedBlock::new_ordered(block))
+    }
+
+    /// Creates and returns a reconfig notifier and listener
+    fn create_reconfig_notifier_and_listener() -> (
+        aptos_channel::Sender<(), ReconfigNotification<DbBackedOnChainConfig>>,
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+    ) {
+        let (notification_sender, notification_receiver) =
+            aptos_channel::new(QueueStyle::LIFO, 1, None);
+        let reconfig_notification_listener = ReconfigNotificationListener {
+            notification_receiver,
+        };
+
+        (notification_sender, reconfig_notification_listener)
+    }
 }
