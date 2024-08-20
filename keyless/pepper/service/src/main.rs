@@ -7,7 +7,7 @@ use aptos_keyless_pepper_service::{
     account_managers::ACCOUNT_MANAGERS,
     jwk::{self, parse_jwks, DECODING_KEY_CACHE},
     metrics::start_metric_server,
-    process_signature_v0, process_v0,
+    process_signature_v0, process_v0, verify_v0,
     vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     ProcessingFailure::{self, BadRequest, InternalError},
 };
@@ -43,6 +43,7 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
         (&Method::POST, "/v0/signature") => {
             handle_fetch_common(origin, req, process_signature_v0).await
         },
+        (&Method::POST, "/v0/verify") => handle_verify(origin, req, verify_v0).await,
         (&Method::POST, "/v0/fetch") => handle_fetch_common(origin, req, process_v0).await,
         (&Method::OPTIONS, _) => hyper::Response::builder()
             .status(StatusCode::OK)
@@ -119,6 +120,46 @@ where
         Ok(Ok(pepper_response)) => (
             StatusCode::OK,
             serde_json::to_string_pretty(&pepper_response).unwrap(),
+        ),
+        Ok(Err(BadRequest(err))) => (
+            StatusCode::BAD_REQUEST,
+            serde_json::to_string_pretty(&BadPepperRequestError {
+                message: err.to_string(),
+            })
+            .unwrap(),
+        ),
+        Ok(Err(InternalError(_))) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
+        Err(err) => (
+            StatusCode::BAD_REQUEST,
+            serde_json::to_string_pretty(&BadPepperRequestError {
+                message: err.to_string(),
+            })
+            .unwrap(),
+        ),
+    };
+
+    build_response(origin, status_code, body_json)
+}
+
+async fn handle_verify<PREQ, PRES>(
+    origin: String,
+    req: Request<Body>,
+    process_func: fn(PREQ) -> Result<PRES, ProcessingFailure>,
+) -> Response<Body>
+where
+    PREQ: Debug + Serialize + DeserializeOwned,
+    PRES: Debug + Serialize,
+{
+    let body = req.into_body();
+    let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
+    let verify_request = serde_json::from_slice::<PREQ>(&body_bytes);
+    info!("verify_request={:?}", verify_request);
+    let verify_response = verify_request.map(process_func);
+    info!("verify_response={:?}", verify_response);
+    let (status_code, body_json) = match verify_response {
+        Ok(Ok(verify_response)) => (
+            StatusCode::OK,
+            serde_json::to_string_pretty(&verify_response).unwrap(),
         ),
         Ok(Err(BadRequest(err))) => (
             StatusCode::BAD_REQUEST,

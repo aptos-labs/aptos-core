@@ -118,13 +118,35 @@ impl PartialAuthenticatorAssertionResponse {
         message: &T,
         public_key: &AnyPublicKey,
     ) -> Result<()> {
+        // Generate signing_message, which is the BCS encoded bytes of message, prefixed with a hash
+        let signing_message_bytes = signing_message(message)?;
+        // Expected challenge is SHA3-256 digest of RawTransaction bytes
+        let expected_challenge = HashValue::sha3_256_of(signing_message_bytes.as_slice());
+        self.verify_arbitrary_msg(expected_challenge.to_vec().as_slice(), public_key)
+    }
+
+    /// In our adaptation of WebAuthn, the `challenge` provided to `authenticatorGetAssertion`
+    /// is the SHA3-256 digest of the `RawTransaction`.
+    ///
+    /// This function should do the following:
+    /// 1. Verify `actual_challenge` and expected challenge from message are equal
+    /// 2. Construct `verification_data` as the binary concatenation of
+    ///    authenticator_data and SHA-256(client_data_json)
+    /// 3. Signature verification
+    ///
+    /// See WebAuthn §6.3.3 `authenticatorGetAssertion` for more info
+    pub fn verify_arbitrary_msg(&self, message: &[u8], public_key: &AnyPublicKey) -> Result<()> {
         let collected_client_data: CollectedClientData =
             serde_json::from_slice(self.client_data_json.as_slice())?;
         let challenge_bytes = Bytes::try_from(collected_client_data.challenge.as_str())
             .map_err(|e| anyhow!("Failed to decode challenge bytes {:?}", e))?;
 
         // Check if expected challenge and actual challenge match. If there's no match, throw error
-        verify_expected_challenge_from_message_matches_actual(message, challenge_bytes.as_slice())?;
+        challenge_bytes
+            .as_slice()
+            .eq(message)
+            .then_some(())
+            .ok_or(CryptoMaterialError::ValidationError)?;
 
         // Generates binary concatenation of authenticator_data and hash(client_data_json)
         let verification_data = generate_verification_data(

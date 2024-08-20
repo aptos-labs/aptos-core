@@ -14,7 +14,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa, secp256r1_ecdsa,
+    secp256k1_ecdsa, secp256r1_ecdsa, signing_message,
     traits::Signature,
     CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
@@ -1051,6 +1051,19 @@ impl AnySignature {
             _ => bail!("Invalid key, signature pairing"),
         }
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
+    }
+}
+
+impl TryFrom<&[u8]> for AnySignature {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<AnySignature>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -1090,6 +1103,16 @@ impl AnyPublicKey {
         bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
     }
 }
+
+impl TryFrom<&[u8]> for AnyPublicKey {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<AnyPublicKey>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EphemeralSignature {
     Ed25519 {
@@ -1110,12 +1133,23 @@ impl EphemeralSignature {
         message: &T,
         public_key: &EphemeralPublicKey,
     ) -> Result<()> {
+        self.verify_arbitrary_msg(&signing_message(message)?, public_key)
+    }
+
+    pub fn verify_arbitrary_msg(
+        &self,
+        message: &[u8],
+        public_key: &EphemeralPublicKey,
+    ) -> Result<()> {
         match (self, public_key) {
             (Self::Ed25519 { signature }, EphemeralPublicKey::Ed25519 { public_key }) => {
-                signature.verify(message, public_key)
+                signature.verify_arbitrary_msg(message, public_key)
             },
             (Self::WebAuthn { signature }, EphemeralPublicKey::Secp256r1Ecdsa { public_key }) => {
-                signature.verify(message, &AnyPublicKey::secp256r1_ecdsa(public_key.clone()))
+                signature.verify_arbitrary_msg(
+                    message,
+                    &AnyPublicKey::secp256r1_ecdsa(public_key.clone()),
+                )
             },
             _ => {
                 bail!("Unsupported ephemeral signature and public key combination");
