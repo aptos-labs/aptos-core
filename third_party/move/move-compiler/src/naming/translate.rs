@@ -1043,6 +1043,15 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
                 ));
             }
             let nes = call_args(context, rhs);
+            if nes.value.len() == 1 {
+                context.env.add_diag(diag!(
+                    Syntax::UnsupportedLanguageItem,
+                    (
+                        mloc,
+                        "single-parameter assert! macro not supported by this compiler"
+                    )
+                ));
+            }
             NE::Builtin(sp(mloc, BF::Assert(true)), nes)
         },
         EE::Call(sp!(mloc, _), CallKind::Receiver, ..) => {
