@@ -47,7 +47,7 @@ where
                 NodeStrongRef::Leaf(leaf) => Some(Box::new(
                     leaf.content
                         .clone()
-                        .into_iter(self.layered_map.bottom_layer()),
+                        .into_iter(self.layered_map.base_layer()),
                 )),
                 NodeStrongRef::Internal(internal) => {
                     let left = self.layered_map.get_node_strong(&internal.left);

@@ -133,6 +133,11 @@ impl Loc {
         }
     }
 
+    /// Checks if `self` is an inlined location.
+    pub fn is_inlined(&self) -> bool {
+        self.inlined_from_loc.is_some()
+    }
+
     // If `self` is an inlined `Loc`, then add the same
     // inlining info to the parameter `loc`.
     fn inline_if_needed(&self, loc: Loc) -> Loc {
