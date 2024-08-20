@@ -25,6 +25,7 @@ use aptos_types::{
         EntryFunction as TransactionEntryFunction, ExecutionStatus, RawTransaction,
         Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
     },
+    txn_provider::default::DefaultTxnProvider,
     vm::configs::set_paranoid_type_checks,
     AptosCoinType,
 };
@@ -517,13 +518,14 @@ impl<'a> AptosTestAdapter<'a> {
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
         let txn_block = vec![txn];
         let sig_verified_block = into_signature_verified_block(txn_block);
+        let txn_provider = Arc::new(DefaultTxnProvider::new(sig_verified_block));
         let onchain_config = BlockExecutorConfigFromOnchain {
             // TODO fetch values from state?
             // Or should we just use execute_block_no_limit ?
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };
         let (mut outputs, _) =
-            AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
+            AptosVM::execute_block(txn_provider, &self.storage.clone(), onchain_config)?
                 .into_inner();
 
         assert_eq!(outputs.len(), 1);

@@ -312,12 +312,15 @@ impl CommitDecision {
 /// The transaction payload and proof of each block
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PayloadWithProof {
-    transactions: Vec<SignedTransaction>,
-    proofs: Vec<ProofOfStore>,
+    pub transactions: Vec<(Arc<Vec<SignedTransaction>>, u64)>,
+    pub proofs: Vec<ProofOfStore>,
 }
 
 impl PayloadWithProof {
-    pub fn new(transactions: Vec<SignedTransaction>, proofs: Vec<ProofOfStore>) -> Self {
+    pub fn new(
+        transactions: Vec<(Arc<Vec<SignedTransaction>>, u64)>,
+        proofs: Vec<ProofOfStore>,
+    ) -> Self {
         Self {
             transactions,
             proofs,
@@ -371,7 +374,7 @@ pub enum BlockTransactionPayload {
 impl BlockTransactionPayload {
     /// Creates a returns a new InQuorumStore transaction payload
     pub fn new_in_quorum_store(
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(Arc<Vec<SignedTransaction>>, u64)>,
         proofs: Vec<ProofOfStore>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
@@ -380,7 +383,7 @@ impl BlockTransactionPayload {
 
     /// Creates a returns a new InQuorumStoreWithLimit transaction payload
     pub fn new_in_quorum_store_with_limit(
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(Arc<Vec<SignedTransaction>>, u64)>,
         proofs: Vec<ProofOfStore>,
         limit: Option<u64>,
     ) -> Self {
@@ -391,7 +394,7 @@ impl BlockTransactionPayload {
 
     /// Creates a returns a new QuorumStoreInlineHybrid transaction payload
     pub fn new_quorum_store_inline_hybrid(
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(Arc<Vec<SignedTransaction>>, u64)>,
         proofs: Vec<ProofOfStore>,
         limit: Option<u64>,
         inline_batches: Vec<BatchInfo>,
@@ -402,7 +405,7 @@ impl BlockTransactionPayload {
     }
 
     pub fn new_opt_quorum_store(
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(Arc<Vec<SignedTransaction>>, u64)>,
         proofs: Vec<ProofOfStore>,
         limit: Option<u64>,
         batch_infos: Vec<BatchInfo>,
@@ -457,7 +460,7 @@ impl BlockTransactionPayload {
     }
 
     /// Returns the transactions in the payload
-    pub fn transactions(&self) -> Vec<SignedTransaction> {
+    pub fn transactions(&self) -> Vec<(Arc<Vec<SignedTransaction>>, u64)> {
         match self {
             BlockTransactionPayload::InQuorumStore(payload) => payload.transactions.clone(),
             BlockTransactionPayload::InQuorumStoreWithLimit(payload) => {
@@ -546,7 +549,7 @@ impl BlockTransactionPayload {
     /// Verifies the inline batches against the expected inline batches
     fn verify_inline_batches(
         &self,
-        expected_inline_batches: &[(BatchInfo, Vec<SignedTransaction>)],
+        expected_inline_batches: &[(BatchInfo, Arc<Vec<SignedTransaction>>)],
     ) -> Result<(), Error> {
         // Get the expected inline batches
         let expected_inline_batches: Vec<&BatchInfo> = expected_inline_batches
@@ -665,7 +668,14 @@ impl BlockPayload {
     pub fn verify_payload_digests(&self) -> Result<(), Error> {
         // Get the block info, transactions, payload proofs and inline batches
         let block_info = self.block.clone();
-        let transactions = self.transaction_payload.transactions();
+        // Get the transactions, payload proofs and inline batches
+        // TODO: avoid a clone here?
+        let transactions: Vec<_> = self
+            .transaction_payload
+            .transactions()
+            .into_iter()
+            .flat_map(|(txns, _)| txns.as_ref().clone().into_iter())
+            .collect();
         let payload_proofs = self.transaction_payload.payload_proofs();
         let inline_batches = self.transaction_payload.inline_batches();
 
@@ -954,7 +964,7 @@ mod test {
         // Create a quorum store payload with a single inline batch
         let proof_with_data = ProofWithData::new(vec![]);
         let ordered_payload = Payload::QuorumStoreInlineHybrid(
-            vec![(create_batch_info(), vec![])],
+            vec![(create_batch_info(), Arc::new(vec![]))],
             proof_with_data,
             transaction_limit,
         );
@@ -1392,7 +1402,8 @@ mod test {
     ) -> BlockPayload {
         // Create the transaction payload
         let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
-            signed_transactions.to_vec(),
+            // TODO: this seems wrong
+            vec![(Arc::new(signed_transactions.to_vec()), 0)],
             proofs.to_vec(),
             None,
             inline_batches.to_vec(),
@@ -1460,7 +1471,7 @@ mod test {
             BlockType::Genesis,
         );
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(
+        Arc::new(PipelinedBlock::new_with_window(
             block,
             OrderedBlockWindow::empty(),
         ))
@@ -1493,7 +1504,7 @@ mod test {
 
         // Create the pipelined block
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(
+        Arc::new(PipelinedBlock::new_with_window(
             block,
             OrderedBlockWindow::empty(),
         ))

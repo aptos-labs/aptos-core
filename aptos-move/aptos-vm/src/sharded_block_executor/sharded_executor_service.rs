@@ -28,6 +28,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput,
     },
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
@@ -135,9 +136,11 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
+                let txn_provider =
+                    Arc::new(DefaultTxnProvider::new(signature_verified_transactions));
                 let ret = BlockAptosVM::execute_block_on_thread_pool(
                     executor_thread_pool,
-                    &signature_verified_transactions,
+                    txn_provider.clone(),
                     aggr_overridden_state_view.as_ref(),
                     config,
                     cross_shard_commit_sender,
@@ -163,7 +166,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 callback.send(ret).unwrap();
                 executor_thread_pool_clone.spawn(move || {
                     // Explicit async drop
-                    drop(signature_verified_transactions);
+                    // TODO: does this drop the provider or the arc?
+                    drop(txn_provider);
                 });
             });
         });

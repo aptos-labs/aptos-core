@@ -14,6 +14,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
         TransactionOutput, Version,
     },
+    txn_provider::default::DefaultTxnProvider,
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 use aptos_validator_interface::{AptosValidatorInterface, FilterCondition, RestDebuggerInterface};
@@ -92,7 +93,8 @@ impl DataCollection {
         // FIXME(#10412): remove the assert
         let val = debugger_state_view.get_state_value(TOTAL_SUPPLY_STATE_KEY.deref());
         assert!(val.is_ok() && val.unwrap().is_some());
-        AptosVM::execute_block_no_limit(&sig_verified_txns, debugger_state_view)
+        let txn_provider = Arc::new(DefaultTxnProvider::new(sig_verified_txns));
+        AptosVM::execute_block_no_limit(txn_provider, debugger_state_view)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 

@@ -153,6 +153,17 @@ pub static TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static TXN_GET_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_txn_get_seconds",
+        // metric description
+        "The time spent in txn get (for blocking txn provider) in Block STM",
+        time_buckets(),
+    )
+    .unwrap()
+});
+
 pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_execution_dependency_wait",
