@@ -199,6 +199,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Whether to attach the compiled module to the global env.".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::LINT_CHECKS.to_string(),
+            description: "Whether to run various lint checks.".to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -223,6 +228,7 @@ impl Experiment {
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
+    pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
