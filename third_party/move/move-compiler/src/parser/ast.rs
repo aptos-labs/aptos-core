@@ -507,34 +507,39 @@ new_name!(Var);
 pub enum Bind_ {
     // x
     Var(Var),
-    // T { f1: b1, ... fn: bn }
-    // T<t1, ... , tn> { f1: b1, ... fn: bn }
+    // T { f1: b1, ... fn: bn, ".."? }
+    // T<t1, ... , tn> { f1: b1, ... fn: bn, ".."? }
     Unpack(
         Box<NameAccessChain>,
         Option<Vec<Type>>,
-        Vec<BindFieldOrDotdot>,
+        Vec<BindFieldOrDotDot>,
     ),
     // T(e1, ..., en)
     // T<t1, ... , tn>(e1, ..., en)
-    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotdot>),
+    // where each e_i is an expression or a ".."
+    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotDot>),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
 pub type BindList = Spanned<Vec<Bind>>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BindFieldOrDotdot_ {
+pub enum BindFieldOrDotDot_ {
+    // f : b
     FieldBind(Field, Bind),
-    Dotdot,
+    // ..
+    DotDot,
 }
-pub type BindFieldOrDotdot = Spanned<BindFieldOrDotdot_>;
+pub type BindFieldOrDotDot = Spanned<BindFieldOrDotDot_>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BindOrDotdot_ {
+pub enum BindOrDotDot_ {
+    // a bind
     Bind(Bind),
-    Dotdot,
+    // ..
+    DotDot,
 }
-pub type BindOrDotdot = Spanned<BindOrDotdot_>;
+pub type BindOrDotDot = Spanned<BindOrDotDot_>;
 
 pub type BindWithRange = Spanned<(Bind, Exp)>;
 pub type BindWithRangeList = Spanned<Vec<BindWithRange>>;
@@ -2057,25 +2062,25 @@ impl AstDebug for Vec<Bind> {
     }
 }
 
-impl AstDebug for BindOrDotdot_ {
+impl AstDebug for BindOrDotDot_ {
     fn ast_debug(&self, w: &mut AstWriter) {
-        use BindOrDotdot_ as B;
+        use BindOrDotDot_ as B;
         match self {
             B::Bind(b) => b.ast_debug(w),
-            B::Dotdot => w.write(".."),
+            B::DotDot => w.write(".."),
         }
     }
 }
 
-impl AstDebug for BindFieldOrDotdot_ {
+impl AstDebug for BindFieldOrDotDot_ {
     fn ast_debug(&self, w: &mut AstWriter) {
-        use BindFieldOrDotdot_ as B;
+        use BindFieldOrDotDot_ as B;
         match self {
             B::FieldBind(f, b) => {
                 w.write(&format!("{}: ", f));
                 b.ast_debug(w);
             },
-            B::Dotdot => w.write(".."),
+            B::DotDot => w.write(".."),
         }
     }
 }

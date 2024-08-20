@@ -2432,21 +2432,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ) else {
                     return self.new_error_pat(loc);
                 };
-                let arity = self.get_struct_arity(struct_id.to_qualified_id(), variant).expect("arity");
+                let arity = self
+                    .get_struct_arity(struct_id.to_qualified_id(), variant)
+                    .expect("arity");
                 let dotdot_loc = args
                     .value
                     .iter()
                     .filter_map(|arg| {
-                        if let sp!(loc, EA::LValueOrDotdot_::Dotdot) = arg {
-                            Some(loc.clone())
+                        if let sp!(loc, EA::LValueOrDotDot_::DotDot) = arg {
+                            Some(*loc)
                         } else {
                             None
                         }
                     })
                     .next();
                 if dotdot_loc.is_none() && args.value.len() != arity
-                    || dotdot_loc.is_some()
-                        && args.value.len() - 1 > arity
+                    || dotdot_loc.is_some() && args.value.len() - 1 > arity
                 {
                     self.error(
                         loc,
@@ -2467,7 +2468,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 while remaining > 0 {
                     let sp!(arg_loc, arg) = args.value.get(arg_idx).expect("invalid index");
                     match arg {
-                        EA::LValueOrDotdot_::LValue(lval) => {
+                        EA::LValueOrDotDot_::LValue(lval) => {
                             let field_name = Name::new(
                                 *arg_loc,
                                 move_symbol_pool::Symbol::from(format!("{}", field_offset)),
@@ -2479,7 +2480,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             remaining -= 1;
                             field_offset += 1;
                         },
-                        EA::LValueOrDotdot_::Dotdot => {
+                        EA::LValueOrDotDot_::DotDot => {
                             let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
                                 arity + 1 - args.value.len()
                             } else {
@@ -2502,7 +2503,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     arg_idx += 1;
                 }
                 let unpack_ = EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields, None);
-                let unpack = Spanned::new(lv.loc.clone(), unpack_);
+                let unpack = Spanned::new(lv.loc, unpack_);
                 self.translate_lvalue(
                     &unpack,
                     expected_type,
@@ -2524,7 +2525,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         maccess: &EA::ModuleAccess,
         generics: &Option<Vec<EA::Type>>,
         fields: Option<&EA::Fields<EA::LValue>>,
-        dotdot: &Option<EA::Dotdot>,
+        dotdot: &Option<EA::DotDot>,
     ) -> Option<Pattern> {
         // Translate constructor name
         let expected_type = self.subs.specialize(expected_type);
@@ -2566,8 +2567,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let missing_fields =
                 self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
             if let Some(dotdot) = dotdot {
-                for uncoverd_field in missing_fields {
-                    if let Some(field_data) = field_decls.get(&uncoverd_field) {
+                for uncovered_field in missing_fields {
+                    if let Some(field_data) = field_decls.get(&uncovered_field) {
                         let field_ty = field_data.ty.instantiate(&inst);
                         let expected_field_ty = if let Some(kind) = ref_expected {
                             Type::Reference(kind, Box::new(field_ty.clone()))
@@ -4751,16 +4752,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> Option<usize> {
         let struct_entry = self.parent.parent.lookup_struct_entry(struct_id);
         match (&struct_entry.layout, variant) {
-            (StructLayout::Singleton(fields, _), None) => {
-                Some(if struct_entry.is_empty_struct { 0 } else { fields.len() })
-            },
-            (StructLayout::Variants(variants), Some(name)) => {
-                if let Some(variant) = variants.iter().find(|v| v.name == name) {
-                    Some(variant.fields.len())
+            (StructLayout::Singleton(fields, _), None) => Some(
+                if struct_entry.is_empty_struct {
+                    0
                 } else {
-                    None
-                }
-            },
+                    fields.len()
+                },
+            ),
+            (StructLayout::Variants(variants), Some(name)) => variants
+                .iter()
+                .find(|v| v.name == name)
+                .map(|v| v.fields.len()),
             _ => None,
         }
     }

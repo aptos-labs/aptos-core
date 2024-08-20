@@ -418,9 +418,9 @@ pub enum LValue_ {
         ModuleAccess,
         Option<Vec<Type>>,
         Fields<LValue>,
-        Option<Dotdot>,
+        Option<DotDot>,
     ),
-    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueOrDotdotList),
+    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueOrDotDotList),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
@@ -433,17 +433,17 @@ pub fn wild_card(loc: Loc) -> LValue {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Dotdot_;
-pub type Dotdot = Spanned<Dotdot_>;
+pub struct DotDot_;
+pub type DotDot = Spanned<DotDot_>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum LValueOrDotdot_ {
+pub enum LValueOrDotDot_ {
     LValue(LValue),
-    Dotdot,
+    DotDot,
 }
-pub type LValueOrDotdot = Spanned<LValueOrDotdot_>;
-pub type LValueOrDotdotList_ = Vec<LValueOrDotdot>;
-pub type LValueOrDotdotList = Spanned<LValueOrDotdotList_>;
+pub type LValueOrDotDot = Spanned<LValueOrDotDot_>;
+pub type LValueOrDotDotList_ = Vec<LValueOrDotDot>;
+pub type LValueOrDotDotList = Spanned<LValueOrDotDotList_>;
 
 pub type LValueWithRange_ = (LValue, Exp);
 pub type LValueWithRange = Spanned<LValueWithRange_>;
@@ -1861,12 +1861,12 @@ impl AstDebug for LValue_ {
     }
 }
 
-impl AstDebug for LValueOrDotdot_ {
+impl AstDebug for LValueOrDotDot_ {
     fn ast_debug(&self, w: &mut AstWriter) {
-        use LValueOrDotdot_::*;
+        use LValueOrDotDot_::*;
         match self {
             LValue(l) => l.ast_debug(w),
-            Dotdot => w.write(".."),
+            DotDot => w.write(".."),
         }
     }
 }

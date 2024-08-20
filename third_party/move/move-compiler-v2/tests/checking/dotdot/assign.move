@@ -7,17 +7,48 @@ module 0x42::test {
 		z: C,
 	}
 
+	fun drop_S1<A, B, C>(x: S1) {
+		S1(..) = x;
+	}
+
 	fun proj_0_S1<A, B>(x: &S1<A, B>): &A {
 		let a;
-		S1(a, b) = x;
+		S1(a, ..) = x;
 		a
+	}
+
+	fun proj_1_S1<A, B>(x: &S1<A, B>): &B {
+		let b;
+		S1(_, b, ..) = x;
+		S1(.., b, _) = x;
+		b
+	}
+
+	fun proj_2_S1<A, B>(x: &S1<A, B>): &C {
+		let c;
+		S1(.., c) = x;
+		c
+	}
+
+	fun drop_S2<A, B, C>(s: S2<A, B, C>) {
+		S2 { .. } = s;
 	}
 
 	fun proj_0_S2<A, B, C>(s: &S2<A, B, C>): &A {
 		let a;
-		let y;
-		let z;
-		S2 { x: a, y, z} = s;
+		S2 { x: a, .. } = s;
 		a
+	}
+
+	fun proj_1_S2<A, B, C>(s: &S2<A, B, C>): &B {
+		let b;
+		S2 { y: b, .. } = s;
+		b
+	}
+
+	fun proj_2_S2<A, B, C>(s: &S2<A, B, C>): &C {
+		let c;
+		S2 { z: c, .. } = s;
+		c
 	}
 }

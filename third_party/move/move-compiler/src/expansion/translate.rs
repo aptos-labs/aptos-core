@@ -10,7 +10,7 @@ use crate::{
     expansion::{
         aliases::{AliasMap, AliasSet},
         ast::{
-            self as E, Address, Fields, LValueOrDotdot_, ModuleAccess_, ModuleIdent, ModuleIdent_,
+            self as E, Address, Fields, LValueOrDotDot_, ModuleAccess_, ModuleIdent, ModuleIdent_,
             SpecId,
         },
         byte_string, hex_string,
@@ -2939,18 +2939,18 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             let mut vfields = vec![];
             for (i, pfield) in pfields.iter().enumerate() {
                 match &pfield.value {
-                    P::BindFieldOrDotdot_::FieldBind(field, pbind) => {
+                    P::BindFieldOrDotDot_::FieldBind(field, pbind) => {
                         let lval = bind(context, pbind.clone())?;
-                        vfields.push((field.clone(), lval));
+                        vfields.push((*field, lval));
                     },
-                    P::BindFieldOrDotdot_::Dotdot => {
+                    P::BindFieldOrDotDot_::DotDot => {
                         if i != pfields.len() - 1 {
                             context.env.add_diag(diag!(
                                 Syntax::UnexpectedToken,
                                 (pfield.loc, "`..` must be at the end in a named field list")
                             ));
                         } else {
-                            dotdot = Some(sp(pfield.loc, E::Dotdot_));
+                            dotdot = Some(sp(pfield.loc, E::DotDot_));
                         }
                     },
                 }
@@ -2967,24 +2967,24 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             )?;
             let tys_opt = optional_types(context, ptys_opt);
             let mut dot_seen = false;
-            let fields: Option<Vec<E::LValueOrDotdot>> = pargs
+            let fields: Option<Vec<E::LValueOrDotDot>> = pargs
                 .into_iter()
                 .map(|pb_or_dotdot| {
                     let sp!(loc, pb_or_dotdot_) = pb_or_dotdot;
                     match pb_or_dotdot_ {
-                        P::BindOrDotdot_::Bind(pb) => {
-                            bind(context, pb).map(|b| sp(b.loc, LValueOrDotdot_::LValue(b)))
+                        P::BindOrDotDot_::Bind(pb) => {
+                            bind(context, pb).map(|b| sp(b.loc, LValueOrDotDot_::LValue(b)))
                         },
-                        P::BindOrDotdot_::Dotdot => {
+                        P::BindOrDotDot_::DotDot => {
                             if dot_seen {
                                 context.env.add_diag(diag!(
                                     Syntax::UnexpectedToken,
-                                    (loc, "there can be at most one `..` per sturct or variant pattern")
+                                    (loc, "there can be at most one `..` per struct or variant pattern")
                                 ));
                                 None
                             } else {
                                 dot_seen = true;
-                                Some(sp(loc, LValueOrDotdot_::Dotdot))
+                                Some(sp(loc, LValueOrDotDot_::DotDot))
                             }
                         },
                     }
@@ -3100,6 +3100,8 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
             )?;
             let tys_opt = optional_types(context, ptys_opt);
             let efields = assign_unpack_fields(context, loc, pfields)?;
+            // we have not implemented .. in the LHS of an assignment
+            // and the `pfields` doesn't have a `..` in it, so we use `None` here
             EL::Unpack(en, tys_opt, efields, None)
         },
         _ => {
@@ -3338,7 +3340,7 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
                 .value
                 .iter()
                 .filter_map(|l| {
-                    if let sp!(_, LValueOrDotdot_::LValue(l)) = l {
+                    if let sp!(_, LValueOrDotDot_::LValue(l)) = l {
                         Some(l.clone())
                     } else {
                         None
@@ -3374,7 +3376,7 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
                 .value
                 .iter()
                 .filter_map(|l| {
-                    if let sp!(_, LValueOrDotdot_::LValue(l)) = l {
+                    if let sp!(_, LValueOrDotDot_::LValue(l)) = l {
                         Some(l.clone())
                     } else {
                         None

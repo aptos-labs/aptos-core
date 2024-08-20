@@ -1,7 +1,10 @@
 
 Diagnostics:
-error: invalid assignment
-   ┌─ tests/checking/dotdot/assign.move:12:3
+error: unexpected token
+   ┌─ tests/checking/dotdot/assign.move:11:6
    │
-12 │         S1(a, b) = x;
-   │         ^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+11 │         S1(..) = x;
+   │            ^^
+   │            │
+   │            Unexpected '..'
+   │            Expected an expression term
