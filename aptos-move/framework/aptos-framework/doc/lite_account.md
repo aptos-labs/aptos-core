@@ -7,7 +7,6 @@
 
 -  [Struct `UpdateNativeAuthenticator`](#0x1_lite_account_UpdateNativeAuthenticator)
 -  [Struct `UpdateDispatchableAuthenticator`](#0x1_lite_account_UpdateDispatchableAuthenticator)
--  [Struct `LiteAccountGroup`](#0x1_lite_account_LiteAccountGroup)
 -  [Resource `Account`](#0x1_lite_account_Account)
 -  [Resource `NativeAuthenticator`](#0x1_lite_account_NativeAuthenticator)
 -  [Resource `DispatchableAuthenticator`](#0x1_lite_account_DispatchableAuthenticator)
@@ -129,35 +128,6 @@
 </dd>
 <dt>
 <code>new_auth_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_lite_account_LiteAccountGroup"></a>
-
-## Struct `LiteAccountGroup`
-
-A shared resource group for storing new account resources together in storage.
-
-
-<pre><code>#[resource_group(#[scope = <b>address</b>])]
-<b>struct</b> <a href="lite_account.md#0x1_lite_account_LiteAccountGroup">LiteAccountGroup</a>
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
 </dt>
 <dd>
 

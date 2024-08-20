@@ -42,10 +42,6 @@ module aptos_framework::lite_account {
         new_auth_function: Option<FunctionInfo>
     }
 
-    #[resource_group(scope = address)]
-    /// A shared resource group for storing new account resources together in storage.
-    struct LiteAccountGroup {}
-
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Resource representing an account object.
     struct Account has key {

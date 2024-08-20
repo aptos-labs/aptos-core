@@ -1090,7 +1090,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool {
-    <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr) || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_lite_account_enabled">features::lite_account_enabled</a>()
+    !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_default_to_lite_account_enabled">features::default_to_lite_account_enabled</a>() && <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr) || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_lite_account_enabled">features::lite_account_enabled</a>()
 }
 </code></pre>
 
@@ -1105,7 +1105,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="account.md#0x1_account_account_resource_exists_at">account_resource_exists_at</a>(addr: <b>address</b>): bool
+<b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_account_resource_exists_at">account_resource_exists_at</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -1114,7 +1114,7 @@ is returned. This way, the caller of this function can publish additional resour
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_account_resource_exists_at">account_resource_exists_at</a>(addr: <b>address</b>): bool {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_account_resource_exists_at">account_resource_exists_at</a>(addr: <b>address</b>): bool {
     <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)
 }
 </code></pre>
@@ -1139,7 +1139,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code>inline <b>fun</b> <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr: <b>address</b>): bool {
-    <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr)
+    !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_default_to_lite_account_enabled">features::default_to_lite_account_enabled</a>() && <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr)
 }
 </code></pre>
 

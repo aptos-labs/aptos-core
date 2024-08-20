@@ -92,7 +92,7 @@ if os.environ.get("DISABLE_FA_APT"):
     FEATURE_FLAGS = ""
     SKIP_NATIVE = False
 else:
-    FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE --enable-feature LITE_ACCOUNT"
+    FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE --enable-feature LITE_ACCOUNT --enable-feature DEFAULT_TO_LITE_ACCOUNT"
     SKIP_NATIVE = True
 
 if os.environ.get("ENABLE_PRUNER"):
