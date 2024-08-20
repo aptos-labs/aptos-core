@@ -11,6 +11,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `min`](#0x1_math64_min)
 -  [Function `average`](#0x1_math64_average)
 -  [Function `gcd`](#0x1_math64_gcd)
+-  [Function `lcm`](#0x1_math64_lcm)
 -  [Function `mul_div`](#0x1_math64_mul_div)
 -  [Function `clamp`](#0x1_math64_clamp)
 -  [Function `pow`](#0x1_math64_pow)
@@ -152,6 +153,35 @@ Return greatest common divisor of <code>a</code> & <code>b</code>, via the Eucli
         large = tmp;
     };
     large
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_math64_lcm"></a>
+
+## Function `lcm`
+
+Returns least common multiple of <code>a</code> & <code>b</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_lcm">lcm</a>(a: u64, b: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="math64.md#0x1_math64_lcm">lcm</a>(a: u64, b: u64): u64 {
+    <b>if</b> (a == 0 || b == 0) {
+        0
+    } <b>else</b> {
+        a / <a href="math64.md#0x1_math64_gcd">gcd</a>(a, b) * b
+    }
 }
 </code></pre>
 
