@@ -280,7 +280,7 @@ impl BlockTree {
                     "Added block: {}, for window of block: {}",
                     current_block, block
                 );
-                window.push(current_block.clone());
+                window.push(parent_block);
             } else {
                 info!(
                     "Visiting block: {} was not found, parent of block: {}, for window of block: {}",

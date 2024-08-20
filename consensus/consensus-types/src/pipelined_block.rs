@@ -29,11 +29,11 @@ use std::{
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct OrderedBlockWindow {
-    blocks: Vec<Block>,
+    blocks: Vec<Arc<PipelinedBlock>>,
 }
 
 impl OrderedBlockWindow {
-    pub fn new(blocks: Vec<Block>) -> Self {
+    pub fn new(blocks: Vec<Arc<PipelinedBlock>>) -> Self {
         Self { blocks }
     }
 
@@ -41,7 +41,12 @@ impl OrderedBlockWindow {
         Self { blocks: vec![] }
     }
 
-    pub fn blocks(&self) -> &Vec<Block> {
+    // TODO: clone required?
+    pub fn blocks(&self) -> Vec<Block> {
+        self.blocks.iter().map(|b| b.block().clone()).collect()
+    }
+
+    pub fn pipelined_blocks(&self) -> &Vec<Arc<PipelinedBlock>> {
         &self.blocks
     }
 }
@@ -64,6 +69,7 @@ pub struct PipelinedBlock {
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,
     execution_summary: Arc<OnceCell<ExecutionSummary>>,
+    committed_transactions: OnceCell<Vec<HashValue>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -123,6 +129,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
+            committed_transactions: OnceCell::new(),
         };
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -141,11 +148,20 @@ impl PipelinedBlock {
         self.state_compute_result = result;
         self.input_transactions = input_transactions;
 
+        let mut committed_transactions = vec![];
         let mut to_commit = 0;
         let mut to_retry = 0;
-        for txn in self.state_compute_result.compute_status_for_input_txns() {
-            match txn {
-                TransactionStatus::Keep(_) => to_commit += 1,
+        for (txn, status) in self
+            .input_transactions
+            .iter()
+            .zip(self.state_compute_result.compute_status_for_input_txns())
+        {
+            match status {
+                TransactionStatus::Keep(_) => {
+                    // TODO: was this already computed?
+                    committed_transactions.push(txn.committed_hash());
+                    to_commit += 1
+                },
                 TransactionStatus::Retry => to_retry += 1,
                 _ => {},
             }
@@ -182,6 +198,14 @@ impl PipelinedBlock {
             self.execution_summary
                 .set(execution_summary)
                 .expect("inserting into empty execution summary");
+        }
+
+        if self.committed_transactions.get().is_some() {
+            error!("Re-inserting committed transactions");
+        } else {
+            self.committed_transactions
+                .set(committed_transactions)
+                .expect("inserting into empty committed transactions");
         }
 
         self
@@ -231,6 +255,7 @@ impl PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
+            committed_transactions: OnceCell::new(),
         }
     }
 
@@ -251,6 +276,7 @@ impl PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
+            committed_transactions: OnceCell::new(),
         }
     }
 
@@ -356,6 +382,10 @@ impl PipelinedBlock {
 
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
+    }
+
+    pub fn wait_for_committed_transactions(&self) -> &Vec<HashValue> {
+        self.committed_transactions.wait()
     }
 }
 
