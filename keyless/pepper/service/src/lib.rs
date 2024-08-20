@@ -171,7 +171,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
             let jwt_header = signature
                 .parse_jwt_header()
                 .map_err(|e| BadRequest(format!("JWT header decoding error: {e}")))?;
-            let jwk = jwk::cached_decoding_key_as_rsa(&iss_val, &jwt_header.kid)
+            let jwk = jwk::cached_decoding_key_as_rsa(iss_val, &jwt_header.kid)
                 .map_err(|e| BadRequest(format!("JWK not found: {e}")))?;
             let config = Configuration::new_for_devnet();
             let training_wheels_pk = match &config.training_wheels_pubkey {
@@ -203,7 +203,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                         ZKP::Groth16(groth16proof) => {
                             // let start = std::time::Instant::now();
                             let public_inputs_hash =
-                                get_public_inputs_hash(&signature, &public_key, &jwk, &config)
+                                get_public_inputs_hash(signature, public_key, &jwk, &config)
                                     .map_err(|_| {
                                         // println!("[aptos-vm][groth16] PIH computation failed");
                                         invalid_signature!("Could not compute public inputs hash")
