@@ -19,6 +19,7 @@ use move_model::{
     model::{FunctionEnv, Loc, NodeId, StructEnv},
     pragmas::{INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP},
     ty::Type,
+    well_known,
 };
 use move_stackless_bytecode::{
     function_data_builder::FunctionDataBuilder,
@@ -256,6 +257,18 @@ impl<'a> Instrumenter<'a> {
                 Call(id, oper @ Select(..), args) if args.is_empty() => RewriteResult::Rewritten(
                     Call(*id, oper.to_owned(), vec![value.clone()]).into_exp(),
                 ),
+                Call(id, oper @ Select(..), args) => {
+                    if args.len() == 1
+                        && args[0].display(self.builder.global_env()).to_string()
+                            == well_known::RECEIVER_PARAM_NAME
+                    {
+                        RewriteResult::Rewritten(
+                            Call(*id, oper.to_owned(), vec![value.clone()]).into_exp(),
+                        )
+                    } else {
+                        RewriteResult::Unchanged(e)
+                    }
+                },
                 _ => RewriteResult::Unchanged(e),
             };
             // Also instantiate types.
