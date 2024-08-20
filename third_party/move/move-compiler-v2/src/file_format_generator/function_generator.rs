@@ -1025,8 +1025,10 @@ impl<'a> FunctionGenerator<'a> {
             if before && ctx.is_alive_before(temp)
                 || !before && ctx.is_alive_after(temp, &[], false)
                 || self.pinned.contains(&temp)
+                || !ctx.fun_ctx.is_droppable(temp)
             {
-                // Only need to save to a local if the temp is still used afterwards
+                // Only need to save to a local if the temp is still used afterwards, is pinned,
+                // or if it is not droppable
                 let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), temp);
                 self.emit(FF::Bytecode::StLoc(local));
             } else {
@@ -1146,6 +1148,14 @@ impl<'env> FunctionContext<'env> {
             .env
             .type_abilities(self.temp_type(temp), &self.type_parameters)
             .has_ability(FF::Ability::Copy)
+    }
+
+    /// Returns true of the given temporary can/should be dropped when flushing the stack.
+    pub fn is_droppable(&self, temp: TempIndex) -> bool {
+        self.module
+            .env
+            .type_abilities(self.temp_type(temp), &self.type_parameters)
+            .has_ability(FF::Ability::Drop)
     }
 }
 

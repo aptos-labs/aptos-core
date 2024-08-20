@@ -13,9 +13,11 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 pub(crate) type DefaultHashBuilder = core::hash::BuildHasherDefault<ahash::AHasher>;
 
+/// A view of content within range (base_layer, top_layer] (n.b. left-exclusive, right-inclusive).
 #[derive(Clone, Debug)]
 pub struct LayeredMap<K: ArcAsyncDrop, V: ArcAsyncDrop, S = DefaultHashBuilder> {
-    bottom_layer: MapLayer<K, V>,
+    /// n.b. base layer content is not visible
+    base_layer: MapLayer<K, V>,
     top_layer: MapLayer<K, V>,
     /// Hasher is needed only for spawning a new layer, i.e. for a read only map there's no need to
     /// pay the overhead of constructing it.
@@ -27,9 +29,9 @@ where
     K: ArcAsyncDrop,
     V: ArcAsyncDrop,
 {
-    pub fn new(bottom_layer: MapLayer<K, V>, top_layer: MapLayer<K, V>) -> Self {
+    pub fn new(base_layer: MapLayer<K, V>, top_layer: MapLayer<K, V>) -> Self {
         Self {
-            bottom_layer,
+            base_layer,
             top_layer,
             _hash_builder: PhantomData,
         }
@@ -37,16 +39,16 @@ where
 
     pub fn unpack(self) -> (MapLayer<K, V>, MapLayer<K, V>) {
         let Self {
-            bottom_layer,
+            base_layer,
             top_layer,
             _hash_builder,
         } = self;
 
-        (bottom_layer, top_layer)
+        (base_layer, top_layer)
     }
 
-    pub(crate) fn bottom_layer(&self) -> u64 {
-        self.bottom_layer.layer()
+    pub(crate) fn base_layer(&self) -> u64 {
+        self.base_layer.layer()
     }
 
     fn top_layer(&self) -> u64 {
@@ -54,7 +56,7 @@ where
     }
 
     pub(crate) fn get_node_strong(&self, node_ref: &NodeRef<K, V>) -> NodeStrongRef<K, V> {
-        node_ref.get_strong_with_min_layer(self.bottom_layer())
+        node_ref.get_strong(self.base_layer())
     }
 
     pub(crate) fn root(&self) -> NodeStrongRef<K, V> {
@@ -79,7 +81,7 @@ where
             match cur_node {
                 NodeStrongRef::Empty => return None,
                 NodeStrongRef::Leaf(leaf) => {
-                    return leaf.get_value(key, self.bottom_layer()).cloned()
+                    return leaf.get_value(key, self.base_layer()).cloned()
                 },
                 NodeStrongRef::Internal(internal) => match bits.next() {
                     None => {
@@ -123,7 +125,7 @@ where
 
         let old = old_leaf.content.clone();
         let new = to_leaf_content(new_items, new_layer);
-        let content = old.combined_with(old_leaf.layer, new, new_layer, self.bottom_layer());
+        let content = old.combined_with(old_leaf.layer, new, new_layer, self.base_layer());
 
         NodeRef::new_leaf(key_hash, content, new_layer)
     }
@@ -220,7 +222,7 @@ where
 
         let root = self.create_tree(0, self.root(), &items);
 
-        self.top_layer.spawn(root, self.bottom_layer())
+        self.top_layer.spawn(root, self.base_layer())
     }
 
     pub fn new_layer(&self, items: &[(K, V)]) -> MapLayer<K, V>

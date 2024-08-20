@@ -440,7 +440,13 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .remote_peer(*aug_data.author()));
                             match self.aug_data_store.add_aug_data(aug_data) {
                                 Ok(sig) => self.process_response(protocol, response_sender, RandMessage::AugDataSignature(sig)),
-                                Err(e) => error!("[RandManager] Failed to add aug data: {}", e),
+                                Err(e) => {
+                                    if e.to_string().contains("[AugDataStore] equivocate data") {
+                                        warn!("[RandManager] Failed to add aug data: {}", e);
+                                    } else {
+                                        error!("[RandManager] Failed to add aug data: {}", e);
+                                    }
+                                },
                             }
                         }
                         RandMessage::CertifiedAugData(certified_aug_data) => {
@@ -450,7 +456,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .remote_peer(*certified_aug_data.author()));
                             match self.aug_data_store.add_certified_aug_data(certified_aug_data) {
                                 Ok(ack) => self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack)),
-                                Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
+                                Err(e) => warn!("[RandManager] Failed to add certified aug data: {}", e),
                             }
                         }
                         _ => unreachable!("[RandManager] Unexpected message type after verification"),
