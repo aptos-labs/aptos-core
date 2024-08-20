@@ -153,6 +153,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
             public_key,
             signature,
             message,
+            address: _,
         } = request;
         if let (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) =
             (&public_key, &signature)

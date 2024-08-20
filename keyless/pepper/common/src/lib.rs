@@ -160,6 +160,11 @@ pub struct VerifyRequest {
         deserialize_with = "deserialize_bytes_from_hex"
     )]
     pub message: Vec<u8>,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex_with_0x",
+        deserialize_with = "deserialize_bytes_from_hex_with_0x"
+    )]
+    pub address: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
