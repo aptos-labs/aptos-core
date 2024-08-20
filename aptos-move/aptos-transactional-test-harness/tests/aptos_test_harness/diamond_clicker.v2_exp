@@ -15,49 +15,47 @@ struct OuterStruct has key {
 }
 
 entry public test_upgrade(Arg0: &signer) /* def_idx: 0 */ {
-L1:	loc0: &signer
-L2:	loc1: OuterStruct
-L3:	loc2: &mut vector<InnerStruct>
+L1:	loc0: OuterStruct
+L2:	loc1: &mut vector<InnerStruct>
+L3:	loc2: u64
 L4:	loc3: u64
 L5:	loc4: u64
-L6:	loc5: &mut vector<InnerStruct>
-L7:	loc6: u64
 B0:
 	0: CopyLoc[0](Arg0: &signer)
 	1: Call signer::address_of(&signer): address
 	2: VecPack(3, 0)
 	3: Pack[1](OuterStruct)
-	4: StLoc[2](loc1: OuterStruct)
+	4: StLoc[1](loc0: OuterStruct)
 	5: MoveLoc[0](Arg0: &signer)
-	6: MoveLoc[2](loc1: OuterStruct)
+	6: MoveLoc[1](loc0: OuterStruct)
 	7: MoveTo[1](OuterStruct)
 	8: MutBorrowGlobal[1](OuterStruct)
 	9: MutBorrowField[0](OuterStruct.any_field: vector<InnerStruct>)
-	10: StLoc[3](loc2: &mut vector<InnerStruct>)
+	10: StLoc[2](loc1: &mut vector<InnerStruct>)
 	11: LdU64(0)
-	12: CopyLoc[3](loc2: &mut vector<InnerStruct>)
+	12: CopyLoc[2](loc1: &mut vector<InnerStruct>)
 	13: FreezeRef
 	14: VecLen(3)
-	15: StLoc[4](loc3: u64)
-	16: StLoc[5](loc4: u64)
+	15: StLoc[3](loc2: u64)
+	16: StLoc[4](loc3: u64)
 B1:
-	17: CopyLoc[5](loc4: u64)
-	18: CopyLoc[4](loc3: u64)
+	17: CopyLoc[4](loc3: u64)
+	18: CopyLoc[3](loc2: u64)
 	19: Lt
 	20: BrFalse(31)
 B2:
-	21: CopyLoc[3](loc2: &mut vector<InnerStruct>)
-	22: CopyLoc[5](loc4: u64)
+	21: CopyLoc[2](loc1: &mut vector<InnerStruct>)
+	22: CopyLoc[4](loc3: u64)
 	23: VecMutBorrow(3)
 	24: FreezeRef
 	25: Call debug::print<InnerStruct>(&InnerStruct)
-	26: MoveLoc[5](loc4: u64)
+	26: MoveLoc[4](loc3: u64)
 	27: LdU64(1)
 	28: Add
-	29: StLoc[5](loc4: u64)
+	29: StLoc[4](loc3: u64)
 	30: Branch(34)
 B3:
-	31: MoveLoc[3](loc2: &mut vector<InnerStruct>)
+	31: MoveLoc[2](loc1: &mut vector<InnerStruct>)
 	32: Pop
 	33: Branch(35)
 B4:
