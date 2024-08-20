@@ -3,7 +3,7 @@ processed 5 tasks
 task 0 'publish'. lines 1-51:
 Error: compilation errors:
  error: match not exhaustive
-   ┌─ TEMPFILE:22:10
+   ┌─ TEMPFILE:22:16
    │
 22 │         match (x) {
    │                ^
