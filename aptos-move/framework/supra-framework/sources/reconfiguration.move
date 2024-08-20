@@ -187,6 +187,7 @@ module supra_framework::reconfiguration {
         let config_ref = borrow_global_mut<Configuration>(@supra_framework);
         assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, error::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
+        config_ref.last_reconfiguration_time = timestamp::now_microseconds();
 
         if (std::features::module_event_migration_enabled()) {
             event::emit(
