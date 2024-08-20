@@ -1799,10 +1799,14 @@ impl<'env> Generator<'env> {
         }
         match pat {
             Pattern::Wildcard(id) => {
-                let pat_ty = self.env().get_node_type(*id);
                 if !match_mode.is_probing() {
-                    let temp = self.new_temp(pat_ty);
-                    self.emit_assign_with_convert(*id, temp, values[0], AssignKind::Inferred)
+                    // Maybe do a conversion, but otherwise drop the value.
+                    let target_ty = self.env().get_node_type(*id);
+                    let actual_type = self.temp_type(values[0]).clone();
+                    if let Some((new_temp, oper)) = self.get_conversion(&target_ty, &actual_type) {
+                        self.emit_call(*id, vec![new_temp], oper, vec![values[0]]);
+                    }
+                    // drop the resulting value
                 }
             },
             Pattern::Var(var_id, sym) => {

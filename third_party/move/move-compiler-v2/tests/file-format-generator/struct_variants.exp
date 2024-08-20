@@ -97,31 +97,24 @@ B5:
 }
 public is_inner1(Arg0: &Inner): bool /* def_idx: 1 */ {
 L1:	loc0: bool
-L2:	loc1: &Inner
 B0:
-	0: CopyLoc[0](Arg0: &Inner)
+	0: MoveLoc[0](Arg0: &Inner)
 	1: TestVariant[0](Inner/Inner1)
-	2: BrFalse(8)
+	2: BrFalse(6)
 B1:
-	3: MoveLoc[0](Arg0: &Inner)
-	4: Pop
-	5: LdTrue
-	6: StLoc[1](loc0: bool)
-	7: Branch(17)
+	3: LdTrue
+	4: StLoc[1](loc0: bool)
+	5: Branch(11)
 B2:
-	8: MoveLoc[0](Arg0: &Inner)
-	9: StLoc[2](loc1: &Inner)
-	10: MoveLoc[2](loc1: &Inner)
-	11: Pop
-	12: LdFalse
-	13: StLoc[1](loc0: bool)
-	14: Branch(17)
+	6: LdFalse
+	7: StLoc[1](loc0: bool)
+	8: Branch(11)
 B3:
-	15: LdU64(15621340914461310977)
-	16: Abort
+	9: LdU64(15621340914461310977)
+	10: Abort
 B4:
-	17: MoveLoc[1](loc0: bool)
-	18: Ret
+	11: MoveLoc[1](loc0: bool)
+	12: Ret
 }
 public is_some<Ty0>(Arg0: &Option<Ty0>): bool /* def_idx: 2 */ {
 L1:	loc0: bool
@@ -152,7 +145,6 @@ B5:
 }
 public is_some_dropped<Ty0: drop>(Arg0: Option<Ty0>): bool /* def_idx: 3 */ {
 L1:	loc0: bool
-L2:	loc1: Option<Ty0>
 B0:
 	0: ImmBorrowLoc[0](Arg0: Option<Ty0>)
 	1: TestVariantGeneric[0](Option/None<Ty0>)
@@ -162,19 +154,17 @@ B1:
 	4: UnpackVariantGeneric[0](Option/None<Ty0>)
 	5: LdFalse
 	6: StLoc[1](loc0: bool)
-	7: Branch(15)
+	7: Branch(13)
 B2:
-	8: MoveLoc[0](Arg0: Option<Ty0>)
-	9: StLoc[2](loc1: Option<Ty0>)
-	10: LdTrue
-	11: StLoc[1](loc0: bool)
-	12: Branch(15)
+	8: LdTrue
+	9: StLoc[1](loc0: bool)
+	10: Branch(13)
 B3:
-	13: LdU64(15621340914461310977)
-	14: Abort
+	11: LdU64(15621340914461310977)
+	12: Abort
 B4:
-	15: MoveLoc[1](loc0: bool)
-	16: Ret
+	13: MoveLoc[1](loc0: bool)
+	14: Ret
 }
 public is_some_specialized(Arg0: &Option<Option<u64>>): bool /* def_idx: 4 */ {
 L1:	loc0: bool

@@ -129,22 +129,20 @@ public fun m::matched_value_not_consumed($t0: m::Outer) {
      var $t1: &m::Outer
      var $t2: bool
      var $t3: m::Inner
-     var $t4: m::Outer
-     var $t5: u64
+     var $t4: u64
   0: $t1 := borrow_local($t0)
   1: $t2 := test_variant m::Outer::One($t1)
   2: if ($t2) goto 3 else goto 6
   3: label L2
   4: $t3 := unpack_variant m::Outer::One($t0)
-  5: goto 12
+  5: goto 11
   6: label L1
-  7: $t4 := infer($t0)
-  8: goto 12
-  9: label L3
- 10: $t5 := 15621340914461310977
- 11: abort($t5)
- 12: label L0
- 13: return ()
+  7: goto 11
+  8: label L3
+  9: $t4 := 15621340914461310977
+ 10: abort($t4)
+ 11: label L0
+ 12: return ()
 }
 
 
@@ -155,11 +153,14 @@ error: value of type `m::Inner` does not have the `drop` ability
 28 │             One{i: _} => {}
    │             ^^^^^^^^^ implicitly dropped here since it is no longer used
 
-error: value of type `m::Outer` does not have the `drop` ability
-   ┌─ tests/bytecode-generator/matching_ability_err.move:29:13
+error: local `o` of type `m::Outer` does not have the `drop` ability
+   ┌─ tests/bytecode-generator/matching_ability_err.move:27:9
    │
-29 │             _ => {}
-   │             ^ implicitly dropped here since it is no longer used
+27 │ ╭         match (o) {
+28 │ │             One{i: _} => {}
+29 │ │             _ => {}
+30 │ │         }
+   │ ╰─────────^ implicitly dropped here since it is no longer used
 
 error: local `i` of type `m::Inner` does not have the `copy` ability
    ┌─ tests/bytecode-generator/matching_ability_err.move:35:31
