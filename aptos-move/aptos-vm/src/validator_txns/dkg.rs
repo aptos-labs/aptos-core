@@ -18,6 +18,7 @@ use aptos_types::{
     on_chain_config::{ConfigurationResource, OnChainConfig},
     transaction::TransactionStatus,
 };
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
 use move_core_types::{
@@ -27,6 +28,7 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
+use crate::system_module_names::{DKG_MODULE, FINISH};
 
 #[derive(Debug)]
 enum ExpectedFailure {
@@ -39,6 +41,7 @@ enum ExpectedFailure {
     MissingResourceDKGState = 0x30001,
     MissingResourceInprogressDKGSession = 0x30002,
     MissingResourceConfiguration = 0x30003,
+    MissingResourceFeatures = 0x30004,
 }
 
 enum ExecutionFailure {
@@ -100,25 +103,45 @@ impl AptosVM {
         // All check passed, invoke VM to publish DKG result on chain.
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self.new_session(resolver, session_id, None);
-        let args = vec![
-            MoveValue::Signer(AccountAddress::ONE),
-            dkg_node.transcript_bytes.as_move_value(),
-        ];
 
         let module_storage = TraversalStorage::new();
-        session
-            .execute_function_bypass_visibility(
-                &RECONFIGURATION_WITH_DKG_MODULE,
-                FINISH_WITH_DKG_RESULT,
-                vec![],
-                serialize_values(&args),
-                &mut gas_meter,
-                &mut TraversalContext::new(&module_storage),
-            )
-            .map_err(|e| {
-                expect_only_successful_execution(e, FINISH_WITH_DKG_RESULT.as_str(), log_context)
-            })
-            .map_err(|r| Unexpected(r.unwrap_err()))?;
+        let features = Features::fetch_config(resolver).ok_or_else(||Expected(MissingResourceFeatures))?;
+        let vm_result = if features.is_enabled(FeatureFlag::RECONFIG_REFACTORING) {
+            let args = vec![
+                dkg_node.transcript_bytes.as_move_value(),
+            ];
+            session
+                .execute_function_bypass_visibility(
+                    &DKG_MODULE,
+                    FINISH,
+                    vec![],
+                    serialize_values(&args),
+                    &mut gas_meter,
+                    &mut TraversalContext::new(&module_storage),
+                )
+                .map_err(|e| {
+                    expect_only_successful_execution(e, FINISH.as_str(), log_context)
+                })
+        } else {
+            let args = vec![
+                MoveValue::Signer(AccountAddress::ONE),
+                dkg_node.transcript_bytes.as_move_value(),
+            ];
+            session
+                .execute_function_bypass_visibility(
+                    &RECONFIGURATION_WITH_DKG_MODULE,
+                    FINISH_WITH_DKG_RESULT,
+                    vec![],
+                    serialize_values(&args),
+                    &mut gas_meter,
+                    &mut TraversalContext::new(&module_storage),
+                )
+                .map_err(|e| {
+                    expect_only_successful_execution(e, FINISH_WITH_DKG_RESULT.as_str(), log_context)
+                })
+        };
+
+        vm_result.map_err(|r| Unexpected(r.unwrap_err()))?;
 
         let output = get_system_transaction_output(
             session,

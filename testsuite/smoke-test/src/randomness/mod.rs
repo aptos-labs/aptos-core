@@ -8,7 +8,7 @@ use aptos_forge::LocalSwarm;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_types::{
-    dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
+    dkg::{DefaultDKG, DKGSessionState, DKGState, DKGTrait},
     on_chain_config::{OnChainConfig, OnChainConsensusConfig},
     randomness::{PerBlockRandomness, RandMetadata, WVUF},
     validator_verifier::ValidatorConsensusInfo,
@@ -18,6 +18,7 @@ use move_core_types::{account_address::AccountAddress, language_storage::CORE_CO
 use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
+use crate::utils;
 
 mod disable_feature_0;
 mod disable_feature_1;
@@ -40,14 +41,6 @@ async fn get_current_version(rest_client: &Client) -> u64 {
         .unwrap()
         .inner()
         .version
-}
-
-async fn get_on_chain_resource<T: OnChainConfig>(rest_client: &Client) -> T {
-    let maybe_response = rest_client
-        .get_account_resource_bcs::<T>(CORE_CODE_ADDRESS, T::struct_tag().to_string().as_str())
-        .await;
-    let response = maybe_response.unwrap();
-    response.into_inner()
 }
 
 #[allow(dead_code)]
@@ -74,7 +67,7 @@ async fn wait_for_dkg_finish(
     target_epoch: Option<u64>,
     time_limit_secs: u64,
 ) -> DKGSessionState {
-    let mut dkg_state = get_on_chain_resource::<DKGState>(client).await;
+    let mut dkg_state = utils::get_on_chain_resource::<DKGState>(client).await;
     let timer = Instant::now();
     while timer.elapsed().as_secs() < time_limit_secs
         && !(dkg_state.in_progress.is_none()
@@ -87,7 +80,7 @@ async fn wait_for_dkg_finish(
                     == target_epoch))
     {
         tokio::time::sleep(Duration::from_secs(1)).await;
-        dkg_state = get_on_chain_resource::<DKGState>(client).await;
+        dkg_state = utils::get_on_chain_resource::<DKGState>(client).await;
     }
     assert!(timer.elapsed().as_secs() < time_limit_secs);
     dkg_state.last_complete().clone()

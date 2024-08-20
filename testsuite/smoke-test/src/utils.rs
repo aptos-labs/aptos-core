@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib;
-use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
-use aptos_rest_client::Client as RestClient;
+use aptos_forge::{LocalSwarm, NodeExt, reconfig, Swarm, SwarmExt};
+use aptos_rest_client::{Client as RestClient, Client};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{LocalAccount, transaction::SignedTransaction},
 };
-use aptos_types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
+use aptos_types::on_chain_config::{OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use rand::random;
 use std::{sync::Arc, time::Duration};
@@ -241,4 +241,12 @@ pub mod swarm_utils {
         let backend = &node_config.consensus.safety_rules.backend;
         f(backend);
     }
+}
+
+pub(crate) async fn get_on_chain_resource<T: OnChainConfig>(rest_client: &Client) -> T {
+    let maybe_response = rest_client
+        .get_account_resource_bcs::<T>(CORE_CODE_ADDRESS, T::struct_tag().to_string().as_str())
+        .await;
+    let response = maybe_response.unwrap();
+    response.into_inner()
 }

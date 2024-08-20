@@ -27,6 +27,7 @@ pub mod mempool_status;
 pub mod move_any;
 pub mod move_fixed_point;
 pub mod move_utils;
+pub mod mpc;
 pub mod network_address;
 pub mod nibble;
 pub mod object_address;

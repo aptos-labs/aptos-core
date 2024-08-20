@@ -24,6 +24,7 @@ pub mod internal_indexer_db_config;
 mod jwk_consensus_config;
 mod logger_config;
 mod mempool_config;
+mod mpc_config;
 mod netbench_config;
 mod network_config;
 mod node_config;

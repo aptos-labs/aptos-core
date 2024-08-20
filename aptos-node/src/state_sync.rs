@@ -54,6 +54,10 @@ pub fn create_event_subscription_service(
     Option<(
         ReconfigNotificationListener<DbBackedOnChainConfig>,
         EventNotificationListener,
+    )>, // (reconfig_events, mpc_events) for MPC
+    Option<(
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+        EventNotificationListener,
     )>, // (reconfig_events, jwk_updated_events) for JWK consensus
 ) {
     // Create the event subscription service
@@ -101,6 +105,19 @@ pub fn create_event_subscription_service(
         None
     };
 
+    // Create reconfiguration subscriptions for MPC
+    let mpc_subscriptions = if node_config.base.role.is_validator() {
+        let reconfig_events = event_subscription_service
+            .subscribe_to_reconfigurations()
+            .expect("MPC must subscribe to reconfigurations");
+        let mpc_events = event_subscription_service
+            .subscribe_to_events(vec![], vec!["0x1::mpc::MPCEvent".to_string()])
+            .expect("Consensus must subscribe to MPC events");
+        Some((reconfig_events, mpc_events))
+    } else {
+        None
+    };
+
     // Create reconfiguration subscriptions for JWK consensus
     let jwk_consensus_subscriptions = if node_config.base.role.is_validator() {
         let reconfig_events = event_subscription_service
@@ -120,6 +137,7 @@ pub fn create_event_subscription_service(
         consensus_observer_reconfig_subscription,
         consensus_reconfig_subscription,
         dkg_subscriptions,
+        mpc_subscriptions,
         jwk_consensus_subscriptions,
     )
 }
