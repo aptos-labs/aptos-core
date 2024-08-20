@@ -2715,14 +2715,8 @@ impl AptosVM {
         };
         let mut session = self.new_session(resolver, SessionId::Void, None);
         match get_randomness_annotation(resolver, &mut session, entry_fn) {
-            Ok(annotation) => {
-                println!("daniel require_randomness annotation: {:?}", annotation);
-                annotation.is_some()
-            },
-            Err(err) => {
-                println!("daniel require_randomness error: {:?}", err);
-                false
-            },
+            Ok(annotation) => annotation.is_some(),
+            Err(err) => false,
         }
     }
 }

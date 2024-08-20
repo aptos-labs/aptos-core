@@ -25,6 +25,7 @@ use aptos_consensus_types::{
     utils::PayloadTxnsSize,
 };
 use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue};
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_types::{on_chain_config::{OnChainRandomnessConfig, ValidatorTxnConfig}, transaction::Transaction, validator_txn::ValidatorTransaction};
@@ -32,6 +33,8 @@ use aptos_validator_transaction_pool as vtxn_pool;
 use aptos_vm::AptosVM;
 use futures::future::BoxFuture;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
@@ -41,6 +44,16 @@ use std::{
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
 mod proposal_generator_test;
+
+pub static RAND_CHECKER_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(16)
+            .thread_name(|index| format!("rand-checker-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 #[derive(Clone)]
 pub struct ChainHealthBackoffConfig {
@@ -508,25 +521,33 @@ impl ProposalGenerator {
             let parent_block_id = self.block_store.commit_root().id();
             match self.execution_proxy.get_state_view(block_id, parent_block_id) {
                 Ok(stale_state_view) => {
-                    let vm = AptosVM::new(&stale_state_view);
-                    let resolver = vm.as_move_resolver(&stale_state_view);
+                    // let vm = AptosVM::new(&stale_state_view);
+                    // let resolver = vm.as_move_resolver(&stale_state_view);
 
-                    info!("[ProposalGeneration] init vm took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
+                    // info!("[ProposalGeneration] init vm took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
 
-                    let mut counter = 0;
-                    for txn in all_txns.iter() {
-                        info!("[ProposalGeneration] check randomness txn {} took: {:?}, round {}", counter, self.time_service.get_current_timestamp() - start_time, round);
+                    // for txn in all_txns.iter() {
+                    //     if vm.require_randomness(&resolver, txn, 0) {
+                    //         require_randomness = true;
+                    //         break;
+                    //     }
+                    // }
 
-                        if vm.require_randomness(&resolver, txn, 0) {
-                            require_randomness = true;
-                            break;
-                        }
-                        counter += 1;
-                    }
-                }
+                    let num_txns = all_txns.len();
+                    require_randomness = RAND_CHECKER_POOL.install(|| {
+                        all_txns
+                            .into_par_iter()
+                            .with_min_len(optimal_min_len(num_txns, 32))
+                            .any(|txn| {
+                                let vm = AptosVM::new(&stale_state_view);
+                                let resolver = vm.as_move_resolver(&stale_state_view);
+                                vm.require_randomness(&resolver, &txn, 0)
+                            })
+                    });
+                },
                 Err(e) => {
                     error!("[ProposalGenerator] Failed to get stale state view of block {}, error: {:?}", parent_block_id, e);
-                }
+                },
             }
             Some(require_randomness)
         } else {
