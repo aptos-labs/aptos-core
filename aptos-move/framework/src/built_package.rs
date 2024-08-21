@@ -99,7 +99,6 @@ pub struct BuildOptions {
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
     pub experiments: Vec<String>,
-    #[clap(long)]
     /// Select bytecode, language, compiler for Move 2
     #[clap(long)]
     pub move_2: bool,
