@@ -129,6 +129,7 @@ pub enum FeatureFlag {
     RejectUnstableBytecodeForScript,
     FederatedKeyless,
     TransactionSimulationEnhancement,
+    CollectionOwner,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -342,6 +343,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::TransactionSimulationEnhancement => {
                 AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
             },
+            FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
         }
     }
 }
@@ -484,6 +486,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT => {
                 FeatureFlag::TransactionSimulationEnhancement
             },
+            AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
         }
     }
 }

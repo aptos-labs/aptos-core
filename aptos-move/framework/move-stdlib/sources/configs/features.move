@@ -595,6 +595,14 @@ module std::features {
         is_enabled(TRANSACTION_SIMULATION_ENHANCEMENT)
     }
 
+    const COLLECTION_OWNER: u64 = 79;
+
+    public fun get_collection_owner_feature(): u64 { COLLECTION_OWNER }
+
+    public fun is_collection_owner_enabled(): bool acquires Features {
+        is_enabled(COLLECTION_OWNER)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
