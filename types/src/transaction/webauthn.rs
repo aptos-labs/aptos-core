@@ -28,6 +28,25 @@ fn generate_verification_data(authenticator_data_bytes: &[u8], client_data_json:
         .to_vec()
 }
 
+/// This checks that the SHA3-256 of the [`signing_message(message)`](signing_message)
+/// is equal to the actual `challenge` from `client_data_json` in `PartialAuthenticatorAssertionResponse`
+fn verify_expected_challenge_from_message_matches_actual<T: Serialize + CryptoHash>(
+    message: &T,
+    actual_challenge: &[u8],
+) -> std::result::Result<(), CryptoMaterialError> {
+    // Generate signing_message, which is the BCS encoded bytes of message, prefixed with a hash
+    let signing_message_bytes = signing_message(message)?;
+    // Expected challenge is SHA3-256 digest of RawTransaction bytes
+    let expected_challenge = HashValue::sha3_256_of(signing_message_bytes.as_slice());
+
+    expected_challenge
+        .to_vec()
+        .as_slice()
+        .eq(actual_challenge)
+        .then_some(())
+        .ok_or(CryptoMaterialError::ValidationError)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum AssertionSignature {
     Secp256r1Ecdsa {
@@ -84,19 +103,47 @@ impl PartialAuthenticatorAssertionResponse {
         bcs::to_bytes(&self.signature).expect("Only unhandleable errors happen here.")
     }
 
-    /// This checks that the SHA3-256 of the [`signing_message(message)`](signing_message)
-    /// is equal to the actual `challenge` from `client_data_json` in `PartialAuthenticatorAssertionResponse`
-    /// and executes the checks defined in `verify_arbitrary_msg`
+    /// In our adaptation of WebAuthn, the `challenge` provided to `authenticatorGetAssertion`
+    /// is the SHA3-256 digest of the `RawTransaction`.
+    ///
+    /// This function should do the following:
+    /// 1. Verify `actual_challenge` and expected challenge from message are equal
+    /// 2. Construct `verification_data` as the binary concatenation of
+    ///    authenticator_data and SHA-256(client_data_json)
+    /// 3. Signature verification
+    ///
+    /// See WebAuthn §6.3.3 `authenticatorGetAssertion` for more info
     pub fn verify<T: Serialize + CryptoHash>(
         &self,
         message: &T,
         public_key: &AnyPublicKey,
     ) -> Result<()> {
-        // Generate signing_message, which is the BCS encoded bytes of message, prefixed with a hash
-        let signing_message_bytes = signing_message(message)?;
-        // Expected challenge is SHA3-256 digest of RawTransaction bytes
-        let expected_challenge = HashValue::sha3_256_of(signing_message_bytes.as_slice());
-        self.verify_arbitrary_msg(expected_challenge.to_vec().as_slice(), public_key)
+        let collected_client_data: CollectedClientData =
+            serde_json::from_slice(self.client_data_json.as_slice())?;
+        let challenge_bytes = Bytes::try_from(collected_client_data.challenge.as_str())
+            .map_err(|e| anyhow!("Failed to decode challenge bytes {:?}", e))?;
+
+        // Check if expected challenge and actual challenge match. If there's no match, throw error
+        verify_expected_challenge_from_message_matches_actual(message, challenge_bytes.as_slice())?;
+
+        // Generates binary concatenation of authenticator_data and hash(client_data_json)
+        let verification_data = generate_verification_data(
+            self.authenticator_data.as_slice(),
+            self.client_data_json.as_slice(),
+        );
+
+        // Note: We must call verify_arbitrary_msg instead of verify here. We do NOT want to
+        // use verify because it BCS serializes and prefixes the message with a hash
+        // via the signing_message function invocation
+        match (&public_key, &self.signature) {
+            (
+                AnyPublicKey::Secp256r1Ecdsa { public_key },
+                AssertionSignature::Secp256r1Ecdsa { signature },
+            ) => signature.verify_arbitrary_msg(&verification_data, public_key),
+            _ => Err(anyhow!(
+                "WebAuthn verification failure, invalid key, signature pairing"
+            )),
+        }
     }
 
     /// In our adaptation of WebAuthn, the `challenge` provided to `authenticatorGetAssertion`
