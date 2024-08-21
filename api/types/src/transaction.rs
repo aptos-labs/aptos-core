@@ -1412,7 +1412,12 @@ impl VerifyInput for KeylessSignature {
     fn verify(&self) -> anyhow::Result<()> {
         let public_key_len = self.public_key.inner().len();
         let signature_len = self.signature.inner().len();
-        if public_key_len > keyless::KeylessPublicKey::MAX_LEN {
+        if public_key_len
+            > std::cmp::max(
+                keyless::KeylessPublicKey::MAX_LEN,
+                keyless::FederatedKeylessPublicKey::MAX_LEN,
+            )
+        {
             bail!(
                 "Keyless public key length is greater than the maximum number of {} bytes: found {} bytes",
                 keyless::KeylessPublicKey::MAX_LEN, public_key_len
@@ -1492,6 +1497,17 @@ impl Keyless {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct FederatedKeyless {
+    pub value: HexEncodedBytes,
+}
+
+impl FederatedKeyless {
+    pub fn new(value: HexEncodedBytes) -> Self {
+        Self { value }
+    }
+}
+
 impl TryFrom<Signature> for AnySignature {
     type Error = anyhow::Error;
 
@@ -1534,6 +1550,7 @@ pub enum PublicKey {
     Secp256k1Ecdsa(Secp256k1Ecdsa),
     Secp256r1Ecdsa(Secp256r1Ecdsa),
     Keyless(Keyless),
+    FederatedKeyless(FederatedKeyless),
 }
 
 impl TryFrom<PublicKey> for AnyPublicKey {
@@ -1549,6 +1566,9 @@ impl TryFrom<PublicKey> for AnyPublicKey {
                 AnyPublicKey::secp256r1_ecdsa(p.value.inner().try_into()?)
             },
             PublicKey::Keyless(p) => AnyPublicKey::keyless(p.value.inner().try_into()?),
+            PublicKey::FederatedKeyless(p) => {
+                AnyPublicKey::federated_keyless(p.value.inner().try_into()?)
+            },
         })
     }
 }
@@ -1567,6 +1587,9 @@ impl From<AnyPublicKey> for PublicKey {
             ),
             AnyPublicKey::Keyless { public_key } => {
                 PublicKey::Keyless(Keyless::new(public_key.to_bytes().into()))
+            },
+            AnyPublicKey::FederatedKeyless { public_key } => {
+                PublicKey::FederatedKeyless(FederatedKeyless::new(public_key.to_bytes().into()))
             },
         }
     }
@@ -1600,6 +1623,11 @@ impl VerifyInput for SingleKeySignature {
             }
             .verify(),
             (PublicKey::Keyless(p), Signature::Keyless(s)) => KeylessSignature {
+                public_key: p.value.clone(),
+                signature: s.value.clone(),
+            }
+            .verify(),
+            (PublicKey::FederatedKeyless(p), Signature::Keyless(s)) => KeylessSignature {
                 public_key: p.value.clone(),
                 signature: s.value.clone(),
             }
@@ -1646,6 +1674,12 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
                 PublicKey::Keyless(p) => {
                     let key = p.value.inner().try_into().context(
                         "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
+                    )?;
+                    AnyPublicKey::keyless(key)
+                },
+                PublicKey::FederatedKeyless(p) => {
+                    let key = p.value.inner().try_into().context(
+                        "Failed to parse given public_key bytes as AnyPublicKey::FederatedKeyless",
                     )?;
                     AnyPublicKey::keyless(key)
                 },
@@ -1750,6 +1784,12 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
                         "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
                     )?;
                     AnyPublicKey::keyless(key)
+                },
+                PublicKey::FederatedKeyless(p) => {
+                    let key = p.value.inner().try_into().context(
+                        "Failed to parse given public_key bytes as AnyPublicKey::FederatedKeyless",
+                    )?;
+                    AnyPublicKey::federated_keyless(key)
                 },
             };
             public_keys.push(key);

@@ -216,8 +216,4 @@ impl LedgerUpdateOutput {
     pub fn first_version(&self) -> Version {
         self.transaction_accumulator.num_leaves() - self.to_commit.len() as Version
     }
-
-    pub fn num_txns(&self) -> usize {
-        self.to_commit.len()
-    }
 }

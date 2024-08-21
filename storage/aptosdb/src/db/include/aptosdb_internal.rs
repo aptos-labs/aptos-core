@@ -57,8 +57,7 @@ impl AptosDB {
                 state_merkle_db,
                 state_kv_db,
             ),
-            pre_commit_lock: std::sync::Mutex::new(()),
-            commit_lock: std::sync::Mutex::new(()),
+            ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
         }
@@ -115,7 +114,7 @@ impl AptosDB {
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self.get_synced_version()?.map_or(0, |v| v + 1);
+        let ledger_next_version = self.get_synced_version().map_or(0, |v| v + 1);
         info!(
             indexer_next_version = indexer.next_version(),
             ledger_next_version = ledger_next_version,
@@ -232,7 +231,7 @@ impl AptosDB {
             let (first_version, new_block_event) = self.event_store.get_event_by_key(
                 &new_block_event_key(),
                 block_height,
-                self.ensure_synced_version()?,
+                self.get_synced_version()?,
             )?;
             let new_block_event = bcs::from_bytes(new_block_event.event_data())?;
             Ok(BlockInfo::from_new_block_event(
@@ -254,7 +253,7 @@ impl AptosDB {
         &self,
         version: Version,
     ) -> Result<(u64 /* block_height */, BlockInfo)> {
-        let synced_version = self.ensure_synced_version()?;
+        let synced_version = self.get_synced_version()?;
         ensure!(
             version <= synced_version,
             "Requested version {version} > synced version {synced_version}",

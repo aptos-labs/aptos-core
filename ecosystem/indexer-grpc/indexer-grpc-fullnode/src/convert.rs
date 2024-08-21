@@ -637,6 +637,10 @@ fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::Keyless as i32,
             public_key: p.value.clone().into(),
         },
+        PublicKey::FederatedKeyless(p) => transaction::AnyPublicKey {
+            r#type: transaction::any_public_key::Type::FederatedKeyless as i32,
+            public_key: p.value.clone().into(),
+        },
     }
 }
 

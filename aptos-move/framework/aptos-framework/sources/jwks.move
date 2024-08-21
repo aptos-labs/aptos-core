@@ -5,9 +5,11 @@
 /// write some of the resources in this file. As a result, the structs in this file are declared so as to
 /// have a simple layout which is easily accessible in Rust.
 module aptos_framework::jwks {
+    use std::bcs;
     use std::error;
     use std::option;
     use std::option::Option;
+    use std::signer;
     use std::string;
     use std::string::{String, utf8};
     use std::vector;
@@ -25,12 +27,18 @@ module aptos_framework::jwks {
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
 
+    /// We limit the size of a `PatchedJWKs` resource installed by a dapp owner for federated keyless accounts.
+    /// Note: If too large, validators waste work reading it for invalid TXN signatures.
+    const MAX_FEDERATED_JWKS_SIZE_BYTES: u64 = 2 * 1024; // 2 KiB
+
     const EUNEXPECTED_EPOCH: u64 = 1;
     const EUNEXPECTED_VERSION: u64 = 2;
     const EUNKNOWN_PATCH_VARIANT: u64 = 3;
     const EUNKNOWN_JWK_VARIANT: u64 = 4;
     const EISSUER_NOT_FOUND: u64 = 5;
     const EJWK_ID_NOT_FOUND: u64 = 6;
+    const EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK: u64 = 7;
+    const EFEDERATED_JWKS_TOO_LARGE: u64 = 8;
 
     const ENATIVE_MISSING_RESOURCE_VALIDATOR_SET: u64 = 0x0101;
     const ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS: u64 = 0x0102;
@@ -155,10 +163,43 @@ module aptos_framework::jwks {
         jwks: AllProvidersJWKs,
     }
 
+    /// JWKs for federated keyless accounts are stored in this resource.
+    struct FederatedJWKs has drop, key {
+        jwks: AllProvidersJWKs,
+    }
+
     //
     // Structs end.
     // Functions begin.
     //
+
+    /// Called by a federated keyless dapp owner to install the JWKs for the federated OIDC provider (e.g., Auth0, AWS
+    /// Cognito, etc).
+    ///
+    /// For type-safety, we explicitly use a `struct FederatedJWKs { jwks: AllProviderJWKs }` instead of
+    /// reusing `PatchedJWKs { jwks: AllProviderJWKs }`, which is a JWK-consensus-specific struct. We'd
+    /// need to be careful how we read it in Rust (but BCS serialization should be the same).
+    public fun patch_federated_jwks(jwk_owner: &signer, patches: vector<Patch>) acquires FederatedJWKs {
+        // Prevents accidental calls in 0x1::jwks that install federated JWKs at the Aptos framework address.
+        assert!(!system_addresses::is_aptos_framework_address(signer::address_of(jwk_owner)),
+            error::invalid_argument(EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK)
+        );
+
+        let jwk_addr = signer::address_of(jwk_owner);
+        if (!exists<FederatedJWKs>(jwk_addr)) {
+            move_to(jwk_owner, FederatedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
+        };
+
+        let fed_jwks = borrow_global_mut<FederatedJWKs>(jwk_addr);
+        vector::for_each_ref(&patches, |obj|{
+            let patch: &Patch = obj;
+            apply_patch(&mut fed_jwks.jwks, *patch);
+        });
+
+        // TODO: Can we check the size more efficiently instead of serializing it via BCS?
+        let num_bytes = vector::length(&bcs::to_bytes(fed_jwks));
+        assert!(num_bytes < MAX_FEDERATED_JWKS_SIZE_BYTES, error::invalid_argument(EFEDERATED_JWKS_TOO_LARGE));
+    }
 
     /// Get a JWK by issuer and key ID from the `PatchedJWKs`.
     /// Abort if such a JWK does not exist.
@@ -382,7 +423,7 @@ module aptos_framework::jwks {
         *borrow_global_mut<PatchedJWKs>(@aptos_framework) = PatchedJWKs { jwks };
     }
 
-    /// Get a JWK by issuer and key ID from a `AllProvidersJWKs`, if it exists.
+    /// Get a JWK by issuer and key ID from an `AllProvidersJWKs`, if it exists.
     fun try_get_jwk_by_issuer(jwks: &AllProvidersJWKs, issuer: vector<u8>, jwk_id: vector<u8>): Option<JWK> {
         let (issuer_found, index) = vector::find(&jwks.entries, |obj| {
             let provider_jwks: &ProviderJWKs = obj;
