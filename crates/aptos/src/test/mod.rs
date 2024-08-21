@@ -1045,6 +1045,9 @@ impl CliTestFramework {
                 compiled_script_path: None,
                 framework_package_args,
                 bytecode_version: None,
+                compiler_version: None,
+                language_version: None,
+                move_2: false,
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args: vec![] },
@@ -1074,6 +1077,9 @@ impl CliTestFramework {
                     skip_fetch_latest_git_deps: false,
                 },
                 bytecode_version: None,
+                compiler_version: None,
+                language_version: None,
+                move_2: false,
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args },
@@ -1107,6 +1113,7 @@ impl CliTestFramework {
             language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
+            move_2: false,
         }
     }
 
@@ -1212,6 +1219,9 @@ impl CliTestFramework {
                         skip_fetch_latest_git_deps: false,
                     },
                     bytecode_version: None,
+                    compiler_version: None,
+                    language_version: None,
+                    move_2: false,
                 },
             },
         }
@@ -1258,6 +1268,9 @@ impl CliTestFramework {
                     skip_fetch_latest_git_deps: false,
                 },
                 bytecode_version: None,
+                compiler_version: None,
+                language_version: None,
+                move_2: false,
             },
             rest_options: self.rest_options(),
             profile: Default::default(),
