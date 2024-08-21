@@ -255,7 +255,7 @@ async fn test_federated_keyless() {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_and_wait(&signed_txn)
         .await;
     println!("result_0={:?}", result);
     assert!(result.is_err());
@@ -294,7 +294,7 @@ script {
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_and_wait(&signed_txn)
         .await;
     println!("result_1={:?}", result);
     assert!(result.is_err());
@@ -338,17 +338,13 @@ script {{
         1,
     )
         .await;
-
-    info!("Submit keyless Groth16 transaction");
     let result = swarm
         .aptos_public_info()
         .client()
-        .submit_without_serializing_response(&signed_txn)
+        .submit_and_wait(&signed_txn)
         .await;
-
-    if let Err(e) = result {
-        panic!("Error with keyless Groth16 TXN verification: {:?}", e)
-    }
+    println!("result={:?}", result);
+    assert!(result.is_ok());
 }
 
 
