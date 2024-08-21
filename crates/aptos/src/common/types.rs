@@ -1062,19 +1062,19 @@ pub struct MovePackageDir {
     pub(crate) skip_fetch_latest_git_deps: bool,
 
     /// Specify the version of the bytecode the compiler is going to emit.
-    #[clap(long, default_value_if("move-2", "true", "7"))]
+    #[clap(long, default_value_if("move_2", "true", "7"))]
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
     /// Currently, default to `v1`
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move-2", "true", "V2_0"))]
+           default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Specify the language version to be supported.
     /// Currently, default to `v1`
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move-2", "true", "V2_0"))]
+           default_value_if("move_2", "true", "2.0"))]
     pub language_version: Option<LanguageVersion>,
 
     /// Do not complain about unknown attributes in Move code.

@@ -83,13 +83,13 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
-    #[clap(long, default_value_if("move-2", "true", "7"))]
+    #[clap(long, default_value_if("move_2", "true", "7"))]
     pub bytecode_version: Option<u32>,
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move-2", "true", "V2_0"))]
+           default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move-2", "true", "V2_0"))]
+           default_value_if("move_2", "true", "2.0"))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -141,7 +141,6 @@ impl BuildOptions {
             bytecode_version: Some(7),
             language_version: Some(LanguageVersion::V2_0),
             compiler_version: Some(CompilerVersion::V2_0),
-            move_2: true,
             ..Self::default()
         }
     }
@@ -204,7 +203,6 @@ pub fn build_model(
             skip_attribute_checks,
             known_attributes,
             experiments,
-            move_2: false, // don't override provided values
         },
     };
     let compiler_version = compiler_version.unwrap_or_default();
@@ -227,7 +225,6 @@ impl BuiltPackage {
         let bytecode_version = Some(options.inferred_bytecode_version());
         let compiler_version = options.compiler_version;
         let language_version = options.language_version;
-        let move_2 = options.move_2;
         Self::check_versions(&compiler_version, &language_version)?;
         let skip_attribute_checks = options.skip_attribute_checks;
         let build_config = BuildConfig {
@@ -251,7 +248,6 @@ impl BuiltPackage {
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
-                move_2,
             },
         };
 

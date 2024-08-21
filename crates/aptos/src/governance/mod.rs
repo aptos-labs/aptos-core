@@ -907,15 +907,15 @@ pub struct CompileScriptFunction {
     #[clap(flatten)]
     pub(crate) framework_package_args: FrameworkPackageArgs,
 
-    #[clap(long, default_value_if("move-2", "true", "7"))]
+    #[clap(long, default_value_if("move_2", "true", "7"))]
     pub(crate) bytecode_version: Option<u32>,
 
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move-2", "true", "V2_0"))]
+           default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
 
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move-2", "true", "V2_0"))]
+           default_value_if("move_2", "true", "2.0"))]
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language, compiler for Move 2
