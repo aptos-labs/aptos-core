@@ -347,7 +347,7 @@ async fn sign_federated_transaction<'a>(
     tw_sk: Option<&Ed25519PrivateKey>,
     seqno: usize,
 ) -> SignedTransaction {
-    let any_pk = AnyPublicKey::keyless(pk.clone());
+    let any_pk = AnyPublicKey::federated_keyless(pk.clone());
     let addr = AuthenticationKey::any_key(any_pk.clone()).account_address();
 
     // If the account does not exist, create it.
