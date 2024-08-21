@@ -396,7 +396,7 @@ async fn sign_federated_transaction<'a>(
         if let EphemeralCertificate::ZeroKnowledgeSig(_) = &sig.cert {
             // This will only calculate the hash if it's needed, avoiding unnecessary computation.
             Some(fr_to_bytes_le(
-                &get_public_inputs_hash(&sig, &pk, jwk, config).unwrap(),
+                &get_public_inputs_hash(&sig, &pk.pk, jwk, config).unwrap(),
             ))
         } else {
             None
