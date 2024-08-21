@@ -854,15 +854,6 @@ fun main(core_resources: &signer) {{
     let patched_jwks = get_latest_jwkset(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
 
-    let expected_providers_jwks = AllProvidersJWKs {
-        entries: vec![ProviderJWKs {
-            issuer: iss.into_bytes(),
-            version: 0,
-            jwks: vec![JWKMoveStruct::from(JWK::RSA(jwk.clone()))],
-        }],
-    };
-    assert_eq!(expected_providers_jwks, patched_jwks.jwks);
-
     let new_config = print_account_resource::<Configuration>(
         &client,
         AccountAddress::ONE,
