@@ -1,0 +1,21 @@
+
+Diagnostics:
+warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/checking/receiver/dont_warn_unused_self.move:5:27
+  │
+5 │     fun receiver(self: S, y: u64) {
+  │                           ^
+
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    struct S {
+        x: u64,
+    }
+    private fun receiver(self: m::S,y: u64) {
+        Tuple()
+    }
+    spec {
+      requires true;
+    }
+
+} // end 0x42::m
