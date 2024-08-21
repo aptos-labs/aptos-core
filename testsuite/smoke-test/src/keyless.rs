@@ -482,6 +482,7 @@ async fn sign_federated_transaction<'a>(
         info.get_account_sequence_number(addr).await.unwrap()
     );
 
+    info.sync_root_account_sequence_number().await;
     let recipient = info
         .create_and_fund_user_account(20_000_000_000)
         .await
