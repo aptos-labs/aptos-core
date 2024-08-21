@@ -361,6 +361,9 @@ impl TransactionAuthenticator {
                 AccountAuthenticator::MultiKey { authenticator } => {
                     single_key_authenticators.extend(authenticator.to_single_key_authenticators()?);
                 },
+                AccountAuthenticator::NoAccountAuthenticator => {
+                    //  This case adds no single key authenticators to the vector.
+                },
             };
         }
         Ok(single_key_authenticators)
@@ -452,6 +455,7 @@ pub enum Scheme {
     MultiEd25519 = 1,
     SingleKey = 2,
     MultiKey = 3,
+    NoScheme = 250,
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
@@ -471,6 +475,7 @@ impl fmt::Display for Scheme {
             Scheme::MultiEd25519 => "MultiEd25519",
             Scheme::SingleKey => "SingleKey",
             Scheme::MultiKey => "MultiKey",
+            Scheme::NoScheme => "NoScheme",
             Scheme::DeriveAuid => "DeriveAuid",
             Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
@@ -505,6 +510,7 @@ pub enum AccountAuthenticator {
     MultiKey {
         authenticator: MultiKeyAuthenticator,
     },
+    NoAccountAuthenticator,
     // ... add more schemes here
 }
 
@@ -516,6 +522,7 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { .. } => Scheme::MultiEd25519,
             Self::SingleKey { .. } => Scheme::SingleKey,
             Self::MultiKey { .. } => Scheme::MultiKey,
+            Self::NoAccountAuthenticator => Scheme::NoScheme,
         }
     }
 
@@ -561,6 +568,7 @@ impl AccountAuthenticator {
             } => signature.verify(message, public_key),
             Self::SingleKey { authenticator } => authenticator.verify(message),
             Self::MultiKey { authenticator } => authenticator.verify(message),
+            Self::NoAccountAuthenticator => bail!("No signature to verify."),
         }
     }
 
@@ -571,6 +579,7 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { public_key, .. } => public_key.to_bytes().to_vec(),
             Self::SingleKey { authenticator } => authenticator.public_key_bytes(),
             Self::MultiKey { authenticator } => authenticator.public_key_bytes(),
+            Self::NoAccountAuthenticator => vec![],
         }
     }
 
@@ -581,12 +590,20 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { signature, .. } => signature.to_bytes().to_vec(),
             Self::SingleKey { authenticator } => authenticator.signature_bytes(),
             Self::MultiKey { authenticator } => authenticator.signature_bytes(),
+            Self::NoAccountAuthenticator => vec![],
         }
     }
 
     /// Return an authentication key derived from `self`'s public key and scheme id
-    pub fn authentication_key(&self) -> AuthenticationKey {
-        AuthenticationKey::from_preimage(self.public_key_bytes(), self.scheme())
+    pub fn authentication_key(&self) -> Option<AuthenticationKey> {
+        if let Self::NoAccountAuthenticator = self {
+            None
+        } else {
+            Some(AuthenticationKey::from_preimage(
+                self.public_key_bytes(),
+                self.scheme(),
+            ))
+        }
     }
 
     /// Return the number of signatures included in this account authenticator.
@@ -596,6 +613,7 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { signature, .. } => signature.signatures().len(),
             Self::SingleKey { .. } => 1,
             Self::MultiKey { authenticator } => authenticator.signatures.len(),
+            Self::NoAccountAuthenticator => 0,
         }
     }
 }
@@ -1033,6 +1051,10 @@ impl AnySignature {
         }
     }
 
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
+    }
+
     fn verify_keyless_ephemeral_signature<T: Serialize + CryptoHash>(
         message: &T,
         signature: &KeylessSignature,
@@ -1061,6 +1083,15 @@ impl AnySignature {
         signature
             .ephemeral_signature
             .verify(&txn_and_zkp, &signature.ephemeral_pubkey)
+    }
+}
+
+impl TryFrom<&[u8]> for AnySignature {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<AnySignature>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
@@ -1108,6 +1139,16 @@ impl AnyPublicKey {
         bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
     }
 }
+
+impl TryFrom<&[u8]> for AnyPublicKey {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<AnyPublicKey>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EphemeralSignature {
     Ed25519 {
@@ -1134,6 +1175,27 @@ impl EphemeralSignature {
             },
             (Self::WebAuthn { signature }, EphemeralPublicKey::Secp256r1Ecdsa { public_key }) => {
                 signature.verify(message, &AnyPublicKey::secp256r1_ecdsa(public_key.clone()))
+            },
+            _ => {
+                bail!("Unsupported ephemeral signature and public key combination");
+            },
+        }
+    }
+
+    pub fn verify_arbitrary_msg(
+        &self,
+        message: &[u8],
+        public_key: &EphemeralPublicKey,
+    ) -> Result<()> {
+        match (self, public_key) {
+            (Self::Ed25519 { signature }, EphemeralPublicKey::Ed25519 { public_key }) => {
+                signature.verify_arbitrary_msg(message, public_key)
+            },
+            (Self::WebAuthn { signature }, EphemeralPublicKey::Secp256r1Ecdsa { public_key }) => {
+                signature.verify_arbitrary_msg(
+                    message,
+                    &AnyPublicKey::secp256r1_ecdsa(public_key.clone()),
+                )
             },
             _ => {
                 bail!("Unsupported ephemeral signature and public key combination");

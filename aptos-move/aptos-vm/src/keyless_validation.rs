@@ -195,11 +195,12 @@ pub(crate) fn validate_authenticators(
     let onchain_timestamp_obj = get_current_time_onchain(resolver)?;
     // Check the expiry timestamp on all authenticators first to fail fast
     for (_, sig) in authenticators {
-        sig.verify_expiry(&onchain_timestamp_obj).map_err(|_| {
-            // println!("[aptos-vm][groth16] ZKP expired");
+        sig.verify_expiry(onchain_timestamp_obj.microseconds)
+            .map_err(|_| {
+                // println!("[aptos-vm][groth16] ZKP expired");
 
-            invalid_signature!("The ephemeral keypair has expired")
-        })?;
+                invalid_signature!("The ephemeral keypair has expired")
+            })?;
     }
 
     let patched_jwks = get_jwks_onchain(resolver)?;

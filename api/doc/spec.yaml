@@ -10453,6 +10453,7 @@ components:
       - $ref: '#/components/schemas/AccountSignature_MultiEd25519Signature'
       - $ref: '#/components/schemas/AccountSignature_SingleKeySignature'
       - $ref: '#/components/schemas/AccountSignature_MultiKeySignature'
+      - $ref: '#/components/schemas/AccountSignature_NoAccountSignature'
       discriminator:
         propertyName: type
         mapping:
@@ -10460,6 +10461,7 @@ components:
           multi_ed25519_signature: '#/components/schemas/AccountSignature_MultiEd25519Signature'
           single_key_signature: '#/components/schemas/AccountSignature_SingleKeySignature'
           multi_key_signature: '#/components/schemas/AccountSignature_MultiKeySignature'
+          no_account_signature: '#/components/schemas/AccountSignature_NoAccountSignature'
     AccountSignature_Ed25519Signature:
       allOf:
       - type: object
@@ -10496,6 +10498,18 @@ components:
             - multi_key_signature
             example: multi_key_signature
       - $ref: '#/components/schemas/MultiKeySignature'
+    AccountSignature_NoAccountSignature:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - no_account_signature
+            example: no_account_signature
+      - $ref: '#/components/schemas/NoAccountSignature'
     AccountSignature_SingleKeySignature:
       allOf:
       - type: object
@@ -11702,6 +11716,9 @@ components:
             - entry_function_payload
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
+    NoAccountSignature:
+      type: object
+      description: A placeholder to represent the absence of account signature
     PendingTransaction:
       type: object
       description: A transaction waiting in mempool

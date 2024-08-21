@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    on_chain_config::CurrentTimeMicroseconds,
-    transaction::{
-        authenticator::{
-            AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
-        },
-        SignedTransaction,
+use crate::transaction::{
+    authenticator::{
+        AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
     },
+    SignedTransaction,
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
@@ -143,8 +140,8 @@ impl KeylessSignature {
         Ok(header)
     }
 
-    pub fn verify_expiry(&self, current_time: &CurrentTimeMicroseconds) -> anyhow::Result<()> {
-        let block_time = UNIX_EPOCH + Duration::from_micros(current_time.microseconds);
+    pub fn verify_expiry(&self, current_time_microseconds: u64) -> anyhow::Result<()> {
+        let block_time = UNIX_EPOCH + Duration::from_micros(current_time_microseconds);
         let expiry_time = seconds_from_epoch(self.exp_date_secs);
 
         if block_time > expiry_time {
