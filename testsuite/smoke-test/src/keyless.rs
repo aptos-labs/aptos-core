@@ -428,7 +428,7 @@ async fn sign_federated_transaction<'a>(
 
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
-    SignedTransaction::new_keyless(raw_txn, pk, sig)
+    SignedTransaction::new_federated_keyless(raw_txn, pk, sig)
 }
 
 async fn sign_transaction<'a>(
