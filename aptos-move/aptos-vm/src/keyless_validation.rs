@@ -183,12 +183,14 @@ pub(crate) fn validate_authenticators(
 
     // If there are ZK authenticators, the Groth16 VK must have been set on-chain.
     if with_zk && pvk.is_none() {
+        println!("0821 - A");
         return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
     }
 
     let config = &get_configs_onchain(resolver)?;
     if authenticators.len() > config.max_signatures_per_txn as usize {
         // println!("[aptos-vm][groth16] Too many keyless authenticators");
+        println!("0821 - B");
         return Err(invalid_signature!("Too many keyless authenticators"));
     }
 
@@ -198,6 +200,7 @@ pub(crate) fn validate_authenticators(
         sig.verify_expiry(&onchain_timestamp_obj).map_err(|_| {
             // println!("[aptos-vm][groth16] ZKP expired");
 
+            println!("0821 - C");
             invalid_signature!("The ephemeral keypair has expired")
         })?;
     }
@@ -212,6 +215,7 @@ pub(crate) fn validate_authenticators(
             Ed25519PublicKey::try_from(bytes.as_slice()).map_err(|_| {
                 // println!("[aptos-vm][groth16] On chain TW PK is invalid");
 
+                println!("0821 - D");
                 invalid_signature!("The training wheels PK set on chain is not a valid PK")
             })?,
         )),
@@ -229,6 +233,7 @@ pub(crate) fn validate_authenticators(
                     AnyKeylessPublicKey::Federated(fed_pk) => {
                         let federated_jwks = get_federated_jwks_onchain(resolver, &fed_pk.jwk_addr)
                             .map_err(|_| {
+                                println!("0821 - E");
                                 invalid_signature!(format!(
                                     "Could not fetch federated PatchedJWKs at {}",
                                     fed_pk.jwk_addr
@@ -248,6 +253,7 @@ pub(crate) fn validate_authenticators(
                 JWK::RSA(rsa_jwk) => {
                     if zksig.exp_horizon_secs > config.max_exp_horizon_secs {
                         // println!("[aptos-vm][groth16] Expiration horizon is too long");
+                        println!("0821 - F");
                         return Err(invalid_signature!("The expiration horizon is too long"));
                     }
 
@@ -268,6 +274,7 @@ pub(crate) fn validate_authenticators(
                             )
                             .map_err(|_| {
                                 // println!("[aptos-vm][groth16] PIH computation failed");
+                                println!("0821 - G");
                                 invalid_signature!("Could not compute public inputs hash")
                             })?;
                             // println!("Public inputs hash time: {:?}", start.elapsed());
@@ -286,6 +293,7 @@ pub(crate) fn validate_authenticators(
                                             )
                                             .map_err(|_| {
                                                 // println!("[aptos-vm][groth16] TW sig verification failed");
+                                                println!("0821 - H");
                                                 invalid_signature!(
                                                     "Could not verify training wheels signature"
                                                 )
@@ -293,6 +301,7 @@ pub(crate) fn validate_authenticators(
                                     },
                                     None => {
                                         // println!("[aptos-vm][groth16] Expected TW sig to be set");
+                                        println!("0821 - I");
                                         return Err(invalid_signature!(
                                             "Training wheels signature expected but it is missing"
                                         ));
@@ -315,6 +324,7 @@ pub(crate) fn validate_authenticators(
                                 //     "[aptos-vm][groth16] PVK: {}",
                                 //     Groth16VerificationKey::from(pvk).hash()
                                 // );
+                                println!("0821 - J");
                                 invalid_signature!("Proof verification failed")
                             })?;
                         },
