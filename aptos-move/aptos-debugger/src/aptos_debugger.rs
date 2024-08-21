@@ -249,40 +249,51 @@ impl AptosDebugger {
         Ok(ret)
     }
 
-    async fn execute_transactions_by_epoch(
-        &self,
-        mut limit: u64,
-        mut begin: u64,
-        mut txns: Vec<Transaction>,
-        repeat_execution_times: u64,
-        concurrency_levels: &[usize],
-        mut txn_infos: Vec<TransactionInfo>,
-    ) -> Result<Vec<TransactionOutput>> {
-        let mut ret = vec![];
-        while limit != 0 {
-            println!(
-                "Starting epoch execution at {:?}, {:?} transactions remaining",
-                begin, limit
-            );
+async fn execute_transactions_by_epoch(
+    &self,
+    mut limit: u64,
+    mut begin: u64,
+    txns: Vec<Transaction>,
+    repeat_execution_times: u64,
+    concurrency_levels: &[usize],
+    mut txn_infos: Vec<TransactionInfo>,
+) -> Result<Vec<TransactionOutput>> {
+    let mut results = Vec::new();
+    let mut remaining_txns = txns;
+    
+    while limit > 0 {
+        println!(
+            "Starting epoch execution at {:?}, {:?} transactions remaining",
+            begin, limit
+        );
 
-            let mut epoch_result = self
-                .execute_transactions_until_epoch_end(
-                    begin,
-                    txns.clone(),
-                    repeat_execution_times,
-                    concurrency_levels,
-                )
-                .await?;
-            begin += epoch_result.len() as u64;
-            limit -= epoch_result.len() as u64;
-            txns = txns.split_off(epoch_result.len());
-            let epoch_txn_infos = txn_infos.drain(0..epoch_result.len()).collect::<Vec<_>>();
-            Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin);
+        // Compute the number of transactions to process in this epoch
+        let num_txns_to_process = usize::min(limit as usize, remaining_txns.len());
+        let current_txns = &remaining_txns[..num_txns_to_process];
+        let current_txn_infos = txn_infos.drain(0..num_txns_to_process).collect::<Vec<_>>();
 
-            ret.append(&mut epoch_result);
-        }
-        Ok(ret)
+        // Execute transactions for this epoch
+        let mut epoch_result = self
+            .execute_transactions_until_epoch_end(
+                begin,
+                current_txns.to_vec(),  // Convert slice to Vec
+                repeat_execution_times,
+                concurrency_levels,
+            )
+            .await?;
+        
+        // Update state for the next iteration
+        begin += epoch_result.len() as u64;
+        limit -= epoch_result.len() as u64;
+        remaining_txns = remaining_txns[num_txns_to_process..].to_vec(); // Slice remaining transactions
+
+        // Print mismatches and append results
+        Self::print_mismatches(&epoch_result, &current_txn_infos, begin);
+        results.append(&mut epoch_result);
     }
+    
+    Ok(results)
+}
 
     async fn execute_transactions_by_block(
         &self,
