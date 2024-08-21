@@ -590,14 +590,16 @@ script {{
     use aptos_framework::jwks;
     use std::string::utf8;
     fun main(account: &signer) {{
+        let patch_0 = jwks::new_patch_remove_all();
         let iss = b"{}";
         let kid = utf8(b"{}");
         let alg = utf8(b"{}");
         let e = utf8(b"{}");
         let n = utf8(b"{}");
         let jwk = jwks::new_rsa_jwk(kid, alg, e, n);
-        let patch = jwks::new_patch_upsert_jwk(iss, jwk);
-        jwks::install_federated_jwks(account, vector[patch]);
+        let patch_1 = jwks::new_patch_upsert_jwk(iss, jwk);
+        let patches = vector[patch_0, patch_1]; // clear all, then add 1 jwk.
+        jwks::patch_federated_jwks(account, patches);
     }}
 }}
     "#, SAMPLE_TEST_ISS_VALUE, SAMPLE_JWK.kid, SAMPLE_JWK.alg, SAMPLE_JWK.e, SAMPLE_JWK.n);
