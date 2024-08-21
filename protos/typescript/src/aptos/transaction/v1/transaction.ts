@@ -955,6 +955,7 @@ export enum AnyPublicKey_Type {
   TYPE_SECP256K1_ECDSA = 2,
   TYPE_SECP256R1_ECDSA = 3,
   TYPE_KEYLESS = 4,
+  TYPE_FEDERATED_KEYLESS = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -975,6 +976,9 @@ export function anyPublicKey_TypeFromJSON(object: any): AnyPublicKey_Type {
     case 4:
     case "TYPE_KEYLESS":
       return AnyPublicKey_Type.TYPE_KEYLESS;
+    case 5:
+    case "TYPE_FEDERATED_KEYLESS":
+      return AnyPublicKey_Type.TYPE_FEDERATED_KEYLESS;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -994,6 +998,8 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
       return "TYPE_SECP256R1_ECDSA";
     case AnyPublicKey_Type.TYPE_KEYLESS:
       return "TYPE_KEYLESS";
+    case AnyPublicKey_Type.TYPE_FEDERATED_KEYLESS:
+      return "TYPE_FEDERATED_KEYLESS";
     case AnyPublicKey_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
