@@ -602,7 +602,7 @@ script {{
     "#, SAMPLE_TEST_ISS_VALUE, SAMPLE_JWK.kid, SAMPLE_JWK.alg, SAMPLE_JWK.e, SAMPLE_JWK.n);
 
     let txn_result = cli.run_script_with_gas_options(0, &script, Some(gas_options)).await;
-    assert!(txn_result.unwrap().success);
+    assert_eq!(Some(true), txn_result.unwrap().success);
 
     // We simply let the root be the jwk owner here.
     let (sig, pk) = get_sample_groth16_sig_and_fed_pk(root_addr);
