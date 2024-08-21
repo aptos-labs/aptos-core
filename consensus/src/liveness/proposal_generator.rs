@@ -2,7 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::proposer_election::ProposerElection;
+use super::{
+    proposal_status_tracker::{self, ExponentialWindowFailureTracker, TOptQSPullParamsProvider},
+    proposer_election::ProposerElection,
+    round_state::NewRoundReason,
+};
 use crate::{
     block_storage::BlockReader,
     counters::{
@@ -12,10 +16,11 @@ use crate::{
         PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
-    payload_client::{PayloadClient, PayloadPullParameters},
+    payload_client::PayloadClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
+use aptos_collections::BoundedVecDeque;
 use aptos_config::config::{
     ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
 };
@@ -23,6 +28,7 @@ use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
     common::{Author, Payload, PayloadFilter, Round},
+    payload_pull_params::PayloadPullParameters,
     pipelined_block::ExecutionSummary,
     quorum_cert::QuorumCert,
     utils::PayloadTxnsSize,
@@ -267,6 +273,7 @@ pub struct ProposalGenerator {
     vtxn_config: ValidatorTxnConfig,
 
     allow_batches_without_pos_in_proposal: bool,
+    opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
 }
 
 impl ProposalGenerator {
@@ -287,6 +294,7 @@ impl ProposalGenerator {
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
         allow_batches_without_pos_in_proposal: bool,
+        opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
     ) -> Self {
         Self {
             author,
@@ -305,6 +313,7 @@ impl ProposalGenerator {
             quorum_store_enabled,
             vtxn_config,
             allow_batches_without_pos_in_proposal,
+            opt_qs_payload_param_provider,
         }
     }
 
@@ -353,6 +362,7 @@ impl ProposalGenerator {
                 bail!("Already proposed in the round {}", round);
             }
         }
+        let maybe_optqs_payload_pull_params = self.opt_qs_payload_param_provider.get_params();
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
@@ -456,7 +466,7 @@ impl ProposalGenerator {
                         soft_max_txns_after_filtering: max_txns_from_block_to_execute
                             .unwrap_or(max_block_txns_after_filtering),
                         max_inline_txns: self.max_inline_txns,
-                        opt_batch_txns_pct: 0,
+                        maybe_optqs_payload_pull_params,
                         user_txn_filter: payload_filter,
                         pending_ordering,
                         pending_uncommitted_blocks: pending_blocks.len(),

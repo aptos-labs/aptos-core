@@ -52,6 +52,10 @@ impl<T> BoundedVecDeque<T> {
     pub fn iter(&self) -> Iter<'_, T> {
         self.inner.iter()
     }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
 }
 
 impl<T> IntoIterator for BoundedVecDeque<T> {
