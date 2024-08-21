@@ -23,16 +23,16 @@ module aptos_std::type_info {
     // Public functions
     //
 
-    public fun account_address(type_info: &TypeInfo): address {
-        type_info.account_address
+    public fun account_address(self: &TypeInfo): address {
+        self.account_address
     }
 
-    public fun module_name(type_info: &TypeInfo): vector<u8> {
-        type_info.module_name
+    public fun module_name(self: &TypeInfo): vector<u8> {
+        self.module_name
     }
 
-    public fun struct_name(type_info: &TypeInfo): vector<u8> {
-        type_info.struct_name
+    public fun struct_name(self: &TypeInfo): vector<u8> {
+        self.struct_name
     }
 
     /// Returns the current chain ID, mirroring what `aptos_framework::chain_id::get()` would return, except in `#[test]`
