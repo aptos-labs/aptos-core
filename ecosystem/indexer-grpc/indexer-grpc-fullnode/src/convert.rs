@@ -670,6 +670,11 @@ pub fn convert_account_signature(
                 convert_multi_key_signature(s),
             ),
         ),
+        AccountSignature::NoAccountSignature(_) => {
+            unreachable!(
+                "[Indexer Fullnode] Indexer should never see transactions with NoAccountSignature"
+            )
+        },
     };
 
     transaction::AccountSignature {

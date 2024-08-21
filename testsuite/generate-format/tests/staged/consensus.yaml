@@ -35,6 +35,8 @@ AccountAuthenticator:
         STRUCT:
           - authenticator:
               TYPENAME: MultiKeyAuthenticator
+    4:
+      NoAccountAuthenticator: UNIT
 AggregateSignature:
   STRUCT:
     - validator_bitmask:

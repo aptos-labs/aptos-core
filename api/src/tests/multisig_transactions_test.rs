@@ -411,13 +411,17 @@ async fn test_multisig_transaction_simulation() {
         .create_multisig_account(
             owner_account_1,
             vec![owner_account_2.address(), owner_account_3.address()],
-            2,    /* 2-of-3 */
+            1,    /* 1-of-3 */
             1000, /* initial balance */
         )
         .await;
 
-    // Should be able to simulate the multisig tx without having enough approvals or the transaction
-    // created.
+    let multisig_payload = construct_multisig_txn_transfer_payload(owner_account_1.address(), 1000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
+
+    // Simulate the multisig tx
     let simulation_resp = context
         .simulate_multisig_transaction(
             owner_account_1,
@@ -443,6 +447,79 @@ async fn test_multisig_transaction_simulation() {
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
     assert_eq!(withdraw_from_account, multisig_account);
     assert_eq!(withdrawn_amount, "1000");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_multisig_transaction_simulation_2_of_3() {
+    let mut context = new_test_context(current_function_name!());
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address(), owner_account_3.address()],
+            2,    /* 2-of-3 */
+            1000, /* initial balance */
+        )
+        .await;
+
+    let multisig_payload = construct_multisig_txn_transfer_payload(owner_account_1.address(), 1000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
+
+    context
+        .approve_multisig_transaction(owner_account_2, multisig_account, 1)
+        .await;
+
+    // Simulate the multisig transaction
+    let simulation_resp = context
+        .simulate_multisig_transaction(
+            owner_account_1,
+            multisig_account,
+            "0x1::aptos_account::transfer",
+            &[],
+            &[&owner_account_1.address().to_hex_literal(), "1000"],
+            200,
+        )
+        .await;
+    // Validate that the simulation did successfully execute a transfer of 1000 coins from the
+    // multisig account.
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    assert!(simulation_resp["success"].as_bool().unwrap());
+    let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
+    assert_eq!(
+        withdraw_event["type"].as_str().unwrap(),
+        "0x1::coin::CoinWithdraw"
+    );
+    let withdraw_from_account =
+        AccountAddress::from_hex_literal(withdraw_event["data"]["account"].as_str().unwrap())
+            .unwrap();
+    let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
+    assert_eq!(withdraw_from_account, multisig_account);
+    assert_eq!(withdrawn_amount, "1000");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_multisig_transaction_simulation_fail() {
+    let mut context = new_test_context(current_function_name!());
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address(), owner_account_3.address()],
+            1,    /* 1-of-3 */
+            1000, /* initial balance */
+        )
+        .await;
+
+    let multisig_payload = construct_multisig_txn_transfer_payload(owner_account_1.address(), 2000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
 
     // Simulating transferring more than what the multisig account has should fail.
     let simulation_resp = context
@@ -456,7 +533,56 @@ async fn test_multisig_transaction_simulation() {
         )
         .await;
     let simulation_resp = &simulation_resp.as_array().unwrap()[0];
+    let transaction_failed = &simulation_resp["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|event| {
+            event["type"]
+                .as_str()
+                .unwrap()
+                .contains("TransactionExecutionFailed")
+        });
+    assert!(transaction_failed);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_multisig_transaction_simulation_fail_2_of_3_insufficient_approvals() {
+    let mut context = new_test_context(current_function_name!());
+    let owner_account_1 = &mut context.create_account().await;
+    let owner_account_2 = &mut context.create_account().await;
+    let owner_account_3 = &mut context.create_account().await;
+    let multisig_account = context
+        .create_multisig_account(
+            owner_account_1,
+            vec![owner_account_2.address(), owner_account_3.address()],
+            2,    /* 2-of-3 */
+            1000, /* initial balance */
+        )
+        .await;
+
+    let multisig_payload = construct_multisig_txn_transfer_payload(owner_account_1.address(), 2000);
+    context
+        .create_multisig_transaction(owner_account_1, multisig_account, multisig_payload.clone())
+        .await;
+
+    // Simulating without sufficient approvals has should fail.
+    let simulation_resp = context
+        .simulate_multisig_transaction(
+            owner_account_1,
+            multisig_account,
+            "0x1::aptos_account::transfer",
+            &[],
+            &[&owner_account_1.address().to_hex_literal(), "1000"],
+            200,
+        )
+        .await;
+    let simulation_resp = &simulation_resp.as_array().unwrap()[0];
     assert!(!simulation_resp["success"].as_bool().unwrap());
+    assert!(simulation_resp["vm_status"]
+        .as_str()
+        .unwrap()
+        .contains("MULTISIG_TRANSACTION_INSUFFICIENT_APPROVALS"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -472,6 +598,11 @@ async fn test_simulate_multisig_transaction_should_charge_gas_against_sender() {
         )
         .await;
     assert_eq!(10, context.get_apt_balance(multisig_account).await);
+
+    let multisig_payload = construct_multisig_txn_transfer_payload(owner_account.address(), 10);
+    context
+        .create_multisig_transaction(owner_account, multisig_account, multisig_payload.clone())
+        .await;
 
     // This simulation should succeed because gas should be paid out of the sender account (owner),
     // not the multisig account itself.
