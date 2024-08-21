@@ -806,17 +806,17 @@ use std::string::utf8;
 use std::option;
 fun main(core_resources: &signer) {{
     let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+    let jwk_0 = jwks::new_rsa_jwk(
+        utf8(b"{}"),
+        utf8(b"{}"),
+        utf8(b"{}"),
+        utf8(b"{}")
+    );
+    let patches = vector[
+        jwks::new_patch_remove_all(),
+        jwks::new_patch_upsert_jwk(b"{}", jwk_0),
+    ];
     if ({}) {{
-        let jwk_0 = jwks::new_rsa_jwk(
-            utf8(b"{}"),
-            utf8(b"{}"),
-            utf8(b"{}"),
-            utf8(b"{}")
-        );
-        let patches = vector[
-            jwks::new_patch_remove_all(),
-            jwks::new_patch_upsert_jwk(b"{}", jwk_0),
-        ];
         jwks::set_patches(&framework_signer, patches);
     }}
 
@@ -827,12 +827,12 @@ fun main(core_resources: &signer) {{
 }}
 "#,
         KEYLESS_ACCOUNT_MODULE_NAME,
-        install_test_jwk,
         jwk.kid,
         jwk.alg,
         jwk.e,
         jwk.n,
         iss,
+        install_test_jwk,
         KEYLESS_ACCOUNT_MODULE_NAME,
         max_exp_horizon_secs,
         KEYLESS_ACCOUNT_MODULE_NAME,
