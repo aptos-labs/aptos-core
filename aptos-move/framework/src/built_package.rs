@@ -83,11 +83,13 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
-    #[clap(long)]
+    #[clap(long, default_value_if("move-2", "true", "7"))]
     pub bytecode_version: Option<u32>,
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           default_value_if("move-2", "true", "V2_0"))]
     pub compiler_version: Option<CompilerVersion>,
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           default_value_if("move-2", "true", "V2_0"))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -97,6 +99,10 @@ pub struct BuildOptions {
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
     pub experiments: Vec<String>,
+    #[clap(long)]
+    /// Select bytecode, language, compiler for Move 2
+    #[clap(long)]
+    pub move_2: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -124,6 +130,7 @@ impl Default for BuildOptions {
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
+            move_2: false,
         }
     }
 }
@@ -131,8 +138,10 @@ impl Default for BuildOptions {
 impl BuildOptions {
     pub fn move_2() -> Self {
         BuildOptions {
+            bytecode_version: Some(7),
             language_version: Some(LanguageVersion::V2_0),
             compiler_version: Some(CompilerVersion::V2_0),
+            move_2: true,
             ..Self::default()
         }
     }
@@ -195,17 +204,21 @@ pub fn build_model(
             skip_attribute_checks,
             known_attributes,
             experiments,
+            move_2: false, // don't override provided values
         },
     };
     let compiler_version = compiler_version.unwrap_or_default();
     let language_version = language_version.unwrap_or_default();
     compiler_version.check_language_support(language_version)?;
-    build_config.move_model_for_package(package_path, ModelConfig {
-        target_filter,
-        all_files_as_targets: false,
-        compiler_version,
-        language_version,
-    })
+    build_config.move_model_for_package(
+        package_path,
+        ModelConfig {
+            target_filter,
+            all_files_as_targets: false,
+            compiler_version,
+            language_version,
+        },
+    )
 }
 
 impl BuiltPackage {
@@ -217,6 +230,7 @@ impl BuiltPackage {
         let bytecode_version = Some(options.inferred_bytecode_version());
         let compiler_version = options.compiler_version;
         let language_version = options.language_version;
+        let move_2 = options.move_2;
         Self::check_versions(&compiler_version, &language_version)?;
         let skip_attribute_checks = options.skip_attribute_checks;
         let build_config = BuildConfig {
@@ -240,6 +254,7 @@ impl BuiltPackage {
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
+                move_2,
             },
         };
 
