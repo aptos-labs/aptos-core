@@ -264,8 +264,9 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                     ))
                 },
             }
+            Ok(VerifyResponse { success: true })
         }
-        Ok(VerifyResponse { success: true })
+        Err(invalid_signature!("Not a keyless signature"))
     }
 }
 
