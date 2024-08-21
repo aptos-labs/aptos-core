@@ -47,7 +47,7 @@ use aptos::move_tool::MemberId;
 use aptos_types::keyless::circuit_testcases::{SAMPLE_JWK, SAMPLE_TEST_ISS_VALUE};
 use aptos_types::keyless::FederatedKeylessPublicKey;
 use aptos_types::keyless::test_utils::get_sample_groth16_sig_and_fed_pk;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::{FeatureFlag, Features, OnChainJWKConsensusConfig};
 // TODO(keyless): Test the override aud_val path
 
 #[tokio::test]
@@ -747,6 +747,9 @@ async fn setup_local_net() -> (
             let mut features = Features::default();
             features.disable(FeatureFlag::FEDERATED_KEYLESS);
             genesis_config.initial_features_override = Some(features);
+
+            // Ensure no default JWKs.
+            genesis_config.jwk_consensus_config_override = Some(OnChainJWKConsensusConfig::Off);
         }))
         .with_aptos()
         .build_with_cli(0)
