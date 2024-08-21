@@ -258,7 +258,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                         },
                     }
                 },
-                EphemeralCertificate::OpenIdSig(_) => todo!(),
+                EphemeralCertificate::OpenIdSig(_) => bail!("OpenIdSig not supported"),
             }
         }
         Ok(VerifyResponse { success: true })
