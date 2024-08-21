@@ -356,6 +356,7 @@ async fn sign_federated_transaction<'a>(
             "{} account does not exist. Creating...",
             addr.to_hex_literal()
         );
+        info.sync_root_account_sequence_number().await;
         info.create_user_account_with_any_key(&any_pk)
             .await
             .unwrap();
