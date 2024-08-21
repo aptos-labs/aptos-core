@@ -775,6 +775,8 @@ pub fn compile_in_temp_dir(
     framework_package_args: &FrameworkPackageArgs,
     prompt_options: PromptOptions,
     bytecode_version: Option<u32>,
+    language_version: Option<LanguageVersion>,
+    compiler_version: Option<CompilerVersion>,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     // Make a temporary directory for compilation
     let temp_dir = TempDir::new().map_err(|err| {
@@ -814,6 +816,8 @@ pub fn compile_in_temp_dir(
         framework_package_args.skip_fetch_latest_git_deps,
         package_dir,
         bytecode_version,
+        language_version,
+        compiler_version,
     )
 }
 
@@ -821,6 +825,8 @@ fn compile_script(
     skip_fetch_latest_git_deps: bool,
     package_dir: &Path,
     bytecode_version: Option<u32>,
+    language_version: Option<LanguageVersion>,
+    compiler_version: Option<CompilerVersion>,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     let build_options = BuildOptions {
         with_srcs: false,
@@ -829,6 +835,8 @@ fn compile_script(
         with_error_map: false,
         skip_fetch_latest_git_deps,
         bytecode_version,
+        language_version,
+        compiler_version,
         ..BuildOptions::default()
     };
 
@@ -900,6 +908,21 @@ pub struct CompileScriptFunction {
 
     #[clap(long)]
     pub(crate) bytecode_version: Option<u32>,
+
+    #[clap(long, default_value_if("move-2", "true", "7"))]
+    pub(crate) bytecode_version: Option<u32>,
+
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           default_value_if("move-2", "true", "V2_0"))]
+    pub compiler_version: Option<CompilerVersion>,
+
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           default_value_if("move-2", "true", "V2_0"))]
+    pub language_version: Option<LanguageVersion>,
+
+    /// Select bytecode, language, compiler for Move 2
+    #[clap(long)]
+    pub move_2: bool,
 }
 
 impl CompileScriptFunction {

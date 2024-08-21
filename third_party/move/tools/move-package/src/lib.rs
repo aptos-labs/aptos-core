@@ -159,7 +159,11 @@ pub struct BuildConfig {
 #[derive(Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default, Debug)]
 pub struct CompilerConfig {
     /// Bytecode version to compile move code
-    #[clap(long = "bytecode-version", global = true)]
+    #[clap(
+        long = "bytecode-version",
+        global = true,
+        default_value_if("move-2", "true", "7")
+    )]
     pub bytecode_version: Option<u32>,
 
     // Known attribute names.  Depends on compilation context (Move variant)
@@ -172,17 +176,23 @@ pub struct CompilerConfig {
 
     /// Compiler version to use
     #[clap(long = "compiler-version", global = true,
-           value_parser = clap::value_parser!(CompilerVersion))]
+           value_parser = clap::value_parser!(CompilerVersion),
+           default_value_if("move-2", "true", "V2_0"))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Language version to support
     #[clap(long = "language-version", global = true,
-           value_parser = clap::value_parser!(LanguageVersion))]
+           value_parser = clap::value_parser!(LanguageVersion),
+           default_value_if("move-2", "true", "V2_0"))]
     pub language_version: Option<LanguageVersion>,
 
     /// Experiments for v2 compiler to set to true
     #[clap(long = "experiments", global = true)]
     pub experiments: Vec<String>,
+
+    /// Select bytecode, language, compiler for Move 2
+    #[clap(long)]
+    pub move_2: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
