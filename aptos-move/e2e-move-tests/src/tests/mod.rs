@@ -47,6 +47,7 @@ mod stake;
 mod state_metadata;
 mod storage_refund;
 mod string_args;
+mod test_self;
 mod token_event_store;
 mod token_objects;
 mod transaction_context;
