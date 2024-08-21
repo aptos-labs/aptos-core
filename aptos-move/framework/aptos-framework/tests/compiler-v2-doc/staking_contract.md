@@ -1279,7 +1279,7 @@ Commission percentage has to be between 0 and 100.
 
 <a id="0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
 
-Chaning beneficiaries for operators is not supported.
+Changing beneficiaries for operators is not supported.
 
 
 <pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 9;
@@ -3372,7 +3372,7 @@ The StakePool exists under the pool_address of StakingContract.
 
 
 The Account exists under the staker.
-The guid_creation_num of the ccount resource is up to MAX_U64.
+The guid_creation_num of the account resource is up to MAX_U64.
 
 
 <pre><code><b>include</b> <a href="staking_contract.md#0x1_staking_contract_NewStakingContractsHolderAbortsIf">NewStakingContractsHolderAbortsIf</a>;

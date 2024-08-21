@@ -90,9 +90,11 @@ where
             self.version += num_txns as u64;
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
+            let parent_block_id = self.executor.committed_block_id();
             self.executor
-                .commit_blocks(vec![block_id], ledger_info_with_sigs)
+                .pre_commit_block(block_id, parent_block_id)
                 .unwrap();
+            self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
 
             report_block(
                 start_version,
