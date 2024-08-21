@@ -28,6 +28,7 @@ use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
+use aptos_infallible::duration_since_epoch;
 
 /// Maximum number of signatures supported in `TransactionAuthenticator`,
 /// across all `AccountAuthenticator`s included.
@@ -1015,6 +1016,7 @@ impl AnySignature {
         public_key: &AnyPublicKey,
         message: &T,
     ) -> Result<()> {
+        assert_eq!(0, duration_since_epoch().as_millis());
         match (self, public_key) {
             (Self::Ed25519 { signature }, AnyPublicKey::Ed25519 { public_key }) => {
                 signature.verify(message, public_key)

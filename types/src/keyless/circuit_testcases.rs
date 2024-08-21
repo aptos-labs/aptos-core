@@ -4,6 +4,7 @@
 //^ This file stores the details associated with a sample ZK proof. The constants are outputted by
 //^ `input_gen.py` in the `keyless-circuit` repo (or can be derived implicitly from that code).
 
+use std::ops::Deref;
 use crate::{
     jwks::{
         insecure_test_rsa_jwk,
@@ -22,6 +23,8 @@ use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use once_cell::sync::Lazy;
 use ring::signature::RsaKeyPair;
+use move_core_types::account_address::AccountAddress;
+use crate::keyless::FederatedKeylessPublicKey;
 
 /// The JWT header, decoded as JSON
 pub(crate) static SAMPLE_JWT_HEADER_JSON: Lazy<String> = Lazy::new(|| {
@@ -49,7 +52,7 @@ static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
+pub const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
 
 pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
     format!(
@@ -88,7 +91,7 @@ pub(crate) static SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
 pub(crate) static SAMPLE_JWT_PARSED: Lazy<Claims> =
     Lazy::new(|| serde_json::from_str(SAMPLE_JWT_PAYLOAD_JSON.as_str()).unwrap());
 
-pub(crate) static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(insecure_test_rsa_jwk);
+pub static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(insecure_test_rsa_jwk);
 
 /// This is the SK from https://token.dev/.
 /// To convert it into a JSON, you can use https://irrte.ch/jwt-js-decode/pem2jwk.html

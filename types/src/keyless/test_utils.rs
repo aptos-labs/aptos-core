@@ -28,6 +28,8 @@ use ark_groth16::PreparedVerifyingKey;
 use base64::{encode_config, URL_SAFE_NO_PAD};
 use once_cell::sync::Lazy;
 use ring::signature;
+use move_core_types::account_address::AccountAddress;
+use crate::keyless::FederatedKeylessPublicKey;
 
 static DUMMY_EPHEMERAL_SIGNATURE: Lazy<EphemeralSignature> = Lazy::new(|| {
     let sk = Ed25519PrivateKey::generate_for_testing();
@@ -116,6 +118,33 @@ pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     };
 
     (sig, SAMPLE_PK.clone())
+}
+
+pub fn get_sample_groth16_sig_and_fed_pk(jwk_addr: AccountAddress) -> (KeylessSignature, FederatedKeylessPublicKey) {
+    let proof = *SAMPLE_PROOF;
+
+    let zks = ZeroKnowledgeSig {
+        proof: proof.into(),
+        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
+    };
+
+    let sig = KeylessSignature {
+        cert: EphemeralCertificate::ZeroKnowledgeSig(zks.clone()),
+        jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
+        exp_date_secs: SAMPLE_EXP_DATE,
+        ephemeral_pubkey: SAMPLE_EPK.clone(),
+        ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
+    };
+
+    let fed_pk = FederatedKeylessPublicKey {
+        jwk_addr,
+        pk: SAMPLE_PK.clone(),
+    };
+
+    (sig, fed_pk)
 }
 
 pub fn get_upgraded_vk() -> PreparedVerifyingKey<Bn254> {

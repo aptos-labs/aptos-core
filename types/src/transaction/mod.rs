@@ -77,6 +77,7 @@ pub use script::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
+use crate::keyless::FederatedKeylessPublicKey;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -620,6 +621,18 @@ impl SignedTransaction {
     ) -> SignedTransaction {
         let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
             AnyPublicKey::keyless(public_key),
+            AnySignature::keyless(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
+    }
+
+    pub fn new_federated_keyless(
+        raw_txn: RawTransaction,
+        public_key: FederatedKeylessPublicKey,
+        signature: KeylessSignature,
+    ) -> SignedTransaction {
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::federated_keyless(public_key),
             AnySignature::keyless(signature),
         ));
         Self::new_single_sender(raw_txn, authenticator)

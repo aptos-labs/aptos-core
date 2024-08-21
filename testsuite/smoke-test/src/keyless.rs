@@ -41,6 +41,11 @@ use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, time::Duration};
+use std::str::FromStr;
+use aptos::move_tool::MemberId;
+use aptos_types::keyless::circuit_testcases::{SAMPLE_JWK, SAMPLE_TEST_ISS_VALUE};
+use aptos_types::keyless::FederatedKeylessPublicKey;
+use aptos_types::keyless::test_utils::get_sample_groth16_sig_and_fed_pk;
 // TODO(keyless): Test the override aud_val path
 
 #[tokio::test]
@@ -226,6 +231,22 @@ async fn test_keyless_groth16_verifies() {
 }
 
 #[tokio::test]
+async fn test_federated_keyless() {
+    let (_, _, swarm, signed_txn) = get_federated_transaction().await;
+
+    info!("Submit keyless Groth16 transaction");
+    let result = swarm
+        .aptos_public_info()
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await;
+
+    if let Err(e) = result {
+        panic!("Error with keyless Groth16 TXN verification: {:?}", e)
+    }
+}
+
+#[tokio::test]
 async fn test_keyless_no_extra_field_groth16_verifies() {
     let (_, _, swarm, signed_txn) =
         get_transaction(get_sample_groth16_sig_and_pk_no_extra_field).await;
@@ -315,6 +336,99 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
             "Keyless Groth16 TXN with bad training wheels signature should have failed verification"
         )
     }
+}
+
+async fn sign_federated_transaction<'a>(
+    info: &mut AptosPublicInfo,
+    mut sig: KeylessSignature,
+    pk: FederatedKeylessPublicKey,
+    jwk: &RSA_JWK,
+    config: &Configuration,
+    tw_sk: Option<&Ed25519PrivateKey>,
+    seqno: usize,
+) -> SignedTransaction {
+    let any_pk = AnyPublicKey::keyless(pk.clone());
+    let addr = AuthenticationKey::any_key(any_pk.clone()).account_address();
+
+    // If the account does not exist, create it.
+    if info.account_exists(addr).await.is_err() {
+        info!(
+            "{} account does not exist. Creating...",
+            addr.to_hex_literal()
+        );
+        info.create_user_account_with_any_key(&any_pk)
+            .await
+            .unwrap();
+        info.mint(addr, 10_000_000_000).await.unwrap();
+    }
+
+    // TODO: No idea why, but these calls do not actually reflect the updated balance after a successful TXN.
+    info!(
+        "{} balance before TXN: {}",
+        addr.to_hex_literal(),
+        info.get_balance(addr).await.unwrap()
+    );
+    // TODO: No idea why, but these calls do not actually reflect the updated sequence number after a successful TXN.
+    info!(
+        "{} sequence number before TXN: {}",
+        addr.to_hex_literal(),
+        info.get_account_sequence_number(addr).await.unwrap()
+    );
+
+    let recipient = info
+        .create_and_fund_user_account(20_000_000_000)
+        .await
+        .unwrap();
+
+    let raw_txn = info
+        .transaction_factory()
+        .payload(aptos_stdlib::aptos_coin_transfer(
+            recipient.address(),
+            1_000_000,
+        ))
+        .sender(addr)
+        .sequence_number(seqno as u64)
+        .build();
+
+    let esk = get_sample_esk();
+
+    let public_inputs_hash: Option<[u8; 32]> =
+        if let EphemeralCertificate::ZeroKnowledgeSig(_) = &sig.cert {
+            // This will only calculate the hash if it's needed, avoiding unnecessary computation.
+            Some(fr_to_bytes_le(
+                &get_public_inputs_hash(&sig, &pk, jwk, config).unwrap(),
+            ))
+        } else {
+            None
+        };
+
+    let mut txn_and_zkp = TransactionAndProof {
+        message: raw_txn.clone(),
+        proof: None,
+    };
+
+    // Compute the training wheels signature if not present
+    match &mut sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+            let proof_and_statement = Groth16ProofAndStatement {
+                proof: proof.proof.into(),
+                public_inputs_hash: public_inputs_hash.unwrap(),
+            };
+
+            if let Some(tw_sk) = tw_sk {
+                proof.training_wheels_signature = Some(EphemeralSignature::ed25519(
+                    tw_sk.sign(&proof_and_statement).unwrap(),
+                ));
+            }
+
+            txn_and_zkp.proof = Some(proof.proof);
+        },
+        EphemeralCertificate::OpenIdSig(_) => {},
+    }
+
+    sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
+
+    SignedTransaction::new_keyless(raw_txn, pk, sig)
 }
 
 async fn sign_transaction<'a>(
@@ -452,7 +566,58 @@ async fn get_transaction(
         Some(&tw_sk),
         1,
     )
-    .await;
+        .await;
+
+    (sig, pk, swarm, signed_txn)
+}
+
+async fn get_federated_transaction() -> (
+    KeylessSignature,
+    FederatedKeylessPublicKey,
+    LocalSwarm,
+    SignedTransaction,
+) {
+    let (tw_sk, config, jwk, swarm, mut cli, _) = setup_local_net().await;
+    let root_addr = swarm.chain_info().root_account().address();
+    let _root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let script = format!(r#"
+script {{
+    use aptos_framework::jwks;
+    fun main(account: &signer) {{
+        let iss = b"{}";
+        let kid = utf8(b"{}");
+        let alg = utf8(b"{}");
+        let e = utf8(b"{}");
+        let n = utf8(b"{}");
+        let jwk = new_rsa_jwk(kid, alg, e, n);
+        let patch = new_patch_upsert_jwk(iss, jwk);
+        jwks::install_federated_jwks(account, vector[patch]);
+    }}
+}}
+    "#, SAMPLE_TEST_ISS_VALUE, SAMPLE_JWK.kid, SAMPLE_JWK.alg, SAMPLE_JWK.e, SAMPLE_JWK.n);
+
+    let txn_result = cli.run_script_with_gas_options(0, &script, Some(gas_options)).await;
+    assert!(txn_result.unwrap().success);
+
+    // We simply let the root be the jwk owner here.
+    let (sig, pk) = get_sample_groth16_sig_and_fed_pk(root_addr);
+
+    let mut info = swarm.aptos_public_info();
+    let signed_txn = sign_federated_transaction(
+        &mut info,
+        sig.clone(),
+        pk.clone(),
+        &jwk,
+        &config,
+        Some(&tw_sk),
+        1,
+    )
+        .await;
 
     (sig, pk, swarm, signed_txn)
 }
