@@ -6,13 +6,11 @@ use crate::{
     block::Block,
     common::{Payload, Round},
     order_vote_proposal::OrderVoteProposal,
-    pipeline_execution_result::PipelineExecutionResult,
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_executor_types::{ExecutorResult, StateComputeResult};
-use aptos_infallible::Mutex;
+use aptos_executor_types::StateComputeResult;
 use aptos_logger::{error, warn};
 use aptos_types::{
     block_info::BlockInfo,
@@ -21,7 +19,6 @@ use aptos_types::{
     transaction::{SignedTransaction, TransactionStatus},
     validator_txn::ValidatorTransaction,
 };
-use derivative::Derivative;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -29,13 +26,11 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::oneshot;
 
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered
 /// or in executed state. In the ordered state, the block is waiting to be executed. In the executed state,
 /// the block has been executed and the output is available.
-#[derive(Derivative, Clone)]
-#[derivative(Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct PipelinedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
@@ -48,8 +43,6 @@ pub struct PipelinedBlock {
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,
     execution_summary: Arc<OnceCell<ExecutionSummary>>,
-    #[derivative(PartialEq = "ignore")]
-    pre_commit_result_rx: Arc<Mutex<Option<oneshot::Receiver<ExecutorResult<()>>>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -104,7 +97,6 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
-            pre_commit_result_rx: Arc::new(Mutex::new(None)),
         };
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -116,18 +108,12 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
 impl PipelinedBlock {
     pub fn set_execution_result(
         mut self,
-        pipeline_execution_result: PipelineExecutionResult,
+        input_transactions: Vec<SignedTransaction>,
+        result: StateComputeResult,
+        execution_time: Duration,
     ) -> Self {
-        let PipelineExecutionResult {
-            input_txns,
-            result,
-            execution_time,
-            pre_commit_result_rx,
-        } = pipeline_execution_result;
-
         self.state_compute_result = result;
-        self.input_transactions = input_txns;
-        self.pre_commit_result_rx = Arc::new(Mutex::new(Some(pre_commit_result_rx)));
+        self.input_transactions = input_transactions;
 
         let mut to_commit = 0;
         let mut to_retry = 0;
@@ -171,14 +157,8 @@ impl PipelinedBlock {
                 .set(execution_summary)
                 .expect("inserting into empty execution summary");
         }
-        self
-    }
 
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn mark_successful_pre_commit_for_test(&self) {
-        let (tx, rx) = oneshot::channel();
-        tx.send(Ok(())).unwrap();
-        *self.pre_commit_result_rx.lock() = Some(rx);
+        self
     }
 
     pub fn set_randomness(&self, randomness: Randomness) {
@@ -187,13 +167,6 @@ impl PipelinedBlock {
 
     pub fn set_insertion_time(&self) {
         assert!(self.pipeline_insertion_time.set(Instant::now()).is_ok());
-    }
-
-    pub fn take_pre_commit_result_rx(&self) -> oneshot::Receiver<ExecutorResult<()>> {
-        self.pre_commit_result_rx
-            .lock()
-            .take()
-            .expect("pre_commit_result_rx missing.")
     }
 }
 
@@ -222,7 +195,6 @@ impl PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
-            pre_commit_result_rx: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -234,7 +206,6 @@ impl PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
-            pre_commit_result_rx: Arc::new(Mutex::new(None)),
         }
     }
 

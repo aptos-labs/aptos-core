@@ -18,7 +18,6 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
@@ -36,7 +35,6 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    proof::TransactionInfoListWithProof,
     state_store::StateViewId,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
@@ -50,14 +48,7 @@ use fail::fail_point;
 use itertools::multizip;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::{
-    iter::once,
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{iter::once, marker::PhantomData, sync::Arc};
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -88,25 +79,6 @@ impl<V: VMExecutor> ChunkExecutor<V> {
         }
         Ok(())
     }
-
-    fn with_inner<F, T>(&self, f: F) -> Result<T>
-    where
-        F: FnOnce(&ChunkExecutorInner<V>) -> Result<T>,
-    {
-        let locked = self.inner.read();
-        let inner = locked.as_ref().expect("not reset");
-
-        let has_pending_pre_commit = inner.has_pending_pre_commit.load(Ordering::Acquire);
-        f(inner).map_err(|error| {
-            if has_pending_pre_commit {
-                panic!(
-                    "Hit error with pending pre-committed ledger, panicking. {:?}",
-                    error,
-                );
-            }
-            error
-        })
-    }
 }
 
 impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
@@ -117,13 +89,11 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
         self.maybe_initialize()?;
-        self.with_inner(|inner| {
-            inner.enqueue_chunk_by_execution(
-                txn_list_with_proof,
-                verified_target_li,
-                epoch_change_li,
-            )
-        })
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .enqueue_chunk_by_execution(txn_list_with_proof, verified_target_li, epoch_change_li)
     }
 
     fn enqueue_chunk_by_transaction_outputs(
@@ -132,21 +102,31 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        self.with_inner(|inner| {
-            inner.enqueue_chunk_by_transaction_outputs(
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .enqueue_chunk_by_transaction_outputs(
                 txn_output_list_with_proof,
                 verified_target_li,
                 epoch_change_li,
             )
-        })
     }
 
     fn update_ledger(&self) -> Result<()> {
-        self.with_inner(|inner| inner.update_ledger())
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .update_ledger()
     }
 
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
-        self.with_inner(|inner| inner.commit_chunk())
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .commit_chunk()
     }
 
     fn reset(&self) -> Result<()> {
@@ -162,23 +142,15 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 struct ChunkExecutorInner<V> {
     db: DbReaderWriter,
     commit_queue: Mutex<ChunkCommitQueue>,
-    has_pending_pre_commit: AtomicBool,
     _phantom: PhantomData<V>,
 }
 
 impl<V: VMExecutor> ChunkExecutorInner<V> {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
-        let commit_queue = ChunkCommitQueue::new_from_db(&db.reader)?;
-
-        let next_pre_committed_version = commit_queue.expecting_version();
-        let next_synced_version = db.reader.get_synced_version()?.map_or(0, |v| v + 1);
-        assert!(next_synced_version <= next_pre_committed_version);
-        let has_pending_pre_commit = next_synced_version < next_pre_committed_version;
-
+        let commit_queue = Mutex::new(ChunkCommitQueue::new_from_db(&db.reader)?);
         Ok(Self {
             db,
-            commit_queue: Mutex::new(commit_queue),
-            has_pending_pre_commit: AtomicBool::new(has_pending_pre_commit),
+            commit_queue,
             _phantom: PhantomData,
         })
     }
@@ -192,25 +164,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             latest_state.current.clone(),
             Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
         )?)
-    }
-
-    fn verify_extends_ledger(
-        &self,
-        proof: &TransactionInfoListWithProof,
-        first_version: Version,
-        my_root_hash: HashValue,
-    ) -> Result<()> {
-        // In consensus-only mode, we cannot verify the proof against the executed output,
-        // because the proof returned by the remote peer is an empty one.
-        if cfg!(feature = "consensus-only-perf-test") {
-            return Ok(());
-        }
-
-        let num_overlap =
-            proof.verify_extends_ledger(first_version, my_root_hash, Some(first_version))?;
-        assert_eq!(num_overlap, 0, "overlapped chunks");
-
-        Ok(())
     }
 
     fn commit_chunk_impl(&self) -> Result<ExecutedChunk> {
@@ -465,11 +418,18 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         } = chunk;
 
         let first_version = parent_accumulator.num_leaves();
-        self.verify_extends_ledger(
-            &txn_infos_with_proof,
-            first_version,
-            parent_accumulator.root_hash(),
-        )?;
+
+        // In consensus-only mode, we cannot verify the proof against the executed output,
+        // because the proof returned by the remote peer is an empty one.
+        #[cfg(not(feature = "consensus-only-perf-test"))]
+        {
+            let num_overlap = txn_infos_with_proof.verify_extends_ledger(
+                first_version,
+                parent_accumulator.root_hash(),
+                Some(first_version),
+            )?;
+            assert_eq!(num_overlap, 0, "overlapped chunks");
+        }
 
         let (ledger_update_output, to_discard, to_retry) = {
             let _timer =
@@ -510,7 +470,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
         let _timer = APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS.start_timer();
         let executed_chunk = self.commit_chunk_impl()?;
-        self.has_pending_pre_commit.store(false, Ordering::Release);
 
         let commit_notification = {
             let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
