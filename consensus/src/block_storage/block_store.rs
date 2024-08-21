@@ -18,6 +18,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
@@ -481,8 +482,12 @@ impl BlockStore {
         Ok(())
     }
 
-    pub fn check_payload(&self, proposal: &Block) -> bool {
+    pub fn check_payload(&self, proposal: &Block) -> Result<(), BitVec> {
         self.payload_manager.check_payload_availability(proposal)
+    }
+
+    pub fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {
+        self.inner.read().get_block_for_round(round)
     }
 }
 

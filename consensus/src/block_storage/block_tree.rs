@@ -15,10 +15,13 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
+use aptos_types::{
+    block_info::{BlockInfo, Round},
+    ledger_info::LedgerInfoWithSignatures,
+};
 use mirai_annotations::{checked_verify_eq, precondition};
 use std::{
-    collections::{vec_deque::VecDeque, HashMap, HashSet},
+    collections::{vec_deque::VecDeque, BTreeMap, BTreeSet, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -89,6 +92,9 @@ pub struct BlockTree {
     pruned_block_ids: VecDeque<HashValue>,
     /// Num pruned blocks to keep in memory.
     max_pruned_blocks_in_mem: usize,
+
+    /// Round to Block index. We expect only one block per round.
+    round_to_ids: BTreeMap<Round, HashValue>,
 }
 
 impl BlockTree {
@@ -108,6 +114,8 @@ impl BlockTree {
         let root_id = root.id();
 
         let mut id_to_block = HashMap::new();
+        let mut round_to_ids = BTreeMap::new();
+        round_to_ids.insert(root.round(), root_id);
         id_to_block.insert(root_id, LinkableBlock::new(root));
         counters::NUM_BLOCKS_IN_TREE.set(1);
 
@@ -132,6 +140,7 @@ impl BlockTree {
             pruned_block_ids,
             max_pruned_blocks_in_mem,
             highest_2chain_timeout_cert,
+            round_to_ids,
         }
     }
 
@@ -165,7 +174,10 @@ impl BlockTree {
 
     fn remove_block(&mut self, block_id: HashValue) {
         // Remove the block from the store
-        self.id_to_block.remove(&block_id);
+        if let Some(block) = self.id_to_block.remove(&block_id) {
+            let round = block.executed_block().round();
+            self.round_to_ids.remove(&round);
+        };
         self.id_to_quorum_cert.remove(&block_id);
     }
 
@@ -176,6 +188,12 @@ impl BlockTree {
     pub(super) fn get_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
         self.get_linkable_block(block_id)
             .map(|lb| lb.executed_block().clone())
+    }
+
+    pub(super) fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {
+        self.round_to_ids
+            .get(&round)
+            .and_then(|block_id| self.get_block(block_id))
     }
 
     pub(super) fn ordered_root(&self) -> Arc<PipelinedBlock> {
@@ -241,6 +259,16 @@ impl BlockTree {
             let linkable_block = LinkableBlock::new(block);
             let arc_block = Arc::clone(linkable_block.executed_block());
             assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
+            // Note: the assumption is that we have/enforce unequivocal proposer election.
+            if let Some(old_block_id) = self.round_to_ids.get(&arc_block.round()) {
+                warn!(
+                    "Multiple blocks received for round {}. Previous block id: {}",
+                    arc_block.round(),
+                    old_block_id
+                );
+            } else {
+                self.round_to_ids.insert(arc_block.round(), block_id);
+            }
             counters::NUM_BLOCKS_IN_TREE.inc();
             Ok(arc_block)
         }

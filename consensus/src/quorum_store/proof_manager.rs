@@ -34,7 +34,6 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
-    enable_opt_quorum_store: bool,
 }
 
 impl ProofManager {
@@ -44,7 +43,6 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
-        enable_opt_quorum_store: bool,
     ) -> Self {
         Self {
             batch_proof_queue: BatchProofQueue::new(my_peer_id, batch_store),
@@ -53,7 +51,6 @@ impl ProofManager {
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
-            enable_opt_quorum_store,
         }
     }
 
@@ -106,10 +103,6 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let max_txns_with_proof = request
-                    .max_txns
-                    .compute_pct(100 - request.opt_batch_txns_pct);
-
                 let (
                     proof_block,
                     txns_with_proof_size,
@@ -117,7 +110,7 @@ impl ProofManager {
                     proof_queue_fully_utilized,
                 ) = self.batch_proof_queue.pull_proofs(
                     &excluded_batches,
-                    max_txns_with_proof,
+                    request.max_txns,
                     request.max_txns_after_filtering,
                     request.soft_max_txns_after_filtering,
                     request.return_non_full,
@@ -129,26 +122,29 @@ impl ProofManager {
                 counters::PROOF_QUEUE_FULLY_UTILIZED
                     .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-                let (opt_batches, opt_batch_txns_size) = if self.enable_opt_quorum_store {
+                let (opt_batches, opt_batch_txns_size) = 
                     // TODO(ibalajiarun): Support unique txn calculation
-                    let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
-                    let (opt_batches, opt_payload_size, _) = self.batch_proof_queue.pull_batches(
-                        &excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .collect(),
-                        max_opt_batch_txns_size,
-                        request.max_txns_after_filtering,
-                        request.soft_max_txns_after_filtering,
-                        request.return_non_full,
-                        request.block_timestamp,
-                    );
+                    if let Some(ref params) = request.maybe_optqs_payload_pull_params {
+                        let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
+                        let (opt_batches, opt_payload_size, _) =
+                            self.batch_proof_queue.pull_batches(
+                                &excluded_batches
+                                    .iter()
+                                    .cloned()
+                                    .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                                    .collect(),
+                                &params.exclude_authors,
+                                max_opt_batch_txns_size,
+                                request.max_txns_after_filtering,
+                                request.soft_max_txns_after_filtering,
+                                request.return_non_full,
+                                request.block_timestamp,
+                            );
 
-                    (opt_batches, opt_payload_size)
-                } else {
-                    (Vec::new(), PayloadTxnsSize::zero())
-                };
+                        (opt_batches, opt_payload_size)
+                    } else {
+                        (Vec::new(), PayloadTxnsSize::zero())
+                    };
 
                 let cur_txns = txns_with_proof_size + opt_batch_txns_size;
                 let (inline_block, inline_block_size) =
@@ -183,7 +179,7 @@ impl ProofManager {
                 counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
                 counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
-                let response = if self.enable_opt_quorum_store {
+                let response = if request.maybe_optqs_payload_pull_params.is_some() {
                     let inline_batches = inline_block.into();
                     Payload::OptQuorumStore(OptQuorumStorePayload::new(
                         inline_batches,
