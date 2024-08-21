@@ -68,7 +68,7 @@ async fn test_keyless_oidc_txn_verifies() {
 
 #[tokio::test]
 async fn test_keyless_rotate_vk() {
-    let (tw_sk, config, jwk, swarm, mut cli, root_idx) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, mut cli, root_idx) = setup_local_net(true).await;
     let mut info = swarm.aptos_public_info();
 
     let (old_sig, old_pk) = get_sample_groth16_sig_and_pk();
@@ -171,7 +171,7 @@ async fn test_keyless_secure_test_jwk_initialized_at_genesis() {
 
 #[tokio::test]
 async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
-    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net(true).await;
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
     match &mut sig.cert {
@@ -197,7 +197,7 @@ async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
 
 #[tokio::test]
 async fn test_keyless_oidc_txn_with_expired_epk() {
-    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net(true).await;
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
     sig.exp_date_secs = 1; // This should fail the verification since the expiration date is way in the past
@@ -234,7 +234,7 @@ async fn test_keyless_groth16_verifies() {
 
 #[tokio::test]
 async fn test_federated_keyless() {
-    let (tw_sk, config, jwk, swarm, mut cli, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, mut cli, _) = setup_local_net(false).await;
     let mut info = swarm.aptos_public_info();
 
     // We will later use the root account as JWK owner. (Root account has no difference from a normal account except that it can derive 0x1).
@@ -371,7 +371,7 @@ async fn test_keyless_no_extra_field_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_no_training_wheels_groth16_verifies() {
-    let (_tw_sk, config, jwk, swarm, mut cli, root_idx) = setup_local_net().await;
+    let (_tw_sk, config, jwk, swarm, mut cli, root_idx) = setup_local_net(true).await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
@@ -394,7 +394,7 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_groth16_with_mauled_proof() {
-    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net(true).await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
@@ -414,7 +414,7 @@ async fn test_keyless_groth16_with_mauled_proof() {
 
 #[tokio::test]
 async fn test_keyless_groth16_with_bad_tw_signature() {
-    let (_tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
+    let (_tw_sk, config, jwk, swarm, _, _) = setup_local_net(true).await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
@@ -660,7 +660,7 @@ async fn get_transaction(
     LocalSwarm,
     SignedTransaction,
 ) {
-    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net(true).await;
 
     let (sig, pk) = get_pk_and_sig_func();
 
@@ -679,61 +679,7 @@ async fn get_transaction(
     (sig, pk, swarm, signed_txn)
 }
 
-async fn get_federated_transaction() -> (
-    KeylessSignature,
-    FederatedKeylessPublicKey,
-    LocalSwarm,
-    SignedTransaction,
-) {
-    let (tw_sk, config, jwk, swarm, mut cli, _) = setup_local_net().await;
-    let root_addr = swarm.chain_info().root_account().address();
-    let _root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
-    let gas_options = GasOptions {
-        gas_unit_price: Some(100),
-        max_gas: Some(2000000),
-        expiration_secs: 60,
-    };
-    let script = format!(r#"
-script {{
-    use aptos_framework::jwks;
-    use std::string::utf8;
-    fun main(account: &signer) {{
-        let patch_0 = jwks::new_patch_remove_all();
-        let iss = b"{}";
-        let kid = utf8(b"{}");
-        let alg = utf8(b"{}");
-        let e = utf8(b"{}");
-        let n = utf8(b"{}");
-        let jwk = jwks::new_rsa_jwk(kid, alg, e, n);
-        let patch_1 = jwks::new_patch_upsert_jwk(iss, jwk);
-        let patches = vector[patch_0, patch_1]; // clear all, then add 1 jwk.
-        jwks::patch_federated_jwks(account, patches);
-    }}
-}}
-    "#, SAMPLE_TEST_ISS_VALUE, SAMPLE_JWK.kid, SAMPLE_JWK.alg, SAMPLE_JWK.e, SAMPLE_JWK.n);
-
-    let txn_result = cli.run_script_with_gas_options(0, &script, Some(gas_options)).await;
-    assert_eq!(Some(true), txn_result.unwrap().success);
-
-    // We simply let the root be the jwk owner here.
-    let (sig, pk) = get_sample_groth16_sig_and_fed_pk(root_addr);
-
-    let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_federated_transaction(
-        &mut info,
-        sig.clone(),
-        pk.clone(),
-        &jwk,
-        &config,
-        Some(&tw_sk),
-        1,
-    )
-        .await;
-
-    (sig, pk, swarm, signed_txn)
-}
-
-async fn setup_local_net() -> (
+async fn setup_local_net(install_test_jwk: bool) -> (
     Ed25519PrivateKey,
     Configuration,
     RSA_JWK,
@@ -756,7 +702,7 @@ async fn setup_local_net() -> (
         .await;
 
     let (tw_sk, config, jwk, root_idx) =
-        spawn_network_and_execute_gov_proposals(&mut swarm, &mut cli).await;
+        spawn_network_and_execute_gov_proposals(&mut swarm, &mut cli, install_test_jwk).await;
     (tw_sk, config, jwk, swarm, cli, root_idx)
 }
 
@@ -807,6 +753,7 @@ fun main(core_resources: &signer) {{
 async fn spawn_network_and_execute_gov_proposals(
     swarm: &mut LocalSwarm,
     cli: &mut CliTestFramework,
+    install_test_jwk: bool,
 ) -> (Ed25519PrivateKey, Configuration, RSA_JWK, usize) {
     let client = swarm.validators().next().unwrap().rest_client();
     let root_idx = cli.add_account_with_address_to_cli(
@@ -858,18 +805,20 @@ use aptos_framework::aptos_governance;
 use std::string::utf8;
 use std::option;
 fun main(core_resources: &signer) {{
-    let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-    let jwk_0 = jwks::new_rsa_jwk(
-        utf8(b"{}"),
-        utf8(b"{}"),
-        utf8(b"{}"),
-        utf8(b"{}")
-    );
-    let patches = vector[
-        jwks::new_patch_remove_all(),
-        jwks::new_patch_upsert_jwk(b"{}", jwk_0),
-    ];
-    jwks::set_patches(&framework_signer, patches);
+    let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+    if ({}) {{
+        let jwk_0 = jwks::new_rsa_jwk(
+            utf8(b"{}"),
+            utf8(b"{}"),
+            utf8(b"{}"),
+            utf8(b"{}")
+        );
+        let patches = vector[
+            jwks::new_patch_remove_all(),
+            jwks::new_patch_upsert_jwk(b"{}", jwk_0),
+        ];
+        jwks::set_patches(&framework_signer, patches);
+    }}
 
     {}::update_max_exp_horizon_for_next_epoch(&framework_signer, {});
     {}::update_training_wheels_for_next_epoch(&framework_signer, option::some(x"{}"));
@@ -878,6 +827,7 @@ fun main(core_resources: &signer) {{
 }}
 "#,
         KEYLESS_ACCOUNT_MODULE_NAME,
+        install_test_jwk,
         jwk.kid,
         jwk.alg,
         jwk.e,
