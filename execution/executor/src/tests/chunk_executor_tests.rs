@@ -9,7 +9,7 @@ use crate::{
     chunk_executor::ChunkExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{encode_mint_transaction, MockVM},
-    tests::{self, create_blocks_and_chunks, create_transaction_chunks},
+    tests,
 };
 use aptos_crypto::HashValue;
 use aptos_db::AptosDB;
@@ -18,7 +18,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
-    transaction::{TransactionListWithProof, Version},
+    transaction::TransactionListWithProof,
 };
 use rand::Rng;
 
@@ -47,7 +47,7 @@ impl TestExecutor {
 }
 
 fn execute_and_commit_chunks(
-    chunks: [TransactionListWithProof; 3],
+    chunks: Vec<TransactionListWithProof>,
     ledger_info: LedgerInfoWithSignatures,
     db: &DbReaderWriter,
     executor: &ChunkExecutor<MockVM>,
@@ -91,10 +91,10 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
     let third_batch_start = second_batch_start + second_batch_size;
 
     let (chunks, ledger_info) = {
-        create_transaction_chunks(vec![
-            first_batch_start..=first_batch_start + first_batch_size - 1,
-            second_batch_start..=second_batch_start + second_batch_size - 1,
-            third_batch_start..=third_batch_start + third_batch_size - 1,
+        tests::create_transaction_chunks(vec![
+            first_batch_start..first_batch_start + first_batch_size,
+            second_batch_start..second_batch_start + second_batch_size,
+            third_batch_start..third_batch_start + third_batch_size,
         ])
     };
     // First test with transactions only and reset chunks to be `Vec<TransactionOutputListWithProof>`.
@@ -104,14 +104,9 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
             db,
             executor,
         } = TestExecutor::new();
-        execute_and_commit_chunks(
-            chunks.try_into().unwrap(),
-            ledger_info.clone(),
-            &db,
-            &executor,
-        );
+        execute_and_commit_chunks(chunks, ledger_info.clone(), &db, &executor);
 
-        let ledger_version = db.reader.expect_synced_version();
+        let ledger_version = db.reader.get_synced_version().unwrap();
         let output1 = db
             .reader
             .get_transaction_outputs(first_batch_start, first_batch_size, ledger_version)
@@ -124,7 +119,7 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
             .reader
             .get_transaction_outputs(third_batch_start, third_batch_size, ledger_version)
             .unwrap();
-        [output1, output2, output3]
+        vec![output1, output2, output3]
     };
 
     // Test with transaction outputs.
@@ -170,8 +165,8 @@ fn test_executor_execute_and_commit_chunk_restart() {
         let first_batch_start = 1;
         let second_batch_start = first_batch_start + first_batch_size;
         tests::create_transaction_chunks(vec![
-            first_batch_start..=first_batch_start + first_batch_size - 1,
-            second_batch_start..=second_batch_start + second_batch_size - 1,
+            first_batch_start..first_batch_start + first_batch_size,
+            second_batch_start..second_batch_start + second_batch_size,
         ])
     };
 
@@ -194,11 +189,13 @@ fn test_executor_execute_and_commit_chunk_restart() {
 
     // Then we restart executor and resume to the next chunk.
     {
+        println!("------------------------------------ CCC");
         let executor = ChunkExecutor::<MockVM>::new(db.clone());
 
         executor
             .execute_chunk(chunks[1].clone(), &ledger_info, None)
             .unwrap();
+        println!("------------------------------------ DDD");
         executor.commit_chunk().unwrap();
         let li = db.reader.get_latest_ledger_info().unwrap();
         assert_eq!(li, ledger_info);
@@ -214,9 +211,9 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
     let (chunks, ledger_info) = {
         let first_batch_start = 1;
         let second_batch_start = first_batch_start + first_batch_size;
-        create_transaction_chunks(vec![
-            first_batch_start..=first_batch_start + first_batch_size - 1,
-            second_batch_start..=second_batch_start + second_batch_size - 1,
+        tests::create_transaction_chunks(vec![
+            first_batch_start..first_batch_start + first_batch_size,
+            second_batch_start..second_batch_start + second_batch_size,
         ])
     };
 
@@ -307,95 +304,4 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
     assert!(chunk_manager
         .execute_chunk(chunks[1].clone(), &ledger_info, None)
         .is_ok());
-}
-
-const PRE_COMMIT_TESTS_LATEST_VERSION: Version = 10;
-
-/// commits txn 1-3, pre-commits txn 4-7, returns txn 8-10 and ledger infos at 7 and 10
-fn commit_1_pre_commit_2_return_3() -> (
-    DbReaderWriter,
-    TransactionListWithProof,
-    LedgerInfoWithSignatures,
-    LedgerInfoWithSignatures,
-) {
-    let (blocks, chunks) =
-        create_blocks_and_chunks(vec![1..=3, 4..=7, 8..=10], vec![1..=3, 4..=7, 8..=10]);
-
-    let TestExecutor {
-        _path,
-        db,
-        executor: chunk_executor,
-    } = TestExecutor::new();
-    drop(chunk_executor);
-
-    let block_executor = BlockExecutor::<MockVM>::new(db.clone());
-    let mut parent_block_id = block_executor.committed_block_id();
-    // execute and pre-commit block 1 & 2
-    for (txns, ledger_info) in &blocks[0..=1] {
-        let block_id = ledger_info.commit_info().id();
-        let output = block_executor
-            .execute_block(
-                (block_id, block(txns.clone())).into(),
-                parent_block_id,
-                TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
-            )
-            .unwrap();
-        assert_eq!(
-            output.root_hash(),
-            ledger_info.ledger_info().transaction_accumulator_hash()
-        );
-        block_executor
-            .pre_commit_block(block_id, parent_block_id)
-            .unwrap();
-        parent_block_id = block_id;
-    }
-    // commit till block 1
-    let ledger_info1 = blocks[0].1.clone();
-    let ledger_info2 = blocks[1].1.clone();
-    let ledger_info3 = blocks[2].1.clone();
-    block_executor.commit_ledger(ledger_info1).unwrap();
-    assert_eq!(
-        ledger_info3.ledger_info().version(),
-        PRE_COMMIT_TESTS_LATEST_VERSION
-    );
-
-    (db, chunks[2].clone(), ledger_info2, ledger_info3)
-}
-
-#[test]
-#[should_panic(expected = "Hit error with pending pre-committed ledger, panicking.")]
-fn test_panic_on_mismatch_with_pre_committed() {
-    // See comments on `commit_1_pre_commit_2_return_3()`
-    let (db, _chunk3, _ledger_info2, _ledger_info3) = commit_1_pre_commit_2_return_3();
-
-    let (bad_chunks, bad_ledger_info) = create_transaction_chunks(vec![1..=7, 8..=12]);
-    // bad chunk has txn 8-12
-    let bad_chunk = bad_chunks[1].clone();
-
-    let chunk_executor = ChunkExecutor::<MockVM>::new(db);
-    // chunk executor knows there's pre-committed txns in the DB and when a verified chunk
-    // doesn't match the pre-committed root hash it panics in hope that pre-committed versions
-    // get truncated on reboot
-    let _res = chunk_executor.execute_chunk(bad_chunk, &bad_ledger_info, None);
-}
-
-#[test]
-fn test_continue_from_pre_committed() {
-    // See comments on `commit_1_pre_commit_2_return_3()`
-    let (db, chunk3, _ledger_info2, ledger_info3) = commit_1_pre_commit_2_return_3();
-
-    let (bad_chunks, bad_ledger_info) = create_transaction_chunks(vec![1..=10, 11..=15]);
-    // bad chunk has txn 11-15
-    let bad_chunk = bad_chunks[1].clone();
-
-    // continue from pre-committed version
-    let chunk_executor = ChunkExecutor::<MockVM>::new(db);
-    chunk_executor
-        .execute_chunk(chunk3, &ledger_info3, None)
-        .unwrap();
-    chunk_executor.commit_chunk().unwrap();
-    // once pre-committed range is committed, don't panic on errors
-    assert!(chunk_executor
-        .execute_chunk(bad_chunk, &bad_ledger_info, None)
-        .is_err());
 }

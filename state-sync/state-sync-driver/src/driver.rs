@@ -378,7 +378,7 @@ impl<
         &mut self,
         sync_notification: ConsensusSyncNotification,
     ) -> Result<(), Error> {
-        let latest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
+        let latest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
         info!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
             "Received a consensus sync notification! Target version: {:?}. Latest synced version: {:?}",
