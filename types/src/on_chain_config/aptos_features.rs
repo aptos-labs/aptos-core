@@ -92,6 +92,12 @@ pub enum FeatureFlag {
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
     REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+<<<<<<< HEAD
+=======
+    FEDERATED_KEYLESS = 77,
+    TRANSACTION_SIMULATION_ENHANCEMENT = 78,
+    COLLECTION_OWNER = 79,
+>>>>>>> 15c641adca (Separate out collection creator and owner permissions (#14307))
 }
 
 impl FeatureFlag {
