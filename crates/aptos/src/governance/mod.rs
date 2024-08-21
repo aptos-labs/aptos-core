@@ -42,6 +42,7 @@ use move_core_types::{
     ident_str, language_storage::ModuleId, parser::parse_type_tag,
     transaction_argument::TransactionArgument,
 };
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -906,9 +907,6 @@ pub struct CompileScriptFunction {
     #[clap(flatten)]
     pub(crate) framework_package_args: FrameworkPackageArgs,
 
-    #[clap(long)]
-    pub(crate) bytecode_version: Option<u32>,
-
     #[clap(long, default_value_if("move-2", "true", "7"))]
     pub(crate) bytecode_version: Option<u32>,
 
@@ -968,6 +966,8 @@ impl CompileScriptFunction {
             &self.framework_package_args,
             prompt_options,
             self.bytecode_version,
+            self.language_version,
+            self.compiler_version,
         )
     }
 }
@@ -1092,6 +1092,9 @@ impl GenerateExecutionHash {
                 skip_fetch_latest_git_deps: false,
             },
             bytecode_version: None,
+            compiler_version: None,
+            language_version: None,
+            move_2: false,
         }
         .compile("execution_hash", PromptOptions::yes())
     }

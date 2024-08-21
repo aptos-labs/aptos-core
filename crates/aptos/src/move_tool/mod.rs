@@ -683,6 +683,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
+            move_2: move_options.move_2,
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
