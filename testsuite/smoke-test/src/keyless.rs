@@ -818,7 +818,7 @@ fun main(core_resources: &signer) {{
     ];
     if ({}) {{
         jwks::set_patches(&framework_signer, patches);
-    }}
+    }};
 
     {}::update_max_exp_horizon_for_next_epoch(&framework_signer, {});
     {}::update_training_wheels_for_next_epoch(&framework_signer, option::some(x"{}"));
