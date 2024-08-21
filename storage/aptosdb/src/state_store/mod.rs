@@ -87,7 +87,7 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2 + 1/*  Rendezvous channel */)
     * 2;
 
-pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
+pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 100000;
 
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
@@ -342,10 +342,7 @@ impl StateStore {
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
-        if let Some(overall_commit_progress) = ledger_metadata_db
-            .get_synced_version()
-            .expect("DB read failed.")
-        {
+        if let Ok(overall_commit_progress) = ledger_metadata_db.get_synced_version() {
             info!(
                 overall_commit_progress = overall_commit_progress,
                 "Start syncing databases..."
@@ -443,7 +440,7 @@ impl StateStore {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
-            .get_synced_version()?
+            .get_synced_version()
             .map_or(0, |v| v + 1);
 
         let latest_snapshot_version = state_db

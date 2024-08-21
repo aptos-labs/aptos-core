@@ -161,9 +161,6 @@ pub(crate) fn save_transactions(
         )?;
 
         ledger_db.write_schemas(ledger_db_batch)?;
-        ledger_db
-            .metadata_db()
-            .set_pre_committed_version(last_version);
     }
 
     Ok(())
