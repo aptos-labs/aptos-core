@@ -588,14 +588,15 @@ async fn get_federated_transaction() -> (
     let script = format!(r#"
 script {{
     use aptos_framework::jwks;
+    use std::string::utf8;
     fun main(account: &signer) {{
         let iss = b"{}";
         let kid = utf8(b"{}");
         let alg = utf8(b"{}");
         let e = utf8(b"{}");
         let n = utf8(b"{}");
-        let jwk = new_rsa_jwk(kid, alg, e, n);
-        let patch = new_patch_upsert_jwk(iss, jwk);
+        let jwk = jwks::new_rsa_jwk(kid, alg, e, n);
+        let patch = jwks::new_patch_upsert_jwk(iss, jwk);
         jwks::install_federated_jwks(account, vector[patch]);
     }}
 }}
