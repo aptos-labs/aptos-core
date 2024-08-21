@@ -166,6 +166,13 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                 ephemeral_pubkey,
                 ephemeral_signature,
             } = signature;
+            let current_time_microseconds = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as u64;
+            signature
+                .verify_expiry(current_time_microseconds)
+                .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
             ephemeral_signature
                 .verify_arbitrary_msg(&message, ephemeral_pubkey)
                 .map_err(|e| BadRequest(format!("Ephemeral sig check failed: {e}")))?;
@@ -264,7 +271,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                     ))
                 },
             }
-            Ok(VerifyResponse { success: true })
+            return Ok(VerifyResponse { success: true });
         }
         Err(invalid_signature!("Not a keyless signature"))
     }
