@@ -55,7 +55,7 @@ impl Default for ConsensusObserverConfig {
             max_num_pending_blocks: 100,                       // 100 blocks
             max_subscription_timeout_ms: 30_000,               // 30 seconds
             max_synced_version_timeout_ms: 60_000,             // 60 seconds
-            peer_optimality_check_interval_ms: 60_000,         // 60 seconds
+            peer_optimality_check_interval_ms: 120_000,        // 2 minutes
             progress_check_interval_ms: 5_000,                 // 5 seconds
         }
     }
