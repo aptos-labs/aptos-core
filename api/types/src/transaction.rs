@@ -1834,6 +1834,33 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
     }
 }
 
+/// A placeholder to represent the absence of account signature
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct NoAccountSignature;
+
+impl VerifyInput for NoAccountSignature {
+    fn verify(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+impl TryFrom<NoAccountSignature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(signature: NoAccountSignature) -> Result<Self, Self::Error> {
+        let account_auth = signature.try_into()?;
+        Ok(TransactionAuthenticator::single_sender(account_auth))
+    }
+}
+
+impl TryFrom<NoAccountSignature> for AccountAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(_value: NoAccountSignature) -> Result<Self, Self::Error> {
+        Ok(AccountAuthenticator::NoAccountAuthenticator)
+    }
+}
+
 /// Account signature scheme
 ///
 /// The account signature scheme allows you to have two types of accounts:
@@ -1849,6 +1876,7 @@ pub enum AccountSignature {
     MultiEd25519Signature(MultiEd25519Signature),
     SingleKeySignature(SingleKeySignature),
     MultiKeySignature(MultiKeySignature),
+    NoAccountSignature(NoAccountSignature),
 }
 
 impl VerifyInput for AccountSignature {
@@ -1858,6 +1886,7 @@ impl VerifyInput for AccountSignature {
             AccountSignature::MultiEd25519Signature(inner) => inner.verify(),
             AccountSignature::SingleKeySignature(inner) => inner.verify(),
             AccountSignature::MultiKeySignature(inner) => inner.verify(),
+            AccountSignature::NoAccountSignature(inner) => inner.verify(),
         }
     }
 }
@@ -1871,6 +1900,7 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
             AccountSignature::MultiEd25519Signature(s) => s.try_into()?,
             AccountSignature::SingleKeySignature(s) => s.try_into()?,
             AccountSignature::MultiKeySignature(s) => s.try_into()?,
+            AccountSignature::NoAccountSignature(s) => s.try_into()?,
         })
     }
 }
@@ -2031,6 +2061,7 @@ impl From<&AccountAuthenticator> for AccountSignature {
                     signatures_required: public_keys.signatures_required(),
                 })
             },
+            NoAccountAuthenticator => AccountSignature::NoAccountSignature(NoAccountSignature),
         }
     }
 }
