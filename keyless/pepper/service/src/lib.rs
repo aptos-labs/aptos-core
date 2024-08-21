@@ -258,7 +258,11 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                         },
                     }
                 },
-                EphemeralCertificate::OpenIdSig(_) => bail!("OpenIdSig not supported"),
+                EphemeralCertificate::OpenIdSig(_) => {
+                    return Err(invalid_signature!(
+                        "Could not verify training wheels signature"
+                    ))
+                },
             }
         }
         Ok(VerifyResponse { success: true })
