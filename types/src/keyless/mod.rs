@@ -386,16 +386,6 @@ pub fn get_authenticators(
                     signature.clone(),
                 ))
             },
-            (
-                AnyPublicKey::FederatedKeyless { public_key },
-                AnySignature::Keyless { signature },
-            ) => authenticators.push((
-                AnyKeylessPublicKey::Federated(FederatedKeylessPublicKey {
-                    jwk_addr: public_key.jwk_addr,
-                    pk: public_key.pk.clone(),
-                }),
-                signature.clone(),
-            )),
             _ => bail!("Invalid keyless public key & signature combination"),
         }
     }

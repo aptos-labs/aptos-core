@@ -1550,7 +1550,6 @@ pub enum PublicKey {
     Secp256k1Ecdsa(Secp256k1Ecdsa),
     Secp256r1Ecdsa(Secp256r1Ecdsa),
     Keyless(Keyless),
-    FederatedKeyless(FederatedKeyless),
 }
 
 impl TryFrom<PublicKey> for AnyPublicKey {
@@ -1566,9 +1565,6 @@ impl TryFrom<PublicKey> for AnyPublicKey {
                 AnyPublicKey::secp256r1_ecdsa(p.value.inner().try_into()?)
             },
             PublicKey::Keyless(p) => AnyPublicKey::keyless(p.value.inner().try_into()?),
-            PublicKey::FederatedKeyless(p) => {
-                AnyPublicKey::federated_keyless(p.value.inner().try_into()?)
-            },
         })
     }
 }
@@ -1587,9 +1583,6 @@ impl From<AnyPublicKey> for PublicKey {
             ),
             AnyPublicKey::Keyless { public_key } => {
                 PublicKey::Keyless(Keyless::new(public_key.to_bytes().into()))
-            },
-            AnyPublicKey::FederatedKeyless { public_key } => {
-                PublicKey::FederatedKeyless(FederatedKeyless::new(public_key.to_bytes().into()))
             },
         }
     }
@@ -1623,11 +1616,6 @@ impl VerifyInput for SingleKeySignature {
             }
             .verify(),
             (PublicKey::Keyless(p), Signature::Keyless(s)) => KeylessSignature {
-                public_key: p.value.clone(),
-                signature: s.value.clone(),
-            }
-            .verify(),
-            (PublicKey::FederatedKeyless(p), Signature::Keyless(s)) => KeylessSignature {
                 public_key: p.value.clone(),
                 signature: s.value.clone(),
             }
@@ -1674,12 +1662,6 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
                 PublicKey::Keyless(p) => {
                     let key = p.value.inner().try_into().context(
                         "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
-                    )?;
-                    AnyPublicKey::keyless(key)
-                },
-                PublicKey::FederatedKeyless(p) => {
-                    let key = p.value.inner().try_into().context(
-                        "Failed to parse given public_key bytes as AnyPublicKey::FederatedKeyless",
                     )?;
                     AnyPublicKey::keyless(key)
                 },
@@ -1784,12 +1766,6 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
                         "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
                     )?;
                     AnyPublicKey::keyless(key)
-                },
-                PublicKey::FederatedKeyless(p) => {
-                    let key = p.value.inner().try_into().context(
-                        "Failed to parse given public_key bytes as AnyPublicKey::FederatedKeyless",
-                    )?;
-                    AnyPublicKey::federated_keyless(key)
                 },
             };
             public_keys.push(key);

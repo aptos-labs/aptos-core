@@ -778,7 +778,7 @@ Called by a federated keyless dapp owner to install the JWKs for the federated O
 Cognito, etc).
 
 For type-safety, we explicitly use a <code><b>struct</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: AllProviderJWKs }</code> instead of
-reusing <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: AllProviderJWKs }</code>, which is a JWK-consensus-specific struct? We'd
+reusing <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: AllProviderJWKs }</code>, which is a JWK-consensus-specific struct. We'd
 need to be careful how we read it in Rust (but BCS serialization should be the same).
 
 

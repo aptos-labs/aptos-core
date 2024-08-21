@@ -4,10 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    keyless::{
-        EphemeralCertificate, FederatedKeylessPublicKey, KeylessPublicKey, KeylessSignature,
-        TransactionAndProof,
-    },
+    keyless::{EphemeralCertificate, KeylessPublicKey, KeylessSignature, TransactionAndProof},
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
@@ -1024,43 +1021,35 @@ impl AnySignature {
             },
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
             (Self::Keyless { signature }, AnyPublicKey::Keyless { public_key: _ }) => {
-                Self::verify_keyless_ephemeral_signature(message, signature)
-            },
-            (Self::Keyless { signature }, AnyPublicKey::FederatedKeyless { public_key: _ }) => {
-                Self::verify_keyless_ephemeral_signature(message, signature)
+                // Verifies the ephemeral signature on the TXN and, if present, the ZKP. The rest of
+                // the verification, i.e., [ZKPoK of] OpenID signature verification is done in
+                // `AptosVM::run_prologue`.
+                //
+                // This is because the JWK, under which the [ZKPoK of an] OpenID signature verifies,
+                // can only be fetched from on chain inside the `AptosVM`.
+                //
+                // This deferred verification is what actually ensures the `signature.ephemeral_pubkey`
+                // used below is the right pubkey signed by the OIDC provider.
+
+                let mut txn_and_zkp = TransactionAndProof {
+                    message,
+                    proof: None,
+                };
+
+                // Add the ZK proof into the `txn_and_zkp` struct, if we are in the ZK path
+                match &signature.cert {
+                    EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+                        txn_and_zkp.proof = Some(proof.proof)
+                    },
+                    EphemeralCertificate::OpenIdSig(_) => {},
+                }
+
+                signature
+                    .ephemeral_signature
+                    .verify(&txn_and_zkp, &signature.ephemeral_pubkey)
             },
             _ => bail!("Invalid key, signature pairing"),
         }
-    }
-
-    fn verify_keyless_ephemeral_signature<T: Serialize + CryptoHash>(
-        message: &T,
-        signature: &KeylessSignature,
-    ) -> Result<()> {
-        // Verifies the ephemeral signature on (TXN [+ ZKP]). The rest of the verification,
-        // i.e., [ZKPoK of] OpenID signature verification is done in
-        // `AptosVM::run_prologue`.
-        //
-        // This is because the JWK, under which the [ZKPoK of an] OpenID signature verifies,
-        // can only be fetched from on chain inside the `AptosVM`.
-        //
-        // This deferred verification is what actually ensures the `signature.ephemeral_pubkey`
-        // used below is the right pubkey signed by the OIDC provider.
-
-        let mut txn_and_zkp = TransactionAndProof {
-            message,
-            proof: None,
-        };
-
-        // Add the ZK proof into the `txn_and_zkp` struct, if we are in the ZK path
-        match &signature.cert {
-            EphemeralCertificate::ZeroKnowledgeSig(proof) => txn_and_zkp.proof = Some(proof.proof),
-            EphemeralCertificate::OpenIdSig(_) => {},
-        }
-
-        signature
-            .ephemeral_signature
-            .verify(&txn_and_zkp, &signature.ephemeral_pubkey)
     }
 }
 
@@ -1077,9 +1066,6 @@ pub enum AnyPublicKey {
     },
     Keyless {
         public_key: KeylessPublicKey,
-    },
-    FederatedKeyless {
-        public_key: FederatedKeylessPublicKey,
     },
 }
 
@@ -1098,10 +1084,6 @@ impl AnyPublicKey {
 
     pub fn keyless(public_key: KeylessPublicKey) -> Self {
         Self::Keyless { public_key }
-    }
-
-    pub fn federated_keyless(public_key: FederatedKeylessPublicKey) -> Self {
-        Self::FederatedKeyless { public_key }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
