@@ -396,7 +396,9 @@ pub fn get_authenticators(
                 }),
                 signature.clone(),
             )),
-            _ => bail!("Invalid keyless public key & signature combination"),
+            _ => {
+                // ignore.
+            },
         }
     }
     Ok(authenticators)
