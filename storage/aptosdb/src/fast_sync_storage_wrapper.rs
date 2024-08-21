@@ -67,7 +67,7 @@ impl FastSyncStorageWrapper {
             && (db_main
                 .ledger_db
                 .metadata_db()
-                .get_synced_version()
+                .get_synced_version()?
                 .map_or(0, |v| v)
                 == 0)
         {
@@ -164,27 +164,35 @@ impl DbWriter for FastSyncStorageWrapper {
         Ok(())
     }
 
-    fn save_transactions(
+    fn pre_commit_ledger(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
         state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
         sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
-        self.get_aptos_db_write_ref().save_transactions(
+        self.get_aptos_db_write_ref().pre_commit_ledger(
             txns_to_commit,
             first_version,
             base_state_version,
-            ledger_info_with_sigs,
             sync_commit,
             latest_in_memory_state,
             state_updates_until_last_checkpoint,
             sharded_state_cache,
         )
+    }
+
+    fn commit_ledger(
+        &self,
+        version: Version,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        txns_to_commit: Option<&[TransactionToCommit]>,
+    ) -> Result<()> {
+        self.get_aptos_db_write_ref()
+            .commit_ledger(version, ledger_info_with_sigs, txns_to_commit)
     }
 }
 

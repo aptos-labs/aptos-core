@@ -970,6 +970,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4",
+ "derivative",
  "fail",
  "futures",
  "itertools 0.13.0",
