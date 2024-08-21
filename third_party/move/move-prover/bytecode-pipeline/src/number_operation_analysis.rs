@@ -1097,6 +1097,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             } // empty, do nothing
                         }
                     },
+                    // TODO(#14349): add support for enum type related operation
                     _ => {},
                 }
             },

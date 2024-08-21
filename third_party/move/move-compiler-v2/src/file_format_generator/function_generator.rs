@@ -609,6 +609,7 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::OpaqueCallBegin(_, _, _)
             | Operation::OpaqueCallEnd(_, _, _)
             | Operation::GetField(_, _, _, _)
+            | Operation::GetVariantField(_, _, _, _, _)
             | Operation::GetGlobal(_, _, _)
             | Operation::Uninit
             | Operation::Havoc(_)
