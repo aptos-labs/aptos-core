@@ -142,7 +142,7 @@ impl FeatureFlag {
             FeatureFlag::WEBAUTHN_SIGNATURE,
             // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
             FeatureFlag::KEYLESS_ACCOUNTS,
-            FeatureFlag::FEDERATED_KEYLESS,
+            //FeatureFlag::FEDERATED_KEYLESS, // disabled by default
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,

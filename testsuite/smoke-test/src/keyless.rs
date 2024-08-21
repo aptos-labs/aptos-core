@@ -42,10 +42,12 @@ use rand::thread_rng;
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, time::Duration};
 use std::str::FromStr;
+use std::sync::Arc;
 use aptos::move_tool::MemberId;
 use aptos_types::keyless::circuit_testcases::{SAMPLE_JWK, SAMPLE_TEST_ISS_VALUE};
 use aptos_types::keyless::FederatedKeylessPublicKey;
 use aptos_types::keyless::test_utils::get_sample_groth16_sig_and_fed_pk;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 // TODO(keyless): Test the override aud_val path
 
 #[tokio::test]
@@ -232,7 +234,110 @@ async fn test_keyless_groth16_verifies() {
 
 #[tokio::test]
 async fn test_federated_keyless() {
-    let (_, _, swarm, signed_txn) = get_federated_transaction().await;
+    let (tw_sk, config, jwk, swarm, mut cli, _) = setup_local_net().await;
+    let mut info = swarm.aptos_public_info();
+
+    // We will later use the root account as JWK owner. (Root account has no difference from a normal account except that it can derive 0x1).
+    let root_addr = swarm.chain_info().root_account().address();
+    let (sig, pk) = get_sample_groth16_sig_and_fed_pk(root_addr);
+
+    info!("Federated keyless txn attempt 0 should fail: the feature is not enabled.");
+    let signed_txn = sign_federated_transaction(
+        &mut info,
+        sig.clone(),
+        pk.clone(),
+        &jwk,
+        &config,
+        Some(&tw_sk),
+        1,
+    )
+        .await;
+    let result = swarm
+        .aptos_public_info()
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await;
+    println!("result_0={:?}", result);
+    assert!(result.is_err());
+
+    info!("Enable the feature.");
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let script = r#"
+script {
+    use aptos_framework::aptos_governance;
+    use std::features;
+    fun main(core_resources: &signer) {
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        features::change_feature_flags_for_next_epoch(&framework, vector[77], vector[]);
+        aptos_governance::force_end_epoch(&framework);
+    }
+}
+"#;
+    let txn_result = cli.run_script_with_gas_options(0, script, Some(gas_options)).await;
+    assert_eq!(Some(true), txn_result.unwrap().success);
+
+    info!("Federated keyless txn attempt 1 should fail: no matching jwks installed.");
+    let signed_txn = sign_federated_transaction(
+        &mut info,
+        sig.clone(),
+        pk.clone(),
+        &jwk,
+        &config,
+        Some(&tw_sk),
+        1,
+    )
+        .await;
+    let result = swarm
+        .aptos_public_info()
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await;
+    println!("result_1={:?}", result);
+    assert!(result.is_err());
+
+    info!("Install the JWKs.");
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let script = format!(r#"
+script {{
+    use aptos_framework::jwks;
+    use std::string::utf8;
+    fun main(account: &signer) {{
+        let patch_0 = jwks::new_patch_remove_all();
+        let iss = b"{}";
+        let kid = utf8(b"{}");
+        let alg = utf8(b"{}");
+        let e = utf8(b"{}");
+        let n = utf8(b"{}");
+        let jwk = jwks::new_rsa_jwk(kid, alg, e, n);
+        let patch_1 = jwks::new_patch_upsert_jwk(iss, jwk);
+        let patches = vector[patch_0, patch_1]; // clear all, then add 1 jwk.
+        jwks::patch_federated_jwks(account, patches);
+    }}
+}}
+    "#, SAMPLE_TEST_ISS_VALUE, SAMPLE_JWK.kid, SAMPLE_JWK.alg, SAMPLE_JWK.e, SAMPLE_JWK.n);
+
+    let txn_result = cli.run_script_with_gas_options(0, &script, Some(gas_options)).await;
+    assert_eq!(Some(true), txn_result.unwrap().success);
+
+    info!("Federated keyless txn attempt 2 should pass.");
+    let signed_txn = sign_federated_transaction(
+        &mut info,
+        sig.clone(),
+        pk.clone(),
+        &jwk,
+        &config,
+        Some(&tw_sk),
+        1,
+    )
+        .await;
 
     info!("Submit keyless Groth16 transaction");
     let result = swarm
@@ -245,6 +350,7 @@ async fn test_federated_keyless() {
         panic!("Error with keyless Groth16 TXN verification: {:?}", e)
     }
 }
+
 
 #[tokio::test]
 async fn test_keyless_no_extra_field_groth16_verifies() {
@@ -635,6 +741,12 @@ async fn setup_local_net() -> (
     usize,
 ) {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            // Start with `FEDERATED_KEYLESS` disabled.
+            let mut features = Features::default();
+            features.disable(FeatureFlag::FEDERATED_KEYLESS);
+            genesis_config.initial_features_override = Some(features);
+        }))
         .with_aptos()
         .build_with_cli(0)
         .await;
