@@ -348,6 +348,17 @@ impl AnyKeylessPublicKey {
     }
 }
 
+impl From<AnyKeylessPublicKey> for AnyPublicKey {
+    fn from(apk: AnyKeylessPublicKey) -> Self {
+        match apk {
+            AnyKeylessPublicKey::Normal(pk) => AnyPublicKey::Keyless { public_key: pk },
+            AnyKeylessPublicKey::Federated(fed_pk) => {
+                AnyPublicKey::FederatedKeyless { public_key: fed_pk }
+            },
+        }
+    }
+}
+
 impl KeylessPublicKey {
     /// A reasonable upper bound for the number of bytes we expect in a keyless public key. This is
     /// enforced by our full nodes when they receive TXNs.
