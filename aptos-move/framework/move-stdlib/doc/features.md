@@ -360,7 +360,7 @@ Lifetime: transient
 
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a>: u64 = 77;
+<pre><code><b>const</b> <a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a>: u64 = 79;
 </code></pre>
 
 
@@ -3181,52 +3181,6 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_collection_owner_feature"></a>
-
-## Function `get_collection_owner_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collection_owner_feature">get_collection_owner_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collection_owner_feature">get_collection_owner_feature</a>(): u64 { <a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a> }
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_is_collection_owner_enabled"></a>
-
-## Function `is_collection_owner_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_collection_owner_enabled">is_collection_owner_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_collection_owner_enabled">is_collection_owner_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a>)
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_features_get_transaction_simulation_enhancement_feature"></a>
 
 ## Function `get_transaction_simulation_enhancement_feature`
@@ -3266,6 +3220,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_transaction_simulation_enhancement_enabled">transaction_simulation_enhancement_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT">TRANSACTION_SIMULATION_ENHANCEMENT</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_collection_owner_feature"></a>
+
+## Function `get_collection_owner_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collection_owner_feature">get_collection_owner_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collection_owner_feature">get_collection_owner_feature</a>(): u64 { <a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_collection_owner_enabled"></a>
+
+## Function `is_collection_owner_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_collection_owner_enabled">is_collection_owner_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_collection_owner_enabled">is_collection_owner_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a>)
 }
 </code></pre>
 
