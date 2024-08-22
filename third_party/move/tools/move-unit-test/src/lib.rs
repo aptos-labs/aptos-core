@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod cargo_runner;
 pub mod extensions;
 pub mod test_reporter;
 pub mod test_runner;
@@ -26,7 +25,7 @@ use std::{
     marker::Send,
     sync::Mutex,
 };
-use test_reporter::{DefaultUnitTestFactory, UnitTestFactory};
+use test_reporter::UnitTestFactory;
 
 /// The default value bounding the amount of gas consumed in a test.
 const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
@@ -34,10 +33,6 @@ const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
 #[derive(Debug, Parser, Clone)]
 #[clap(author, version, about)]
 pub struct UnitTestingConfig {
-    /// Bound the gas limit for any one test. If using custom gas table, this is the max number of instructions.
-    #[clap(name = "gas_limit", short = 'i', long = "gas_limit")]
-    pub gas_limit: Option<u64>,
-
     /// A filter string to determine which unit tests to run
     #[clap(name = "filter", short = 'f', long = "filter")]
     pub filter: Option<String>,
@@ -123,11 +118,9 @@ fn format_module_id(module_id: &ModuleId) -> String {
     )
 }
 
-impl UnitTestingConfig {
-    /// Create a unit testing config for use with `register_move_unit_tests`
-    pub fn default_with_bound(bound: Option<u64>) -> Self {
+impl Default for UnitTestingConfig {
+    fn default() -> Self {
         Self {
-            gas_limit: bound.or(Some(DEFAULT_EXECUTION_BOUND)),
             filter: None,
             num_threads: 8,
             report_statistics: false,
@@ -145,7 +138,9 @@ impl UnitTestingConfig {
             evm: false,
         }
     }
+}
 
+impl UnitTestingConfig {
     pub fn with_named_addresses(
         mut self,
         named_address_values: BTreeMap<String, NumericalAddress>,
@@ -212,25 +207,7 @@ impl UnitTestingConfig {
 
     /// Public entry point to Move unit testing as a library
     /// Returns `true` if all unit tests passed. Otherwise, returns `false`.
-    pub fn run_and_report_unit_tests<W: Write + Send>(
-        &self,
-        test_plan: TestPlan,
-        native_function_table: Option<NativeFunctionTable>,
-        genesis_state: Option<ChangeSet>,
-        writer: W,
-    ) -> Result<(W, bool)> {
-        self.run_and_report_unit_tests_with_factory(
-            test_plan,
-            native_function_table,
-            genesis_state,
-            writer,
-            DefaultUnitTestFactory,
-        )
-    }
-
-    /// Public entry point to Move unit testing as a library
-    /// Returns `true` if all unit tests passed. Otherwise, returns `false`.
-    pub fn run_and_report_unit_tests_with_factory<W: Write + Send, G: GasMeter, F: UnitTestFactory<G> + Send>(
+    pub fn run_and_report_unit_tests<W: Write + Send, G: GasMeter, F: UnitTestFactory<G> + Send>(
         &self,
         test_plan: TestPlan,
         native_function_table: Option<NativeFunctionTable>,

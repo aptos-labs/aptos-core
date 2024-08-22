@@ -23,6 +23,7 @@ use move_core_types::{
     account_address::AccountAddress, effects::ChangeSet, identifier::Identifier,
 };
 use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_test_utils::gas_schedule::CostTable;
 use std::path::PathBuf;
 
 type NativeFunctionRecord = (AccountAddress, Identifier, Identifier, NativeFunction);
@@ -70,6 +71,7 @@ pub enum Command {
 pub fn run_cli(
     natives: Vec<NativeFunctionRecord>,
     genesis: ChangeSet,
+    cost_table: &CostTable,
     move_args: Move,
     cmd: Command,
 ) -> Result<()> {
@@ -89,13 +91,18 @@ pub fn run_cli(
             move_args.build_config,
             natives,
             genesis,
+            Some(cost_table.clone()),
         ),
     }
 }
 
-pub fn move_cli(natives: Vec<NativeFunctionRecord>, genesis: ChangeSet) -> Result<()> {
+pub fn move_cli(
+    natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
+    cost_table: &CostTable,
+) -> Result<()> {
     let args = MoveCLI::parse();
-    run_cli(natives, genesis, args.move_args, args.cmd)
+    run_cli(natives, genesis, cost_table, args.move_args, args.cmd)
 }
 
 #[test]

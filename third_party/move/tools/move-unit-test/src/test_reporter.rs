@@ -19,7 +19,7 @@ use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status:
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::Session;
-use move_vm_test_utils::gas_schedule::{GasStatus, INITIAL_COST_SCHEDULE};
+use move_vm_test_utils::gas_schedule::{zero_cost_schedule, CostTable, GasCost, GasStatus};
 use move_vm_types::gas::GasMeter;
 use once_cell::sync::Lazy;
 use std::{
@@ -28,6 +28,16 @@ use std::{
     sync::Mutex,
     time::Duration,
 };
+
+/// A gas schedule where every instruction has a cost of "1". This is used to bound execution of a
+/// test to a certain number of ticks.
+fn unit_cost_table() -> CostTable {
+    let mut cost_schedule = zero_cost_schedule();
+    cost_schedule.instruction_table.iter_mut().for_each(|cost| {
+        *cost = GasCost::new(1, 1);
+    });
+    cost_schedule
+}
 
 pub trait UnitTestFactory<G: GasMeter> {
     fn new_gas_meter(&self) -> G;
@@ -39,11 +49,23 @@ pub trait UnitTestFactory<G: GasMeter> {
     ) -> (VMResult<ChangeSet>, TestRunInfo);
 }
 
-pub struct DefaultUnitTestFactory;
+pub struct UnitTestFactoryWithCostTable {
+    cost_table: CostTable,
+    gas_limit: u64,
+}
 
-impl<'a> UnitTestFactory<GasStatus<'a>> for DefaultUnitTestFactory {
-    fn new_gas_meter(&self) -> GasStatus<'a> {
-        GasStatus::new(&INITIAL_COST_SCHEDULE, DEFAULT_EXECUTION_BOUND.into())
+impl UnitTestFactoryWithCostTable {
+    pub fn new(cost_table: Option<CostTable>, gas_limit: Option<u64>) -> Self {
+        Self {
+            cost_table: cost_table.unwrap_or_else(|| unit_cost_table()),
+            gas_limit: gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
+        }
+    }
+}
+
+impl UnitTestFactory<GasStatus> for UnitTestFactoryWithCostTable {
+    fn new_gas_meter(&self) -> GasStatus {
+        GasStatus::new(self.cost_table.clone(), self.gas_limit.into())
     }
 
     // @dev: the caller must fill the test_run_info.gas_used field in the returned TestRunInfo
@@ -54,7 +76,7 @@ impl<'a> UnitTestFactory<GasStatus<'a>> for DefaultUnitTestFactory {
         mut test_run_info: TestRunInfo,
     ) -> (VMResult<ChangeSet>, TestRunInfo) {
         let remaining_gas: u64 = gas_status.remaining_gas().into();
-        test_run_info.gas_used = DEFAULT_EXECUTION_BOUND - remaining_gas;
+        test_run_info.gas_used = self.gas_limit - remaining_gas;
 
         match session.finish() {
             Ok(cs) => (Ok(cs), test_run_info),

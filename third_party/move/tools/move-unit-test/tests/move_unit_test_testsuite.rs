@@ -59,6 +59,7 @@ fn run_test_with_modifiers(
                     test_plan.unwrap(),
                     None,
                     None,
+                    None,
                     buffer,
                 )?,
                 modified_exp_path,
@@ -74,7 +75,7 @@ fn run_test_with_modifiers(
     }
 
     results.push((
-        unit_test_config.run_and_report_unit_tests(test_plan.unwrap(), None, None, buffer)?,
+        unit_test_config.run_and_report_unit_tests(test_plan.unwrap(), None, None, None, buffer)?,
         path.with_extension(exp_ext),
     ));
 
@@ -88,7 +89,6 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
     let source_files = vec![path.to_str().unwrap().to_owned()];
     let unit_test_config = UnitTestingConfig {
         num_threads: 1,
-        gas_limit: Some(1000),
         source_files,
         dep_files: move_stdlib::move_stdlib_files(),
         named_address_values: move_stdlib::move_stdlib_named_addresses()
