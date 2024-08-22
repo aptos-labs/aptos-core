@@ -248,7 +248,6 @@ impl AptosDebugger {
         }
         Ok(ret)
     }
-
 async fn execute_transactions_by_epoch(
     &self,
     mut limit: u64,
@@ -273,14 +272,14 @@ async fn execute_transactions_by_epoch(
         let current_txn_infos = txn_infos.drain(0..num_txns_to_process).collect::<Vec<_>>();
 
         // Execute transactions for this epoch
-        let mut epoch_result = self
+       let mut epoch_result = self
             .execute_transactions_until_epoch_end(
                 begin,
                 current_txns.to_vec(),  // Convert slice to Vec
                 repeat_execution_times,
                 concurrency_levels,
-            )
-            .await?;
+      )
+      .await?;
         
         // Update state for the next iteration
         begin += epoch_result.len() as u64;
