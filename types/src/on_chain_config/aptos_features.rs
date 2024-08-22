@@ -10,7 +10,7 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
-use move_vm_runtime::should_use_loader_v2;
+use move_vm_runtime::use_loader_v2_based_on_env;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
 
@@ -199,7 +199,7 @@ impl Default for Features {
             features.enable(feature);
         }
 
-        if should_use_loader_v2() {
+        if use_loader_v2_based_on_env() {
             features.enable(FeatureFlag::USE_LOADER_V2);
         }
 

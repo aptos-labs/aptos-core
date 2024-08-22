@@ -32,6 +32,7 @@ move-vm-types = { path = "../types" }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+claims = { workspace = true }
 hex = { workspace = true }
 move-compiler = { path = "../../move-compiler" }
 move-ir-compiler = { path = "../../move-ir-compiler" }

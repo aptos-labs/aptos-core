@@ -678,7 +678,7 @@ impl FakeExecutor {
         let vm = AptosVM::new(self.get_state_view());
 
         let resolver = self.data_store.as_move_resolver();
-        let module_and_script_storage = self.data_store.as_aptos_code_storage();
+        let module_and_script_storage = vm.as_aptos_code_storage(&self.data_store);
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
@@ -863,8 +863,6 @@ impl FakeExecutor {
         };
 
         let resolver = self.data_store.as_move_resolver();
-        let module_storage = self.data_store.as_aptos_code_storage();
-
         let (gas_params, storage_gas_params) = match gas_meter_type {
             GasMeterType::RegularGasMeter => (
                 AptosGasParameters::initial(),
@@ -883,6 +881,7 @@ impl FakeExecutor {
             self.env.clone(),
             &resolver,
         );
+        let module_storage = self.data_store.as_aptos_code_storage(&vm);
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -989,7 +988,6 @@ impl FakeExecutor {
 
         let (write_set, _events) = {
             let resolver = self.data_store.as_move_resolver();
-            let module_storage = self.data_store.as_aptos_code_storage();
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_extended_options(
@@ -1002,6 +1000,7 @@ impl FakeExecutor {
                 false,
                 &resolver,
             );
+            let module_storage = self.data_store.as_aptos_code_storage(&vm);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
@@ -1065,7 +1064,6 @@ impl FakeExecutor {
         let module_id = Self::module(module_name);
         let (write_set, events) = {
             let resolver = self.data_store.as_move_resolver();
-            let module_storage = self.data_store.as_aptos_code_storage();
 
             let vm = MoveVmExt::new(
                 LATEST_GAS_FEATURE_VERSION,
@@ -1073,6 +1071,7 @@ impl FakeExecutor {
                 self.env.clone(),
                 &resolver,
             );
+            let module_storage = self.data_store.as_aptos_code_storage(&vm);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
             let storage = TraversalStorage::new();
             session
@@ -1119,7 +1118,6 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let resolver = self.data_store.as_move_resolver();
-        let module_storage = self.data_store.as_aptos_code_storage();
 
         let vm = MoveVmExt::new(
             LATEST_GAS_FEATURE_VERSION,
@@ -1127,6 +1125,8 @@ impl FakeExecutor {
             self.env.clone(),
             &resolver,
         );
+        let module_storage = self.data_store.as_aptos_code_storage(&vm);
+
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
         let traversal_storage = TraversalStorage::new();
         session
