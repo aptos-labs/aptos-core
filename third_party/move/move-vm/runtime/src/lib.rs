@@ -34,9 +34,15 @@ mod storage;
 
 pub use loader::{LoadedFunction, Module, Script};
 pub use storage::{
-    dummy::{should_use_loader_v2, DummyCodeStorage},
+    dummy::{use_loader_v2_based_on_env, DummyCodeStorage},
+    environment::RuntimeEnvironment,
+    implementations::{
+        unsync_code_storage::{IntoUnsyncCodeStorage, UnsyncCodeStorage},
+        unsync_module_storage::{
+            IntoUnsyncModuleStorage, LocalModuleBytesStorage, ModuleBytesStorage,
+            UnsyncModuleStorage,
+        },
+    },
     module_storage::ModuleStorage,
     script_storage::{script_hash, ScriptStorage},
 };
-#[cfg(any(test, feature = "testing"))]
-pub use storage::{TestModuleStorage, TestScriptStorage};

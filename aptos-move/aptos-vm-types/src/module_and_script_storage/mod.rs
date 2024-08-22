@@ -5,7 +5,7 @@ pub mod module_storage;
 pub mod script_storage;
 
 mod state_view_adapter;
-pub use state_view_adapter::AsAptosCodeStorage;
+pub use state_view_adapter::{AptosCodeStorageAdapter, AsAptosCodeStorage};
 
 mod temporary_module_storage;
 pub use temporary_module_storage::TemporaryModuleStorage;
