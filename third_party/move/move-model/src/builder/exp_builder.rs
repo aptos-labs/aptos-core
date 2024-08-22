@@ -5161,10 +5161,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.error(loc, "macro invocation cannot have type arguments");
             self.new_error_exp()
         } else if let EA::ModuleAccess_::Name(name) = &maccess.value {
-            let expansion = self
-                .parent
-                .parent
-                .expand_macro(maccess.loc, name.value.as_str(), args);
+            let expansion = self.expand_macro(maccess.loc, name.value.as_str(), args);
             self.translate_exp(&expansion, expected_type)
         } else {
             let qsym = self.parent.module_access_to_qualified(maccess);
