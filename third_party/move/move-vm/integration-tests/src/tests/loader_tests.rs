@@ -19,7 +19,8 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, should_use_loader_v2, TestModuleStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, DummyCodeStorage,
+    IntoUnsyncModuleStorage, LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -29,7 +30,7 @@ const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
 
 struct Adapter {
     resource_storage: InMemoryStorage,
-    module_storage: TestModuleStorage,
+    module_bytes_storage: LocalModuleBytesStorage,
     vm: Arc<MoveVM>,
     functions: Vec<(ModuleId, Identifier)>,
 }
@@ -69,7 +70,7 @@ impl Adapter {
 
         Self {
             resource_storage,
-            module_storage: TestModuleStorage::empty(&vm.vm_config().deserializer_config),
+            module_bytes_storage: LocalModuleBytesStorage::empty(),
             vm,
             functions,
         }
@@ -86,7 +87,7 @@ impl Adapter {
 
         Self {
             resource_storage: self.resource_storage,
-            module_storage: TestModuleStorage::empty(&vm.vm_config().deserializer_config),
+            module_bytes_storage: LocalModuleBytesStorage::empty(),
             vm,
             functions: self.functions,
         }
@@ -104,12 +105,12 @@ impl Adapter {
                 .verify_module_bundle_before_publishing(
                     &[module.clone()],
                     &WORKING_ACCOUNT,
-                    &self.module_storage,
+                    &DummyCodeStorage,
                 )
                 .unwrap_or_else(|_| panic!("failure verifying publishing module: {:#?}", module));
             drop(session);
 
-            self.module_storage.add_module_bytes(
+            self.module_bytes_storage.add_module_bytes(
                 module.self_addr(),
                 module.self_name(),
                 binary.clone().into(),
@@ -130,7 +131,7 @@ impl Adapter {
                 .verify_module_bundle_before_publishing(
                     &[module.clone()],
                     &WORKING_ACCOUNT,
-                    &self.module_storage,
+                    &DummyCodeStorage,
                 )
                 .expect_err("publishing must fail");
         }
@@ -147,6 +148,10 @@ impl Adapter {
             for _ in 0..reps {
                 for (module_id, name) in self.functions.clone() {
                     let resource_storage = self.resource_storage.clone();
+                    let module_storage = self
+                        .module_bytes_storage
+                        .clone()
+                        .into_unsync_module_storage(self.vm.runtime_env());
                     scope.spawn(move || {
                         // It is fine to share the VM: we do not publish modules anyway.
                         let mut session = self.vm.as_ref().new_session(&resource_storage);
@@ -159,7 +164,7 @@ impl Adapter {
                                 Vec::<Vec<u8>>::new(),
                                 &mut UnmeteredGasMeter,
                                 &mut TraversalContext::new(&traversal_storage),
-                                &self.module_storage,
+                                &module_storage,
                             )
                             .unwrap_or_else(|e| {
                                 panic!("Failure executing {}::{}: {:?}", module_id, name, e)
@@ -171,6 +176,10 @@ impl Adapter {
     }
 
     fn call_function(&self, module: &ModuleId, name: &IdentStr) {
+        let module_storage = self
+            .module_bytes_storage
+            .clone()
+            .into_unsync_module_storage(self.vm.runtime_env());
         let mut session = self.vm.new_session(&self.resource_storage);
         let traversal_storage = TraversalStorage::new();
         session
@@ -181,7 +190,7 @@ impl Adapter {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &self.module_storage,
+                &module_storage,
             )
             .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module, name));
     }
@@ -272,10 +281,14 @@ fn load_phantom_module() {
     let module_id = module.self_id();
     adapter.publish_modules(vec![module]);
 
-    if should_use_loader_v2() {
+    if adapter.vm.vm_config().use_loader_v2 {
         let mut session = adapter.vm.new_session(&adapter.resource_storage);
+        let module_storage = adapter
+            .module_bytes_storage
+            .clone()
+            .into_unsync_module_storage(adapter.vm.runtime_env());
         let _ = session
-            .load_function(&adapter.module_storage, &module_id, ident_str!("foo"), &[])
+            .load_function(&module_storage, &module_id, ident_str!("foo"), &[])
             .unwrap();
     } else {
         #[allow(deprecated)]
@@ -338,10 +351,14 @@ fn load_with_extra_ability() {
     let module_id = module.self_id();
     adapter.publish_modules(vec![module]);
 
-    if should_use_loader_v2() {
+    if adapter.vm.vm_config().use_loader_v2 {
         let mut session = adapter.vm.new_session(&adapter.resource_storage);
+        let module_storage = adapter
+            .module_bytes_storage
+            .clone()
+            .into_unsync_module_storage(adapter.vm.runtime_env());
         let _ = session
-            .load_function(&adapter.module_storage, &module_id, ident_str!("foo"), &[])
+            .load_function(&module_storage, &module_id, ident_str!("foo"), &[])
             .unwrap();
     } else {
         #[allow(deprecated)]

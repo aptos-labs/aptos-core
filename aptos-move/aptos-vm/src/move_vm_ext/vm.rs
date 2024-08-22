@@ -14,11 +14,13 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, Features, TimedFeaturesBuilder},
+    state_store::StateView,
     transaction::user_transaction_context::UserTransactionContext,
     vm::configs::aptos_prod_vm_config,
 };
 use aptos_vm_types::{
     environment::{aptos_default_ty_builder, aptos_prod_ty_builder, Environment},
+    module_and_script_storage::{AptosCodeStorageAdapter, AsAptosCodeStorage},
     storage::change_set_configs::ChangeSetConfigs,
 };
 use move_vm_runtime::move_vm::MoveVM;
@@ -63,6 +65,13 @@ impl GenesisMoveVM {
             chain_id,
             features,
         }
+    }
+
+    pub fn as_aptos_code_storage<'s, S: StateView>(
+        &'s self,
+        state_view: &'s S,
+    ) -> AptosCodeStorageAdapter<'s, S> {
+        state_view.as_aptos_code_storage(&self.vm)
     }
 
     pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {

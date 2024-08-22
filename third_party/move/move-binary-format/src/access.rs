@@ -219,6 +219,15 @@ pub trait ModuleAccess: Sync {
         self.as_module().version
     }
 
+    fn num_immediate_dependencies(&self) -> usize {
+        // We need to subtract one for self handle.
+        self.module_handles().len() - 1
+    }
+
+    fn num_immediate_friends(&self) -> usize {
+        self.friend_decls().len()
+    }
+
     fn immediate_dependencies(&self) -> Vec<ModuleId> {
         let self_handle = self.self_handle();
         self.module_handles()

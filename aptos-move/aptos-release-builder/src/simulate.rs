@@ -49,9 +49,7 @@ use aptos_vm::{
     AptosVM,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{
-    module_and_script_storage::AsAptosCodeStorage, storage::change_set_configs::ChangeSetConfigs,
-};
+use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use clap::Parser;
 use move_binary_format::{
     access::ModuleAccess,
@@ -465,7 +463,7 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
     flush_warm_vm_cache();
     let vm = AptosVM::new_for_gov_sim(&state_view);
     let resolver = state_view.as_move_resolver();
-    let module_storage = state_view.as_aptos_code_storage();
+    let module_storage = vm.as_aptos_code_storage(&state_view);
 
     let gas_schedule =
         GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
@@ -622,7 +620,7 @@ pub async fn simulate_multistep_proposal(
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let module_and_script_storage = state_view.as_aptos_code_storage();
+        let module_and_script_storage = vm.as_aptos_code_storage(&state_view);
 
         let (_vm_status, vm_output) = vm.execute_user_transaction(
             &resolver,

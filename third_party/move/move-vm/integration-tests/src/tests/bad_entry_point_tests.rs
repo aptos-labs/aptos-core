@@ -10,7 +10,9 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, IntoUnsyncModuleStorage, LocalModuleBytesStorage,
+};
 use move_vm_test_utils::{BlankStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -21,7 +23,8 @@ fn call_non_existent_module() {
     let vm = MoveVM::new(vec![]);
 
     let resource_storage = BlankStorage;
-    let module_storage = TestModuleStorage::empty_for_vm(&vm);
+    let module_storage =
+        LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_env());
 
     let mut sess = vm.new_session(&resource_storage);
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
@@ -62,8 +65,9 @@ fn call_non_existent_function() {
     let mut resource_storage = InMemoryStorage::new();
     resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
 
-    let module_storage = TestModuleStorage::empty_for_vm(&vm);
-    module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+    module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
     let mut sess = vm.new_session(&resource_storage);
     let fun_name = Identifier::new("foo").unwrap();

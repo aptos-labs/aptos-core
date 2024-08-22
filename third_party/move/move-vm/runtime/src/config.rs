@@ -1,6 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::use_loader_v2_based_on_env;
 use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_types::loaded_data::runtime_types::TypeBuilder;
@@ -26,6 +27,7 @@ pub struct VMConfig {
     pub ty_builder: TypeBuilder,
     pub disallow_dispatch_for_native: bool,
     pub use_compatibility_checker_v2: bool,
+    pub use_loader_v2: bool,
 }
 
 impl Default for VMConfig {
@@ -43,6 +45,7 @@ impl Default for VMConfig {
             ty_builder: TypeBuilder::with_limits(128, 20),
             disallow_dispatch_for_native: true,
             use_compatibility_checker_v2: true,
+            use_loader_v2: use_loader_v2_based_on_env(),
         }
     }
 }
