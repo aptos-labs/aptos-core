@@ -9,7 +9,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
-    TestModuleStorage,
+    DummyCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -28,8 +28,7 @@ fn make_failed_native() -> NativeFunction {
 
 #[test]
 fn test_publish_module_with_nested_loops() {
-    // Compile the modules and scripts.
-    // TODO: find a better way to include the Signer module.
+    // Compile modules and scripts.
     let code = r#"
         module {{ADDR}}::M {
             entry fun foo() {
@@ -72,21 +71,22 @@ fn test_publish_module_with_nested_loops() {
         });
 
         let mut resource_storage = InMemoryStorage::new();
-        let module_storage = TestModuleStorage::empty(&vm.vm_config().deserializer_config);
-
         {
             let mut sess = vm.new_session(&resource_storage);
-            sess.verify_module_bundle_before_publishing(&[m.clone()], &TEST_ADDR, &module_storage)
-                .unwrap();
+            sess.verify_module_bundle_before_publishing(
+                &[m.clone()],
+                &TEST_ADDR,
+                &DummyCodeStorage,
+            )
+            .unwrap();
             drop(sess);
             resource_storage.publish_or_overwrite_module(m.self_id(), m_blob.clone());
-            module_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.clone().into());
         }
 
         let mut sess = vm.new_session(&resource_storage);
         let func = sess
             .load_function(
-                &module_storage,
+                &DummyCodeStorage,
                 &m.self_id(),
                 &Identifier::new("foo").unwrap(),
                 &[],
@@ -98,7 +98,7 @@ fn test_publish_module_with_nested_loops() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
+                &DummyCodeStorage,
             )
             .unwrap_err();
 
@@ -106,7 +106,7 @@ fn test_publish_module_with_nested_loops() {
 
         let func = sess
             .load_function(
-                &module_storage,
+                &DummyCodeStorage,
                 &m.self_id(),
                 &Identifier::new("foo2").unwrap(),
                 &[],
@@ -118,7 +118,7 @@ fn test_publish_module_with_nested_loops() {
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
+                &DummyCodeStorage,
             )
             .unwrap_err();
 

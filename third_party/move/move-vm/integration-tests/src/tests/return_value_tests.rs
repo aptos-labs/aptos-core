@@ -11,7 +11,8 @@ use move_core_types::{
     value::{MoveTypeLayout, MoveValue},
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, TestModuleStorage,
+    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, IntoUnsyncModuleStorage,
+    LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -53,8 +54,9 @@ fn run(
     let mut resource_storage = InMemoryStorage::new();
     resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
 
-    let module_storage = TestModuleStorage::empty_for_vm(&vm);
-    module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+    module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
     let mut sess = vm.new_session(&resource_storage);
 

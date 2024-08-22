@@ -44,8 +44,7 @@ use aptos_vm::{
     move_vm_ext::{GenesisMoveVM, SessionExt},
 };
 use aptos_vm_types::{
-    module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
-    module_write_set::ModuleWriteSet,
+    module_and_script_storage::module_storage::AptosModuleStorage, module_write_set::ModuleWriteSet,
 };
 use claims::assert_ok;
 use move_core_types::{
@@ -133,9 +132,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let module_storage = state_view.as_aptos_code_storage();
 
     let vm = GenesisMoveVM::new(chain_id);
+    let module_storage = vm.as_aptos_code_storage(&state_view);
     let resolver = state_view.as_move_resolver();
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
@@ -248,10 +247,10 @@ pub fn encode_genesis_change_set(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let module_storage = state_view.as_aptos_code_storage();
 
-    let resolver = state_view.as_move_resolver();
     let vm = GenesisMoveVM::new(chain_id);
+    let module_storage = vm.as_aptos_code_storage(&state_view);
+    let resolver = state_view.as_move_resolver();
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
     // On-chain genesis process.
@@ -1190,7 +1189,7 @@ pub fn test_genesis_module_publishing() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
 
-    let module_storage = state_view.as_aptos_code_storage();
+    let module_storage = vm.as_aptos_code_storage(&state_view);
     let resolver = state_view.as_move_resolver();
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 

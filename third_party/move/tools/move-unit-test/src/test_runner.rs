@@ -11,9 +11,7 @@ use crate::{
 };
 use anyhow::Result;
 use colored::*;
-use move_binary_format::{
-    deserializer::DeserializerConfig, errors::VMResult, file_format::CompiledModule,
-};
+use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_bytecode_utils::Modules;
 use move_compiler::unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan};
 use move_core_types::{
@@ -29,7 +27,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    TestModuleStorage,
+    IntoUnsyncModuleStorage, LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -51,7 +49,7 @@ pub struct SharedTestingConfig {
     native_function_table: NativeFunctionTable,
     vm: MoveVM,
     starting_resource_storage: InMemoryStorage,
-    starting_module_storage: TestModuleStorage,
+    starting_module_storage: LocalModuleBytesStorage,
     #[allow(dead_code)] // used by some features
     source_files: Vec<String>,
     record_writeset: bool,
@@ -70,9 +68,9 @@ pub struct TestRunner {
 fn setup_test_storage<'a>(
     modules: impl Iterator<Item = &'a CompiledModule>,
     genesis_state: Option<ChangeSet>,
-) -> Result<(InMemoryStorage, TestModuleStorage)> {
+) -> Result<(InMemoryStorage, LocalModuleBytesStorage)> {
     let mut resource_storage = InMemoryStorage::new();
-    let module_storage = TestModuleStorage::empty(&DeserializerConfig::default());
+    let mut module_storage = LocalModuleBytesStorage::empty();
 
     let modules = Modules::new(modules);
     let dependency_graph = modules.compute_dependency_graph();
@@ -287,6 +285,13 @@ impl SharedTestingConfig {
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
+        // Note: While Move unit tests run concurrently, there is no publishing involved.
+        //       For simplicity, locally unsync module storage is used.
+        let module_storage = self
+            .starting_module_storage
+            .clone()
+            .into_unsync_module_storage(self.vm.runtime_env());
+
         let now = Instant::now();
         let traversal_storage = TraversalStorage::new();
         let serialized_return_values_result = session.execute_function_bypass_visibility(
@@ -296,7 +301,7 @@ impl SharedTestingConfig {
             serialize_values(test_info.arguments.iter()),
             &mut gas_meter,
             &mut TraversalContext::new(&traversal_storage),
-            &self.starting_module_storage,
+            &module_storage,
         );
         let mut return_result = serialized_return_values_result.map(|res| {
             res.return_values

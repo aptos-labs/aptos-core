@@ -4,8 +4,9 @@
 
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
-    module_traversal::TraversalContext, native_functions::NativeFunctions, script_hash,
-    storage::module_storage::ModuleStorage as ModuleStorageV2,
+    module_traversal::TraversalContext, script_hash,
+    storage::module_storage::ModuleStorage as ModuleStorageV2, unexpected_unimplemented_error,
+    RuntimeEnvironment,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -53,8 +54,7 @@ mod type_loader;
 use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     storage::{
-        dummy::DummyVerifier, loader::LoaderV2, script_storage::ScriptStorage,
-        struct_name_index_map::StructNameIndexMap, struct_type_storage::LoaderV1StructTypeStorage,
+        loader::LoaderV2, script_storage::ScriptStorage, struct_name_index_map::StructNameIndexMap,
     },
 };
 pub use function::LoadedFunction;
@@ -73,7 +73,6 @@ use type_loader::intern_type;
 type ScriptHash = [u8; 32];
 
 // A simple cache that offers both a HashMap and a Vector lookup.
-// Values are forced into a `Arc` so they can be used from multiple thread.
 // Access to this cache is always under a `RwLock`.
 #[derive(Clone)]
 pub(crate) struct BinaryCache<K, V> {
@@ -81,7 +80,7 @@ pub(crate) struct BinaryCache<K, V> {
     // one from std, as it allows alternative key representations to be used for lookup,
     // making certain optimizations possible.
     id_map: hashbrown::HashMap<K, usize>,
-    binaries: Vec<Arc<V>>,
+    binaries: Vec<V>,
 }
 
 impl<K, V> BinaryCache<K, V>
@@ -95,8 +94,8 @@ where
         }
     }
 
-    fn insert(&mut self, key: K, binary: V) -> &Arc<V> {
-        self.binaries.push(Arc::new(binary));
+    fn insert(&mut self, key: K, binary: V) -> &V {
+        self.binaries.push(binary);
         let idx = self.binaries.len() - 1;
         self.id_map.insert(key, idx);
         self.binaries
@@ -104,7 +103,7 @@ where
             .expect("BinaryCache: last() after push() impossible failure")
     }
 
-    fn get<Q>(&self, key: &Q) -> Option<&Arc<V>>
+    fn get<Q>(&self, key: &Q) -> Option<&V>
     where
         Q: Hash + Eq + Equivalent<K>,
     {
@@ -129,7 +128,7 @@ lazy_static! {
 #[derive(Clone)]
 pub(crate) enum Loader {
     V1(LoaderV1),
-    V2(LoaderV2<DummyVerifier>),
+    V2(LoaderV2),
 }
 
 macro_rules! versioned_loader_getter {
@@ -152,20 +151,20 @@ impl Loader {
 
     versioned_loader_getter!(ty_cache, RwLock<TypeCache>);
 
-    pub(crate) fn v1(natives: NativeFunctions, vm_config: VMConfig) -> Self {
+    versioned_loader_getter!(runtime_env, RuntimeEnvironment);
+
+    pub(crate) fn v1(runtime_env: RuntimeEnvironment) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::empty()),
-            struct_name_index_map: StructNameIndexMap::empty(),
-            natives,
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
-            vm_config,
+            runtime_env: Arc::new(runtime_env),
         })
     }
 
-    pub(crate) fn v2(natives: NativeFunctions, vm_config: VMConfig) -> Self {
-        Self::V2(LoaderV2::new(natives, vm_config, DummyVerifier))
+    pub(crate) fn v2(runtime_env: RuntimeEnvironment) -> Self {
+        Self::V2(LoaderV2::new(runtime_env))
     }
 
     /// Flush this cache if it is marked as invalidated.
@@ -329,16 +328,15 @@ impl Loader {
         modules: &[CompiledModule],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
+        _module_storage: &impl ModuleStorageV2,
     ) -> VMResult<()> {
         match self {
             Self::V1(loader) => {
                 loader.verify_module_bundle_for_publication(modules, data_store, module_store)
             },
-            Self::V2(loader) => loader
-                .verify_modules_for_publication(module_storage, modules)
-                // TODO(loader_v2): Revisit errors...
-                .map_err(|e| e.finish(Location::Undefined)),
+            Self::V2(_loader) => {
+                unexpected_unimplemented_error!().map_err(|e| e.finish(Location::Undefined))
+            },
         }
     }
 
@@ -408,8 +406,6 @@ impl Loader {
 pub(crate) struct LoaderV1 {
     scripts: RwLock<ScriptCache>,
     type_cache: RwLock<TypeCache>,
-    natives: NativeFunctions,
-    struct_name_index_map: StructNameIndexMap,
 
     // The below field supports a hack to workaround well-known issues with the
     // loader cache. This cache is not designed to support module upgrade or deletion.
@@ -441,7 +437,8 @@ pub(crate) struct LoaderV1 {
     // other transactions.
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
-    vm_config: VMConfig,
+    // The environment used by the loader, e.g, VM config, available native functions, etc..
+    runtime_env: Arc<RuntimeEnvironment>,
 }
 
 impl Clone for LoaderV1 {
@@ -449,22 +446,24 @@ impl Clone for LoaderV1 {
         Self {
             scripts: RwLock::new(self.scripts.read().clone()),
             type_cache: RwLock::new(self.type_cache.read().clone()),
-            natives: self.natives.clone(),
-            struct_name_index_map: self.struct_name_index_map.clone(),
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
-            vm_config: self.vm_config.clone(),
+            runtime_env: self.runtime_env.clone(),
         }
     }
 }
 
 impl LoaderV1 {
     pub(crate) fn vm_config(&self) -> &VMConfig {
-        &self.vm_config
+        self.runtime_env().vm_config()
+    }
+
+    pub(crate) fn runtime_env(&self) -> &RuntimeEnvironment {
+        &self.runtime_env
     }
 
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
-        &self.vm_config.ty_builder
+        &self.vm_config().ty_builder
     }
 
     pub(crate) fn ty_cache(&self) -> &RwLock<TypeCache> {
@@ -472,7 +471,7 @@ impl LoaderV1 {
     }
 
     pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
-        &self.struct_name_index_map
+        self.runtime_env().struct_name_index_map()
     }
 
     //
@@ -532,10 +531,8 @@ impl LoaderV1 {
                     module_store,
                 )?;
 
-                let struct_ty_storage = LoaderV1StructTypeStorage { module_store };
-                let script =
-                    Script::new(ver_script, &struct_ty_storage, &self.struct_name_index_map)
-                        .map_err(|e| e.finish(Location::Script))?;
+                let script = Script::new(ver_script, self.struct_name_index_map())
+                    .map_err(|e| e.finish(Location::Script))?;
                 scripts.insert(hash_value, script)
             },
         };
@@ -578,7 +575,7 @@ impl LoaderV1 {
         //   - Local, using a bytecode verifier.
         //   - Global, loading & verifying module dependencies.
         move_bytecode_verifier::verify_script_with_config(
-            &self.vm_config.verifier_config,
+            &self.vm_config().verifier_config,
             script.as_ref(),
         )?;
         let loaded_deps = script
@@ -753,7 +750,10 @@ impl LoaderV1 {
         // module will NOT show up in `module_cache`. In the module republishing case, it means
         // that the old module is still in the `module_cache`, unless a new Loader is created,
         // which means that a new MoveVM instance needs to be created.
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier_config, module)?;
+        move_bytecode_verifier::verify_module_with_config(
+            &self.vm_config().verifier_config,
+            module,
+        )?;
         self.check_natives(module)?;
 
         let mut visited = BTreeSet::new();
@@ -918,9 +918,9 @@ impl LoaderV1 {
 
         while let Some((addr, name, allow_loading_failure)) = stack.pop() {
             // Load and deserialize the module only if it has not been cached by the loader.
-            // Otherwise this will cause a significant regression in performance.
+            // Otherwise, this will cause a significant regression in performance.
             let (module, size) = match module_store.module_at_by_ref(addr, name) {
-                Some(module) => (module.module.clone(), module.size),
+                Some((module, size)) => (module.module.clone(), size),
                 None => {
                     let (module, size, _) = data_store.load_compiled_module_to_cache(
                         ModuleId::new(*addr, name.to_owned()),
@@ -1006,7 +1006,7 @@ impl LoaderV1 {
 
         fail::fail_point!("verifier-failpoint-2", |_| { Ok((module.clone(), size)) });
 
-        if self.vm_config.paranoid_type_checks && &module.self_id() != id {
+        if self.vm_config().paranoid_type_checks && &module.self_id() != id {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("Module self id mismatch with storage".to_string())
@@ -1017,7 +1017,7 @@ impl LoaderV1 {
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
             move_bytecode_verifier::verify_module_with_config(
-                &self.vm_config.verifier_config,
+                &self.vm_config().verifier_config,
                 &module,
             )
             .map_err(expect_no_verification_errors)?;
@@ -1068,11 +1068,11 @@ impl LoaderV1 {
 
         // if linking goes well, insert the module to the code cache
         let module_ref = module_store.insert(
-            &self.natives,
+            self.runtime_env().natives(),
             id.clone(),
             size,
             module,
-            &self.struct_name_index_map,
+            self.struct_name_index_map(),
         )?;
 
         Ok(module_ref)

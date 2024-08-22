@@ -6,7 +6,9 @@ use move_binary_format::file_format::{
     SignatureToken::*,
 };
 use move_core_types::vm_status::StatusCode;
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage, TestScriptStorage};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage, LocalModuleBytesStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -75,9 +77,8 @@ fn merge_borrow_states_infinite_loop() {
 
     let vm = MoveVM::new(vec![]);
 
-    let deserializer_config = &vm.vm_config().deserializer_config;
-    let module_storage = TestModuleStorage::empty(deserializer_config);
-    let script_storage = TestScriptStorage::empty(deserializer_config);
+    let module_and_script_storage =
+        LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
     let resource_storage = InMemoryStorage::new();
 
     let traversal_storage = TraversalStorage::new();
@@ -90,8 +91,8 @@ fn merge_borrow_states_infinite_loop() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .unwrap_err();
 

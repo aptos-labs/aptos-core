@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation};
-use crate::{
-    loader::ScriptHash,
-    storage::{struct_name_index_map::StructNameIndexMap, struct_type_storage::StructTypeStorage},
-};
+use crate::{loader::ScriptHash, storage::struct_name_index_map::StructNameIndexMap};
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
@@ -43,7 +40,6 @@ pub struct Script {
 impl Script {
     pub(crate) fn new(
         script: Arc<CompiledScript>,
-        struct_ty_storage: &impl StructTypeStorage,
         struct_name_index_map: &StructNameIndexMap,
     ) -> PartialVMResult<Self> {
         let mut struct_names = vec![];
@@ -51,10 +47,6 @@ impl Script {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
             let module_id = script.module_id_for_handle(module_handle);
-
-            struct_ty_storage
-                .fetch_struct_ty(&module_id, struct_name)?
-                .check_compatibility(struct_handle)?;
             struct_names.push(struct_name_index_map.struct_name_to_idx(StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),
@@ -208,7 +200,7 @@ impl Script {
 // does not require further verification (except for parameters and type parameters)
 #[derive(Clone)]
 pub(crate) struct ScriptCache {
-    pub(crate) scripts: BinaryCache<ScriptHash, Script>,
+    pub(crate) scripts: BinaryCache<ScriptHash, Arc<Script>>,
 }
 
 impl ScriptCache {
@@ -225,7 +217,7 @@ impl ScriptCache {
     pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Script> {
         match self.get(&hash) {
             Some(cached) => cached,
-            None => self.scripts.insert(hash, script).clone(),
+            None => self.scripts.insert(hash, Arc::new(script)).clone(),
         }
     }
 }

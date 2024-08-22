@@ -9,8 +9,7 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility, deserializer::DeserializerConfig, file_format::CompiledScript,
-    file_format_common, CompiledModule,
+    compatibility::Compatibility, file_format::CompiledScript, file_format_common, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
@@ -40,7 +39,7 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues,
-    should_use_loader_v2, TestModuleStorage, TestScriptStorage,
+    DummyCodeStorage, IntoUnsyncCodeStorage, IntoUnsyncModuleStorage, LocalModuleBytesStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -65,8 +64,7 @@ struct SimpleVMTestAdapter<'a> {
     // Different storages for a task: resources, modules, and scripts. Module
     // and script storages are only used if loader V2 implementation is enabled.
     resource_storage: InMemoryStorage,
-    module_storage: TestModuleStorage,
-    script_storage: TestScriptStorage,
+    module_bytes_storage: LocalModuleBytesStorage,
 
     default_syntax: SyntaxChoice,
     comparison_mode: bool,
@@ -152,8 +150,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         // Create the VM and storages to initialize.
         let vm = Self::create_vm();
         let mut resource_storage = InMemoryStorage::new();
-        let module_storage = TestModuleStorage::empty(&DeserializerConfig::default());
-        let script_storage = TestScriptStorage::empty(&DeserializerConfig::default());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
 
         // Initialize module storages.
         for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
@@ -165,7 +162,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 .verify_module_bundle_before_publishing(
                     &[module.clone()],
                     module.self_addr(),
-                    &module_storage,
+                    &DummyCodeStorage,
                 )
                 .unwrap();
             drop(session);
@@ -178,7 +175,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             // We need to store both in resource and module storage for preserving
             // V1 and V2 flows.
             resource_storage.publish_or_overwrite_module(module.self_id(), module_bytes.clone());
-            module_storage.add_module_bytes(
+            module_bytes_storage.add_module_bytes(
                 module.self_addr(),
                 module.self_name(),
                 module_bytes.into(),
@@ -194,10 +191,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             ),
             default_syntax,
             // If we use V2 loader, we should share the VM with other tasks.
-            vm: should_use_loader_v2().then_some(vm),
+            vm: vm.vm_config().use_loader_v2.then_some(vm),
             resource_storage,
-            module_storage,
-            script_storage,
+            module_bytes_storage,
             comparison_mode,
             run_config,
         };
@@ -244,7 +240,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 session.verify_module_bundle_before_publishing_with_compat_config(
                     &[module.clone()],
                     module.self_addr(),
-                    &self.module_storage,
+                    &DummyCodeStorage,
                     compat,
                 )
             } else {
@@ -253,7 +249,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 session.verify_module_bundle_before_publishing_with_compat_config(
                     &[module.clone()],
                     module.self_addr(),
-                    &self.module_storage,
+                    &DummyCodeStorage,
                     compat,
                 )
             }
@@ -267,7 +263,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     &mut module_bytes,
                 )?;
 
-                self.module_storage.add_module_bytes(
+                self.module_bytes_storage.add_module_bytes(
                     module.self_addr(),
                     module.self_name(),
                     module_bytes.clone().into(),
@@ -462,6 +458,10 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let mut gas_status = self.get_gas_status(gas_budget);
 
         let mut session = vm.new_session(&self.resource_storage);
+        let module_and_script_storage = self
+            .module_bytes_storage
+            .clone()
+            .into_unsync_code_storage(vm.runtime_env());
         session
             .execute_script(
                 script_bytes,
@@ -469,8 +469,8 @@ impl<'a> SimpleVMTestAdapter<'a> {
                 args,
                 &mut gas_status,
                 &mut TraversalContext::new(&traversal_storage),
-                &self.module_storage,
-                &self.script_storage,
+                &module_and_script_storage,
+                &module_and_script_storage,
             )
             .map_err(|vm_error| {
                 anyhow!(
@@ -499,6 +499,10 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let mut gas_status = self.get_gas_status(gas_budget);
 
         let mut session = vm.new_session(&self.resource_storage);
+        let module_storage = self
+            .module_bytes_storage
+            .clone()
+            .into_unsync_module_storage(vm.runtime_env());
         let results = session
             .execute_function_bypass_visibility(
                 module_id,
@@ -507,7 +511,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
                 args,
                 &mut gas_status,
                 &mut TraversalContext::new(&traversal_storage),
-                &self.module_storage,
+                &module_storage,
             )
             .map_err(|vm_error| {
                 anyhow!(
