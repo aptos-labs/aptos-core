@@ -5,7 +5,8 @@ use crate::compiler::{as_module, as_script, compile_units};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, TestModuleStorage, TestScriptStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage,
+    IntoUnsyncModuleStorage, LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -54,7 +55,8 @@ fn test_publish_module_with_nested_loops() {
         );
 
         let resource_storage = InMemoryStorage::new();
-        let module_storage = TestModuleStorage::empty(&vm.vm_config().deserializer_config);
+        let module_storage =
+            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.verify_module_bundle_before_publishing(&[m.clone()], &TEST_ADDR, &module_storage)
@@ -78,7 +80,8 @@ fn test_publish_module_with_nested_loops() {
         );
 
         let resource_storage = InMemoryStorage::new();
-        let module_storage = TestModuleStorage::empty(&vm.vm_config().deserializer_config);
+        let module_storage =
+            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.verify_module_bundle_before_publishing(&[m], &TEST_ADDR, &module_storage)
@@ -128,9 +131,8 @@ fn test_run_script_with_nested_loops() {
             },
         );
 
-        let deserializer_config = &vm.vm_config().deserializer_config;
-        let module_storage = TestModuleStorage::empty(deserializer_config);
-        let script_storage = TestScriptStorage::empty(deserializer_config);
+        let module_and_script_storage =
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
         let resource_storage = InMemoryStorage::new();
 
         let mut sess = vm.new_session(&resource_storage);
@@ -141,8 +143,8 @@ fn test_run_script_with_nested_loops() {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .unwrap();
     }
@@ -163,9 +165,8 @@ fn test_run_script_with_nested_loops() {
             },
         );
 
-        let deserializer_config = &vm.vm_config().deserializer_config;
-        let module_storage = TestModuleStorage::empty(deserializer_config);
-        let script_storage = TestScriptStorage::empty(deserializer_config);
+        let module_and_script_storage =
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
         let resource_storage = InMemoryStorage::new();
 
         let mut sess = vm.new_session(&resource_storage);
@@ -176,8 +177,8 @@ fn test_run_script_with_nested_loops() {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .unwrap_err();
     }

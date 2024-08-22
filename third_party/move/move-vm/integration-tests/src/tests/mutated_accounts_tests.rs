@@ -8,7 +8,9 @@ use move_core_types::{
     identifier::Identifier,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, IntoUnsyncModuleStorage, LocalModuleBytesStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -43,8 +45,9 @@ fn mutated_accounts() {
     let mut resource_storage = InMemoryStorage::new();
     resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
 
-    let module_storage = TestModuleStorage::empty_for_vm(&vm);
-    module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+    module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
     let mut sess = vm.new_session(&resource_storage);
 
