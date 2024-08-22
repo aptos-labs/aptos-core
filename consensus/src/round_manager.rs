@@ -892,7 +892,7 @@ impl RoundManager {
 
         let block_store = self.block_store.clone();
         if !block_store.check_payload(&proposal) {
-            debug!("Payload not available locally for block: {}", proposal.id());
+            info!("Payload not available locally for block: {}", proposal.id());
             counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
                 .with_label_values(&["missing"])
                 .inc();
