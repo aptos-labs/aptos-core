@@ -210,7 +210,7 @@ impl Default for ConsensusConfig {
             sync_only: false,
             channel_size: 30, // hard-coded
             quorum_store_pull_timeout_ms: 400,
-            quorum_store_poll_time_ms: 300,
+            quorum_store_poll_time_ms: 30, // daniel todo: revert to 300
             // disable wait_for_full until fully tested
             // We never go above 20-30 pending blocks, so this disables it
             wait_for_full_blocks_above_pending_blocks: 100,
