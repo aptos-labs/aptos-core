@@ -64,6 +64,7 @@ aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-validator = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 either = { workspace = true }

@@ -74,7 +74,7 @@ use aptos_dkg::{
 };
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_global_constants::CONSENSUS_KEY;
-use aptos_infallible::{duration_since_epoch, Mutex};
+use aptos_infallible::{duration_since_epoch, Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
@@ -96,6 +96,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
+use aptos_vm_validator::vm_validator::{PooledVMValidator, TransactionValidation};
 use dashmap::DashMap;
 use fail::fail_point;
 use futures::{
@@ -179,6 +180,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
+    validator: Arc<RwLock<PooledVMValidator>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -199,6 +201,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         vtxn_pool: VTxnPoolState,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        validator: Arc<RwLock<PooledVMValidator>>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -248,6 +251,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .build(),
             consensus_publisher,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
+            validator,
         }
     }
 
@@ -772,6 +776,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        validator: Arc<RwLock<PooledVMValidator>>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -877,7 +882,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
-            self.execution_client.get_execution_proxy(),
+            validator,
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
@@ -1185,6 +1190,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         self.rand_manager_msg_tx = Some(rand_msg_tx);
 
+        let _ = self.validator.write().restart();
+
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
                 epoch_state,
@@ -1213,6 +1220,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                self.validator.clone(),
             )
             .await
         }
@@ -1261,6 +1269,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        validator: Arc<RwLock<PooledVMValidator>>,
     ) {
         match self.storage.start(consensus_config.order_vote_enabled()) {
             LivenessStorageData::FullRecoveryData(initial_data) => {
@@ -1278,6 +1287,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     rand_config,
                     fast_rand_config,
                     rand_msg_rx,
+                    validator,
                 )
                 .await
             },

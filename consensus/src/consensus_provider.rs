@@ -26,6 +26,7 @@ use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_executor::block_executor::BlockExecutor;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{
@@ -35,6 +36,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_time_service::TimeService;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use aptos_vm::AptosVM;
+use aptos_vm_validator::vm_validator::PooledVMValidator;
 use futures::channel::mpsc;
 use move_core_types::account_address::AccountAddress;
 use std::{collections::HashMap, sync::Arc};
@@ -52,6 +54,7 @@ pub fn start_consensus(
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    validator: Arc<RwLock<PooledVMValidator>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
@@ -111,6 +114,7 @@ pub fn start_consensus(
         vtxn_pool,
         rand_storage,
         consensus_publisher,
+        validator,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

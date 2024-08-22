@@ -4,13 +4,13 @@
 
 use super::proposer_election::ProposerElection;
 use crate::{
-    block_storage::BlockReader, counters::{
+    block_storage::{tracing::{observe_block, BlockStage}, BlockReader}, counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
         PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
         PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
         PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
-    }, payload_client::{PayloadClient, PayloadPullParameters}, state_computer::ExecutionProxy, util::time_service::TimeService
+    }, payload_client::{PayloadClient, PayloadPullParameters}, util::time_service::TimeService
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{
@@ -26,15 +26,17 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
+use aptos_storage_interface::DbReader;
 use aptos_types::{on_chain_config::{OnChainRandomnessConfig, ValidatorTxnConfig}, transaction::Transaction, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
 use aptos_vm::AptosVM;
+use aptos_vm_validator::vm_validator::PooledVMValidator;
 use futures::future::BoxFuture;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
@@ -44,16 +46,6 @@ use std::{
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
 mod proposal_generator_test;
-
-pub static RAND_CHECKER_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(16)
-            .thread_name(|index| format!("rand-checker-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
 
 #[derive(Clone)]
 pub struct ChainHealthBackoffConfig {
@@ -280,7 +272,8 @@ pub struct ProposalGenerator {
 
     allow_batches_without_pos_in_proposal: bool,
 
-    execution_proxy: Arc<ExecutionProxy>,
+    // For checking randomness
+    validator: Arc<RwLock<PooledVMValidator>>,
 }
 
 impl ProposalGenerator {
@@ -302,7 +295,7 @@ impl ProposalGenerator {
         vtxn_config: ValidatorTxnConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         allow_batches_without_pos_in_proposal: bool,
-        execution_proxy: Arc<ExecutionProxy>,
+        validator: Arc<RwLock<PooledVMValidator>>,
     ) -> Self {
         Self {
             author,
@@ -322,7 +315,7 @@ impl ProposalGenerator {
             vtxn_config,
             onchain_randomness_config,
             allow_batches_without_pos_in_proposal,
-            execution_proxy,
+            validator,
         }
     }
 
@@ -375,6 +368,7 @@ impl ProposalGenerator {
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
         let skip_non_rand_blocks = self.onchain_randomness_config.skip_non_rand_blocks();
+        let start_time = self.time_service.get_current_timestamp();
 
         let (validator_txns, payload, all_txns, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
@@ -500,11 +494,11 @@ impl ProposalGenerator {
                 all_txns = all_txns[..len].to_vec();
             }
 
-            info!("[ProposalGeneration] Pull txns took: {:?}, round {}", self.time_service.get_current_timestamp() - timestamp, round);
-
             (validator_txns, payload, all_txns, timestamp.as_micros() as u64)
         };
 
+        observe_block(timestamp, BlockStage::PULLED_PAYLOAD);
+        info!("[ProposalGeneration] Pull txns took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
         let start_time = self.time_service.get_current_timestamp();
 
         let quorum_cert = hqc.as_ref().clone();
@@ -515,46 +509,15 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        let maybe_require_randomness = if skip_non_rand_blocks {
-            let mut require_randomness = false;
-            let block_id = HashValue::zero();
-            let parent_block_id = self.block_store.commit_root().id();
-            match self.execution_proxy.get_state_view(block_id, parent_block_id) {
-                Ok(stale_state_view) => {
-                    let vm = AptosVM::new(&stale_state_view);
-                    let resolver = vm.as_move_resolver(&stale_state_view);
+        // Check if the block contains any randomness transaction
+        let maybe_require_randomness = skip_non_rand_blocks.then(|| {
+            all_txns.par_iter().any(|txn| {
+                self.validator.read().check_randomness(txn)
+            })
+        });
 
-                    info!("[ProposalGeneration] init vm took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
-
-                    for txn in all_txns.iter() {
-                        if vm.require_randomness(&resolver, txn, 0) {
-                            require_randomness = true;
-                            break;
-                        }
-                    }
-
-                    // let num_txns = all_txns.len();
-                    // require_randomness = RAND_CHECKER_POOL.install(|| {
-                    //     all_txns
-                    //         .into_par_iter()
-                    //         .with_min_len(optimal_min_len(num_txns, 32))
-                    //         .any(|txn| {
-                    //             let vm = AptosVM::new(&stale_state_view);
-                    //             let resolver = vm.as_move_resolver(&stale_state_view);
-                    //             vm.require_randomness(&resolver, &txn, 0)
-                    //         })
-                    // });
-                },
-                Err(e) => {
-                    error!("[ProposalGenerator] Failed to get stale state view of block {}, error: {:?}", parent_block_id, e);
-                },
-            }
-            Some(require_randomness)
-        } else {
-            None
-        };
-
-        info!("[ProposalGeneration] check randomness took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
+        observe_block(timestamp, BlockStage::CHECKED_RAND);
+        info!("[ProposalGeneration] Check randomness took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
 
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(

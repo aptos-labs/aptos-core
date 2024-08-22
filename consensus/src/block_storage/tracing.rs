@@ -26,6 +26,8 @@ impl BlockStage {
     pub const RAND_ENTER: &'static str = "rand_enter";
     pub const RAND_READY: &'static str = "rand_ready";
     pub const ROUND_MANAGER_RECEIVED: &'static str = "round_manager_received";
+    pub const PULLED_PAYLOAD: &'static str = "pulled_payload";
+    pub const CHECKED_RAND: &'static str = "checked_rand";
     pub const SIGNED: &'static str = "signed";
     pub const SYNCED: &'static str = "synced";
     pub const VOTED: &'static str = "voted";

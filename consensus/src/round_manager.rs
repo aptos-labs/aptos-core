@@ -501,7 +501,9 @@ impl RoundManager {
         let signed_proposal =
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
         observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);
-        info!("[ProposalGeneration] Round {} in total took: {:?} ms", signed_proposal.round(), duration_since_epoch().checked_sub(Duration::from_micros(signed_proposal.timestamp_usecs())).unwrap());
+
+        info!("[ProposalGeneration] In total took: {:?}, round {}", duration_since_epoch().checked_sub(Duration::from_micros(signed_proposal.timestamp_usecs())).unwrap(), signed_proposal.round());
+
         info!(
             Self::new_log_with_round_epoch(LogEvent::Propose, new_round_event.round, epoch),
             "{}", signed_proposal

@@ -97,13 +97,10 @@ pub fn bootstrap(
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    validator: Arc<RwLock<PooledVMValidator>>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
-    let vm_validator = Arc::new(RwLock::new(PooledVMValidator::new(
-        Arc::clone(&db),
-        num_cpus::get(),
-    )));
     start_shared_mempool(
         runtime.handle(),
         config,
@@ -115,7 +112,7 @@ pub fn bootstrap(
         mempool_listener,
         mempool_reconfig_events,
         db,
-        vm_validator,
+        validator,
         vec![],
         peers_and_metadata,
     );

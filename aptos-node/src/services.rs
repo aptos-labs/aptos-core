@@ -17,6 +17,7 @@ use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_indexer_grpc_table_info::runtime::{
     bootstrap as bootstrap_indexer_table_info, bootstrap_internal_indexer_db,
 };
+use aptos_infallible::RwLock;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
@@ -31,6 +32,7 @@ use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
 use aptos_validator_transaction_pool::VTxnPoolState;
+use aptos_vm_validator::vm_validator::PooledVMValidator;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
 use tokio::runtime::{Handle, Runtime};
@@ -130,6 +132,7 @@ pub fn start_consensus_runtime(
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    validator: Arc<RwLock<PooledVMValidator>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
 
@@ -146,6 +149,7 @@ pub fn start_consensus_runtime(
         reconfig_subscription,
         vtxn_pool,
         consensus_publisher,
+        validator,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
 
@@ -161,6 +165,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     mempool_listener: MempoolNotificationListener,
     mempool_client_receiver: Receiver<MempoolClientRequest>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    validator: Arc<RwLock<PooledVMValidator>>,
 ) -> (Runtime, Sender<QuorumStoreRequest>) {
     // Create a communication channel between consensus and mempool
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -178,6 +183,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
         mempool_listener,
         mempool_reconfig_subscription,
         peers_and_metadata,
+        validator,
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 

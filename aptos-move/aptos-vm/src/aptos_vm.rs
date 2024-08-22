@@ -26,7 +26,6 @@ use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
-use aptos_mvhashmap::types::TxnIndex;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
 use aptos_types::{
@@ -2518,6 +2517,23 @@ impl AptosVM {
             },
         })
     }
+
+    pub fn check_randomness(
+        &self,
+        signed_transaction: &SignedTransaction,
+        resolver: &impl AptosMoveResolver,
+    ) -> bool {
+        let entry_fn = match signed_transaction.payload() {
+            TransactionPayload::EntryFunction(entry) => entry,
+            TransactionPayload::Multisig(_) => return false, // daniel todo fix
+            _ => return false,
+        };
+        let mut session = self.new_session(resolver, SessionId::Void, None);
+        match get_randomness_annotation(resolver, &mut session, entry_fn) {
+            Ok(annotation) => annotation.is_some(),
+            Err(_) => false,
+        }
+    }
 }
 
 // Executor external API
@@ -2698,26 +2714,6 @@ impl VMValidator for AptosVM {
             .inc();
 
         result
-    }
-}
-
-impl AptosVM {
-    pub fn require_randomness(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        signed_transaction: &SignedTransaction,
-        txn_idx: TxnIndex,
-    ) -> bool {
-        let entry_fn = match signed_transaction.payload() {
-            TransactionPayload::EntryFunction(entry) => entry,
-            TransactionPayload::Multisig(_) => return false, // daniel todo fix
-            _ => return false,
-        };
-        let mut session = self.new_session(resolver, SessionId::Void, None);
-        match get_randomness_annotation(resolver, &mut session, entry_fn) {
-            Ok(annotation) => annotation.is_some(),
-            Err(err) => false,
-        }
     }
 }
 
