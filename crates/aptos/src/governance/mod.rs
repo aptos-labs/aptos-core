@@ -894,7 +894,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
 }
 
 /// Compile a specified script.
-#[derive(Parser)]
+#[derive(Parser, Default)]
 pub struct CompileScriptFunction {
     /// Path to the Move script for the proposal
     #[clap(long, group = "script", value_parser)]
@@ -1085,16 +1085,11 @@ impl GenerateExecutionHash {
         };
         CompileScriptFunction {
             script_path: self.script_path.clone(),
-            compiled_script_path: None,
             framework_package_args: FrameworkPackageArgs {
-                framework_git_rev: None,
                 framework_local_dir,
-                skip_fetch_latest_git_deps: false,
+                ..FrameworkPackageArgs::default()
             },
-            bytecode_version: None,
-            compiler_version: None,
-            language_version: None,
-            move_2: false,
+            ..CompileScriptFunction::default()
         }
         .compile("execution_hash", PromptOptions::yes())
     }
