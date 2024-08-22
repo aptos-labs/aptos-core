@@ -3,18 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
     loader::{LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
-    native_functions::{NativeFunction, NativeFunctions},
     session::SerializedReturnValues,
-    storage::{
-        dummy::should_use_loader_v2, module_storage::ModuleStorage as ModuleStorageV2,
-        script_storage::ScriptStorage,
-    },
+    storage::{module_storage::ModuleStorage as ModuleStorageV2, script_storage::ScriptStorage},
+    RuntimeEnvironment,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -24,8 +20,8 @@ use move_binary_format::{
     normalized, CompiledModule, IndexKind,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::TypeTag,
-    value::MoveTypeLayout, vm_status::StatusCode,
+    account_address::AccountAddress, language_storage::TypeTag, value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -50,21 +46,12 @@ impl Clone for VMRuntime {
 }
 
 impl VMRuntime {
-    /// Creates a new runtime instance with provided native functions and VM
-    /// configurations. If there are duplicated natives, panics.
-    pub(crate) fn new(
-        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-        vm_config: VMConfig,
-    ) -> Self {
-        let natives = NativeFunctions::new(natives)
-            .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
-
-        // TODO(loader_v2): Connect V2 creation to feature flag properly, for now use this to
-        //                  run end-to-end tests with adapter and raw MoveVM.
-        let loader = if should_use_loader_v2() {
-            Loader::v2(natives, vm_config)
+    /// Creates a new runtime instance with provided environment.
+    pub(crate) fn new(runtime_env: RuntimeEnvironment) -> Self {
+        let loader = if runtime_env.vm_config().use_loader_v2 {
+            Loader::v2(runtime_env)
         } else {
-            Loader::v1(natives, vm_config)
+            Loader::v1(runtime_env)
         };
 
         VMRuntime {

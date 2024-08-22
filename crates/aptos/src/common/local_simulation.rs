@@ -8,9 +8,7 @@ use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_types::transaction::SignedTransaction;
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{
-    module_and_script_storage::AsAptosCodeStorage, output::VMOutput, resolver::StateStorageView,
-};
+use aptos_vm_types::{output::VMOutput, resolver::StateStorageView};
 use move_core_types::vm_status::VMStatus;
 use std::{path::Path, time::Instant};
 
@@ -25,7 +23,7 @@ pub fn run_transaction_using_debugger(
     let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
     let resolver = state_view.as_move_resolver();
-    let module_and_script_storage = state_view.as_aptos_code_storage();
+    let module_and_script_storage = vm.as_aptos_code_storage(&state_view);
 
     let (vm_status, vm_output) = vm.execute_user_transaction(
         &resolver,
@@ -49,7 +47,7 @@ pub fn benchmark_transaction_using_debugger(
     let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
     let resolver = state_view.as_move_resolver();
-    let module_and_script_storage = state_view.as_aptos_code_storage();
+    let module_and_script_storage = vm.as_aptos_code_storage(&state_view);
     let (vm_status, vm_output) = vm.execute_user_transaction(
         &resolver,
         &module_and_script_storage,

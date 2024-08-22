@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::compiler::{as_module, compile_units};
-use move_binary_format::{deserializer::DeserializerConfig, errors::PartialVMResult};
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::GasQuantity, identifier::Identifier,
     language_storage::ModuleId, vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction, should_use_loader_v2,
-    TestModuleStorage,
+    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
+    IntoUnsyncModuleStorage, LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -63,12 +63,9 @@ fn make_dispatch_d_native() -> NativeFunction {
     })
 }
 
-fn set_up_storage(
-    deserializer_config: &DeserializerConfig,
-    modules: Vec<String>,
-) -> (InMemoryStorage, TestModuleStorage) {
+fn set_up_storage(modules: Vec<String>) -> (InMemoryStorage, LocalModuleBytesStorage) {
     let mut resource_storage = InMemoryStorage::new();
-    let module_storage = TestModuleStorage::empty(deserializer_config);
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
 
     for module in modules {
         let mut units = compile_units(&module).unwrap();
@@ -77,9 +74,9 @@ fn set_up_storage(
         m.serialize(&mut blob).unwrap();
 
         resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
     }
-    (resource_storage, module_storage)
+    (resource_storage, module_bytes_storage)
 }
 
 #[test]
@@ -158,10 +155,8 @@ fn runtime_reentrancy_check() {
         "#,
         TEST_ADDR.to_hex(),
     );
-    let (resource_storage, module_storage) =
-        set_up_storage(&vm.vm_config().deserializer_config, vec![
-            code_1, code_2, code_3,
-        ]);
+    let (resource_storage, module_bytes_storage) = set_up_storage(vec![code_1, code_2, code_3]);
+    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
     let fun_name = Identifier::new("foo1").unwrap();
@@ -211,7 +206,7 @@ fn runtime_reentrancy_check() {
     //      not exist it returns FUNCTION_RESOLUTION_FAILURE.
     //   2) V2 loader checks the module first, and if it does not exist, returns the
     //      linker error.
-    let expected_error_code = if should_use_loader_v2() {
+    let expected_error_code = if vm.vm_config().use_loader_v2 {
         StatusCode::LINKER_ERROR
     } else {
         StatusCode::FUNCTION_RESOLUTION_FAILURE
