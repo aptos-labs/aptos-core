@@ -209,7 +209,7 @@ impl Client {
         address: AccountAddress,
     ) -> AptosResult<Response<Balance>> {
         let resp = self
-            .get_account_resource(address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
+            .get_account_resource(address, "0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>")
             .await?;
         resp.and_then(|resource| {
             if let Some(res) = resource {

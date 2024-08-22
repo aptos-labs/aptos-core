@@ -555,7 +555,7 @@ async fn test_view_function() {
     // Non-BCS
     let view_request = ViewRequest {
         function: "0x1::coin::is_account_registered".parse().unwrap(),
-        type_arguments: vec!["0x1::aptos_coin::AptosCoin".parse().unwrap()],
+        type_arguments: vec!["0x1::supra_coin::SupraCoin".parse().unwrap()],
         arguments: vec![serde_json::Value::String(address.to_hex_literal())],
     };
 
