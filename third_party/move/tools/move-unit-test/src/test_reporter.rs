@@ -53,12 +53,11 @@ impl<'a> UnitTestFactory<GasStatus<'a>> for DefaultUnitTestFactory {
         gas_status: GasStatus,
         mut test_run_info: TestRunInfo,
     ) -> (VMResult<ChangeSet>, TestRunInfo) {
+        let remaining_gas: u64 = gas_status.remaining_gas().into();
+        test_run_info.gas_used = DEFAULT_EXECUTION_BOUND - remaining_gas;
+
         match session.finish() {
-            Ok(cs) => {
-                let remaining_gas: u64 = gas_status.remaining_gas().into();
-                test_run_info.gas_used = DEFAULT_EXECUTION_BOUND - remaining_gas;
-                (Ok(cs), test_run_info)
-            },
+            Ok(cs) => (Ok(cs), test_run_info),
             Err(err) => (Err(err), test_run_info),
         }
     }
