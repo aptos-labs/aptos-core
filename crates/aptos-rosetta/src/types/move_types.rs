@@ -8,7 +8,7 @@ use aptos_types::event::EventHandle;
 use serde::{Deserialize, Serialize};
 
 pub const ACCOUNT_MODULE: &str = "account";
-pub const APTOS_ACCOUNT_MODULE: &str = "aptos_account";
+pub const APTOS_ACCOUNT_MODULE: &str = "supra_account";
 pub const APTOS_COIN_MODULE: &str = "aptos_coin";
 pub const COIN_MODULE: &str = "coin";
 pub const STAKE_MODULE: &str = "stake";

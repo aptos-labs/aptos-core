@@ -378,7 +378,7 @@ impl TransactionBlockExecutor for NativeExecutor {
                                         true,
                                     )
                                 },
-                                (AccountAddress::ONE, "aptos_account", "transfer") => {
+                                (AccountAddress::ONE, "supra_account", "transfer") => {
                                     Self::handle_account_creation_and_transfer(
                                         user_txn.sender(),
                                         bcs::from_bytes(&f.args()[0]).unwrap(),
@@ -388,7 +388,7 @@ impl TransactionBlockExecutor for NativeExecutor {
                                         false,
                                     )
                                 },
-                                (AccountAddress::ONE, "aptos_account", "create_account") => {
+                                (AccountAddress::ONE, "supra_account", "create_account") => {
                                     Self::handle_account_creation_and_transfer(
                                         user_txn.sender(),
                                         bcs::from_bytes(&f.args()[0]).unwrap(),
@@ -398,7 +398,7 @@ impl TransactionBlockExecutor for NativeExecutor {
                                         false,
                                     )
                                 },
-                                (AccountAddress::ONE, "aptos_account", "batch_transfer") => {
+                                (AccountAddress::ONE, "supra_account", "batch_transfer") => {
                                     Self::handle_batch_account_creation_and_transfer(
                                         user_txn.sender(),
                                         bcs::from_bytes(&f.args()[0]).unwrap(),
