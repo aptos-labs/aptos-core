@@ -1,9 +1,0 @@
-
-============ bytecode verification failed ========
-
-Diagnostics:
-error: reference safety check failed on bytecode level. This is a known issue, to be fixed later, resulting from differences between safety rules of the v1 and v2 compiler. Try to rewrite your code to workaround this problem.
-  ┌─ tests/reference-safety/bug_13488.move:8:9
-  │
-8 │         x + copy x;
-  │         ^^^^^^^^^^

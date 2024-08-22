@@ -71,6 +71,7 @@ fn test_random_with_rng() {
     seed[..4].copy_from_slice(&[1, 2, 3, 4]);
     let hash1;
     let hash2;
+    let hash3;
     {
         let mut rng: StdRng = SeedableRng::from_seed(seed);
         hash1 = HashValue::random_with_rng(&mut rng);
@@ -79,7 +80,12 @@ fn test_random_with_rng() {
         let mut rng: StdRng = SeedableRng::from_seed(seed);
         hash2 = HashValue::random_with_rng(&mut rng);
     }
+    {
+        let mut rng: StdRng = SeedableRng::from_seed(seed);
+        hash3 = rng.gen();
+    }
     assert_eq!(hash1, hash2);
+    assert_eq!(hash1, hash3);
 }
 
 #[test]

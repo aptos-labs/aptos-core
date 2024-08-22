@@ -18,11 +18,14 @@ fun m::test($t0: u64): u64 {
 
 
 Diagnostics:
-error: mutable reference in local `a` requires exclusive access but is borrowed
+error: cannot write local `a` since it is borrowed
   ┌─ tests/copy-propagation/mut_refs_3.move:7:9
   │
+5 │         let b = a;
+  │                 - previously mutably borrowed here
+6 │         let c = b;
 7 │         *a = 0;
-  │         ^^^^^^ requirement enforced here
+  │         ^^^^^^ write attempted here
 8 │         *c
   │         -- conflicting reference `c` used here
 

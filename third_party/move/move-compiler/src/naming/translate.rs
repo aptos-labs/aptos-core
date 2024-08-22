@@ -1043,6 +1043,15 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
                 ));
             }
             let nes = call_args(context, rhs);
+            if nes.value.len() == 1 {
+                context.env.add_diag(diag!(
+                    Syntax::UnsupportedLanguageItem,
+                    (
+                        mloc,
+                        "single-parameter assert! macro not supported by this compiler"
+                    )
+                ));
+            }
             NE::Builtin(sp(mloc, BF::Assert(true)), nes)
         },
         EE::Call(sp!(mloc, _), CallKind::Receiver, ..) => {
@@ -1163,7 +1172,8 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
                 NL::Var(v)
             }
         },
-        EL::Unpack(tn, etys_opt, efields) => {
+        EL::Unpack(tn, etys_opt, efields, dotdot) => {
+            assert!(dotdot.is_none(), "\"..\" syntax only supported in Move 2");
             let msg = match case {
                 C::Bind => "deconstructing binding",
                 C::Assign => "deconstructing assignment",

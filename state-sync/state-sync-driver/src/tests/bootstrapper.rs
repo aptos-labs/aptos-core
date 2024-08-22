@@ -1401,7 +1401,9 @@ async fn test_snapshot_sync_lag() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "Fast syncing is currently unsupported for nodes with existing state!")]
+#[should_panic(
+    expected = "You are currently 10000 versions behind the latest snapshot version (1000000)"
+)]
 async fn test_snapshot_sync_lag_panic() {
     // Create test data
     let num_versions_behind = 10000;

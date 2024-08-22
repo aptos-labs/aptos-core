@@ -188,6 +188,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:288: opaque_incorrect
     =     at tests/sources/functional/emits.move:289: opaque_incorrect
     =         <redacted> = <redacted>
+    =     at tests/sources/functional/emits.move:286: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:290: opaque_incorrect
     =     at tests/sources/functional/emits.move:292: opaque_incorrect (spec)
@@ -213,6 +214,7 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:311: opaque_completeness_incorrect
     =     at tests/sources/functional/emits.move:312: opaque_completeness_incorrect
     =         <redacted> = <redacted>
+    =     at tests/sources/functional/emits.move:309: opaque_completeness_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:313: opaque_completeness_incorrect
     =     at tests/sources/functional/emits.move:315: opaque_completeness_incorrect (spec)
@@ -239,6 +241,7 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:352: opaque_partial_incorrect
     =     at tests/sources/functional/emits.move:353: opaque_partial_incorrect
     =         <redacted> = <redacted>
+    =     at tests/sources/functional/emits.move:350: opaque_partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:354: opaque_partial_incorrect
     =     at tests/sources/functional/emits.move:356: opaque_partial_incorrect (spec)

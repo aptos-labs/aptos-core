@@ -268,28 +268,52 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "LiveVarAnalysisProcessor"]),
         },
+        // Reference safety tests, old version (with optimizations on)
+        TestConfig {
+            name: "reference-safety-old",
+            runner: |p| run_test(p, get_config_by_name("reference-safety-old")),
+            include: vec!["/reference-safety/"],
+            exclude: vec![],
+            exp_suffix: Some("old.exp"),
+            // TODO(#13485): Need to turn off acquires check for now to test 2.0 access specifiers
+            options: opts.clone().set_experiment(Experiment::ACQUIRES_CHECK, false).
+                set_experiment(Experiment::REFERENCE_SAFETY_V3, false),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter:
+            // For debugging (dump_bytecode set DumpLevel::AllStages)
+            Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "ReferenceSafetyProcessor",
+                "DeadStoreElimination",
+                FILE_FORMAT_STAGE,
+            ]),
+        },
         // Reference safety tests (with optimizations on)
         TestConfig {
             name: "reference-safety",
             runner: |p| run_test(p, get_config_by_name("reference-safety")),
             include: vec!["/reference-safety/"],
             exclude: vec![],
+            // Some reference tests create different errors since variable names are
+            // known without optimizations, so we need to have a different exp file
             exp_suffix: None,
-            // TODO(#13485): Need to turn off acquires check for now to test 2.0 access specifiers
-            options: opts.clone().set_experiment(Experiment::ACQUIRES_CHECK, false),
+            options: opts.clone().set_experiment(Experiment::REFERENCE_SAFETY_V3, true)
+                .set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter:
-            // For debugging (dump_bytecode set DumpLevel::AllStages)
-             Some(vec![
-               INITIAL_BYTECODE_STAGE,
-               "ReferenceSafetyProcessor",
-               "DeadStoreElimination",
-               FILE_FORMAT_STAGE,
+            // For debugging:
+            Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "ReferenceSafetyProcessor",
+                "DeadStoreElimination",
+                FILE_FORMAT_STAGE,
             ]),
         },
-        // Reference safety tests (without optimizations on)
+        // Reference safety tests no-opt
         TestConfig {
             name: "reference-safety-no-opt",
             runner: |p| run_test(p, get_config_by_name("reference-safety-no-opt")),
@@ -308,6 +332,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             Some(vec![
                 INITIAL_BYTECODE_STAGE,
                 "ReferenceSafetyProcessor",
+                "AbilityProcessor",
                 "DeadStoreElimination",
                 FILE_FORMAT_STAGE,
             ]),
@@ -598,6 +623,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .set_skip_attribute_checks(true),
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
+        TestConfig {
+            name: "lint-checks",
+            runner: |p| run_test(p, get_config_by_name("lint-checks")),
+            include: vec!["/lints/model_ast_lints/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_experiment(Experiment::LINT_CHECKS, true),
+            stop_after: StopAfter::AstPipeline,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,

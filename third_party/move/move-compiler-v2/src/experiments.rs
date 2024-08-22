@@ -52,6 +52,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::REFERENCE_SAFETY_V3.to_string(),
+            description: "Turns on or off whether to use the new v3 reference safety checker"
+                .to_string(),
+            default: Given(true), // v3 is the default
+        },
+        Experiment {
             name: Experiment::USAGE_CHECK.to_string(),
             description: "Turns on or off checks for correct usage of types and variables"
                 .to_string(),
@@ -193,6 +199,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Whether to attach the compiled module to the global env.".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::LINT_CHECKS.to_string(),
+            description: "Whether to run various lint checks.".to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -217,10 +228,12 @@ impl Experiment {
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
+    pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
+    pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";

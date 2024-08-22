@@ -220,29 +220,24 @@ L0:	loc0: u64
 L1:	loc1: u64
 B0:
 	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
-	2: LdTrue
-	3: BrFalse(9)
+	1: LdU64(1)
+	2: Add
+	3: StLoc[0](loc0: u64)
+	4: Branch(6)
 B1:
-	4: MoveLoc[0](loc0: u64)
-	5: LdU64(1)
-	6: Add
-	7: StLoc[0](loc0: u64)
-	8: Branch(10)
+	5: Branch(6)
 B2:
-	9: Branch(10)
+	6: MoveLoc[0](loc0: u64)
+	7: LdU64(1)
+	8: Eq
+	9: BrFalse(11)
 B3:
-	10: MoveLoc[0](loc0: u64)
-	11: LdU64(1)
-	12: Eq
-	13: BrFalse(15)
+	10: Branch(13)
 B4:
-	14: Branch(17)
+	11: LdU64(42)
+	12: Abort
 B5:
-	15: LdU64(42)
-	16: Abort
-B6:
-	17: Ret
+	13: Ret
 }
 }
 ============ bytecode verification succeeded ========

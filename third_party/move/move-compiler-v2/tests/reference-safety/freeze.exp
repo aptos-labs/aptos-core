@@ -1,16 +1,19 @@
 
 Diagnostics:
-error: same mutable reference in local `r` is used again in argument list
+error: cannot transfer mutable local `r` since it is borrowed
    ┌─ tests/reference-safety/freeze.move:18:9
    │
 18 │         ref_mut_mut(r, r); // error
-   │         ^^^^^^^^^^^^^^^^^ requirement enforced here
+   │         ^^^^^^^^^^^^^^^^^
+   │         │
+   │         transfer attempted here
+   │         previously mutably borrowed here
 
-error: mutable reference in local `r` requires exclusive access but is borrowed
+error: cannot transfer mutable local `r` since it is borrowed
    ┌─ tests/reference-safety/freeze.move:24:9
    │
 24 │         ref_imm_mut(r, r); // error
    │         ^^^^^^^^^^^^^^^^^
    │         │           │
-   │         │           previous freeze
-   │         requirement enforced here
+   │         │           previously borrowed here
+   │         transfer attempted here

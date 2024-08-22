@@ -10453,6 +10453,7 @@ components:
       - $ref: '#/components/schemas/AccountSignature_MultiEd25519Signature'
       - $ref: '#/components/schemas/AccountSignature_SingleKeySignature'
       - $ref: '#/components/schemas/AccountSignature_MultiKeySignature'
+      - $ref: '#/components/schemas/AccountSignature_NoAccountSignature'
       discriminator:
         propertyName: type
         mapping:
@@ -10460,6 +10461,7 @@ components:
           multi_ed25519_signature: '#/components/schemas/AccountSignature_MultiEd25519Signature'
           single_key_signature: '#/components/schemas/AccountSignature_SingleKeySignature'
           multi_key_signature: '#/components/schemas/AccountSignature_MultiKeySignature'
+          no_account_signature: '#/components/schemas/AccountSignature_NoAccountSignature'
     AccountSignature_Ed25519Signature:
       allOf:
       - type: object
@@ -10496,6 +10498,18 @@ components:
             - multi_key_signature
             example: multi_key_signature
       - $ref: '#/components/schemas/MultiKeySignature'
+    AccountSignature_NoAccountSignature:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - no_account_signature
+            example: no_account_signature
+      - $ref: '#/components/schemas/NoAccountSignature'
     AccountSignature_SingleKeySignature:
       allOf:
       - type: object
@@ -11030,6 +11044,13 @@ components:
           $ref: '#/components/schemas/ExportedProviderJWKs'
         multi_sig:
           $ref: '#/components/schemas/ExportedAggregateSignature'
+    FederatedKeyless:
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
     FeePayerSignature:
       type: object
       description: |-
@@ -11695,6 +11716,9 @@ components:
             - entry_function_payload
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
+    NoAccountSignature:
+      type: object
+      description: A placeholder to represent the absence of account signature
     PendingTransaction:
       type: object
       description: A transaction waiting in mempool
@@ -11730,6 +11754,7 @@ components:
       - $ref: '#/components/schemas/PublicKey_Secp256k1Ecdsa'
       - $ref: '#/components/schemas/PublicKey_Secp256r1Ecdsa'
       - $ref: '#/components/schemas/PublicKey_Keyless'
+      - $ref: '#/components/schemas/PublicKey_FederatedKeyless'
       discriminator:
         propertyName: type
         mapping:
@@ -11737,6 +11762,7 @@ components:
           secp256k1_ecdsa: '#/components/schemas/PublicKey_Secp256k1Ecdsa'
           secp256r1_ecdsa: '#/components/schemas/PublicKey_Secp256r1Ecdsa'
           keyless: '#/components/schemas/PublicKey_Keyless'
+          federated_keyless: '#/components/schemas/PublicKey_FederatedKeyless'
     PublicKey_Ed25519:
       allOf:
       - type: object
@@ -11749,6 +11775,18 @@ components:
             - ed25519
             example: ed25519
       - $ref: '#/components/schemas/Ed25519'
+    PublicKey_FederatedKeyless:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - federated_keyless
+            example: federated_keyless
+      - $ref: '#/components/schemas/FederatedKeyless'
     PublicKey_Keyless:
       allOf:
       - type: object

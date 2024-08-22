@@ -1,31 +1,31 @@
 
 Diagnostics:
-error: missing field `0`
+error: the struct/variant has 1 field but 0 were provided
    ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:12:7
    │
 12 │         let S0() = x;
    │             ^^^^
 
-error: field `1` not declared in `test::S0`
-   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:16:14
+error: the struct/variant has 1 field but 2 were provided
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:16:7
    │
 16 │         let S0(_x, _y) = x;
-   │                    ^^
+   │             ^^^^^^^^^^
 
-error: field `1` not declared in `test::S0`
-   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:20:21
+error: the struct/variant has 1 field but 2 were provided
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:20:14
    │
 20 │         let S1(_x, S0(_y, _z)) = x;
-   │                           ^^
+   │                    ^^^^^^^^^^
 
-error: field `1` not declared in `test::S0`
-   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:26:18
+error: the struct/variant has 1 field but 2 were provided
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:26:11
    │
 26 │             E1::V1(S0(_x, _y)) => {},
-   │                           ^^
+   │                    ^^^^^^^^^^
 
-error: field `1` not declared in `test::S0`
-   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:27:25
+error: the struct/variant has 1 field but 2 were provided
+   ┌─ tests/checking/positional_fields/bind_anonymous_field_invalid.move:27:18
    │
 27 │             E1::V2(S1(_x, S0(_y, _z))) => {}
-   │                                  ^^
+   │                           ^^^^^^^^^^
