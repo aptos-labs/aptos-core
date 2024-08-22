@@ -59,38 +59,10 @@ impl<VoteType: Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> 
         Self {
             validator_verifier,
             vote_data: HashMap::new(),
-            recent_aggregated_blocks: LruCache::new(30),
+            recent_aggregated_blocks: LruCache::new(50),
             verification_frequency,
         }
     }
-
-    // // TODO: Improve the interface
-    // fn verify_each_unverified_vote(&self, block: &LedgerInfo, signature_data: &mut SignatureData<VoteType>) -> Result<(), VerifyError> {
-    //     // TODO: What's the right way of waiting for all the futures to complete?
-    //     let mut bad_votes = Arc::new(Vec::new());
-    //     let unverified_votes = signature_data.unverified_votes.iter().map(|(author, (signature, _vote))| (author.clone(), signature.clone())).collect::<Vec<_>>();
-    //     let verification_result = unverified_votes.into_par_iter().map(|(author, signature)| {
-    //         self.validator_verifier.verify(author, block, &signature)
-    //     }).collect::<Vec<_>>();
-            
-    //         // self.bounded_executor.spawn(async move {
-    //         //     if let Err(_) = self.validator_verifier.verify(*author, block, signature) {
-    //         //         bad_votes.push(author);
-    //         //     }
-    //         // }).await;
-    //     // }
-    //     for author in bad_votes.iter() {
-    //         signature_data.unverified_votes.remove(author);
-    //     }
-    //     let aggregated_signature = self.validator_verifier.aggregate_signatures(
-    //         &PartialSignatures::new(signature_data.unverified_votes.iter().map(|(account_address, (signature, vote))| (account_address.clone(), signature.clone())).collect()),
-    //         signature_data.aggregated_signature
-    //     )?;
-    //     signature_data.aggregated_signature = Some(aggregated_signature);
-    //     signature_data.verified_votes.extend(signature_data.unverified_votes.iter().map(|(account_address, (_signature, vote))| (account_address.clone(), vote.clone())).collect());
-    //     signature_data.unverified_votes.clear();
-    //     Ok(())
-    // }
 
     pub async fn verify(
         &mut self,
@@ -135,11 +107,11 @@ impl<VoteType: Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> 
         signature_data.unverified_votes.insert(author, (signature.clone(), vote.clone()));
 
         // If there are enough votes, aggregate the unverified votes and verify the signature.
-        let authors = signature_data.verified_votes.keys().chain(signature_data.unverified_votes.keys());
-        let has_enough_voting_power = self.validator_verifier.check_voting_power(authors, true).is_ok();
+        let voted_authors = signature_data.verified_votes.keys().chain(signature_data.unverified_votes.keys());
+        let has_enough_voting_power = self.validator_verifier.check_voting_power(voted_authors, true).is_ok();
         if has_enough_voting_power || signature_data.unverified_votes.len() as u64 >= self.verification_frequency {
             let aggregated_signature = self.validator_verifier.aggregate_signatures(
-                &PartialSignatures::new(signature_data.unverified_votes.iter().map(|(account_address, (signature, vote))| (*account_address, signature.clone())).collect()),
+                &PartialSignatures::new(signature_data.unverified_votes.iter().map(|(account_address, (signature, _))| (*account_address, signature.clone())).collect()),
                 signature_data.aggregated_signature.clone()
             )?;
             match self.validator_verifier.verify_multi_signatures(block, &aggregated_signature) {
@@ -149,11 +121,25 @@ impl<VoteType: Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> 
                     signature_data.unverified_votes.clear();
                 },
                 Err(err) => {
-                    // self.verify_each_unverified_vote(block, signature_data)?;
-                    let unverified_votes = signature_data.unverified_votes.iter().map(|(account_address, (signature, _vote))| (*account_address, signature.clone())).collect::<Vec<_>>();
-                    let verification_result = unverified_votes.into_par_iter().map(|(account_address, signature)| {
-                        self.validator_verifier.verify(account_address, block, &signature)
+                    // TODO: Need to return/print this error.
+                    println!("Failed to verify aggregated signature {:?}", err);
+                    let unverified_signatures = signature_data.unverified_votes.iter().map(|(account_address, (signature, _vote))| (*account_address, signature.clone())).collect::<Vec<_>>();
+                    let verified_votes = unverified_signatures.into_par_iter().flat_map(|(account_address, signature)| {
+                        match self.validator_verifier.verify(account_address, block, &signature) {
+                            Ok(_) => Some((account_address, signature)),
+                            Err(_) => None,
+                        }
                     }).collect::<Vec<_>>();
+                    let aggregated_signature = self.validator_verifier.aggregate_signatures(
+                        &PartialSignatures::new(verified_votes.iter().cloned().collect()),
+                        signature_data.aggregated_signature.clone()
+                    )?;
+                    signature_data.aggregated_signature = Some(aggregated_signature.clone());
+                    for (author, _) in verified_votes {
+                        let (_, vote) = signature_data.unverified_votes.remove(&author).unwrap();
+                        signature_data.verified_votes.insert(author, vote);
+                    }
+                    signature_data.unverified_votes.clear();
                 }
             }
 

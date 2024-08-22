@@ -61,10 +61,7 @@ use aptos_config::config::{
     SafetyRulesConfig, SecureBackend,
 };
 use aptos_consensus_types::{
-    common::{Author, Round},
-    delayed_qc_msg::DelayedQcMsg,
-    epoch_retrieval::EpochRetrievalRequest,
-    proof_of_store::ProofCache,
+    common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, epoch_retrieval::EpochRetrievalRequest, order_vote_msg::OrderVoteMsg, proof_of_store::ProofCache, vote_msg::VoteMsg,
 };
 use aptos_crypto::bls12381;
 use aptos_dkg::{
@@ -170,8 +167,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
-    optimistic_vote_verifier: Option<Arc<OptimisticValidatorVerifier<Vote>>>,
-    optimistic_order_vote_verifier: Option<Arc<OptimisticValidatorVerifier<OrderVote>>>,
+    optimistic_vote_verifier: Option<Arc<OptimisticValidatorVerifier<VoteMsg>>>,
+    optimistic_order_vote_verifier: Option<Arc<OptimisticValidatorVerifier<OrderVoteMsg>>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -1396,6 +1393,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .epoch_state
             .clone()
             .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
+        
+        let quorum_store_enabled = self.quorum_store_enabled;
+        let author = self.author;
+        let proof_cache = self.proof_cache.clone();
+        let receiver_max_num_batches = self.config.quorum_store.receiver_max_num_batches;
+        let batch_expiry_gap_when_init_usecs = self.config.quorum_store.batch_expiry_gap_when_init_usecs;
+        let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
+        let round_manager_tx = self.round_manager_tx.clone(); 
+        let buffered_proposal_tx = self.buffered_proposal_tx.clone();
+        let payload_manager = self.payload_manager.clone();
+        let pending_blocks = self.pending_blocks.clone();
 
         self.bounded_executor
             .spawn(async move {
@@ -1404,22 +1412,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     unverified_event.clone().verify(
                         peer_id,
                         &epoch_state.verifier,
-                        &self.proof_cache.clone(),
-                        self.quorum_store_enabled,
-                        peer_id == self.author,
-                        self.config.quorum_store.receiver_max_num_batches,
-                        self.config.quorum_store.batch_expiry_gap_when_init_usecs,
+                        &proof_cache,
+                        quorum_store_enabled,
+                        peer_id == author,
+                        receiver_max_num_batches,
+                        batch_expiry_gap_when_init_usecs,
                     )
                 ) {
                     Ok(verified_event) => {
                         Self::forward_event(
-                            self.quorum_store_msg_tx.clone(),
-                            self.round_manager_tx.clone(),
-                            self.buffered_proposal_tx.clone(),
+                            quorum_store_msg_tx,
+                            round_manager_tx,
+                            buffered_proposal_tx,
                             peer_id,
                             verified_event,
-                            self.payload_manager.clone(),
-                            self.pending_blocks.clone(),
+                            payload_manager,
+                            pending_blocks,
                         );
                     },
                     Err(e) => {
@@ -1446,24 +1454,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .clone()
             .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
 
+        let optimistic_vote_verifier = self.optimistic_vote_verifier.clone();
+        let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
+        let round_manager_tx = self.round_manager_tx.clone(); 
+        let buffered_proposal_tx = self.buffered_proposal_tx.clone();
+        let payload_manager = self.payload_manager.clone();
+        let pending_blocks = self.pending_blocks.clone();
+
         if self.config.optimistic_sig_verification_for_votes {
             tokio::task::spawn_blocking(move || {
                 match vote_msg.partial_verify(&epoch_state.verifier) {
                     Ok(_) => {
-                        match self.optimistic_vote_verifier
+                        match optimistic_vote_verifier
                                 .as_ref()
                                 .expect("Optimistic vote verifier is not initialized for verifying vote")
                                 .verify(peer_id, vote_msg.vote().ledger_info(), vote_msg.vote().signature(), &vote_msg) {
                             Ok(VerificationResult::Verified((votes, aggregate_signature))) => {
                                 for (author, vote) in votes {
                                     Self::forward_event(
-                                        quorum_store_msg_tx.clone(),
-                                        round_manager_tx.clone(),
-                                        buffered_proposal_tx.clone(),
+                                        quorum_store_msg_tx,
+                                        round_manager_tx,
+                                        buffered_proposal_tx,
                                         author,
                                         VerifiedEvent::VoteMsg(vote),
-                                        payload_manager.clone(),
-                                        pending_blocks.clone(),
+                                        payload_manager,
+                                        pending_blocks,
                                     );
                                 }
                             },
@@ -1486,7 +1501,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         );
                     }
                 }
-            }).await
+            }).await?
         } else {
             self.verify_and_forward_message(
                 peer_id,
@@ -1505,24 +1520,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .epoch_state
             .clone()
             .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
+        let optimistic_vote_verifier = self.optimistic_vote_verifier.clone();
+        let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
+        let round_manager_tx = self.round_manager_tx.clone(); 
+        let buffered_proposal_tx = self.buffered_proposal_tx.clone();
+        let payload_manager = self.payload_manager.clone();
+        let pending_blocks = self.pending_blocks.clone();
+
         if self.config.optimistic_sig_verification_for_order_votes {
             tokio::task::spawn_blocking(move || {
                 match order_vote_msg.partial_verify() {
                     Ok(_) => {
-                        match self.optimistic_vote_verifier
+                        match optimistic_vote_verifier
                                 .as_ref()
                                 .expect("Optimistic vote verifier is not initialized for verifying vote")
                                 .verify(peer_id, order_vote_msg.order_vote().ledger_info(), order_vote_msg.order_vote().signature(), &order_vote_msg) {
                             Ok(VerificationResult::Verified((order_votes, aggregate_signature))) => {
                                 for (author, vote) in order_votes {
                                     Self::forward_event(
-                                        quorum_store_msg_tx.clone(),
-                                        round_manager_tx.clone(),
-                                        buffered_proposal_tx.clone(),
+                                        quorum_store_msg_tx,
+                                        round_manager_tx,
+                                        buffered_proposal_tx,
                                         author,
                                         VerifiedEvent::OrderVoteMsg(vote),
-                                        payload_manager.clone(),
-                                        pending_blocks.clone(),
+                                        payload_manager,
+                                        pending_blocks,
                                     );
                                 }
                             },
@@ -1545,7 +1567,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         );
                     }
                 }
-            }).await
+            }).await?
         } else {
             self.verify_and_forward_message(
                 peer_id,

@@ -68,7 +68,7 @@ impl OrderVote {
         self.ledger_info.epoch()
     }
 
-    pub fn partial_verify(&self) -> anyhow::Result<> {
+    pub fn partial_verify(&self) -> anyhow::Result<()> {
         ensure!(
             self.ledger_info.consensus_data_hash() == HashValue::zero(),
             "Failed to verify OrderVote. Consensus data hash is not Zero"
