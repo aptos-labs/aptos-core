@@ -483,6 +483,7 @@ async fn process_payload_helper<T: TDataInfo>(
     block: &Block,
     ordered_authors: &[PeerId],
 ) -> ExecutorResult<Vec<SignedTransaction>> {
+    debug!("process payload helper: {}", block.id());
     let status = data_ptr.status.lock().take();
     match status.expect("Should have been updated before.") {
         DataStatus::Cached(data) => {
