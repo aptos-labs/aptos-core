@@ -210,7 +210,7 @@ module supra_framework::supra_coin {
 
 
 	#[test_only]
-	use supra_framework::aptos_account;
+	use supra_framework::supra_account;
 
 	// #[test(source = @0x1, destination = @0x2)]
     // public entry fun end_to_end(

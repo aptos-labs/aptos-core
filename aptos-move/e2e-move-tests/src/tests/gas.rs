@@ -131,7 +131,7 @@ fn test_gas() {
         &mut harness,
         "CreateAccount",
         account_1,
-        aptos_stdlib::aptos_account_create_account(
+        aptos_stdlib::supra_account_create_account(
             AccountAddress::from_hex_literal("0xcafe1").unwrap(),
         ),
     );
@@ -139,7 +139,7 @@ fn test_gas() {
         &mut harness,
         "CreateTransfer",
         account_1,
-        aptos_stdlib::aptos_account_transfer(
+        aptos_stdlib::supra_account_transfer(
             AccountAddress::from_hex_literal("0xcafe2").unwrap(),
             1000,
         ),

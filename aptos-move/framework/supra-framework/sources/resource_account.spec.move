@@ -79,15 +79,15 @@ spec supra_framework::resource_account {
         optional_auth_key: vector<u8>,
         fund_amount: u64,
     ) {
-        use supra_framework::aptos_account;
+        use supra_framework::supra_account;
         // TODO(fa_migration)
         pragma verify = false;
         let source_addr = signer::address_of(origin);
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
         let coin_store_resource = global<coin::CoinStore<SupraCoin>>(resource_addr);
 
-        include aptos_account::WithdrawAbortsIf<SupraCoin>{from: origin, amount: fund_amount};
-        include aptos_account::GuidAbortsIf<SupraCoin>{to: resource_addr};
+        include supra_account::WithdrawAbortsIf<SupraCoin>{from: origin, amount: fund_amount};
+        include supra_account::GuidAbortsIf<SupraCoin>{to: resource_addr};
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit;
 
         //coin property

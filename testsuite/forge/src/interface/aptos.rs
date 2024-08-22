@@ -162,7 +162,7 @@ impl AptosPublicInfo {
         let create_account_txn =
             self.root_account
                 .sign_with_transaction_builder(self.transaction_factory().payload(
-                    aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
+                    aptos_stdlib::supra_account_create_account(auth_key.account_address()),
                 ));
         self.rest_client
             .submit_and_wait(&create_account_txn)
@@ -178,7 +178,7 @@ impl AptosPublicInfo {
         let create_account_txn =
             self.root_account
                 .sign_with_transaction_builder(self.transaction_factory().payload(
-                    aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
+                    aptos_stdlib::supra_account_create_account(auth_key.account_address()),
                 ));
         self.rest_client
             .submit_and_wait(&create_account_txn)
@@ -342,7 +342,7 @@ pub async fn reconfig(
             root_account.sign_with_transaction_builder(
                 transaction_factory
                     .clone()
-                    .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+                    .payload(aptos_stdlib::supra_governance_force_end_epoch_test_only()),
             ),
         ]
     };

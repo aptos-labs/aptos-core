@@ -1,7 +1,7 @@
 /// This module provides an interface to burn or collect and redistribute transaction fees.
 module supra_framework::transaction_fee {
     use supra_framework::coin::{Self, AggregatableCoin, BurnCapability, Coin, MintCapability};
-    use supra_framework::aptos_account;
+    use supra_framework::supra_account;
     use supra_framework::supra_coin::SupraCoin;
     use supra_framework::stake;
     use supra_framework::fungible_asset::BurnRef;
@@ -211,12 +211,12 @@ module supra_framework::transaction_fee {
     public(friend) fun burn_fee(account: address, fee: u64) acquires SupraFABurnCapabilities, SupraCoinCapabilities {
         if (exists<SupraFABurnCapabilities>(@supra_framework)) {
             let burn_ref = &borrow_global<SupraFABurnCapabilities>(@supra_framework).burn_ref;
-            aptos_account::burn_from_fungible_store(burn_ref, account, fee);
+            supra_account::burn_from_fungible_store(burn_ref, account, fee);
         } else {
             let burn_cap = &borrow_global<SupraCoinCapabilities>(@supra_framework).burn_cap;
             if (features::operations_default_to_fa_supra_store_enabled()) {
                 let (burn_ref, burn_receipt) = coin::get_paired_burn_ref(burn_cap);
-                aptos_account::burn_from_fungible_store(&burn_ref, account, fee);
+                supra_account::burn_from_fungible_store(&burn_ref, account, fee);
                 coin::return_paired_burn_ref(burn_ref, burn_receipt);
             } else {
                 coin::burn_from<SupraCoin>(
@@ -350,7 +350,7 @@ module supra_framework::transaction_fee {
         carol: signer,
     ) acquires SupraCoinCapabilities, CollectedFeesPerBlock {
         use std::signer;
-        use supra_framework::aptos_account;
+        use supra_framework::supra_account;
         use supra_framework::supra_coin;
 
         // Initialization.
@@ -362,9 +362,9 @@ module supra_framework::transaction_fee {
         let alice_addr = signer::address_of(&alice);
         let bob_addr = signer::address_of(&bob);
         let carol_addr = signer::address_of(&carol);
-        aptos_account::create_account(alice_addr);
-        aptos_account::create_account(bob_addr);
-        aptos_account::create_account(carol_addr);
+        supra_account::create_account(alice_addr);
+        supra_account::create_account(bob_addr);
+        supra_account::create_account(carol_addr);
         assert!(object::object_address(&coin::ensure_paired_metadata<SupraCoin>()) == @aptos_fungible_asset, 0);
         coin::deposit(alice_addr, coin::mint(10000, &mint_cap));
         coin::deposit(bob_addr, coin::mint(10000, &mint_cap));

@@ -119,7 +119,7 @@ fn test_account_not_exist_with_fee_payer() {
     assert!(alice_start.is_none());
     let bob_start = h.read_aptos_balance(bob.address());
 
-    let payload = aptos_stdlib::aptos_account_set_allow_direct_coin_transfers(true);
+    let payload = aptos_stdlib::supra_account_set_allow_direct_coin_transfers(true);
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
@@ -339,7 +339,7 @@ fn test_account_not_exist_with_fee_payer_without_create_account() {
         h.read_resource::<CoinStoreResource>(alice.address(), CoinStoreResource::struct_tag());
     assert!(alice_start.is_none());
 
-    let payload = aptos_stdlib::aptos_account_set_allow_direct_coin_transfers(true);
+    let payload = aptos_stdlib::supra_account_set_allow_direct_coin_transfers(true);
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
@@ -368,7 +368,7 @@ fn test_normal_tx_with_fee_payer_insufficient_funds() {
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
     let bob = h.new_account_with_balance_and_sequence_number(1, 0);
 
-    let payload = aptos_stdlib::aptos_account_set_allow_direct_coin_transfers(true);
+    let payload = aptos_stdlib::supra_account_set_allow_direct_coin_transfers(true);
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
