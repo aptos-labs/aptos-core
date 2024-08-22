@@ -274,6 +274,17 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
 ) -> EnvProcessorPipeline<'b> {
     let mut env_pipeline = EnvProcessorPipeline::<'b>::default();
 
+    if !for_v1_model && options.experiment_on(Experiment::USAGE_CHECK) {
+        env_pipeline.add(
+            "unused checks",
+            flow_insensitive_checkers::check_for_unused_vars_and_params,
+        );
+        env_pipeline.add(
+            "type parameter check",
+            function_checker::check_for_function_typed_parameters,
+        );
+    }
+
     if !for_v1_model && options.experiment_on(Experiment::RECURSIVE_TYPE_CHECK) {
         env_pipeline.add("check recursive struct definition", |env| {
             recursive_struct_checker::check_recursive_struct(env)
@@ -329,15 +340,10 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         );
     }
 
-    if !for_v1_model && options.experiment_on(Experiment::USAGE_CHECK) {
-        env_pipeline.add(
-            "unused checks",
-            flow_insensitive_checkers::check_for_unused_vars_and_params,
-        );
-        env_pipeline.add(
-            "type parameter check",
-            function_checker::check_for_function_typed_parameters,
-        );
+    if !for_v1_model && options.experiment_on(Experiment::ACQUIRES_CHECK) {
+        env_pipeline.add("acquires check", |env| {
+            acquires_checker::acquires_checker(env)
+        });
     }
 
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
