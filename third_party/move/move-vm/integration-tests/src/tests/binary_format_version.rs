@@ -8,7 +8,8 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, TestModuleStorage, TestScriptStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage,
+    LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -114,9 +115,8 @@ fn test_run_script_with_custom_max_binary_format_version() {
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let deserializer_config = &vm.vm_config().deserializer_config;
-        let module_storage = TestModuleStorage::empty(deserializer_config);
-        let script_storage = TestScriptStorage::empty(deserializer_config);
+        let module_and_script_storage =
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
         let resource_storage = InMemoryStorage::new();
 
         let mut sess = vm.new_session(&resource_storage);
@@ -126,8 +126,8 @@ fn test_run_script_with_custom_max_binary_format_version() {
             args.clone(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .unwrap();
 
@@ -137,8 +137,8 @@ fn test_run_script_with_custom_max_binary_format_version() {
             args.clone(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .unwrap();
     }
@@ -159,9 +159,8 @@ fn test_run_script_with_custom_max_binary_format_version() {
             },
         );
 
-        let deserializer_config = &vm.vm_config().deserializer_config;
-        let module_storage = TestModuleStorage::empty(deserializer_config);
-        let script_storage = TestScriptStorage::empty(deserializer_config);
+        let module_and_script_storage =
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
         let resource_storage = InMemoryStorage::new();
 
         let mut sess = vm.new_session(&resource_storage);
@@ -172,8 +171,8 @@ fn test_run_script_with_custom_max_binary_format_version() {
                 args.clone(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
-                &script_storage,
+                &module_and_script_storage,
+                &module_and_script_storage,
             )
             .unwrap_err()
             .major_status(),
@@ -186,8 +185,8 @@ fn test_run_script_with_custom_max_binary_format_version() {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .unwrap();
     }

@@ -112,6 +112,7 @@ pub fn aptos_prod_vm_config(
         ty_builder,
         disallow_dispatch_for_native: false,
         use_compatibility_checker_v2,
+        use_loader_v2: features.use_loader_v2(),
     }
 }
 
