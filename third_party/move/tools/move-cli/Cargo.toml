@@ -33,6 +33,7 @@ move-prover = { path = "../../move-prover" }
 move-stdlib = { path = "../../move-stdlib" }
 move-unit-test = { path = "../move-unit-test" }
 move-vm-runtime = { path = "../../move-vm/runtime", features = ["debugging"] }
+move-vm-types = { path = "../../move-vm/types" }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }
 
 [dev-dependencies]

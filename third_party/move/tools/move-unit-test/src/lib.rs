@@ -19,26 +19,17 @@ use move_compiler::{
 };
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use move_vm_test_utils::gas_schedule::{zero_cost_schedule, CostTable, Gas, GasCost, GasStatus, TestGasMeter};
+use move_vm_types::gas::GasMeter;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     marker::Send,
     sync::Mutex,
 };
+use test_reporter::{DefaultUnitTestFactory, UnitTestFactory};
 
 /// The default value bounding the amount of gas consumed in a test.
 const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
-
-/// A gas schedule where every instruction has a cost of "1". This is used to bound execution of a
-/// test to a certain number of ticks.
-fn unit_cost_table() -> CostTable {
-    let mut cost_schedule = zero_cost_schedule();
-    cost_schedule.instruction_table.iter_mut().for_each(|cost| {
-        *cost = GasCost::new(1, 1);
-    });
-    cost_schedule
-}
 
 #[derive(Debug, Parser, Clone)]
 #[clap(author, version, about)]
@@ -226,33 +217,29 @@ impl UnitTestingConfig {
         test_plan: TestPlan,
         native_function_table: Option<NativeFunctionTable>,
         genesis_state: Option<ChangeSet>,
-        cost_table: Option<CostTable>,
         writer: W,
     ) -> Result<(W, bool)> {
-        self.run_and_report_unit_tests_with_gas_meter(
+        self.run_and_report_unit_tests_with_factory(
             test_plan,
             native_function_table,
             genesis_state,
             writer,
-            GasStatus::new(
-                &cost_table.unwrap_or_else(unit_cost_table),
-                Gas::new(self.gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND)),
-            ),
+            DefaultUnitTestFactory,
         )
     }
 
     /// Public entry point to Move unit testing as a library
     /// Returns `true` if all unit tests passed. Otherwise, returns `false`.
-    pub fn run_and_report_unit_tests_with_gas_meter<W: Write + Send, G: TestGasMeter + Send>(
+    pub fn run_and_report_unit_tests_with_factory<W: Write + Send, G: GasMeter, F: UnitTestFactory<G> + Send>(
         &self,
         test_plan: TestPlan,
         native_function_table: Option<NativeFunctionTable>,
         genesis_state: Option<ChangeSet>,
         writer: W,
-        gas_meter: G,
+        factory: F,
     ) -> Result<(W, bool)> {
         let shared_writer = Mutex::new(writer);
-        let shared_gas_meter = Mutex::new(gas_meter);
+        let shared_options = Mutex::new(factory);
 
         if self.list {
             for (module_id, test_plan) in &test_plan.module_tests {
@@ -270,7 +257,6 @@ impl UnitTestingConfig {
 
         writeln!(shared_writer.lock().unwrap(), "Running Move unit tests")?;
         let mut test_runner = TestRunner::new(
-            self.gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
             self.num_threads,
             self.report_storage_on_error,
             self.report_stacktrace_on_abort,
@@ -287,7 +273,7 @@ impl UnitTestingConfig {
             test_runner.filter(filter_str)
         }
 
-        let test_results = test_runner.run(&shared_writer, &shared_gas_meter).unwrap();
+        let test_results = test_runner.run(&shared_writer, &shared_options).unwrap();
         if self.report_statistics {
             test_results.report_statistics(&shared_writer)?;
         }

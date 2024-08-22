@@ -10749,6 +10749,7 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
+ "move-vm-types",
  "once_cell",
  "tempfile",
 ]

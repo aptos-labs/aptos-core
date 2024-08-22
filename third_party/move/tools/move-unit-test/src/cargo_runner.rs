@@ -6,7 +6,6 @@ use crate::UnitTestingConfig;
 use move_command_line_common::files::find_filenames;
 use move_core_types::effects::ChangeSet;
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use move_vm_test_utils::gas_schedule::CostTable;
 
 pub fn run_tests_with_config_and_filter(
     mut config: UnitTestingConfig,
@@ -15,7 +14,6 @@ pub fn run_tests_with_config_and_filter(
     dep_root: Option<&str>,
     native_function_table: Option<NativeFunctionTable>,
     genesis_state: Option<ChangeSet>,
-    cost_table: Option<CostTable>,
 ) {
     let get_files = |root_path, pat| {
         let source_re = regex::Regex::new(pat)
@@ -40,7 +38,6 @@ pub fn run_tests_with_config_and_filter(
             test_plan,
             native_function_table,
             genesis_state,
-            cost_table,
             std::io::stdout(),
         )
         .expect("Failed to execute tests");

@@ -6,6 +6,7 @@ use crate::{
     extensions, format_module_id,
     test_reporter::{
         FailureReason, MoveError, TestFailure, TestResults, TestRunInfo, TestStatistics,
+        UnitTestFactory,
     },
 };
 use anyhow::Result;
@@ -24,13 +25,10 @@ use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
-    native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
 };
-use move_vm_test_utils::{
-    gas_schedule::{Gas, TestGasMeter},
-    InMemoryStorage,
-};
+use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::GasMeter;
 use rayon::prelude::*;
 use std::{io::Write, marker::Send, sync::Mutex, time::Instant};
 #[cfg(feature = "evm-backend")]
@@ -47,7 +45,6 @@ use {
 pub struct SharedTestingConfig {
     save_storage_state_on_failure: bool,
     report_stacktrace_on_abort: bool,
-    execution_bound: u64,
     native_function_table: NativeFunctionTable,
     starting_storage_state: InMemoryStorage,
     #[allow(dead_code)] // used by some features
@@ -85,11 +82,7 @@ fn setup_test_storage<'a>(
 
 /// Print the updates to storage represented by `cs` in the context of the starting storage state
 /// `storage`.
-fn print_resources_and_extensions(
-    cs: &ChangeSet,
-    extensions: &mut NativeContextExtensions,
-    storage: &InMemoryStorage,
-) -> Result<String> {
+fn print_resources(cs: &ChangeSet, storage: &InMemoryStorage) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
     let annotator = MoveValueAnnotator::new(storage.clone());
@@ -106,14 +99,12 @@ fn print_resources_and_extensions(
             }
         }
     }
-    extensions::print_change_sets(&mut buf, extensions);
 
     Ok(buf)
 }
 
 impl TestRunner {
     pub fn new(
-        execution_bound: u64,
         num_threads: usize,
         save_storage_state_on_failure: bool,
         report_stacktrace_on_abort: bool,
@@ -146,7 +137,6 @@ impl TestRunner {
                 save_storage_state_on_failure,
                 report_stacktrace_on_abort,
                 starting_storage_state,
-                execution_bound,
                 native_function_table,
                 source_files,
                 record_writeset,
@@ -158,10 +148,10 @@ impl TestRunner {
         })
     }
 
-    pub fn run<W: Write + Send, G: TestGasMeter + Send>(
+    pub fn run<W: Write + Send, G: GasMeter, F: UnitTestFactory<G> + Send>(
         self,
         writer: &Mutex<W>,
-        gas_meter: &Mutex<G>,
+        options: &Mutex<F>,
     ) -> Result<TestResults> {
         rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
@@ -174,7 +164,7 @@ impl TestRunner {
                     .par_iter()
                     .map(|(_, test_plan)| {
                         self.testing_config
-                            .exec_module_tests(test_plan, writer, gas_meter)
+                            .exec_module_tests(test_plan, writer, options)
                     })
                     .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
 
@@ -244,87 +234,60 @@ impl<'a, 'b, W: Write> TestOutput<'a, 'b, W> {
 
 impl SharedTestingConfig {
     #[allow(clippy::field_reassign_with_default)]
-    fn execute_via_move_vm(
+    fn execute_via_move_vm<G: GasMeter, F: UnitTestFactory<G>>(
         &self,
         test_plan: &ModuleTestPlan,
         function_name: &str,
         test_info: &TestCase,
-        gas_meter: &Mutex<impl TestGasMeter>,
-    ) -> (
-        VMResult<ChangeSet>,
-        VMResult<NativeContextExtensions>,
-        VMResult<Vec<Vec<u8>>>,
-        TestRunInfo,
-    ) {
+        factory: &Mutex<F>,
+    ) -> (VMResult<()>, VMResult<ChangeSet>, TestRunInfo) {
         let move_vm = MoveVM::new(self.native_function_table.clone());
         let extensions = extensions::new_extensions();
         let mut session =
             move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
-        let mut gas_meter = gas_meter.lock().unwrap().instantiate();
+        let mut gas_meter = factory.lock().unwrap().new_gas_meter();
+
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
         let storage = TraversalStorage::new();
-        let serialized_return_values_result = session.execute_function_bypass_visibility(
-            &test_plan.module_id,
-            IdentStr::new(function_name).unwrap(),
-            vec![], // no ty args, at least for now
-            serialize_values(test_info.arguments.iter()),
-            &mut gas_meter,
-            &mut TraversalContext::new(&storage),
-        );
-        let mut return_result = serialized_return_values_result.map(|res| {
-            res.return_values
-                .into_iter()
-                .map(|(bytes, _layout)| bytes)
-                .collect()
-        });
+        let mut execute_result = session
+            .execute_function_bypass_visibility(
+                &test_plan.module_id,
+                IdentStr::new(function_name).unwrap(),
+                vec![], // no ty args, at least for now
+                serialize_values(test_info.arguments.iter()),
+                &mut gas_meter,
+                &mut TraversalContext::new(&storage),
+            )
+            .map(|_| ());
         if !self.report_stacktrace_on_abort {
-            if let Err(err) = &mut return_result {
+            if let Err(err) = &mut execute_result {
                 err.remove_exec_state();
             }
         }
-        let mut test_run_info = TestRunInfo::new(
-            function_name.to_string(),
-            now.elapsed(),
-            // TODO(Gas): This doesn't look quite right...
-            //            We're not computing the number of instructions executed even with a unit gas schedule.
-            Gas::new(self.execution_bound)
-                .checked_sub(gas_meter.remaining_gas())
-                .unwrap()
-                .into(),
-        );
-        match session.finish_with_extensions() {
-            Ok((cs, mut extensions)) => {
-                match gas_meter.charge_write_set(&cs, &mut extensions)
-                {
-                    Ok(()) => {
-                        // recompute used gas after write_set charging
-                        test_run_info.instructions_executed = Gas::new(self.execution_bound)
-                            .checked_sub(gas_meter.remaining_gas())
-                            .unwrap()
-                            .into();
 
-                        (Ok(cs), Ok(extensions), return_result, test_run_info)
-                    },
-                    Err(err) => (Err(err.clone()), Err(err), return_result, test_run_info),
-                }
-            },
-            Err(err) => (Err(err.clone()), Err(err), return_result, test_run_info),
-        }
+        let test_run_info = TestRunInfo::new(function_name.to_string(), now.elapsed());
+        let (cs_result, test_run_info) = factory.lock().unwrap().finish_session(
+            session,
+            gas_meter,
+            test_run_info,
+        );
+
+        (execute_result, cs_result, test_run_info)
     }
 
-    fn exec_module_tests_move_vm_and_stackless_vm(
+    fn exec_module_tests_move_vm_and_stackless_vm<G: GasMeter, F: UnitTestFactory<G>>(
         &self,
         test_plan: &ModuleTestPlan,
         output: &TestOutput<impl Write>,
-        gas_meter: &Mutex<impl TestGasMeter>,
+        factory: &Mutex<F>,
     ) -> TestStatistics {
         let mut stats = TestStatistics::new();
 
         for (function_name, test_info) in &test_plan.tests {
-            let (cs_result, ext_result, exec_result, test_run_info) =
-                self.execute_via_move_vm(test_plan, function_name, test_info, gas_meter);
+            let (exec_result, cs_result, test_run_info) =
+                self.execute_via_move_vm(test_plan, function_name, test_info, factory);
 
             if self.record_writeset {
                 stats.test_output(
@@ -337,19 +300,13 @@ impl SharedTestingConfig {
             let save_session_state = || {
                 if self.save_storage_state_on_failure {
                     cs_result.ok().and_then(|changeset| {
-                        ext_result.ok().and_then(|mut extensions| {
-                            print_resources_and_extensions(
-                                &changeset,
-                                &mut extensions,
-                                &self.starting_storage_state,
-                            )
-                            .ok()
-                        })
+                        print_resources(&changeset, &self.starting_storage_state).ok()
                     })
                 } else {
                     None
                 }
             };
+
             match exec_result {
                 Err(err) => {
                     let actual_err = MoveError(
@@ -433,7 +390,7 @@ impl SharedTestingConfig {
                         },
                     }
                 },
-                Ok(_) => {
+                Ok(()) => {
                     // Expected the test to fail, but it executed
                     if test_info.expected_failure.is_some() {
                         output.fail(function_name);
@@ -675,11 +632,11 @@ impl SharedTestingConfig {
 
     // TODO: comparison of results via different backends
 
-    fn exec_module_tests(
+    fn exec_module_tests<G: GasMeter, F: UnitTestFactory<G>>(
         &self,
         test_plan: &ModuleTestPlan,
         writer: &Mutex<impl Write>,
-        gas_meter: &Mutex<impl TestGasMeter>,
+        factory: &Mutex<F>,
     ) -> TestStatistics {
         let output = TestOutput { test_plan, writer };
 
@@ -688,6 +645,6 @@ impl SharedTestingConfig {
             return self.exec_module_tests_evm(test_plan, &output);
         }
 
-        self.exec_module_tests_move_vm_and_stackless_vm(test_plan, &output, gas_meter)
+        self.exec_module_tests_move_vm_and_stackless_vm(test_plan, &output, factory)
     }
 }
