@@ -14,7 +14,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, TestModuleStorage};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, DummyCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 
 #[test]
@@ -112,21 +112,23 @@ fn instantiation_err() {
     let vm = MoveVM::new_with_config(vec![], vm_config);
 
     let mut resource_storage: InMemoryStorage = InMemoryStorage::new();
-    let module_storage = TestModuleStorage::empty(&vm.vm_config().deserializer_config);
 
     // Verify we can publish this module.
     {
         let mut session = vm.new_session(&resource_storage);
         session
-            .verify_module_bundle_before_publishing(&[cm.clone()], cm.self_addr(), &module_storage)
+            .verify_module_bundle_before_publishing(
+                &[cm.clone()],
+                cm.self_addr(),
+                &DummyCodeStorage,
+            )
             .expect("Module must publish");
         drop(session);
 
         // Add it to module storage and restart the session.
         let mut mod_bytes = vec![];
         cm.serialize(&mut mod_bytes).unwrap();
-        resource_storage.publish_or_overwrite_module(cm.self_id(), mod_bytes.clone());
-        module_storage.add_module_bytes(cm.self_addr(), cm.self_name(), mod_bytes.into());
+        resource_storage.publish_or_overwrite_module(cm.self_id(), mod_bytes);
     }
 
     let mut session = vm.new_session(&resource_storage);
@@ -140,7 +142,7 @@ fn instantiation_err() {
         }));
     }
 
-    let res = session.load_function(&module_storage, &cm.self_id(), ident_str!("f"), &[ty_arg]);
+    let res = session.load_function(&DummyCodeStorage, &cm.self_id(), ident_str!("f"), &[ty_arg]);
     assert!(
         res.is_err(),
         "Instantiation must fail at load time when converting from type tag to type "

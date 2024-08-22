@@ -11,7 +11,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, TestModuleStorage, TestScriptStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage,
+    LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -112,7 +113,6 @@ fn script_large_ty() {
         paranoid_type_checks: true,
         ..Default::default()
     });
-    let deserializer_config = &move_vm.vm_config().deserializer_config;
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();
@@ -120,14 +120,14 @@ fn script_large_ty() {
     let mut resource_storage = InMemoryStorage::new();
     resource_storage.publish_or_overwrite_module(decompiled_module.self_id(), module.clone());
 
-    let module_storage = TestModuleStorage::empty(deserializer_config);
-    module_storage.add_module_bytes(
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+    module_bytes_storage.add_module_bytes(
         decompiled_module.self_addr(),
         decompiled_module.self_name(),
         module.into(),
     );
-
-    let script_storage = TestScriptStorage::empty(deserializer_config);
+    let module_and_script_storage =
+        module_bytes_storage.into_unsync_code_storage(move_vm.runtime_env());
 
     // constructs a type with about 25^3 nodes
     let num_type_args = 25;
@@ -149,8 +149,8 @@ fn script_large_ty() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .unwrap_err();
 

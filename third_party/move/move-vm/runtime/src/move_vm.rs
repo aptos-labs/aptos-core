@@ -10,6 +10,7 @@ use crate::{
     native_functions::NativeFunction,
     runtime::VMRuntime,
     session::Session,
+    RuntimeEnvironment,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
@@ -48,13 +49,20 @@ impl MoveVM {
         vm_config: VMConfig,
     ) -> Self {
         Self {
-            runtime: VMRuntime::new(natives, vm_config),
+            // TODO(loader_v2): Propagate up to AptosVM layer, the environment needs
+            //                  to be passed by callers.
+            runtime: VMRuntime::new(RuntimeEnvironment::new(vm_config, natives, None)),
         }
     }
 
     /// Returns VM configuration used to initialize the VM.
     pub fn vm_config(&self) -> &VMConfig {
         self.runtime.loader().vm_config()
+    }
+
+    /// Returns the VM runtime environment.
+    pub fn runtime_env(&self) -> &RuntimeEnvironment {
+        self.runtime.loader().runtime_env()
     }
 
     /// Create a new Session backed by the given storage.

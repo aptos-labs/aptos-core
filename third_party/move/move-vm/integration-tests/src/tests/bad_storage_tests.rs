@@ -17,8 +17,8 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, Module, ModuleStorage, TestModuleStorage,
-    TestScriptStorage,
+    module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage, IntoUnsyncModuleStorage,
+    LocalModuleBytesStorage, Module, ModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -92,17 +92,15 @@ fn test_malformed_resource() {
         AccountAddress::from_hex_literal("0x1").unwrap(),
         move_stdlib::natives::GasParameters::zeros(),
     ));
-    let deserializer_config = &vm.vm_config().deserializer_config;
 
     let mut resource_storage = InMemoryStorage::new();
     resource_storage.publish_or_overwrite_module(ms.self_id(), ms_blob.clone());
     resource_storage.publish_or_overwrite_module(m.self_id(), m_blob.clone());
 
-    let module_storage = TestModuleStorage::empty(deserializer_config);
-    module_storage.add_module_bytes(ms.self_addr(), ms.self_name(), ms_blob.into());
-    module_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.into());
-
-    let script_storage = TestScriptStorage::empty(deserializer_config);
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+    module_bytes_storage.add_module_bytes(ms.self_addr(), ms.self_name(), ms_blob.into());
+    module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.into());
+    let module_and_script_storage = module_bytes_storage.into_unsync_code_storage(vm.runtime_env());
 
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
@@ -115,8 +113,8 @@ fn test_malformed_resource() {
         vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &module_storage,
-        &script_storage,
+        &module_and_script_storage,
+        &module_and_script_storage,
     )
     .map(|_| ())
     .unwrap();
@@ -136,8 +134,8 @@ fn test_malformed_resource() {
             vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .map(|_| ())
         .unwrap();
@@ -166,8 +164,8 @@ fn test_malformed_resource() {
                 vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_storage,
-                &script_storage,
+                &module_and_script_storage,
+                &module_and_script_storage,
             )
             .map(|_| ())
             .unwrap_err();
@@ -201,8 +199,9 @@ fn test_malformed_module() {
         let mut resource_storage = InMemoryStorage::new();
         resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -234,8 +233,9 @@ fn test_malformed_module() {
         let mut resource_storage = InMemoryStorage::new();
         resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         let err = sess
@@ -282,8 +282,9 @@ fn test_unverifiable_module() {
         let mut resource_storage = InMemoryStorage::new();
         resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -311,8 +312,9 @@ fn test_unverifiable_module() {
         let mut resource_storage = InMemoryStorage::new();
         resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
 
@@ -367,9 +369,10 @@ fn test_missing_module_dependency() {
         resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
         resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
-        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
+        module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -392,8 +395,9 @@ fn test_missing_module_dependency() {
         let mut resource_storage = InMemoryStorage::new();
         resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         let err = sess
@@ -447,9 +451,10 @@ fn test_malformed_module_dependency() {
         resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
         resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.clone().into());
-        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.clone().into());
+        module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -477,9 +482,10 @@ fn test_malformed_module_dependency() {
         resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
         resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
-        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
+        module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         let err = sess
@@ -536,9 +542,10 @@ fn test_unverifiable_module_dependency() {
         resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
         resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
-        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
+        module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -566,9 +573,10 @@ fn test_unverifiable_module_dependency() {
         resource_storage.publish_or_overwrite_module(m.self_id(), blob_m.clone());
         resource_storage.publish_or_overwrite_module(n.self_id(), blob_n.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
-        module_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
+        module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let mut sess = vm.new_session(&resource_storage);
         let err = sess
@@ -636,11 +644,10 @@ impl ModuleStorage for BogusModuleStorage {
         Err(PartialVMError::new(self.bad_status_code))
     }
 
-    fn fetch_or_create_verified_module(
+    fn fetch_verified_module(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-        _f: &dyn Fn(Arc<CompiledModule>) -> PartialVMResult<Module>,
     ) -> PartialVMResult<Arc<Module>> {
         Err(PartialVMError::new(self.bad_status_code))
     }
@@ -775,9 +782,10 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
         resource_storage.publish_or_overwrite_module(m.self_id(), m_blob.clone());
         resource_storage.publish_or_overwrite_module(s.self_id(), s_blob.clone());
 
-        let module_storage = TestModuleStorage::empty_for_vm(&vm);
-        module_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.clone().into());
-        module_storage.add_module_bytes(s.self_addr(), s.self_name(), s_blob.clone().into());
+        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.clone().into());
+        module_bytes_storage.add_module_bytes(s.self_addr(), s.self_name(), s_blob.clone().into());
+        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
         let storage = BogusResourceStorage {
             module_storage: resource_storage,

@@ -9,10 +9,7 @@ use crate::{
         BinaryCache,
     },
     native_functions::NativeFunctions,
-    storage::{
-        struct_name_index_map::StructNameIndexMap,
-        struct_type_storage::{LoaderV1StructTypeStorage, StructTypeStorage},
-    },
+    storage::struct_name_index_map::StructNameIndexMap,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -47,12 +44,17 @@ use std::{
 /// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
 /// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
 pub trait ModuleStorage {
-    fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
+    fn store_module(&self, module_id: &ModuleId, binary: Module, module_size: usize)
+        -> Arc<Module>;
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
-    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
+    fn fetch_module_by_ref(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> Option<(Arc<Module>, usize)>;
 }
 
-pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Module>>);
+pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, (Arc<Module>, usize)>>);
 
 impl ModuleCache {
     pub fn new() -> Self {
@@ -71,15 +73,28 @@ impl Clone for ModuleCache {
 }
 
 impl ModuleStorage for ModuleCache {
-    fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module> {
-        self.0.write().insert(module_id.clone(), binary).clone()
+    fn store_module(
+        &self,
+        module_id: &ModuleId,
+        binary: Module,
+        module_size: usize,
+    ) -> Arc<Module> {
+        self.0
+            .write()
+            .insert(module_id.clone(), (Arc::new(binary), module_size))
+            .0
+            .clone()
     }
 
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
-        self.0.read().get(module_id).cloned()
+        self.0.read().get(module_id).map(|(m, _)| m.clone())
     }
 
-    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>> {
+    fn fetch_module_by_ref(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> Option<(Arc<Module>, usize)> {
         self.0.read().get(&(addr, name)).cloned()
     }
 }
@@ -103,7 +118,7 @@ impl ModuleStorageAdapter {
         &self,
         addr: &AccountAddress,
         name: &IdentStr,
-    ) -> Option<Arc<Module>> {
+    ) -> Option<(Arc<Module>, usize)> {
         self.modules.fetch_module_by_ref(addr, name)
     }
 
@@ -119,16 +134,9 @@ impl ModuleStorageAdapter {
             return Ok(cached);
         }
 
-        let struct_ty_storage = LoaderV1StructTypeStorage { module_store: self };
-        let module = Module::new(
-            natives,
-            module_size,
-            module,
-            &struct_ty_storage,
-            struct_name_index_map,
-        )
-        .map_err(|e| e.finish(Location::Undefined))?;
-        Ok(self.modules.store_module(&id, module))
+        let module = Module::new(natives, module, struct_name_index_map)
+            .map_err(|e| e.finish(Location::Undefined))?;
+        Ok(self.modules.store_module(&id, module, module_size))
     }
 
     pub(crate) fn has_module(&self, module_id: &ModuleId) -> bool {
@@ -188,9 +196,6 @@ impl ModuleStorageAdapter {
 #[derive(Clone, Debug)]
 pub struct Module {
     id: ModuleId,
-
-    // size in bytes
-    pub(crate) size: usize,
 
     // primitive pools
     pub(crate) module: Arc<CompiledModule>,
@@ -288,9 +293,7 @@ pub(crate) struct VariantFieldInfo {
 impl Module {
     pub(crate) fn new(
         natives: &NativeFunctions,
-        size: usize,
         module: Arc<CompiledModule>,
-        struct_ty_storage: &impl StructTypeStorage,
         struct_name_index_map: &StructNameIndexMap,
     ) -> PartialVMResult<Self> {
         let id = module.self_id();
@@ -320,11 +323,6 @@ impl Module {
                 let module_handle = module.module_handle_at(struct_handle.module);
                 let module_id = module.module_id_for_handle(module_handle);
 
-                if module_handle != module.self_handle() {
-                    struct_ty_storage
-                        .fetch_struct_ty(&module_id, struct_name)?
-                        .check_compatibility(struct_handle)?;
-                }
                 let struct_name = StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
@@ -553,7 +551,6 @@ impl Module {
         match create() {
             Ok(_) => Ok(Self {
                 id,
-                size,
                 module,
                 structs,
                 struct_instantiations,

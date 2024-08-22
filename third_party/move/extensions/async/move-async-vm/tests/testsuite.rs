@@ -455,14 +455,12 @@ impl<'a> ModuleStorage for HarnessProxy<'a> {
         Ok(Arc::new(cm))
     }
 
-    fn fetch_or_create_verified_module(
+    fn fetch_verified_module(
         &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        f: &dyn Fn(Arc<CompiledModule>) -> PartialVMResult<Module>,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
     ) -> PartialVMResult<Arc<Module>> {
-        let m = self.fetch_deserialized_module(address, module_name)?;
-        Ok(Arc::new(f(m)?))
+        unimplemented!()
     }
 }
 

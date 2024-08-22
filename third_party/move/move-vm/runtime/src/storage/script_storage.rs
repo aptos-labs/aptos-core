@@ -26,13 +26,7 @@ pub trait ScriptStorage {
         serialized_script: &[u8],
     ) -> PartialVMResult<Arc<CompiledScript>>;
 
-    /// Returns a verified script, if it is cached. If not, the script is created using
-    /// the passed callback function. It is the responsibility of the client to ensure
-    /// that the callback verifies the script. An error is returned if script fails to
-    /// deserialize or verify.
-    fn fetch_or_create_verified_script(
-        &self,
-        serialized_script: &[u8],
-        f: &dyn Fn(Arc<CompiledScript>) -> PartialVMResult<Script>,
-    ) -> PartialVMResult<Arc<Script>>;
+    /// Returns a verified script. The script can either be cached, or deserialized and/or
+    /// verified from scratch. An error is returned if script fails to deserialize or verify.
+    fn fetch_verified_script(&self, serialized_script: &[u8]) -> PartialVMResult<Arc<Script>>;
 }
