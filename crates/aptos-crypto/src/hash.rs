@@ -105,7 +105,7 @@ use more_asserts::debug_assert_lt;
 use once_cell::sync::{Lazy, OnceCell};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use rand::{rngs::OsRng, Rng};
+use rand::{distributions::Standard, prelude::Distribution, rngs::OsRng, Rng};
 use serde::{de, ser, Deserialize, Serialize};
 use std::{
     self,
@@ -159,15 +159,12 @@ impl HashValue {
 
     /// Create a cryptographically random instance.
     pub fn random() -> Self {
-        let mut rng = OsRng;
-        let hash: [u8; HashValue::LENGTH] = rng.gen();
-        HashValue { hash }
+        Self::random_with_rng(&mut OsRng)
     }
 
     /// Creates a random instance with given rng. Useful in unit tests.
     pub fn random_with_rng<R: Rng>(rng: &mut R) -> Self {
-        let hash: [u8; HashValue::LENGTH] = rng.gen();
-        HashValue { hash }
+        rng.gen()
     }
 
     /// Convenience function that computes a `HashValue` internally equal to
@@ -410,6 +407,12 @@ impl FromStr for HashValue {
 
     fn from_str(s: &str) -> Result<Self, HashValueParseError> {
         HashValue::from_hex(s)
+    }
+}
+
+impl Distribution<HashValue> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> HashValue {
+        HashValue { hash: rng.gen() }
     }
 }
 
