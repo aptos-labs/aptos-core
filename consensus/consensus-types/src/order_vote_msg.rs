@@ -8,7 +8,7 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct OrderVoteMsg {
     order_vote: OrderVote,
     quorum_cert: QuorumCert,

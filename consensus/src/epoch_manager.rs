@@ -82,7 +82,7 @@ use aptos_types::{
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
         RandomnessConfigSeqNum, ValidatorSet,
-    }, optimistic_validator_verifier::{OptimisticValidatorVerifier, VerificationResult}, randomness::{RandKeys, WvufPP, WVUF}, validator_signer::ValidatorSigner
+    }, optimistic_validator_verifier::{OptimisticValidatorVerifier, VerificationResult}, randomness::{RandKeys, WvufPP, WVUF}, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
@@ -167,8 +167,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
-    optimistic_vote_verifier: Option<Arc<OptimisticValidatorVerifier<VoteMsg>>>,
-    optimistic_order_vote_verifier: Option<Arc<OptimisticValidatorVerifier<OrderVoteMsg>>>,
+    optimistic_vote_verifier: Option<Arc<OptimisticValidatorVerifier<Box<VoteMsg>>>>,
+    optimistic_order_vote_verifier: Option<Arc<OptimisticValidatorVerifier<Box<OrderVoteMsg>>>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -1066,18 +1066,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
-        let validator_verifier = (&validator_set).into();
+        let validator_verifier: ValidatorVerifier = (&validator_set).into();
         let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
             verifier: validator_verifier.clone(),
         });
         self.epoch_state = Some(epoch_state.clone());
         self.optimistic_vote_verifier = Some(Arc::new(OptimisticValidatorVerifier::new(
-            validator_verifier,
+            Arc::new(validator_verifier.clone()),
             16,
         )));
         self.optimistic_order_vote_verifier = Some(Arc::new(OptimisticValidatorVerifier::new(
-            validator_verifier,
+            Arc::new(validator_verifier),
             16,
         )));
 
@@ -1447,7 +1447,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn verify_and_forward_vote(
         &self,
         peer_id: AccountAddress,
-        vote_msg: VoteMsg,
+        vote_msg: Box<VoteMsg>,
     ) -> anyhow::Result<()> {
         let epoch_state = self
             .epoch_state
@@ -1469,7 +1469,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 .as_ref()
                                 .expect("Optimistic vote verifier is not initialized for verifying vote")
                                 .verify(peer_id, vote_msg.vote().ledger_info(), vote_msg.vote().signature(), &vote_msg) {
-                            Ok(VerificationResult::Verified((votes, aggregate_signature))) => {
+                            Ok(VerificationResult::Verified((votes, _))) => {
                                 for (author, vote) in votes {
                                     Self::forward_event(
                                         quorum_store_msg_tx,
@@ -1482,6 +1482,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                     );
                                 }
                             },
+                            Ok(_) => {},
                             Err(e) => {
                                 error!(
                                     SecurityEvent::ConsensusInvalidMessage,
@@ -1514,13 +1515,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn verify_and_forward_order_vote(
         &self,
         peer_id: AccountAddress,
-        order_vote_msg: OrderVoteMsg,
+        order_vote_msg: Box<OrderVoteMsg>,
     ) -> anyhow::Result<()> {
         let epoch_state = self
             .epoch_state
             .clone()
             .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
-        let optimistic_vote_verifier = self.optimistic_vote_verifier.clone();
+        let optimistic_order_vote_verifier = self.optimistic_order_vote_verifier.clone();
         let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
         let round_manager_tx = self.round_manager_tx.clone(); 
         let buffered_proposal_tx = self.buffered_proposal_tx.clone();
@@ -1531,7 +1532,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             tokio::task::spawn_blocking(move || {
                 match order_vote_msg.partial_verify() {
                     Ok(_) => {
-                        match optimistic_vote_verifier
+                        match optimistic_order_vote_verifier
                                 .as_ref()
                                 .expect("Optimistic vote verifier is not initialized for verifying vote")
                                 .verify(peer_id, order_vote_msg.order_vote().ledger_info(), order_vote_msg.order_vote().signature(), &order_vote_msg) {
@@ -1548,6 +1549,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                     );
                                 }
                             },
+                            Ok(_) => {},
                             Err(e) => {
                                 error!(
                                     SecurityEvent::ConsensusInvalidMessage,

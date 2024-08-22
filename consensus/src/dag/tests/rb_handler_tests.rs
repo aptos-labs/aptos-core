@@ -152,7 +152,7 @@ async fn test_node_broadcast_receiver_failure() {
     let node_cert = NodeCertificate::new(
         node.metadata().clone(),
         validator_verifier
-            .aggregate_signatures(&partial_sigs)
+            .aggregate_signatures(&partial_sigs, None)
             .unwrap(),
     );
     let node = new_node(2, 20, signers[0].author(), vec![node_cert]);
@@ -177,7 +177,7 @@ async fn test_node_broadcast_receiver_failure() {
             NodeCertificate::new(
                 node.metadata().clone(),
                 validator_verifier
-                    .aggregate_signatures(&partial_sigs)
+                    .aggregate_signatures(&partial_sigs, None)
                     .unwrap(),
             )
         })

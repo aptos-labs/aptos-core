@@ -10,7 +10,7 @@ use aptos_types::{ledger_info::LedgerInfo, validator_verifier::ValidatorVerifier
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct OrderVote {
     /// The identity of the voter.
     author: Author,

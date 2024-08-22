@@ -149,7 +149,7 @@ fn create_ledger_info_with_timestamp(
         ValidatorVerifier::new_with_quorum_voting_power(validator_infos, NUM_SIGNERS as u128)
             .expect("Incorrect quorum size.");
     let aggregated_signature = validator_verifier
-        .aggregate_signatures(&partial_signature)
+        .aggregate_signatures(&partial_signature, None)
         .unwrap();
     let ledger_info_with_signatures =
         LedgerInfoWithSignatures::new(ledger_info, aggregated_signature);

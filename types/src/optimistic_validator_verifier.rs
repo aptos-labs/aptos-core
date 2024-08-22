@@ -13,6 +13,7 @@ use serde::Serialize;
 use std::{
     collections::HashMap,
     sync::Arc,
+    marker::{Send + Sync},
 };
 use lru::LruCache;
 
@@ -39,10 +40,10 @@ struct SignatureData<VoteType> {
 #[derive(Debug)]
 pub struct OptimisticValidatorVerifier<VoteType> {
     validator_verifier: Arc<ValidatorVerifier>,
-    vote_data: HashMap<LedgerInfo, SignatureData<VoteType>>,
+    vote_data: Arc<HashMap<LedgerInfo, SignatureData<VoteType>>>,
     // Cache of the most recent aggregated messages. If more votes are received for these messages, 
     // we can ignore the votes.
-    recent_aggregated_blocks: LruCache<LedgerInfo, ()>,
+    recent_aggregated_blocks: Arc<LruCache<LedgerInfo, ()>>,
     verification_frequency: u64,
 }
 
@@ -51,21 +52,21 @@ pub struct OptimisticValidatorVerifier<VoteType> {
 // TODO: After an aggregate signature is formed for a message, should we remove immediately? How to handle the next set of votes received for the same message?
 // TODO: Need to make sure the verificaiton can be done in parallel. This may not be the case when having mut signature_data.
 
-impl<VoteType: Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> {
+impl<VoteType: Sync + Send + Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> {
     pub fn new(
         validator_verifier: Arc<ValidatorVerifier>,
         verification_frequency: u64,
     ) -> Self {
         Self {
             validator_verifier,
-            vote_data: HashMap::new(),
-            recent_aggregated_blocks: LruCache::new(50),
+            vote_data: Arc::new(HashMap::new()),
+            recent_aggregated_blocks: Arc::new(LruCache::new(50)),
             verification_frequency,
         }
     }
 
-    pub async fn verify(
-        &mut self,
+    pub fn verify(
+        &self,
         author: AccountAddress,
         block: &LedgerInfo,
         signature: &bls12381::Signature,

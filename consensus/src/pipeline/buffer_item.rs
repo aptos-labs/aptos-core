@@ -85,7 +85,7 @@ fn aggregate_commit_proof(
     validator: &ValidatorVerifier,
 ) -> LedgerInfoWithSignatures {
     let aggregated_sig = validator
-        .aggregate_signatures(verified_signatures)
+        .aggregate_signatures(verified_signatures, None)
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
