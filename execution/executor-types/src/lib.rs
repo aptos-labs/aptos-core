@@ -271,6 +271,7 @@ pub trait TransactionReplayer: Send {
 }
 
 /// A structure that holds relevant information about a chunk that was committed.
+#[derive(Clone)]
 pub struct ChunkCommitNotification {
     pub subscribable_events: Vec<ContractEvent>,
     pub committed_transactions: Vec<Transaction>,
