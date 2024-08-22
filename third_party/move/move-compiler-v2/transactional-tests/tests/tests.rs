@@ -102,6 +102,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     // Creates different code if optimized or not
     "no-v1-comparison/enum/enum_field_select.move",
     "no-v1-comparison/enum/enum_field_select_different_offsets.move",
+    "no-v1-comparison/assert_one.move",
     // Flaky redundant unused assignment error
     "no-v1-comparison/enum/enum_scoping.move",
 ];
