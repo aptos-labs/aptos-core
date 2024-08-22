@@ -44,13 +44,12 @@ pub trait ModuleStorage {
         module_name: &IdentStr,
     ) -> PartialVMResult<Arc<CompiledModule>>;
 
-    /// Returns the verified module. In case the storage contains an unverified module in
-    /// its cache, the module is created using the passed callback. It is the responsibility
-    /// of the client to pass the callback which verifies all necessary module properties.
-    fn fetch_or_create_verified_module(
+    /// Returns the verified module. The module can be either in a cached state (it is
+    /// then returned) or newly constructed. The error is returned if the storage fails
+    /// to fetch the compiled script and verify it.
+    fn fetch_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-        f: &dyn Fn(Arc<CompiledModule>) -> PartialVMResult<Module>,
     ) -> PartialVMResult<Arc<Module>>;
 }

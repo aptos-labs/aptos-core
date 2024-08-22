@@ -14,7 +14,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, TestModuleStorage,
+    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, IntoUnsyncModuleStorage,
+    LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -94,7 +95,10 @@ fn run(
 ) -> VMResult<(ChangeSet, SerializedReturnValues)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
-    let (vm, resource_storage, module_storage) = setup_vm(&modules);
+    let (resource_storage, module_bytes_storage) = setup(&modules);
+
+    let vm = MoveVM::new(vec![]);
+    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -119,11 +123,9 @@ fn run(
 type ModuleCode = (ModuleId, String);
 
 // TODO - move some utility functions to where test infra lives, see about unifying with similar code
-fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage, TestModuleStorage) {
-    let vm = MoveVM::new(vec![]);
-
+fn setup(modules: &[ModuleCode]) -> (InMemoryStorage, LocalModuleBytesStorage) {
     let mut resource_storage = InMemoryStorage::new();
-    let module_storage = TestModuleStorage::empty_for_vm(&vm);
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
 
     for (id, code) in modules.iter() {
         let mut units = compile_units(code).unwrap();
@@ -132,10 +134,10 @@ fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage, TestModuleStora
         module.serialize(&mut blob).unwrap();
 
         resource_storage.publish_or_overwrite_module(id.clone(), blob.clone());
-        module_storage.add_module_bytes(id.address(), id.name(), blob.into());
+        module_bytes_storage.add_module_bytes(id.address(), id.name(), blob.into());
     }
 
-    (vm, resource_storage, module_storage)
+    (resource_storage, module_bytes_storage)
 }
 
 fn parse_u64_arg(arg: &[u8]) -> u64 {
