@@ -21,7 +21,10 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, TestModuleStorage, TestScriptStorage};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage, IntoUnsyncModuleStorage,
+    LocalModuleBytesStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -253,9 +256,8 @@ fn call_script_with_args_ty_args_signers(
 ) -> VMResult<()> {
     let move_vm = MoveVM::new(vec![]);
 
-    let deserializer_config = &move_vm.vm_config().deserializer_config;
-    let module_storage = TestModuleStorage::empty(deserializer_config);
-    let script_storage = TestScriptStorage::empty(deserializer_config);
+    let module_and_script_storage =
+        LocalModuleBytesStorage::empty().into_unsync_code_storage(move_vm.runtime_env());
     let resource_storage = InMemoryStorage::new();
 
     let traversal_storage = TraversalStorage::new();
@@ -268,8 +270,8 @@ fn call_script_with_args_ty_args_signers(
             combine_signers_and_args(signers, non_signer_args),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_storage,
-            &script_storage,
+            &module_and_script_storage,
+            &module_and_script_storage,
         )
         .map(|_| ())
 }
@@ -289,13 +291,17 @@ fn call_function_with_args_ty_args_signers(
     let mut module_blob = vec![];
     module.serialize(&mut module_blob).unwrap();
 
-    let move_vm = MoveVM::new(vec![]);
-
     let mut resource_storage = InMemoryStorage::new();
     resource_storage.publish_or_overwrite_module(module_id.clone(), module_blob.clone());
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+    module_bytes_storage.add_module_bytes(
+        module_id.address(),
+        module_id.name(),
+        module_blob.into(),
+    );
 
-    let module_storage = TestModuleStorage::empty_for_vm(&move_vm);
-    module_storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
+    let move_vm = MoveVM::new(vec![]);
+    let module_storage = module_bytes_storage.into_unsync_module_storage(move_vm.runtime_env());
 
     let traversal_storage = TraversalStorage::new();
 
@@ -782,8 +788,8 @@ fn call_missing_item() {
 
     let move_vm = MoveVM::new(vec![]);
 
-    let deserializer_config = &move_vm.vm_config().deserializer_config;
-    let module_storage = TestModuleStorage::empty(deserializer_config);
+    let module_storage =
+        LocalModuleBytesStorage::empty().into_unsync_module_storage(move_vm.runtime_env());
     let mut resource_storage = InMemoryStorage::new();
 
     let traversal_storage = TraversalStorage::new();
@@ -812,7 +818,13 @@ fn call_missing_item() {
     drop(session);
 
     resource_storage.publish_or_overwrite_module(module_id.clone(), module_blob.clone());
-    module_storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
+    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+    module_bytes_storage.add_module_bytes(
+        module_id.address(),
+        module_id.name(),
+        module_blob.into(),
+    );
+    let module_storage = module_bytes_storage.into_unsync_module_storage(move_vm.runtime_env());
 
     let traversal_storage = TraversalStorage::new();
 
