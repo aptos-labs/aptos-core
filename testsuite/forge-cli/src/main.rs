@@ -987,7 +987,7 @@ fn changing_working_quorum_test_high_load() -> ForgeConfig {
         120,
         500,
         300,
-        true,
+        false,
         true,
         true,
         ChangingWorkingQuorumTest {
