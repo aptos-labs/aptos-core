@@ -25,13 +25,11 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use async_trait::async_trait;
-use futures::{channel::mpsc::Sender, future::BoxFuture, FutureExt, Stream, StreamExt};
+use futures::{channel::mpsc::Sender, FutureExt};
 use std::{
-    borrow::Borrow,
     collections::{btree_map::Entry, BTreeMap},
     ops::Deref,
     sync::Arc,
-    task::Poll,
 };
 use tokio::sync::oneshot;
 
@@ -251,7 +249,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 .batch_summary
                 .iter()
                 .map(|proof| {
-                    let mut signers = proof.signers(ordered_authors);
+                    let signers = proof.signers(ordered_authors);
                     // TODO(ibalajiarun): Add block author to signers
                     (proof.info().clone(), signers)
                 })

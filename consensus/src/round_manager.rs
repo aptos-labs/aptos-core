@@ -1526,16 +1526,17 @@ impl RoundManager {
                 },
                 Some((result, block, start_time)) = self.futures.next() => {
                     let elapsed = start_time.elapsed().as_secs_f64();
+                    let id = block.id();
                     match result {
                         Ok(()) => {
                             counters::CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION.with_label_values(&["success"]).observe(elapsed);
                             if let Err(e) = monitor!("payload_fetch_proposal_process", self.check_backpressure_and_process_proposal(block)).await {
-                                warn!("error {}", e);
+                                warn!("failed process proposal after payload fetch for block {}: {}", id, e);
                             }
                         },
                         Err(err) => {
                             counters::CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION.with_label_values(&["error"]).observe(elapsed);
-                            warn!("unable to get transactions: {}", err);
+                            warn!("unable to fetch payload for block {}: {}", id, err);
                         },
                     };
                 },

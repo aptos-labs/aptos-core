@@ -1,17 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::{DataStatus, ProofWithData},
-    proof_of_store::{BatchInfo, ProofOfStore},
-};
+use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
 use futures::{
     future::{BoxFuture, Shared},
-    stream::Stream,
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
