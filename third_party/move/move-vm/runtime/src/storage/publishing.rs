@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    IntoUnsyncModuleStorage, Module, ModuleBytesStorage, ModuleStorage, RuntimeEnvironment,
-    UnsyncModuleStorage,
+    ambassador_impl_ModuleStorage, IntoUnsyncModuleStorage, Module, ModuleBytesStorage,
+    ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
 };
+use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
@@ -162,6 +163,8 @@ impl<'m, M: ModuleStorage> ModuleBytesStorage for TemporaryModuleBytesStorage<'m
 ///   2) Published modules satisfy compatibility constraints.
 ///   3) Published modules are verifiable and can link to existing modules without breaking
 ///      invariants such as cyclic dependencies.
+#[derive(Delegate)]
+#[delegate(ModuleStorage)]
 pub struct TemporaryModuleStorage<'a, M> {
     storage: UnsyncModuleStorage<'a, TemporaryModuleBytesStorage<'a, M>>,
 }
@@ -221,56 +224,5 @@ impl<'a, M: ModuleStorage> TemporaryModuleStorage<'a, M> {
             .temporary_storage
             .into_iter()
             .flat_map(|(_, account_storage)| account_storage.into_values())
-    }
-}
-
-impl<'a, M: ModuleStorage> ModuleStorage for TemporaryModuleStorage<'a, M> {
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool> {
-        self.storage.check_module_exists(address, module_name)
-    }
-
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        self.storage.fetch_module_bytes(address, module_name)
-    }
-
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>> {
-        self.storage
-            .fetch_module_size_in_bytes(address, module_name)
-    }
-
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
-        self.storage.fetch_module_metadata(address, module_name)
-    }
-
-    fn fetch_deserialized_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<CompiledModule>> {
-        self.storage.fetch_deserialized_module(address, module_name)
-    }
-
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
-        self.storage.fetch_verified_module(address, module_name)
     }
 }

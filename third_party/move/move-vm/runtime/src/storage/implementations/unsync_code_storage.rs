@@ -6,10 +6,11 @@ use crate::{
     storage::{
         environment::WithEnvironment,
         implementations::unsync_module_storage::IntoUnsyncModuleStorage,
-        module_storage::ModuleBytesStorage,
+        module_storage::{ambassador_impl_ModuleStorage, ModuleBytesStorage},
     },
     CodeStorage, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncModuleStorage,
 };
+use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
     access::ScriptAccess,
@@ -37,6 +38,8 @@ enum ScriptStorageEntry {
 }
 
 /// Code storage that stores both modules and scripts (not thread-safe).
+#[derive(Delegate)]
+#[delegate(ModuleStorage, target = "module_storage")]
 pub struct UnsyncCodeStorage<M> {
     script_storage: RefCell<HashMap<[u8; 32], ScriptStorageEntry>>,
     module_storage: M,
@@ -164,61 +167,6 @@ impl<M: ModuleStorage + WithEnvironment> CodeStorage for UnsyncCodeStorage<M> {
                 script
             },
         })
-    }
-}
-
-impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> {
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<bool> {
-        self.module_storage
-            .check_module_exists(address, module_name)
-    }
-
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        self.module_storage.fetch_module_bytes(address, module_name)
-    }
-
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<usize>> {
-        self.module_storage
-            .fetch_module_size_in_bytes(address, module_name)
-    }
-
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
-        self.module_storage
-            .fetch_module_metadata(address, module_name)
-    }
-
-    fn fetch_deserialized_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<CompiledModule>> {
-        self.module_storage
-            .fetch_deserialized_module(address, module_name)
-    }
-
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
-        self.module_storage
-            .fetch_verified_module(address, module_name)
     }
 }
 
