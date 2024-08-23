@@ -6,7 +6,7 @@ use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage,
-    IntoUnsyncModuleStorage, LocalModuleBytesStorage,
+    IntoUnsyncModuleStorage, LocalModuleBytesStorage, TemporaryModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -15,8 +15,6 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 
 #[test]
 fn test_publish_module_with_nested_loops() {
-    // Compile the modules and scripts.
-    // TODO: find a better way to include the Signer module.
     let code = r#"
         module {{ADDR}}::M {
             fun foo() {
@@ -59,8 +57,19 @@ fn test_publish_module_with_nested_loops() {
             LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
-        sess.verify_module_bundle_before_publishing(&[m.clone()], &TEST_ADDR, &module_storage)
-            .unwrap();
+        if vm.vm_config().use_loader_v2 {
+            let result = TemporaryModuleStorage::new(
+                &TEST_ADDR,
+                vm.runtime_environment(),
+                &module_storage,
+                vec![m_blob.clone().into()],
+            );
+            assert!(result.is_ok());
+        } else {
+            #[allow(deprecated)]
+            sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
+                .unwrap();
+        }
     }
 
     // Should fail with max_loop_depth = 1
@@ -84,15 +93,24 @@ fn test_publish_module_with_nested_loops() {
             LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
-        sess.verify_module_bundle_before_publishing(&[m], &TEST_ADDR, &module_storage)
-            .unwrap_err();
+        if vm.vm_config().use_loader_v2 {
+            let result = TemporaryModuleStorage::new(
+                &TEST_ADDR,
+                vm.runtime_environment(),
+                &module_storage,
+                vec![m_blob.clone().into()],
+            );
+            assert!(result.is_err());
+        } else {
+            #[allow(deprecated)]
+            sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
+                .unwrap_err();
+        }
     }
 }
 
 #[test]
 fn test_run_script_with_nested_loops() {
-    // Compile the modules and scripts.
-    // TODO: find a better way to include the Signer module.
     let code = r#"
         script {
             fun main() {
