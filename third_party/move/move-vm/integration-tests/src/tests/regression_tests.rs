@@ -127,7 +127,7 @@ fn script_large_ty() {
         module.into(),
     );
     let module_and_script_storage =
-        module_bytes_storage.into_unsync_code_storage(move_vm.runtime_env());
+        module_bytes_storage.into_unsync_code_storage(move_vm.runtime_environment());
 
     // constructs a type with about 25^3 nodes
     let num_type_args = 25;
