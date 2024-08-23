@@ -188,7 +188,8 @@ fn main() -> Result<()> {
         );
         Entrypoint::Module(module.self_id())
     };
-    let module_and_script_storage = module_bytes_storage.into_unsync_code_storage(vm.runtime_env());
+    let module_and_script_storage =
+        module_bytes_storage.into_unsync_code_storage(vm.runtime_environment());
 
     let mut extensions = NativeContextExtensions::default();
     extensions.add(NativeTableContext::new([0; 32], &resource_storage));

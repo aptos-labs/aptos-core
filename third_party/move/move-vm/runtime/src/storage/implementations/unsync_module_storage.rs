@@ -272,7 +272,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 }
 
 impl<'e, B: ModuleBytesStorage> WithEnvironment for UnsyncModuleStorage<'e, B> {
-    fn runtime_env(&self) -> &RuntimeEnvironment {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.env
     }
 }

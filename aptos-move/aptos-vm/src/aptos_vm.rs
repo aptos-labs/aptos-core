@@ -1671,7 +1671,7 @@ impl AptosVM {
                         )
                         .map_err(|e| e.finish(Location::Undefined))?;
                     let tmp_module_storage = TemporaryModuleStorage::create(
-                        self.move_vm.runtime_env(),
+                        self.move_vm.runtime_environment(),
                         write_ops,
                         module_storage,
                     );
