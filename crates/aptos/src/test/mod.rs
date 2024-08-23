@@ -1044,7 +1044,7 @@ impl CliTestFramework {
                 script_path: Some(source_path),
                 compiled_script_path: None,
                 framework_package_args,
-                ..Self::default()
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args: vec![] },
@@ -1072,7 +1072,7 @@ impl CliTestFramework {
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                ..Self::default()
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args },
@@ -1201,7 +1201,7 @@ impl CliTestFramework {
                         framework_local_dir: Some(Self::aptos_framework_dir()),
                         skip_fetch_latest_git_deps: false,
                     },
-                    ..Self::default()
+                    ..CompileScriptFunction::default()
                 },
             },
         }
@@ -1246,7 +1246,7 @@ impl CliTestFramework {
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                ..Self::default()
+                ..CompileScriptFunction::default()
             },
             rest_options: self.rest_options(),
             profile: Default::default(),
