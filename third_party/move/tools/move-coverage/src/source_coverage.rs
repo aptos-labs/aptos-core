@@ -183,6 +183,10 @@ impl<'a> SourceCoverageBuilder<'a> {
         coverage_map: &CoverageMap,
         source_map: &'a SourceMap,
     ) -> Self {
+        eprintln!("coverage_map is {:#?}", coverage_map);
+        eprintln!("source_map is {:#?}", source_map);
+        eprintln!("module is {:#?}", module);
+
         let module_name = module.self_id();
         let unified_exec_map = coverage_map.to_unified_exec_map();
         let module_map = unified_exec_map
@@ -247,6 +251,7 @@ impl<'a> SourceCoverageBuilder<'a> {
                 coverage.map(|x| (fn_name, x))
             })
             .collect();
+        eprintln!("uncovered_locations is {:#?}", uncovered_locations);
 
         Self {
             uncovered_locations,
@@ -255,6 +260,7 @@ impl<'a> SourceCoverageBuilder<'a> {
     }
 
     pub fn compute_source_coverage(&self, file_path: &Path) -> SourceCoverage {
+        eprintln!("Reading file {}", file_path.display());
         let file_contents = fs::read_to_string(file_path).unwrap();
         assert!(
             self.source_map.check(&file_contents),
@@ -273,6 +279,13 @@ impl<'a> SourceCoverageBuilder<'a> {
                 let end_loc = files.location(file_id, span.end()).unwrap();
                 let start_line = start_loc.line.0;
                 let end_line = end_loc.line.0;
+                eprintln!(
+                    "Looking at span = ({}, {}), line = ({}, {})",
+                    span.start(),
+                    span.end(),
+                    start_line,
+                    end_line
+                );
                 let segments = uncovered_segments
                     .entry(start_line)
                     .or_insert_with(Vec::new);
@@ -305,6 +318,7 @@ impl<'a> SourceCoverageBuilder<'a> {
 
         let mut annotated_lines = Vec::new();
         for (line_number, mut line) in file_contents.lines().map(|x| x.to_owned()).enumerate() {
+            eprintln!("looking at {}, {}", line_number, line);
             match uncovered_segments.get(&(line_number as u32)) {
                 None => annotated_lines.push(vec![StringSegment::Covered(line)]),
                 Some(segments) => {
@@ -315,6 +329,7 @@ impl<'a> SourceCoverageBuilder<'a> {
                     for segment in segments {
                         match segment {
                             AbstractSegment::Bounded { start, end } => {
+                                eprintln!("Bounded {}, {}, cursor = {}", start, end, cursor);
                                 let length = end - start;
                                 let (before, after) = line.split_at((start - cursor) as usize);
                                 let (uncovered, rest) = after.split_at(length as usize);
@@ -324,12 +339,14 @@ impl<'a> SourceCoverageBuilder<'a> {
                                 cursor = *end;
                             },
                             AbstractSegment::BoundedRight { end } => {
+                                eprintln!("BoundedRight {}, cursor = {}", end, cursor);
                                 let (uncovered, rest) = line.split_at((end - cursor) as usize);
                                 line_acc.push(StringSegment::Uncovered(uncovered.to_string()));
                                 line = rest.to_string();
                                 cursor = *end;
                             },
                             AbstractSegment::BoundedLeft { start } => {
+                                eprintln!("BoundedLeft {}, cursor = {}", start, cursor);
                                 let (before, after) = line.split_at((start - cursor) as usize);
                                 line_acc.push(StringSegment::Covered(before.to_string()));
                                 line_acc.push(StringSegment::Uncovered(after.to_string()));
