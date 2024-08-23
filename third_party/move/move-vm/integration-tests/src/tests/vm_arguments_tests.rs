@@ -257,7 +257,7 @@ fn call_script_with_args_ty_args_signers(
     let move_vm = MoveVM::new(vec![]);
 
     let module_and_script_storage =
-        LocalModuleBytesStorage::empty().into_unsync_code_storage(move_vm.runtime_env());
+        LocalModuleBytesStorage::empty().into_unsync_code_storage(move_vm.runtime_environment());
     let resource_storage = InMemoryStorage::new();
 
     let traversal_storage = TraversalStorage::new();
@@ -301,7 +301,8 @@ fn call_function_with_args_ty_args_signers(
     );
 
     let move_vm = MoveVM::new(vec![]);
-    let module_storage = module_bytes_storage.into_unsync_module_storage(move_vm.runtime_env());
+    let module_storage =
+        module_bytes_storage.into_unsync_module_storage(move_vm.runtime_environment());
 
     let traversal_storage = TraversalStorage::new();
 
@@ -789,7 +790,7 @@ fn call_missing_item() {
     let move_vm = MoveVM::new(vec![]);
 
     let module_storage =
-        LocalModuleBytesStorage::empty().into_unsync_module_storage(move_vm.runtime_env());
+        LocalModuleBytesStorage::empty().into_unsync_module_storage(move_vm.runtime_environment());
     let mut resource_storage = InMemoryStorage::new();
 
     let traversal_storage = TraversalStorage::new();
@@ -824,7 +825,8 @@ fn call_missing_item() {
         module_id.name(),
         module_blob.into(),
     );
-    let module_storage = module_bytes_storage.into_unsync_module_storage(move_vm.runtime_env());
+    let module_storage =
+        module_bytes_storage.into_unsync_module_storage(move_vm.runtime_environment());
 
     let traversal_storage = TraversalStorage::new();
 

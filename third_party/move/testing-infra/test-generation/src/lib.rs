@@ -153,7 +153,8 @@ fn execute_function_in_module(
 
         let (resource_storage, module_bytes_storage) =
             storage_with_stdlib_and_modules(vec![module]);
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         let traversal_storage = TraversalStorage::new();

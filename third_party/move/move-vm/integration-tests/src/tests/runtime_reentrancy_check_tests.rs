@@ -156,7 +156,7 @@ fn runtime_reentrancy_check() {
         TEST_ADDR.to_hex(),
     );
     let (resource_storage, module_bytes_storage) = set_up_storage(vec![code_1, code_2, code_3]);
-    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
     let fun_name = Identifier::new("foo1").unwrap();
