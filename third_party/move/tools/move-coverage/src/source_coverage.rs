@@ -6,17 +6,19 @@
 
 use crate::coverage_map::CoverageMap;
 use codespan::{Files, Span};
-use colored::*;
+use colored::Colorize;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{CodeOffset, FunctionDefinitionIndex},
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::SourceMap;
+use move_command_line_common::files::FileHash;
 use move_core_types::identifier::Identifier;
 use move_ir_types::location::Loc;
 use serde::Serialize;
 use std::{
+    cmp::Ordering,
     collections::BTreeMap,
     fs,
     io::{self, Write},
@@ -33,13 +35,44 @@ pub struct FunctionSourceCoverage {
 pub struct SourceCoverageBuilder<'a> {
     uncovered_locations: BTreeMap<Identifier, FunctionSourceCoverage>,
     source_map: &'a SourceMap,
+    inlines: bool,
 }
 
-#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Serialize, Eq, PartialEq, Ord)]
 pub enum AbstractSegment {
     Bounded { start: u32, end: u32 },
     BoundedRight { end: u32 },
     BoundedLeft { start: u32 },
+}
+
+impl AbstractSegment {
+    fn start(&self) -> Option<u32> {
+        use AbstractSegment::*;
+        match self {
+            BoundedLeft { start: s } | Bounded { start: s, .. } => Some(*s),
+            BoundedRight { .. } => None,
+        }
+    }
+    fn end(&self) -> Option<u32> {
+        use AbstractSegment::*;
+        match self {
+            BoundedRight { end: e } | Bounded { end: e, .. } => Some(*e),
+            BoundedLeft { .. } => None,
+        }
+    }
+}
+
+impl PartialOrd for AbstractSegment {
+    fn partial_cmp(&self, other: &AbstractSegment) -> Option<Ordering> {
+        match (self.start(), self.end(), other.start(), other.end()) {
+            (Some(x1), Some(x2), Some(y1), Some(y2)) if (x1 >= x2) || (y1 >= y2) => {
+                panic!("Coverage data is inconsistent");
+            },
+            (Some(x), _, _, Some(y)) if y < x => Some(Ordering::Greater),
+            (_, Some(x), Some(y), _) if x < y => Some(Ordering::Less),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -60,7 +93,12 @@ impl<'a> SourceCoverageBuilder<'a> {
         module: &CompiledModule,
         coverage_map: &CoverageMap,
         source_map: &'a SourceMap,
+        inlines: bool,
     ) -> Self {
+        eprintln!("coverage_map is {:#?}", coverage_map);
+        eprintln!("source_map is {:#?}", source_map);
+        eprintln!("module is {:#?}", module);
+
         let module_name = module.self_id();
         let unified_exec_map = coverage_map.to_unified_exec_map();
         let module_map = unified_exec_map
@@ -125,30 +163,48 @@ impl<'a> SourceCoverageBuilder<'a> {
                 coverage.map(|x| (fn_name, x))
             })
             .collect();
+        eprintln!("uncovered_locations is {:#?}", uncovered_locations);
 
         Self {
             uncovered_locations,
             source_map,
+            inlines,
         }
     }
 
     pub fn compute_source_coverage(&self, file_path: &Path) -> SourceCoverage {
+        eprintln!("Reading file {}", file_path.display());
         let file_contents = fs::read_to_string(file_path).unwrap();
-        assert!(
-            self.source_map.check(&file_contents),
-            "File contents out of sync with source map"
-        );
+        let file_hash = FileHash::new(&file_contents);
+        if !self.source_map.check(&file_contents) {
+            eprintln!(
+                "File contents {} out of sync with source map",
+                file_path.display()
+            );
+            panic!(
+                "File contents {} out of sync with source map",
+                file_path.display()
+            );
+        };
         let mut files = Files::new();
         let file_id = files.add(file_path.as_os_str().to_os_string(), file_contents.clone());
 
         let mut uncovered_segments = BTreeMap::new();
 
-        for (_, fn_cov) in self.uncovered_locations.iter() {
-            for span in merge_spans(fn_cov.clone()).into_iter() {
+        for (key, fn_cov) in self.uncovered_locations.iter() {
+            eprintln!("Looking at (key, fn_cov) = ({:#?}, {:#?})", key, fn_cov);
+            for span in merge_spans(&file_hash, fn_cov.clone()).into_iter() {
                 let start_loc = files.location(file_id, span.start()).unwrap();
                 let end_loc = files.location(file_id, span.end()).unwrap();
                 let start_line = start_loc.line.0;
                 let end_line = end_loc.line.0;
+                eprintln!(
+                    "Looking at span = ({}, {}), line = ({}, {})",
+                    span.start(),
+                    span.end(),
+                    start_line,
+                    end_line
+                );
                 let segments = uncovered_segments
                     .entry(start_line)
                     .or_insert_with(Vec::new);
@@ -177,9 +233,12 @@ impl<'a> SourceCoverageBuilder<'a> {
                 }
             }
         }
+        uncovered_segments.values_mut().for_each(|v| v.sort());
+        eprintln!("uncovered_segments is {:#?}", uncovered_segments);
 
         let mut annotated_lines = Vec::new();
         for (line_number, mut line) in file_contents.lines().map(|x| x.to_owned()).enumerate() {
+            eprintln!("looking at {}, {}", line_number, line);
             match uncovered_segments.get(&(line_number as u32)) {
                 None => annotated_lines.push(vec![StringSegment::Covered(line)]),
                 Some(segments) => {
@@ -190,6 +249,7 @@ impl<'a> SourceCoverageBuilder<'a> {
                     for segment in segments {
                         match segment {
                             AbstractSegment::Bounded { start, end } => {
+                                eprintln!("Bounded {}, {}, cursor = {}", start, end, cursor);
                                 let length = end - start;
                                 let (before, after) = line.split_at((start - cursor) as usize);
                                 let (uncovered, rest) = after.split_at(length as usize);
@@ -199,12 +259,14 @@ impl<'a> SourceCoverageBuilder<'a> {
                                 cursor = *end;
                             },
                             AbstractSegment::BoundedRight { end } => {
+                                eprintln!("BoundedRight {}, cursor = {}", end, cursor);
                                 let (uncovered, rest) = line.split_at((end - cursor) as usize);
                                 line_acc.push(StringSegment::Uncovered(uncovered.to_string()));
                                 line = rest.to_string();
                                 cursor = *end;
                             },
                             AbstractSegment::BoundedLeft { start } => {
+                                eprintln!("BoundedLeft {}, cursor = {}", start, cursor);
                                 let (before, after) = line.split_at((start - cursor) as usize);
                                 line_acc.push(StringSegment::Covered(before.to_string()));
                                 line_acc.push(StringSegment::Uncovered(after.to_string()));
@@ -240,7 +302,7 @@ impl SourceCoverage {
     }
 }
 
-fn merge_spans(cov: FunctionSourceCoverage) -> Vec<Span> {
+fn merge_spans(file_hash: &FileHash, cov: FunctionSourceCoverage) -> Vec<Span> {
     if cov.uncovered_locations.is_empty() {
         return vec![];
     }
@@ -248,6 +310,7 @@ fn merge_spans(cov: FunctionSourceCoverage) -> Vec<Span> {
     let mut covs: Vec<_> = cov
         .uncovered_locations
         .iter()
+        .filter(|loc| loc.file_hash() == *file_hash)
         .map(|loc| Span::new(loc.start(), loc.end()))
         .collect();
     covs.sort();

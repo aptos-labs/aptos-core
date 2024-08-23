@@ -87,8 +87,14 @@ impl CliCommand<()> for SummaryCoverage {
 /// Display coverage information about the module against source code
 #[derive(Debug, Parser)]
 pub struct SourceCoverage {
+    /// Show coverage for the given module
     #[clap(long = "module")]
     pub module_name: String,
+
+    /// Include inline function calls in coverage info shown
+    #[clap(long = "inlines")]
+    pub inlines: bool,
+
     #[clap(flatten)]
     pub move_options: MovePackageDir,
 }
@@ -109,11 +115,11 @@ impl CliCommand<()> for SourceCoverage {
             }) => (module, source_map),
             _ => panic!("Should all be modules"),
         };
-        let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
-        source_coverage
-            .compute_source_coverage(source_path)
-            .output_source_coverage(&mut std::io::stdout())
-            .map_err(|err| CliError::UnexpectedError(format!("Failed to get coverage {}", err)))
+        let source_coverage =
+            SourceCoverageBuilder::new(module, &coverage_map, source_map, self.inlines);
+        let t1 = source_coverage.compute_source_coverage(source_path);
+        let t2 = t1.output_source_coverage(&mut std::io::stdout());
+        t2.map_err(|err| CliError::UnexpectedError(format!("Failed to get coverage {}", err)))
     }
 }
 

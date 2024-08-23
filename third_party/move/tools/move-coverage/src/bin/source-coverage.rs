@@ -69,10 +69,8 @@ fn main() {
         None => Box::new(io::stdout()),
     };
 
-    source_cov
-        .compute_source_coverage(source_path)
-        .output_source_coverage(&mut coverage_writer)
-        .unwrap();
+    let t1 = source_cov.compute_source_coverage(source_path);
+    let t2 = t1.output_source_coverage(&mut coverage_writer).unwrap();
 }
 
 #[test]
