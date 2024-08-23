@@ -3,15 +3,18 @@
 
 use aptos_executor_types::{ExecutorResult, StateComputeResult};
 use aptos_types::transaction::SignedTransaction;
+use derivative::Derivative;
+use futures::future::BoxFuture;
 use std::time::Duration;
-use tokio::sync::oneshot;
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct PipelineExecutionResult {
     pub input_txns: Vec<SignedTransaction>,
     pub result: StateComputeResult,
     pub execution_time: Duration,
-    pub pre_commit_result_rx: oneshot::Receiver<ExecutorResult<()>>,
+    #[derivative(Debug = "ignore")]
+    pub pre_commit_fut: BoxFuture<'static, ExecutorResult<()>>,
 }
 
 impl PipelineExecutionResult {
@@ -19,13 +22,13 @@ impl PipelineExecutionResult {
         input_txns: Vec<SignedTransaction>,
         result: StateComputeResult,
         execution_time: Duration,
-        pre_commit_result_rx: oneshot::Receiver<ExecutorResult<()>>,
+        pre_commit_fut: BoxFuture<'static, ExecutorResult<()>>,
     ) -> Self {
         Self {
             input_txns,
             result,
             execution_time,
-            pre_commit_result_rx,
+            pre_commit_fut,
         }
     }
 }

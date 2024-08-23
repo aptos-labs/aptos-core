@@ -24,7 +24,7 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorError, ExecutorResult};
+use aptos_executor_types::{BlockExecutorTrait, ExecutorResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -282,7 +282,7 @@ impl StateComputer for ExecutionProxy {
             .as_ref()
             .cloned()
             .expect("must be set within an epoch");
-        let mut pre_commit_rxs = Vec::with_capacity(blocks.len());
+        let mut pre_commit_futs = Vec::with_capacity(blocks.len());
         for block in blocks {
             if let Some(payload) = block.block().payload() {
                 payloads.push(payload.clone());
@@ -290,12 +290,12 @@ impl StateComputer for ExecutionProxy {
 
             txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled));
             subscribable_txn_events.extend(block.subscribable_events());
-            pre_commit_rxs.push(block.take_pre_commit_result_rx());
+            pre_commit_futs.push(block.take_pre_commit_fut());
         }
 
         // wait until all blocks are committed
-        for pre_commit_rx in pre_commit_rxs {
-            pre_commit_rx.await.map_err(ExecutorError::internal_err)??;
+        for pre_commit_fut in pre_commit_futs {
+            pre_commit_fut.await?
         }
 
         let executor = self.executor.clone();
