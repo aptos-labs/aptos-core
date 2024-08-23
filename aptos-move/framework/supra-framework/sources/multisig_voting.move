@@ -976,7 +976,7 @@ module supra_framework::multisig_voting {
 
         // Vote.
         let proof = TestProposal {};
-        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>( &account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
         vote<TestProposal>(&account::create_signer_for_test(@0xa2), &proof, governance_address, proposal_id, true);
         let TestProposal {} = proof;
 

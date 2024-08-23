@@ -259,10 +259,7 @@ module supra_framework::supra_governance {
         simple_map::add(signer_caps, signer_address, signer_cap);
     }
 
-    /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
-    /// for the supra_framework (0x1) account.
-    /// This function is private because it's called directly from the vm.
-    fun initialize(
+    fun old_initialize(
         supra_framework: &signer,
         min_voting_threshold: u128,
         required_proposer_stake: u64,
@@ -285,13 +282,14 @@ module supra_framework::supra_governance {
             votes: table::new(),
         });
         move_to(supra_framework, ApprovedExecutionHashes {
-            hashes: simple_map::create<u64, vector<u8>>(),
-        })
-
-
+            hashes: simple_map::create<u64, vector<u8>>()
+        });
     }
 
-    fun supra_initialize(
+    /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
+    /// for the supra_framework (0x1) account.
+    /// This function is private because it's called directly from the vm.
+    fun initialize(
         supra_framework: &signer,
         voting_duration_secs: u64,
         min_voting_threshold: u64,
@@ -312,6 +310,9 @@ module supra_framework::supra_governance {
             update_config_events: account::new_event_handle<SupraUpdateConfigEvent>(supra_framework),
             vote_events: account::new_event_handle<SupraVoteEvent>(supra_framework),
         });
+        move_to(supra_framework, ApprovedExecutionHashes {
+            hashes: simple_map::create<u64, vector<u8>>(),
+        })
     }
 
     /// Update the governance configurations. This can only be called as part of resolving a proposal in this same
@@ -1569,7 +1570,7 @@ module supra_framework::supra_governance {
 
         // Initialize the governance.
         staking_config::initialize_for_test(supra_framework, 0, 1000, 2000, true, 0, 1, 100);
-        initialize(supra_framework, 10, 100, 1000);
+        old_initialize(supra_framework, 10, 100, 1000);
         store_signer_cap(
             supra_framework,
             @supra_framework,
@@ -1622,7 +1623,7 @@ module supra_framework::supra_governance {
 
         // Initialize the governance.
         stake::initialize_for_test_custom(supra_framework, 0, 1000, 2000, true, 0, 1, 1000);
-        initialize(supra_framework, 10, 100, 1000);
+        old_initialize(supra_framework, 10, 100, 1000);
         store_signer_cap(
             supra_framework,
             @supra_framework,
@@ -1667,7 +1668,7 @@ module supra_framework::supra_governance {
         supra_framework: signer,
     ) acquires GovernanceConfig, GovernanceEvents {
         account::create_account_for_test(signer::address_of(&supra_framework));
-        initialize(&supra_framework, 1, 2, 3);
+        old_initialize(&supra_framework, 1, 2, 3);
         update_governance_config(&supra_framework, 10, 20, 30);
 
         let config = borrow_global<GovernanceConfig>(@supra_framework);
@@ -1680,7 +1681,7 @@ module supra_framework::supra_governance {
     #[expected_failure(abort_code = 0x50003, location = supra_framework::system_addresses)]
     public entry fun test_update_governance_config_unauthorized_should_fail(
         account: signer) acquires GovernanceConfig, GovernanceEvents {
-        initialize(&account, 1, 2, 3);
+        old_initialize(&account, 1, 2, 3);
         update_governance_config(&account, 10, 20, 30);
     }
 
@@ -1726,19 +1727,17 @@ module supra_framework::supra_governance {
         required_proposer_stake: u64,
         voting_duration_secs: u64,
     ) {
-        initialize(supra_framework, min_voting_threshold, required_proposer_stake, voting_duration_secs);
+        old_initialize(supra_framework, min_voting_threshold, required_proposer_stake, voting_duration_secs);
     }
 
     #[verify_only]
     public fun initialize_for_verification(
         supra_framework: &signer,
-        min_voting_threshold: u128,
-        required_proposer_stake: u64,
         voting_duration_secs: u64,
         supra_min_voting_threshold: u64,
         voters: vector<address>,
     ) {
-        initialize(supra_framework, min_voting_threshold, required_proposer_stake, voting_duration_secs);
-        supra_initialize(supra_framework, voting_duration_secs, supra_min_voting_threshold, voters);
+        // old_initialize(supra_framework, min_voting_threshold, required_proposer_stake, voting_duration_secs);
+        initialize(supra_framework, voting_duration_secs, supra_min_voting_threshold, voters);
     }
 }
