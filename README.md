@@ -1,3 +1,8 @@
+# This repo is deprecated.
+# The tools are currently located in this [repository](https://github.com/eigerco/move-spec-testing).
+
+------
+
 **Move Specification Tester** and **Move Mutator** are tools to test the quality of the Move specifications.
 
 ## Overview
