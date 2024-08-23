@@ -61,20 +61,58 @@ impl VMRuntime {
         }
     }
 
-    pub(crate) fn verify_module_bundle_before_publishing(
+    #[deprecated]
+    pub(crate) fn publish_module_bundle(
         &self,
-        compiled_modules: &[CompiledModule],
-        sender: &AccountAddress,
+        modules: Vec<Vec<u8>>,
+        sender: AccountAddress,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
+        _gas_meter: &mut impl GasMeter,
         compat: Compatibility,
-        module_storage: &impl ModuleStorageV2,
     ) -> VMResult<()> {
+        // We must be using V1 loader flow here.
+        let loader = match &self.loader {
+            Loader::V1(loader) => loader,
+            Loader::V2(_) => {
+                let msg =
+                    "Loader V2 cannot be used in V1 runtime::publish_module_bundle".to_string();
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(msg)
+                        .finish(Location::Undefined),
+                );
+            },
+        };
+
+        // Deserialize the modules. Perform bounds check. After this indices can be
+        // used with the `[]` operator
+        let compiled_modules = match modules
+            .iter()
+            .map(|blob| {
+                CompiledModule::deserialize_with_config(
+                    blob,
+                    &loader.vm_config().deserializer_config,
+                )
+            })
+            .collect::<PartialVMResult<Vec<_>>>()
+        {
+            Ok(modules) => modules,
+            Err(err) => {
+                return Err(err
+                    .append_message_with_separator(
+                        '\n',
+                        "[VM] module deserialization failed".to_string(),
+                    )
+                    .finish(Location::Undefined));
+            },
+        };
+
         // Make sure all modules' self addresses matches the transaction sender. The self address is
         // where the module will actually be published. If we did not check this, the sender could
         // publish a module under anyone's account.
-        for module in compiled_modules {
-            if module.address() != sender {
+        for module in &compiled_modules {
+            if module.address() != &sender {
                 return Err(verification_error(
                     StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
                     IndexKind::AddressIdentifier,
@@ -92,29 +130,14 @@ impl VMRuntime {
         //
         // TODO: in the future, we may want to add restrictions on module republishing, possibly by
         // changing the bytecode format to include an `is_upgradable` flag in the CompiledModule.
-        for module in compiled_modules {
+        for module in &compiled_modules {
             let module_id = module.self_id();
 
-            let module_exists = match self.loader() {
-                Loader::V1(_) =>
-                {
-                    #[allow(deprecated)]
-                    data_store.exists_module(&module_id)?
-                },
-                Loader::V2(_) => module_storage
-                    .check_module_exists(module.self_addr(), module.self_name())
-                    .map_err(|e| e.finish(Location::Undefined))?,
-            };
-
-            if module_exists && compat.need_check_compat() {
-                let old_module_ref = self.loader.load_module(
-                    &module_id,
-                    data_store,
-                    module_store,
-                    module_storage,
-                )?;
+            #[allow(deprecated)]
+            if data_store.exists_module(&module_id)? && compat.need_check_compat() {
+                let old_module_ref = loader.load_module(&module_id, data_store, module_store)?;
                 let old_module = old_module_ref.module();
-                if self.loader.vm_config().use_compatibility_checker_v2 {
+                if loader.vm_config().use_compatibility_checker_v2 {
                     compat
                         .check(old_module, module)
                         .map_err(|e| e.finish(Location::Undefined))?
@@ -137,57 +160,7 @@ impl VMRuntime {
         }
 
         // Perform bytecode and loading verification. Modules must be sorted in topological order.
-        self.loader.verify_module_bundle_for_publication(
-            compiled_modules,
-            data_store,
-            module_store,
-            module_storage,
-        )?;
-
-        Ok(())
-    }
-
-    pub(crate) fn publish_module_bundle(
-        &self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        _gas_meter: &mut impl GasMeter,
-        compat: Compatibility,
-        module_storage: &impl ModuleStorageV2,
-    ) -> VMResult<()> {
-        // deserialize the modules. Perform bounds check. After this indexes can be
-        // used with the `[]` operator
-        let compiled_modules = match modules
-            .iter()
-            .map(|blob| {
-                CompiledModule::deserialize_with_config(
-                    blob,
-                    &self.loader.vm_config().deserializer_config,
-                )
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
-        {
-            Ok(modules) => modules,
-            Err(err) => {
-                return Err(err
-                    .append_message_with_separator(
-                        '\n',
-                        "[VM] module deserialization failed".to_string(),
-                    )
-                    .finish(Location::Undefined));
-            },
-        };
-
-        self.verify_module_bundle_before_publishing(
-            &compiled_modules,
-            &sender,
-            data_store,
-            module_store,
-            compat,
-            module_storage,
-        )?;
+        loader.verify_module_bundle_for_publication(&compiled_modules, data_store, module_store)?;
 
         // NOTE: we want to (informally) argue that all modules pass the linking check before being
         // published to the data store.
@@ -242,18 +215,7 @@ impl VMRuntime {
         // all the checks, then the whole bundle can be published/upgraded together. Otherwise,
         // none of the module can be published/updated.
 
-        // Sanity check: we should only be calling the verification API with V2 loader design.
-        if let Loader::V2(_) = self.loader() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(
-                        "Can never publish modules via V2 workflow to data cache".to_string(),
-                    )
-                    .finish(Location::Undefined),
-            );
-        }
-
-        // All modules verified, publish them to data cache.
+        // All modules verified, publish them to data cache
         for (module, blob) in compiled_modules.into_iter().zip(modules.into_iter()) {
             #[allow(deprecated)]
             let is_republishing = data_store.exists_module(&module.self_id())?;

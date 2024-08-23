@@ -6,10 +6,11 @@ use crate::{
     storage::{
         environment::WithEnvironment,
         implementations::unsync_module_storage::IntoUnsyncModuleStorage,
+        module_storage::ModuleBytesStorage,
     },
-    Module, ModuleBytesStorage, ModuleStorage, RuntimeEnvironment, Script, ScriptStorage,
-    UnsyncModuleStorage,
+    Module, ModuleStorage, RuntimeEnvironment, Script, ScriptStorage, UnsyncModuleStorage,
 };
+use bytes::Bytes;
 use move_binary_format::{
     access::ScriptAccess,
     errors::{PartialVMError, PartialVMResult},
@@ -175,6 +176,14 @@ impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> 
     ) -> PartialVMResult<bool> {
         self.module_storage
             .check_module_exists(address, module_name)
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        self.module_storage.fetch_module_bytes(address, module_name)
     }
 
     fn fetch_module_size_in_bytes(

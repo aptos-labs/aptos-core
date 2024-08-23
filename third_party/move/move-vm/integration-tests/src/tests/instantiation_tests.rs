@@ -11,11 +11,15 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, DummyCodeStorage};
+use move_vm_runtime::{
+    config::VMConfig, move_vm::MoveVM, session::Session, IntoUnsyncCodeStorage,
+    LocalModuleBytesStorage, ModuleStorage, TemporaryModuleStorage, UnreachableCodeStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn instantiation_err() {
@@ -102,8 +106,9 @@ fn instantiation_err() {
         variant_field_handles: vec![],
         variant_field_instantiations: vec![],
     };
-
     move_bytecode_verifier::verify_module(&cm).expect("verify failed");
+    let mut mod_bytes = vec![];
+    cm.serialize(&mut mod_bytes).unwrap();
 
     let vm_config = VMConfig {
         paranoid_type_checks: false,
@@ -111,27 +116,11 @@ fn instantiation_err() {
     };
     let vm = MoveVM::new_with_config(vec![], vm_config);
 
-    let mut resource_storage: InMemoryStorage = InMemoryStorage::new();
+    let resource_storage: InMemoryStorage = InMemoryStorage::new();
+    let module_storage =
+        LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
 
-    // Verify we can publish this module.
-    {
-        let mut session = vm.new_session(&resource_storage);
-        session
-            .verify_module_bundle_before_publishing(
-                &[cm.clone()],
-                cm.self_addr(),
-                &DummyCodeStorage,
-            )
-            .expect("Module must publish");
-        drop(session);
-
-        // Add it to module storage and restart the session.
-        let mut mod_bytes = vec![];
-        cm.serialize(&mut mod_bytes).unwrap();
-        resource_storage.publish_or_overwrite_module(cm.self_id(), mod_bytes);
-    }
-
-    let mut session = vm.new_session(&resource_storage);
+    // Prepare type arguments.
     let mut ty_arg = TypeTag::U128;
     for _ in 0..4 {
         ty_arg = TypeTag::Struct(Box::new(StructTag {
@@ -142,7 +131,33 @@ fn instantiation_err() {
         }));
     }
 
-    let res = session.load_function(&DummyCodeStorage, &cm.self_id(), ident_str!("f"), &[ty_arg]);
+    // Publish (must succeed!) and the load the function.
+    let mut session = vm.new_session(&resource_storage);
+    if vm.vm_config().use_loader_v2 {
+        let module_storage =
+            TemporaryModuleStorage::new(&addr, vm.runtime_environment(), &module_storage, vec![
+                mod_bytes.into(),
+            ])
+            .expect("Module must publish");
+        load_function(&mut session, &module_storage, &cm.self_id(), &[ty_arg])
+    } else {
+        #[allow(deprecated)]
+        session
+            .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
+            .expect("Module must publish");
+        load_function(&mut session, &UnreachableCodeStorage, &cm.self_id(), &[
+            ty_arg,
+        ])
+    }
+}
+
+fn load_function(
+    session: &mut Session,
+    module_storage: &impl ModuleStorage,
+    module_id: &ModuleId,
+    ty_args: &[TypeTag],
+) {
+    let res = session.load_function(module_storage, module_id, ident_str!("f"), ty_args);
     assert!(
         res.is_err(),
         "Instantiation must fail at load time when converting from type tag to type "
