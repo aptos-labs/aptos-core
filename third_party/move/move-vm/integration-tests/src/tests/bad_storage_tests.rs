@@ -639,7 +639,7 @@ impl ModuleStorage for BogusModuleStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> VMResult<usize> {
+    ) -> VMResult<Option<usize>> {
         Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 

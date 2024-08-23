@@ -72,7 +72,7 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<usize> {
+    ) -> VMResult<Option<usize>> {
         self.storage
             .fetch_module_size_in_bytes(address, module_name)
     }

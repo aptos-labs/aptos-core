@@ -5,6 +5,7 @@ use crate::{
     config::VMConfig,
     loader::{Function, LoadedFunctionOwner, Module, TypeCache},
     logging::expect_no_verification_errors,
+    module_linker_error,
     module_traversal::TraversalContext,
     storage::{
         environment::RuntimeEnvironment, module_storage::ModuleStorage,
@@ -115,7 +116,9 @@ impl LoaderV2 {
         push_next_ids_to_visit(&mut stack, visited, ids);
 
         while let Some((addr, name)) = stack.pop() {
-            let size = module_storage.fetch_module_size_in_bytes(addr, name)?;
+            let size = module_storage
+                .fetch_module_size_in_bytes(addr, name)?
+                .ok_or_else(|| module_linker_error!(addr, name))?;
             gas_meter
                 .charge_dependency(false, addr, name, NumBytes::new(size as u64))
                 .map_err(|err| {
