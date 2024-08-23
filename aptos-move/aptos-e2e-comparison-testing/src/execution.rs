@@ -28,6 +28,8 @@ use move_model::metadata::CompilerVersion;
 use std::{cmp, collections::HashMap, env, path::PathBuf, sync::Arc};
 // use std::cmp::min;
 
+const GAS_DIFF_PERCENTAGE: u64 = 5;
+
 fn add_packages_to_data_store(
     data_store: &mut FakeDataStore,
     package_info: &PackageInfo,
@@ -351,13 +353,18 @@ impl Execution {
                 debugger.clone(),
                 true,
             );
-            self.print_mismatches(cur_version, &res_main, &res_other);
+            self.print_mismatches(
+                cur_version,
+                &res_main,
+                &res_other,
+                txn_idx.package_info.package_name.clone(),
+            );
         } else {
             match res_main {
-                Ok(((write_set, events), txn_status)) => {
+                Ok(((write_set, events), txn_status, gas)) => {
                     self.output_result_str(format!(
-                        "version:{}\nwrite set:{:?}\n events:{:?}, txn_status:{:?}\n",
-                        cur_version, write_set, events, txn_status
+                        "version:{}\nwrite set:{:?}\n events:{:?}, txn_status:{:?}, gas:{}\n",
+                        cur_version, write_set, events, txn_status, gas
                     ));
                 },
                 Err(vm_status) => {
@@ -379,7 +386,7 @@ impl Execution {
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
         debugger_opt: Option<Arc<dyn AptosValidatorInterface + Send>>,
         v2_flag: bool,
-    ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus), VMStatus> {
+    ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus> {
         // Always add Aptos (0x1) packages.
         add_aptos_packages_to_data_store(&mut state, compiled_package_cache);
 
@@ -413,7 +420,11 @@ impl Execution {
                 .execute_transaction_block_with_state_view(txns, &data_view, false)
                 .map(|mut res| {
                     let res_i = res.pop().unwrap();
-                    (res_i.clone().into(), res_i.status().clone())
+                    (
+                        res_i.clone().into(),
+                        res_i.status().clone(),
+                        res_i.gas_used(),
+                    )
                 })
         } else {
             let res = executor
@@ -426,7 +437,11 @@ impl Execution {
                     //     res_i.gas_used(),
                     //     res_i.status()
                     // );
-                    (res_i.clone().into(), res_i.status().clone())
+                    (
+                        res_i.clone().into(),
+                        res_i.status().clone(),
+                        res_i.gas_used(),
+                    )
                 });
             res
         }
@@ -454,9 +469,25 @@ impl Execution {
     fn print_mismatches(
         &self,
         cur_version: u64,
-        res_1: &Result<((WriteSet, Vec<ContractEvent>), TransactionStatus), VMStatus>,
-        res_2: &Result<((WriteSet, Vec<ContractEvent>), TransactionStatus), VMStatus>,
+        res_1: &Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>,
+        res_2: &Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>,
+        package_name: String,
     ) {
+        let gas_diff = |gas_1: u64, gas_2: u64, x: u64| -> (f64, bool, bool) {
+            let gas2_ge_gas1 = gas_2 >= gas_1;
+            let mut denominator = gas_1;
+            let mut difference = gas_2 as i64 - gas_1 as i64;
+            if !gas2_ge_gas1 {
+                difference = gas_1 as i64 - gas_2 as i64;
+                denominator = gas_2;
+            }
+            let percentage_difference = difference as f64 / denominator as f64 * 100.0;
+            (
+                percentage_difference,
+                gas2_ge_gas1 && percentage_difference > x as f64,
+                !gas2_ge_gas1,
+            )
+        };
         match (res_1, res_2) {
             (Err(e1), Err(e2)) => {
                 if e1.message() != e2.message() || e1.status_code() != e2.status_code() {
@@ -480,7 +511,7 @@ impl Execution {
                     cur_version
                 ));
             },
-            (Ok((res_1, txn_status_1)), Ok((res_2, txn_status_2))) => {
+            (Ok((res_1, txn_status_1, gas_used_1)), Ok((res_2, txn_status_2, gas_used_2))) => {
                 // compare txn status
                 if txn_status_1 != txn_status_2 {
                     println!("txn status is different at version: {}", cur_version);
@@ -562,6 +593,15 @@ impl Execution {
                     self.output_result_str(format!(
                         "write set is different at version: {}",
                         cur_version
+                    ));
+                }
+                let (diff, gas2_gt_gas1, gas1_gt_gas_2) =
+                    gas_diff(*gas_used_1, *gas_used_2, GAS_DIFF_PERCENTAGE);
+                let greater_version = if gas1_gt_gas_2 { "v1" } else { "v2" };
+                if gas2_gt_gas1 || gas1_gt_gas_2 {
+                    self.output_result_str(format!(
+                        "gas diff: {}'s gas usage is {} percent more than the other at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
+                        greater_version, diff, cur_version, txn_status_1, txn_status_2, package_name
                     ));
                 }
             },
