@@ -82,7 +82,7 @@ impl LoaderV2 {
         traversal_context: &mut TraversalContext,
         serialized_script: &[u8],
     ) -> VMResult<()> {
-        let compiled_script = code_storage.fetch_deserialized_script(serialized_script)?;
+        let compiled_script = code_storage.deserialize_and_cache_script(serialized_script)?;
         let compiled_script = traversal_context.referenced_scripts.alloc(compiled_script);
 
         // TODO(Gas): Should we charge dependency gas for the script itself?
@@ -151,7 +151,7 @@ impl LoaderV2 {
     ) -> VMResult<LoadedFunction> {
         // Step 1: Load script. During the loading process, if script has not been previously
         // cached, it will be verified.
-        let script = code_storage.fetch_verified_script(serialized_script)?;
+        let script = code_storage.verify_and_cache_script(serialized_script)?;
 
         // Step 2: Load & verify types used as type arguments passed to this script. Note that
         // arguments for scripts are verified on the client side.
