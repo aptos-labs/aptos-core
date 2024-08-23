@@ -5,7 +5,7 @@ use crate::{
     module_cyclic_dependency_error, module_linker_error,
     storage::{
         environment::{RuntimeEnvironment, WithEnvironment},
-        module_storage::ModuleStorage,
+        module_storage::{ModuleBytesStorage, ModuleStorage},
     },
     Module,
 };
@@ -24,16 +24,6 @@ use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     sync::Arc,
 };
-
-/// Storage that contains serialized modules. Clients can implement this trait
-/// for their own backends, so that [UnsyncModuleStorage] can use them.
-pub trait ModuleBytesStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>>;
-}
 
 /// Represents an in-memory storage that contains modules' bytes.
 #[derive(Clone)]
@@ -120,8 +110,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Bytes> {
-        self.byte_storage
-            .fetch_module_bytes(address, module_name)?
+        self.fetch_module_bytes(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
@@ -273,6 +262,11 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     pub fn byte_storage(&self) -> &B {
         &self.byte_storage
     }
+
+    /// Returns the byte storage used by this module storage.
+    pub(crate) fn release_byte_storage(self) -> B {
+        self.byte_storage
+    }
 }
 
 impl<'e, B: ModuleBytesStorage> WithEnvironment for UnsyncModuleStorage<'e, B> {
@@ -293,6 +287,14 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
             .byte_storage
             .fetch_module_bytes(address, module_name)?
             .is_some())
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        self.byte_storage.fetch_module_bytes(address, module_name)
     }
 
     fn fetch_module_size_in_bytes(
