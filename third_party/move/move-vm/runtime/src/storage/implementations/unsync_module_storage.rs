@@ -311,8 +311,10 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<usize> {
-        Ok(self.get_existing_module_bytes(address, module_name)?.len())
+    ) -> VMResult<Option<usize>> {
+        Ok(self
+            .fetch_module_bytes(address, module_name)?
+            .map(|b| b.len()))
     }
 
     fn fetch_module_metadata(
@@ -407,7 +409,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use claims::{assert_err, assert_ok};
+    use claims::{assert_err, assert_none, assert_ok};
     use move_binary_format::{
         file_format::empty_module_with_dependencies_and_friends,
         file_format_common::VERSION_DEFAULT,
@@ -449,7 +451,7 @@ pub(crate) mod test {
 
         let result =
             module_storage.fetch_module_size_in_bytes(&AccountAddress::ZERO, ident_str!("a"));
-        assert_eq!(assert_err!(result).major_status(), StatusCode::LINKER_ERROR);
+        assert_none!(assert_ok!(result));
 
         let result = module_storage.fetch_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
         assert_eq!(assert_err!(result).major_status(), StatusCode::LINKER_ERROR);
