@@ -77,7 +77,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
     fn deserialize_script(&self, serialized_script: &[u8]) -> PartialVMResult<Arc<CompiledScript>> {
         let deserializer_config = &self
             .module_storage
-            .runtime_env()
+            .runtime_environment()
             .vm_config()
             .deserializer_config;
         let compiled_script =
@@ -103,7 +103,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
     ) -> PartialVMResult<Arc<Script>> {
         let partially_compiled_script = self
             .module_storage
-            .runtime_env()
+            .runtime_environment()
             .build_partially_verified_script(compiled_script.clone())?;
         let immediate_dependencies = compiled_script
             .immediate_dependencies_iter()
@@ -111,7 +111,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Arc::new(
             self.module_storage
-                .runtime_env()
+                .runtime_environment()
                 .build_verified_script(partially_compiled_script, &immediate_dependencies)?,
         ))
     }

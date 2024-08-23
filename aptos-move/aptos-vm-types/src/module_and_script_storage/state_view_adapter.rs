@@ -42,7 +42,7 @@ pub struct AptosCodeStorageAdapter<'s, S> {
 impl<'s, S: StateView> AptosCodeStorageAdapter<'s, S> {
     fn new(state_view: &'s S, vm: &'s MoveVM) -> Self {
         let adapter = StateViewAdapter { state_view };
-        let storage = adapter.into_unsync_code_storage(vm.runtime_env());
+        let storage = adapter.into_unsync_code_storage(vm.runtime_environment());
         Self { storage }
     }
 }

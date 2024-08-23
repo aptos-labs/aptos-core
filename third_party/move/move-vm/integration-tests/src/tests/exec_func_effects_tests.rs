@@ -98,7 +98,7 @@ fn run(
     let (resource_storage, module_bytes_storage) = setup(&modules);
 
     let vm = MoveVM::new(vec![]);
-    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
