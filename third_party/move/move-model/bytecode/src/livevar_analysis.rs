@@ -285,9 +285,10 @@ impl<'a> LiveVarAnalysis<'a> {
                     new_bytecodes.append(&mut bytecodes);
                     transformed_code.push(Bytecode::Branch(attr_id, then_label, else_label, src));
                 },
-                Bytecode::Load(_, dest, _) | Bytecode::Assign(_, dest, _, _)
+                Bytecode::Load(_, dest, _) | Bytecode::Assign(_, dest, _, _, _)
                     if !annotation_at.after.contains(&dest) =>
                 {
+                    // TODO: Should warning for unused assignment be here?
                     // Drop this load/assign as it is not used.
                 },
                 Bytecode::Call(attr_id, dests, oper, srcs, aa)
@@ -318,7 +319,7 @@ impl<'a> LiveVarAnalysis<'a> {
                     // to support IsParent test against local and global directly, but that is more complicated.
                     // 2) if the called operation is either OpaqueCallBegin or OpaqueCallEnd, they should not be optimized away, because they should always appear pairwise.
                     let next_code_offset = code_offset + 1;
-                    if let Bytecode::Assign(_, dest, src, _) = &code[next_code_offset] {
+                    if let Bytecode::Assign(_, dest, src, _, _) = &code[next_code_offset] {
                         let annotation_at = &annotations[&(next_code_offset as CodeOffset)];
                         if src == &dests[0] && !annotation_at.after.contains(src) {
                             transformed_code.push(Bytecode::Call(
@@ -407,7 +408,7 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
     fn execute(&self, state: &mut LiveVarState, instr: &Bytecode, _idx: CodeOffset) {
         use Bytecode::*;
         match instr {
-            Assign(_, dst, src, _) => {
+            Assign(_, dst, src, _, _) => {
                 if state.remove(&[*dst]) {
                     state.insert(&[*src]);
                 }

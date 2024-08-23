@@ -6,6 +6,18 @@ error: cannot mutably borrow since mutable references exist
 29 │         let p1 = borrow_global_mut<Pair>(addr1);
    │                  ------------------------------ previous mutable global borrow
 30 │         let p2 = borrow_global_mut<Pair>(addr2);
+   │             --   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+   │             │
+   │             requirement enforced here
+31 │         p1 == p2
+   │         -- conflicting reference `p1` used here
+
+error: cannot mutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_global_invalid.move:30:18
+   │
+29 │         let p1 = borrow_global_mut<Pair>(addr1);
+   │                  ------------------------------ previous mutable global borrow
+30 │         let p2 = borrow_global_mut<Pair>(addr2);
    │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 31 │         p1 == p2
    │         --------

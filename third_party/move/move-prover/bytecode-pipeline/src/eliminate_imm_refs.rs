@@ -11,7 +11,7 @@ use move_stackless_bytecode::{
     function_data_builder::FunctionDataBuilder,
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AssignKind, Bytecode, Operation},
+    stackless_bytecode::{AssignKind, Bytecode, DefOrAssign, Operation},
 };
 
 pub struct EliminateImmRefsProcessor {}
@@ -90,13 +90,23 @@ impl<'a> EliminateImmRefs<'a> {
         match bytecode {
             Call(attr_id, dests, op, srcs, aa) => match op {
                 ReadRef if self.is_imm_ref(srcs[0]) => {
-                    self.builder
-                        .emit(Assign(attr_id, dests[0], srcs[0], AssignKind::Move));
+                    self.builder.emit(Assign(
+                        attr_id,
+                        dests[0],
+                        srcs[0],
+                        AssignKind::Move,
+                        DefOrAssign::default(),
+                    ));
                 },
                 FreezeRef(_) => self.builder.emit(Call(attr_id, dests, ReadRef, srcs, None)),
                 BorrowLoc if self.is_imm_ref(dests[0]) => {
-                    self.builder
-                        .emit(Assign(attr_id, dests[0], srcs[0], AssignKind::Copy));
+                    self.builder.emit(Assign(
+                        attr_id,
+                        dests[0],
+                        srcs[0],
+                        AssignKind::Copy,
+                        DefOrAssign::default(),
+                    ));
                 },
                 BorrowField(mid, sid, type_actuals, offset) if self.is_imm_ref(dests[0]) => {
                     self.builder.emit(Call(

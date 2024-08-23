@@ -1049,7 +1049,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
 
         // Process the instruction
         match instr {
-            Assign(_, dest, src, kind) => {
+            Assign(_, dest, src, kind, _) => {
                 step.assign(*dest, *src, *kind);
             },
             Ret(_, srcs) => step.return_(instr, srcs),

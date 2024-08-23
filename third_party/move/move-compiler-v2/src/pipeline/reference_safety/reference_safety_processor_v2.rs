@@ -1999,7 +1999,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                     .collect_vec();
                 step.check_borrow_safety(&exclusive_refs)
             },
-            Assign(_, _, src, _) if step.ty(*src).is_mutable_reference() => {
+            Assign(_, _, src, _, _) if step.ty(*src).is_mutable_reference() => {
                 step.check_borrow_safety(&[*src])
             },
             _ => {},
@@ -2007,7 +2007,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
 
         // Process the instruction
         match instr {
-            Assign(_, dest, src, kind) => {
+            Assign(_, dest, src, kind, _) => {
                 step.assign(*dest, *src, *kind);
             },
             Ret(_, srcs) => step.return_(srcs),

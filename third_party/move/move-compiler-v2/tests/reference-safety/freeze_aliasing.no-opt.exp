@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot freeze local `_z` which is still mutably borrowed
+error: cannot freeze value which is still mutably borrowed
   ┌─ tests/reference-safety/freeze_aliasing.move:7:18
   │
 5 │         let r = &mut x;

@@ -23,19 +23,25 @@ module 0xc0ffee::m {
 [variant baseline]
 fun m::test() {
      var $t0: u64
-     var $t1: &mut u64
+     var $t1: u64
      var $t2: &mut u64
-     var $t3: &u64
-     var $t4: &u64
-     var $t5: u64
-  0: $t0 := 3
-  1: $t1 := borrow_local($t0)
-  2: $t2 := borrow_local($t0)
-  3: $t3 := freeze_ref($t2)
-  4: $t4 := infer($t3)
-  5: $t5 := 4
-  6: write_ref($t1, $t5)
-  7: return ()
+     var $t3: &mut u64
+     var $t4: &mut u64
+     var $t5: &mut u64
+     var $t6: &u64
+     var $t7: &u64
+     var $t8: u64
+  0: $t1 := 3
+  1: $t0 := infer($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := infer($t3)
+  4: $t5 := borrow_local($t0)
+  5: $t4 := infer($t5)
+  6: $t6 := freeze_ref($t4)
+  7: $t7 := infer($t6)
+  8: $t8 := 4
+  9: write_ref($t2, $t8)
+ 10: return ()
 }
 
 

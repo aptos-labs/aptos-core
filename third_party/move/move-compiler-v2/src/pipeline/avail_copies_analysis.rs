@@ -191,7 +191,7 @@ impl TransferFunctions for AvailCopiesAnalysis {
                 state.kill_copies_with(*dst);
             }
         });
-        if let Assign(_, dst, src, _) = instr {
+        if let Assign(_, dst, src, _, _) = instr {
             if !self.pinned_temps.contains(dst) && !self.pinned_temps.contains(src) {
                 // Note that we are conservative here for the sake of simplicity, and disallow
                 // tracking copies when either `dst` or `src` is pinned.

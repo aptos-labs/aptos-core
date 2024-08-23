@@ -24,8 +24,8 @@ use move_stackless_bytecode::{
     livevar_analysis::LiveVarAnalysisProcessor,
     reaching_def_analysis::ReachingDefProcessor,
     stackless_bytecode::{
-        AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, HavocKind, Label,
-        Operation, PropKind,
+        AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, DefOrAssign, HavocKind,
+        Label, Operation, PropKind,
     },
     usage_analysis, COMPILED_MODULE_AVAILABLE,
 };
@@ -429,8 +429,9 @@ impl<'a> Instrumenter<'a> {
             Ret(id, results) => {
                 self.builder.set_loc_from_attr(id);
                 for (i, r) in self.ret_locals.clone().into_iter().enumerate() {
-                    self.builder
-                        .emit_with(|id| Assign(id, r, results[i], AssignKind::Move));
+                    self.builder.emit_with(|id| {
+                        Assign(id, r, results[i], AssignKind::Move, DefOrAssign::default())
+                    });
                 }
                 let ret_label = self.ret_label;
                 self.builder.emit_with(|id| Jump(id, ret_label));
@@ -440,8 +441,15 @@ impl<'a> Instrumenter<'a> {
                 self.builder.set_loc_from_attr(id);
                 let abort_local = self.abort_local;
                 let abort_label = self.abort_label;
-                self.builder
-                    .emit_with(|id| Assign(id, abort_local, code, AssignKind::Move));
+                self.builder.emit_with(|id| {
+                    Assign(
+                        id,
+                        abort_local,
+                        code,
+                        AssignKind::Move,
+                        DefOrAssign::default(),
+                    )
+                });
                 self.builder.emit_with(|id| Jump(id, abort_label));
                 self.can_abort = true;
             },
@@ -720,8 +728,15 @@ impl<'a> Instrumenter<'a> {
                     )
                 })
             } else {
-                self.builder
-                    .emit_with(|attr_id| Assign(attr_id, *saved_idx, *idx, AssignKind::Copy))
+                self.builder.emit_with(|attr_id| {
+                    Assign(
+                        attr_id,
+                        *saved_idx,
+                        *idx,
+                        AssignKind::Copy,
+                        DefOrAssign::default(),
+                    )
+                })
             }
         }
     }

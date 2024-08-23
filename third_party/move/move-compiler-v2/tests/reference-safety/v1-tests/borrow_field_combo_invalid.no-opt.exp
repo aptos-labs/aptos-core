@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
+error: cannot borrow field `f1` of value which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:14:18
    │
 14 │         let f1 = &inner.f1;
@@ -46,7 +46,7 @@ error: cannot read local `inner` since it is mutably borrowed
 19 │         *c;
    │         -- conflicting reference `c` used here
 
-error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
+error: cannot borrow field `f1` of value which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:25:18
    │
 25 │         let f1 = &inner.f1;
@@ -92,7 +92,7 @@ error: cannot read local `inner` since it is mutably borrowed
 30 │         *c;
    │         -- conflicting reference `c` used here
 
-error: cannot mutably borrow field `f1` of local `f1` which is already borrowed
+error: cannot mutably borrow field `f1` of value which is already borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:36:18
    │
 35 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
@@ -140,7 +140,7 @@ error: cannot read local `inner` since it is mutably borrowed
 41 │         *c;
    │         -- conflicting reference `c` used here
 
-error: cannot mutably borrow field `f1` of local `f1` which is already borrowed
+error: cannot mutably borrow field `f1` of value which is already borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:47:18
    │
 46 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
@@ -188,7 +188,7 @@ error: cannot read local `inner` since it is mutably borrowed
 52 │         *c;
    │         -- conflicting reference `c` used here
 
-error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
+error: cannot borrow field `f1` of value which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:58:18
    │
 57 │         let c; if (cond) c = &mut inner.f1 else c = &mut inner.f2;
@@ -199,7 +199,7 @@ error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
 60 │         *c;
    │         -- conflicting reference `c` used here
 
-error: cannot borrow field `f1` of local `f1` which is already mutably borrowed
+error: cannot borrow field `f1` of value which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:67:18
    │
 66 │         let c; if (cond) c = id_mut(&mut inner.f1) else c = &mut inner.f1;

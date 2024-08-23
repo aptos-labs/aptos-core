@@ -614,7 +614,7 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
             .expect("livevar annotation");
 
         match instr {
-            Assign(_, dest, src, kind) => {
+            Assign(_, dest, src, kind, _) => {
                 let dest_node = self.borrow_node(*dest);
                 state.add_node(dest_node.clone());
 

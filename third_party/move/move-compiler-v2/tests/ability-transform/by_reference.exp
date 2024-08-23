@@ -15,23 +15,25 @@ fun <SELF>_0::check() {
      var $t10: vector<u8>
      var $t11: u64
      var $t12: &mut u64
-     var $t13: u64
+     var $t13: &mut u64
      var $t14: u64
-     var $t15: &mut vector<u8>
-     var $t16: vector<u8>
-     var $t17: vector<u8>
-     var $t18: bool
-     var $t19: u64
-     var $t20: u64
+     var $t15: u64
+     var $t16: &mut vector<u8>
+     var $t17: &mut vector<u8>
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: bool
      var $t21: u64
-     var $t22: bool
-     var $t23: vector<u8>
-     var $t24: vector<u8>
-     var $t25: u64
-     var $t26: bool
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: vector<u8>
+     var $t26: vector<u8>
      var $t27: u64
      var $t28: bool
      var $t29: u64
+     var $t30: bool
+     var $t31: u64
   0: $t0 := true
   1: if ($t0) goto 2 else goto 4
   2: label L0
@@ -68,51 +70,53 @@ fun <SELF>_0::check() {
  33: $t11 := 42
  34: abort($t11)
  35: label L11
- 36: $t13 := 0
- 37: $t12 := borrow_local($t13)
- 38: $t14 := 1
- 39: write_ref($t12, $t14)
- 40: $t16 := [104, 101, 108, 108, 111]
- 41: $t15 := borrow_local($t16)
- 42: $t17 := [98, 121, 101]
- 43: write_ref($t15, $t17)
- 44: $t19 := read_ref($t12)
- 45: $t20 := 1
- 46: $t18 := ==($t19, $t20)
- 47: if ($t18) goto 48 else goto 50
- 48: label L12
- 49: goto 53
- 50: label L13
- 51: $t21 := 42
- 52: abort($t21)
- 53: label L14
- 54: $t23 := read_ref($t15)
- 55: $t24 := [98, 121, 101]
- 56: $t22 := ==($t23, $t24)
- 57: if ($t22) goto 58 else goto 60
- 58: label L15
- 59: goto 63
- 60: label L16
- 61: $t25 := 42
- 62: abort($t25)
- 63: label L17
- 64: $t26 := true
- 65: if ($t26) goto 66 else goto 68
- 66: label L18
- 67: goto 71
- 68: label L19
- 69: $t27 := 42
- 70: abort($t27)
- 71: label L20
- 72: $t28 := true
- 73: if ($t28) goto 74 else goto 76
- 74: label L21
- 75: goto 79
- 76: label L22
- 77: $t29 := 42
- 78: abort($t29)
- 79: label L23
- 80: return ()
+ 36: $t14 := 0
+ 37: $t13 := borrow_local($t14)
+ 38: $t12 := infer($t13)
+ 39: $t15 := 1
+ 40: write_ref($t12, $t15)
+ 41: $t18 := [104, 101, 108, 108, 111]
+ 42: $t17 := borrow_local($t18)
+ 43: $t16 := infer($t17)
+ 44: $t19 := [98, 121, 101]
+ 45: write_ref($t16, $t19)
+ 46: $t21 := read_ref($t12)
+ 47: $t22 := 1
+ 48: $t20 := ==($t21, $t22)
+ 49: if ($t20) goto 50 else goto 52
+ 50: label L12
+ 51: goto 55
+ 52: label L13
+ 53: $t23 := 42
+ 54: abort($t23)
+ 55: label L14
+ 56: $t25 := read_ref($t16)
+ 57: $t26 := [98, 121, 101]
+ 58: $t24 := ==($t25, $t26)
+ 59: if ($t24) goto 60 else goto 62
+ 60: label L15
+ 61: goto 65
+ 62: label L16
+ 63: $t27 := 42
+ 64: abort($t27)
+ 65: label L17
+ 66: $t28 := true
+ 67: if ($t28) goto 68 else goto 70
+ 68: label L18
+ 69: goto 73
+ 70: label L19
+ 71: $t29 := 42
+ 72: abort($t29)
+ 73: label L20
+ 74: $t30 := true
+ 75: if ($t30) goto 76 else goto 78
+ 76: label L21
+ 77: goto 81
+ 78: label L22
+ 79: $t31 := 42
+ 80: abort($t31)
+ 81: label L23
+ 82: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -132,23 +136,25 @@ fun <SELF>_0::check() {
      var $t10: vector<u8>
      var $t11: u64
      var $t12: &mut u64
-     var $t13: u64
+     var $t13: &mut u64
      var $t14: u64
-     var $t15: &mut vector<u8>
-     var $t16: vector<u8>
-     var $t17: vector<u8>
-     var $t18: bool
-     var $t19: u64
-     var $t20: u64
+     var $t15: u64
+     var $t16: &mut vector<u8>
+     var $t17: &mut vector<u8>
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: bool
      var $t21: u64
-     var $t22: bool
-     var $t23: vector<u8>
-     var $t24: vector<u8>
-     var $t25: u64
-     var $t26: bool
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: vector<u8>
+     var $t26: vector<u8>
      var $t27: u64
      var $t28: bool
      var $t29: u64
+     var $t30: bool
+     var $t31: u64
      # live vars:
   0: $t0 := true
      # live vars: $t0
@@ -222,95 +228,99 @@ fun <SELF>_0::check() {
      # live vars:
  35: label L11
      # live vars:
- 36: $t13 := 0
+ 36: $t14 := 0
+     # live vars: $t14
+ 37: $t13 := borrow_local($t14)
      # live vars: $t13
- 37: $t12 := borrow_local($t13)
+ 38: $t12 := infer($t13)
      # live vars: $t12
- 38: $t14 := 1
-     # live vars: $t12, $t14
- 39: write_ref($t12, $t14)
+ 39: $t15 := 1
+     # live vars: $t12, $t15
+ 40: write_ref($t12, $t15)
      # live vars: $t12
- 40: $t16 := [104, 101, 108, 108, 111]
+ 41: $t18 := [104, 101, 108, 108, 111]
+     # live vars: $t12, $t18
+ 42: $t17 := borrow_local($t18)
+     # live vars: $t12, $t17
+ 43: $t16 := infer($t17)
      # live vars: $t12, $t16
- 41: $t15 := borrow_local($t16)
-     # live vars: $t12, $t15
- 42: $t17 := [98, 121, 101]
-     # live vars: $t12, $t15, $t17
- 43: write_ref($t15, $t17)
-     # live vars: $t12, $t15
- 44: $t19 := read_ref($t12)
-     # live vars: $t15, $t19
- 45: $t20 := 1
-     # live vars: $t15, $t19, $t20
- 46: $t18 := ==($t19, $t20)
-     # live vars: $t15, $t18
- 47: if ($t18) goto 48 else goto 50
-     # live vars: $t15
- 48: label L12
-     # live vars: $t15
- 49: goto 53
-     # live vars: $t15
- 50: label L13
+ 44: $t19 := [98, 121, 101]
+     # live vars: $t12, $t16, $t19
+ 45: write_ref($t16, $t19)
+     # live vars: $t12, $t16
+ 46: $t21 := read_ref($t12)
+     # live vars: $t16, $t21
+ 47: $t22 := 1
+     # live vars: $t16, $t21, $t22
+ 48: $t20 := ==($t21, $t22)
+     # live vars: $t16, $t20
+ 49: if ($t20) goto 50 else goto 52
+     # live vars: $t16
+ 50: label L12
+     # live vars: $t16
+ 51: goto 55
+     # live vars: $t16
+ 52: label L13
      # live vars:
- 51: $t21 := 42
-     # live vars: $t21
- 52: abort($t21)
-     # live vars: $t15
- 53: label L14
-     # live vars: $t15
- 54: $t23 := read_ref($t15)
+ 53: $t23 := 42
      # live vars: $t23
- 55: $t24 := [98, 121, 101]
-     # live vars: $t23, $t24
- 56: $t22 := ==($t23, $t24)
-     # live vars: $t22
- 57: if ($t22) goto 58 else goto 60
-     # live vars:
- 58: label L15
-     # live vars:
- 59: goto 63
-     # live vars:
- 60: label L16
-     # live vars:
- 61: $t25 := 42
+ 54: abort($t23)
+     # live vars: $t16
+ 55: label L14
+     # live vars: $t16
+ 56: $t25 := read_ref($t16)
      # live vars: $t25
- 62: abort($t25)
+ 57: $t26 := [98, 121, 101]
+     # live vars: $t25, $t26
+ 58: $t24 := ==($t25, $t26)
+     # live vars: $t24
+ 59: if ($t24) goto 60 else goto 62
      # live vars:
- 63: label L17
+ 60: label L15
      # live vars:
- 64: $t26 := true
-     # live vars: $t26
- 65: if ($t26) goto 66 else goto 68
+ 61: goto 65
      # live vars:
- 66: label L18
+ 62: label L16
      # live vars:
- 67: goto 71
-     # live vars:
- 68: label L19
-     # live vars:
- 69: $t27 := 42
+ 63: $t27 := 42
      # live vars: $t27
- 70: abort($t27)
+ 64: abort($t27)
      # live vars:
- 71: label L20
+ 65: label L17
      # live vars:
- 72: $t28 := true
+ 66: $t28 := true
      # live vars: $t28
- 73: if ($t28) goto 74 else goto 76
+ 67: if ($t28) goto 68 else goto 70
      # live vars:
- 74: label L21
+ 68: label L18
      # live vars:
- 75: goto 79
+ 69: goto 73
      # live vars:
- 76: label L22
+ 70: label L19
      # live vars:
- 77: $t29 := 42
+ 71: $t29 := 42
      # live vars: $t29
- 78: abort($t29)
+ 72: abort($t29)
      # live vars:
- 79: label L23
+ 73: label L20
      # live vars:
- 80: return ()
+ 74: $t30 := true
+     # live vars: $t30
+ 75: if ($t30) goto 76 else goto 78
+     # live vars:
+ 76: label L21
+     # live vars:
+ 77: goto 81
+     # live vars:
+ 78: label L22
+     # live vars:
+ 79: $t31 := 42
+     # live vars: $t31
+ 80: abort($t31)
+     # live vars:
+ 81: label L23
+     # live vars:
+ 82: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -330,23 +340,25 @@ fun <SELF>_0::check() {
      var $t10: vector<u8>
      var $t11: u64
      var $t12: &mut u64
-     var $t13: u64
+     var $t13: &mut u64
      var $t14: u64
-     var $t15: &mut vector<u8>
-     var $t16: vector<u8>
-     var $t17: vector<u8>
-     var $t18: bool
-     var $t19: u64
-     var $t20: u64
+     var $t15: u64
+     var $t16: &mut vector<u8>
+     var $t17: &mut vector<u8>
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: bool
      var $t21: u64
-     var $t22: bool
-     var $t23: vector<u8>
-     var $t24: vector<u8>
-     var $t25: u64
-     var $t26: bool
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: vector<u8>
+     var $t26: vector<u8>
      var $t27: u64
      var $t28: bool
      var $t29: u64
+     var $t30: bool
+     var $t31: u64
      # live vars:
   0: $t0 := true
      # live vars: $t0
@@ -420,95 +432,99 @@ fun <SELF>_0::check() {
      # live vars:
  35: label L11
      # live vars:
- 36: $t13 := 0
+ 36: $t14 := 0
+     # live vars: $t14
+ 37: $t13 := borrow_local($t14)
      # live vars: $t13
- 37: $t12 := borrow_local($t13)
+ 38: $t12 := infer($t13)
      # live vars: $t12
- 38: $t14 := 1
-     # live vars: $t12, $t14
- 39: write_ref($t12, $t14)
+ 39: $t15 := 1
+     # live vars: $t12, $t15
+ 40: write_ref($t12, $t15)
      # live vars: $t12
- 40: $t16 := [104, 101, 108, 108, 111]
+ 41: $t18 := [104, 101, 108, 108, 111]
+     # live vars: $t12, $t18
+ 42: $t17 := borrow_local($t18)
+     # live vars: $t12, $t17
+ 43: $t16 := infer($t17)
      # live vars: $t12, $t16
- 41: $t15 := borrow_local($t16)
-     # live vars: $t12, $t15
- 42: $t17 := [98, 121, 101]
-     # live vars: $t12, $t15, $t17
- 43: write_ref($t15, $t17)
-     # live vars: $t12, $t15
- 44: $t19 := read_ref($t12)
-     # live vars: $t15, $t19
- 45: $t20 := 1
-     # live vars: $t15, $t19, $t20
- 46: $t18 := ==($t19, $t20)
-     # live vars: $t15, $t18
- 47: if ($t18) goto 48 else goto 50
-     # live vars: $t15
- 48: label L12
-     # live vars: $t15
- 49: goto 53
-     # live vars: $t15
- 50: label L13
+ 44: $t19 := [98, 121, 101]
+     # live vars: $t12, $t16, $t19
+ 45: write_ref($t16, $t19)
+     # live vars: $t12, $t16
+ 46: $t21 := read_ref($t12)
+     # live vars: $t16, $t21
+ 47: $t22 := 1
+     # live vars: $t16, $t21, $t22
+ 48: $t20 := ==($t21, $t22)
+     # live vars: $t16, $t20
+ 49: if ($t20) goto 50 else goto 52
+     # live vars: $t16
+ 50: label L12
+     # live vars: $t16
+ 51: goto 55
+     # live vars: $t16
+ 52: label L13
      # live vars:
- 51: $t21 := 42
-     # live vars: $t21
- 52: abort($t21)
-     # live vars: $t15
- 53: label L14
-     # live vars: $t15
- 54: $t23 := read_ref($t15)
+ 53: $t23 := 42
      # live vars: $t23
- 55: $t24 := [98, 121, 101]
-     # live vars: $t23, $t24
- 56: $t22 := ==($t23, $t24)
-     # live vars: $t22
- 57: if ($t22) goto 58 else goto 60
-     # live vars:
- 58: label L15
-     # live vars:
- 59: goto 63
-     # live vars:
- 60: label L16
-     # live vars:
- 61: $t25 := 42
+ 54: abort($t23)
+     # live vars: $t16
+ 55: label L14
+     # live vars: $t16
+ 56: $t25 := read_ref($t16)
      # live vars: $t25
- 62: abort($t25)
+ 57: $t26 := [98, 121, 101]
+     # live vars: $t25, $t26
+ 58: $t24 := ==($t25, $t26)
+     # live vars: $t24
+ 59: if ($t24) goto 60 else goto 62
      # live vars:
- 63: label L17
+ 60: label L15
      # live vars:
- 64: $t26 := true
-     # live vars: $t26
- 65: if ($t26) goto 66 else goto 68
+ 61: goto 65
      # live vars:
- 66: label L18
+ 62: label L16
      # live vars:
- 67: goto 71
-     # live vars:
- 68: label L19
-     # live vars:
- 69: $t27 := 42
+ 63: $t27 := 42
      # live vars: $t27
- 70: abort($t27)
+ 64: abort($t27)
      # live vars:
- 71: label L20
+ 65: label L17
      # live vars:
- 72: $t28 := true
+ 66: $t28 := true
      # live vars: $t28
- 73: if ($t28) goto 74 else goto 76
+ 67: if ($t28) goto 68 else goto 70
      # live vars:
- 74: label L21
+ 68: label L18
      # live vars:
- 75: goto 79
+ 69: goto 73
      # live vars:
- 76: label L22
+ 70: label L19
      # live vars:
- 77: $t29 := 42
+ 71: $t29 := 42
      # live vars: $t29
- 78: abort($t29)
+ 72: abort($t29)
      # live vars:
- 79: label L23
+ 73: label L20
      # live vars:
- 80: return ()
+ 74: $t30 := true
+     # live vars: $t30
+ 75: if ($t30) goto 76 else goto 78
+     # live vars:
+ 76: label L21
+     # live vars:
+ 77: goto 81
+     # live vars:
+ 78: label L22
+     # live vars:
+ 79: $t31 := 42
+     # live vars: $t31
+ 80: abort($t31)
+     # live vars:
+ 81: label L23
+     # live vars:
+ 82: return ()
 }
 
 ============ after ReferenceSafetyProcessor: ================
@@ -528,23 +544,25 @@ fun <SELF>_0::check() {
      var $t10: vector<u8>
      var $t11: u64
      var $t12: &mut u64
-     var $t13: u64
+     var $t13: &mut u64
      var $t14: u64
-     var $t15: &mut vector<u8>
-     var $t16: vector<u8>
-     var $t17: vector<u8>
-     var $t18: bool
-     var $t19: u64
-     var $t20: u64
+     var $t15: u64
+     var $t16: &mut vector<u8>
+     var $t17: &mut vector<u8>
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: bool
      var $t21: u64
-     var $t22: bool
-     var $t23: vector<u8>
-     var $t24: vector<u8>
-     var $t25: u64
-     var $t26: bool
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: vector<u8>
+     var $t26: vector<u8>
      var $t27: u64
      var $t28: bool
      var $t29: u64
+     var $t30: bool
+     var $t31: u64
      # live vars:
      # refs: []
      #
@@ -692,11 +710,19 @@ fun <SELF>_0::check() {
      # live vars:
      # refs: []
      #
- 36: $t13 := 0
-     # live vars: $t13
+ 36: $t14 := 0
+     # live vars: $t14
      # refs: []
      #
- 37: $t12 := borrow_local($t13)
+ 37: $t13 := borrow_local($t14)
+     # live vars: $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => (mut) #13 via [value] at line 13
+     #
+ 38: $t12 := infer($t13)
      # live vars: $t12
      # refs: [$t12 => #12]
      # #12
@@ -704,15 +730,15 @@ fun <SELF>_0::check() {
      # #root
      #   => (mut) #12 via [value] at line 13
      #
- 38: $t14 := 1
-     # live vars: $t12, $t14
+ 39: $t15 := 1
+     # live vars: $t12, $t15
      # refs: [$t12 => #12]
      # #12
      #   <no edges>
      # #root
      #   => (mut) #12 via [value] at line 13
      #
- 39: write_ref($t12, $t14)
+ 40: write_ref($t12, $t15)
      # live vars: $t12
      # refs: [$t12 => #12]
      # #12
@@ -720,224 +746,235 @@ fun <SELF>_0::check() {
      # #root
      #   => (mut) #12 via [value] at line 13
      #
- 40: $t16 := [104, 101, 108, 108, 111]
+ 41: $t18 := [104, 101, 108, 108, 111]
+     # live vars: $t12, $t18
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => (mut) #12 via [value] at line 13
+     #
+ 42: $t17 := borrow_local($t18)
+     # live vars: $t12, $t17
+     # refs: [$t12 => #12, $t17 => #17]
+     # #12
+     #   <no edges>
+     # #17
+     #   <no edges>
+     # #root
+     #   => (mut) #12 via [value] at line 13
+     #   => (mut) #17 via [value] at line 15
+     #
+ 43: $t16 := infer($t17)
      # live vars: $t12, $t16
-     # refs: [$t12 => #12]
+     # refs: [$t12 => #12, $t16 => #16]
      # #12
+     #   <no edges>
+     # #16
      #   <no edges>
      # #root
      #   => (mut) #12 via [value] at line 13
+     #   => (mut) #16 via [value] at line 15
      #
- 41: $t15 := borrow_local($t16)
-     # live vars: $t12, $t15
-     # refs: [$t12 => #12, $t15 => #15]
+ 44: $t19 := [98, 121, 101]
+     # live vars: $t12, $t16, $t19
+     # refs: [$t12 => #12, $t16 => #16]
      # #12
      #   <no edges>
-     # #15
+     # #16
      #   <no edges>
      # #root
      #   => (mut) #12 via [value] at line 13
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 42: $t17 := [98, 121, 101]
-     # live vars: $t12, $t15, $t17
-     # refs: [$t12 => #12, $t15 => #15]
+ 45: write_ref($t16, $t19)
+     # live vars: $t12, $t16
+     # refs: [$t12 => #12, $t16 => #16]
      # #12
      #   <no edges>
-     # #15
+     # #16
      #   <no edges>
      # #root
      #   => (mut) #12 via [value] at line 13
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 43: write_ref($t15, $t17)
-     # live vars: $t12, $t15
-     # refs: [$t12 => #12, $t15 => #15]
-     # #12
-     #   <no edges>
-     # #15
+ 46: $t21 := read_ref($t12)
+     # live vars: $t16, $t21
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #12 via [value] at line 13
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 44: $t19 := read_ref($t12)
-     # live vars: $t15, $t19
-     # refs: [$t15 => #15]
-     # #15
+ 47: $t22 := 1
+     # live vars: $t16, $t21, $t22
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 45: $t20 := 1
-     # live vars: $t15, $t19, $t20
-     # refs: [$t15 => #15]
-     # #15
+ 48: $t20 := ==($t21, $t22)
+     # live vars: $t16, $t20
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 46: $t18 := ==($t19, $t20)
-     # live vars: $t15, $t18
-     # refs: [$t15 => #15]
-     # #15
+ 49: if ($t20) goto 50 else goto 52
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 47: if ($t18) goto 48 else goto 50
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
+ 50: label L12
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 48: label L12
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
+ 51: goto 55
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 49: goto 53
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
-     #   <no edges>
-     # #root
-     #   => (mut) #15 via [value] at line 15
-     #
- 50: label L13
+ 52: label L13
      # live vars:
      # refs: []
      #
- 51: $t21 := 42
-     # live vars: $t21
-     # refs: []
-     #
- 52: abort($t21)
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
-     #   <no edges>
-     # #root
-     #   => (mut) #15 via [value] at line 15
-     #
- 53: label L14
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
-     #   <no edges>
-     # #root
-     #   => (mut) #15 via [value] at line 15
-     #
- 54: $t23 := read_ref($t15)
+ 53: $t23 := 42
      # live vars: $t23
      # refs: []
      #
- 55: $t24 := [98, 121, 101]
-     # live vars: $t23, $t24
-     # refs: []
+ 54: abort($t23)
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => (mut) #16 via [value] at line 15
      #
- 56: $t22 := ==($t23, $t24)
-     # live vars: $t22
-     # refs: []
+ 55: label L14
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => (mut) #16 via [value] at line 15
      #
- 57: if ($t22) goto 58 else goto 60
-     # live vars:
-     # refs: []
-     #
- 58: label L15
-     # live vars:
-     # refs: []
-     #
- 59: goto 63
-     # live vars:
-     # refs: []
-     #
- 60: label L16
-     # live vars:
-     # refs: []
-     #
- 61: $t25 := 42
+ 56: $t25 := read_ref($t16)
      # live vars: $t25
      # refs: []
      #
- 62: abort($t25)
+ 57: $t26 := [98, 121, 101]
+     # live vars: $t25, $t26
+     # refs: []
+     #
+ 58: $t24 := ==($t25, $t26)
+     # live vars: $t24
+     # refs: []
+     #
+ 59: if ($t24) goto 60 else goto 62
      # live vars:
      # refs: []
      #
- 63: label L17
+ 60: label L15
      # live vars:
      # refs: []
      #
- 64: $t26 := true
-     # live vars: $t26
-     # refs: []
-     #
- 65: if ($t26) goto 66 else goto 68
+ 61: goto 65
      # live vars:
      # refs: []
      #
- 66: label L18
+ 62: label L16
      # live vars:
      # refs: []
      #
- 67: goto 71
-     # live vars:
-     # refs: []
-     #
- 68: label L19
-     # live vars:
-     # refs: []
-     #
- 69: $t27 := 42
+ 63: $t27 := 42
      # live vars: $t27
      # refs: []
      #
- 70: abort($t27)
+ 64: abort($t27)
      # live vars:
      # refs: []
      #
- 71: label L20
+ 65: label L17
      # live vars:
      # refs: []
      #
- 72: $t28 := true
+ 66: $t28 := true
      # live vars: $t28
      # refs: []
      #
- 73: if ($t28) goto 74 else goto 76
+ 67: if ($t28) goto 68 else goto 70
      # live vars:
      # refs: []
      #
- 74: label L21
+ 68: label L18
      # live vars:
      # refs: []
      #
- 75: goto 79
+ 69: goto 73
      # live vars:
      # refs: []
      #
- 76: label L22
+ 70: label L19
      # live vars:
      # refs: []
      #
- 77: $t29 := 42
+ 71: $t29 := 42
      # live vars: $t29
      # refs: []
      #
- 78: abort($t29)
+ 72: abort($t29)
      # live vars:
      # refs: []
      #
- 79: label L23
+ 73: label L20
      # live vars:
      # refs: []
      #
- 80: return ()
+ 74: $t30 := true
+     # live vars: $t30
+     # refs: []
+     #
+ 75: if ($t30) goto 76 else goto 78
+     # live vars:
+     # refs: []
+     #
+ 76: label L21
+     # live vars:
+     # refs: []
+     #
+ 77: goto 81
+     # live vars:
+     # refs: []
+     #
+ 78: label L22
+     # live vars:
+     # refs: []
+     #
+ 79: $t31 := 42
+     # live vars: $t31
+     # refs: []
+     #
+ 80: abort($t31)
+     # live vars:
+     # refs: []
+     #
+ 81: label L23
+     # live vars:
+     # refs: []
+     #
+ 82: return ()
 }
 
 ============ after AbortAnalysisProcessor: ================
@@ -957,23 +994,25 @@ fun <SELF>_0::check() {
      var $t10: vector<u8>
      var $t11: u64
      var $t12: &mut u64
-     var $t13: u64
+     var $t13: &mut u64
      var $t14: u64
-     var $t15: &mut vector<u8>
-     var $t16: vector<u8>
-     var $t17: vector<u8>
-     var $t18: bool
-     var $t19: u64
-     var $t20: u64
+     var $t15: u64
+     var $t16: &mut vector<u8>
+     var $t17: &mut vector<u8>
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: bool
      var $t21: u64
-     var $t22: bool
-     var $t23: vector<u8>
-     var $t24: vector<u8>
-     var $t25: u64
-     var $t26: bool
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: vector<u8>
+     var $t26: vector<u8>
      var $t27: u64
      var $t28: bool
      var $t29: u64
+     var $t30: bool
+     var $t31: u64
      # abort state: {returns,aborts}
      # live vars:
      # refs: []
@@ -1158,12 +1197,21 @@ fun <SELF>_0::check() {
      # live vars:
      # refs: []
      #
- 36: $t13 := 0
+ 36: $t14 := 0
      # abort state: {returns,aborts}
-     # live vars: $t13
+     # live vars: $t14
      # refs: []
      #
- 37: $t12 := borrow_local($t13)
+ 37: $t13 := borrow_local($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => (mut) #13 via [value] at line 13
+     #
+ 38: $t12 := infer($t13)
      # abort state: {returns,aborts}
      # live vars: $t12
      # refs: [$t12 => #12]
@@ -1172,16 +1220,16 @@ fun <SELF>_0::check() {
      # #root
      #   => (mut) #12 via [value] at line 13
      #
- 38: $t14 := 1
+ 39: $t15 := 1
      # abort state: {returns,aborts}
-     # live vars: $t12, $t14
+     # live vars: $t12, $t15
      # refs: [$t12 => #12]
      # #12
      #   <no edges>
      # #root
      #   => (mut) #12 via [value] at line 13
      #
- 39: write_ref($t12, $t14)
+ 40: write_ref($t12, $t15)
      # abort state: {returns,aborts}
      # live vars: $t12
      # refs: [$t12 => #12]
@@ -1190,264 +1238,276 @@ fun <SELF>_0::check() {
      # #root
      #   => (mut) #12 via [value] at line 13
      #
- 40: $t16 := [104, 101, 108, 108, 111]
+ 41: $t18 := [104, 101, 108, 108, 111]
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t18
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => (mut) #12 via [value] at line 13
+     #
+ 42: $t17 := borrow_local($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t12, $t17
+     # refs: [$t12 => #12, $t17 => #17]
+     # #12
+     #   <no edges>
+     # #17
+     #   <no edges>
+     # #root
+     #   => (mut) #12 via [value] at line 13
+     #   => (mut) #17 via [value] at line 15
+     #
+ 43: $t16 := infer($t17)
      # abort state: {returns,aborts}
      # live vars: $t12, $t16
-     # refs: [$t12 => #12]
+     # refs: [$t12 => #12, $t16 => #16]
      # #12
+     #   <no edges>
+     # #16
      #   <no edges>
      # #root
      #   => (mut) #12 via [value] at line 13
+     #   => (mut) #16 via [value] at line 15
      #
- 41: $t15 := borrow_local($t16)
+ 44: $t19 := [98, 121, 101]
      # abort state: {returns,aborts}
-     # live vars: $t12, $t15
-     # refs: [$t12 => #12, $t15 => #15]
+     # live vars: $t12, $t16, $t19
+     # refs: [$t12 => #12, $t16 => #16]
      # #12
      #   <no edges>
-     # #15
+     # #16
      #   <no edges>
      # #root
      #   => (mut) #12 via [value] at line 13
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 42: $t17 := [98, 121, 101]
+ 45: write_ref($t16, $t19)
      # abort state: {returns,aborts}
-     # live vars: $t12, $t15, $t17
-     # refs: [$t12 => #12, $t15 => #15]
+     # live vars: $t12, $t16
+     # refs: [$t12 => #12, $t16 => #16]
      # #12
      #   <no edges>
-     # #15
+     # #16
      #   <no edges>
      # #root
      #   => (mut) #12 via [value] at line 13
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 43: write_ref($t15, $t17)
+ 46: $t21 := read_ref($t12)
      # abort state: {returns,aborts}
-     # live vars: $t12, $t15
-     # refs: [$t12 => #12, $t15 => #15]
-     # #12
-     #   <no edges>
-     # #15
+     # live vars: $t16, $t21
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #12 via [value] at line 13
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 44: $t19 := read_ref($t12)
+ 47: $t22 := 1
      # abort state: {returns,aborts}
-     # live vars: $t15, $t19
-     # refs: [$t15 => #15]
-     # #15
+     # live vars: $t16, $t21, $t22
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 45: $t20 := 1
+ 48: $t20 := ==($t21, $t22)
      # abort state: {returns,aborts}
-     # live vars: $t15, $t19, $t20
-     # refs: [$t15 => #15]
-     # #15
+     # live vars: $t16, $t20
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 46: $t18 := ==($t19, $t20)
+ 49: if ($t20) goto 50 else goto 52
      # abort state: {returns,aborts}
-     # live vars: $t15, $t18
-     # refs: [$t15 => #15]
-     # #15
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 47: if ($t18) goto 48 else goto 50
+ 50: label L12
      # abort state: {returns,aborts}
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 48: label L12
-     # abort state: {returns,aborts}
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
-     #   <no edges>
-     # #root
-     #   => (mut) #15 via [value] at line 15
-     #
- 49: goto 53
+ 51: goto 55
      # abort state: {aborts}
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
      #   <no edges>
      # #root
-     #   => (mut) #15 via [value] at line 15
+     #   => (mut) #16 via [value] at line 15
      #
- 50: label L13
+ 52: label L13
      # abort state: {aborts}
      # live vars:
      # refs: []
      #
- 51: $t21 := 42
+ 53: $t23 := 42
      # abort state: {aborts}
-     # live vars: $t21
-     # refs: []
-     #
- 52: abort($t21)
-     # abort state: {returns,aborts}
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
-     #   <no edges>
-     # #root
-     #   => (mut) #15 via [value] at line 15
-     #
- 53: label L14
-     # abort state: {returns,aborts}
-     # live vars: $t15
-     # refs: [$t15 => #15]
-     # #15
-     #   <no edges>
-     # #root
-     #   => (mut) #15 via [value] at line 15
-     #
- 54: $t23 := read_ref($t15)
-     # abort state: {returns,aborts}
      # live vars: $t23
      # refs: []
      #
- 55: $t24 := [98, 121, 101]
+ 54: abort($t23)
      # abort state: {returns,aborts}
-     # live vars: $t23, $t24
-     # refs: []
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => (mut) #16 via [value] at line 15
      #
- 56: $t22 := ==($t23, $t24)
+ 55: label L14
      # abort state: {returns,aborts}
-     # live vars: $t22
-     # refs: []
+     # live vars: $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => (mut) #16 via [value] at line 15
      #
- 57: if ($t22) goto 58 else goto 60
+ 56: $t25 := read_ref($t16)
      # abort state: {returns,aborts}
-     # live vars:
-     # refs: []
-     #
- 58: label L15
-     # abort state: {returns,aborts}
-     # live vars:
-     # refs: []
-     #
- 59: goto 63
-     # abort state: {aborts}
-     # live vars:
-     # refs: []
-     #
- 60: label L16
-     # abort state: {aborts}
-     # live vars:
-     # refs: []
-     #
- 61: $t25 := 42
-     # abort state: {aborts}
      # live vars: $t25
      # refs: []
      #
- 62: abort($t25)
+ 57: $t26 := [98, 121, 101]
+     # abort state: {returns,aborts}
+     # live vars: $t25, $t26
+     # refs: []
+     #
+ 58: $t24 := ==($t25, $t26)
+     # abort state: {returns,aborts}
+     # live vars: $t24
+     # refs: []
+     #
+ 59: if ($t24) goto 60 else goto 62
      # abort state: {returns,aborts}
      # live vars:
      # refs: []
      #
- 63: label L17
+ 60: label L15
      # abort state: {returns,aborts}
      # live vars:
      # refs: []
      #
- 64: $t26 := true
-     # abort state: {returns,aborts}
-     # live vars: $t26
-     # refs: []
-     #
- 65: if ($t26) goto 66 else goto 68
-     # abort state: {returns,aborts}
-     # live vars:
-     # refs: []
-     #
- 66: label L18
-     # abort state: {returns,aborts}
-     # live vars:
-     # refs: []
-     #
- 67: goto 71
+ 61: goto 65
      # abort state: {aborts}
      # live vars:
      # refs: []
      #
- 68: label L19
+ 62: label L16
      # abort state: {aborts}
      # live vars:
      # refs: []
      #
- 69: $t27 := 42
+ 63: $t27 := 42
      # abort state: {aborts}
      # live vars: $t27
      # refs: []
      #
- 70: abort($t27)
+ 64: abort($t27)
      # abort state: {returns,aborts}
      # live vars:
      # refs: []
      #
- 71: label L20
+ 65: label L17
      # abort state: {returns,aborts}
      # live vars:
      # refs: []
      #
- 72: $t28 := true
+ 66: $t28 := true
      # abort state: {returns,aborts}
      # live vars: $t28
      # refs: []
      #
- 73: if ($t28) goto 74 else goto 76
-     # abort state: {returns}
+ 67: if ($t28) goto 68 else goto 70
+     # abort state: {returns,aborts}
      # live vars:
      # refs: []
      #
- 74: label L21
-     # abort state: {returns}
+ 68: label L18
+     # abort state: {returns,aborts}
      # live vars:
      # refs: []
      #
- 75: goto 79
+ 69: goto 73
      # abort state: {aborts}
      # live vars:
      # refs: []
      #
- 76: label L22
+ 70: label L19
      # abort state: {aborts}
      # live vars:
      # refs: []
      #
- 77: $t29 := 42
+ 71: $t29 := 42
      # abort state: {aborts}
      # live vars: $t29
      # refs: []
      #
- 78: abort($t29)
+ 72: abort($t29)
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+ 73: label L20
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+ 74: $t30 := true
+     # abort state: {returns,aborts}
+     # live vars: $t30
+     # refs: []
+     #
+ 75: if ($t30) goto 76 else goto 78
      # abort state: {returns}
      # live vars:
      # refs: []
      #
- 79: label L23
+ 76: label L21
      # abort state: {returns}
      # live vars:
      # refs: []
      #
- 80: return ()
+ 77: goto 81
+     # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
+ 78: label L22
+     # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
+ 79: $t31 := 42
+     # abort state: {aborts}
+     # live vars: $t31
+     # refs: []
+     #
+ 80: abort($t31)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 81: label L23
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 82: return ()
 }
 
 ============ after AbilityProcessor: ================
@@ -1467,23 +1527,25 @@ fun <SELF>_0::check() {
      var $t10: vector<u8>
      var $t11: u64
      var $t12: &mut u64
-     var $t13: u64
+     var $t13: &mut u64
      var $t14: u64
-     var $t15: &mut vector<u8>
-     var $t16: vector<u8>
-     var $t17: vector<u8>
-     var $t18: bool
-     var $t19: u64
-     var $t20: u64
+     var $t15: u64
+     var $t16: &mut vector<u8>
+     var $t17: &mut vector<u8>
+     var $t18: vector<u8>
+     var $t19: vector<u8>
+     var $t20: bool
      var $t21: u64
-     var $t22: bool
-     var $t23: vector<u8>
-     var $t24: vector<u8>
-     var $t25: u64
-     var $t26: bool
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: vector<u8>
+     var $t26: vector<u8>
      var $t27: u64
      var $t28: bool
      var $t29: u64
+     var $t30: bool
+     var $t31: u64
   0: $t0 := true
   1: if ($t0) goto 2 else goto 4
   2: label L0
@@ -1520,50 +1582,52 @@ fun <SELF>_0::check() {
  33: $t11 := 42
  34: abort($t11)
  35: label L11
- 36: $t13 := 0
- 37: $t12 := borrow_local($t13)
- 38: $t14 := 1
- 39: write_ref($t12, $t14)
- 40: $t16 := [104, 101, 108, 108, 111]
- 41: $t15 := borrow_local($t16)
- 42: $t17 := [98, 121, 101]
- 43: write_ref($t15, $t17)
- 44: $t19 := read_ref($t12)
- 45: $t20 := 1
- 46: $t18 := ==($t19, $t20)
- 47: if ($t18) goto 48 else goto 50
- 48: label L12
- 49: goto 54
- 50: label L13
- 51: drop($t15)
- 52: $t21 := 42
- 53: abort($t21)
- 54: label L14
- 55: $t23 := read_ref($t15)
- 56: $t24 := [98, 121, 101]
- 57: $t22 := ==($t23, $t24)
- 58: if ($t22) goto 59 else goto 61
- 59: label L15
- 60: goto 64
- 61: label L16
- 62: $t25 := 42
- 63: abort($t25)
- 64: label L17
- 65: $t26 := true
- 66: if ($t26) goto 67 else goto 69
- 67: label L18
- 68: goto 72
- 69: label L19
- 70: $t27 := 42
- 71: abort($t27)
- 72: label L20
- 73: $t28 := true
- 74: if ($t28) goto 75 else goto 77
- 75: label L21
- 76: goto 80
- 77: label L22
- 78: $t29 := 42
- 79: abort($t29)
- 80: label L23
- 81: return ()
+ 36: $t14 := 0
+ 37: $t13 := borrow_local($t14)
+ 38: $t12 := move($t13)
+ 39: $t15 := 1
+ 40: write_ref($t12, $t15)
+ 41: $t18 := [104, 101, 108, 108, 111]
+ 42: $t17 := borrow_local($t18)
+ 43: $t16 := move($t17)
+ 44: $t19 := [98, 121, 101]
+ 45: write_ref($t16, $t19)
+ 46: $t21 := read_ref($t12)
+ 47: $t22 := 1
+ 48: $t20 := ==($t21, $t22)
+ 49: if ($t20) goto 50 else goto 52
+ 50: label L12
+ 51: goto 56
+ 52: label L13
+ 53: drop($t16)
+ 54: $t23 := 42
+ 55: abort($t23)
+ 56: label L14
+ 57: $t25 := read_ref($t16)
+ 58: $t26 := [98, 121, 101]
+ 59: $t24 := ==($t25, $t26)
+ 60: if ($t24) goto 61 else goto 63
+ 61: label L15
+ 62: goto 66
+ 63: label L16
+ 64: $t27 := 42
+ 65: abort($t27)
+ 66: label L17
+ 67: $t28 := true
+ 68: if ($t28) goto 69 else goto 71
+ 69: label L18
+ 70: goto 74
+ 71: label L19
+ 72: $t29 := 42
+ 73: abort($t29)
+ 74: label L20
+ 75: $t30 := true
+ 76: if ($t30) goto 77 else goto 79
+ 77: label L21
+ 78: goto 82
+ 79: label L22
+ 80: $t31 := 42
+ 81: abort($t31)
+ 82: label L23
+ 83: return ()
 }

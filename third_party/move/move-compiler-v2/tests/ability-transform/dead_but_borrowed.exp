@@ -4,11 +4,13 @@
 fun explicate_drop::test0(): u8 {
      var $t0: u8
      var $t1: &u8
-     var $t2: u8
-  0: $t2 := 42
-  1: $t1 := borrow_local($t2)
-  2: $t0 := read_ref($t1)
-  3: return $t0
+     var $t2: &u8
+     var $t3: u8
+  0: $t3 := 42
+  1: $t2 := borrow_local($t3)
+  2: $t1 := infer($t2)
+  3: $t0 := read_ref($t1)
+  4: return $t0
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -17,15 +19,18 @@ fun explicate_drop::test0(): u8 {
 fun explicate_drop::test0(): u8 {
      var $t0: u8
      var $t1: &u8
-     var $t2: u8
+     var $t2: &u8
+     var $t3: u8
      # live vars:
-  0: $t2 := 42
+  0: $t3 := 42
+     # live vars: $t3
+  1: $t2 := borrow_local($t3)
      # live vars: $t2
-  1: $t1 := borrow_local($t2)
+  2: $t1 := infer($t2)
      # live vars: $t1
-  2: $t0 := read_ref($t1)
+  3: $t0 := read_ref($t1)
      # live vars: $t0
-  3: return $t0
+  4: return $t0
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -34,15 +39,18 @@ fun explicate_drop::test0(): u8 {
 fun explicate_drop::test0(): u8 {
      var $t0: u8
      var $t1: &u8
-     var $t2: u8
+     var $t2: &u8
+     var $t3: u8
      # live vars:
-  0: $t2 := 42
+  0: $t3 := 42
+     # live vars: $t3
+  1: $t2 := borrow_local($t3)
      # live vars: $t2
-  1: $t1 := borrow_local($t2)
+  2: $t1 := infer($t2)
      # live vars: $t1
-  2: $t0 := read_ref($t1)
+  3: $t0 := read_ref($t1)
      # live vars: $t0
-  3: return $t0
+  4: return $t0
 }
 
 ============ after ReferenceSafetyProcessor: ================
@@ -51,15 +59,24 @@ fun explicate_drop::test0(): u8 {
 fun explicate_drop::test0(): u8 {
      var $t0: u8
      var $t1: &u8
-     var $t2: u8
+     var $t2: &u8
+     var $t3: u8
      # live vars:
      # refs: []
      #
-  0: $t2 := 42
-     # live vars: $t2
+  0: $t3 := 42
+     # live vars: $t3
      # refs: []
      #
-  1: $t1 := borrow_local($t2)
+  1: $t2 := borrow_local($t3)
+     # live vars: $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => #2 via [value] at line 4
+     #
+  2: $t1 := infer($t2)
      # live vars: $t1
      # refs: [$t1 => #1]
      # #1
@@ -67,11 +84,11 @@ fun explicate_drop::test0(): u8 {
      # #root
      #   => #1 via [value] at line 4
      #
-  2: $t0 := read_ref($t1)
+  3: $t0 := read_ref($t1)
      # live vars: $t0
      # refs: []
      #
-  3: return $t0
+  4: return $t0
 }
 
 ============ after AbortAnalysisProcessor: ================
@@ -80,17 +97,27 @@ fun explicate_drop::test0(): u8 {
 fun explicate_drop::test0(): u8 {
      var $t0: u8
      var $t1: &u8
-     var $t2: u8
+     var $t2: &u8
+     var $t3: u8
      # abort state: {returns}
      # live vars:
      # refs: []
      #
-  0: $t2 := 42
+  0: $t3 := 42
      # abort state: {returns}
-     # live vars: $t2
+     # live vars: $t3
      # refs: []
      #
-  1: $t1 := borrow_local($t2)
+  1: $t2 := borrow_local($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => #2 via [value] at line 4
+     #
+  2: $t1 := infer($t2)
      # abort state: {returns}
      # live vars: $t1
      # refs: [$t1 => #1]
@@ -99,12 +126,12 @@ fun explicate_drop::test0(): u8 {
      # #root
      #   => #1 via [value] at line 4
      #
-  2: $t0 := read_ref($t1)
+  3: $t0 := read_ref($t1)
      # abort state: {returns}
      # live vars: $t0
      # refs: []
      #
-  3: return $t0
+  4: return $t0
 }
 
 ============ after AbilityProcessor: ================
@@ -113,9 +140,11 @@ fun explicate_drop::test0(): u8 {
 fun explicate_drop::test0(): u8 {
      var $t0: u8
      var $t1: &u8
-     var $t2: u8
-  0: $t2 := 42
-  1: $t1 := borrow_local($t2)
-  2: $t0 := read_ref($t1)
-  3: return $t0
+     var $t2: &u8
+     var $t3: u8
+  0: $t3 := 42
+  1: $t2 := borrow_local($t3)
+  2: $t1 := move($t2)
+  3: $t0 := read_ref($t1)
+  4: return $t0
 }
