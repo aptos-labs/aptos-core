@@ -26,13 +26,13 @@ pub trait ModuleStorage {
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>>;
 
-    /// Returns the size of a module in bytes. An error is returned if the module does
-    /// not exist, or there is a storage error.
+    /// Returns the size of a module in bytes. An error is returned if the there is
+    /// a storage error. If module does not exist, [None] is returned.
     fn fetch_module_size_in_bytes(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<usize>;
+    ) -> VMResult<Option<usize>>;
 
     /// Returns the metadata in the module. An error is returned if the module does
     /// not exist, or there is a storage error.

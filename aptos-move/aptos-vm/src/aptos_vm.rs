@@ -1565,12 +1565,9 @@ impl AptosVM {
                         }
 
                         let size_if_module_exists = if self.features().is_loader_v2_enabled() {
-                            if module_storage.check_module_exists(addr, name)? {
-                                let size = module_storage.fetch_module_size_in_bytes(addr, name)?;
-                                Some(size as u64)
-                            } else {
-                                None
-                            }
+                            module_storage
+                                .fetch_module_size_in_bytes(addr, name)?
+                                .map(|v| v as u64)
                         } else {
                             resolver
                                 .as_executor_view()

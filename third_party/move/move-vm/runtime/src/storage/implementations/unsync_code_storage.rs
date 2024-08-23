@@ -189,7 +189,7 @@ impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> 
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<usize> {
+    ) -> VMResult<Option<usize>> {
         self.module_storage
             .fetch_module_size_in_bytes(address, module_name)
     }

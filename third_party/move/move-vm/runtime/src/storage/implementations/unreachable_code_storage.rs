@@ -56,7 +56,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> VMResult<usize> {
+    ) -> VMResult<Option<usize>> {
         unreachable_error!()
     }
 
