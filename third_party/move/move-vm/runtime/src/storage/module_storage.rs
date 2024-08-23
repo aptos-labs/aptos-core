@@ -3,7 +3,7 @@
 
 use crate::loader::Module;
 use bytes::Bytes;
-use move_binary_format::{errors::PartialVMResult, CompiledModule};
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use std::sync::Arc;
 
@@ -16,7 +16,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<bool>;
+    ) -> VMResult<bool>;
 
     /// Returns module bytes. An error is returned if there is a storage error. If
     /// the module does not exist, returns [None].
@@ -24,7 +24,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>>;
+    ) -> VMResult<Option<Bytes>>;
 
     /// Returns the size of a module in bytes. An error is returned if the module does
     /// not exist, or there is a storage error.
@@ -32,7 +32,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<usize>;
+    ) -> VMResult<usize>;
 
     /// Returns the metadata in the module. An error is returned if the module does
     /// not exist, or there is a storage error.
@@ -40,7 +40,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>>;
+    ) -> VMResult<Vec<Metadata>>;
 
     /// Returns the deserialized module. There is no guarantees that the module has been
     /// previously verified. An error is returned if:
@@ -51,7 +51,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>>;
+    ) -> VMResult<Arc<CompiledModule>>;
 
     /// Returns the verified module. The module can be either in a cached state (it is
     /// then returned) or newly constructed. The error is returned if the storage fails
@@ -60,7 +60,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>>;
+    ) -> VMResult<Arc<Module>>;
 }
 
 /// Storage that contains serialized modules. Clients can implement this trait
@@ -70,5 +70,5 @@ pub trait ModuleBytesStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>>;
+    ) -> VMResult<Option<Bytes>>;
 }

@@ -110,6 +110,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
+    module_linker_error,
     module_traversal::{TraversalContext, TraversalStorage},
     TemporaryModuleStorage, UnreachableCodeStorage,
 };
@@ -851,7 +852,11 @@ impl AptosVM {
         _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         if self.features().use_loader_v2() {
-            // TODO(loader_v2): Check that the module & function actually exist?
+            let addr = entry_fn.module().address();
+            let name = entry_fn.module().name();
+            if !module_storage.check_module_exists(addr, name)? {
+                return Err(module_linker_error!(addr, name).into_vm_status());
+            }
         }
 
         // Note: Feature gating is needed here because the traversal of the dependencies could
@@ -1570,13 +1575,8 @@ impl AptosVM {
                         }
 
                         let size_if_module_exists = if self.features().use_loader_v2() {
-                            if module_storage
-                                .check_module_exists(addr, name)
-                                .map_err(|e| e.finish(Location::Undefined))?
-                            {
-                                let size = module_storage
-                                    .fetch_module_size_in_bytes(addr, name)
-                                    .map_err(|e| e.finish(Location::Undefined))?;
+                            if module_storage.check_module_exists(addr, name)? {
+                                let size = module_storage.fetch_module_size_in_bytes(addr, name)?;
                                 Some(size as u64)
                             } else {
                                 None
@@ -1674,8 +1674,7 @@ impl AptosVM {
                         compat,
                         module_storage,
                         bundle.into_bytes(),
-                    )
-                    .map_err(|e| e.finish(Location::Undefined))?;
+                    )?;
 
                     // Run init_module for each new module. We use a new session for that as well.
                     let mut tmp_session = tmp_vm.new_session(
@@ -1688,8 +1687,7 @@ impl AptosVM {
                     for module in modules {
                         // Check if module existed previously.
                         let module_exists = module_storage
-                            .check_module_exists(module.self_addr(), module.self_name())
-                            .map_err(|e| e.finish(Location::Undefined))?;
+                            .check_module_exists(module.self_addr(), module.self_name())?;
                         if module_exists {
                             continue;
                         }
@@ -3149,9 +3147,7 @@ pub(crate) fn fetch_module_metadata_for_struct_tag(
     module_storage: &impl AptosModuleStorage,
 ) -> VMResult<Vec<Metadata>> {
     if features.use_loader_v2() {
-        module_storage
-            .fetch_module_metadata(&struct_tag.address, &struct_tag.module)
-            .map_err(|e| e.finish(Location::Undefined))
+        module_storage.fetch_module_metadata(&struct_tag.address, &struct_tag.module)
     } else {
         Ok(resolver.get_module_metadata(&struct_tag.module_id()))
     }

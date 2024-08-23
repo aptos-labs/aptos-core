@@ -6,7 +6,11 @@ use crate::module_and_script_storage::{
 };
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView};
 use bytes::Bytes;
-use move_binary_format::{errors::PartialVMResult, file_format::CompiledScript, CompiledModule};
+use move_binary_format::{
+    errors::{PartialVMResult, VMResult},
+    file_format::CompiledScript,
+    CompiledModule,
+};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
     module_storage_error, move_vm::MoveVM, IntoUnsyncCodeStorage, Module, ModuleBytesStorage,
@@ -24,7 +28,7 @@ impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
+    ) -> VMResult<Option<Bytes>> {
         let state_key = StateKey::module(address, module_name);
         self.state_view
             .get_state_value_bytes(&state_key)
@@ -52,7 +56,7 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
+    ) -> VMResult<bool> {
         self.storage.check_module_exists(address, module_name)
     }
 
@@ -60,7 +64,7 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
+    ) -> VMResult<Option<Bytes>> {
         self.storage.fetch_module_bytes(address, module_name)
     }
 
@@ -68,7 +72,7 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
+    ) -> VMResult<usize> {
         self.storage
             .fetch_module_size_in_bytes(address, module_name)
     }
@@ -77,7 +81,7 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
+    ) -> VMResult<Vec<Metadata>> {
         self.storage.fetch_module_metadata(address, module_name)
     }
 
@@ -85,7 +89,7 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
+    ) -> VMResult<Arc<CompiledModule>> {
         self.storage.fetch_deserialized_module(address, module_name)
     }
 
@@ -93,7 +97,7 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
+    ) -> VMResult<Arc<Module>> {
         self.storage.fetch_verified_module(address, module_name)
     }
 }
@@ -111,20 +115,17 @@ impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
             .byte_storage()
             .state_view
             .get_state_value(&state_key)
-            .map_err(|e| module_storage_error!(address, module_name, e))?
+            .map_err(|e| module_storage_error!(address, module_name, e).to_partial())?
             .map(|s| s.into_metadata()))
     }
 }
 
 impl<'s, S: StateView> ScriptStorage for AptosCodeStorageAdapter<'s, S> {
-    fn fetch_deserialized_script(
-        &self,
-        serialized_script: &[u8],
-    ) -> PartialVMResult<Arc<CompiledScript>> {
+    fn fetch_deserialized_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
         self.storage.fetch_deserialized_script(serialized_script)
     }
 
-    fn fetch_verified_script(&self, serialized_script: &[u8]) -> PartialVMResult<Arc<Script>> {
+    fn fetch_verified_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
         self.storage.fetch_verified_script(serialized_script)
     }
 }

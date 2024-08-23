@@ -11,6 +11,7 @@ macro_rules! module_storage_error {
             "Unexpected storage error for module {}::{}: {:?}",
             $addr, $name, $err
         ))
+        .finish(move_binary_format::errors::Location::Undefined)
     };
 }
 
@@ -21,6 +22,7 @@ macro_rules! module_linker_error {
             move_core_types::vm_status::StatusCode::LINKER_ERROR,
         )
         .with_message(format!("Module {}::{} does not exist", $addr, $name))
+        .finish(move_binary_format::errors::Location::Undefined)
     };
 }
 
@@ -33,6 +35,9 @@ macro_rules! module_cyclic_dependency_error {
         .with_message(format!(
             "Module {}::{} forms a cyclic dependency",
             $addr, $name
+        ))
+        .finish(move_binary_format::errors::Location::Module(
+            move_core_types::language_storage::ModuleId::new(*$addr, $name.to_owned()),
         ))
     };
 }

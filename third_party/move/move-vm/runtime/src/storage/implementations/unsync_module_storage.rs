@@ -12,12 +12,17 @@ use crate::{
 use bytes::Bytes;
 #[cfg(test)]
 use claims::assert_some;
-use move_binary_format::{access::ModuleAccess, errors::PartialVMResult, CompiledModule};
+use move_binary_format::{
+    access::ModuleAccess,
+    errors::{Location, PartialVMError, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     metadata::Metadata,
+    vm_status::StatusCode,
 };
 use std::{
     cell::RefCell,
@@ -56,7 +61,7 @@ impl ModuleBytesStorage for LocalModuleBytesStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
+    ) -> VMResult<Option<Bytes>> {
         if let Some(account_storage) = self.0.get(address) {
             return Ok(account_storage.get(module_name).cloned());
         }
@@ -109,7 +114,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Bytes> {
+    ) -> VMResult<Bytes> {
         self.fetch_module_bytes(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
@@ -128,7 +133,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<()> {
+    ) -> VMResult<()> {
         use btree_map::Entry::*;
         use ModuleStorageEntry::*;
 
@@ -137,7 +142,16 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
             let compiled_module = CompiledModule::deserialize_with_config(
                 &bytes,
                 &self.runtime_environment.vm_config().deserializer_config,
-            )?;
+            )
+            .map_err(|err| {
+                let msg = format!("Deserialization error: {:?}", err);
+                PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Module(ModuleId::new(
+                        *address,
+                        module_name.to_owned(),
+                    )))
+            })?;
             let mut module_storage = self.module_storage.borrow_mut();
             let account_module_storage = match module_storage.entry(*address) {
                 Occupied(entry) => entry.into_mut(),
@@ -153,11 +167,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 
     /// Returns true if the specified module is stored as deserialized.
     /// In case it is not cached, the function will cache it.
-    fn is_deserialized(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
+    fn is_deserialized(&self, address: &AccountAddress, module_name: &IdentStr) -> VMResult<bool> {
         use ModuleStorageEntry::*;
 
         self.initialize_module_storage_entry(address, module_name)?;
@@ -173,7 +183,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         address: &AccountAddress,
         module_name: &IdentStr,
         visited: &mut BTreeSet<ModuleId>,
-    ) -> PartialVMResult<Arc<Module>> {
+    ) -> VMResult<Arc<Module>> {
         use ModuleStorageEntry::*;
 
         self.initialize_module_storage_entry(address, module_name)?;
@@ -222,7 +232,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         address: &AccountAddress,
         module_name: &IdentStr,
         visited: &mut BTreeSet<ModuleId>,
-    ) -> PartialVMResult<Arc<Module>> {
+    ) -> VMResult<Arc<Module>> {
         use ModuleStorageEntry::*;
 
         // Step 1: verify compiled module locally.
@@ -237,7 +247,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         for (addr, name) in partially_verified_module.immediate_dependencies_iter() {
             let module_id = ModuleId::new(*addr, name.to_owned());
             if !visited.insert(module_id) && self.is_deserialized(addr, name)? {
-                return Err(module_cyclic_dependency_error!(addr, name));
+                return Err(module_cyclic_dependency_error!(address, module_name));
             }
 
             let verified_dependency = self.fetch_verified_module_recursive(addr, name, visited)?;
@@ -280,7 +290,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
+    ) -> VMResult<bool> {
         // Cached modules in module storage are a subset of modules in byte
         // storage, so it is sufficient to check existence based on it.
         Ok(self
@@ -293,7 +303,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
+    ) -> VMResult<Option<Bytes>> {
         self.byte_storage.fetch_module_bytes(address, module_name)
     }
 
@@ -301,7 +311,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
+    ) -> VMResult<usize> {
         Ok(self.get_existing_module_bytes(address, module_name)?.len())
     }
 
@@ -309,7 +319,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
+    ) -> VMResult<Vec<Metadata>> {
         Ok(self
             .fetch_deserialized_module(address, module_name)?
             .metadata
@@ -320,7 +330,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
+    ) -> VMResult<Arc<CompiledModule>> {
         use ModuleStorageEntry::*;
 
         self.initialize_module_storage_entry(address, module_name)?;
@@ -340,7 +350,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
+    ) -> VMResult<Arc<Module>> {
         let mut visited = BTreeSet::new();
         self.fetch_verified_module_recursive(address, module_name, &mut visited)
     }

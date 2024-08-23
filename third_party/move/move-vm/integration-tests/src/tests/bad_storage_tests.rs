@@ -5,7 +5,7 @@
 use crate::compiler::{as_module, as_script, compile_units};
 use bytes::Bytes;
 use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -627,48 +627,48 @@ impl ModuleStorage for BogusModuleStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<bool> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_module_bytes(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<Option<Bytes>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_module_size_in_bytes(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<usize> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_module_metadata(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<Vec<Metadata>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_deserialized_module(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<Arc<CompiledModule>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_verified_module(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<Arc<Module>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 }
 

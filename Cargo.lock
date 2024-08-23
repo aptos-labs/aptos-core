@@ -10707,6 +10707,7 @@ dependencies = [
  "anyhow",
  "move-binary-format",
  "move-core-types",
+ "move-vm-runtime",
  "petgraph 0.5.1",
  "serde-reflection",
 ]

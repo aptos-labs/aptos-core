@@ -4,6 +4,7 @@
 use crate::{
     config::VMConfig,
     loader::{Function, LoadedFunctionOwner, Module, TypeCache},
+    logging::expect_no_verification_errors,
     module_traversal::TraversalContext,
     storage::{
         environment::RuntimeEnvironment, module_storage::ModuleStorage,
@@ -17,8 +18,11 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, gas_algebra::NumBytes, identifier::IdentStr,
-    language_storage::TypeTag, vm_status::StatusCode,
+    account_address::AccountAddress,
+    gas_algebra::NumBytes,
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
+    vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -77,7 +81,7 @@ impl LoaderV2 {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         serialized_script: &[u8],
-    ) -> PartialVMResult<()> {
+    ) -> VMResult<()> {
         let compiled_script = script_storage.fetch_deserialized_script(serialized_script)?;
         let compiled_script = traversal_context.referenced_scripts.alloc(compiled_script);
 
@@ -100,7 +104,7 @@ impl LoaderV2 {
         visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
         referenced_modules: &'a Arena<Arc<CompiledModule>>,
         ids: I,
-    ) -> PartialVMResult<()>
+    ) -> VMResult<()>
     where
         I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
         I::IntoIter: DoubleEndedIterator,
@@ -113,7 +117,11 @@ impl LoaderV2 {
 
         while let Some((addr, name)) = stack.pop() {
             let size = module_storage.fetch_module_size_in_bytes(addr, name)?;
-            gas_meter.charge_dependency(false, addr, name, NumBytes::new(size as u64))?;
+            gas_meter
+                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
+                .map_err(|err| {
+                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
+                })?;
 
             // Extend the lifetime of the module to the remainder of the function body
             // by storing it in an arena.
@@ -142,9 +150,7 @@ impl LoaderV2 {
     ) -> VMResult<LoadedFunction> {
         // Step 1: Load script. During the loading process, if script has not been previously
         // cached, it will be verified.
-        let script = script_storage
-            .fetch_verified_script(serialized_script)
-            .map_err(|e| e.finish(Location::Script))?;
+        let script = script_storage.fetch_verified_script(serialized_script)?;
 
         // Step 2: Load & verify types used as type arguments passed to this script. Note that
         // arguments for scripts are verified on the client side.
@@ -152,8 +158,7 @@ impl LoaderV2 {
             .iter()
             .map(|ty| self.load_ty(module_storage, ty))
             .collect::<PartialVMResult<Vec<_>>>()
-            // TODO(loader_v2): We return a VMResult here only because one of transactional tests differs
-            //                  in location: loader V1 returns undefined...
+            // Note: Loader V1 implementation returns undefined here, causing some tests to fail.
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let main = script.entry_point();
@@ -173,8 +178,10 @@ impl LoaderV2 {
         module_storage: &dyn ModuleStorage,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
-        module_storage.fetch_verified_module(address, module_name)
+    ) -> VMResult<Arc<Module>> {
+        module_storage
+            .fetch_verified_module(address, module_name)
+            .map_err(expect_no_verification_errors)
     }
 
     /// Returns a function definition corresponding to the specified name. The module
@@ -185,17 +192,19 @@ impl LoaderV2 {
         address: &AccountAddress,
         module_name: &IdentStr,
         function_name: &IdentStr,
-    ) -> PartialVMResult<(Arc<Module>, Arc<Function>)> {
+    ) -> VMResult<(Arc<Module>, Arc<Function>)> {
         let module = self.load_module(module_storage, address, module_name)?;
         let function = module
             .function_map
             .get(function_name)
             .and_then(|idx| module.function_defs.get(*idx))
             .ok_or_else(|| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
-                    "Function {}::{}::{} does not exist",
-                    address, module_name, function_name
-                ))
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(format!(
+                        "Function {}::{}::{} does not exist",
+                        address, module_name, function_name
+                    ))
+                    .finish(Location::Undefined)
             })?
             .clone();
         Ok((module, function))
@@ -210,7 +219,9 @@ impl LoaderV2 {
         module_name: &IdentStr,
         struct_name: &IdentStr,
     ) -> PartialVMResult<Arc<StructType>> {
-        let module = self.load_module(module_storage, address, module_name)?;
+        let module = self
+            .load_module(module_storage, address, module_name)
+            .map_err(|e| e.to_partial())?;
         Ok(module
             .struct_map
             .get(struct_name)
