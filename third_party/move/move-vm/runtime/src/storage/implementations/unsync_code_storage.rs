@@ -8,7 +8,7 @@ use crate::{
         implementations::unsync_module_storage::IntoUnsyncModuleStorage,
         module_storage::ModuleBytesStorage,
     },
-    Module, ModuleStorage, RuntimeEnvironment, Script, ScriptStorage, UnsyncModuleStorage,
+    CodeStorage, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -120,7 +120,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
     }
 }
 
-impl<M: ModuleStorage + WithEnvironment> ScriptStorage for UnsyncCodeStorage<M> {
+impl<M: ModuleStorage + WithEnvironment> CodeStorage for UnsyncCodeStorage<M> {
     fn fetch_deserialized_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;

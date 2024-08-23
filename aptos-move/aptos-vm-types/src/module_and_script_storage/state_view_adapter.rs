@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::module_and_script_storage::{
-    module_storage::AptosModuleStorage, script_storage::AptosScriptStorage,
+    code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
 };
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView};
 use bytes::Bytes;
@@ -13,8 +13,8 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
-    module_storage_error, move_vm::MoveVM, IntoUnsyncCodeStorage, Module, ModuleBytesStorage,
-    ModuleStorage, Script, ScriptStorage, UnsyncCodeStorage, UnsyncModuleStorage,
+    module_storage_error, move_vm::MoveVM, CodeStorage, IntoUnsyncCodeStorage, Module,
+    ModuleBytesStorage, ModuleStorage, Script, UnsyncCodeStorage, UnsyncModuleStorage,
 };
 use std::sync::Arc;
 
@@ -120,7 +120,7 @@ impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> ScriptStorage for AptosCodeStorageAdapter<'s, S> {
+impl<'s, S: StateView> CodeStorage for AptosCodeStorageAdapter<'s, S> {
     fn fetch_deserialized_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
         self.storage.fetch_deserialized_script(serialized_script)
     }
@@ -130,7 +130,7 @@ impl<'s, S: StateView> ScriptStorage for AptosCodeStorageAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> AptosScriptStorage for AptosCodeStorageAdapter<'s, S> {}
+impl<'s, S: StateView> AptosCodeStorage for AptosCodeStorageAdapter<'s, S> {}
 
 /// Allows to treat a state view as a code storage with scripts and modules. The
 /// main use case is when transaction or a Move function has to be executed outside

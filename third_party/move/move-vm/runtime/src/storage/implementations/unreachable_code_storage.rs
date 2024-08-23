@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Module, ModuleStorage, Script, ScriptStorage};
+use crate::{CodeStorage, Module, ModuleStorage, Script};
 use bytes::Bytes;
 use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
@@ -85,7 +85,7 @@ impl ModuleStorage for UnreachableCodeStorage {
     }
 }
 
-impl ScriptStorage for UnreachableCodeStorage {
+impl CodeStorage for UnreachableCodeStorage {
     fn fetch_deserialized_script(
         &self,
         _serialized_script: &[u8],

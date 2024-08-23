@@ -4,9 +4,9 @@
 pub(crate) mod loader;
 pub(crate) mod struct_name_index_map;
 
+pub mod code_storage;
 pub mod environment;
 pub mod module_storage;
-pub mod script_storage;
 pub mod verifier;
 
 // TODO(loader_v2): Remove when we no longer need the dummy implementation.

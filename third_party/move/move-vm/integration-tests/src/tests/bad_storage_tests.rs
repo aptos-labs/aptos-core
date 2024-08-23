@@ -100,8 +100,7 @@ fn test_malformed_resource() {
     let mut module_bytes_storage = LocalModuleBytesStorage::empty();
     module_bytes_storage.add_module_bytes(ms.self_addr(), ms.self_name(), ms_blob.into());
     module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.into());
-    let module_and_script_storage =
-        module_bytes_storage.into_unsync_code_storage(vm.runtime_environment());
+    let code_storage = module_bytes_storage.into_unsync_code_storage(vm.runtime_environment());
 
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
@@ -114,8 +113,7 @@ fn test_malformed_resource() {
         vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &module_and_script_storage,
-        &module_and_script_storage,
+        &code_storage,
     )
     .map(|_| ())
     .unwrap();
@@ -135,8 +133,7 @@ fn test_malformed_resource() {
             vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .map(|_| ())
         .unwrap();
@@ -165,8 +162,7 @@ fn test_malformed_resource() {
                 vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_and_script_storage,
-                &module_and_script_storage,
+                &code_storage,
             )
             .map(|_| ())
             .unwrap_err();

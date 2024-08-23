@@ -8,9 +8,9 @@ use crate::{
     module_traversal::TraversalContext,
     storage::{
         environment::RuntimeEnvironment, module_storage::ModuleStorage,
-        script_storage::ScriptStorage, struct_name_index_map::StructNameIndexMap,
+        struct_name_index_map::StructNameIndexMap,
     },
-    LoadedFunction,
+    CodeStorage, LoadedFunction,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -76,18 +76,17 @@ impl LoaderV2 {
 
     pub(crate) fn check_script_dependencies_and_check_gas(
         &self,
-        module_storage: &impl ModuleStorage,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         serialized_script: &[u8],
     ) -> VMResult<()> {
-        let compiled_script = script_storage.fetch_deserialized_script(serialized_script)?;
+        let compiled_script = code_storage.fetch_deserialized_script(serialized_script)?;
         let compiled_script = traversal_context.referenced_scripts.alloc(compiled_script);
 
         // TODO(Gas): Should we charge dependency gas for the script itself?
         self.check_dependencies_and_charge_gas(
-            module_storage,
+            code_storage,
             gas_meter,
             &mut traversal_context.visited,
             traversal_context.referenced_modules,
@@ -143,20 +142,19 @@ impl LoaderV2 {
 
     pub(crate) fn load_script(
         &self,
-        module_storage: &impl ModuleStorage,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
         serialized_script: &[u8],
         ty_args: &[TypeTag],
     ) -> VMResult<LoadedFunction> {
         // Step 1: Load script. During the loading process, if script has not been previously
         // cached, it will be verified.
-        let script = script_storage.fetch_verified_script(serialized_script)?;
+        let script = code_storage.fetch_verified_script(serialized_script)?;
 
         // Step 2: Load & verify types used as type arguments passed to this script. Note that
         // arguments for scripts are verified on the client side.
         let ty_args = ty_args
             .iter()
-            .map(|ty| self.load_ty(module_storage, ty))
+            .map(|ty| self.load_ty(code_storage, ty))
             .collect::<PartialVMResult<Vec<_>>>()
             // Note: Loader V1 implementation returns undefined here, causing some tests to fail.
             .map_err(|e| e.finish(Location::Undefined))?;

@@ -126,8 +126,7 @@ fn script_large_ty() {
         decompiled_module.self_name(),
         module.into(),
     );
-    let module_and_script_storage =
-        module_bytes_storage.into_unsync_code_storage(move_vm.runtime_environment());
+    let code_storage = module_bytes_storage.into_unsync_code_storage(move_vm.runtime_environment());
 
     // constructs a type with about 25^3 nodes
     let num_type_args = 25;
@@ -149,8 +148,7 @@ fn script_large_ty() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .unwrap_err();
 
