@@ -21,12 +21,15 @@ pub fn script_hash(serialized_script: &[u8]) -> [u8; 32] {
 #[delegatable_trait]
 pub trait CodeStorage: ModuleStorage {
     /// Returns a deserialized script, either by directly deserializing it from the
-    /// provided bytes, or fetching it from the storage (if it has been cached). Note
-    /// that there are no guarantees that the returned script is verified. An error
-    /// is returned if the deserialization fails.
-    fn fetch_deserialized_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>>;
+    /// provided bytes (and caching it), or fetching it from the cache. Note that
+    /// there are no guarantees that the returned script is verified. An error is
+    /// returned if the deserialization fails.
+    fn deserialize_and_cache_script(
+        &self,
+        serialized_script: &[u8],
+    ) -> VMResult<Arc<CompiledScript>>;
 
-    /// Returns a verified script. The script can either be cached, or deserialized and/or
-    /// verified from scratch. An error is returned if script fails to deserialize or verify.
-    fn fetch_verified_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>>;
+    /// Returns a verified script. If not yet cached, verified from scratch and cached.
+    /// An error is returned if script fails to deserialize or verify.
+    fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>>;
 }
