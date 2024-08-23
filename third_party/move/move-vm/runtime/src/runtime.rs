@@ -9,7 +9,7 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
-    storage::{module_storage::ModuleStorage as ModuleStorageV2, script_storage::ScriptStorage},
+    storage::{code_storage::CodeStorage, module_storage::ModuleStorage as ModuleStorageV2},
     RuntimeEnvironment,
 };
 use move_binary_format::{
@@ -485,8 +485,7 @@ impl VMRuntime {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        module_storage: &impl ModuleStorageV2,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
         // Load the script first, verify it, and then execute the entry-point main function.
         let main = self.loader.load_script(
@@ -494,8 +493,7 @@ impl VMRuntime {
             &ty_args,
             data_store,
             module_store,
-            module_storage,
-            script_storage,
+            code_storage,
         )?;
 
         self.execute_function_impl(
@@ -503,7 +501,7 @@ impl VMRuntime {
             serialized_args,
             data_store,
             module_store,
-            module_storage,
+            code_storage,
             gas_meter,
             traversal_context,
             extensions,

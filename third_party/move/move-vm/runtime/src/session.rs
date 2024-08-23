@@ -11,7 +11,7 @@ use crate::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     storage::module_storage::ModuleStorage,
-    ScriptStorage,
+    CodeStorage,
 };
 use bytes::Bytes;
 use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
@@ -172,8 +172,7 @@ impl<'r, 'l> Session<'r, 'l> {
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
         self.move_vm.runtime.execute_script(
             script,
@@ -184,8 +183,7 @@ impl<'r, 'l> Session<'r, 'l> {
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
-            module_storage,
-            script_storage,
+            code_storage,
         )
     }
 
@@ -374,8 +372,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// Load a script and all of its types into cache
     pub fn load_script(
         &mut self,
-        module_storage: &impl ModuleStorage,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
         script: impl Borrow<[u8]>,
         ty_args: &[TypeTag],
     ) -> VMResult<LoadedFunction> {
@@ -384,8 +381,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ty_args,
             &mut self.data_cache,
             &self.module_store,
-            module_storage,
-            script_storage,
+            code_storage,
         )
     }
 
@@ -534,8 +530,7 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn check_script_dependencies_and_check_gas(
         &mut self,
-        module_storage: &impl ModuleStorage,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         script: impl Borrow<[u8]>,
@@ -549,8 +544,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 gas_meter,
                 traversal_context,
                 script.borrow(),
-                module_storage,
-                script_storage,
+                code_storage,
             )
     }
 }

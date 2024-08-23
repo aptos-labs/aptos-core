@@ -3,7 +3,7 @@
 
 use crate::{
     loader::{Module, Script},
-    storage::{module_storage::ModuleStorage, script_storage::ScriptStorage},
+    storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -89,7 +89,7 @@ impl ModuleStorage for DummyCodeStorage {
     }
 }
 
-impl ScriptStorage for DummyCodeStorage {
+impl CodeStorage for DummyCodeStorage {
     fn fetch_deserialized_script(
         &self,
         _serialized_script: &[u8],

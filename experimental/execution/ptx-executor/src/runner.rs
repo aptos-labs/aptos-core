@@ -260,14 +260,13 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
 
-                    let module_and_script_storage = vm.as_aptos_code_storage(&state_view);
+                    let code_storage = vm.as_aptos_code_storage(&state_view);
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
                             &transaction,
                             &vm.as_move_resolver(&state_view),
-                            &module_and_script_storage,
-                            &module_and_script_storage,
+                            &code_storage,
                             &log_context,
                         )
                     };

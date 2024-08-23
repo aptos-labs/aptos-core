@@ -5,7 +5,7 @@
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     module_traversal::TraversalContext, script_hash,
-    storage::module_storage::ModuleStorage as ModuleStorageV2, RuntimeEnvironment,
+    storage::module_storage::ModuleStorage as ModuleStorageV2, CodeStorage, RuntimeEnvironment,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -52,9 +52,7 @@ mod type_loader;
 
 use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
-    storage::{
-        loader::LoaderV2, script_storage::ScriptStorage, struct_name_index_map::StructNameIndexMap,
-    },
+    storage::{loader::LoaderV2, struct_name_index_map::StructNameIndexMap},
 };
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
@@ -197,8 +195,7 @@ impl Loader {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         script_blob: &[u8],
-        module_storage: &impl ModuleStorageV2,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
         match self {
             Self::V1(loader) => loader.check_script_dependencies_and_check_gas(
@@ -209,8 +206,7 @@ impl Loader {
                 script_blob,
             ),
             Self::V2(loader) => loader.check_script_dependencies_and_check_gas(
-                module_storage,
-                script_storage,
+                code_storage,
                 gas_meter,
                 traversal_context,
                 script_blob,
@@ -257,14 +253,11 @@ impl Loader {
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<LoadedFunction> {
         match self {
             Self::V1(loader) => loader.load_script(script_blob, ty_args, data_store, module_store),
-            Self::V2(loader) => {
-                loader.load_script(module_storage, script_storage, script_blob, ty_args)
-            },
+            Self::V2(loader) => loader.load_script(code_storage, script_blob, ty_args),
         }
     }
 
