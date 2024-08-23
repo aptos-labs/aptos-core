@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::loader::Module;
+use ambassador::delegatable_trait;
 use bytes::Bytes;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
@@ -9,6 +10,7 @@ use std::sync::Arc;
 
 /// Represents module storage backend, abstracting away any caching behaviour. The
 /// clients can implement their own module storage to pass to the VM to resolve code.
+#[delegatable_trait]
 pub trait ModuleStorage {
     /// Returns true if the module exists, and false otherwise. An error is returned
     /// if there is a storage error.

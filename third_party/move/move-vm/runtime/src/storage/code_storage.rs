@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{loader::Script, ModuleStorage};
+use ambassador::delegatable_trait;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
@@ -17,6 +18,7 @@ pub fn script_hash(serialized_script: &[u8]) -> [u8; 32] {
 /// clients can implement this trait to ensure that even script dependency is
 /// upgraded, the correct script is still returned. Scripts are cached based
 /// on their hash.
+#[delegatable_trait]
 pub trait CodeStorage: ModuleStorage {
     /// Returns a deserialized script, either by directly deserializing it from the
     /// provided bytes, or fetching it from the storage (if it has been cached). Note
