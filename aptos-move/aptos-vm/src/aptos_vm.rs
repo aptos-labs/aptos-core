@@ -851,7 +851,7 @@ impl AptosVM {
         entry_fn: &EntryFunction,
         _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
-        if self.features().use_loader_v2() {
+        if self.features().is_loader_v2_enabled() {
             let addr = entry_fn.module().address();
             let name = entry_fn.module().name();
             if !module_storage.check_module_exists(addr, name)? {
@@ -904,7 +904,7 @@ impl AptosVM {
                 module_storage,
                 session,
                 entry_fn,
-                self.features().use_loader_v2(),
+                self.features().is_loader_v2_enabled(),
             )?
             .is_some()
         {
@@ -1574,7 +1574,7 @@ impl AptosVM {
                             continue;
                         }
 
-                        let size_if_module_exists = if self.features().use_loader_v2() {
+                        let size_if_module_exists = if self.features().is_loader_v2_enabled() {
                             if module_storage.check_module_exists(addr, name)? {
                                 let size = module_storage.fetch_module_size_in_bytes(addr, name)?;
                                 Some(size as u64)
@@ -1659,7 +1659,7 @@ impl AptosVM {
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
                 let compat = Compatibility::new(check_struct_layout, check_friend_linking);
 
-                if self.features().use_loader_v2() {
+                if self.features().is_loader_v2_enabled() {
                     // Create a temporary storage. If this fails, it means publishing
                     // is not possible. We use a new VM here so that struct index map
                     // in the environment, and the type cache inside loader are not
@@ -1775,7 +1775,7 @@ impl AptosVM {
                 }
             } else {
                 Ok::<_, VMError>(
-                    if self.features().use_loader_v2() {
+                    if self.features().is_loader_v2_enabled() {
                         Some((ModuleWriteSet::empty(), VMChangeSet::empty()))
                     } else {
                         None
@@ -3146,7 +3146,7 @@ pub(crate) fn fetch_module_metadata_for_struct_tag(
     resolver: &impl AptosMoveResolver,
     module_storage: &impl AptosModuleStorage,
 ) -> VMResult<Vec<Metadata>> {
-    if features.use_loader_v2() {
+    if features.is_loader_v2_enabled() {
         module_storage.fetch_module_metadata(&struct_tag.address, &struct_tag.module)
     } else {
         Ok(resolver.get_module_metadata(&struct_tag.module_id()))
