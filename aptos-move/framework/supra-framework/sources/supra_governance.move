@@ -237,11 +237,6 @@ module supra_framework::supra_governance {
         voters: vector<address>,
     }
 
-    /// Used to track which execution script hashes have been approved by governance.
-    /// This is required to bypass cases where the execution scripts exceed the size limit imposed by mempool.
-    struct SupraApprovedExecutionHashes has key {
-        hashes: SimpleMap<u64, vector<u8>>,
-    }
 
     /// Can be called during genesis or by the governance itself.
     /// Stores the signer capability for a given address.
@@ -292,6 +287,8 @@ module supra_framework::supra_governance {
         move_to(supra_framework, ApprovedExecutionHashes {
             hashes: simple_map::create<u64, vector<u8>>(),
         })
+
+
     }
 
     fun supra_initialize(
@@ -315,9 +312,6 @@ module supra_framework::supra_governance {
             update_config_events: account::new_event_handle<SupraUpdateConfigEvent>(supra_framework),
             vote_events: account::new_event_handle<SupraVoteEvent>(supra_framework),
         });
-        move_to(supra_framework, SupraApprovedExecutionHashes {
-            hashes: simple_map::create<u64, vector<u8>>(),
-        })
     }
 
     /// Update the governance configurations. This can only be called as part of resolving a proposal in this same
@@ -813,7 +807,7 @@ module supra_framework::supra_governance {
         voter: &signer,
         proposal_id: u64,
         should_pass: bool,
-    ) acquires SupraApprovedExecutionHashes, SupraGovernanceEvents, SupraGovernanceConfig {
+    ) acquires ApprovedExecutionHashes, SupraGovernanceEvents, SupraGovernanceConfig {
         supra_vote_internal(voter, proposal_id, should_pass);
     }
 
@@ -825,7 +819,7 @@ module supra_framework::supra_governance {
         voter: &signer,
         proposal_id: u64,
         should_pass: bool,
-    ) acquires SupraApprovedExecutionHashes, SupraGovernanceEvents, SupraGovernanceConfig {
+    ) acquires ApprovedExecutionHashes, SupraGovernanceEvents, SupraGovernanceConfig {
         let voter_address = signer::address_of(voter);
 
         let supra_governance_config = borrow_global<SupraGovernanceConfig>(@supra_framework);
@@ -875,7 +869,7 @@ module supra_framework::supra_governance {
         add_approved_script_hash(proposal_id)
     }
 
-    public entry fun add_supra_approved_script_hash_script(proposal_id: u64) acquires SupraApprovedExecutionHashes {
+    public entry fun add_supra_approved_script_hash_script(proposal_id: u64) acquires ApprovedExecutionHashes {
         add_supra_approved_script_hash(proposal_id)
     }
 
@@ -904,8 +898,8 @@ module supra_framework::supra_governance {
     /// Add the execution script hash of a successful governance proposal to the approved list.
     /// This is needed to bypass the mempool transaction size limit for approved governance proposal transactions that
     /// are too large (e.g. module upgrades).
-    public fun add_supra_approved_script_hash(proposal_id: u64) acquires SupraApprovedExecutionHashes {
-        let approved_hashes = borrow_global_mut<SupraApprovedExecutionHashes>(@supra_framework);
+    public fun add_supra_approved_script_hash(proposal_id: u64) acquires ApprovedExecutionHashes {
+        let approved_hashes = borrow_global_mut<ApprovedExecutionHashes>(@supra_framework);
 
         // Ensure the proposal can be resolved.
         let proposal_state = multisig_voting::get_proposal_state<GovernanceProposal>(@supra_framework, proposal_id);
@@ -939,7 +933,7 @@ module supra_framework::supra_governance {
     public fun supra_resolve(
         proposal_id: u64,
         signer_address: address
-    ): signer acquires SupraApprovedExecutionHashes, GovernanceResponsbility {
+    ): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
         multisig_voting::resolve<GovernanceProposal>(@supra_framework, proposal_id);
         remove_supra_approved_hash(proposal_id);
         get_signer(signer_address)
@@ -970,7 +964,7 @@ module supra_framework::supra_governance {
         proposal_id: u64,
         signer_address: address,
         next_execution_hash: vector<u8>
-    ): signer acquires GovernanceResponsbility, SupraApprovedExecutionHashes {
+    ): signer acquires GovernanceResponsbility, ApprovedExecutionHashes {
         multisig_voting::resolve_proposal_v2<GovernanceProposal>(@supra_framework, proposal_id, next_execution_hash);
         // If the current step is the last step of this multi-step proposal,
         // we will remove the execution hash from the ApprovedExecutionHashes map.
@@ -999,13 +993,13 @@ module supra_framework::supra_governance {
     }
 
     /// Remove an approved proposal's execution script hash.
-    public fun remove_supra_approved_hash(proposal_id: u64) acquires SupraApprovedExecutionHashes {
+    public fun remove_supra_approved_hash(proposal_id: u64) acquires ApprovedExecutionHashes {
         assert!(
             multisig_voting::is_resolved<GovernanceProposal>(@supra_framework, proposal_id),
             error::invalid_argument(EPROPOSAL_NOT_RESOLVED_YET),
         );
 
-        let approved_hashes = &mut borrow_global_mut<SupraApprovedExecutionHashes>(@supra_framework).hashes;
+        let approved_hashes = &mut borrow_global_mut<ApprovedExecutionHashes>(@supra_framework).hashes;
         if (simple_map::contains_key(approved_hashes, &proposal_id)) {
             simple_map::remove(approved_hashes, &proposal_id);
         };
