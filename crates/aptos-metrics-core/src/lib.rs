@@ -32,13 +32,36 @@ impl TimerHelper for HistogramVec {
     }
 }
 
+pub struct ConcurrencyGauge {
+    gauge: IntGauge,
+}
+
+impl ConcurrencyGauge {
+    fn new(gauge: IntGauge) -> Self {
+        gauge.inc();
+        Self { gauge }
+    }
+}
+
+impl Drop for ConcurrencyGauge {
+    fn drop(&mut self) {
+        self.gauge.dec();
+    }
+}
+
 pub trait IntGaugeHelper {
     fn set_with(&self, labels: &[&str], val: i64);
+
+    fn concurrency_with(&self, labels: &[&str]) -> ConcurrencyGauge;
 }
 
 impl IntGaugeHelper for IntGaugeVec {
     fn set_with(&self, labels: &[&str], val: i64) {
         self.with_label_values(labels).set(val)
+    }
+
+    fn concurrency_with(&self, labels: &[&str]) -> ConcurrencyGauge {
+        ConcurrencyGauge::new(self.with_label_values(labels))
     }
 }
 
