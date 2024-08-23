@@ -20,7 +20,7 @@ use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_infallible::RwLock;
 use aptos_logger::{error, info, warn};
 use aptos_network::application::interface::NetworkClient;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use futures_channel::mpsc;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::time::interval;
@@ -70,10 +70,15 @@ impl ConsensusPublisher {
         (consensus_publisher, outbound_message_receiver)
     }
 
+    /// Adds an active subscriber to the set of active subscribers
+    fn add_active_subscriber(&self, peer_network_id: PeerNetworkId) {
+        self.active_subscribers.write().insert(peer_network_id);
+    }
+
     /// Garbage collect inactive subscriptions by removing peers that are no longer connected
     fn garbage_collect_subscriptions(&self) {
         // Get the set of active subscribers
-        let active_subscribers = self.active_subscribers.read().clone();
+        let active_subscribers = self.get_active_subscribers();
 
         // Get the connected peers and metadata
         let peers_and_metadata = self.consensus_observer_client.get_peers_and_metadata();
@@ -102,7 +107,7 @@ impl ConsensusPublisher {
 
         // Remove any subscriptions from peers that are no longer connected
         for peer_network_id in &disconnected_subscribers {
-            self.active_subscribers.write().remove(peer_network_id);
+            self.remove_active_subscriber(peer_network_id);
             info!(LogSchema::new(LogEntry::ConsensusPublisher)
                 .event(LogEvent::Subscription)
                 .message(&format!(
@@ -112,7 +117,7 @@ impl ConsensusPublisher {
         }
 
         // Update the number of active subscribers for each network
-        let active_subscribers = self.active_subscribers.read().clone();
+        let active_subscribers = self.get_active_subscribers();
         for network_id in peers_and_metadata.get_registered_networks() {
             // Calculate the number of active subscribers for the network
             let num_active_subscribers = active_subscribers
@@ -134,6 +139,11 @@ impl ConsensusPublisher {
         self.active_subscribers.read().clone()
     }
 
+    /// Removes an active subscriber from the set of active subscribers
+    fn remove_active_subscriber(&self, peer_network_id: &PeerNetworkId) {
+        self.active_subscribers.write().remove(peer_network_id);
+    }
+
     /// Processes a network message received by the consensus publisher
     fn process_network_message(&self, network_message: ConsensusPublisherNetworkMessage) {
         // Unpack the network message
@@ -150,7 +160,7 @@ impl ConsensusPublisher {
         match message {
             ConsensusObserverRequest::Subscribe => {
                 // Add the peer to the set of active subscribers
-                self.active_subscribers.write().insert(peer_network_id);
+                self.add_active_subscriber(peer_network_id);
                 info!(LogSchema::new(LogEntry::ConsensusPublisher)
                     .event(LogEvent::Subscription)
                     .message(&format!(
@@ -163,7 +173,7 @@ impl ConsensusPublisher {
             },
             ConsensusObserverRequest::Unsubscribe => {
                 // Remove the peer from the set of active subscribers
-                self.active_subscribers.write().remove(&peer_network_id);
+                self.remove_active_subscriber(&peer_network_id);
                 info!(LogSchema::new(LogEntry::ConsensusPublisher)
                     .event(LogEvent::Subscription)
                     .message(&format!(
@@ -177,25 +187,25 @@ impl ConsensusPublisher {
         }
     }
 
-    /// Publishes a direct send message to all active subscribers
-    pub async fn publish_message(&self, message: ConsensusObserverDirectSend) {
-        // Get the set of active subscribers
-        let active_subscribers = self.active_subscribers.read().clone();
+    /// Publishes a direct send message to all active subscribers. Note: this method is
+    /// non-blocking (to avoid blocking callers when messages are published, e.g., consensus).
+    pub fn publish_message(&self, message: ConsensusObserverDirectSend) {
+        // Get the active subscribers
+        let active_subscribers = self.get_active_subscribers();
 
         // Send the message to all active subscribers
         for peer_network_id in &active_subscribers {
             // Send the message to the outbound receiver for publishing
             let mut outbound_message_sender = self.outbound_message_sender.clone();
-            if let Err(error) = outbound_message_sender
-                .send((*peer_network_id, message.clone()))
-                .await
+            if let Err(error) =
+                outbound_message_sender.try_send((*peer_network_id, message.clone()))
             {
                 // The message send failed
                 warn!(LogSchema::new(LogEntry::ConsensusPublisher)
-                    .event(LogEvent::SendDirectSendMessage)
-                    .message(&format!(
-                        "Failed to send outbound message to the receiver for peer {:?}! Error: {:?}",
-                        peer_network_id, error
+                        .event(LogEvent::SendDirectSendMessage)
+                        .message(&format!(
+                            "Failed to send outbound message to the receiver for peer {:?}! Error: {:?}",
+                            peer_network_id, error
                     )));
             }
         }
@@ -493,9 +503,7 @@ mod test {
                 AggregateSignature::empty(),
             ),
         );
-        consensus_publisher
-            .publish_message(ordered_block_message.clone())
-            .await;
+        consensus_publisher.publish_message(ordered_block_message.clone());
 
         // Verify that the message was sent to the outbound message receiver
         let (peer_network_id, message) = outbound_message_receiver.next().await.unwrap();
@@ -521,9 +529,7 @@ mod test {
             BlockInfo::empty(),
             transaction_payload,
         );
-        consensus_publisher
-            .publish_message(block_payload_message.clone())
-            .await;
+        consensus_publisher.publish_message(block_payload_message.clone());
 
         // Verify that the message was sent to all active subscribers
         let num_expected_messages = additional_peer_network_ids.len() + 1;
@@ -545,9 +551,7 @@ mod test {
                 LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                 AggregateSignature::empty(),
             ));
-        consensus_publisher
-            .publish_message(commit_decision_message.clone())
-            .await;
+        consensus_publisher.publish_message(commit_decision_message.clone());
 
         // Verify that the message was sent to all active subscribers except the first peer
         for _ in 0..additional_peer_network_ids.len() {
@@ -566,9 +570,7 @@ mod test {
             BlockInfo::empty(),
             BlockTransactionPayload::empty(),
         );
-        consensus_publisher
-            .publish_message(block_payload_message.clone())
-            .await;
+        consensus_publisher.publish_message(block_payload_message.clone());
 
         // Verify that no messages were sent to the outbound message receiver
         assert!(outbound_message_receiver.next().now_or_never().is_none());
