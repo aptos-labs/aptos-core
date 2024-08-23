@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::loader::Script;
-use move_binary_format::{errors::PartialVMResult, file_format::CompiledScript};
+use move_binary_format::{errors::VMResult, file_format::CompiledScript};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
@@ -21,12 +21,9 @@ pub trait ScriptStorage {
     /// provided bytes, or fetching it from the storage (if it has been cached). Note
     /// that there are no guarantees that the returned script is verified. An error
     /// is returned if the deserialization fails.
-    fn fetch_deserialized_script(
-        &self,
-        serialized_script: &[u8],
-    ) -> PartialVMResult<Arc<CompiledScript>>;
+    fn fetch_deserialized_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>>;
 
     /// Returns a verified script. The script can either be cached, or deserialized and/or
     /// verified from scratch. An error is returned if script fails to deserialize or verify.
-    fn fetch_verified_script(&self, serialized_script: &[u8]) -> PartialVMResult<Arc<Script>>;
+    fn fetch_verified_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>>;
 }

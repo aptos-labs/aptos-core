@@ -6,6 +6,7 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     loader::{LoadedFunction, ModuleStorageAdapter},
+    module_linker_error,
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
@@ -91,7 +92,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// Execute a Move function ignoring its visibility and whether it is entry or not.
     pub fn execute_function_bypass_visibility(
         &mut self,
-        module: &ModuleId,
+        module_id: &ModuleId,
         function_name: &IdentStr,
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
@@ -99,8 +100,16 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
+        if self.move_vm.vm_config().use_loader_v2 {
+            let addr = module_id.address();
+            let name = module_id.name();
+            if !module_storage.check_module_exists(addr, name)? {
+                return Err(module_linker_error!(addr, name));
+            }
+        }
+
         let func = self.move_vm.runtime.loader().load_function(
-            module,
+            module_id,
             function_name,
             &ty_args,
             &mut self.data_cache,

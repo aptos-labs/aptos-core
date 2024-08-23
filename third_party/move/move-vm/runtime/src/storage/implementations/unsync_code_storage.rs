@@ -13,7 +13,7 @@ use crate::{
 use bytes::Bytes;
 use move_binary_format::{
     access::ScriptAccess,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, VMResult},
     file_format::CompiledScript,
     CompiledModule,
 };
@@ -75,7 +75,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
 
     /// Deserializes the script into its compiled representation. The deserialization
     /// is based on the current environment configurations.
-    fn deserialize_script(&self, serialized_script: &[u8]) -> PartialVMResult<Arc<CompiledScript>> {
+    fn deserialize_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
         let deserializer_config = &self
             .module_storage
             .runtime_environment()
@@ -86,7 +86,9 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
                 .map_err(|err| {
                     // Note: we remap the error to be consistent with loader V1 implementation!
                     let msg = format!("[VM] deserializer for script returned error: {:?}", err);
-                    PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR).with_message(msg)
+                    PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                        .with_message(msg)
+                        .finish(Location::Script)
                 })?;
         Ok(Arc::new(compiled_script))
     }
@@ -101,7 +103,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
     fn verify_deserialized_script(
         &self,
         compiled_script: Arc<CompiledScript>,
-    ) -> PartialVMResult<Arc<Script>> {
+    ) -> VMResult<Arc<Script>> {
         let partially_compiled_script = self
             .module_storage
             .runtime_environment()
@@ -109,7 +111,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
         let immediate_dependencies = compiled_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| self.module_storage.fetch_verified_module(addr, name))
-            .collect::<PartialVMResult<Vec<_>>>()?;
+            .collect::<VMResult<Vec<_>>>()?;
         Ok(Arc::new(
             self.module_storage
                 .runtime_environment()
@@ -119,10 +121,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
 }
 
 impl<M: ModuleStorage + WithEnvironment> ScriptStorage for UnsyncCodeStorage<M> {
-    fn fetch_deserialized_script(
-        &self,
-        serialized_script: &[u8],
-    ) -> PartialVMResult<Arc<CompiledScript>> {
+    fn fetch_deserialized_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;
 
@@ -142,7 +141,7 @@ impl<M: ModuleStorage + WithEnvironment> ScriptStorage for UnsyncCodeStorage<M> 
         })
     }
 
-    fn fetch_verified_script(&self, serialized_script: &[u8]) -> PartialVMResult<Arc<Script>> {
+    fn fetch_verified_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;
 
@@ -173,7 +172,7 @@ impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> 
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
+    ) -> VMResult<bool> {
         self.module_storage
             .check_module_exists(address, module_name)
     }
@@ -182,7 +181,7 @@ impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> 
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
+    ) -> VMResult<Option<Bytes>> {
         self.module_storage.fetch_module_bytes(address, module_name)
     }
 
@@ -190,7 +189,7 @@ impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> 
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
+    ) -> VMResult<usize> {
         self.module_storage
             .fetch_module_size_in_bytes(address, module_name)
     }
@@ -199,7 +198,7 @@ impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> 
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
+    ) -> VMResult<Vec<Metadata>> {
         self.module_storage
             .fetch_module_metadata(address, module_name)
     }
@@ -208,7 +207,7 @@ impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> 
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
+    ) -> VMResult<Arc<CompiledModule>> {
         self.module_storage
             .fetch_deserialized_module(address, module_name)
     }
@@ -217,7 +216,7 @@ impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> 
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
+    ) -> VMResult<Arc<Module>> {
         self.module_storage
             .fetch_verified_module(address, module_name)
     }

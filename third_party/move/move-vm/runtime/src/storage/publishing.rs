@@ -9,7 +9,7 @@ use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
-    errors::{verification_error, PartialVMError, PartialVMResult},
+    errors::{verification_error, Location, PartialVMError, VMResult},
     normalized, CompiledModule, IndexKind,
 };
 use move_core_types::{
@@ -41,14 +41,21 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
         compatibility: Compatibility,
         module_storage: &'m M,
         module_bundle: Vec<Bytes>,
-    ) -> PartialVMResult<Self> {
+    ) -> VMResult<Self> {
         use btree_map::Entry::*;
 
         let mut temporary_storage = BTreeMap::new();
         for module_bytes in module_bundle {
             let deserializer_config = &env.vm_config().deserializer_config;
             let compiled_module =
-                CompiledModule::deserialize_with_config(&module_bytes, deserializer_config)?;
+                CompiledModule::deserialize_with_config(&module_bytes, deserializer_config)
+                    .map_err(|err| {
+                        err.append_message_with_separator(
+                            '\n',
+                            "[VM] module deserialization failed".to_string(),
+                        )
+                        .finish(Location::Undefined)
+                    })?;
             let addr = compiled_module.self_addr();
             let name = compiled_module.self_name();
 
@@ -56,11 +63,17 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
             // where the module will actually be published. If we did not check this,
             // the sender could publish a module under anyone's account.
             if addr != sender {
+                let msg = format!(
+                    "Compiled modules address {} does not match the sender {}",
+                    addr, sender
+                );
                 return Err(verification_error(
                     StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
                     IndexKind::AddressIdentifier,
                     compiled_module.self_handle_idx().0,
-                ));
+                )
+                .with_message(msg)
+                .finish(Location::Undefined));
             }
 
             // All modules can be republished, as long as the new module is compatible
@@ -70,13 +83,19 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
                 let old_module_ref = module_storage.fetch_verified_module(addr, name)?;
                 let old_module = old_module_ref.module();
                 if env.vm_config().use_compatibility_checker_v2 {
-                    compatibility.check(old_module, &compiled_module)?
+                    compatibility
+                        .check(old_module, &compiled_module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
                 } else {
                     #[allow(deprecated)]
-                    let old_m = normalized::Module::new(old_module)?;
+                    let old_m = normalized::Module::new(old_module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
                     #[allow(deprecated)]
-                    let new_m = normalized::Module::new(&compiled_module)?;
-                    compatibility.legacy_check(&old_m, &new_m)?
+                    let new_m = normalized::Module::new(&compiled_module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    compatibility
+                        .legacy_check(&old_m, &new_m)
+                        .map_err(|e| e.finish(Location::Undefined))?;
                 }
             }
 
@@ -87,12 +106,20 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
             };
 
             // Publishing the same module in the same bundle is not allowed.
-            account_module_storage
-                .insert(
-                    compiled_module.self_name().to_owned(),
-                    (module_bytes, compiled_module),
-                )
-                .ok_or_else(|| PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME))?;
+            let prev = account_module_storage.insert(
+                compiled_module.self_name().to_owned(),
+                (module_bytes, compiled_module),
+            );
+            if let Some((_, compiled_module)) = prev {
+                let msg = format!(
+                    "Module {}::{} occurs more than once in published bundle",
+                    compiled_module.self_addr(),
+                    compiled_module.self_name()
+                );
+                return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)
+                    .with_message(msg)
+                    .finish(Location::Undefined));
+            }
         }
 
         Ok(Self {
@@ -118,7 +145,7 @@ impl<'m, M: ModuleStorage> ModuleBytesStorage for TemporaryModuleBytesStorage<'m
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
+    ) -> VMResult<Option<Bytes>> {
         if let Some(account_storage) = self.temporary_storage.get(address) {
             if let Some((bytes, _)) = account_storage.get(module_name) {
                 return Ok(Some(bytes.clone()));
@@ -146,7 +173,7 @@ impl<'a, M: ModuleStorage> TemporaryModuleStorage<'a, M> {
         env: &'a RuntimeEnvironment,
         existing_module_storage: &'a M,
         module_bundle: Vec<Bytes>,
-    ) -> PartialVMResult<Self> {
+    ) -> VMResult<Self> {
         Self::new_with_compat_config(
             sender,
             env,
@@ -163,7 +190,7 @@ impl<'a, M: ModuleStorage> TemporaryModuleStorage<'a, M> {
         compatibility: Compatibility,
         existing_module_storage: &'a M,
         module_bundle: Vec<Bytes>,
-    ) -> PartialVMResult<Self> {
+    ) -> VMResult<Self> {
         // Verify compatibility here.
         let temporary_module_bytes_storage = TemporaryModuleBytesStorage::new(
             sender,
@@ -202,7 +229,7 @@ impl<'a, M: ModuleStorage> ModuleStorage for TemporaryModuleStorage<'a, M> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
+    ) -> VMResult<bool> {
         self.storage.check_module_exists(address, module_name)
     }
 
@@ -210,7 +237,7 @@ impl<'a, M: ModuleStorage> ModuleStorage for TemporaryModuleStorage<'a, M> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
+    ) -> VMResult<Option<Bytes>> {
         self.storage.fetch_module_bytes(address, module_name)
     }
 
@@ -218,7 +245,7 @@ impl<'a, M: ModuleStorage> ModuleStorage for TemporaryModuleStorage<'a, M> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
+    ) -> VMResult<usize> {
         self.storage
             .fetch_module_size_in_bytes(address, module_name)
     }
@@ -227,7 +254,7 @@ impl<'a, M: ModuleStorage> ModuleStorage for TemporaryModuleStorage<'a, M> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
+    ) -> VMResult<Vec<Metadata>> {
         self.storage.fetch_module_metadata(address, module_name)
     }
 
@@ -235,7 +262,7 @@ impl<'a, M: ModuleStorage> ModuleStorage for TemporaryModuleStorage<'a, M> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
+    ) -> VMResult<Arc<CompiledModule>> {
         self.storage.fetch_deserialized_module(address, module_name)
     }
 
@@ -243,7 +270,7 @@ impl<'a, M: ModuleStorage> ModuleStorage for TemporaryModuleStorage<'a, M> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
+    ) -> VMResult<Arc<Module>> {
         self.storage.fetch_verified_module(address, module_name)
     }
 }

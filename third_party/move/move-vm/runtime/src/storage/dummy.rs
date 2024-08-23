@@ -7,7 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, VMResult},
     file_format::CompiledScript,
     CompiledModule,
 };
@@ -23,7 +23,8 @@ macro_rules! unexpected_unimplemented_error {
     () => {
         Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("New loader and code cache are not yet implemented".to_string()),
+                .with_message("New loader and code cache are not yet implemented".to_string())
+                .finish(Location::Undefined),
         )
     };
 }
@@ -43,7 +44,7 @@ impl ModuleStorage for DummyCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
+    ) -> VMResult<bool> {
         unexpected_unimplemented_error!()
     }
 
@@ -51,7 +52,7 @@ impl ModuleStorage for DummyCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
+    ) -> VMResult<usize> {
         unexpected_unimplemented_error!()
     }
 
@@ -59,7 +60,7 @@ impl ModuleStorage for DummyCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
+    ) -> VMResult<Option<Bytes>> {
         unexpected_unimplemented_error!()
     }
 
@@ -67,7 +68,7 @@ impl ModuleStorage for DummyCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
+    ) -> VMResult<Vec<Metadata>> {
         unexpected_unimplemented_error!()
     }
 
@@ -75,7 +76,7 @@ impl ModuleStorage for DummyCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
+    ) -> VMResult<Arc<CompiledModule>> {
         unexpected_unimplemented_error!()
     }
 
@@ -83,7 +84,7 @@ impl ModuleStorage for DummyCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
+    ) -> VMResult<Arc<Module>> {
         unexpected_unimplemented_error!()
     }
 }
@@ -92,11 +93,11 @@ impl ScriptStorage for DummyCodeStorage {
     fn fetch_deserialized_script(
         &self,
         _serialized_script: &[u8],
-    ) -> PartialVMResult<Arc<CompiledScript>> {
+    ) -> VMResult<Arc<CompiledScript>> {
         unexpected_unimplemented_error!()
     }
 
-    fn fetch_verified_script(&self, _serialized_script: &[u8]) -> PartialVMResult<Arc<Script>> {
+    fn fetch_verified_script(&self, _serialized_script: &[u8]) -> VMResult<Arc<Script>> {
         unexpected_unimplemented_error!()
     }
 }

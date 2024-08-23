@@ -9,11 +9,8 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use move_binary_format::{
-    access::ModuleAccess,
-    compatibility::Compatibility,
-    errors::{Location, VMResult},
-    file_format::CompiledScript,
-    file_format_common, CompiledModule,
+    access::ModuleAccess, compatibility::Compatibility, errors::VMResult,
+    file_format::CompiledScript, file_format_common, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
@@ -158,7 +155,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let vm_config = vm_config();
         let vm = vm_config
             .use_loader_v2
-            .then_some(Rc::new(create_vm(vm_config)));
+            .then_some(Rc::new(create_vm(vm_config.clone())));
 
         let mut adapter = Self {
             compiled_state: CompiledState::new(
@@ -171,56 +168,78 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             comparison_mode,
             run_config,
             vm,
-            module_bytes_storage: LocalModuleBytesStorage::empty(),
             resource_storage: InMemoryStorage::new(),
+            module_bytes_storage: LocalModuleBytesStorage::empty(),
         };
 
-        let vm = adapter.vm();
-        let mut modules_to_publish = vec![];
+        if vm_config.use_loader_v2 {
+            let addresses = either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+                .iter()
+                .map(|tmod| *tmod.named_module.module.self_addr())
+                .collect::<BTreeSet<_>>();
+            assert_eq!(addresses.len(), 1);
 
-        for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-            .into_iter()
-            .map(|tmod| &tmod.named_module.module)
-        {
-            let mut module_bytes = vec![];
-            module
-                .serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)
-                .unwrap();
-            let id = module.self_id();
-            let sender = *id.address();
+            let sender = *addresses.first().unwrap();
+            let module_bundle = either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+                .into_iter()
+                .map(|tmod| {
+                    let mut module_bytes = vec![];
+                    tmod.named_module
+                        .module
+                        .serialize_for_version(
+                            Some(file_format_common::VERSION_MAX),
+                            &mut module_bytes,
+                        )
+                        .unwrap();
+                    module_bytes.into()
+                })
+                .collect();
 
+            let vm = adapter.vm();
             let module_storage = adapter
                 .module_bytes_storage
                 .clone()
                 .into_unsync_module_storage(vm.runtime_environment());
 
-            let additional_modules_to_publish = adapter
+            TemporaryModuleStorage::new(
+                &sender,
+                vm.runtime_environment(),
+                &module_storage,
+                module_bundle,
+            )
+            .expect("All modules should publish")
+            .release_verified_module_bundle()
+            .for_each(|(bytes, module)| {
+                adapter.module_bytes_storage.add_module_bytes(
+                    module.self_addr(),
+                    module.self_name(),
+                    bytes,
+                );
+            });
+        } else {
+            adapter
                 .perform_session_action(None, |session, gas_status| {
-                    if vm.vm_config().use_loader_v2 {
-                        let tmp_storage = TemporaryModuleStorage::new(
-                            &sender,
-                            vm.runtime_environment(),
-                            &module_storage,
-                            vec![module_bytes.into()],
-                        )
-                        .expect("All modules for initialization should publish");
-                        Ok(tmp_storage.release_verified_module_bundle().collect())
-                    } else {
+                    for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+                        .into_iter()
+                        .map(|tmod| &tmod.named_module.module)
+                    {
+                        let mut module_bytes = vec![];
+                        module
+                            .serialize_for_version(
+                                Some(file_format_common::VERSION_MAX),
+                                &mut module_bytes,
+                            )
+                            .unwrap();
+                        let id = module.self_id();
+                        let sender = *id.address();
                         #[allow(deprecated)]
                         session
                             .publish_module(module_bytes, sender, gas_status)
                             .unwrap();
-                        Ok(vec![])
                     }
+                    Ok(())
                 })
                 .unwrap();
-            modules_to_publish.extend(additional_modules_to_publish);
-        }
-
-        for (bytes, module) in modules_to_publish {
-            adapter
-                .module_bytes_storage
-                .add_module_bytes(module.address(), module.name(), bytes);
         }
 
         let mut addr_to_name_mapping = BTreeMap::new();
@@ -277,8 +296,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     compat,
                     &module_storage,
                     vec![module_bytes.into()],
-                )
-                .map_err(|e| e.finish(Location::Undefined))?;
+                )?;
                 Ok(tmp_module_storage
                     .release_verified_module_bundle()
                     .collect())
@@ -451,8 +469,18 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         {
             None => Ok("[No Resource Exists]".to_owned()),
             Some(data) => {
-                let annotated = MoveValueAnnotator::new(self.resource_storage.clone())
-                    .view_resource(&tag, &data)?;
+                let vm = self.vm();
+                let annotated = if vm.vm_config().use_loader_v2 {
+                    MoveValueAnnotator::new(
+                        self.module_bytes_storage
+                            .clone()
+                            .into_unsync_module_storage(vm.runtime_environment()),
+                    )
+                    .view_resource(&tag, &data)?
+                } else {
+                    MoveValueAnnotator::new(self.resource_storage.clone())
+                        .view_resource(&tag, &data)?
+                };
                 Ok(format!("{}", annotated))
             },
         }
