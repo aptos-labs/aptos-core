@@ -40,7 +40,6 @@ CompiledPackageInfo {
             ),
             language_version: None,
             experiments: [],
-            move_2: false,
         },
     },
 }
