@@ -51,7 +51,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
-    move_vm_ext::{MoveVmExt, SessionId},
+    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
@@ -69,7 +69,10 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::{MoveResource, MoveStructType},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    ModuleStorage,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -1128,18 +1131,7 @@ impl FakeExecutor {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
-            let (change_set, empty_module_write_set) = session
-                .finish(
-                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-                    &module_storage,
-                )
-                .expect("Failed to generate txn effects");
-            assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
-
-            change_set
-                .try_combine_into_storage_change_set(empty_module_write_set)
-                .expect("Failed to convert to storage ChangeSet")
-                .into_inner()
+            finish_session_assert_no_modules(session, &module_storage)
         };
         self.data_store.add_write_set(&write_set);
 
@@ -1190,18 +1182,7 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let (change_set, empty_module_write_set) = session
-                .finish(
-                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-                    &module_storage,
-                )
-                .expect("Failed to generate txn effects");
-            assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
-
-            change_set
-                .try_combine_into_storage_change_set(empty_module_write_set)
-                .expect("Failed to convert to storage ChangeSet")
-                .into_inner()
+            finish_session_assert_no_modules(session, &module_storage)
         };
         self.data_store.add_write_set(&write_set);
         self.event_store.extend(events);
@@ -1238,20 +1219,7 @@ impl FakeExecutor {
                 &module_storage,
             )
             .map_err(|e| e.into_vm_status())?;
-
-        let (change_set, empty_module_write_set) = session
-            .finish(
-                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-                &module_storage,
-            )
-            .expect("Failed to generate txn effects");
-        assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
-
-        let (write_set, events) = change_set
-            .try_combine_into_storage_change_set(empty_module_write_set)
-            .expect("Failed to convert to storage ChangeSet")
-            .into_inner();
-        Ok((write_set, events))
+        Ok(finish_session_assert_no_modules(session, &module_storage))
     }
 
     pub fn execute_view_function(
@@ -1270,6 +1238,27 @@ impl FakeExecutor {
             max_gas_amount,
         )
     }
+}
+
+/// Finishes the session with [ChangeSetConfigs::unlimited_at_gas_feature_version]
+/// configs, and asserts there has been no modules published (publishing is the
+/// responsibility of the adapter, e.g., [AptosVM]).
+fn finish_session_assert_no_modules(
+    session: SessionExt,
+    module_storage: &impl ModuleStorage,
+) -> (WriteSet, Vec<ContractEvent>) {
+    let (change_set, empty_module_write_set) = session
+        .finish(
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+            &module_storage,
+        )
+        .expect("Failed to finish the session");
+    assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
+
+    change_set
+        .try_combine_into_storage_change_set(empty_module_write_set)
+        .expect("Failed to convert to storage ChangeSet")
+        .into_inner()
 }
 
 pub fn assert_outputs_equal(
