@@ -536,9 +536,10 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         consensus_public_key: bls12381::PublicKey,
         proof_of_possession: bls12381::ProofOfPossession,
+        gas_options: Option<GasOptions>,
     ) -> CliTypedResult<TransactionSummary> {
         UpdateConsensusKey {
-            txn_options: self.transaction_options(operator_index, None),
+            txn_options: self.transaction_options(operator_index, gas_options),
             operator_args: self.operator_args(pool_index),
             operator_config_file_args: OperatorConfigFileArgs {
                 operator_config_file: None,
