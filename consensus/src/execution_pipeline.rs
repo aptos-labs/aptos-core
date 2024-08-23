@@ -26,6 +26,7 @@ use aptos_types::{
     },
 };
 use fail::fail_point;
+use futures::future::BoxFuture;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
@@ -267,22 +268,39 @@ impl ExecutionPipeline {
             }
             .await;
             let pipeline_res = res.map(|(output, execution_duration)| {
-                let (pre_commit_result_tx, pre_commit_result_rx) = oneshot::channel();
-                // schedule pre-commit
-                pre_commit_tx
-                    .send(PreCommitCommand {
-                        block_id,
-                        parent_block_id,
-                        result_tx: pre_commit_result_tx,
-                        lifetime_guard,
-                    })
-                    .expect("Failed to send block to pre_commit stage.");
-                PipelineExecutionResult::new(
-                    input_txns,
-                    output,
-                    execution_duration,
-                    pre_commit_result_rx,
-                )
+                let pre_commit_fut: BoxFuture<'static, ExecutorResult<()>> =
+                    if output.epoch_state().is_some() {
+                        // hack: it causes issue if pre-commit is finished at an epoch ending, and
+                        // we switch to state sync, so we do the pre-commit only after we actually
+                        // decide to commit (in the commit phase)
+                        let executor = executor.clone();
+                        Box::pin(async move {
+                            tokio::task::spawn_blocking(move || {
+                                executor.pre_commit_block(block_id, parent_block_id)
+                            })
+                            .await
+                            .expect("failed to spawn_blocking")
+                        })
+                    } else {
+                        // kick off pre-commit right away
+                        let (pre_commit_result_tx, pre_commit_result_rx) = oneshot::channel();
+                        // schedule pre-commit
+                        pre_commit_tx
+                            .send(PreCommitCommand {
+                                block_id,
+                                parent_block_id,
+                                result_tx: pre_commit_result_tx,
+                                lifetime_guard,
+                            })
+                            .expect("Failed to send block to pre_commit stage.");
+                        Box::pin(async {
+                            pre_commit_result_rx
+                                .await
+                                .map_err(ExecutorError::internal_err)?
+                        })
+                    };
+
+                PipelineExecutionResult::new(input_txns, output, execution_duration, pre_commit_fut)
             });
             result_tx
                 .send(pipeline_res)
