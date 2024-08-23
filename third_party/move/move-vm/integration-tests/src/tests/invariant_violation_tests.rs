@@ -78,7 +78,7 @@ fn merge_borrow_states_infinite_loop() {
     let vm = MoveVM::new(vec![]);
 
     let module_and_script_storage =
-        LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
+        LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
     let resource_storage = InMemoryStorage::new();
 
     let traversal_storage = TraversalStorage::new();

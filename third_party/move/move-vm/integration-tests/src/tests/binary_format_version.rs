@@ -116,7 +116,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
         ));
 
         let module_and_script_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
         let resource_storage = InMemoryStorage::new();
 
         let mut sess = vm.new_session(&resource_storage);
@@ -160,7 +160,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
         );
 
         let module_and_script_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
         let resource_storage = InMemoryStorage::new();
 
         let mut sess = vm.new_session(&resource_storage);
