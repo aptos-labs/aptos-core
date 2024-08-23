@@ -168,5 +168,5 @@ impl RuntimeEnvironment {
 
 /// Represents any type that contains a [RuntimeEnvironment].
 pub trait WithEnvironment {
-    fn runtime_env(&self) -> &RuntimeEnvironment;
+    fn runtime_environment(&self) -> &RuntimeEnvironment;
 }
