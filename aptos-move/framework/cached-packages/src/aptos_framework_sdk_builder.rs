@@ -1016,6 +1016,10 @@ pub enum EntryFunctionCall {
         proposal_id: u64,
     },
 
+    SupraGovernanceAddSupraApprovedScriptHashScript {
+        proposal_id: u64,
+    },
+
     /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
     SupraGovernanceBatchPartialVote {
         stake_pools: Vec<AccountAddress>,
@@ -1082,6 +1086,31 @@ pub enum EntryFunctionCall {
     /// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
     /// since such updates are applied whenever we enter an new epoch.
     SupraGovernanceReconfigure {},
+
+    /// Create a single-step proposal with the backing `stake_pool`.
+    /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
+    /// only the exact script with matching hash can be successfully executed.
+    SupraGovernanceSupraCreateProposal {
+        execution_hash: Vec<u8>,
+        metadata_location: Vec<u8>,
+        metadata_hash: Vec<u8>,
+    },
+
+    /// Create a single-step or multi-step proposal with the backing `stake_pool`.
+    /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
+    /// only the exact script with matching hash can be successfully executed.
+    SupraGovernanceSupraCreateProposalV2 {
+        execution_hash: Vec<u8>,
+        metadata_location: Vec<u8>,
+        metadata_hash: Vec<u8>,
+        is_multi_step_proposal: bool,
+    },
+
+    /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
+    SupraGovernanceSupraVote {
+        proposal_id: u64,
+        should_pass: bool,
+    },
 
     /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
     SupraGovernanceVote {
@@ -1924,6 +1953,9 @@ impl EntryFunctionCall {
             SupraGovernanceAddApprovedScriptHashScript { proposal_id } => {
                 supra_governance_add_approved_script_hash_script(proposal_id)
             },
+            SupraGovernanceAddSupraApprovedScriptHashScript { proposal_id } => {
+                supra_governance_add_supra_approved_script_hash_script(proposal_id)
+            },
             SupraGovernanceBatchPartialVote {
                 stake_pools,
                 proposal_id,
@@ -1973,6 +2005,30 @@ impl EntryFunctionCall {
                 should_pass,
             } => supra_governance_partial_vote(stake_pool, proposal_id, voting_power, should_pass),
             SupraGovernanceReconfigure {} => supra_governance_reconfigure(),
+            SupraGovernanceSupraCreateProposal {
+                execution_hash,
+                metadata_location,
+                metadata_hash,
+            } => supra_governance_supra_create_proposal(
+                execution_hash,
+                metadata_location,
+                metadata_hash,
+            ),
+            SupraGovernanceSupraCreateProposalV2 {
+                execution_hash,
+                metadata_location,
+                metadata_hash,
+                is_multi_step_proposal,
+            } => supra_governance_supra_create_proposal_v2(
+                execution_hash,
+                metadata_location,
+                metadata_hash,
+                is_multi_step_proposal,
+            ),
+            SupraGovernanceSupraVote {
+                proposal_id,
+                should_pass,
+            } => supra_governance_supra_vote(proposal_id, should_pass),
             SupraGovernanceVote {
                 stake_pool,
                 proposal_id,
@@ -5010,6 +5066,23 @@ pub fn supra_governance_add_approved_script_hash_script(proposal_id: u64) -> Tra
     ))
 }
 
+pub fn supra_governance_add_supra_approved_script_hash_script(
+    proposal_id: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("add_supra_approved_script_hash_script").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&proposal_id).unwrap()],
+    ))
+}
+
 /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
 pub fn supra_governance_batch_partial_vote(
     stake_pools: Vec<AccountAddress>,
@@ -5203,6 +5276,79 @@ pub fn supra_governance_reconfigure() -> TransactionPayload {
         ident_str!("reconfigure").to_owned(),
         vec![],
         vec![],
+    ))
+}
+
+/// Create a single-step proposal with the backing `stake_pool`.
+/// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
+/// only the exact script with matching hash can be successfully executed.
+pub fn supra_governance_supra_create_proposal(
+    execution_hash: Vec<u8>,
+    metadata_location: Vec<u8>,
+    metadata_hash: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("supra_create_proposal").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&execution_hash).unwrap(),
+            bcs::to_bytes(&metadata_location).unwrap(),
+            bcs::to_bytes(&metadata_hash).unwrap(),
+        ],
+    ))
+}
+
+/// Create a single-step or multi-step proposal with the backing `stake_pool`.
+/// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
+/// only the exact script with matching hash can be successfully executed.
+pub fn supra_governance_supra_create_proposal_v2(
+    execution_hash: Vec<u8>,
+    metadata_location: Vec<u8>,
+    metadata_hash: Vec<u8>,
+    is_multi_step_proposal: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("supra_create_proposal_v2").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&execution_hash).unwrap(),
+            bcs::to_bytes(&metadata_location).unwrap(),
+            bcs::to_bytes(&metadata_hash).unwrap(),
+            bcs::to_bytes(&is_multi_step_proposal).unwrap(),
+        ],
+    ))
+}
+
+/// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
+pub fn supra_governance_supra_vote(proposal_id: u64, should_pass: bool) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("supra_governance").to_owned(),
+        ),
+        ident_str!("supra_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
     ))
 }
 
@@ -7511,6 +7657,20 @@ mod decoder {
         }
     }
 
+    pub fn supra_governance_add_supra_approved_script_hash_script(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::SupraGovernanceAddSupraApprovedScriptHashScript {
+                    proposal_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn supra_governance_batch_partial_vote(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7607,6 +7767,46 @@ mod decoder {
     pub fn supra_governance_reconfigure(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::SupraGovernanceReconfigure {})
+        } else {
+            None
+        }
+    }
+
+    pub fn supra_governance_supra_create_proposal(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::SupraGovernanceSupraCreateProposal {
+                execution_hash: bcs::from_bytes(script.args().get(0)?).ok()?,
+                metadata_location: bcs::from_bytes(script.args().get(1)?).ok()?,
+                metadata_hash: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn supra_governance_supra_create_proposal_v2(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::SupraGovernanceSupraCreateProposalV2 {
+                execution_hash: bcs::from_bytes(script.args().get(0)?).ok()?,
+                metadata_location: bcs::from_bytes(script.args().get(1)?).ok()?,
+                metadata_hash: bcs::from_bytes(script.args().get(2)?).ok()?,
+                is_multi_step_proposal: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn supra_governance_supra_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::SupraGovernanceSupraVote {
+                proposal_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
         } else {
             None
         }
@@ -8512,6 +8712,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::supra_governance_add_approved_script_hash_script),
         );
         map.insert(
+            "supra_governance_add_supra_approved_script_hash_script".to_string(),
+            Box::new(decoder::supra_governance_add_supra_approved_script_hash_script),
+        );
+        map.insert(
             "supra_governance_batch_partial_vote".to_string(),
             Box::new(decoder::supra_governance_batch_partial_vote),
         );
@@ -8542,6 +8746,18 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "supra_governance_reconfigure".to_string(),
             Box::new(decoder::supra_governance_reconfigure),
+        );
+        map.insert(
+            "supra_governance_supra_create_proposal".to_string(),
+            Box::new(decoder::supra_governance_supra_create_proposal),
+        );
+        map.insert(
+            "supra_governance_supra_create_proposal_v2".to_string(),
+            Box::new(decoder::supra_governance_supra_create_proposal_v2),
+        );
+        map.insert(
+            "supra_governance_supra_vote".to_string(),
+            Box::new(decoder::supra_governance_supra_vote),
         );
         map.insert(
             "supra_governance_vote".to_string(),

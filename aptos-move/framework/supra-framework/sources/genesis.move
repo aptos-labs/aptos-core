@@ -653,9 +653,11 @@ module supra_framework::genesis {
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
         supra_framework: &signer,
-        min_voting_threshold: u128,
-        required_proposer_stake: u64,
+        // min_voting_threshold: u128,
+        // required_proposer_stake: u64,
         voting_duration_secs: u64,
+        supra_min_voting_threshold: u64,
+        voters: vector<address>,
         accounts: vector<AccountMap>,
         employee_vesting_start: u64,
         employee_vesting_period_duration: u64,
@@ -682,9 +684,11 @@ module supra_framework::genesis {
         initialize_supra_coin(supra_framework);
         supra_governance::initialize_for_verification(
             supra_framework,
-            min_voting_threshold,
-            required_proposer_stake,
-            voting_duration_secs
+            // min_voting_threshold,
+            // required_proposer_stake,
+            voting_duration_secs,
+            supra_min_voting_threshold,
+            voters,
         );
         create_accounts(supra_framework, accounts);
         create_employee_validators(employee_vesting_start, employee_vesting_period_duration, employees);

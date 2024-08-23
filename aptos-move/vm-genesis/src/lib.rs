@@ -84,11 +84,12 @@ pub struct GenesisConfiguration {
     pub is_test: bool,
     pub max_stake: u64,
     pub min_stake: u64,
-    pub min_voting_threshold: u128,
+    pub min_voting_threshold: u64,
     pub recurring_lockup_duration_secs: u64,
     pub required_proposer_stake: u64,
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
+    pub voters: Vec<AccountAddress>,
     pub voting_power_increase_limit: u64,
     pub genesis_timestamp_in_microseconds: u64,
     pub employee_vesting_start: u64,
@@ -637,9 +638,9 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::U128(genesis_config.min_voting_threshold),
-            MoveValue::U64(genesis_config.required_proposer_stake),
             MoveValue::U64(genesis_config.voting_duration_secs),
+            MoveValue::U64(genesis_config.min_voting_threshold),
+            MoveValue::vector_address(genesis_config.voters.clone()),
         ]),
     );
 }
@@ -1023,13 +1024,18 @@ pub fn generate_test_genesis(
             epoch_duration_secs: 3600,
             is_test: true,
             min_stake: 0,
-            min_voting_threshold: 0,
+            min_voting_threshold: 2,
             // 1M APTOS coins (with 8 decimals).
             max_stake: 100_000_000_000_000,
             recurring_lockup_duration_secs: 7200,
             required_proposer_stake: 0,
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
+            voters: vec![
+                AccountAddress::from_hex_literal("0xdd1").unwrap(),
+                AccountAddress::from_hex_literal("0xdd2").unwrap(),
+                AccountAddress::from_hex_literal("0xdd3").unwrap()
+            ],
             voting_power_increase_limit: 50,
             genesis_timestamp_in_microseconds: 0,
             employee_vesting_start: 1663456089,
@@ -1078,12 +1084,17 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         is_test: false,
         min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
         // 400M APT
-        min_voting_threshold: (400_000_000 * APTOS_COINS_BASE_WITH_DECIMALS as u128),
+        min_voting_threshold: 2,
         max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M APT.
         recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
         required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
         rewards_apy_percentage: 10,
         voting_duration_secs: 7 * 24 * 3600, // 7 days
+        voters: vec![
+            AccountAddress::from_hex_literal("0xdd1").unwrap(),
+            AccountAddress::from_hex_literal("0xdd2").unwrap(),
+            AccountAddress::from_hex_literal("0xdd3").unwrap()
+        ],
         voting_power_increase_limit: 30,
         genesis_timestamp_in_microseconds: 0,
         employee_vesting_start: 1663456089,
