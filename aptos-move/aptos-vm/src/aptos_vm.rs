@@ -78,7 +78,7 @@ use aptos_vm_types::{
     environment::Environment,
     module_and_script_storage::{
         module_storage::AptosModuleStorage, script_storage::AptosScriptStorage,
-        AptosCodeStorageAdapter, AsAptosCodeStorage, TemporaryModuleStorage,
+        AptosCodeStorageAdapter, AsAptosCodeStorage,
     },
     module_write_set::ModuleWriteSet,
     output::VMOutput,
@@ -111,6 +111,7 @@ use move_core_types::{
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
+    TemporaryModuleStorage, UnreachableCodeStorage,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -1452,11 +1453,10 @@ impl AptosVM {
         Ok(epilogue_session)
     }
 
-    /// Execute all module initializers.
+    /// Execute all module initializers. This code is only used for V1 loader implementation.
     fn execute_module_initialization(
         &self,
         session: &mut SessionExt,
-        module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
         modules: &[CompiledModule],
         exists: BTreeSet<ModuleId>,
@@ -1471,8 +1471,12 @@ impl AptosVM {
                 continue;
             }
             *new_published_modules_loaded = true;
-            let init_function =
-                session.load_function(module_storage, &module.self_id(), init_func_name, &[]);
+            let init_function = session.load_function(
+                &UnreachableCodeStorage,
+                &module.self_id(),
+                init_func_name,
+                &[],
+            );
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
             // Note that for historic reasons, verification here is treated
@@ -1491,7 +1495,7 @@ impl AptosVM {
                         args,
                         gas_meter,
                         traversal_context,
-                        module_storage,
+                        &UnreachableCodeStorage,
                     )?;
                 } else {
                     return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
@@ -1656,38 +1660,24 @@ impl AptosVM {
                 let compat = Compatibility::new(check_struct_layout, check_friend_linking);
 
                 if self.features().use_loader_v2() {
-                    // TODO(loader_v2): This check MUST also have inside of it whatever
-                    //                  `validate_publish_request` was doing.
-                    //                  Also, uncomment when the implementation ready, for now we
-                    //                  do not need this to block e2e happy test cases.
-                    // session.verify_module_bundle_before_publishing_with_compat_config(
-                    //     modules.as_slice(),
-                    //     &destination,
-                    //     module_storage,
-                    //     compat,
-                    // )?;
-
-                    // Create module write set for modules to be published.
-                    let write_ops = session
-                        .convert_modules_into_write_ops(
-                            module_storage,
-                            bundle.iter().zip(modules).map(|(m, compiled_module)| {
-                                (m.code().to_vec().into(), compiled_module)
-                            }),
-                        )
-                        .map_err(|e| e.finish(Location::Undefined))?;
-
-                    // Create temporary VM, session, and module storage for running init_module.
-                    // We create a new VM so that type cache is not inconsistent when init_module
-                    // function fails, but loads some new types , type depth formulas, or struct
-                    // name indices.
-                    // TODO(loader_v2): Revisit this to support in a nicer way?
-                    let tmp_module_storage = TemporaryModuleStorage::create(
-                        self.move_vm.runtime_environment(),
-                        write_ops,
-                        module_storage,
-                    );
+                    // Create a temporary storage. If this fails, it means publishing
+                    // is not possible. We use a new VM here so that struct index map
+                    // in the environment, and the type cache inside loader are not
+                    // inconsistent.
+                    // TODO(loader_v2): Revisit this to make it less ugly.
                     let tmp_vm = self.move_vm.clone();
+                    let tmp_module_storage = TemporaryModuleStorage::new_with_compat_config(
+                        &destination,
+                        // TODO(loader_v2): Make sure to `validate_publish_request` passes to environment
+                        //                  verifier extension.
+                        tmp_vm.runtime_environment(),
+                        compat,
+                        module_storage,
+                        bundle.into_bytes(),
+                    )
+                    .map_err(|e| e.finish(Location::Undefined))?;
+
+                    // Run init_module for each new module. We use a new session for that as well.
                     let mut tmp_session = tmp_vm.new_session(
                         resolver,
                         SessionId::txn_meta(transaction_metadata),
@@ -1705,35 +1695,35 @@ impl AptosVM {
                         }
 
                         let module_id = module.self_id();
-                        let init_function = tmp_session.load_function(
-                            &tmp_module_storage,
-                            &module_id,
-                            init_func_name,
-                            &[],
-                        );
-                        if init_function.is_ok() {
-                            if verifier::module_init::verify_module_init_function(module).is_ok() {
-                                tmp_session.execute_function_bypass_visibility(
-                                    &module_id,
-                                    init_func_name,
-                                    vec![],
-                                    vec![MoveValue::Signer(destination)
-                                        .simple_serialize()
-                                        .unwrap()],
-                                    gas_meter,
-                                    traversal_context,
-                                    &tmp_module_storage,
-                                )?;
-                            } else {
-                                // TODO(loader_v2): Use this opportunity to change the error message?
-                                return Err(PartialVMError::new(
-                                    StatusCode::CONSTRAINT_NOT_SATISFIED,
-                                )
-                                .finish(Location::Undefined));
-                            }
+                        let init_function_exists = tmp_session
+                            .load_function(&tmp_module_storage, &module_id, init_func_name, &[])
+                            .is_ok();
+                        if init_function_exists {
+                            verifier::module_init::verify_module_init_function(module)
+                                .map_err(|e| e.finish(Location::Undefined))?;
+                            tmp_session.execute_function_bypass_visibility(
+                                &module_id,
+                                init_func_name,
+                                vec![],
+                                vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
+                                gas_meter,
+                                traversal_context,
+                                &tmp_module_storage,
+                            )?;
                         }
                     }
 
+                    // Create module write set for modules to be published. We do not care
+                    // here about writes to special addresses because there is no flushing.
+                    let write_ops = session
+                        .convert_modules_into_write_ops(
+                            module_storage,
+                            tmp_module_storage.release_verified_module_bundle(),
+                        )
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    let module_write_set = ModuleWriteSet::new(false, write_ops);
+
+                    // Process init_module side-effects.
                     let (init_module_changes, empty_write_set) =
                         tmp_session.finish(change_set_configs, module_storage)?;
                     empty_write_set
@@ -1743,7 +1733,7 @@ impl AptosVM {
                                 .finish(Location::Undefined)
                         })?;
 
-                    Ok(Some((tmp_module_storage.destroy(), init_module_changes)))
+                    Ok(Some((module_write_set, init_module_changes)))
                 } else {
                     // Validate the module bundle
                     self.validate_publish_request(
@@ -1771,13 +1761,11 @@ impl AptosVM {
                         bundle.into_inner(),
                         destination,
                         gas_meter,
-                        module_storage,
                         compat,
                     )?;
 
                     self.execute_module_initialization(
                         session,
-                        module_storage,
                         gas_meter,
                         modules,
                         exists,

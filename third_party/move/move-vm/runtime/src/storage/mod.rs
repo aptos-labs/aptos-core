@@ -12,3 +12,4 @@ pub mod verifier;
 // TODO(loader_v2): Remove when we no longer need the dummy implementation.
 pub mod dummy;
 pub mod implementations;
+pub mod publishing;

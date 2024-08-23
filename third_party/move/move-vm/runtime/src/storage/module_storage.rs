@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::loader::Module;
+use bytes::Bytes;
 use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use std::sync::Arc;
@@ -16,6 +17,14 @@ pub trait ModuleStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<bool>;
+
+    /// Returns module bytes. An error is returned if there is a storage error. If
+    /// the module does not exist, returns [None].
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>>;
 
     /// Returns the size of a module in bytes. An error is returned if the module does
     /// not exist, or there is a storage error.
@@ -52,4 +61,14 @@ pub trait ModuleStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Arc<Module>>;
+}
+
+/// Storage that contains serialized modules. Clients can implement this trait
+/// for their own backends, so that [ModuleStorage] can be built on top of it.
+pub trait ModuleBytesStorage {
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>>;
 }
