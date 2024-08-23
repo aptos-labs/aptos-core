@@ -116,6 +116,10 @@ pub enum CliError {
     SimulationError(String),
     #[error("Coverage failed with status: {0}")]
     CoverageError(String),
+    #[error("Move mutator failed: {0}")]
+    MoveMutatorError(String),
+    #[error("Move spec-test failed: {0}")]
+    MoveSpecTestError(String),
 }
 
 impl CliError {
@@ -130,12 +134,14 @@ impl CliError {
             CliError::IO(_, _) => "IO",
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError => "MoveTestError",
+            CliError::MoveMutatorError(_) => "MoveMutatorError",
             CliError::MoveProverError(_) => "MoveProverError",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
             CliError::SimulationError(_) => "SimulationError",
             CliError::CoverageError(_) => "CoverageError",
+            CliError::MoveSpecTestError(_) => "MoveSpecTestError",
         }
     }
 }

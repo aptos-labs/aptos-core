@@ -4,7 +4,7 @@
 
 use base::{
     build::Build, coverage::Coverage, disassemble::Disassemble, docgen::Docgen, errmap::Errmap,
-    new::New, prove::Prove, test::Test,
+    mutate::Mutate, new::New, prove::Prove, spec_test::SpecTest, test::Test,
 };
 use move_package::BuildConfig;
 
@@ -63,8 +63,10 @@ pub enum Command {
     Disassemble(Disassemble),
     Docgen(Docgen),
     Errmap(Errmap),
+    Mutate(Mutate),
     New(New),
     Prove(Prove),
+    SpecTest(SpecTest),
     Test(Test),
 }
 
@@ -84,8 +86,10 @@ pub fn run_cli(
         Command::Disassemble(c) => c.execute(move_args.package_path, move_args.build_config),
         Command::Docgen(c) => c.execute(move_args.package_path, move_args.build_config),
         Command::Errmap(c) => c.execute(move_args.package_path, move_args.build_config),
+        Command::Mutate(c) => c.execute(move_args.package_path, move_args.build_config),
         Command::New(c) => c.execute_with_defaults(move_args.package_path),
         Command::Prove(c) => c.execute(move_args.package_path, move_args.build_config),
+        Command::SpecTest(c) => c.execute(move_args.package_path, move_args.build_config),
         Command::Test(c) => c.execute(
             move_args.package_path,
             move_args.build_config,

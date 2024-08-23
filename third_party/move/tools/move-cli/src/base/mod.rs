@@ -6,8 +6,10 @@ pub mod coverage;
 pub mod disassemble;
 pub mod docgen;
 pub mod errmap;
+pub mod mutate;
 pub mod new;
 pub mod prove;
+pub mod spec_test;
 pub mod test;
 pub mod test_validation;
 
