@@ -234,7 +234,7 @@ pub fn get_vm_metadata(
     features: &Features,
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if features.use_loader_v2() {
+    if features.is_loader_v2_enabled() {
         let metadata = module_storage
             .fetch_module_metadata(module_id.address(), module_id.name())
             .ok()?;
@@ -252,7 +252,7 @@ pub fn get_vm_metadata_v0(
     features: &Features,
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if features.use_loader_v2() {
+    if features.is_loader_v2_enabled() {
         let metadata = module_storage
             .fetch_module_metadata(module_id.address(), module_id.name())
             .ok()?;
