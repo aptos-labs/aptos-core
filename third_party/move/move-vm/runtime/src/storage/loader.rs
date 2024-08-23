@@ -32,7 +32,7 @@ use typed_arena::Arena;
 /// module or script cache. Instead, module and script storages are passed to all
 /// APIs by reference.
 pub(crate) struct LoaderV2 {
-    runtime_env: Arc<RuntimeEnvironment>,
+    runtime_environment: Arc<RuntimeEnvironment>,
     // Local caches:
     //   These caches are owned by this loader and are not affected by module
     //   upgrades. When a new cache is added, the safety guarantees (i.e., why
@@ -45,17 +45,17 @@ pub(crate) struct LoaderV2 {
 impl LoaderV2 {
     pub(crate) fn new(runtime_env: RuntimeEnvironment) -> Self {
         Self {
-            runtime_env: Arc::new(runtime_env),
+            runtime_environment: Arc::new(runtime_env),
             ty_cache: RwLock::new(TypeCache::empty()),
         }
     }
 
-    pub(crate) fn runtime_env(&self) -> &RuntimeEnvironment {
-        self.runtime_env.as_ref()
+    pub(crate) fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.runtime_environment.as_ref()
     }
 
     pub(crate) fn vm_config(&self) -> &VMConfig {
-        self.runtime_env.vm_config()
+        self.runtime_environment.vm_config()
     }
 
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
@@ -67,7 +67,7 @@ impl LoaderV2 {
     }
 
     pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
-        self.runtime_env.struct_name_index_map()
+        self.runtime_environment.struct_name_index_map()
     }
 
     pub(crate) fn check_script_dependencies_and_check_gas(
@@ -253,7 +253,7 @@ impl LoaderV2 {
 impl Clone for LoaderV2 {
     fn clone(&self) -> Self {
         Self {
-            runtime_env: self.runtime_env.clone(),
+            runtime_environment: self.runtime_environment.clone(),
             ty_cache: RwLock::new(self.ty_cache().read().clone()),
         }
     }

@@ -151,7 +151,7 @@ impl Loader {
 
     versioned_loader_getter!(ty_cache, RwLock<TypeCache>);
 
-    versioned_loader_getter!(runtime_env, RuntimeEnvironment);
+    versioned_loader_getter!(runtime_environment, RuntimeEnvironment);
 
     pub(crate) fn v1(runtime_env: RuntimeEnvironment) -> Self {
         Self::V1(LoaderV1 {
@@ -159,7 +159,7 @@ impl Loader {
             type_cache: RwLock::new(TypeCache::empty()),
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
-            runtime_env: Arc::new(runtime_env),
+            runtime_environment: Arc::new(runtime_env),
         })
     }
 
@@ -438,7 +438,7 @@ pub(crate) struct LoaderV1 {
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
     // The environment used by the loader, e.g, VM config, available native functions, etc..
-    runtime_env: Arc<RuntimeEnvironment>,
+    runtime_environment: Arc<RuntimeEnvironment>,
 }
 
 impl Clone for LoaderV1 {
@@ -448,18 +448,18 @@ impl Clone for LoaderV1 {
             type_cache: RwLock::new(self.type_cache.read().clone()),
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
-            runtime_env: self.runtime_env.clone(),
+            runtime_environment: self.runtime_environment.clone(),
         }
     }
 }
 
 impl LoaderV1 {
     pub(crate) fn vm_config(&self) -> &VMConfig {
-        self.runtime_env().vm_config()
+        self.runtime_environment().vm_config()
     }
 
-    pub(crate) fn runtime_env(&self) -> &RuntimeEnvironment {
-        &self.runtime_env
+    pub(crate) fn runtime_environment(&self) -> &RuntimeEnvironment {
+        &self.runtime_environment
     }
 
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
@@ -471,7 +471,7 @@ impl LoaderV1 {
     }
 
     pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
-        self.runtime_env().struct_name_index_map()
+        self.runtime_environment().struct_name_index_map()
     }
 
     //
@@ -1068,7 +1068,7 @@ impl LoaderV1 {
 
         // if linking goes well, insert the module to the code cache
         let module_ref = module_store.insert(
-            self.runtime_env().natives(),
+            self.runtime_environment().natives(),
             id.clone(),
             size,
             module,

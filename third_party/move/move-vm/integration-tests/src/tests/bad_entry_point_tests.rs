@@ -24,7 +24,7 @@ fn call_non_existent_module() {
 
     let resource_storage = BlankStorage;
     let module_storage =
-        LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_env());
+        LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
 
     let mut sess = vm.new_session(&resource_storage);
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
@@ -67,7 +67,7 @@ fn call_non_existent_function() {
 
     let mut module_bytes_storage = LocalModuleBytesStorage::empty();
     module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
-    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
     let mut sess = vm.new_session(&resource_storage);
     let fun_name = Identifier::new("foo").unwrap();

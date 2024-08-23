@@ -56,7 +56,7 @@ fn test_publish_module_with_nested_loops() {
 
         let resource_storage = InMemoryStorage::new();
         let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_env());
+            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.verify_module_bundle_before_publishing(&[m.clone()], &TEST_ADDR, &module_storage)
@@ -81,7 +81,7 @@ fn test_publish_module_with_nested_loops() {
 
         let resource_storage = InMemoryStorage::new();
         let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_env());
+            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.verify_module_bundle_before_publishing(&[m], &TEST_ADDR, &module_storage)
@@ -132,7 +132,7 @@ fn test_run_script_with_nested_loops() {
         );
 
         let module_and_script_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
         let resource_storage = InMemoryStorage::new();
 
         let mut sess = vm.new_session(&resource_storage);
@@ -166,7 +166,7 @@ fn test_run_script_with_nested_loops() {
         );
 
         let module_and_script_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_env());
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
         let resource_storage = InMemoryStorage::new();
 
         let mut sess = vm.new_session(&resource_storage);

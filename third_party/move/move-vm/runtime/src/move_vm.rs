@@ -61,8 +61,8 @@ impl MoveVM {
     }
 
     /// Returns the VM runtime environment.
-    pub fn runtime_env(&self) -> &RuntimeEnvironment {
-        self.runtime.loader().runtime_env()
+    pub fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.runtime.loader().runtime_environment()
     }
 
     /// Create a new Session backed by the given storage.
