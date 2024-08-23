@@ -22,7 +22,7 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
     session::{SerializedReturnValues, Session},
-    DummyCodeStorage,
+    UnreachableCodeStorage,
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
 use move_vm_types::{
@@ -69,12 +69,19 @@ impl AsyncVM {
                 })
             })
             .collect();
+        let move_vm = MoveVM::new(
+            natives
+                .into_iter()
+                .chain(natives::actor_natives(async_lib_addr, actor_gas_parameters)),
+        );
+        if move_vm.vm_config().use_loader_v2 {
+            return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+                .with_message("AsyncVM does not support loader V2 implementation".to_string())
+                .finish(Location::Undefined));
+        }
+
         Ok(AsyncVM {
-            move_vm: MoveVM::new(
-                natives
-                    .into_iter()
-                    .chain(natives::actor_natives(async_lib_addr, actor_gas_parameters)),
-            ),
+            move_vm,
             actor_metadata,
             message_table,
         })
@@ -112,9 +119,14 @@ impl AsyncVM {
         }
     }
 
-    /// Get the underlying Move VM.
-    pub fn get_move_vm(&mut self) -> &mut MoveVM {
+    /// Get the mutable reference to the underlying Move VM.
+    pub fn get_move_vm_mut(&mut self) -> &mut MoveVM {
         &mut self.move_vm
+    }
+
+    /// Get the reference to the underlying Move VM.
+    pub fn get_move_vm(&self) -> &MoveVM {
+        &self.move_vm
     }
 
     /// Resolve the message hash into module and handler function.
@@ -183,13 +195,13 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         let state_type_tag = TypeTag::Struct(Box::new(actor.state_tag.clone()));
         let state_type = self
             .vm_session
-            .load_type(&state_type_tag, &DummyCodeStorage)
+            .load_type(&state_type_tag, &UnreachableCodeStorage)
             .map_err(vm_error_to_async)?;
 
         // Check whether the actor state already exists.
         let state = self
             .vm_session
-            .load_resource(&DummyCodeStorage, actor_addr, &state_type)
+            .load_resource(&UnreachableCodeStorage, actor_addr, &state_type)
             .map(|(gv, _)| gv)
             .map_err(partial_vm_error_to_async)?;
         if state.exists().map_err(partial_vm_error_to_async)? {
@@ -212,7 +224,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 Vec::<Vec<u8>>::new(),
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &UnreachableCodeStorage,
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
@@ -280,12 +292,12 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         let state_type_tag = TypeTag::Struct(Box::new(actor.state_tag.clone()));
         let state_type = self
             .vm_session
-            .load_type(&state_type_tag, &DummyCodeStorage)
+            .load_type(&state_type_tag, &UnreachableCodeStorage)
             .map_err(vm_error_to_async)?;
 
         let actor_state_global = self
             .vm_session
-            .load_resource(&DummyCodeStorage, actor_addr, &state_type)
+            .load_resource(&UnreachableCodeStorage, actor_addr, &state_type)
             .map(|(gv, _)| gv)
             .map_err(partial_vm_error_to_async)?;
         let actor_state = actor_state_global
@@ -311,7 +323,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 args,
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
+                &UnreachableCodeStorage,
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
 
@@ -360,7 +372,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
     fn to_bcs(&mut self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
         let type_layout = self
             .vm_session
-            .get_type_layout(tag, &DummyCodeStorage)
+            .get_type_layout(tag, &UnreachableCodeStorage)
             .map_err(|e| e.to_partial())?;
         value
             .simple_serialize(&type_layout)

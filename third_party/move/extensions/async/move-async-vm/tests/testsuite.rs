@@ -2,19 +2,16 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::bail;
 use bytes::Bytes;
 use itertools::Itertools;
 use move_async_vm::{
     actor_metadata,
     actor_metadata::ActorMetadata,
-    async_vm::{AsyncResult, AsyncVM, Message},
+    async_vm::{AsyncResult, AsyncSession, AsyncVM, Message},
     natives::GasParameters as ActorGasParameters,
 };
-use move_binary_format::{
-    access::ModuleAccess,
-    errors::{PartialVMError, PartialVMResult},
-    CompiledModule,
-};
+use move_binary_format::{access::ModuleAccess, errors::PartialVMResult};
 use move_command_line_common::testing::get_compiler_exp_extension;
 use move_compiler::{
     attr_derivation, compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
@@ -28,10 +25,8 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     value::MoveTypeLayout,
-    vm_status::StatusCode,
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
-use move_vm_runtime::{Module, ModuleStorage};
 use move_vm_test_utils::gas_schedule::GasStatus;
 use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use std::{
@@ -39,7 +34,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     path::{Path, PathBuf},
     str::FromStr,
-    sync::Arc,
 };
 
 const TEST_ADDR: &str = "0x3";
@@ -91,13 +85,18 @@ datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$");
 
 impl Harness {
     fn run(&self, _module: &str) -> anyhow::Result<()> {
+        if self.vm.get_move_vm().vm_config().use_loader_v2 {
+            bail!("AsyncVM does not support loader V2 implementation")
+        }
+
         let mut gas = GasStatus::new_unmetered();
         let mut tick = 0;
         // Publish modules.
         let proxy = HarnessProxy { harness: self };
+        let mut session = self.vm.new_session(test_account(), 0, &proxy);
         let mut done = BTreeSet::new();
         for id in self.module_cache.keys() {
-            self.publish_module(id, &mut done, &proxy)?;
+            self.publish_module(&mut session, id, &mut gas, &mut done)?;
         }
         // Initialize actors
         let mut mailbox: VecDeque<Message> = Default::default();
@@ -148,34 +147,27 @@ impl Harness {
         Ok(())
     }
 
-    // Note(loader_v2):
-    //   This code reads weird. We do not really publish anything, because module cache
-    //   cache already has all the modules. The session is not also used, so we can just
-    //   ignore the whole thing? Keep like this for now and revisit in the future.
     fn publish_module(
         &self,
+        session: &mut AsyncSession,
         id: &IdentStr,
+        gas: &mut GasStatus,
         done: &mut BTreeSet<Identifier>,
-        proxy: &HarnessProxy,
     ) -> anyhow::Result<()> {
         if done.insert(id.to_owned()) {
             let cu = self.module_cache.get(id).unwrap();
             if let CompiledUnit::Module(m) = cu {
                 for dep in &m.module.module_handles {
                     let dep_id = m.module.identifier_at(dep.name);
-                    self.publish_module(dep_id, done, proxy)?
+                    self.publish_module(session, dep_id, gas, done)?
                 }
             }
 
             self.log(format!("publishing {}", id));
-
-            let bytes = cu.serialize(None);
-            let cm = CompiledModule::deserialize(&bytes)?;
-
-            let mut session = self.vm.new_session(test_account(), 0, proxy);
+            #[allow(deprecated)]
             session
                 .get_move_session()
-                .verify_module_bundle_before_publishing(&[cm], &test_account(), proxy)?
+                .publish_module(cu.serialize(None), test_account(), gas)?
         }
         Ok(())
     }
@@ -407,60 +399,6 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
             .module_cache
             .get(id.name())
             .map(|c| c.serialize(None).into()))
-    }
-}
-
-impl<'a> ModuleStorage for HarnessProxy<'a> {
-    fn check_module_exists(
-        &self,
-        _address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
-        Ok(self.harness.module_cache.contains_key(module_name))
-    }
-
-    fn fetch_module_size_in_bytes(
-        &self,
-        _address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
-        let m = self
-            .harness
-            .module_cache
-            .get(module_name)
-            .ok_or_else(|| PartialVMError::new(StatusCode::LINKER_ERROR))?;
-        Ok(m.serialize(None).len())
-    }
-
-    fn fetch_module_metadata(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
-        // Same as ModuleResolver.
-        Ok(vec![])
-    }
-
-    fn fetch_deserialized_module(
-        &self,
-        _address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
-        let m = self
-            .harness
-            .module_cache
-            .get(module_name)
-            .ok_or_else(|| PartialVMError::new(StatusCode::LINKER_ERROR))?;
-        let cm = CompiledModule::deserialize(&m.serialize(None))?;
-        Ok(Arc::new(cm))
-    }
-
-    fn fetch_verified_module(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
-        unimplemented!()
     }
 }
 

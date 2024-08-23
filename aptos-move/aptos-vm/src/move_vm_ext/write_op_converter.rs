@@ -80,10 +80,10 @@ impl<'r> WriteOpConverter<'r> {
 
     /// Converts module bytes and their compiled representation extracted from publish
     /// request into write ops. Only used by V2 loader implementation.
-    pub(crate) fn convert_modules_into_write_ops<'a>(
+    pub(crate) fn convert_modules_into_write_ops(
         &self,
         module_storage: &impl AptosModuleStorage,
-        code_and_modules: impl IntoIterator<Item = (Bytes, &'a CompiledModule)>,
+        code_and_modules: impl IntoIterator<Item = (Bytes, CompiledModule)>,
     ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
         let mut write_ops = BTreeMap::new();
         for (bytes, compiled_module) in code_and_modules.into_iter() {
@@ -424,10 +424,10 @@ mod tests {
         let woc = WriteOpConverter::new(&resolver, true);
 
         let modules = vec![
-            (a_bytes.clone(), &a),
-            (b_bytes.clone(), &b),
-            (c_bytes.clone(), &c),
-            (d_bytes.clone(), &d),
+            (a_bytes.clone(), a),
+            (b_bytes.clone(), b),
+            (c_bytes.clone(), c),
+            (d_bytes.clone(), d),
         ];
 
         let results = assert_ok!(woc.convert_modules_into_write_ops(&code_storage, modules));
