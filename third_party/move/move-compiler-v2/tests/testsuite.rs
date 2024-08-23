@@ -482,6 +482,35 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 FILE_FORMAT_STAGE,
             ]),
         },
+        // Flush writes processor tests
+        TestConfig {
+            name: "flush-writes-on",
+            runner: |p| run_test(p, get_config_by_name("flush-writes-on")),
+            include: vec!["/flush-writes/"],
+            exclude: vec![],
+            exp_suffix: Some("on.exp"),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::FLUSH_WRITES_OPTIMIZATION, true),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec!["FlushWritesProcessor", FILE_FORMAT_STAGE]),
+        },
+        TestConfig {
+            name: "flush-writes-off",
+            runner: |p| run_test(p, get_config_by_name("flush-writes-off")),
+            include: vec!["/flush-writes/"],
+            exclude: vec![],
+            exp_suffix: Some("off.exp"),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::FLUSH_WRITES_OPTIMIZATION, false),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
+        },
         // Unreachable code remover
         TestConfig {
             name: "unreachable-code",
