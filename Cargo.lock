@@ -8675,7 +8675,7 @@ dependencies = [
  "itertools 0.12.1",
  "nested",
  "once_cell",
- "pathdiff 0.2.1",
+ "pathdiff",
  "petgraph 0.6.4",
  "rayon",
  "semver",
@@ -10801,7 +10801,7 @@ dependencies = [
  "move-stdlib",
  "move-symbol-pool",
  "once_cell",
- "pathdiff 0.1.0",
+ "pathdiff",
  "petgraph 0.5.1",
  "regex",
  "sha3 0.9.1",
@@ -12364,12 +12364,6 @@ name = "paste"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
-
-[[package]]
-name = "pathdiff"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3bf70094d203e07844da868b634207e71bfab254fe713171fae9a6e751ccf31"
 
 [[package]]
 name = "pathdiff"
