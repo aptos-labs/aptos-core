@@ -56,6 +56,14 @@ impl<'s, S: StateView> ModuleStorage for AptosCodeStorageAdapter<'s, S> {
         self.storage.check_module_exists(address, module_name)
     }
 
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        self.storage.fetch_module_bytes(address, module_name)
+    }
+
     fn fetch_module_size_in_bytes(
         &self,
         address: &AccountAddress,

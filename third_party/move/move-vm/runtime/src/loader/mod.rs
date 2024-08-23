@@ -5,8 +5,7 @@
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     module_traversal::TraversalContext, script_hash,
-    storage::module_storage::ModuleStorage as ModuleStorageV2, unexpected_unimplemented_error,
-    RuntimeEnvironment,
+    storage::module_storage::ModuleStorage as ModuleStorageV2, RuntimeEnvironment,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -273,25 +272,6 @@ impl Loader {
         }
     }
 
-    pub(crate) fn load_module(
-        &self,
-        id: &ModuleId,
-        data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
-    ) -> VMResult<Arc<Module>> {
-        match self {
-            Loader::V1(loader) => loader.load_module(id, data_store, module_store),
-            Loader::V2(loader) => loader
-                .load_module(module_storage, id.address(), id.name())
-                .map_err(|e| {
-                    // TODO(loader_v2): Revisit errors...
-                    let e = e.finish(Location::Undefined);
-                    expect_no_verification_errors(e)
-                }),
-        }
-    }
-
     fn load_function_without_type_args(
         &self,
         module_id: &ModuleId,
@@ -320,23 +300,6 @@ impl Loader {
                     let e = e.finish(Location::Undefined);
                     expect_no_verification_errors(e)
                 }),
-        }
-    }
-
-    pub(crate) fn verify_module_bundle_for_publication(
-        &self,
-        modules: &[CompiledModule],
-        data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        _module_storage: &impl ModuleStorageV2,
-    ) -> VMResult<()> {
-        match self {
-            Self::V1(loader) => {
-                loader.verify_module_bundle_for_publication(modules, data_store, module_store)
-            },
-            Self::V2(_loader) => {
-                unexpected_unimplemented_error!().map_err(|e| e.finish(Location::Undefined))
-            },
         }
     }
 

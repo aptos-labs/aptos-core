@@ -37,12 +37,13 @@ pub use storage::{
     dummy::{use_loader_v2_based_on_env, DummyCodeStorage},
     environment::RuntimeEnvironment,
     implementations::{
+        unreachable_code_storage::UnreachableCodeStorage,
         unsync_code_storage::{IntoUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{
-            IntoUnsyncModuleStorage, LocalModuleBytesStorage, ModuleBytesStorage,
-            UnsyncModuleStorage,
+            IntoUnsyncModuleStorage, LocalModuleBytesStorage, UnsyncModuleStorage,
         },
     },
-    module_storage::ModuleStorage,
+    module_storage::{ModuleBytesStorage, ModuleStorage},
+    publishing::TemporaryModuleStorage,
     script_storage::{script_hash, ScriptStorage},
 };

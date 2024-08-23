@@ -53,7 +53,10 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveTypeLayout, MoveValue},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    ModuleStorage, TemporaryModuleStorage,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -181,10 +184,10 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
 
-    let module_write_set = publish_framework(&mut session, &module_storage, framework);
-    let (additional_change_set, empty_module_write_set) =
+    let loader_v2_module_write_set = publish_framework(&mut session, &module_storage, framework);
+    let (additional_change_set, loader_v1_module_write_set) =
         session.finish(&configs, &module_storage).unwrap();
-    assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
+    assert!(!loader_v2_module_write_set.is_empty() && !loader_v1_module_write_set.is_empty());
 
     change_set
         .squash_additional_change_set(additional_change_set)
@@ -202,6 +205,11 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
+    let module_write_set = if loader_v2_module_write_set.is_empty() {
+        loader_v1_module_write_set
+    } else {
+        loader_v2_module_write_set
+    };
     let change_set = change_set
         .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
@@ -316,11 +324,10 @@ pub fn encode_genesis_change_set(
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
 
-    // Use new flow for publishing straight away.
-    let module_write_set = publish_framework(&mut session, &module_storage, framework);
-    let (additional_change_set, empty_module_write_set) =
+    let loader_v2_module_write_set = publish_framework(&mut session, &module_storage, framework);
+    let (additional_change_set, loader_v1_module_write_set) =
         session.finish(&configs, &module_storage).unwrap();
-    assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());
+    assert!(!loader_v2_module_write_set.is_empty() && !loader_v1_module_write_set.is_empty());
 
     change_set
         .squash_additional_change_set(additional_change_set)
@@ -339,6 +346,11 @@ pub fn encode_genesis_change_set(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
+    let module_write_set = if loader_v2_module_write_set.is_empty() {
+        loader_v1_module_write_set
+    } else {
+        loader_v2_module_write_set
+    };
     change_set
         .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
@@ -382,7 +394,7 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 
 fn exec_function(
     session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -827,6 +839,28 @@ fn allow_core_resources_to_set_version(
     );
 }
 
+fn initialize_package(
+    session: &mut SessionExt,
+    module_storage: &impl ModuleStorage,
+    addr: AccountAddress,
+    package: &ReleasePackage,
+) {
+    exec_function(
+        session,
+        module_storage,
+        CODE_MODULE_NAME,
+        "initialize",
+        vec![],
+        vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS)
+                .simple_serialize()
+                .unwrap(),
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            bcs::to_bytes(package.package_metadata()).unwrap(),
+        ],
+    );
+}
+
 /// Publish the framework release bundle.
 fn publish_framework(
     session: &mut SessionExt,
@@ -850,51 +884,58 @@ fn publish_package(
     let modules = pack.sorted_code_and_modules();
     let addr = *modules.first().unwrap().1.self_id().address();
 
-    // Add modules to write set.
-    let package_write_ops = session
-        .convert_modules_into_write_ops(
-            module_storage,
-            modules
-                .iter()
-                .map(|(code, compiled_module)| (code.to_vec().into(), compiled_module)),
-        )
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failure when creating write ops for package `{}`: {:?}",
-                pack.package_metadata().name,
-                e
-            )
-        });
-    write_ops.extend(package_write_ops);
+    let vm = session.get_move_vm();
+    if vm.vm_config().use_loader_v2 {
+        let code = modules
+            .into_iter()
+            .map(|(c, _)| c.to_vec().into())
+            .collect::<Vec<_>>();
 
-    // Ensure all modules are publishable.
-    let compiled_modules = modules.into_iter().map(|(_, m)| m).collect::<Vec<_>>();
-    session
-        .verify_module_bundle_before_publishing(&compiled_modules, &addr, module_storage)
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failure publishing package `{}`: {:?}",
-                pack.package_metadata().name,
-                e
-            )
-        });
+        // State view already contains all code, we just need to:
+        //  1) check it is publishable,
+        //  2) convert to write ops.
+        let tmp_module_storage =
+            TemporaryModuleStorage::new(&addr, vm.runtime_environment(), module_storage, code)
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Failure publishing package `{}`: {:?}",
+                        pack.package_metadata().name,
+                        e
+                    )
+                });
+        initialize_package(session, &tmp_module_storage, addr, pack);
 
-    // Module storage already contains all modules, so we only need to call the initialize
-    // function with the metadata.
-    exec_function(
-        session,
-        module_storage,
-        CODE_MODULE_NAME,
-        "initialize",
-        vec![],
-        vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS)
-                .simple_serialize()
-                .unwrap(),
-            MoveValue::Signer(addr).simple_serialize().unwrap(),
-            bcs::to_bytes(pack.package_metadata()).unwrap(),
-        ],
-    );
+        // Add modules to write set.
+        let package_write_ops = session
+            .convert_modules_into_write_ops(
+                module_storage,
+                tmp_module_storage.release_verified_module_bundle(),
+            )
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failure when creating write ops for package `{}`: {:?}",
+                    pack.package_metadata().name,
+                    e
+                )
+            });
+        write_ops.extend(package_write_ops);
+    } else {
+        let code = modules
+            .into_iter()
+            .map(|(c, _)| c.to_vec())
+            .collect::<Vec<_>>();
+        #[allow(deprecated)]
+        session
+            .publish_module_bundle(code, addr, &mut UnmeteredGasMeter)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failure publishing package `{}`: {:?}",
+                    pack.package_metadata().name,
+                    e
+                )
+            });
+        initialize_package(session, module_storage, addr, pack);
+    }
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.

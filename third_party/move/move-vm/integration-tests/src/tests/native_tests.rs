@@ -6,10 +6,12 @@ use move_binary_format::errors::PartialVMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::InternalGas, identifier::Identifier,
+    language_storage::ModuleId,
 };
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
-    DummyCodeStorage,
+    IntoUnsyncCodeStorage, LocalModuleBytesStorage, ModuleStorage, TemporaryModuleStorage,
+    UnreachableCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -28,7 +30,6 @@ fn make_failed_native() -> NativeFunction {
 
 #[test]
 fn test_publish_module_with_nested_loops() {
-    // Compile modules and scripts.
     let code = r#"
         module {{ADDR}}::M {
             entry fun foo() {
@@ -54,7 +55,6 @@ fn test_publish_module_with_nested_loops() {
     m.serialize(&mut m_blob).unwrap();
     let traversal_storage = TraversalStorage::new();
 
-    // Should succeed with max_loop_depth = 2
     {
         let natives = vec![(
             TEST_ADDR,
@@ -70,58 +70,86 @@ fn test_publish_module_with_nested_loops() {
             ..Default::default()
         });
 
-        let mut resource_storage = InMemoryStorage::new();
-        {
-            let mut sess = vm.new_session(&resource_storage);
-            sess.verify_module_bundle_before_publishing(
-                &[m.clone()],
-                &TEST_ADDR,
-                &DummyCodeStorage,
-            )
-            .unwrap();
-            drop(sess);
-            resource_storage.publish_or_overwrite_module(m.self_id(), m_blob.clone());
-        }
+        let resource_storage = InMemoryStorage::new();
+        let module_storage =
+            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
-        let func = sess
-            .load_function(
-                &DummyCodeStorage,
+        if vm.vm_config().use_loader_v2 {
+            let module_storage = TemporaryModuleStorage::new(
+                &TEST_ADDR,
+                vm.runtime_environment(),
+                &module_storage,
+                vec![m_blob.clone().into()],
+            )
+            .expect("Module should be publishable");
+            load_and_run_functions(
+                &vm,
+                &resource_storage,
+                &module_storage,
+                &traversal_storage,
                 &m.self_id(),
-                &Identifier::new("foo").unwrap(),
-                &[],
-            )
-            .unwrap();
-        let err1 = sess
-            .execute_entry_function(
-                func,
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
-            )
-            .unwrap_err();
-
-        assert!(err1.exec_state().unwrap().stack_trace().is_empty());
-
-        let func = sess
-            .load_function(
-                &DummyCodeStorage,
+            );
+        } else {
+            #[allow(deprecated)]
+            sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
+                .unwrap();
+            load_and_run_functions(
+                &vm,
+                &resource_storage,
+                &UnreachableCodeStorage,
+                &traversal_storage,
                 &m.self_id(),
-                &Identifier::new("foo2").unwrap(),
-                &[],
-            )
-            .unwrap();
-        let err2 = sess
-            .execute_entry_function(
-                func,
-                Vec::<Vec<u8>>::new(),
-                &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
-                &DummyCodeStorage,
-            )
-            .unwrap_err();
-
-        assert_eq!(err2.exec_state().unwrap().stack_trace().len(), 1);
+            );
+        };
     }
+}
+
+fn load_and_run_functions(
+    vm: &MoveVM,
+    resource_storage: &InMemoryStorage,
+    module_storage: &impl ModuleStorage,
+    traversal_storage: &TraversalStorage,
+    module_id: &ModuleId,
+) {
+    let mut sess = vm.new_session(resource_storage);
+    let func = sess
+        .load_function(
+            module_storage,
+            module_id,
+            &Identifier::new("foo").unwrap(),
+            &[],
+        )
+        .unwrap();
+    let err1 = sess
+        .execute_entry_function(
+            func,
+            Vec::<Vec<u8>>::new(),
+            &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(traversal_storage),
+            module_storage,
+        )
+        .unwrap_err();
+
+    assert!(err1.exec_state().unwrap().stack_trace().is_empty());
+
+    let func = sess
+        .load_function(
+            module_storage,
+            module_id,
+            &Identifier::new("foo2").unwrap(),
+            &[],
+        )
+        .unwrap();
+    let err2 = sess
+        .execute_entry_function(
+            func,
+            Vec::<Vec<u8>>::new(),
+            &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(traversal_storage),
+            module_storage,
+        )
+        .unwrap_err();
+
+    assert_eq!(err2.exec_state().unwrap().stack_trace().len(), 1);
 }

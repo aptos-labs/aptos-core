@@ -121,10 +121,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn convert_modules_into_write_ops<'a>(
+    pub fn convert_modules_into_write_ops(
         &self,
         module_storage: &impl AptosModuleStorage,
-        code_and_modules: impl IntoIterator<Item = (Bytes, &'a CompiledModule)>,
+        code_and_modules: impl IntoIterator<Item = (Bytes, CompiledModule)>,
     ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
         let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
         woc.convert_modules_into_write_ops(module_storage, code_and_modules)
