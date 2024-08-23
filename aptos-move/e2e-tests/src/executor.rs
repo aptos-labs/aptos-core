@@ -678,12 +678,11 @@ impl FakeExecutor {
         let vm = AptosVM::new(self.get_state_view());
 
         let resolver = self.data_store.as_move_resolver();
-        let module_and_script_storage = vm.as_aptos_code_storage(&self.data_store);
+        let code_storage = vm.as_aptos_code_storage(&self.data_store);
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
             &txn,
             &log_context,
             |gas_meter| {

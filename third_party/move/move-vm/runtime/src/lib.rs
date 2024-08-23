@@ -34,6 +34,7 @@ mod storage;
 
 pub use loader::{LoadedFunction, Module, Script};
 pub use storage::{
+    code_storage::{script_hash, CodeStorage},
     dummy::{use_loader_v2_based_on_env, DummyCodeStorage},
     environment::RuntimeEnvironment,
     implementations::{
@@ -45,5 +46,4 @@ pub use storage::{
     },
     module_storage::{ModuleBytesStorage, ModuleStorage},
     publishing::TemporaryModuleStorage,
-    script_storage::{script_hash, ScriptStorage},
 };

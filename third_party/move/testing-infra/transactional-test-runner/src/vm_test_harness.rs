@@ -343,7 +343,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         extra_args: Self::ExtraRunArgs,
     ) -> Result<Option<String>> {
         let vm = self.vm();
-        let module_and_script_storage = self
+        let code_storage = self
             .module_bytes_storage
             .clone()
             .into_unsync_code_storage(vm.runtime_environment());
@@ -375,8 +375,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 args,
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_and_script_storage,
-                &module_and_script_storage,
+                &code_storage,
             )
         })
         .map_err(|vm_error| {
