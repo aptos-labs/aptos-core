@@ -302,7 +302,7 @@ impl SharedTestingConfig {
         let module_storage = self
             .starting_module_storage
             .clone()
-            .into_unsync_module_storage(self.vm.runtime_env());
+            .into_unsync_module_storage(self.vm.runtime_environment());
 
         let now = Instant::now();
         let traversal_storage = TraversalStorage::new();

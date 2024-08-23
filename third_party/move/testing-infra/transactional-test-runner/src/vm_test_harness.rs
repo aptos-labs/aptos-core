@@ -461,7 +461,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let module_and_script_storage = self
             .module_bytes_storage
             .clone()
-            .into_unsync_code_storage(vm.runtime_env());
+            .into_unsync_code_storage(vm.runtime_environment());
         session
             .execute_script(
                 script_bytes,
@@ -502,7 +502,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let module_storage = self
             .module_bytes_storage
             .clone()
-            .into_unsync_module_storage(vm.runtime_env());
+            .into_unsync_module_storage(vm.runtime_environment());
         let results = session
             .execute_function_bypass_visibility(
                 module_id,
