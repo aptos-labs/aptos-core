@@ -13,7 +13,7 @@ use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
 
 const FORMATTER_BINARY_NAME: &str = "movefmt";
-const TARGET_FORMATTER_VERSION: &str = "1.0.0.beta";
+const TARGET_FORMATTER_VERSION: &str = "1.0.4";
 
 const FORMATTER_EXE_ENV: &str = "FORMATTER_EXE";
 #[cfg(target_os = "windows")]
