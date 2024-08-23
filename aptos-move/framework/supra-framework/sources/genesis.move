@@ -656,6 +656,8 @@ module supra_framework::genesis {
         min_voting_threshold: u128,
         required_proposer_stake: u64,
         voting_duration_secs: u64,
+        supra_min_voting_threshold: u64,
+        voters: vector<address>,
         accounts: vector<AccountMap>,
         employee_vesting_start: u64,
         employee_vesting_period_duration: u64,
@@ -684,7 +686,9 @@ module supra_framework::genesis {
             supra_framework,
             min_voting_threshold,
             required_proposer_stake,
-            voting_duration_secs
+            voting_duration_secs,
+            supra_min_voting_threshold,
+            voters,
         );
         create_accounts(supra_framework, accounts);
         create_employee_validators(employee_vesting_start, employee_vesting_period_duration, employees);

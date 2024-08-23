@@ -748,6 +748,8 @@ spec supra_framework::supra_governance {
         min_voting_threshold: u128,
         required_proposer_stake: u64,
         voting_duration_secs: u64,
+        supra_min_voting_threshold: u64,
+        voters: vector<address>,
     ) {
         pragma verify = false;
     }
