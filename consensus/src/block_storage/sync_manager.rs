@@ -513,7 +513,15 @@ impl BlockStore {
                     executed_block.epoch(),
                     executed_block.round()
                 );
-                blocks.push(executed_block.block().clone());
+                if !executed_block.block().is_genesis_block() {
+                    blocks.push(executed_block.block().clone());
+                } else {
+                    info!(
+                        "Skipping genesis block: ({}, {})",
+                        executed_block.epoch(),
+                        executed_block.round()
+                    );
+                }
                 if request
                     .req
                     .match_target_round(executed_block.epoch(), executed_block.round())
