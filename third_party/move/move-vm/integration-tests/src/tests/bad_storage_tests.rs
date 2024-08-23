@@ -100,7 +100,8 @@ fn test_malformed_resource() {
     let mut module_bytes_storage = LocalModuleBytesStorage::empty();
     module_bytes_storage.add_module_bytes(ms.self_addr(), ms.self_name(), ms_blob.into());
     module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.into());
-    let module_and_script_storage = module_bytes_storage.into_unsync_code_storage(vm.runtime_env());
+    let module_and_script_storage =
+        module_bytes_storage.into_unsync_code_storage(vm.runtime_environment());
 
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
@@ -201,7 +202,8 @@ fn test_malformed_module() {
 
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -235,7 +237,8 @@ fn test_malformed_module() {
 
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.clone().into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         let err = sess
@@ -284,7 +287,8 @@ fn test_unverifiable_module() {
 
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -314,7 +318,8 @@ fn test_unverifiable_module() {
 
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
 
@@ -372,7 +377,8 @@ fn test_missing_module_dependency() {
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -397,7 +403,8 @@ fn test_missing_module_dependency() {
 
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         let err = sess
@@ -454,7 +461,8 @@ fn test_malformed_module_dependency() {
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.clone().into());
         module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -485,7 +493,8 @@ fn test_malformed_module_dependency() {
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         let err = sess
@@ -545,7 +554,8 @@ fn test_unverifiable_module_dependency() {
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.clone().into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         sess.execute_function_bypass_visibility(
@@ -576,7 +586,8 @@ fn test_unverifiable_module_dependency() {
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob_m.into());
         module_bytes_storage.add_module_bytes(n.self_addr(), n.self_name(), blob_n.into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let mut sess = vm.new_session(&resource_storage);
         let err = sess
@@ -785,7 +796,8 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
         let mut module_bytes_storage = LocalModuleBytesStorage::empty();
         module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.clone().into());
         module_bytes_storage.add_module_bytes(s.self_addr(), s.self_name(), s_blob.clone().into());
-        let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_env());
+        let module_storage =
+            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
 
         let storage = BogusResourceStorage {
             module_storage: resource_storage,

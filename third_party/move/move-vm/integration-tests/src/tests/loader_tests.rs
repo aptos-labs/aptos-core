@@ -151,7 +151,7 @@ impl Adapter {
                     let module_storage = self
                         .module_bytes_storage
                         .clone()
-                        .into_unsync_module_storage(self.vm.runtime_env());
+                        .into_unsync_module_storage(self.vm.runtime_environment());
                     scope.spawn(move || {
                         // It is fine to share the VM: we do not publish modules anyway.
                         let mut session = self.vm.as_ref().new_session(&resource_storage);
@@ -179,7 +179,7 @@ impl Adapter {
         let module_storage = self
             .module_bytes_storage
             .clone()
-            .into_unsync_module_storage(self.vm.runtime_env());
+            .into_unsync_module_storage(self.vm.runtime_environment());
         let mut session = self.vm.new_session(&self.resource_storage);
         let traversal_storage = TraversalStorage::new();
         session
@@ -286,7 +286,7 @@ fn load_phantom_module() {
         let module_storage = adapter
             .module_bytes_storage
             .clone()
-            .into_unsync_module_storage(adapter.vm.runtime_env());
+            .into_unsync_module_storage(adapter.vm.runtime_environment());
         let _ = session
             .load_function(&module_storage, &module_id, ident_str!("foo"), &[])
             .unwrap();
@@ -356,7 +356,7 @@ fn load_with_extra_ability() {
         let module_storage = adapter
             .module_bytes_storage
             .clone()
-            .into_unsync_module_storage(adapter.vm.runtime_env());
+            .into_unsync_module_storage(adapter.vm.runtime_environment());
         let _ = session
             .load_function(&module_storage, &module_id, ident_str!("foo"), &[])
             .unwrap();
