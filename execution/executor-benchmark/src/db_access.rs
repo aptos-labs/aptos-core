@@ -92,8 +92,8 @@ impl DbAccessUtil {
         Self::new_state_key(address, AccountAddress::ONE, "coin", "CoinStore", vec![
             TypeTag::Struct(Box::new(Self::new_struct_tag(
                 AccountAddress::ONE,
-                "aptos_coin",
-                "AptosCoin",
+                "supra_coin",
+                "SupraCoin",
                 vec![],
             ))),
         ])

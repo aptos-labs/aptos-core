@@ -567,7 +567,7 @@ pub fn create_and_fund_account_request(
 ) -> SignedTransaction {
     let auth_key = AuthenticationKey::ed25519(pubkey);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::aptos_account_transfer(auth_key.account_address(), amount),
+        aptos_stdlib::supra_account_transfer(auth_key.account_address(), amount),
     ))
 }
 

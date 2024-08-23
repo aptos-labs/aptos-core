@@ -68,7 +68,7 @@ Configuration for whether an account can receive direct transfers of coins that 
 By default, this is enabled. Users can opt-out by disabling at any time.
 
 
-<pre><code><b>struct</b> <a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> <b>has</b> key
 </code></pre>
 
 
@@ -85,7 +85,7 @@ By default, this is enabled. Users can opt-out by disabling at any time.
 
 </dd>
 <dt>
-<code>update_coin_transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="aptos_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">supra_account::DirectCoinTransferConfigUpdatedEvent</a>&gt;</code>
+<code>update_coin_transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="supra_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">supra_account::DirectCoinTransferConfigUpdatedEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -102,7 +102,7 @@ By default, this is enabled. Users can opt-out by disabling at any time.
 Event emitted when an account's direct coins transfer config is updated.
 
 
-<pre><code><b>struct</b> <a href="aptos_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="supra_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -130,7 +130,7 @@ Event emitted when an account's direct coins transfer config is updated.
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="aptos_account.md#0x1_supra_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> <b>has</b> drop, store
+<b>struct</b> <a href="supra_account.md#0x1_supra_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -167,7 +167,7 @@ Event emitted when an account's direct coins transfer config is updated.
 Account opted out of receiving coins that they did not register to receive.
 
 
-<pre><code><b>const</b> <a href="aptos_account.md#0x1_supra_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS">EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS</a>: u64 = 3;
+<pre><code><b>const</b> <a href="supra_account.md#0x1_supra_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS">EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS</a>: u64 = 3;
 </code></pre>
 
 
@@ -177,7 +177,7 @@ Account opted out of receiving coins that they did not register to receive.
 Account opted out of directly receiving NFT tokens.
 
 
-<pre><code><b>const</b> <a href="aptos_account.md#0x1_supra_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_TOKEN_TRANSFERS">EACCOUNT_DOES_NOT_ACCEPT_DIRECT_TOKEN_TRANSFERS</a>: u64 = 4;
+<pre><code><b>const</b> <a href="supra_account.md#0x1_supra_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_TOKEN_TRANSFERS">EACCOUNT_DOES_NOT_ACCEPT_DIRECT_TOKEN_TRANSFERS</a>: u64 = 4;
 </code></pre>
 
 
@@ -187,7 +187,7 @@ Account opted out of directly receiving NFT tokens.
 Account does not exist.
 
 
-<pre><code><b>const</b> <a href="aptos_account.md#0x1_supra_account_EACCOUNT_NOT_FOUND">EACCOUNT_NOT_FOUND</a>: u64 = 1;
+<pre><code><b>const</b> <a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_FOUND">EACCOUNT_NOT_FOUND</a>: u64 = 1;
 </code></pre>
 
 
@@ -197,7 +197,7 @@ Account does not exist.
 Account is not registered to receive APT.
 
 
-<pre><code><b>const</b> <a href="aptos_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT">EACCOUNT_NOT_REGISTERED_FOR_APT</a>: u64 = 2;
+<pre><code><b>const</b> <a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT">EACCOUNT_NOT_REGISTERED_FOR_APT</a>: u64 = 2;
 </code></pre>
 
 
@@ -207,7 +207,7 @@ Account is not registered to receive APT.
 The lengths of the recipients and amounts lists don't match.
 
 
-<pre><code><b>const</b> <a href="aptos_account.md#0x1_supra_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>: u64 = 5;
+<pre><code><b>const</b> <a href="supra_account.md#0x1_supra_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>: u64 = 5;
 </code></pre>
 
 
@@ -219,7 +219,7 @@ The lengths of the recipients and amounts lists don't match.
 Basic account creation methods.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_create_account">create_account</a>(auth_key: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_create_account">create_account</a>(auth_key: <b>address</b>)
 </code></pre>
 
 
@@ -228,9 +228,9 @@ Basic account creation methods.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_create_account">create_account</a>(auth_key: <b>address</b>) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_create_account">create_account</a>(auth_key: <b>address</b>) {
     <b>let</b> account_signer = <a href="account.md#0x1_account_create_account">account::create_account</a>(auth_key);
-    <a href="aptos_account.md#0x1_supra_account_register_supra">register_supra</a>(&account_signer);
+    <a href="supra_account.md#0x1_supra_account_register_supra">register_supra</a>(&account_signer);
 }
 </code></pre>
 
@@ -245,7 +245,7 @@ Basic account creation methods.
 Batch version of APT transfer.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_batch_transfer">batch_transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_batch_transfer">batch_transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -254,16 +254,16 @@ Batch version of APT transfer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_batch_transfer">batch_transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_batch_transfer">batch_transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
     <b>let</b> recipients_len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&recipients);
     <b>assert</b>!(
         recipients_len == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&amounts),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_account.md#0x1_supra_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="supra_account.md#0x1_supra_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
     );
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(&recipients, |i, <b>to</b>| {
         <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
-        <a href="aptos_account.md#0x1_supra_account_transfer">transfer</a>(source, *<b>to</b>, amount);
+        <a href="supra_account.md#0x1_supra_account_transfer">transfer</a>(source, *<b>to</b>, amount);
     });
 }
 </code></pre>
@@ -280,7 +280,7 @@ Convenient function to transfer APT to a recipient account that might not exist.
 This would create the recipient account first, which also registers it to receive APT, before transferring.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_transfer">transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_transfer">transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -289,13 +289,13 @@ This would create the recipient account first, which also registers it to receiv
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_transfer">transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_transfer">transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64) {
     <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
-        <a href="aptos_account.md#0x1_supra_account_create_account">create_account</a>(<b>to</b>)
+        <a href="supra_account.md#0x1_supra_account_create_account">create_account</a>(<b>to</b>)
     };
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_supra_store_enabled">features::operations_default_to_fa_supra_store_enabled</a>()) {
-        <a href="aptos_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(source, <b>to</b>, amount)
+        <a href="supra_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(source, <b>to</b>, amount)
     } <b>else</b> {
         // Resource accounts can be created without registering them <b>to</b> receive APT.
         // This conveniently does the registration <b>if</b> necessary.
@@ -318,7 +318,7 @@ This would create the recipient account first, which also registers it to receiv
 Batch version of transfer_coins.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_batch_transfer_coins">batch_transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_batch_transfer_coins">batch_transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -327,17 +327,17 @@ Batch version of transfer_coins.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_batch_transfer_coins">batch_transfer_coins</a>&lt;CoinType&gt;(
-    from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_batch_transfer_coins">batch_transfer_coins</a>&lt;CoinType&gt;(
+    from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
     <b>let</b> recipients_len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&recipients);
     <b>assert</b>!(
         recipients_len == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&amounts),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_account.md#0x1_supra_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="supra_account.md#0x1_supra_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
     );
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(&recipients, |i, <b>to</b>| {
         <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
-        <a href="aptos_account.md#0x1_supra_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from, *<b>to</b>, amount);
+        <a href="supra_account.md#0x1_supra_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from, *<b>to</b>, amount);
     });
 }
 </code></pre>
@@ -354,7 +354,7 @@ Convenient function to transfer a custom CoinType to a recipient account that mi
 This would create the recipient account first and register it to receive the CoinType, before transferring.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -363,8 +363,8 @@ This would create the recipient account first and register it to receive the Coi
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
-    <a href="aptos_account.md#0x1_supra_account_deposit_coins">deposit_coins</a>(<b>to</b>, <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;CoinType&gt;(from, amount));
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
+    <a href="supra_account.md#0x1_supra_account_deposit_coins">deposit_coins</a>(<b>to</b>, <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;CoinType&gt;(from, amount));
 }
 </code></pre>
 
@@ -380,7 +380,7 @@ Convenient function to deposit a custom CoinType into a recipient account that m
 This would create the recipient account first and register it to receive the CoinType, before transferring.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(<b>to</b>: <b>address</b>, coins: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(<b>to</b>: <b>address</b>, coins: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
 </code></pre>
 
 
@@ -389,9 +389,9 @@ This would create the recipient account first and register it to receive the Coi
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(<b>to</b>: <b>address</b>, coins: Coin&lt;CoinType&gt;) <b>acquires</b> <a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(<b>to</b>: <b>address</b>, coins: Coin&lt;CoinType&gt;) <b>acquires</b> <a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
     <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
-        <a href="aptos_account.md#0x1_supra_account_create_account">create_account</a>(<b>to</b>);
+        <a href="supra_account.md#0x1_supra_account_create_account">create_account</a>(<b>to</b>);
         <b>spec</b> {
             <b>assert</b> <a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;SupraCoin&gt;(<b>to</b>);
             <b>assume</b> aptos_std::type_info::type_of&lt;CoinType&gt;() == aptos_std::type_info::type_of&lt;SupraCoin&gt;() ==&gt;
@@ -400,8 +400,8 @@ This would create the recipient account first and register it to receive the Coi
     };
     <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;CoinType&gt;(<b>to</b>)) {
         <b>assert</b>!(
-            <a href="aptos_account.md#0x1_supra_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<b>to</b>),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_account.md#0x1_supra_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS">EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS</a>),
+            <a href="supra_account.md#0x1_supra_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<b>to</b>),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="supra_account.md#0x1_supra_account_EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS">EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS</a>),
         );
         <a href="coin.md#0x1_coin_register">coin::register</a>&lt;CoinType&gt;(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(<b>to</b>));
     };
@@ -419,7 +419,7 @@ This would create the recipient account first and register it to receive the Coi
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr: <b>address</b>)
 </code></pre>
 
 
@@ -428,8 +428,8 @@ This would create the recipient account first and register it to receive the Coi
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr: <b>address</b>) {
-    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">account::exists_at</a>(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="aptos_account.md#0x1_supra_account_EACCOUNT_NOT_FOUND">EACCOUNT_NOT_FOUND</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr: <b>address</b>) {
+    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">account::exists_at</a>(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_FOUND">EACCOUNT_NOT_FOUND</a>));
 }
 </code></pre>
 
@@ -443,7 +443,7 @@ This would create the recipient account first and register it to receive the Coi
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>)
 </code></pre>
 
 
@@ -452,9 +452,9 @@ This would create the recipient account first and register it to receive the Coi
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>) {
-    <a href="aptos_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr);
-    <b>assert</b>!(<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;SupraCoin&gt;(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="aptos_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT">EACCOUNT_NOT_REGISTERED_FOR_APT</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>) {
+    <a href="supra_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr);
+    <b>assert</b>!(<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;SupraCoin&gt;(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT">EACCOUNT_NOT_REGISTERED_FOR_APT</a>));
 }
 </code></pre>
 
@@ -469,7 +469,7 @@ This would create the recipient account first and register it to receive the Coi
 Set whether <code><a href="account.md#0x1_account">account</a></code> can receive direct transfers of coins that they have not explicitly registered to receive.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool)
 </code></pre>
 
 
@@ -478,10 +478,10 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool) <b>acquires</b> <a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool) <b>acquires</b> <a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>if</b> (<b>exists</b>&lt;<a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr)) {
-        <b>let</b> direct_transfer_config = <b>borrow_global_mut</b>&lt;<a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr);
+    <b>if</b> (<b>exists</b>&lt;<a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr)) {
+        <b>let</b> direct_transfer_config = <b>borrow_global_mut</b>&lt;<a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr);
         // Short-circuit <b>to</b> avoid emitting an <a href="event.md#0x1_event">event</a> <b>if</b> direct transfer config is not changing.
         <b>if</b> (direct_transfer_config.allow_arbitrary_coin_transfers == allow) {
             <b>return</b>
@@ -490,22 +490,22 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
         direct_transfer_config.allow_arbitrary_coin_transfers = allow;
 
         <b>if</b> (std::features::module_event_migration_enabled()) {
-            emit(<a href="aptos_account.md#0x1_supra_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+            emit(<a href="supra_account.md#0x1_supra_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
         };
         emit_event(
             &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
-            <a href="aptos_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
+            <a href="supra_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
     } <b>else</b> {
-        <b>let</b> direct_transfer_config = <a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
+        <b>let</b> direct_transfer_config = <a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
             allow_arbitrary_coin_transfers: allow,
-            update_coin_transfer_events: new_event_handle&lt;<a href="aptos_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a>&gt;(<a href="account.md#0x1_account">account</a>),
+            update_coin_transfer_events: new_event_handle&lt;<a href="supra_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a>&gt;(<a href="account.md#0x1_account">account</a>),
         };
         <b>if</b> (std::features::module_event_migration_enabled()) {
-            emit(<a href="aptos_account.md#0x1_supra_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+            emit(<a href="supra_account.md#0x1_supra_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
         };
         emit_event(
             &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
-            <a href="aptos_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
+            <a href="supra_account.md#0x1_supra_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
         <b>move_to</b>(<a href="account.md#0x1_account">account</a>, direct_transfer_config);
     };
 }
@@ -526,7 +526,7 @@ By default, this returns true if an account has not explicitly set whether the c
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): bool
+<b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): bool
 </code></pre>
 
 
@@ -535,9 +535,9 @@ By default, this returns true if an account has not explicitly set whether the c
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): bool <b>acquires</b> <a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
-    !<b>exists</b>&lt;<a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>) ||
-        <b>borrow_global</b>&lt;<a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>).allow_arbitrary_coin_transfers
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): bool <b>acquires</b> <a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a> {
+    !<b>exists</b>&lt;<a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>) ||
+        <b>borrow_global</b>&lt;<a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>).allow_arbitrary_coin_transfers
 }
 </code></pre>
 
@@ -551,7 +551,7 @@ By default, this returns true if an account has not explicitly set whether the c
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -560,9 +560,9 @@ By default, this returns true if an account has not explicitly set whether the c
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_supra_store_enabled">features::new_accounts_default_to_fa_supra_store_enabled</a>()) {
-        <a href="aptos_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
+        <a href="supra_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
     } <b>else</b> {
         <a href="coin.md#0x1_coin_register">coin::register</a>&lt;SupraCoin&gt;(account_signer);
     }
@@ -585,7 +585,7 @@ TODO: once migration is complete, rename to just "transfer_only" and make it an 
 to transfer APT) - if we want to allow APT PFS without account itself
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -594,11 +594,11 @@ to transfer APT) - if we want to allow APT PFS without account itself
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(
+<pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(
     source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64
 ) {
-    <b>let</b> sender_store = <a href="aptos_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source));
-    <b>let</b> recipient_store = <a href="aptos_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<b>to</b>);
+    <b>let</b> sender_store = <a href="supra_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source));
+    <b>let</b> recipient_store = <a href="supra_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<b>to</b>);
 
     // <b>use</b> <b>internal</b> APIs, <b>as</b> they skip:
     // - owner, frozen and dispatchable checks
@@ -620,7 +620,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
 Is balance from APT Primary FungibleStore at least the given amount
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool
 </code></pre>
 
 
@@ -629,8 +629,8 @@ Is balance from APT Primary FungibleStore at least the given amount
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool {
-    <b>let</b> store_addr = <a href="aptos_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool {
+    <b>let</b> store_addr = <a href="supra_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>);
     <a href="fungible_asset.md#0x1_fungible_asset_is_address_balance_at_least">fungible_asset::is_address_balance_at_least</a>(store_addr, amount)
 }
 </code></pre>
@@ -646,7 +646,7 @@ Is balance from APT Primary FungibleStore at least the given amount
 Burn from APT Primary FungibleStore
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -655,14 +655,14 @@ Burn from APT Primary FungibleStore
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_burn_from_fungible_store">burn_from_fungible_store</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_burn_from_fungible_store">burn_from_fungible_store</a>(
     ref: &BurnRef,
     <a href="account.md#0x1_account">account</a>: <b>address</b>,
     amount: u64,
 ) {
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
     <b>if</b> (amount != 0) {
-        <b>let</b> store_addr = <a href="aptos_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>);
+        <b>let</b> store_addr = <a href="supra_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>);
         <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from">fungible_asset::address_burn_from</a>(ref, store_addr, amount);
     };
 }
@@ -679,7 +679,7 @@ Burn from APT Primary FungibleStore
 Ensure that APT Primary FungibleStore exists (and create if it doesn't)
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(owner: <b>address</b>): <b>address</b>
+<pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(owner: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -688,8 +688,8 @@ Ensure that APT Primary FungibleStore exists (and create if it doesn't)
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="aptos_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(owner: <b>address</b>): <b>address</b> {
-    <b>let</b> store_addr = <a href="aptos_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(owner);
+<pre><code>inline <b>fun</b> <a href="supra_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(owner: <b>address</b>): <b>address</b> {
+    <b>let</b> store_addr = <a href="supra_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(owner);
     <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(store_addr)) {
         store_addr
     } <b>else</b> {
@@ -709,7 +709,7 @@ Ensure that APT Primary FungibleStore exists (and create if it doesn't)
 Address of APT Primary Fungible Store
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b>
+<pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -718,7 +718,7 @@ Address of APT Primary Fungible Store
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="aptos_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b> {
+<pre><code>inline <b>fun</b> <a href="supra_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b> {
     <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(<a href="account.md#0x1_account">account</a>, @aptos_fungible_asset)
 }
 </code></pre>
@@ -819,7 +819,7 @@ Address of APT Primary Fungible Store
 ### Function `create_account`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_create_account">create_account</a>(auth_key: <b>address</b>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_create_account">create_account</a>(auth_key: <b>address</b>)
 </code></pre>
 
 
@@ -830,7 +830,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 
 <pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>pragma</b> aborts_if_is_partial;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a>;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
 </code></pre>
 
@@ -840,10 +840,10 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 <a id="0x1_supra_account_CreateAccountAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_supra_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {
+<pre><code><b>schema</b> <a href="supra_account.md#0x1_supra_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {
     auth_key: <b>address</b>;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
-    <b>aborts_if</b> <a href="aptos_account.md#0x1_supra_account_length_judgment">length_judgment</a>(auth_key);
+    <b>aborts_if</b> <a href="supra_account.md#0x1_supra_account_length_judgment">length_judgment</a>(auth_key);
     <b>aborts_if</b> auth_key == @vm_reserved || auth_key == @supra_framework || auth_key == @aptos_token;
 }
 </code></pre>
@@ -854,7 +854,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 <a id="0x1_supra_account_length_judgment"></a>
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_supra_account_length_judgment">length_judgment</a>(auth_key: <b>address</b>): bool {
+<pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_length_judgment">length_judgment</a>(auth_key: <b>address</b>): bool {
    <b>use</b> std::bcs;
 
    <b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(auth_key);
@@ -869,7 +869,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 ### Function `batch_transfer`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_batch_transfer">batch_transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_batch_transfer">batch_transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -885,11 +885,11 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
     amounts[i] &gt; 0;
 <b>aborts_if</b> len(recipients) != len(amounts);
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
-        !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) && <a href="aptos_account.md#0x1_supra_account_length_judgment">length_judgment</a>(recipients[i]);
+        !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) && <a href="supra_account.md#0x1_supra_account_length_judgment">length_judgment</a>(recipients[i]);
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
         !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @supra_framework || recipients[i] == @aptos_token);
 <b>ensures</b> <b>forall</b> i in 0..len(recipients):
-        (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) ==&gt; !<a href="aptos_account.md#0x1_supra_account_length_judgment">length_judgment</a>(recipients[i])) &&
+        (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) ==&gt; !<a href="supra_account.md#0x1_supra_account_length_judgment">length_judgment</a>(recipients[i])) &&
             (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) ==&gt; (recipients[i] != @vm_reserved && recipients[i] != @supra_framework && recipients[i] != @aptos_token));
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
     !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(account_addr_source);
@@ -912,7 +912,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 ### Function `transfer`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_transfer">transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_transfer">transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -921,10 +921,10 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
 <b>requires</b> account_addr_source != <b>to</b>;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;SupraCoin&gt;;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;SupraCoin&gt;{from: source};
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_TransferEnsures">TransferEnsures</a>&lt;SupraCoin&gt;;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;SupraCoin&gt;;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;SupraCoin&gt;{from: source};
+<b>include</b> <a href="supra_account.md#0x1_supra_account_TransferEnsures">TransferEnsures</a>&lt;SupraCoin&gt;;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(<b>to</b>).frozen;
 // This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
 <b>ensures</b> <b>exists</b>&lt;supra_framework::account::Account&gt;(<b>to</b>);
@@ -938,7 +938,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 ### Function `batch_transfer_coins`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_batch_transfer_coins">batch_transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_batch_transfer_coins">batch_transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -955,11 +955,11 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 // This enforces <a id="high-level-req-7" href="#high-level-req">high-level requirement 7</a>:
 <b>aborts_if</b> len(recipients) != len(amounts);
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
-        !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) && <a href="aptos_account.md#0x1_supra_account_length_judgment">length_judgment</a>(recipients[i]);
+        !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) && <a href="supra_account.md#0x1_supra_account_length_judgment">length_judgment</a>(recipients[i]);
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
         !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @supra_framework || recipients[i] == @aptos_token);
 <b>ensures</b> <b>forall</b> i in 0..len(recipients):
-        (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) ==&gt; !<a href="aptos_account.md#0x1_supra_account_length_judgment">length_judgment</a>(recipients[i])) &&
+        (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) ==&gt; !<a href="supra_account.md#0x1_supra_account_length_judgment">length_judgment</a>(recipients[i])) &&
             (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) ==&gt; (recipients[i] != @vm_reserved && recipients[i] != @supra_framework && recipients[i] != @aptos_token));
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
     !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
@@ -984,7 +984,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 ### Function `transfer_coins`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -993,11 +993,11 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
 <b>requires</b> account_addr_source != <b>to</b>;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt;;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt;;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt;;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt;;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt;;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).frozen;
 <b>ensures</b> <b>exists</b>&lt;supra_framework::account::Account&gt;(<b>to</b>);
 <b>ensures</b> <b>exists</b>&lt;supra_framework::coin::CoinStore&lt;CoinType&gt;&gt;(<b>to</b>);
@@ -1010,16 +1010,16 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 ### Function `deposit_coins`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(<b>to</b>: <b>address</b>, coins: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(<b>to</b>: <b>address</b>, coins: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
 </code></pre>
 
 
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="aptos_account.md#0x1_supra_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt;;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt;;
+<b>include</b> <a href="supra_account.md#0x1_supra_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt;;
 <b>let</b> if_exist_coin = <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
 <b>aborts_if</b> if_exist_coin && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).frozen;
 // This enforces <a id="high-level-spec-6" href="#high-level-req">high-level requirement 6</a>:
@@ -1037,7 +1037,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 ### Function `assert_account_exists`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr: <b>address</b>)
 </code></pre>
 
 
@@ -1053,7 +1053,7 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 ### Function `assert_account_is_registered_for_apt`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>)
 </code></pre>
 
 
@@ -1073,7 +1073,7 @@ Check if the SupraCoin under the address existed.
 ### Function `set_allow_direct_coin_transfers`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_supra_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool)
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool)
 </code></pre>
 
 
@@ -1090,7 +1090,7 @@ Check if the SupraCoin under the address existed.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_supra_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): bool
+<b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): bool
 </code></pre>
 
 
@@ -1099,8 +1099,8 @@ Check if the SupraCoin under the address existed.
 <pre><code><b>aborts_if</b> <b>false</b>;
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> result == (
-    !<b>exists</b>&lt;<a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>) ||
-        <b>global</b>&lt;<a href="aptos_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>).allow_arbitrary_coin_transfers
+    !<b>exists</b>&lt;<a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>) ||
+        <b>global</b>&lt;<a href="supra_account.md#0x1_supra_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>).allow_arbitrary_coin_transfers
 );
 </code></pre>
 
@@ -1111,7 +1111,7 @@ Check if the SupraCoin under the address existed.
 ### Function `register_supra`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_register_supra">register_supra</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -1127,7 +1127,7 @@ Check if the SupraCoin under the address existed.
 ### Function `fungible_transfer_only`
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -1143,7 +1143,7 @@ Check if the SupraCoin under the address existed.
 ### Function `is_fungible_balance_at_least`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool
 </code></pre>
 
 
@@ -1159,7 +1159,7 @@ Check if the SupraCoin under the address existed.
 ### Function `burn_from_fungible_store`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_supra_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -1174,9 +1174,9 @@ Check if the SupraCoin under the address existed.
 <a id="0x1_supra_account_CreateAccountTransferAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a> {
+<pre><code><b>schema</b> <a href="supra_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a> {
     <b>to</b>: <b>address</b>;
-    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && <a href="aptos_account.md#0x1_supra_account_length_judgment">length_judgment</a>(<b>to</b>);
+    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && <a href="supra_account.md#0x1_supra_account_length_judgment">length_judgment</a>(<b>to</b>);
     <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && (<b>to</b> == @vm_reserved || <b>to</b> == @supra_framework || <b>to</b> == @aptos_token);
 }
 </code></pre>
@@ -1187,7 +1187,7 @@ Check if the SupraCoin under the address existed.
 <a id="0x1_supra_account_WithdrawAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_supra_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt; {
+<pre><code><b>schema</b> <a href="supra_account.md#0x1_supra_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt; {
     from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     amount: u64;
     <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
@@ -1205,7 +1205,7 @@ Check if the SupraCoin under the address existed.
 <a id="0x1_supra_account_GuidAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt; {
+<pre><code><b>schema</b> <a href="supra_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt; {
     <b>to</b>: <b>address</b>;
     <b>let</b> acc = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(<b>to</b>);
     <b>aborts_if</b> <a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && acc.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
@@ -1219,7 +1219,7 @@ Check if the SupraCoin under the address existed.
 <a id="0x1_supra_account_RegistCoinAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_supra_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt; {
+<pre><code><b>schema</b> <a href="supra_account.md#0x1_supra_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt; {
     <b>to</b>: <b>address</b>;
     <b>aborts_if</b> !<a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;CoinType&gt;(<b>to</b>) && !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
     <b>aborts_if</b> <b>exists</b>&lt;supra_framework::account::Account&gt;(<b>to</b>);
@@ -1233,7 +1233,7 @@ Check if the SupraCoin under the address existed.
 <a id="0x1_supra_account_TransferEnsures"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_supra_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt; {
+<pre><code><b>schema</b> <a href="supra_account.md#0x1_supra_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt; {
     <b>to</b>: <b>address</b>;
     account_addr_source: <b>address</b>;
     amount: u64;

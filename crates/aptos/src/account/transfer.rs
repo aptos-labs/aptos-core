@@ -39,7 +39,7 @@ impl CliCommand<TransferSummary> for TransferCoins {
 
     async fn execute(self) -> CliTypedResult<TransferSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::aptos_account_transfer(
+            .submit_transaction(aptos_stdlib::supra_account_transfer(
                 self.account,
                 self.amount,
             ))
@@ -48,7 +48,7 @@ impl CliCommand<TransferSummary> for TransferCoins {
     }
 }
 
-const SUPPORTED_COINS: [&str; 1] = ["0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"];
+const SUPPORTED_COINS: [&str; 1] = ["0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>"];
 
 /// A shortened transaction output
 #[derive(Clone, Debug, Serialize)]

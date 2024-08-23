@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::MoveHarness;
-use aptos_cached_packages::aptos_stdlib::aptos_account_transfer;
+use aptos_cached_packages::aptos_stdlib::supra_account_transfer;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::ExecutionStatus, write_set::WriteOp,
 };
@@ -24,7 +24,7 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
         .transaction()
         .sequence_number(10)
         .max_gas_amount(max_gas_amount)
-        .payload(aptos_account_transfer(*receiver.address(), 1))
+        .payload(supra_account_transfer(*receiver.address(), 1))
         .sign();
 
     let state_view = h.executor.get_state_view();

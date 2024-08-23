@@ -35,7 +35,7 @@ module supra_framework::staking_contract {
     use aptos_std::simple_map::{Self, SimpleMap};
 
     use supra_framework::account::{Self, SignerCapability};
-    use supra_framework::aptos_account;
+    use supra_framework::supra_account;
     use supra_framework::supra_coin::SupraCoin;
     use supra_framework::coin::{Self, Coin};
     use supra_framework::event::{EventHandle, emit, emit_event};
@@ -792,7 +792,7 @@ module supra_framework::staking_contract {
             if (recipient == operator) {
                 recipient = beneficiary_for_operator(operator);
             };
-            aptos_account::deposit_coins(recipient, coin::extract(&mut coins, amount_to_distribute));
+            supra_account::deposit_coins(recipient, coin::extract(&mut coins, amount_to_distribute));
 
             if (std::features::module_event_migration_enabled()) {
                 emit(Distribute { operator, pool_address, recipient, amount: amount_to_distribute });
@@ -805,7 +805,7 @@ module supra_framework::staking_contract {
 
         // In case there's any dust left, send them all to the staker.
         if (coin::value(&coins) > 0) {
-            aptos_account::deposit_coins(staker, coins);
+            supra_account::deposit_coins(staker, coins);
             pool_u64::update_total_coins(distribution_pool, 0);
         } else {
             coin::destroy_zero(coins);
@@ -1348,7 +1348,7 @@ module supra_framework::staking_contract {
         let beneficiary_address = signer::address_of(beneficiary);
 
         // account::create_account_for_test(beneficiary_address);
-        supra_framework::aptos_account::create_account(beneficiary_address);
+        supra_framework::supra_account::create_account(beneficiary_address);
         assert_staking_contract_exists(staker_address, operator1_address);
         assert_staking_contract(staker_address, operator1_address, INITIAL_BALANCE, 10);
 

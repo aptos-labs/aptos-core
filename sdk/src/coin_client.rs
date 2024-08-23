@@ -109,7 +109,7 @@ impl<'a> Default for TransferOptions<'a> {
             max_gas_amount: 5_000,
             gas_unit_price: 100,
             timeout_secs: 10,
-            coin_type: "0x1::aptos_coin::AptosCoin",
+            coin_type: "0x1::supra_coin::SupraCoin",
         }
     }
 }

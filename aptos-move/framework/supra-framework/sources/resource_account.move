@@ -232,7 +232,7 @@ module supra_framework::resource_account {
     public entry fun with_coin(framework: signer, user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         let (burn, mint) = supra_framework::supra_coin::initialize_for_test(&framework);
-        supra_framework::aptos_account::create_account(copy user_addr);
+        supra_framework::supra_account::create_account(copy user_addr);
 
         let coin = coin::mint<SupraCoin>(100, &mint);
         coin::deposit(copy user_addr, coin);
@@ -252,7 +252,7 @@ module supra_framework::resource_account {
     public entry fun without_coin(framework: signer, user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         let (burn, mint) = supra_framework::supra_coin::initialize_for_test(&framework);
-        supra_framework::aptos_account::create_account(user_addr);
+        supra_framework::supra_account::create_account(user_addr);
 
         let seed = x"01";
         create_resource_account(&user, copy seed, vector::empty());

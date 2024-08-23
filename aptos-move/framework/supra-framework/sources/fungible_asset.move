@@ -16,7 +16,7 @@ module supra_framework::fungible_asset {
 
     friend supra_framework::coin;
     friend supra_framework::primary_fungible_store;
-    friend supra_framework::aptos_account;
+    friend supra_framework::supra_account;
 
     friend supra_framework::dispatchable_fungible_asset;
 

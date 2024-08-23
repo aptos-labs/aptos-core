@@ -6,7 +6,7 @@ module supra_framework::transaction_validation {
     use std::vector;
 
     use supra_framework::account;
-    use supra_framework::aptos_account;
+    use supra_framework::supra_account;
     use supra_framework::supra_coin::SupraCoin;
     use supra_framework::chain_id;
     use supra_framework::coin;
@@ -133,7 +133,7 @@ module supra_framework::transaction_validation {
 
         if (features::operations_default_to_fa_supra_store_enabled()) {
             assert!(
-                aptos_account::is_fungible_balance_at_least(gas_payer, max_transaction_fee),
+                supra_account::is_fungible_balance_at_least(gas_payer, max_transaction_fee),
                 error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
             );
         } else {
@@ -292,7 +292,7 @@ module supra_framework::transaction_validation {
         // to do failed transaction cleanup.
         if (features::operations_default_to_fa_supra_store_enabled()) {
             assert!(
-                aptos_account::is_fungible_balance_at_least(gas_payer, transaction_fee_amount),
+                supra_account::is_fungible_balance_at_least(gas_payer, transaction_fee_amount),
                 error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
             );
         } else {

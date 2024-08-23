@@ -16,7 +16,7 @@ module supra_framework::account {
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
 
-    friend supra_framework::aptos_account;
+    friend supra_framework::supra_account;
     friend supra_framework::coin;
     friend supra_framework::genesis;
     friend supra_framework::multisig_account;

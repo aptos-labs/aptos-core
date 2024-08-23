@@ -1,4 +1,4 @@
-module supra_framework::aptos_account {
+module supra_framework::supra_account {
     use supra_framework::account::{Self, new_event_handle};
     use supra_framework::supra_coin::SupraCoin;
     use supra_framework::coin::{Self, Coin};

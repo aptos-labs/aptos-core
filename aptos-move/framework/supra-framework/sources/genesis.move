@@ -5,7 +5,7 @@ module supra_framework::genesis {
     use std::option;
 
     use aptos_std::simple_map;
-    use supra_framework::aptos_account;
+    use supra_framework::supra_account;
     use supra_framework::delegation_pool;
     use supra_framework::pbo_delegation_pool;
 
@@ -216,7 +216,7 @@ module supra_framework::genesis {
         transaction_fee::store_supra_coin_mint_cap(supra_framework, mint_cap);
 
         let core_resources = account::create_account(@core_resources);
-        aptos_account::register_supra(&core_resources); // register Supra store
+        supra_account::register_supra(&core_resources); // register Supra store
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
         supra_coin::configure_accounts_for_test(supra_framework, &core_resources, mint_cap);
     }
@@ -800,7 +800,7 @@ module supra_framework::genesis {
         supra_coin::ensure_initialized_with_apt_fa_metadata_for_test();
 
         let core_resources = account::create_account(@core_resources);
-        aptos_account::register_supra(&core_resources); // registers APT store
+        supra_account::register_supra(&core_resources); // registers APT store
 
         let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
         assert!(primary_fungible_store::primary_store_exists(@core_resources, apt_metadata), 2);
@@ -1097,7 +1097,7 @@ module supra_framework::genesis {
 
     #[test(supra_framework = @0x1)]
     fun test_create_vesting_without_staking_pools(supra_framework: &signer) {
-        // use supra_framework::aptos_account::create_account;
+        // use supra_framework::supra_account::create_account;
         setup();
         initialize_supra_coin(supra_framework);
         timestamp::set_time_has_started_for_testing(supra_framework);

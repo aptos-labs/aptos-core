@@ -122,7 +122,6 @@ pool.
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
-<b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -133,6 +132,7 @@ pool.
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="staking_config.md#0x1_staking_config">0x1::staking_config</a>;
+<b>use</b> <a href="supra_account.md#0x1_supra_account">0x1::supra_account</a>;
 <b>use</b> <a href="supra_coin.md#0x1_supra_coin">0x1::supra_coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
@@ -2367,7 +2367,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
         <b>if</b> (recipient == operator) {
             recipient = <a href="staking_contract.md#0x1_staking_contract_beneficiary_for_operator">beneficiary_for_operator</a>(operator);
         };
-        <a href="aptos_account.md#0x1_aptos_account_deposit_coins">aptos_account::deposit_coins</a>(recipient, <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> coins, amount_to_distribute));
+        <a href="supra_account.md#0x1_supra_account_deposit_coins">supra_account::deposit_coins</a>(recipient, <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> coins, amount_to_distribute));
 
         <b>if</b> (std::features::module_event_migration_enabled()) {
             emit(<a href="staking_contract.md#0x1_staking_contract_Distribute">Distribute</a> { operator, pool_address, recipient, amount: amount_to_distribute });
@@ -2380,7 +2380,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
     // In case there's <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> dust left, send them all <b>to</b> the staker.
     <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&coins) &gt; 0) {
-        <a href="aptos_account.md#0x1_aptos_account_deposit_coins">aptos_account::deposit_coins</a>(staker, coins);
+        <a href="supra_account.md#0x1_supra_account_deposit_coins">supra_account::deposit_coins</a>(staker, coins);
         <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_update_total_coins">pool_u64::update_total_coins</a>(distribution_pool, 0);
     } <b>else</b> {
         <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(coins);

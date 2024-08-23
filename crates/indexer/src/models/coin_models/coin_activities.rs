@@ -25,7 +25,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
+const GAS_FEE_EVENT: &str = "0x1::supra_coin::GasFeeEvent";
 // We will never have a negative number on chain so this will avoid collision in postgres
 const BURN_GAS_EVENT_CREATION_NUM: i64 = -1;
 const BURN_GAS_EVENT_INDEX: i64 = -1;

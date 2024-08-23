@@ -254,7 +254,7 @@ impl AnalyzedTransactionProvider for Transaction {
                                 true,
                             )
                         },
-                        (AccountAddress::ONE, "aptos_account", "transfer") => {
+                        (AccountAddress::ONE, "supra_account", "transfer") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
                             rw_set_for_coin_transfer(
@@ -263,7 +263,7 @@ impl AnalyzedTransactionProvider for Transaction {
                                 false,
                             )
                         },
-                        (AccountAddress::ONE, "aptos_account", "create_account") => {
+                        (AccountAddress::ONE, "supra_account", "create_account") => {
                             let sender_address = signed_txn.sender();
                             let receiver_address = bcs::from_bytes(&func.args()[0]).unwrap();
                             rw_set_for_create_account(

@@ -51,7 +51,6 @@
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aggregator_factory.md#0x1_aggregator_factory">0x1::aggregator_factory</a>;
-<b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="block.md#0x1_block">0x1::block</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
@@ -73,6 +72,7 @@
 <b>use</b> <a href="staking_contract.md#0x1_staking_contract">0x1::staking_contract</a>;
 <b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
 <b>use</b> <a href="storage_gas.md#0x1_storage_gas">0x1::storage_gas</a>;
+<b>use</b> <a href="supra_account.md#0x1_supra_account">0x1::supra_account</a>;
 <b>use</b> <a href="supra_coin.md#0x1_supra_coin">0x1::supra_coin</a>;
 <b>use</b> <a href="supra_governance.md#0x1_supra_governance">0x1::supra_governance</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -699,7 +699,7 @@ Only called for testnets and e2e tests.
     <a href="transaction_fee.md#0x1_transaction_fee_store_supra_coin_mint_cap">transaction_fee::store_supra_coin_mint_cap</a>(supra_framework, mint_cap);
 
     <b>let</b> core_resources = <a href="account.md#0x1_account_create_account">account::create_account</a>(@core_resources);
-    <a href="aptos_account.md#0x1_aptos_account_register_supra">aptos_account::register_supra</a>(&core_resources); // register Supra store
+    <a href="supra_account.md#0x1_supra_account_register_supra">supra_account::register_supra</a>(&core_resources); // register Supra store
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
     <a href="supra_coin.md#0x1_supra_coin_configure_accounts_for_test">supra_coin::configure_accounts_for_test</a>(supra_framework, &core_resources, mint_cap);
 }

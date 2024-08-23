@@ -47,7 +47,7 @@ pub fn create_account_txn(
 ) -> SignedTransaction {
     sender
         .transaction()
-        .payload(aptos_stdlib::aptos_account_create_account(
+        .payload(aptos_stdlib::supra_account_create_account(
             *new_account.address(),
         ))
         .sequence_number(seq_num)

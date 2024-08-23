@@ -45,7 +45,7 @@ module supra_framework::vesting {
     use aptos_std::simple_map::{Self, SimpleMap};
 
     use supra_framework::account::{Self, SignerCapability, new_event_handle};
-    use supra_framework::aptos_account::{Self, assert_account_is_registered_for_apt};
+    use supra_framework::supra_account::{Self, assert_account_is_registered_for_apt};
     use supra_framework::supra_coin::SupraCoin;
     use supra_framework::coin::{Self, Coin};
     use supra_framework::event::{EventHandle, emit, emit_event};
@@ -751,12 +751,12 @@ module supra_framework::vesting {
             let amount = pool_u64::shares_to_amount_with_total_coins(grant_pool, shares, total_distribution_amount);
             let share_of_coins = coin::extract(&mut coins, amount);
             let recipient_address = get_beneficiary(vesting_contract, shareholder);
-            aptos_account::deposit_coins(recipient_address, share_of_coins);
+            supra_account::deposit_coins(recipient_address, share_of_coins);
         });
 
         // Send any remaining "dust" (leftover due to rounding error) to the withdrawal address.
         if (coin::value(&coins) > 0) {
-            aptos_account::deposit_coins(vesting_contract.withdrawal_address, coins);
+            supra_account::deposit_coins(vesting_contract.withdrawal_address, coins);
         } else {
             coin::destroy_zero(coins);
         };
@@ -843,7 +843,7 @@ module supra_framework::vesting {
             coin::destroy_zero(coins);
             return
         };
-        aptos_account::deposit_coins(vesting_contract.withdrawal_address, coins);
+        supra_account::deposit_coins(vesting_contract.withdrawal_address, coins);
 
         if (std::features::module_event_migration_enabled()) {
             emit(
@@ -1211,7 +1211,7 @@ module supra_framework::vesting {
 
     #[test_only]
     public fun setup(supra_framework: &signer, accounts: &vector<address>) {
-        use supra_framework::aptos_account::create_account;
+        use supra_framework::supra_account::create_account;
 
         stake::initialize_for_test_custom(
             supra_framework,
@@ -1453,7 +1453,7 @@ module supra_framework::vesting {
     }
 
     #[test(supra_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = supra_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60001, location = supra_framework::supra_account)]
     public entry fun test_create_vesting_contract_with_invalid_withdrawal_address_should_fail(
         supra_framework: &signer,
         admin: &signer,
@@ -1464,7 +1464,7 @@ module supra_framework::vesting {
     }
 
     #[test(supra_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = supra_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60001, location = supra_framework::supra_account)]
     public entry fun test_create_vesting_contract_with_missing_withdrawal_account_should_fail(
         supra_framework: &signer,
         admin: &signer,
@@ -1475,7 +1475,7 @@ module supra_framework::vesting {
     }
 
     #[test(supra_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = supra_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60002, location = supra_framework::supra_account)]
     public entry fun test_create_vesting_contract_with_unregistered_withdrawal_account_should_fail(
         supra_framework: &signer,
         admin: &signer,
@@ -2009,7 +2009,7 @@ module supra_framework::vesting {
     }
 
     #[test(supra_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = supra_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60001, location = supra_framework::supra_account)]
     public entry fun test_set_beneficiary_with_missing_account_should_fail(
         supra_framework: &signer,
         admin: &signer,
@@ -2022,7 +2022,7 @@ module supra_framework::vesting {
     }
 
     #[test(supra_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = supra_framework::aptos_account)]
+    #[expected_failure(abort_code = 0x60002, location = supra_framework::supra_account)]
     public entry fun test_set_beneficiary_with_unregistered_account_should_fail(
         supra_framework: &signer,
         admin: &signer,

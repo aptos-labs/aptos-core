@@ -222,7 +222,6 @@ transferred to A
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
-<b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
@@ -236,6 +235,7 @@ transferred to A
 <b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="staking_config.md#0x1_staking_config">0x1::staking_config</a>;
+<b>use</b> <a href="supra_account.md#0x1_supra_account">0x1::supra_account</a>;
 <b>use</b> <a href="supra_coin.md#0x1_supra_coin">0x1::supra_coin</a>;
 <b>use</b> <a href="supra_governance.md#0x1_supra_governance">0x1::supra_governance</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
@@ -3623,7 +3623,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
     <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
 
     // <a href="stake.md#0x1_stake">stake</a> the entire amount <b>to</b> the <a href="stake.md#0x1_stake">stake</a> pool
-    <a href="aptos_account.md#0x1_aptos_account_transfer">aptos_account::transfer</a>(delegator, pool_address, amount);
+    <a href="supra_account.md#0x1_supra_account_transfer">supra_account::transfer</a>(delegator, pool_address, amount);
     <a href="stake.md#0x1_stake_add_stake">stake::add_stake</a>(&<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(pool), amount);
 
     // but buy shares for delegator just for the remaining amount after fee
@@ -4079,7 +4079,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
         // no excess <a href="stake.md#0x1_stake">stake</a> <b>if</b> `<a href="stake.md#0x1_stake_withdraw">stake::withdraw</a>` does not inactivate at all
         <a href="stake.md#0x1_stake_withdraw">stake::withdraw</a>(stake_pool_owner, amount);
     };
-    <a href="aptos_account.md#0x1_aptos_account_transfer">aptos_account::transfer</a>(stake_pool_owner, delegator_address, amount);
+    <a href="supra_account.md#0x1_supra_account_transfer">supra_account::transfer</a>(stake_pool_owner, delegator_address, amount);
 
     // commit withdrawal of possibly inactive <a href="stake.md#0x1_stake">stake</a> <b>to</b> the `total_coins_inactive`
     // known by the delegation pool in order <b>to</b> not mistake it for slashing at next synchronization

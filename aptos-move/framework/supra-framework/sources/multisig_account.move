@@ -1535,7 +1535,7 @@ module supra_framework::multisig_account {
     ////////////////////////// Tests ///////////////////////////////
 
     #[test_only]
-    use supra_framework::aptos_account::create_account;
+    use supra_framework::supra_account::create_account;
     #[test_only]
     use supra_framework::timestamp;
     #[test_only]

@@ -512,6 +512,7 @@ reconfiguration event.
     <b>let</b> config_ref = <b>borrow_global_mut</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@supra_framework);
     <b>assert</b>!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_ECONFIGURATION">ECONFIGURATION</a>));
     config_ref.epoch = 1;
+    config_ref.last_reconfiguration_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
