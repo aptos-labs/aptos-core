@@ -69,6 +69,8 @@ module supra_framework::multisig_voting {
     const ETHRESHOLD_EXCEEDS_VOTERS: u64 = 15;
     /// Not a multisig owner authorized to vote.
     const ENOT_MULTISIG_OWNER: u64 = 16;
+    /// Threshold value must be greater than 1
+    const ETHRESHOLD_MUST_BE_GREATER_THAN_ONE: u64 = 17;
 
     /// ProposalStateEnum representing proposal state.
     const PROPOSAL_STATE_PENDING: u64 = 0;
@@ -119,7 +121,7 @@ module supra_framework::multisig_voting {
         /// list of voters
         voters: vector<address>,
 
-        /// list of voters who completed there vote
+        /// list of voters who completed their vote
         voted_records: table::Table<address, bool>,
 
         /// Whether the proposal has been resolved.
@@ -289,7 +291,9 @@ module supra_framework::multisig_voting {
         // Make sure the execution script's hash is not empty.
         assert!(vector::length(&execution_hash) > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
 
-        // Make sure voters length must grether than or equal to vote threshold
+        assert!(min_vote_threshold > 1, error::invalid_argument(ETHRESHOLD_MUST_BE_GREATER_THAN_ONE));
+
+        // Make sure voters length must greater or equal  to vote threshold
         assert!(vector::length(&voters) >= min_vote_threshold, error::invalid_argument(ETHRESHOLD_EXCEEDS_VOTERS));
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
@@ -360,8 +364,8 @@ module supra_framework::multisig_voting {
     /// @param proposal_id The proposal id.
     /// @param should_pass Whether the votes are for yes or no.
     public fun vote<ProposalType: store>(
-        _proof: &ProposalType,
         voter: &signer,
+        _proof: &ProposalType,
         voting_forum_address: address,
         proposal_id: u64,
         should_pass: bool,
@@ -393,8 +397,10 @@ module supra_framework::multisig_voting {
 
             if (should_pass) {
                 proposal.yes_votes = proposal.yes_votes + 1;
+                // Since the entry existed in `voted_records`, the vote flip should be reflected by this subtraction
                 proposal.no_votes = proposal.no_votes - 1;
             } else {
+                // Since the voter already voted and flipping the vote here, this subtraction is needed.
                 proposal.yes_votes = proposal.yes_votes - 1;
                 proposal.no_votes = proposal.no_votes + 1;
             };
@@ -914,7 +920,7 @@ module supra_framework::multisig_voting {
 
         // Vote from differen account which is multisig owner list.
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa11), governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa11), &proof, governance_address, proposal_id, true);
         let TestProposal {} = proof;
     }
 
@@ -932,8 +938,8 @@ module supra_framework::multisig_voting {
 
         // Vote from differen account which is multisig owner list.
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
         let TestProposal {} = proof;
     }
 
@@ -970,8 +976,8 @@ module supra_framework::multisig_voting {
 
         // Vote.
         let proof = TestProposal {};
-        vote<TestProposal>( &proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa2), governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa2), &proof, governance_address, proposal_id, true);
         let TestProposal {} = proof;
 
         // Resolve.
@@ -1035,8 +1041,8 @@ module supra_framework::multisig_voting {
 
         // Vote.
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa2), governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa2), &proof, governance_address, proposal_id, true);
         let TestProposal {} = proof;
 
         // Resolve.
@@ -1084,9 +1090,9 @@ module supra_framework::multisig_voting {
 
         // Vote.
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa2), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa3), governance_address, proposal_id, false);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa2), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa3), &proof, governance_address, proposal_id, false);
         let TestProposal {} = proof;
 
         // Resolve early. Need to increase timestamp as resolution cannot happen in the same tx.
@@ -1141,8 +1147,8 @@ module supra_framework::multisig_voting {
         let voters = vector[@0xa1, @0xa2, @0xa3];
         let proposal_id = create_test_proposal_generic(governance, is_multi_step, voters);
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa2), governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa2), &proof, governance_address, proposal_id, true);
         let TestProposal {} = proof;
 
         // Resolving early should fail since timestamp hasn't changed since the last vote.
@@ -1184,8 +1190,8 @@ module supra_framework::multisig_voting {
 
         // Vote.
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, false);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, false);
         let TestProposal {} = proof;
 
         // Resolve.
@@ -1221,7 +1227,7 @@ module supra_framework::multisig_voting {
         // Voting period is over. Voting should now fail.
         timestamp::fast_forward_seconds(VOTING_DURATION_SECS + 1);
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
         let TestProposal {} = proof;
     }
 
@@ -1243,14 +1249,14 @@ module supra_framework::multisig_voting {
 
         // Vote.
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa2), governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa2), &proof, governance_address, proposal_id, true);
 
         // Resolve early.
         timestamp::fast_forward_seconds(1);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_SUCCEEDED, 1);
         resolve_proposal_for_test<TestProposal>(governance_address, proposal_id, true, false);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa3), governance_address, proposal_id, false);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa3), &proof, governance_address, proposal_id, false);
         let TestProposal {} = proof;
     }
 
@@ -1271,8 +1277,8 @@ module supra_framework::multisig_voting {
 
         // Vote.
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, false);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, false);
         let TestProposal {} = proof;
 
         // Resolve.
@@ -1310,8 +1316,8 @@ module supra_framework::multisig_voting {
 
         // Vote.
         let proof = TestProposal {};
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa1), governance_address, proposal_id, true);
-        vote<TestProposal>(&proof, &account::create_signer_for_test(@0xa2), governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa1), &proof, governance_address, proposal_id, true);
+        vote<TestProposal>(&account::create_signer_for_test(@0xa2), &proof, governance_address, proposal_id, true);
         let TestProposal {} = proof;
 
         // Resolve.

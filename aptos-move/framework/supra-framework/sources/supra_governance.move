@@ -67,6 +67,10 @@ module supra_framework::supra_governance {
     const EACCOUNT_NOT_AUTHORIZED: u64 = 15;
     /// Proposal is expired
     const EPROPOSAL_IS_EXPIRE: u64 = 16;
+    /// Threshold should not exceeds voters
+    const ETHRESHOLD_EXCEEDS_VOTERS: u64 = 17;
+    /// Threshold value must be greater than 1
+    const ETHRESHOLD_MUST_BE_GREATER_THAN_ONE: u64 = 18;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;
@@ -298,6 +302,9 @@ module supra_framework::supra_governance {
     ) {
         multisig_voting::register<GovernanceProposal>(supra_framework);
 
+        assert!(vector::length(&voters) >= min_voting_threshold && min_voting_threshold > vector::length(&voters) / 2, error::invalid_argument(ETHRESHOLD_EXCEEDS_VOTERS));
+        assert!(min_voting_threshold > 1, error::invalid_argument(ETHRESHOLD_MUST_BE_GREATER_THAN_ONE));
+
         move_to(supra_framework, SupraGovernanceConfig {
             voting_duration_secs,
             min_voting_threshold,
@@ -355,6 +362,9 @@ module supra_framework::supra_governance {
         voters: vector<address>,
     ) acquires SupraGovernanceConfig, SupraGovernanceEvents {
         system_addresses::assert_supra_framework(supra_framework);
+
+        assert!(vector::length(&voters) >= min_voting_threshold && min_voting_threshold > vector::length(&voters) / 2, error::invalid_argument(ETHRESHOLD_EXCEEDS_VOTERS));
+        assert!(min_voting_threshold > 1, error::invalid_argument(ETHRESHOLD_MUST_BE_GREATER_THAN_ONE));
 
         let supra_governance_config = borrow_global_mut<SupraGovernanceConfig>(@supra_framework);
         supra_governance_config.voting_duration_secs = voting_duration_secs;
@@ -829,8 +839,8 @@ module supra_framework::supra_governance {
         assert!(timestamp::now_seconds() >= proposal_expiration, error::invalid_argument(EPROPOSAL_IS_EXPIRE));
 
         multisig_voting::vote<GovernanceProposal>(
-            &governance_proposal::create_empty_proposal(),
             voter,
+            &governance_proposal::create_empty_proposal(),
             @supra_framework,
             proposal_id,
             should_pass,
