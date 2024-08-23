@@ -316,7 +316,7 @@ impl BufferManager {
                 ordered_blocks.clone().into_iter().map(Arc::new).collect(),
                 ordered_proof.clone(),
             );
-            consensus_publisher.publish_message(message).await;
+            consensus_publisher.publish_message(message);
         }
         self.execution_schedule_phase_tx
             .send(request)
@@ -421,7 +421,7 @@ impl BufferManager {
                 if let Some(consensus_publisher) = &self.consensus_publisher {
                     let message =
                         ConsensusObserverMessage::new_commit_decision_message(commit_proof.clone());
-                    consensus_publisher.publish_message(message).await;
+                    consensus_publisher.publish_message(message);
                 }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
