@@ -124,7 +124,10 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
 }
 
 impl<M: ModuleStorage + WithEnvironment> CodeStorage for UnsyncCodeStorage<M> {
-    fn fetch_deserialized_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
+    fn deserialize_and_cache_script(
+        &self,
+        serialized_script: &[u8],
+    ) -> VMResult<Arc<CompiledScript>> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;
 
@@ -144,7 +147,7 @@ impl<M: ModuleStorage + WithEnvironment> CodeStorage for UnsyncCodeStorage<M> {
         })
     }
 
-    fn fetch_verified_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
+    fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;
 
@@ -226,14 +229,14 @@ mod test {
         let serialized_script = script(vec!["a"]);
         let hash_1 = script_hash(&serialized_script);
 
-        assert_ok!(code_storage.fetch_deserialized_script(&serialized_script));
+        assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.matches(vec![hash_1], |e| matches!(e, Deserialized(..))));
         assert!(code_storage.matches(vec![], |e| matches!(e, Verified(..))));
 
         let serialized_script = script(vec!["b"]);
         let hash_2 = script_hash(&serialized_script);
 
-        assert_ok!(code_storage.fetch_deserialized_script(&serialized_script));
+        assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.module_storage().does_not_have_cached_modules());
         assert!(code_storage.matches(vec![hash_1, hash_2], |e| matches!(e, Deserialized(..))));
         assert!(code_storage.matches(vec![], |e| matches!(e, Verified(..))));
@@ -254,12 +257,12 @@ mod test {
 
         let serialized_script = script(vec!["a"]);
         let hash = script_hash(&serialized_script);
-        assert_ok!(code_storage.fetch_deserialized_script(&serialized_script));
+        assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.module_storage().does_not_have_cached_modules());
         assert!(code_storage.matches(vec![hash], |e| matches!(e, S::Deserialized(..))));
         assert!(code_storage.matches(vec![], |e| matches!(e, S::Verified(..))));
 
-        assert_ok!(code_storage.fetch_verified_script(&serialized_script));
+        assert_ok!(code_storage.verify_and_cache_script(&serialized_script));
 
         assert!(code_storage.matches(vec![], |e| matches!(e, S::Deserialized(..))));
         assert!(code_storage.matches(vec![hash], |e| matches!(e, S::Verified(..))));

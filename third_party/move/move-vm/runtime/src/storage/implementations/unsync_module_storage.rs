@@ -237,7 +237,9 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 
         // Step 1: verify compiled module locally.
         let compiled_module = self.fetch_deserialized_module(address, module_name)?;
-        let size = self.fetch_module_size_in_bytes(address, module_name)?;
+        let size = self
+            .fetch_module_size_in_bytes(address, module_name)?
+            .ok_or_else(|| module_linker_error!(address, module_name))?;
         let partially_verified_module = self
             .runtime_environment
             .build_partially_verified_module(compiled_module, size)?;

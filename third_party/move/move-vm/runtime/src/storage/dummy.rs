@@ -90,14 +90,14 @@ impl ModuleStorage for DummyCodeStorage {
 }
 
 impl CodeStorage for DummyCodeStorage {
-    fn fetch_deserialized_script(
+    fn deserialize_and_cache_script(
         &self,
         _serialized_script: &[u8],
     ) -> VMResult<Arc<CompiledScript>> {
         unexpected_unimplemented_error!()
     }
 
-    fn fetch_verified_script(&self, _serialized_script: &[u8]) -> VMResult<Arc<Script>> {
+    fn verify_and_cache_script(&self, _serialized_script: &[u8]) -> VMResult<Arc<Script>> {
         unexpected_unimplemented_error!()
     }
 }
