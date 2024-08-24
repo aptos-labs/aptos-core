@@ -46,7 +46,6 @@ use {
 pub struct SharedTestingConfig {
     save_storage_state_on_failure: bool,
     report_stacktrace_on_abort: bool,
-    native_function_table: NativeFunctionTable,
     vm: MoveVM,
     starting_resource_storage: InMemoryStorage,
     starting_module_storage: LocalModuleBytesStorage,
