@@ -823,6 +823,51 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PIPELINE_INSERTION_TO_EXECUTED_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_pipeline_insertion_to_executed_time",
+            "Histogram for the time it takes for a block to be executed after being inserted into the pipeline"
+        ).unwrap()
+    )
+});
+
+pub static PIPELINE_ENTRY_TO_INSERTED_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_pipeline_entry_to_inserted_time",
+            "Histogram for the time it takes for a block to be inserted into the pipeline after being received"
+        ).unwrap()
+    )
+});
+
+pub static PREPARE_BLOCK_WAIT_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_prepare_block_wait_time",
+            "Histogram for the time the block waits after it enters the pipeline before the block prepration starts"
+        ).unwrap()
+    )
+});
+
+pub static EXECUTE_BLOCK_WAIT_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_execute_block_wait_time",
+            "Histogram for the time the block waits after the block is prepared before the block execution starts"
+        ).unwrap()
+    )
+});
+
+pub static APPLY_LEDGER_WAIT_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_apply_ledger_wait_time",
+            "Histogram for the time the block waits after the block is executed before the ledger is applied"
+        ).unwrap()
+    )
+});
+
 const CONSENSUS_WAIT_DURATION_BUCKETS: [f64; 19] = [
     0.005, 0.01, 0.015, 0.02, 0.04, 0.06, 0.08, 0.10, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3,
     0.4, 0.6, 0.8, 2.0,
