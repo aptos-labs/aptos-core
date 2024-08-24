@@ -288,7 +288,7 @@ impl<'r> WriteOpConverter<'r> {
 mod tests {
     use super::*;
     use crate::{
-        data_cache::tests::as_resolver_with_group_size_kind,
+        data_cache::{tests::as_resolver_with_group_size_kind, AsMoveResolver},
         move_vm_ext::resolver::ResourceGroupResolver,
     };
     use aptos_types::{
@@ -297,13 +297,20 @@ mod tests {
             errors::StateviewError, state_storage_usage::StateStorageUsage,
             state_value::StateValue, TStateView,
         },
+        write_set::TransactionWrite,
     };
-    use aptos_vm_types::resource_group_adapter::{group_size_as_sum, GroupSizeKind};
-    use claims::{assert_none, assert_some_eq};
+    use aptos_vm_types::{
+        module_and_script_storage::AsAptosCodeStorage,
+        resource_group_adapter::{group_size_as_sum, GroupSizeKind},
+    };
+    use claims::{assert_none, assert_ok, assert_some, assert_some_eq};
+    use move_binary_format::file_format::empty_module_with_dependencies_and_friends;
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
+    use move_vm_runtime::move_vm::MoveVM;
+    use once_cell::sync::Lazy;
 
     fn raw_metadata(v: u64) -> StateValueMetadata {
         StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -360,6 +367,98 @@ mod tests {
         fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
             unimplemented!();
         }
+    }
+
+    static MOCK_VM: Lazy<MoveVM> = Lazy::new(|| MoveVM::new(vec![]));
+
+    fn module(name: &str) -> (StateKey, Bytes, CompiledModule) {
+        let module = empty_module_with_dependencies_and_friends(name, vec![], vec![]);
+        let state_key = StateKey::module(module.self_addr(), module.self_name());
+        let mut module_bytes = vec![];
+        assert_ok!(module.serialize(&mut module_bytes));
+        (state_key, module_bytes.into(), module)
+    }
+
+    #[test]
+    fn test_convert_modules_into_write_ops() {
+        // Create a state value with no metadata.
+        let (a_state_key, a_bytes, a) = module("a");
+        let a_state_value = StateValue::new_legacy(a_bytes.clone());
+
+        // Create a state value with legacy metadata.
+        let (b_state_key, b_bytes, b) = module("b");
+        let b_state_value = StateValue::new_with_metadata(
+            b_bytes.clone(),
+            StateValueMetadata::legacy(10, &CurrentTimeMicroseconds { microseconds: 100 }),
+        );
+
+        // Create a state value with non-legacy metadata.
+        let (c_state_key, c_bytes, c) = module("c");
+        let c_state_value = StateValue::new_with_metadata(
+            c_bytes.clone(),
+            StateValueMetadata::new(20, 30, &CurrentTimeMicroseconds { microseconds: 200 }),
+        );
+
+        // Module that does not yet exist.
+        let (d_state_key, d_bytes, d) = module("d");
+
+        // Create the configuration time resource in the state as well;
+        let current_time = CurrentTimeMicroseconds { microseconds: 300 };
+        let state_key = assert_ok!(StateKey::resource(
+            CurrentTimeMicroseconds::address(),
+            &CurrentTimeMicroseconds::struct_tag()
+        ));
+        let bytes = assert_ok!(bcs::to_bytes(&current_time));
+        let state_value = StateValue::new_legacy(bytes.into());
+
+        // Setting up the state.
+        let state_view = MockStateView::new(BTreeMap::from([
+            (state_key, state_value),
+            (a_state_key.clone(), a_state_value.clone()),
+            (b_state_key.clone(), b_state_value.clone()),
+            (c_state_key.clone(), c_state_value.clone()),
+        ]));
+        let resolver = state_view.as_move_resolver();
+        let code_storage = state_view.as_aptos_code_storage(&MOCK_VM);
+        // Storage slot metadata is enabled on the mainnet.
+        let woc = WriteOpConverter::new(&resolver, true);
+
+        let modules = vec![
+            (a_bytes.clone(), &a),
+            (b_bytes.clone(), &b),
+            (c_bytes.clone(), &c),
+            (d_bytes.clone(), &d),
+        ];
+
+        let results = assert_ok!(woc.convert_modules_into_write_ops(&code_storage, modules));
+        assert_eq!(results.len(), 4);
+
+        // For `a`, `b`, and `c`, since they exist, metadata is inherited
+        // the write op is a creation.
+
+        let a_write_op = assert_some!(results.get(&a_state_key));
+        assert!(a_write_op.is_modification());
+        assert_eq!(assert_some!(a_write_op.bytes()), &a_bytes);
+        assert_eq!(a_write_op.metadata(), &a_state_value.into_metadata());
+
+        let b_write_op = assert_some!(results.get(&b_state_key));
+        assert!(b_write_op.is_modification());
+        assert_eq!(assert_some!(b_write_op.bytes()), &b_bytes);
+        assert_eq!(b_write_op.metadata(), &b_state_value.into_metadata());
+
+        let c_write_op = assert_some!(results.get(&c_state_key));
+        assert!(c_write_op.is_modification());
+        assert_eq!(assert_some!(c_write_op.bytes()), &c_bytes);
+        assert_eq!(c_write_op.metadata(), &c_state_value.into_metadata());
+
+        // Since `d` does not exist, its metadata is a placeholder.
+        let d_write_op = assert_some!(results.get(&d_state_key));
+        assert!(d_write_op.is_creation());
+        assert_eq!(assert_some!(d_write_op.bytes()), &d_bytes);
+        assert_eq!(
+            d_write_op.metadata(),
+            &StateValueMetadata::placeholder(&current_time)
+        )
     }
 
     // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
