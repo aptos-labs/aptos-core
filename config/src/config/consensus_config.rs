@@ -248,7 +248,7 @@ impl Default for ConsensusConfig {
                     backpressure_proposal_delay_ms: 50,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    back_pressure_pipeline_latency_limit_ms: 1300,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
