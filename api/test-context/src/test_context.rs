@@ -162,7 +162,8 @@ pub fn new_test_context(
         db.clone(),
         mempool.ac_client.clone(),
         node_config.clone(),
-        mock_indexer_service.get_indexer_reader(),
+        None, 
+        None, /* table info reader */
     );
 
     // Configure the testing depending on which API version we're testing.

@@ -5,7 +5,7 @@ use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use std::{
     fs,
     fs::File,
-    io::{BufWriter, Error},
+    io::{BufWriter, Error, Write},
     path::PathBuf,
 };
 use tar::{Archive, Builder};
@@ -52,7 +52,10 @@ pub fn rename_db_folders_and_cleanup(
 }
 
 /// Creates a tar.gz archive from the db snapshot directory
-pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBuf, anyhow::Error> {
+pub fn create_tar_gz(
+    dir_path: PathBuf,
+    backup_file_name: &str,
+) -> Result<(PathBuf, String), anyhow::Error> {
     let tar_file_name = format!("{}.tar.gz", backup_file_name);
     let tar_file_path = dir_path.join(&tar_file_name);
     let temp_tar_file_path = dir_path.join(format!("{}.tmp", tar_file_name));
@@ -67,7 +70,16 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
 
     std::fs::rename(&temp_tar_file_path, &tar_file_path)?;
 
-    Ok(tar_file_path)
+    Ok((tar_file_path, tar_file_name))
+}
+
+pub fn write_snapshot_to_file(snapshot: &[u8], target_path: &PathBuf) -> anyhow::Result<()> {
+    let temp_file_path = target_path.with_extension("tmp");
+    let mut temp_file = File::create(&temp_file_path)?;
+    temp_file.write_all(snapshot)?;
+    temp_file.sync_all()?; // Ensure all data is written to disk
+    fs::rename(&temp_file_path, target_path)?; // Atomically move the temp file to the target path
+    Ok(())
 }
 
 /// Unpack a tar.gz archive to a specified directory
@@ -135,7 +147,7 @@ mod tests {
         writeln!(file, "{}", test_content)?;
 
         // Create a tar.gz file from the directory
-        let tar_gz_path = create_tar_gz(dir_to_compress.path().to_path_buf(), "testbackup")?;
+        let (tar_gz_path, _) = create_tar_gz(dir_to_compress.path().to_path_buf(), "testbackup")?;
         assert!(tar_gz_path.exists());
 
         // Create a new temporary directory to unpack the tar.gz file
@@ -172,7 +184,7 @@ mod tests {
         }
 
         // Pack the original RocksDB into a tar.gz file
-        let tar_gz_path = create_tar_gz(original_db_path.to_path_buf(), "testbackup")?;
+        let (tar_gz_path, _) = create_tar_gz(original_db_path.to_path_buf(), "testbackup")?;
         assert!(tar_gz_path.exists(), "Tar.gz file was not created.");
 
         // Create a temporary directory for the unpacked RocksDB

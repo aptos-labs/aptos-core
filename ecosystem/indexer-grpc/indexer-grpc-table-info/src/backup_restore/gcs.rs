@@ -24,7 +24,7 @@ use google_cloud_storage::{
 use hyper::StatusCode;
 use std::{
     borrow::Cow::Borrowed,
-    env,
+    env, fs,
     path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -187,31 +187,20 @@ impl GcsBackupRestoreOperator {
             .create_checkpoint(&snapshot_path)
             .context(format!("DB checkpoint failed at epoch {}", epoch))?;
 
-        // Spawn blocking a thread to create a gzipped tar file by compressing a folder into a single file
-        // synchronously without blocking the async thread
-        let snapshot_path_closure = snapshot_path.clone();
-        let tar_file = task::spawn_blocking(move || {
-            create_tar_gz(snapshot_path_closure.clone(), &epoch.to_string())
-        })
-        .await?
-        .expect("Failed to create tar.gz file in blocking task");
-
-        // Open the file in async mode to stream it
-        let file = File::open(&tar_file)
-            .await
-            .context("Failed to open gzipped tar file for reading")?;
-        let file_stream = tokio_util::io::ReaderStream::new(file);
+        // create a gzipped tar file by compressing a folder into a single file
+        let (tar_file, _tar_file_name) = create_tar_gz(snapshot_path.clone(), &epoch.to_string())?;
+        let buffer = std::fs::read(&tar_file).context("Failed to read gzipped tar file")?;
 
         let filename = generate_blob_name(epoch);
 
         match self
             .gcs_client
-            .upload_streamed_object(
+            .upload_object(
                 &UploadObjectRequest {
                     bucket: self.bucket_name.clone(),
                     ..Default::default()
                 },
-                file_stream,
+                buffer.clone(),
                 &UploadType::Simple(Media {
                     name: filename.clone().into(),
                     content_type: Borrowed(TAR_FILE_TYPE),
@@ -222,10 +211,9 @@ impl GcsBackupRestoreOperator {
         {
             Ok(_) => {
                 self.update_metadata(chain_id, epoch).await?;
-                let snapshot_path_clone = snapshot_path.clone();
-                fs::remove_file(&tar_file)
-                    .and_then(|_| fs::remove_dir_all(snapshot_path_clone))
-                    .await
+
+                std::fs::remove_file(&tar_file)
+                    .and_then(|_| fs::remove_dir_all(&snapshot_path))
                     .expect("Failed to clean up after db snapshot upload");
             },
             Err(err) => {
@@ -252,7 +240,7 @@ impl GcsBackupRestoreOperator {
 
         match self
             .gcs_client
-            .download_streamed_object(
+            .download_object(
                 &GetObjectRequest {
                     bucket: self.bucket_name.clone(),
                     object: epoch_based_filename.clone(),
@@ -262,28 +250,13 @@ impl GcsBackupRestoreOperator {
             )
             .await
         {
-            Ok(mut stream) => {
-                // Create a temporary file and write the stream to it directly
+            Ok(snapshot) => {
                 let temp_file_name = "snapshot.tar.gz";
                 let temp_file_path = base_path.join(temp_file_name);
-                let temp_file_path_clone = temp_file_path.clone();
-                let mut temp_file = File::create(&temp_file_path_clone).await?;
-                while let Some(chunk) = stream.next().await {
-                    match chunk {
-                        Ok(data) => temp_file.write_all(&data).await?,
-                        Err(e) => return Err(anyhow::Error::new(e)),
-                    }
-                }
-                temp_file.sync_all().await?;
+                write_snapshot_to_file(&snapshot, &temp_file_path)?;
 
-                // Spawn blocking a thread to synchronously unpack gzipped tar file without blocking the async thread
-                task::spawn_blocking(move || unpack_tar_gz(&temp_file_path_clone, &db_path))
-                    .await?
-                    .expect("Failed to unpack gzipped tar file");
-
-                fs::remove_file(&temp_file_path)
-                    .await
-                    .context("Failed to remove temporary file after unpacking")?;
+                unpack_tar_gz(&temp_file_path, &db_path)?;
+                fs::remove_file(&temp_file_path).context("Failed to remove temporary file")?;
 
                 self.set_metadata_epoch(epoch);
 

@@ -20,6 +20,7 @@ use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -68,6 +69,7 @@ pub struct MoveConverter<'a, S> {
     inner: AptosValueAnnotator<'a, S>,
     db: Arc<dyn DbReader>,
     indexer_reader: Option<Arc<dyn IndexerReader>>,
+    table_info_reader: Option<Arc<dyn TableInfoReader>>,
 }
 
 impl<'a, S: StateView> MoveConverter<'a, S> {
@@ -75,11 +77,13 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         inner: &'a S,
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> Self {
         Self {
             inner: AptosValueAnnotator::new(inner),
             db,
             indexer_reader,
+            table_info_reader,
         }
     }
 
@@ -1009,8 +1013,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         })
     }
 
+    // Get table info from the db by the order of table_info_reader, indexer_reader, and db.
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+        if let Some(table_info_reader) = self.table_info_reader.as_ref() {
+            // Attempt to get table_info from the table_info_reader if it exists
+            Ok(table_info_reader.get_table_info(handle)?)
+        } else if let Some(indexer_reader) = self.indexer_reader.as_ref() {
             // Attempt to get table_info from the indexer_reader if it exists
             Ok(indexer_reader.get_table_info(handle)?)
         } else if self.db.indexer_enabled() {
@@ -1117,6 +1125,7 @@ pub trait AsConverter<R> {
         &self,
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> MoveConverter<R>;
 }
 
@@ -1125,10 +1134,12 @@ impl<R: StateView> AsConverter<R> for R {
         &self,
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> MoveConverter<R> {
-        MoveConverter::new(self, db, indexer_reader)
+        MoveConverter::new(self, db, indexer_reader, table_info_reader)
     }
 }
+
 
 pub fn new_vm_utf8_string(string: &str) -> move_core_types::value::MoveValue {
     use move_core_types::value::{MoveStruct, MoveValue};

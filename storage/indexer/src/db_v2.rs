@@ -50,6 +50,8 @@ pub struct IndexerAsyncV2 {
     pub db: DB,
     // Next version to be processed
     next_version: AtomicU64,
+    // DB snapshot most recently restored from gcs timestamp
+    restore_timestamp: AtomicU64,
     // It is used in the context of processing write ops and extracting table information.
     // As the code iterates through the write ops, it checks if the state key corresponds to a table item.
     // If it does, the associated bytes are added to the pending_on map under the corresponding table handle.
@@ -62,13 +64,23 @@ pub struct IndexerAsyncV2 {
 
 impl IndexerAsyncV2 {
     pub fn new(db: DB) -> Result<Self> {
-        let next_version = db
-            .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)?
-            .map_or(0, |v| v.expect_version());
+        let next_version = read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &db,
+            &MetadataKey::LatestVersion,
+        )
+        .unwrap()
+        .map_or(0, |v| v.expect_version());
+        let last_restored_timestamp = read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &db,
+            &MetadataKey::RestoreTimestamp,
+        )
+        .unwrap()
+        .map_or(0, |v| v.last_restored_timestamp());
 
         Ok(Self {
             db,
             next_version: AtomicU64::new(next_version),
+            restore_timestamp: AtomicU64::new(last_restored_timestamp),
             pending_on: DashMap::new(),
         })
     }
@@ -137,6 +149,17 @@ impl IndexerAsyncV2 {
         Ok(())
     }
 
+    pub fn update_last_restored_timestamp(&self, restore_timestamp: u64) -> Result<()> {
+        write_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &self.db,
+            MetadataKey::RestoreTimestamp,
+            MetadataValue::Timestamp(restore_timestamp),
+        )?;
+        self.restore_timestamp
+            .store(restore_timestamp, Ordering::Relaxed);
+        Ok(())
+    }
+
     /// Finishes the parsing process and writes the parsed table information to a SchemaBatch.
     pub fn finish_table_info_parsing(
         &self,
@@ -181,6 +204,15 @@ impl IndexerAsyncV2 {
             .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)
             .unwrap()
             .map_or(0, |v| v.expect_version())
+    }
+
+    pub fn restore_timestamp(&self) -> u64 {
+        read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &self.db,
+            &MetadataKey::RestoreTimestamp,
+        )
+        .unwrap()
+        .map_or(0, |v| v.last_restored_timestamp())
     }
 
     pub fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {

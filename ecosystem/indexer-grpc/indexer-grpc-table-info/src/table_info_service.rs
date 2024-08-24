@@ -80,17 +80,15 @@ impl TableInfoService {
             // running backup logic in a separate thread to not let it block the main thread to parse table info, since
             // gcs operation could be slow
             // TODO: move this to a separate thread.
-            if let Some(backup_restore_operator) = backup_restore_operator {
-                tokio::spawn(async move {
-                    Self::try_backup_db_snapshot_for_new_epoch(
-                        context.clone(),
-                        max_version,
-                        indexer_async_v2.clone(),
-                        backup_restore_operator,
-                    )
-                    .await;
-                });
-            }
+            tokio::spawn(async move {
+                Self::try_backup_db_snapshot_for_new_epoch(
+                    context.clone(),
+                    max_version,
+                    indexer_async_v2.clone(),
+                    backup_restore_operator,
+                )
+                .await;
+            });
 
             log_grpc_step(
                 SERVICE_TYPE,
@@ -221,6 +219,7 @@ impl TableInfoService {
             indexer_async_v2,
             end_early_if_pending_on_empty,
         )
+        .await
         .expect("[Table Info] Failed to parse table info");
 
         log_grpc_step(
@@ -288,7 +287,7 @@ impl TableInfoService {
     /// Parse table info from write sets,
     /// end_early_if_pending_on_empty flag will be true if we couldn't parse all table infos in the first try with multithread,
     /// in the second try with sequential looping, to make parsing efficient, we end early if all table infos are parsed
-    fn parse_table_info(
+    async fn parse_table_info(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
@@ -330,7 +329,7 @@ impl TableInfoService {
         context: Arc<Context>,
         last_version: u64,
         indexer_async_v2: Arc<IndexerAsyncV2>,
-        backup_restore_operator: Arc<GcsBackupRestoreOperator>,
+        backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
     ) {
         let metadata_epoch = backup_restore_operator.clone().get_metadata_epoch();
         let (_, _, block_event) = context

@@ -7,6 +7,9 @@ pub mod db_indexer;
 pub mod db_ops;
 pub mod db_v2;
 pub mod indexer_reader;
+pub mod metadata_v2;
+pub mod schema;
+pub mod table_info_reader;
 mod utils;
 
 use crate::db::INDEX_DB_NAME;

@@ -7,6 +7,7 @@ use crate::{
 };
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_protos::{
@@ -35,6 +36,7 @@ pub fn bootstrap(
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     indexer_reader: Option<Arc<dyn IndexerReader>>,
+    table_info_reader: Option<Arc<dyn TableInfoReader>>,
 ) -> Option<Runtime> {
     if !config.indexer_grpc.enabled {
         return None;
@@ -57,6 +59,7 @@ pub fn bootstrap(
             mp_sender,
             node_config,
             indexer_reader,
+            table_info_reader,
         ));
         let service_context = ServiceContext {
             context: context.clone(),

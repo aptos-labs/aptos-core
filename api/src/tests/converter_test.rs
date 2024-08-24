@@ -19,7 +19,7 @@ async fn test_value_conversion() {
     let address = AccountAddress::from_hex_literal("0x1").unwrap();
 
     let state_view = context.latest_state_view();
-    let converter = state_view.as_converter(context.db, None);
+    let converter = state_view.as_converter(context.db, None, None);
 
     assert_value_conversion(&converter, "u8", 1i32, VmMoveValue::U8(1));
     assert_value_conversion(&converter, "u64", "1", VmMoveValue::U64(1));
