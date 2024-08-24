@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::state_store::state_value::StateValueMetadata;
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 use move_vm_runtime::{DummyCodeStorage, ModuleStorage};
@@ -16,6 +16,11 @@ pub trait AptosModuleStorage: ModuleStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>>;
+
+    fn fetch_module_size_by_state_key(
+        &self,
+        state_key: &StateKey,
+    ) -> PartialVMResult<Option<usize>>;
 }
 
 impl AptosModuleStorage for DummyCodeStorage {
@@ -24,6 +29,13 @@ impl AptosModuleStorage for DummyCodeStorage {
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
+        Ok(None)
+    }
+
+    fn fetch_module_size_by_state_key(
+        &self,
+        _state_key: &StateKey,
+    ) -> PartialVMResult<Option<usize>> {
         Ok(None)
     }
 }
