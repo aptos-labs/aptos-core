@@ -57,7 +57,7 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     environment::Environment,
-    module_and_script_storage::AsAptosCodeStorage,
+    module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use bytes::Bytes;
@@ -68,10 +68,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     move_resource::MoveResource,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -1148,12 +1145,12 @@ impl FakeExecutor {
 /// responsibility of the adapter, e.g., [AptosVM]).
 fn finish_session_assert_no_modules(
     session: SessionExt,
-    module_storage: &impl ModuleStorage,
+    module_storage: &impl AptosModuleStorage,
 ) -> (WriteSet, Vec<ContractEvent>) {
     let (change_set, empty_module_write_set) = session
         .finish(
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            &module_storage,
+            module_storage,
         )
         .expect("Failed to finish the session");
     assert_ok!(empty_module_write_set.is_empty_or_invariant_violation());

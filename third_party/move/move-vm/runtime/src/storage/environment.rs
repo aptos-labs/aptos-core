@@ -18,8 +18,9 @@ use move_core_types::{
 use std::sync::Arc;
 
 /// Wrapper around partially verified compiled module, i.e., one that passed
-/// local bytecode verification, but not the dependency checks yet.
-pub struct PartiallyVerifiedModule(Arc<CompiledModule>);
+/// local bytecode verification, but not the dependency checks yet. Also
+/// carries size in bytes.
+pub struct PartiallyVerifiedModule(Arc<CompiledModule>, usize);
 
 impl PartiallyVerifiedModule {
     pub fn immediate_dependencies_iter(
@@ -137,13 +138,14 @@ impl RuntimeEnvironment {
     pub fn build_partially_verified_module(
         &self,
         compiled_module: Arc<CompiledModule>,
+        module_size: usize,
     ) -> PartialVMResult<PartiallyVerifiedModule> {
         move_bytecode_verifier::verify_module(compiled_module.as_ref())
             .map_err(|e| e.to_partial())?;
         if let Some(verifier) = &self.verifier_extension {
             verifier.verify_module(compiled_module.as_ref())?;
         }
-        Ok(PartiallyVerifiedModule(compiled_module))
+        Ok(PartiallyVerifiedModule(compiled_module, module_size))
     }
 
     /// Creates a fully verified module by running dependency verification
@@ -160,6 +162,7 @@ impl RuntimeEnvironment {
         .map_err(|e| e.to_partial())?;
         Module::new(
             &self.natives,
+            partially_verified_module.1,
             partially_verified_module.0,
             self.struct_name_index_map(),
         )
