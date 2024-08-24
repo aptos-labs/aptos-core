@@ -920,7 +920,7 @@ impl LoaderV1 {
             // Load and deserialize the module only if it has not been cached by the loader.
             // Otherwise, this will cause a significant regression in performance.
             let (module, size) = match module_store.module_at_by_ref(addr, name) {
-                Some((module, size)) => (module.module.clone(), size),
+                Some(module) => (module.module.clone(), module.size),
                 None => {
                     let (module, size, _) = data_store.load_compiled_module_to_cache(
                         ModuleId::new(*addr, name.to_owned()),

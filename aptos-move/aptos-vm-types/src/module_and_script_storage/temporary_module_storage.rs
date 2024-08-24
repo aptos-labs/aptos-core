@@ -125,7 +125,7 @@ impl<'a, M: ModuleStorage> ModuleStorage for TemporaryModuleStorage<'a, M> {
                 let compiled_module = self.write_op_to_compiled_module(write_op)?;
                 let partially_verified_module = self
                     .runtime_env
-                    .build_partially_verified_module(compiled_module)?;
+                    .build_partially_verified_module(compiled_module, write_op.size())?;
                 // TODO(loader_v2): Revisit this, technically by this point we have checked there are no cycles and all modules must be loaded.
                 let immediate_dependencies = partially_verified_module
                     .immediate_dependencies_iter()
