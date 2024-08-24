@@ -19,6 +19,14 @@ pub fn open_db<P: AsRef<Path>>(db_path: P, rocksdb_config: &RocksdbConfig) -> Re
         &gen_rocksdb_options(rocksdb_config, false),
     )?)
 }
+pub fn open_db<P: AsRef<Path>>(db_path: P, rocksdb_config: &RocksdbConfig) -> Result<DB> {
+    Ok(DB::open(
+        db_path,
+        TABLE_INFO_DB_NAME,
+        column_families(),
+        &gen_rocksdb_options(rocksdb_config, false),
+    )?)
+}
 
 pub fn open_internal_indexer_db<P: AsRef<Path>>(
     db_path: P,

@@ -10,13 +10,16 @@ pub mod event_by_key;
 pub mod event_by_version;
 pub mod indexer_metadata;
 pub mod state_keys;
+pub mod indexer_metadata_v2;
 pub mod table_info;
 pub mod transaction_by_account;
 use aptos_schemadb::ColumnFamilyName;
 
 pub const DEFAULT_COLUMN_FAMILY_NAME: ColumnFamilyName = "default";
+/// TODO(jill): to be deleted once INDEXER_METADATA_V2_CF_NAME is deployed
 pub const INDEXER_METADATA_CF_NAME: ColumnFamilyName = "indexer_metadata";
 pub const INTERNAL_INDEXER_METADATA_CF_NAME: ColumnFamilyName = "internal_indexer_metadata";
+pub const INDEXER_METADATA_V2_CF_NAME: ColumnFamilyName = "indexer_metadata_v2";
 pub const TABLE_INFO_CF_NAME: ColumnFamilyName = "table_info";
 pub const EVENT_BY_KEY_CF_NAME: ColumnFamilyName = "event_by_key";
 pub const EVENT_BY_VERSION_CF_NAME: ColumnFamilyName = "event_by_version";

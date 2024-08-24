@@ -18,6 +18,7 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -78,6 +79,7 @@ pub struct Context {
     simulate_txn_stats: Arc<FunctionStats>,
     pub indexer_reader: Option<Arc<dyn IndexerReader>>,
     pub wait_for_hash_active_connections: Arc<AtomicUsize>,
+    pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
 }
 
 impl std::fmt::Debug for Context {
@@ -93,6 +95,7 @@ impl Context {
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> Self {
         let (view_function_stats, simulate_txn_stats) = {
             let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
@@ -131,6 +134,7 @@ impl Context {
             simulate_txn_stats,
             indexer_reader,
             wait_for_hash_active_connections: Arc::new(AtomicUsize::new(0)),
+            table_info_reader,
         }
     }
 
@@ -703,7 +707,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -735,7 +739,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {

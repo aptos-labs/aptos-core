@@ -17,5 +17,6 @@ Follow instructions on how to run a fullnode against an existing network.
       parser_batch_size: 1000
       db_backup_enabled: false
       gcs_bucket_name: "table-info"
+      version_diff: 100000
 
 * Run fullnode `cargo run -p aptos-node --release -- -f ./fullnode.yaml`

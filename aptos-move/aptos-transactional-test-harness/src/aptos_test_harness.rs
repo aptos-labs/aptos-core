@@ -1030,7 +1030,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 Ok(render_events(output.events()))
             },
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
-                let converter = self.storage.as_converter(Arc::new(FakeDbReader {}), None);
+                let converter = self.storage.as_converter(Arc::new(FakeDbReader {}), None, None);
 
                 let vm_key = converter
                     .try_into_vm_value(&view_table_cmd.key_type, view_table_cmd.key_value)
