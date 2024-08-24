@@ -97,7 +97,7 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
         verbose: true,
         report_stacktrace_on_abort: true,
 
-        ..UnitTestingConfig::default_with_bound(None)
+        ..UnitTestingConfig::default()
     };
 
     let regex = RegexBuilder::new(r"(┌─ ).+/([^/]+)$")

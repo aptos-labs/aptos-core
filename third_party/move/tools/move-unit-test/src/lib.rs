@@ -18,7 +18,6 @@ use move_compiler::{
 };
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use move_vm_types::gas::GasMeter;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
@@ -207,7 +206,7 @@ impl UnitTestingConfig {
 
     /// Public entry point to Move unit testing as a library
     /// Returns `true` if all unit tests passed. Otherwise, returns `false`.
-    pub fn run_and_report_unit_tests<W: Write + Send, G: GasMeter, F: UnitTestFactory<G> + Send>(
+    pub fn run_and_report_unit_tests<W: Write + Send, F: UnitTestFactory + Send>(
         &self,
         test_plan: TestPlan,
         native_function_table: Option<NativeFunctionTable>,

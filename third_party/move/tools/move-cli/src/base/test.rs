@@ -26,7 +26,6 @@ use move_unit_test::{
 };
 use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
 use move_vm_test_utils::gas_schedule::CostTable;
-use move_vm_types::gas::GasMeter;
 // if unix
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::ExitStatusExt;
@@ -186,8 +185,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
 pub fn run_move_unit_tests_with_factory<
     W: Write + Send,
-    G: GasMeter,
-    F: UnitTestFactory<G> + Send,
+    F: UnitTestFactory + Send,
 >(
     pkg_path: &Path,
     mut build_config: move_package::BuildConfig,

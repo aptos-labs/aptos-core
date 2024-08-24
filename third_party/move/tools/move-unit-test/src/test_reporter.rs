@@ -18,7 +18,7 @@ use move_compiler::{
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status::StatusType};
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
-use move_vm_runtime::session::Session;
+use move_vm_runtime::native_extensions::NativeContextExtensions;
 use move_vm_test_utils::gas_schedule::{zero_cost_schedule, CostTable, GasCost, GasStatus};
 use move_vm_types::gas::GasMeter;
 use once_cell::sync::Lazy;
@@ -39,14 +39,16 @@ fn unit_cost_table() -> CostTable {
     cost_schedule
 }
 
-pub trait UnitTestFactory<G: GasMeter> {
-    fn new_gas_meter(&self) -> G;
-    fn finish_session(
+pub trait UnitTestFactory {
+    type GasMeter: GasMeter;
+    fn new_gas_meter(&self) -> Self::GasMeter;
+    fn finalize_test_run_info(
         &self,
-        session: Session,
-        gas_meter: G,
+        change_set: &ChangeSet,
+        extensions: &mut NativeContextExtensions,
+        gas_meter: Self::GasMeter,
         test_run_info: TestRunInfo,
-    ) -> (VMResult<ChangeSet>, TestRunInfo);
+    ) -> TestRunInfo;
 }
 
 pub struct UnitTestFactoryWithCostTable {
@@ -63,25 +65,24 @@ impl UnitTestFactoryWithCostTable {
     }
 }
 
-impl UnitTestFactory<GasStatus> for UnitTestFactoryWithCostTable {
-    fn new_gas_meter(&self) -> GasStatus {
+impl UnitTestFactory for UnitTestFactoryWithCostTable {
+    type GasMeter = GasStatus;
+
+    fn new_gas_meter(&self) -> Self::GasMeter {
         GasStatus::new(self.cost_table.clone(), self.gas_limit.into())
     }
 
     // @dev: the caller must fill the test_run_info.gas_used field in the returned TestRunInfo
-    fn finish_session(
+    fn finalize_test_run_info(
         &self,
-        session: Session,
-        gas_status: GasStatus,
+        _: &ChangeSet,
+        _: &mut NativeContextExtensions,
+        gas_status: Self::GasMeter,
         mut test_run_info: TestRunInfo,
-    ) -> (VMResult<ChangeSet>, TestRunInfo) {
+    ) -> TestRunInfo {
         let remaining_gas: u64 = gas_status.remaining_gas().into();
         test_run_info.gas_used = self.gas_limit - remaining_gas;
-
-        match session.finish() {
-            Ok(cs) => (Ok(cs), test_run_info),
-            Err(err) => (Err(err), test_run_info),
-        }
+        test_run_info
     }
 }
 
