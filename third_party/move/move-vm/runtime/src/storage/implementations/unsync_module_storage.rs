@@ -79,7 +79,7 @@ impl ModuleBytesStorage for LocalModuleBytesStorage {
 /// verified one.
 #[derive(Debug)]
 pub(crate) enum ModuleStorageEntry {
-    Deserialized(Arc<CompiledModule>),
+    Deserialized(Arc<CompiledModule>, usize),
     Verified(Arc<Module>),
 }
 
@@ -87,7 +87,7 @@ pub(crate) enum ModuleStorageEntry {
 /// and externally.
 pub struct UnsyncModuleStorage<'e, B> {
     /// Environment where this module storage is defined in.
-    env: &'e RuntimeEnvironment,
+    runtime_environment: &'e RuntimeEnvironment,
     /// Storage with deserialized modules, i.e., module cache.
     module_storage: RefCell<BTreeMap<AccountAddress, BTreeMap<Identifier, ModuleStorageEntry>>>,
     /// Immutable baseline byte storage from which one can fetch raw module bytes.
@@ -108,7 +108,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     /// Creates a new storage with empty module cache, but no constraints on the byte storage.
     fn new(env: &'e RuntimeEnvironment, byte_storage: B) -> Self {
         Self {
-            env,
+            runtime_environment: env,
             module_storage: RefCell::new(BTreeMap::new()),
             byte_storage,
         }
@@ -147,7 +147,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
             let bytes = self.get_existing_module_bytes(address, module_name)?;
             let compiled_module = CompiledModule::deserialize_with_config(
                 &bytes,
-                &self.env.vm_config().deserializer_config,
+                &self.runtime_environment.vm_config().deserializer_config,
             )?;
             let mut module_storage = self.module_storage.borrow_mut();
             let account_module_storage = match module_storage.entry(*address) {
@@ -156,7 +156,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
             };
             account_module_storage.insert(
                 module_name.to_owned(),
-                Deserialized(Arc::new(compiled_module)),
+                Deserialized(Arc::new(compiled_module), bytes.len()),
             );
         }
         Ok(())
@@ -192,11 +192,13 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         let entry = get_module_entry_mut_or_panic(&mut module_storage, address, module_name);
         match entry {
             Verified(module) => return Ok(module.clone()),
-            Deserialized(compiled_module) if compiled_module.num_immediate_dependencies() == 0 => {
+            Deserialized(compiled_module, size)
+                if compiled_module.num_immediate_dependencies() == 0 =>
+            {
                 let module = Arc::new(
-                    self.env.build_verified_module(
-                        self.env
-                            .build_partially_verified_module(compiled_module.clone())?,
+                    self.runtime_environment.build_verified_module(
+                        self.runtime_environment
+                            .build_partially_verified_module(compiled_module.clone(), *size)?,
                         &[],
                     )?,
                 );
@@ -236,8 +238,10 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 
         // Step 1: verify compiled module locally.
         let compiled_module = self.fetch_deserialized_module(address, module_name)?;
-        let partially_verified_module =
-            self.env.build_partially_verified_module(compiled_module)?;
+        let size = self.fetch_module_size_in_bytes(address, module_name)?;
+        let partially_verified_module = self
+            .runtime_environment
+            .build_partially_verified_module(compiled_module, size)?;
 
         // Step 2: visit all dependencies and collect them for later verification.
         let mut verified_immediate_dependencies = vec![];
@@ -253,7 +257,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 
         // Step 3: verify module with dependencies.
         let module =
-            Arc::new(self.env.build_verified_module(
+            Arc::new(self.runtime_environment.build_verified_module(
                 partially_verified_module,
                 &verified_immediate_dependencies,
             )?);
@@ -273,7 +277,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 
 impl<'e, B: ModuleBytesStorage> WithEnvironment for UnsyncModuleStorage<'e, B> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.env
+        self.runtime_environment
     }
 }
 
@@ -325,7 +329,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         let entry = get_module_entry_or_panic(&module_storage, address, module_name);
 
         Ok(match entry {
-            Deserialized(compiled_module) => compiled_module.clone(),
+            Deserialized(compiled_module, _) => compiled_module.clone(),
             Verified(module) => module.as_compiled_module(),
         })
     }
