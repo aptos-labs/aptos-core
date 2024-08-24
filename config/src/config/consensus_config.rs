@@ -230,7 +230,7 @@ impl Default for ConsensusConfig {
                 min_blocks_to_activate: 4,
                 percentile: 0.5,
                 target_block_time_ms: 250,
-                min_block_time_ms_to_activate: 100,
+                min_block_time_ms_to_activate: 175,
                 // allow at least two spreading group from reordering in a single block, to utilize paralellism
                 min_calibrated_txns_per_block: 8,
             }),
@@ -241,25 +241,25 @@ impl Default for ConsensusConfig {
                     // Block enters the pipeline after consensus orders it, and leaves the
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 800,
+                    back_pressure_pipeline_latency_limit_ms: 1000,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 100,
+                    backpressure_proposal_delay_ms: 50,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1200,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 200,
+                    backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1600,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
+                    backpressure_proposal_delay_ms: 200,
                 },
                 // with execution backpressure, only later start reducing block size
                 PipelineBackpressureValues {
