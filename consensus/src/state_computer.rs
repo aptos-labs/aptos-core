@@ -34,7 +34,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc, time::Duration};
+use std::{boxed::Box, sync::Arc, time::{Instant, Duration}};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
@@ -224,6 +224,8 @@ impl StateComputer for ExecutionProxy {
                 block_executor_onchain_config,
             )
             .await;
+        observe_block(timestamp, BlockStage::EXECUTION_PIPELINE_INSERTED);
+        let pipeline_insertion_timestamp = Instant::now();
 
         Box::pin(async move {
             let pipeline_execution_result = fut.await?;
