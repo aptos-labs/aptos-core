@@ -9,7 +9,7 @@
 //!
 //! We also only report on the outermost condition with blocks.
 
-use crate::env_pipeline::model_ast_lints::ExpressionLinter;
+use crate::{env_pipeline::model_ast_lints::ExpressionLinter, lint_common::LintChecker};
 use move_model::{
     ast::ExpData,
     model::{GlobalEnv, NodeId},
@@ -38,8 +38,8 @@ enum CondExprState {
 }
 
 impl ExpressionLinter for BlocksInConditions {
-    fn get_name(&self) -> &'static str {
-        "blocks_in_conditions"
+    fn get_lint_checker(&self) -> LintChecker {
+        LintChecker::BlocksInConditions
     }
 
     fn visit_expr_pre(&mut self, _env: &GlobalEnv, expr: &ExpData) {
@@ -88,10 +88,10 @@ impl ExpressionLinter for BlocksInConditions {
                 // We are done with traversing the condition of interest.
                 self.state = None;
                 if has_any_block && !has_spec_block {
-                    env.lint_diag(
+                    self.warning(
+                        env,
                         &env.get_node_loc(id),
-                        self.get_name(),
-                        "Having blocks in conditions make code harder to read. Consider rewriting this code.",
+                        "Having blocks in conditions make code harder to read. Consider rewriting this code."
                     );
                 }
             },

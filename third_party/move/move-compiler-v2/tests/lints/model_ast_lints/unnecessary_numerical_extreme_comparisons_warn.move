@@ -54,3 +54,10 @@ module 0xc0ffee::m {
         apply(|x| x > U8_MAX, x)
     }
 }
+
+module 0xc0ffee::no_warn {
+    #[lint::skip(unnecessary_numerical_extreme_comparison)]
+    public fun test(x: u8) {
+        if (x < 0) abort 1;
+    }
+}

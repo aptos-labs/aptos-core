@@ -10848,6 +10848,8 @@ dependencies = [
  "num 0.4.1",
  "once_cell",
  "petgraph 0.5.1",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
  "walkdir",
 ]
 
