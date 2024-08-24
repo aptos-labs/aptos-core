@@ -44,17 +44,12 @@ use std::{
 /// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
 /// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
 pub trait ModuleStorage {
-    fn store_module(&self, module_id: &ModuleId, binary: Module, module_size: usize)
-        -> Arc<Module>;
+    fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
-    fn fetch_module_by_ref(
-        &self,
-        addr: &AccountAddress,
-        name: &IdentStr,
-    ) -> Option<(Arc<Module>, usize)>;
+    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
-pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, (Arc<Module>, usize)>>);
+pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Arc<Module>>>);
 
 impl ModuleCache {
     pub fn new() -> Self {
@@ -73,28 +68,18 @@ impl Clone for ModuleCache {
 }
 
 impl ModuleStorage for ModuleCache {
-    fn store_module(
-        &self,
-        module_id: &ModuleId,
-        binary: Module,
-        module_size: usize,
-    ) -> Arc<Module> {
+    fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module> {
         self.0
             .write()
-            .insert(module_id.clone(), (Arc::new(binary), module_size))
-            .0
+            .insert(module_id.clone(), Arc::new(binary))
             .clone()
     }
 
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
-        self.0.read().get(module_id).map(|(m, _)| m.clone())
+        self.0.read().get(module_id).cloned()
     }
 
-    fn fetch_module_by_ref(
-        &self,
-        addr: &AccountAddress,
-        name: &IdentStr,
-    ) -> Option<(Arc<Module>, usize)> {
+    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>> {
         self.0.read().get(&(addr, name)).cloned()
     }
 }
@@ -118,7 +103,7 @@ impl ModuleStorageAdapter {
         &self,
         addr: &AccountAddress,
         name: &IdentStr,
-    ) -> Option<(Arc<Module>, usize)> {
+    ) -> Option<Arc<Module>> {
         self.modules.fetch_module_by_ref(addr, name)
     }
 
@@ -134,9 +119,9 @@ impl ModuleStorageAdapter {
             return Ok(cached);
         }
 
-        let module = Module::new(natives, module, struct_name_index_map)
+        let module = Module::new(natives, module_size, module, struct_name_index_map)
             .map_err(|e| e.finish(Location::Undefined))?;
-        Ok(self.modules.store_module(&id, module, module_size))
+        Ok(self.modules.store_module(&id, module))
     }
 
     pub(crate) fn has_module(&self, module_id: &ModuleId) -> bool {
@@ -196,6 +181,9 @@ impl ModuleStorageAdapter {
 #[derive(Clone, Debug)]
 pub struct Module {
     id: ModuleId,
+
+    // size in bytes
+    pub(crate) size: usize,
 
     // primitive pools
     pub(crate) module: Arc<CompiledModule>,
@@ -293,6 +281,7 @@ pub(crate) struct VariantFieldInfo {
 impl Module {
     pub(crate) fn new(
         natives: &NativeFunctions,
+        size: usize,
         module: Arc<CompiledModule>,
         struct_name_index_map: &StructNameIndexMap,
     ) -> PartialVMResult<Self> {
@@ -551,6 +540,7 @@ impl Module {
         match create() {
             Ok(_) => Ok(Self {
                 id,
+                size,
                 module,
                 structs,
                 struct_instantiations,
