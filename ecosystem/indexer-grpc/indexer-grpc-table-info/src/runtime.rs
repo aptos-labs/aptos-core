@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    backup_restore::gcs::GcsBackupRestoreOperator,
     internal_indexer_db_service::InternalIndexerDBService, table_info_service::TableInfoService,
 };
 use aptos_api::context::Context;
@@ -66,12 +67,15 @@ pub fn bootstrap(
     let db =
         open_db(db_path, &rocksdb_config).expect("Failed to open up indexer async v2 db initially");
 
+    let table_info_gcs_bucket_name = node_config.indexer_table_info.gcs_bucket_name.clone();
     let indexer_async_v2 =
         Arc::new(IndexerAsyncV2::new(db).expect("Failed to initialize indexer async v2"));
     let indexer_async_v2_clone = Arc::clone(&indexer_async_v2);
 
     // Spawn the runtime for table info parsing
     runtime.spawn(async move {
+        let backup_restore_operator: Arc<GcsBackupRestoreOperator> =
+            Arc::new(GcsBackupRestoreOperator::new(table_info_gcs_bucket_name).await);
         let context = Arc::new(Context::new(
             chain_id,
             db_rw.reader.clone(),
@@ -79,6 +83,12 @@ pub fn bootstrap(
             node_config.clone(),
             None,
         ));
+        // DB backup is optional
+        let backup_restore_operator = if node_config.indexer_table_info.db_backup_enabled {
+            Some(backup_restore_operator)
+        } else {
+            None
+        };
 
         let mut parser = TableInfoService::new(
             context,
@@ -86,6 +96,7 @@ pub fn bootstrap(
             node_config.indexer_table_info.parser_task_count,
             node_config.indexer_table_info.parser_batch_size,
             node_config.indexer_table_info.enable_expensive_logging,
+            backup_restore_operator,
             indexer_async_v2_clone,
         );
 
