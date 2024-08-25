@@ -902,6 +902,11 @@ impl GlobalEnv {
         self.diag(Severity::Error, loc, msg)
     }
 
+    /// Adds a warning to this environment, without notes.
+    pub fn warning(&self, loc: &Loc, msg: &str) {
+        self.diag(Severity::Warning, loc, msg)
+    }
+
     /// Adds an error to this environment, with notes.
     pub fn error_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
