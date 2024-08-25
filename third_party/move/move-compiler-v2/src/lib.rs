@@ -6,6 +6,7 @@ mod bytecode_generator;
 pub mod env_pipeline;
 mod experiments;
 mod file_format_generator;
+pub mod lint_common;
 pub mod logging;
 pub mod options;
 pub mod pipeline;

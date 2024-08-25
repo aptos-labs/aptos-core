@@ -14,7 +14,7 @@ use crate::{
     metrics::{
         APTOS_CHUNK_EXECUTOR_OTHER_SECONDS, APTOS_EXECUTOR_APPLY_CHUNK_SECONDS,
         APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS, APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS,
-        APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS,
+        APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS, CONCURRENCY_GAUGE,
     },
 };
 use anyhow::{anyhow, ensure, Result};
@@ -26,7 +26,7 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_metrics_core::TimerHelper;
+use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
     state_delta::StateDelta, DbReaderWriter, ExecutedTrees,
@@ -88,6 +88,8 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "enqueue_by_execution"]);
+
         self.maybe_initialize()?;
         self.inner
             .read()
@@ -102,6 +104,8 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "enqueue_by_outputs"]);
+
         self.inner
             .read()
             .as_ref()
@@ -114,6 +118,8 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     }
 
     fn update_ledger(&self) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "update_ledger"]);
+
         self.inner
             .read()
             .as_ref()
@@ -122,6 +128,8 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     }
 
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "commit_chunk"]);
+
         self.inner
             .read()
             .as_ref()
@@ -130,11 +138,15 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     }
 
     fn reset(&self) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "reset"]);
+
         *self.inner.write() = Some(ChunkExecutorInner::new(self.db.clone())?);
         Ok(())
     }
 
     fn finish(&self) {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "finish"]);
+
         *self.inner.write() = None;
     }
 }
@@ -517,6 +529,8 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "replay"]);
+
         self.maybe_initialize()?;
         self.inner.read().as_ref().expect("not reset").replay(
             transactions,
@@ -528,6 +542,8 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
     }
 
     fn commit(&self) -> Result<ExecutedChunk> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "commit"]);
+
         self.inner.read().as_ref().expect("not reset").commit()
     }
 }

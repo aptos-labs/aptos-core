@@ -160,7 +160,7 @@ impl MoveTool {
     }
 }
 
-#[derive(Parser)]
+#[derive(Parser, Default)]
 pub struct FrameworkPackageArgs {
     /// Git revision or branch for the Aptos framework
     ///
@@ -683,6 +683,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
+            move_2: move_options.move_2,
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -826,58 +827,39 @@ impl IncludedArtifacts {
         check_test_code: bool,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
+        let base_options = BuildOptions {
+            dev,
+            // Always enable error map bytecode injection
+            with_error_map: true,
+            named_addresses,
+            override_std,
+            skip_fetch_latest_git_deps,
+            bytecode_version,
+            compiler_version,
+            language_version,
+            skip_attribute_checks,
+            check_test_code,
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
+            ..BuildOptions::default()
+        };
         match self {
             None => BuildOptions {
-                dev,
                 with_srcs: false,
                 with_abis: false,
                 with_source_maps: false,
-                // Always enable error map bytecode injection
-                with_error_map: true,
-                named_addresses,
-                override_std,
-                skip_fetch_latest_git_deps,
-                bytecode_version,
-                compiler_version,
-                language_version,
-                skip_attribute_checks,
-                check_test_code,
-                known_attributes: extended_checks::get_all_attribute_names().clone(),
-                ..BuildOptions::default()
+                ..base_options
             },
             Sparse => BuildOptions {
-                dev,
                 with_srcs: true,
                 with_abis: false,
                 with_source_maps: false,
-                with_error_map: true,
-                named_addresses,
-                override_std,
-                skip_fetch_latest_git_deps,
-                bytecode_version,
-                compiler_version,
-                language_version,
-                skip_attribute_checks,
-                check_test_code,
-                known_attributes: extended_checks::get_all_attribute_names().clone(),
-                ..BuildOptions::default()
+                ..base_options
             },
             All => BuildOptions {
-                dev,
                 with_srcs: true,
                 with_abis: true,
                 with_source_maps: true,
-                with_error_map: true,
-                named_addresses,
-                override_std,
-                skip_fetch_latest_git_deps,
-                bytecode_version,
-                compiler_version,
-                language_version,
-                skip_attribute_checks,
-                check_test_code,
-                known_attributes: extended_checks::get_all_attribute_names().clone(),
-                ..BuildOptions::default()
+                ..base_options
             },
         }
     }

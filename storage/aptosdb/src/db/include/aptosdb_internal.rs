@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_metrics_core::IntGaugeHelper;
 use aptos_storage_interface::block_info::BlockInfo;
+use crate::metrics::CONCURRENCY_GAUGE;
 
 impl AptosDB {
     fn new_with_dbs(
@@ -351,6 +353,8 @@ where
     if nested {
         api_impl()
     } else {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&[api_name]);
+
         let timer = Instant::now();
 
         let res = api_impl();

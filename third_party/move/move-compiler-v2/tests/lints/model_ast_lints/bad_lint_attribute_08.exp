@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/lints/model_ast_lints/bad_lint_attribute_08.move:3:7
+  │
+2 │     #[lint::skip(while_true)]
+  │       ---------- Attribute previously given here
+3 │     #[lint::skip(blocks_in_conditions)]
+  │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Duplicate attribute 'lint::skip' attached to the same item

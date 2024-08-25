@@ -25,3 +25,12 @@ module 0xc0ffee::m {
         }
     }
 }
+
+module 0xc0ffee::no_warn {
+    #[lint::skip(while_true)]
+    public fun test_warn_1(x: u64) {
+        while (true) {
+            if (x > 10) { break; } else { test_warn_1(x + 1); }
+        }
+    }
+}

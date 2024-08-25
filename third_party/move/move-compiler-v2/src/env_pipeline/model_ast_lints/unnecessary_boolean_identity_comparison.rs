@@ -9,7 +9,7 @@
 //!   `x == true` ==> `x`
 //!   `false != foo(x)` ==> `!foo(x)`
 
-use crate::env_pipeline::model_ast_lints::ExpressionLinter;
+use crate::{env_pipeline::model_ast_lints::ExpressionLinter, lint_common::LintChecker};
 use move_model::{
     ast::{ExpData, Operation, Value},
     model::GlobalEnv,
@@ -19,8 +19,8 @@ use move_model::{
 pub struct UnnecessaryBooleanIdentityComparison;
 
 impl ExpressionLinter for UnnecessaryBooleanIdentityComparison {
-    fn get_name(&self) -> &'static str {
-        "unnecessary_boolean_identity_comparison"
+    fn get_lint_checker(&self) -> LintChecker {
+        LintChecker::UnnecessaryBooleanIdentityComparison
     }
 
     fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
@@ -45,7 +45,7 @@ impl ExpressionLinter for UnnecessaryBooleanIdentityComparison {
                         },
                         if *b { "true" } else { "false" }
                     );
-                    env.lint_diag(&env.get_node_loc(e.node_id()), self.get_name(), &msg);
+                    self.warning(env, &env.get_node_loc(e.node_id()), &msg);
                 },
                 _ => {},
             }

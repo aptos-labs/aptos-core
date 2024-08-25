@@ -520,7 +520,9 @@ pub async fn simulate_multistep_proposal(
             path,
             &framework_package_args,
             PromptOptions::yes(),
-            None,
+            None, // bytecode_version
+            None, // language_version
+            None, // compiler_version
         )
         .with_context(|| format!("failed to compile script {}", path.display()))?;
 
