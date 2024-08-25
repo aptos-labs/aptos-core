@@ -1644,7 +1644,8 @@ impl AptosVM {
                 let check_friend_linking = !self
                     .features()
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
-                let compat = Compatibility::new(check_struct_layout, check_friend_linking);
+                let compatability_checks =
+                    Compatibility::new(check_struct_layout, check_friend_linking);
 
                 if self.features().is_loader_v2_enabled() {
                     // Create a temporary storage. If this fails, it means publishing
@@ -1658,7 +1659,7 @@ impl AptosVM {
                         // TODO(loader_v2): Make sure to `validate_publish_request` passes to environment
                         //                  verifier extension.
                         tmp_vm.runtime_environment(),
-                        compat,
+                        compatability_checks,
                         module_storage,
                         bundle.into_bytes(),
                     )?;
@@ -1673,9 +1674,9 @@ impl AptosVM {
                     let init_func_name = ident_str!("init_module");
                     for module in modules {
                         // Check if module existed previously.
-                        let module_exists = module_storage
-                            .check_module_exists(module.self_addr(), module.self_name())?;
-                        if module_exists {
+                        if module_storage
+                            .check_module_exists(module.self_addr(), module.self_name())?
+                        {
                             continue;
                         }
 
@@ -1746,7 +1747,7 @@ impl AptosVM {
                         bundle.into_inner(),
                         destination,
                         gas_meter,
-                        compat,
+                        compatability_checks,
                     )?;
 
                     self.execute_module_initialization(
@@ -1761,13 +1762,11 @@ impl AptosVM {
                     Ok(None)
                 }
             } else {
-                Ok::<_, VMError>(
-                    if self.features().is_loader_v2_enabled() {
-                        Some((ModuleWriteSet::empty(), VMChangeSet::empty()))
-                    } else {
-                        None
-                    },
-                )
+                let maybe_changes = self
+                    .features()
+                    .is_loader_v2_enabled()
+                    .then(|| (ModuleWriteSet::empty(), VMChangeSet::empty()));
+                Ok::<_, VMError>(maybe_changes)
             }
         })?;
         session.finish(
