@@ -61,7 +61,7 @@ pub(crate) fn setup(
     _setup(executor_mode, aggregator_execution_mode, txns, false)
 }
 
-fn setup_allow_fallback(
+pub(crate) fn setup_allow_fallback(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
