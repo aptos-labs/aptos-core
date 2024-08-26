@@ -9,6 +9,7 @@ module 0x42::test {
         }
     }
     struct S1 {
+        dummy_field: bool,
     }
     struct S2 {
         0: u8,

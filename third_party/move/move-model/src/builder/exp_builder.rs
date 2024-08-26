@@ -2551,7 +2551,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         // Process argument list
         let mut args = BTreeMap::new();
-        let (field_decls, is_positional) =
+        let (field_decls, _is_positional) =
             self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
         let field_decls = field_decls.clone();
 
@@ -2603,7 +2603,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             }
         } else {
-            let expected_args = if variant.is_some() || is_positional {
+            let expected_args = if variant.is_some() {
                 field_decls.len()
             } else {
                 // For structs need to account for the dummy field added by v1 compiler
@@ -2625,7 +2625,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .sorted_by_key(|(i, _)| *i)
             .map(|(_, value)| value)
             .collect_vec();
-        if variant.is_none() && args.is_empty() && !is_positional {
+        if variant.is_none() && args.is_empty() {
             // The v1 move compiler inserts a dummy field with the value of false
             // for structs with no fields. We simulate this here for now.
             let id = self.new_node_id_with_type_loc(&Type::new_prim(PrimitiveType::Bool), loc);
@@ -4630,7 +4630,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             }
         } else {
-            let expected_args = if variant.is_some() || is_positional_constructor {
+            let expected_args = if variant.is_some() {
                 field_decls.len()
             } else {
                 // For structs need to account for the dummy field added by v1 compiler
@@ -4660,7 +4660,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let struct_ty = struct_inst_id.to_type();
         let struct_ty = self.check_type(loc, &struct_ty, &expected_type, context);
         let mut field_args = args.into_iter().map(|e| e.into_exp()).collect_vec();
-        if variant.is_none() && field_args.is_empty() && !is_positional_constructor {
+        if variant.is_none() && field_args.is_empty() {
             // The move compiler inserts a dummy field with the value of false
             // for structs with no fields. This is also what we find in the
             // Model metadata (i.e. a field `dummy_field`). We simulate this here

@@ -6,4 +6,10 @@ module 0x42::m {
         // dropping paramter, constructing new value
         S
     }
+
+    fun d() {
+        let S = S;
+        let S{} = S;
+        let S() = S;
+    }
 }

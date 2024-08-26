@@ -9,6 +9,7 @@ module 0x42::test {
         }
     }
     struct S0 {
+        dummy_field: bool,
     }
     struct S1 {
         0: u8,
@@ -29,7 +30,7 @@ module 0x42::test {
         y: u8,
     }
     private fun S0_inhabited(): test::S0 {
-        pack test::S0()
+        pack test::S0(false)
     }
     private fun S1_inhabited(): test::S1 {
         pack test::S1(0)
@@ -44,7 +45,7 @@ module 0x42::test {
         pack test::S3<test::S4>(pack test::S4(false), 0)
     }
     private fun nested_1(): test::S5<test::S0> {
-        pack test::S5<test::S0>(pack test::S0(), 0)
+        pack test::S5<test::S0>(pack test::S0(false), 0)
     }
     private fun test_variant() {
         pack test::E1::V1();

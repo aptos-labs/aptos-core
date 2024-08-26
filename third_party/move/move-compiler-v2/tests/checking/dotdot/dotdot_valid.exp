@@ -14,6 +14,7 @@ module 0x42::test {
         }
     }
     struct S0 {
+        dummy_field: bool,
     }
     struct S1 {
         0: u8,
@@ -46,7 +47,7 @@ module 0x42::test {
     }
     private inline fun lambda_param(f: |test::S2|bool): bool {
         {
-          let x: test::S2 = pack test::S2(true, pack test::S0());
+          let x: test::S2 = pack test::S2(true, pack test::S0(false));
           (f)(x)
         }
     }
@@ -136,13 +137,13 @@ module 0x42::test {
     }
     private fun simple_0(x: test::S0) {
         {
-          let test::S0{  } = x;
+          let test::S0{ dummy_field: _ } = x;
           Tuple()
         }
     }
     private fun simple_0_ref(x: &test::S0) {
         {
-          let test::S0{  } = x;
+          let test::S0{ dummy_field: _ } = x;
           Tuple()
         }
     }
@@ -290,7 +291,7 @@ module 0x42::test {
     }
     private fun test_lambda_param(): bool {
         {
-          let x: test::S2 = pack test::S2(true, pack test::S0());
+          let x: test::S2 = pack test::S2(true, pack test::S0(false));
           {
             let (test::S2{ 0: x, 1: _ }): (test::S2) = Tuple(x);
             x
