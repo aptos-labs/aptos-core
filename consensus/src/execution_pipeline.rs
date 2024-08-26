@@ -128,6 +128,7 @@ impl ExecutionPipeline {
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
+            let sig_verification_start = Instant::now();
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
                 SIG_VERIFY_POOL.install(|| {
                     let num_txns = txns_to_execute.len();
@@ -137,6 +138,8 @@ impl ExecutionPipeline {
                         .map(|t| t.into())
                         .collect::<Vec<_>>()
                 });
+            counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
+                .observe_duration(sig_verification_start.elapsed());
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
