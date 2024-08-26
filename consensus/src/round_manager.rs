@@ -997,7 +997,7 @@ impl RoundManager {
             vote.vote_data_hash()
         };
 
-        if self.randomness_config.skip_non_rand_blocks() {
+        // if self.randomness_config.skip_non_rand_blocks() {
             if !require_randomness {
                 self.block_store
                     .execution_client()
@@ -1006,7 +1006,7 @@ impl RoundManager {
             }
 
             self.broadcast_precommit_vote(vote.ledger_info().commit_info().clone(), consensus_data_hash).await;
-        }
+        // }
 
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);

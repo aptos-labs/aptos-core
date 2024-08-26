@@ -652,7 +652,6 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
-                info!("[PreExecution] receive commit vote for block of epoch {} round {} id {}", commit_info.epoch(), commit_info.round(), commit_info.id());
                 info!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
