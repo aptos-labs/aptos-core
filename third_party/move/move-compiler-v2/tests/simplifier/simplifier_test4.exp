@@ -42,32 +42,23 @@ module 0x8675309::M {
 
 
 Diagnostics:
-error: cannot immutably borrow since mutable references exist
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/simplifier/simplifier_test4.move:11:17
    │
  8 │         let f = { x = x + 1; &mut ({x = x + 1; z; s}).f };
-   │                              -------------------------- previous mutable field borrow
+   │                              -------------------------- field `f` previously mutably borrowed here
    ·
 11 │             foo(freeze(s), { *({x = x + 1; f}) = 0; 1 })
-   │                 ^^^^^^^^^                  - requirement enforced here
-   │                 │
-   │                 immutable borrow attempted here
-
-error: cannot immutably borrow since mutable references exist
-   ┌─ tests/simplifier/simplifier_test4.move:11:17
-   │
- 8 │         let f = { x = x + 1; &mut ({x = x + 1; z; s}).f };
-   │                              -------------------------- previous mutable field borrow
-   ·
-11 │             foo(freeze(s), { *({x = x + 1; f}) = 0; 1 })
-   │                 ^^^^^^^^^    --------------------- requirement enforced here
-   │                 │
-   │                 immutable borrow attempted here
-
-error: cannot freeze local `s` since other mutable usages for this reference exist
-   ┌─ tests/simplifier/simplifier_test4.move:11:17
-   │
-11 │             foo(freeze(s), { *({x = x + 1; f}) = 0; 1 })
-   │                 ^^^^^^^^^                  - used here
+   │                 ^^^^^^^^^                  - conflicting reference `f` used here
    │                 │
    │                 frozen here
+
+error: cannot write value since it is borrowed
+   ┌─ tests/simplifier/simplifier_test4.move:20:25
+   │
+20 │         bar(&mut s.f, { s.f = 0; 1 })
+   │         ----------------^^^^^^^------
+   │         │   │           │
+   │         │   │           write attempted here
+   │         │   previously mutably borrowed here
+   │         conflicting reference used here

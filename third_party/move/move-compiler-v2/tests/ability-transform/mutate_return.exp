@@ -78,33 +78,27 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t2: vector<#0>
      var $t3: &mut vector<#0>
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t2 := vector($t0)
      # live vars: $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t3 := borrow_local($t2)
      # live vars: $t2, $t3
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[]}
-     # locals: {$t2=@100,$t3=@101}
-     # globals: {}
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => (mut) #3 via [local `v`] at line 6
      #
   2: m::g<#0>($t3)
      # live vars: $t2
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   3: $t1 := infer($t2)
      # live vars: $t1
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   4: return $t1
 }
@@ -113,9 +107,11 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
 [variant baseline]
 fun m::g<#0>($t0: &mut vector<#0>) {
      # live vars: $t0
-     # graph: {@1000000=external[borrow_mut -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   0: return ()
 }
@@ -129,37 +125,31 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t3: &mut vector<#0>
      # abort state: {returns,aborts}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t2 := vector($t0)
      # abort state: {returns,aborts}
      # live vars: $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t3 := borrow_local($t2)
      # abort state: {returns,aborts}
      # live vars: $t2, $t3
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[]}
-     # locals: {$t2=@100,$t3=@101}
-     # globals: {}
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   => (mut) #3 via [local `v`] at line 6
      #
   2: m::g<#0>($t3)
      # abort state: {returns}
      # live vars: $t2
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   3: $t1 := infer($t2)
      # abort state: {returns}
      # live vars: $t1
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   4: return $t1
 }
@@ -169,9 +159,11 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
 fun m::g<#0>($t0: &mut vector<#0>) {
      # abort state: {returns}
      # live vars: $t0
-     # graph: {@1000000=external[borrow_mut -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   0: return ()
 }

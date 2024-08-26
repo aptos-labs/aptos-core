@@ -67,33 +67,33 @@ B0:
 	1: Ret
 }
 test_fold() /* def_idx: 2 */ {
-L0:	loc0: vector<u64>
-L1:	loc1: u64
+L0:	loc0: u64
+L1:	loc1: vector<u64>
 L2:	loc2: u64
 B0:
 	0: LdU64(0)
-	1: LdConst[1](Vector(U64): [1, 1, 0, 0, 0, 0, 0, 0, 0])
-	2: StLoc[0](loc0: vector<u64>)
-	3: MutBorrowLoc[0](loc0: vector<u64>)
-	4: Call 1vector::reverse<u64>(&mut vector<u64>)
-	5: StLoc[1](loc1: u64)
+	1: StLoc[0](loc0: u64)
+	2: LdConst[1](Vector(U64): [1, 1, 0, 0, 0, 0, 0, 0, 0])
+	3: StLoc[1](loc1: vector<u64>)
+	4: MutBorrowLoc[1](loc1: vector<u64>)
+	5: Call 1vector::reverse<u64>(&mut vector<u64>)
 B1:
-	6: ImmBorrowLoc[0](loc0: vector<u64>)
+	6: ImmBorrowLoc[1](loc1: vector<u64>)
 	7: Call 1vector::is_empty<u64>(&vector<u64>): bool
 	8: BrTrue(15)
 B2:
-	9: MutBorrowLoc[0](loc0: vector<u64>)
+	9: MutBorrowLoc[1](loc1: vector<u64>)
 	10: VecPopBack(5)
-	11: LdU64(0)
-	12: StLoc[1](loc1: u64)
-	13: Pop
+	11: Pop
+	12: LdU64(0)
+	13: StLoc[0](loc0: u64)
 	14: Branch(16)
 B3:
 	15: Branch(17)
 B4:
 	16: Branch(6)
 B5:
-	17: MoveLoc[1](loc1: u64)
+	17: MoveLoc[0](loc0: u64)
 	18: LdU64(0)
 	19: Eq
 	20: BrFalse(22)

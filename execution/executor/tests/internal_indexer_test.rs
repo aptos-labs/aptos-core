@@ -53,7 +53,7 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
         validators[0].data.owner_address,
-        validators[0].consensus_key.clone(),
+        Arc::new(validators[0].consensus_key.clone()),
     );
     let account1 = LocalAccount::generate(&mut rng);
     let account2 = LocalAccount::generate(&mut rng);

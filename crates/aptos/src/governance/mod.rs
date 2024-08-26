@@ -42,6 +42,7 @@ use move_core_types::{
     ident_str, language_storage::ModuleId, parser::parse_type_tag,
     transaction_argument::TransactionArgument,
 };
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -775,6 +776,8 @@ pub fn compile_in_temp_dir(
     framework_package_args: &FrameworkPackageArgs,
     prompt_options: PromptOptions,
     bytecode_version: Option<u32>,
+    language_version: Option<LanguageVersion>,
+    compiler_version: Option<CompilerVersion>,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     // Make a temporary directory for compilation
     let temp_dir = TempDir::new().map_err(|err| {
@@ -814,6 +817,8 @@ pub fn compile_in_temp_dir(
         framework_package_args.skip_fetch_latest_git_deps,
         package_dir,
         bytecode_version,
+        language_version,
+        compiler_version,
     )
 }
 
@@ -821,6 +826,8 @@ fn compile_script(
     skip_fetch_latest_git_deps: bool,
     package_dir: &Path,
     bytecode_version: Option<u32>,
+    language_version: Option<LanguageVersion>,
+    compiler_version: Option<CompilerVersion>,
 ) -> CliTypedResult<(Vec<u8>, HashValue)> {
     let build_options = BuildOptions {
         with_srcs: false,
@@ -829,6 +836,8 @@ fn compile_script(
         with_error_map: false,
         skip_fetch_latest_git_deps,
         bytecode_version,
+        language_version,
+        compiler_version,
         ..BuildOptions::default()
     };
 
@@ -885,7 +894,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
 }
 
 /// Compile a specified script.
-#[derive(Parser)]
+#[derive(Parser, Default)]
 pub struct CompileScriptFunction {
     /// Path to the Move script for the proposal
     #[clap(long, group = "script", value_parser)]
@@ -898,8 +907,20 @@ pub struct CompileScriptFunction {
     #[clap(flatten)]
     pub(crate) framework_package_args: FrameworkPackageArgs,
 
-    #[clap(long)]
+    #[clap(long, default_value_if("move_2", "true", "7"))]
     pub(crate) bytecode_version: Option<u32>,
+
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           default_value_if("move_2", "true", "2.0"))]
+    pub compiler_version: Option<CompilerVersion>,
+
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           default_value_if("move_2", "true", "2.0"))]
+    pub language_version: Option<LanguageVersion>,
+
+    /// Select bytecode, language, compiler for Move 2
+    #[clap(long)]
+    pub move_2: bool,
 }
 
 impl CompileScriptFunction {
@@ -945,6 +966,8 @@ impl CompileScriptFunction {
             &self.framework_package_args,
             prompt_options,
             self.bytecode_version,
+            self.language_version,
+            self.compiler_version,
         )
     }
 }
@@ -1062,13 +1085,11 @@ impl GenerateExecutionHash {
         };
         CompileScriptFunction {
             script_path: self.script_path.clone(),
-            compiled_script_path: None,
             framework_package_args: FrameworkPackageArgs {
-                framework_git_rev: None,
                 framework_local_dir,
-                skip_fetch_latest_git_deps: false,
+                ..FrameworkPackageArgs::default()
             },
-            bytecode_version: None,
+            ..CompileScriptFunction::default()
         }
         .compile("execution_hash", PromptOptions::yes())
     }

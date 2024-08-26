@@ -31,14 +31,17 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, Ability, AbilitySet};
 use move_compiler::{
-    expansion::ast as EA,
+    expansion::ast::{self as EA, wild_card},
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
-use move_ir_types::location::{sp, Spanned};
+use move_ir_types::{
+    location::{sp, Spanned},
+    sp,
+};
 use num::{BigInt, FromPrimitive, Zero};
 use std::{
     cell::RefCell,
@@ -2392,6 +2395,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             maccess,
                             generics,
                             None,
+                            &None,
                         ) {
                             pat
                         } else {
@@ -2400,7 +2404,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     },
                 }
             },
-            EA::LValue_::Unpack(maccess, generics, args) => {
+            EA::LValue_::Unpack(maccess, generics, args, dotdot) => {
                 if let Some(pat) = self.translate_lvalue_unpack(
                     expected_type,
                     expected_order,
@@ -2410,6 +2414,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     maccess,
                     generics,
                     Some(args),
+                    dotdot,
                 ) {
                     pat
                 } else {
@@ -2417,18 +2422,87 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             },
             EA::LValue_::PositionalUnpack(maccess, generics, args) => {
-                let fields = UniqueMap::maybe_from_iter(args.value.iter().enumerate().map(
-                    |(field_offset, arg)| {
-                        let field_name = Name::new(
-                            arg.loc,
-                            move_symbol_pool::Symbol::from(format!("{}", field_offset)),
-                        );
-                        let field_name = Field(field_name);
-                        (field_name, (field_offset, arg.clone()))
-                    },
-                ))
-                .expect("unique field names");
-                let unpack_ = EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields);
+                let Some((struct_id, variant)) = self.translate_constructor_name(
+                    expected_type,
+                    expected_order,
+                    context,
+                    loc,
+                    maccess,
+                    generics,
+                ) else {
+                    return self.new_error_pat(loc);
+                };
+                let arity = self
+                    .get_struct_arity(struct_id.to_qualified_id(), variant)
+                    .expect("arity");
+                let dotdot_loc = args
+                    .value
+                    .iter()
+                    .filter_map(|arg| {
+                        if let sp!(loc, EA::LValueOrDotDot_::DotDot) = arg {
+                            Some(*loc)
+                        } else {
+                            None
+                        }
+                    })
+                    .next();
+                if dotdot_loc.is_none() && args.value.len() != arity
+                    || dotdot_loc.is_some() && args.value.len() - 1 > arity
+                {
+                    self.error(
+                        loc,
+                        &ErrorMessageContext::PositionalUnpackArgument.arity_mismatch(
+                            false,
+                            args.value.len(),
+                            arity,
+                        ),
+                    );
+                    return self.new_error_pat(loc);
+                }
+                let mut fields = UniqueMap::new();
+                // the index of the field to be processed as in the user provided arguments
+                let mut arg_idx = 0;
+                // the offset of the field to be processed
+                let mut field_offset = 0;
+                let mut remaining = arity;
+                while remaining > 0 {
+                    let sp!(arg_loc, arg) = args.value.get(arg_idx).expect("invalid index");
+                    match arg {
+                        EA::LValueOrDotDot_::LValue(lval) => {
+                            let field_name = Name::new(
+                                *arg_loc,
+                                move_symbol_pool::Symbol::from(format!("{}", field_offset)),
+                            );
+                            let field_name = Field(field_name);
+                            fields
+                                .add(field_name, (field_offset, lval.clone()))
+                                .expect("duplicate keys");
+                            remaining -= 1;
+                            field_offset += 1;
+                        },
+                        EA::LValueOrDotDot_::DotDot => {
+                            let fields_to_expand = if let Some(_dotdot_loc) = dotdot_loc {
+                                arity + 1 - args.value.len()
+                            } else {
+                                0
+                            };
+                            for _ in 0..fields_to_expand {
+                                let field_name = Name::new(
+                                    *arg_loc,
+                                    move_symbol_pool::Symbol::from(format!("{}", field_offset)),
+                                );
+                                let field_name = Field(field_name);
+                                fields
+                                    .add(field_name, (field_offset, wild_card(*arg_loc)))
+                                    .expect("duplicate keys");
+                                remaining -= 1;
+                                field_offset += 1;
+                            }
+                        },
+                    }
+                    arg_idx += 1;
+                }
+                let unpack_ = EA::LValue_::Unpack(maccess.clone(), generics.clone(), fields, None);
                 let unpack = Spanned::new(lv.loc, unpack_);
                 self.translate_lvalue(
                     &unpack,
@@ -2451,6 +2525,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         maccess: &EA::ModuleAccess,
         generics: &Option<Vec<EA::Type>>,
         fields: Option<&EA::Fields<EA::LValue>>,
+        dotdot: &Option<EA::DotDot>,
     ) -> Option<Pattern> {
         // Translate constructor name
         let expected_type = self.subs.specialize(expected_type);
@@ -2486,14 +2561,34 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let (field_decls, _is_positional) =
             self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
         let field_decls = field_decls.clone();
+
         if let Some(fields) = fields {
             // Check whether all fields are covered.
-            self.check_missing_or_undeclared_fields(
-                loc,
-                struct_name.clone(),
-                &field_decls,
-                fields,
-            )?;
+            let missing_fields =
+                self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
+            if let Some(dotdot) = dotdot {
+                for uncovered_field in missing_fields {
+                    if let Some(field_data) = field_decls.get(&uncovered_field) {
+                        let field_ty = field_data.ty.instantiate(&inst);
+                        let expected_field_ty = if let Some(kind) = ref_expected {
+                            Type::Reference(kind, Box::new(field_ty.clone()))
+                        } else {
+                            field_ty.clone()
+                        };
+                        let lvalue = wild_card(dotdot.loc);
+                        let translated = self.translate_lvalue(
+                            &lvalue,
+                            &expected_field_ty,
+                            expected_order,
+                            match_locals,
+                            context,
+                        );
+                        args.insert(field_data.offset, translated);
+                    }
+                }
+            } else {
+                self.report_missing_fields(&missing_fields, loc)
+            }
             // Translate fields
             for (_, name, (_, value)) in fields.iter() {
                 let field_name = self.symbol_pool().make(name);
@@ -4488,7 +4583,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             return None;
         }
         if let Some(fields) = fields {
-            self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
+            let missing_fields =
+                self.check_missing_or_undeclared_fields(struct_name, &field_decls, fields)?;
+            self.report_missing_fields(&missing_fields, loc);
             let in_order_fields = self.in_order_fields(&field_decls, fields);
             for (_, name, (exp_idx, field_exp)) in fields.iter() {
                 let (def_idx, field_name, translated_field_exp) =
@@ -4648,13 +4745,35 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    fn get_struct_arity(
+        &self,
+        struct_id: QualifiedId<StructId>,
+        variant: Option<Symbol>,
+    ) -> Option<usize> {
+        let struct_entry = self.parent.parent.lookup_struct_entry(struct_id);
+        match (&struct_entry.layout, variant) {
+            (StructLayout::Singleton(fields, _), None) => Some(
+                if struct_entry.is_empty_struct {
+                    0
+                } else {
+                    fields.len()
+                },
+            ),
+            (StructLayout::Variants(variants), Some(name)) => variants
+                .iter()
+                .find(|v| v.name == name)
+                .map(|v| v.fields.len()),
+            _ => None,
+        }
+    }
+
+    /// Checks for undeclared fields and return the set of missing fields
     fn check_missing_or_undeclared_fields<T>(
         &mut self,
-        loc: &Loc,
         struct_name: QualifiedSymbol,
         field_decls: &BTreeMap<Symbol, FieldData>,
         fields: &EA::Fields<T>,
-    ) -> Option<()> {
+    ) -> Option<BTreeSet<Symbol>> {
         let mut succeed = true;
         let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
         // Exclude from the covered fields the dummy_field added by legacy compiler
@@ -4681,6 +4800,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 succeed = false;
             }
         }
+        if succeed {
+            Some(fields_not_covered)
+        } else {
+            None
+        }
+    }
+
+    fn report_missing_fields(&mut self, fields_not_covered: &BTreeSet<Symbol>, loc: &Loc) {
         if !fields_not_covered.is_empty() {
             self.error(
                 loc,
@@ -4697,12 +4824,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         .join(", ")
                 ),
             );
-            succeed = false;
-        }
-        if succeed {
-            Some(())
-        } else {
-            None
         }
     }
 
@@ -5040,10 +5161,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.error(loc, "macro invocation cannot have type arguments");
             self.new_error_exp()
         } else if let EA::ModuleAccess_::Name(name) = &maccess.value {
-            let expansion = self
-                .parent
-                .parent
-                .expand_macro(maccess.loc, name.value.as_str(), args);
+            let expansion = self.expand_macro(maccess.loc, name.value.as_str(), args);
             self.translate_exp(&expansion, expected_type)
         } else {
             let qsym = self.parent.module_access_to_qualified(maccess);

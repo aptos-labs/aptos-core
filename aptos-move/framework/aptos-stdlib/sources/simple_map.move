@@ -23,8 +23,8 @@ module aptos_std::simple_map {
         value: Value,
     }
 
-    public fun length<Key: store, Value: store>(map: &SimpleMap<Key, Value>): u64 {
-        vector::length(&map.data)
+    public fun length<Key: store, Value: store>(self: &SimpleMap<Key, Value>): u64 {
+        vector::length(&self.data)
     }
 
     /// Create an empty SimpleMap.
@@ -52,68 +52,68 @@ module aptos_std::simple_map {
     }
 
     public fun borrow<Key: store, Value: store>(
-        map: &SimpleMap<Key, Value>,
+        self: &SimpleMap<Key, Value>,
         key: &Key,
     ): &Value {
-        let maybe_idx = find(map, key);
+        let maybe_idx = find(self, key);
         assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
         let idx = option::extract(&mut maybe_idx);
-        &vector::borrow(&map.data, idx).value
+        &vector::borrow(&self.data, idx).value
     }
 
     public fun borrow_mut<Key: store, Value: store>(
-        map: &mut SimpleMap<Key, Value>,
+        self: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): &mut Value {
-        let maybe_idx = find(map, key);
+        let maybe_idx = find(self, key);
         assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
         let idx = option::extract(&mut maybe_idx);
-        &mut vector::borrow_mut(&mut map.data, idx).value
+        &mut vector::borrow_mut(&mut self.data, idx).value
     }
 
     public fun contains_key<Key: store, Value: store>(
-        map: &SimpleMap<Key, Value>,
+        self: &SimpleMap<Key, Value>,
         key: &Key,
     ): bool {
-        let maybe_idx = find(map, key);
+        let maybe_idx = find(self, key);
         option::is_some(&maybe_idx)
     }
 
-    public fun destroy_empty<Key: store, Value: store>(map: SimpleMap<Key, Value>) {
-        let SimpleMap { data } = map;
+    public fun destroy_empty<Key: store, Value: store>(self: SimpleMap<Key, Value>) {
+        let SimpleMap { data } = self;
         vector::destroy_empty(data);
     }
 
     /// Add a key/value pair to the map. The key must not already exist.
     public fun add<Key: store, Value: store>(
-        map: &mut SimpleMap<Key, Value>,
+        self: &mut SimpleMap<Key, Value>,
         key: Key,
         value: Value,
     ) {
-        let maybe_idx = find(map, &key);
+        let maybe_idx = find(self, &key);
         assert!(option::is_none(&maybe_idx), error::invalid_argument(EKEY_ALREADY_EXISTS));
 
-        vector::push_back(&mut map.data, Element { key, value });
+        vector::push_back(&mut self.data, Element { key, value });
     }
 
     /// Add multiple key/value pairs to the map. The keys must not already exist.
     public fun add_all<Key: store, Value: store>(
-        map: &mut SimpleMap<Key, Value>,
+        self: &mut SimpleMap<Key, Value>,
         keys: vector<Key>,
         values: vector<Value>,
     ) {
         vector::zip(keys, values, |key, value| {
-            add(map, key, value);
+            add(self, key, value);
         });
     }
 
     /// Insert key/value pair or update an existing key to a new value
     public fun upsert<Key: store, Value: store>(
-        map: &mut SimpleMap<Key, Value>,
+        self: &mut SimpleMap<Key, Value>,
         key: Key,
         value: Value
     ): (std::option::Option<Key>, std::option::Option<Value>) {
-        let data = &mut map.data;
+        let data = &mut self.data;
         let len = vector::length(data);
         let i = 0;
         while (i < len) {
@@ -126,21 +126,21 @@ module aptos_std::simple_map {
             };
             i = i + 1;
         };
-        vector::push_back(&mut map.data, Element { key, value });
+        vector::push_back(&mut self.data, Element { key, value });
         (std::option::none(), std::option::none())
     }
 
     /// Return all keys in the map. This requires keys to be copyable.
-    public fun keys<Key: copy, Value>(map: &SimpleMap<Key, Value>): vector<Key> {
-        vector::map_ref(&map.data, |e| {
+    public fun keys<Key: copy, Value>(self: &SimpleMap<Key, Value>): vector<Key> {
+        vector::map_ref(&self.data, |e| {
             let e: &Element<Key, Value> = e;
             e.key
         })
     }
 
     /// Return all values in the map. This requires values to be copyable.
-    public fun values<Key, Value: copy>(map: &SimpleMap<Key, Value>): vector<Value> {
-        vector::map_ref(&map.data, |e| {
+    public fun values<Key, Value: copy>(self: &SimpleMap<Key, Value>): vector<Value> {
+        vector::map_ref(&self.data, |e| {
             let e: &Element<Key, Value> = e;
             e.value
         })
@@ -149,10 +149,10 @@ module aptos_std::simple_map {
     /// Transform the map into two vectors with the keys and values respectively
     /// Primarily used to destroy a map
     public fun to_vec_pair<Key: store, Value: store>(
-        map: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
+        self: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
         let keys: vector<Key> = vector::empty();
         let values: vector<Value> = vector::empty();
-        let SimpleMap { data } = map;
+        let SimpleMap { data } = self;
         vector::for_each(data, |e| {
             let Element { key, value } = e;
             vector::push_back(&mut keys, key);
@@ -164,35 +164,35 @@ module aptos_std::simple_map {
     /// For maps that cannot be dropped this is a utility to destroy them
     /// using lambdas to destroy the individual keys and values.
     public inline fun destroy<Key: store, Value: store>(
-        map: SimpleMap<Key, Value>,
+        self: SimpleMap<Key, Value>,
         dk: |Key|,
         dv: |Value|
     ) {
-        let (keys, values) = to_vec_pair(map);
+        let (keys, values) = to_vec_pair(self);
         vector::destroy(keys, |_k| dk(_k));
         vector::destroy(values, |_v| dv(_v));
     }
 
     /// Remove a key/value pair from the map. The key must exist.
     public fun remove<Key: store, Value: store>(
-        map: &mut SimpleMap<Key, Value>,
+        self: &mut SimpleMap<Key, Value>,
         key: &Key,
     ): (Key, Value) {
-        let maybe_idx = find(map, key);
+        let maybe_idx = find(self, key);
         assert!(option::is_some(&maybe_idx), error::invalid_argument(EKEY_NOT_FOUND));
         let placement = option::extract(&mut maybe_idx);
-        let Element { key, value } = vector::swap_remove(&mut map.data, placement);
+        let Element { key, value } = vector::swap_remove(&mut self.data, placement);
         (key, value)
     }
 
     fun find<Key: store, Value: store>(
-        map: &SimpleMap<Key, Value>,
+        self: &SimpleMap<Key, Value>,
         key: &Key,
     ): option::Option<u64> {
-        let leng = vector::length(&map.data);
+        let leng = vector::length(&self.data);
         let i = 0;
         while (i < leng) {
-            let element = vector::borrow(&map.data, i);
+            let element = vector::borrow(&self.data, i);
             if (&element.key == key) {
                 return option::some(i)
             };

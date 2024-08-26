@@ -2,8 +2,8 @@ Move prover returns: exiting with verification errors
 error: data invariant does not hold
    ┌─ tests/sources/functional/invariants.move:15:9
    │
-15 │         invariant greater_one(x);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+15 │         invariant greater_one(self.x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/invariants.move:42: invalid_R_pack
    =     at tests/sources/functional/invariants.move:15
@@ -11,8 +11,8 @@ error: data invariant does not hold
 error: data invariant does not hold
    ┌─ tests/sources/functional/invariants.move:15:9
    │
-15 │         invariant greater_one(x);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+15 │         invariant greater_one(self.x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/invariants.move:113: lifetime_invalid_R
    =     at tests/sources/functional/invariants.move:15
@@ -53,3 +53,21 @@ error: data invariant does not hold
     =     at tests/sources/functional/invariants.move:160: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:163: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:150
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/invariants.move:174:9
+    │
+174 │         invariant self.self > 10;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/invariants.move:178: pack_struct_self
+    =     at tests/sources/functional/invariants.move:174
+
+error: data invariant does not hold
+    ┌─ tests/sources/functional/invariants.move:186:9
+    │
+186 │         invariant self.x > 10;
+    │         ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/invariants.move:190: pack_struct_RR
+    =     at tests/sources/functional/invariants.move:186

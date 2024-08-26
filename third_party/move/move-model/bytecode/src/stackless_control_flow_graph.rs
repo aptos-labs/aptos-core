@@ -234,6 +234,13 @@ impl StacklessControlFlowGraph {
         }
     }
 
+    pub fn instr_offset_bounds(&self, block_id: BlockId) -> Option<(CodeOffset, CodeOffset)> {
+        match self.blocks[&block_id].content {
+            BlockContent::Basic { lower, upper } => Some((lower, upper)),
+            BlockContent::Dummy => None,
+        }
+    }
+
     pub fn num_blocks(&self) -> u16 {
         self.blocks.len() as u16
     }

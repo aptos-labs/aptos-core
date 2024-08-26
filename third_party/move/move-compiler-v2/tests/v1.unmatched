@@ -1,12 +1,6 @@
 move-compiler/tests/move_check/borrow_tests/{
   borrow_global_acquires_duplicate_annotation.move,
-  eq_bad.move,
-  eq_ok.move,
-  factor_valid_2.move,
   imm_borrow_global_lossy_acquire_invalid.move,
-  imm_borrow_loc_valid.move,
-  mutable_borrow_local_twice_invalid.move,
-  writeref_borrow_invalid.move,
 }
 move-compiler/tests/move_check/commands/{
   abort_negative_stack_size.move,
@@ -52,6 +46,7 @@ move-compiler/tests/move_check/liveness/{
   trailing_semi_loops.move,
 }
 move-compiler/tests/move_check/locals/{
+  dont_warn_unused_self.move,
   use_after_move_if.move,
   use_after_move_if_else.move,
   use_after_move_loop.move,
@@ -61,13 +56,13 @@ move-compiler/tests/move_check/locals/{
 move-compiler/tests/move_check/parser/{
   ability_constraint_trailing_plus.move,
   ability_modifier_trailing_comma.move,
-  acquires_list_generic.move,
   address_misspelled.move,
   address_not_hex.move,
   address_too_long.move,
   address_too_long_decimal.move,
   address_too_long_decimal_exp.move,
   address_too_long_exp.move,
+  anonymous_field_fail.move,
   break_with_value.move,
   byte_string_invalid_escaped_sequence.move,
   byte_string_invalid_hex.move,
@@ -92,6 +87,7 @@ move-compiler/tests/move_check/parser/{
   control_exp_associativity_unreachable_code.move,
   decimal_address.move,
   doc_comments_placement.move,
+  dotdot_not_supported.move,
   duplicate_entry_modifier.move,
   empty_file.move,
   entry_const.move,
@@ -187,6 +183,7 @@ move-compiler/tests/move_check/parser/{
   phantom_param_invalid_keyword.move,
   phantom_param_missing_type_var.move,
   preserve_address_syntax.move,
+  public_packge_visibility.move,
   return_in_binop.move,
   spec_parsing_emits_fail.move,
   spec_parsing_fun_type_fail.move,

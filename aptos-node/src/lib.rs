@@ -20,9 +20,7 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{
-    merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
-};
+use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
@@ -703,17 +701,6 @@ pub fn setup_environment_and_start_node(
             peers_and_metadata,
         );
 
-    // Ensure consensus key in secure DB.
-    if !matches!(
-        node_config
-            .consensus
-            .safety_rules
-            .initial_safety_rules_config,
-        InitialSafetyRulesConfig::None
-    ) {
-        aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
-    }
-
     // Create the DKG runtime and get the VTxn pool
     let (vtxn_pool, dkg_runtime) =
         consensus::create_dkg_runtime(&mut node_config, dkg_subscriptions, dkg_network_interfaces);
@@ -731,9 +718,16 @@ pub fn setup_environment_and_start_node(
     state_sync_runtimes.block_until_initialized();
     debug!("State sync initialization complete.");
 
-    // Create the consensus observer publisher (if enabled)
-    let (consensus_publisher_runtime, consensus_publisher) =
-        consensus::create_consensus_publisher(&node_config, &consensus_observer_network_interfaces);
+    // Create the consensus observer and publisher (if enabled)
+    let (consensus_observer_runtime, consensus_publisher_runtime, consensus_publisher) =
+        consensus::create_consensus_observer_and_publisher(
+            &node_config,
+            consensus_observer_network_interfaces,
+            consensus_notifier.clone(),
+            consensus_to_mempool_sender.clone(),
+            db_rw.clone(),
+            consensus_observer_reconfig_subscription,
+        );
 
     // Create the consensus runtime (if enabled)
     let consensus_runtime = consensus::create_consensus_runtime(
@@ -746,17 +740,6 @@ pub fn setup_environment_and_start_node(
         vtxn_pool,
         consensus_publisher.clone(),
         &mut admin_service,
-    );
-
-    // Create the consensus observer runtime (if enabled)
-    let consensus_observer_runtime = consensus::create_consensus_observer_runtime(
-        &node_config,
-        consensus_observer_network_interfaces,
-        consensus_publisher,
-        consensus_notifier,
-        consensus_to_mempool_sender,
-        db_rw,
-        consensus_observer_reconfig_subscription,
     );
 
     Ok(AptosHandle {

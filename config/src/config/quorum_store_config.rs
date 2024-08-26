@@ -96,6 +96,7 @@ pub struct QuorumStoreConfig {
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
     pub allow_batches_without_pos_in_proposal: bool,
+    pub enable_opt_quorum_store: bool,
 }
 
 impl Default for QuorumStoreConfig {
@@ -134,6 +135,7 @@ impl Default for QuorumStoreConfig {
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
             allow_batches_without_pos_in_proposal: true,
+            enable_opt_quorum_store: false,
         }
     }
 }
