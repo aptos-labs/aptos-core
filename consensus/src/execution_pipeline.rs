@@ -244,8 +244,8 @@ impl ExecutionPipeline {
                     tokio::task::spawn_blocking(move || {
                         executor.ledger_update(block_id, parent_block_id, state_checkpoint_output)
                     })
+                    .await
                 )
-                .await
                 .expect("Failed to spawn_blocking().")
                 .map(|output| (output, execution_duration))
             }
