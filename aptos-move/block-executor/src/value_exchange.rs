@@ -92,7 +92,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
             ViewState::Sync(state) => state
                 .versioned_map
                 .delayed_fields()
-                .read_latest_committed_value(
+                .read_latest_predicted_value(
                     &identifier,
                     self.txn_idx,
                     ReadPosition::AfterCurrentTxn,
