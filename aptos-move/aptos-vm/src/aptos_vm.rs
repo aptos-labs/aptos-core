@@ -90,6 +90,7 @@ use move_binary_format::{
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    file_format::CompiledScript,
     CompiledModule,
 };
 use move_core_types::{
@@ -636,6 +637,7 @@ impl AptosVM {
                 txn_data,
                 log_context,
                 traversal_context,
+                self.is_simulation,
             )
         })?;
 
@@ -681,6 +683,7 @@ impl AptosVM {
                 txn_data,
                 log_context,
                 traversal_context,
+                self.is_simulation,
             )
         })?;
         let output = epilogue_session.finish(
@@ -738,11 +741,30 @@ impl AptosVM {
 
         let func = session.load_script(script.code(), script.ty_args())?;
 
-        // TODO(Gerardo): consolidate the extended validation to verifier.
-        verifier::event_validation::verify_no_event_emission_in_script(
+        let compiled_script = match CompiledScript::deserialize_with_config(
             script.code(),
             self.deserializer_config(),
-        )?;
+        ) {
+            Ok(script) => script,
+            Err(err) => {
+                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                let partial_err = PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Script);
+                return Err(partial_err.into_vm_status());
+            },
+        };
+
+        // Check that unstable bytecode cannot be executed on mainnet
+        if self
+            .features()
+            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT)
+        {
+            self.reject_unstable_bytecode_for_script(&compiled_script)?;
+        }
+
+        // TODO(Gerardo): consolidate the extended validation to verifier.
+        verifier::event_validation::verify_no_event_emission_in_compiled_script(&compiled_script)?;
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
@@ -1213,7 +1235,13 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if self.is_simulation {
+        // Once `simulation_enhancement` is enabled, we use `execute_multisig_transaction` for simulation,
+        // deprecating `simulate_multisig_transaction`.
+        if self.is_simulation
+            && !self
+                .features()
+                .is_transaction_simulation_enhancement_enabled()
+        {
             self.simulate_multisig_transaction(
                 resolver,
                 session,
@@ -1616,6 +1644,22 @@ impl AptosVM {
                             )
                             .finish(Location::Undefined));
                     }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
+    pub fn reject_unstable_bytecode_for_script(&self, module: &CompiledScript) -> VMResult<()> {
+        if self.chain_id().is_mainnet() {
+            if let Some(metadata) =
+                aptos_framework::get_compilation_metadata_from_compiled_script(module)
+            {
+                if metadata.unstable {
+                    return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
+                        .with_message("script marked unstable cannot be run on mainnet".to_string())
+                        .finish(Location::Script));
                 }
             }
         }
@@ -2318,8 +2362,10 @@ impl AptosVM {
                 transaction_validation::run_script_prologue(
                     session,
                     txn_data,
+                    self.features(),
                     log_context,
                     traversal_context,
+                    self.is_simulation,
                 )
             },
             TransactionPayload::Multisig(multisig_payload) => {
@@ -2329,13 +2375,18 @@ impl AptosVM {
                 transaction_validation::run_script_prologue(
                     session,
                     txn_data,
+                    self.features(),
                     log_context,
                     traversal_context,
+                    self.is_simulation,
                 )?;
-                // Skip validation if this is part of tx simulation.
-                // This allows simulating multisig txs without having to first create the multisig
-                // tx.
-                if !self.is_simulation {
+                // Once "simulation_enhancement" is enabled, the simulation path also validates the
+                // multisig transaction by running the multisig prologue.
+                if !self.is_simulation
+                    || self
+                        .features()
+                        .is_transaction_simulation_enhancement_enabled()
+                {
                     transaction_validation::run_multisig_prologue(
                         session,
                         txn_data,

@@ -1,64 +1,58 @@
 
 Diagnostics:
-error: cannot return a reference derived from local `v1` since it is not a parameter
+error: cannot return a reference derived from local `v1` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
-   │            ------- previous mutable local borrow
+   │            ------- local `v1` previously mutably borrowed here
 20 │ │         &v2,
 21 │ │         id_mut(&mut v3),
 22 │ │         id(&v4),
    · │
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
-   │ ╰──────────────────^ returned here
+   │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from value since it is not a parameter
+error: cannot return a reference derived from value since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
 20 │ │         &v2,
-   │ │         --- previous local borrow
+   │ │         --- value previously borrowed here
 21 │ │         id_mut(&mut v3),
 22 │ │         id(&v4),
    · │
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
-   │ ╰──────────────────^ returned here
+   │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from local `v3` since it is not a parameter
+error: cannot return a reference derived from local `v3` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
 20 │ │         &v2,
 21 │ │         id_mut(&mut v3),
-   │ │         ---------------
-   │ │         │      │
-   │ │         │      previous mutable local borrow
-   │ │         used by mutable call result
+   │ │         --------------- local `v3` previously mutably borrowed here
 22 │ │         id(&v4),
    · │
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
-   │ ╰──────────────────^ returned here
+   │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from value since it is not a parameter
+error: cannot return a reference derived from value since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
 20 │ │         &v2,
 21 │ │         id_mut(&mut v3),
 22 │ │         id(&v4),
-   │ │         -------
-   │ │         │  │
-   │ │         │  previous local borrow
-   │ │         used by call result
+   │ │         ------- value previously borrowed here
    · │
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
-   │ ╰──────────────────^ returned here
+   │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from local `s1` since it is not a parameter
+error: cannot return a reference derived from field `f` via local `s1` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
@@ -66,16 +60,13 @@ error: cannot return a reference derived from local `s1` since it is not a param
 21 │ │         id_mut(&mut v3),
 22 │ │         id(&v4),
 23 │ │         &mut s1.f,
-   │ │         ---------
-   │ │         │    │
-   │ │         │    previous mutable local borrow
-   │ │         used by mutable field borrow
+   │ │         --------- field `f` via local `s1` previously mutably borrowed here
 24 │ │         &s2.f,
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
-   │ ╰──────────────────^ returned here
+   │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from local `s2` since it is not a parameter
+error: cannot return a reference derived from field `f` via local `s2` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
@@ -84,15 +75,12 @@ error: cannot return a reference derived from local `s2` since it is not a param
 22 │ │         id(&v4),
 23 │ │         &mut s1.f,
 24 │ │         &s2.f,
-   │ │         -----
-   │ │         ││
-   │ │         │previous local borrow
-   │ │         used by field borrow
+   │ │         ----- field `f` via local `s2` previously borrowed here
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
-   │ ╰──────────────────^ returned here
+   │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from local `s3` since it is not a parameter
+error: cannot return a reference derived from field `f` via local `s3` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
@@ -101,14 +89,11 @@ error: cannot return a reference derived from local `s3` since it is not a param
 22 │ │         id(&v4),
    · │
 25 │ │         id_mut(&mut s3.f),
-   │ │                ---------
-   │ │                │    │
-   │ │                │    previous mutable local borrow
-   │ │                used by mutable field borrow
+   │ │         ----------------- field `f` via local `s3` previously mutably borrowed here
 26 │ │         id(&s4.f))
-   │ ╰──────────────────^ returned here
+   │ ╰──────────────────^ return attempted here
 
-error: cannot return a reference derived from local `s4` since it is not a parameter
+error: cannot return a reference derived from field `f` via local `s4` since it is not based on a parameter
    ┌─ tests/reference-safety/v1-tests/return_borrowed_local_invalid.move:19:9
    │
 19 │ ╭         (&mut v1,
@@ -118,8 +103,5 @@ error: cannot return a reference derived from local `s4` since it is not a param
    · │
 25 │ │         id_mut(&mut s3.f),
 26 │ │         id(&s4.f))
-   │ │            -----
-   │ │            ││
-   │ │            │previous local borrow
-   │ │            used by field borrow
-   │ ╰──────────────────^ returned here
+   │ │         --------- field `f` via local `s4` previously borrowed here
+   │ ╰──────────────────^ return attempted here

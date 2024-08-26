@@ -676,18 +676,17 @@ pub trait ParsePrivateKey {
 
 #[derive(Debug, Default, Parser)]
 pub struct HardwareWalletOptions {
-    /// Derivation Path of your account in hardware wallet
+    /// BIP44 derivation path of hardware wallet account, e.g. `m/44'/637'/0'/0'/0'`
     ///
-    /// e.g format - m/44\'/637\'/0\'/0\'/0\'
-    /// Make sure your wallet is unlocked and have Aptos opened
-    #[clap(long)]
+    /// Note you may need to escape single quotes in your shell, for example
+    /// `m/44'/637'/0'/0'/0'` would be `m/44\'/637\'/0\'/0\'/0\'`
+    #[clap(long, conflicts_with = "derivation_index")]
     pub derivation_path: Option<String>,
 
-    /// Index of your account in hardware wallet
+    /// BIP44 account index of hardware wallet account, e.g. `0`
     ///
-    /// This is the simpler version of derivation path e.g `format - [0]`
-    /// we will translate this index into `[m/44'/637'/0'/0'/0]`
-    #[clap(long)]
+    /// Given index `n` maps to BIP44 derivation path `m/44'/637'/n'/0'/0`
+    #[clap(long, conflicts_with = "derivation_path")]
     pub derivation_index: Option<String>,
 }
 
@@ -1063,17 +1062,19 @@ pub struct MovePackageDir {
     pub(crate) skip_fetch_latest_git_deps: bool,
 
     /// Specify the version of the bytecode the compiler is going to emit.
-    #[clap(long)]
+    #[clap(long, default_value_if("move_2", "true", "7"))]
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
     /// Currently, default to `v1`
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Specify the language version to be supported.
     /// Currently, default to `v1`
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           default_value_if("move_2", "true", "2.0"))]
     pub language_version: Option<LanguageVersion>,
 
     /// Do not complain about unknown attributes in Move code.
@@ -1085,6 +1086,10 @@ pub struct MovePackageDir {
     /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
+
+    /// Select bytecode, language, compiler for Move 2
+    #[clap(long)]
+    pub move_2: bool,
 }
 
 impl MovePackageDir {
@@ -1101,6 +1106,7 @@ impl MovePackageDir {
             language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
+            move_2: false,
         }
     }
 

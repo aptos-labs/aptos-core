@@ -648,6 +648,7 @@ pub mod known_attributes {
         Verification(VerificationAttribute),
         Native(NativeAttribute),
         Deprecation(DeprecationAttribute),
+        Lint(LintAttribute),
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -677,6 +678,12 @@ pub mod known_attributes {
     pub enum DeprecationAttribute {
         // Marks deprecated functions, types, modules, constants, addresses whose use causes warnings
         Deprecated,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum LintAttribute {
+        // Allow the user to suppress a specific subset of lint warnings.
+        Allow,
     }
 
     impl fmt::Display for AttributePosition {
@@ -713,6 +720,7 @@ pub mod known_attributes {
                 DeprecationAttribute::DEPRECATED_NAME => {
                     Self::Deprecation(DeprecationAttribute::Deprecated)
                 },
+                LintAttribute::SKIP => Self::Lint(LintAttribute::Allow),
                 _ => return None,
             })
         }
@@ -733,6 +741,7 @@ pub mod known_attributes {
             VerificationAttribute::add_attribute_names(table);
             NativeAttribute::add_attribute_names(table);
             DeprecationAttribute::add_attribute_names(table);
+            LintAttribute::add_attribute_names(table);
         }
 
         fn name(&self) -> &str {
@@ -741,6 +750,7 @@ pub mod known_attributes {
                 Self::Verification(a) => a.name(),
                 Self::Native(a) => a.name(),
                 Self::Deprecation(a) => a.name(),
+                Self::Lint(a) => a.name(),
             }
         }
 
@@ -750,6 +760,7 @@ pub mod known_attributes {
                 Self::Verification(a) => a.expected_positions(),
                 Self::Native(a) => a.expected_positions(),
                 Self::Deprecation(a) => a.expected_positions(),
+                Self::Lint(a) => a.expected_positions(),
             }
         }
     }
@@ -917,6 +928,35 @@ pub mod known_attributes {
             });
             match self {
                 Self::Deprecated => &DEPRECATED_POSITIONS,
+            }
+        }
+    }
+
+    impl LintAttribute {
+        const ALL_ATTRIBUTE_NAMES: [&'static str; 1] = [Self::SKIP];
+        pub const SKIP: &'static str = "lint::skip";
+    }
+
+    impl AttributeKind for LintAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            for str in Self::ALL_ATTRIBUTE_NAMES {
+                table.insert(str.to_string());
+            }
+        }
+
+        fn name(&self) -> &str {
+            match self {
+                Self::Allow => Self::SKIP,
+            }
+        }
+
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+            static ALLOW_POSITIONS: Lazy<BTreeSet<AttributePosition>> = Lazy::new(|| {
+                IntoIterator::into_iter([AttributePosition::Module, AttributePosition::Function])
+                    .collect()
+            });
+            match self {
+                Self::Allow => &ALLOW_POSITIONS,
             }
         }
     }

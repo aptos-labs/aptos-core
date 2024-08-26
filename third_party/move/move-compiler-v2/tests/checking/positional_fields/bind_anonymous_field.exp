@@ -1,0 +1,41 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    enum E1 {
+        V1 {
+            0: test::S0,
+        }
+        V2 {
+            0: test::S1,
+        }
+    }
+    struct S0 {
+        0: u8,
+    }
+    struct S1 {
+        0: bool,
+        1: test::S0,
+    }
+    private fun match(x: test::E1) {
+        match (x) {
+          test::E1::V1{ 0: test::S0{ 0: _x } } => {
+            Tuple()
+          }
+          test::E1::V2{ 0: test::S1{ 0: _x, 1: test::S0{ 0: _y } } } => {
+            Tuple()
+          }
+        }
+
+    }
+    private fun nested(x: test::S1) {
+        {
+          let test::S1{ 0: _x, 1: test::S0{ 0: _y } } = x;
+          Tuple()
+        }
+    }
+    private fun simple(x: test::S0) {
+        {
+          let test::S0{ 0: _x } = x;
+          Tuple()
+        }
+    }
+} // end 0x42::test

@@ -239,29 +239,24 @@ main() /* def_idx: 0 */ {
 L0:	loc0: u64
 L1:	loc1: u64
 B0:
-	0: LdTrue
-	1: BrFalse(5)
+	0: LdU64(5)
+	1: StLoc[0](loc0: u64)
+	2: Branch(5)
 B1:
-	2: LdU64(5)
-	3: StLoc[0](loc0: u64)
-	4: Branch(7)
+	3: LdU64(0)
+	4: StLoc[0](loc0: u64)
 B2:
-	5: LdU64(0)
-	6: StLoc[0](loc0: u64)
+	5: MoveLoc[0](loc0: u64)
+	6: LdU64(5)
+	7: Eq
+	8: BrFalse(10)
 B3:
-	7: LdU64(5)
-	8: StLoc[1](loc1: u64)
-	9: MoveLoc[0](loc0: u64)
-	10: MoveLoc[1](loc1: u64)
-	11: Eq
-	12: BrFalse(14)
+	9: Branch(12)
 B4:
-	13: Branch(16)
+	10: LdU64(42)
+	11: Abort
 B5:
-	14: LdU64(42)
-	15: Abort
-B6:
-	16: Ret
+	12: Ret
 }
 }
 ============ bytecode verification succeeded ========

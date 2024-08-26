@@ -1,0 +1,18 @@
+
+Diagnostics:
+error: mutable reference in local `a` requires exclusive access but is borrowed
+  ┌─ tests/reference-safety/multiple_use_bug_12301.move:8:9
+  │
+8 │         *a = 0;
+  │         ^^^^^^ requirement enforced here
+9 │         *c
+  │         -- conflicting reference `c` used here
+
+error: mutable reference in local `a` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/multiple_use_bug_12301.move:17:9
+   │
+17 │         *a = 0;
+   │         ^^^^^^ requirement enforced here
+18 │         *k = 1;
+19 │         *c
+   │         -- conflicting reference `c` used here

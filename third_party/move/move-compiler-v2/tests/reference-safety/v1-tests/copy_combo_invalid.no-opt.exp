@@ -4,12 +4,9 @@ error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_combo_invalid.move:14:9
    │
 13 │         if (cond) f = &mut s.f else f = &mut other.f;
-   │                       --------
-   │                       │    │
-   │                       │    previous mutable local borrow
-   │                       used by mutable field borrow
+   │                       -------- field `f` via local `s` previously mutably borrowed here
 14 │         copy s;
-   │         ^^^^^^ copied here
+   │         ^^^^^^ copy attempted here
 15 │         *f;
    │         -- conflicting reference `f` used here
 
@@ -17,9 +14,9 @@ error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_combo_invalid.move:23:9
    │
 22 │         if (cond) f = &mut s else f = other;
-   │                       ------ previous mutable local borrow
+   │                       ------ local `s` previously mutably borrowed here
 23 │         copy s;
-   │         ^^^^^^ copied here
+   │         ^^^^^^ copy attempted here
 24 │         *f;
    │         -- conflicting reference `f` used here
 
@@ -27,12 +24,9 @@ error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_combo_invalid.move:32:9
    │
 31 │         if (cond) f = id_mut(&mut s) else f = other;
-   │                       --------------
-   │                       │      │
-   │                       │      previous mutable local borrow
-   │                       used by mutable call result
+   │                       -------------- local `s` previously mutably borrowed here
 32 │         copy s;
-   │         ^^^^^^ copied here
+   │         ^^^^^^ copy attempted here
 33 │         *f;
    │         -- conflicting reference `f` used here
 
@@ -40,11 +34,8 @@ error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_combo_invalid.move:40:21
    │
 39 │         let f = &mut s.f;
-   │                 --------
-   │                 │    │
-   │                 │    previous mutable local borrow
-   │                 used by mutable field borrow
+   │                 -------- field `f` via local `s` previously mutably borrowed here
 40 │         if (cond) { copy s; };
-   │                     ^^^^^^ copied here
+   │                     ^^^^^^ copy attempted here
 41 │         *f;
    │         -- conflicting reference `f` used here

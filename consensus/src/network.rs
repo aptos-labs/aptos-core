@@ -170,16 +170,12 @@ pub struct NetworkReceivers {
 
 #[async_trait::async_trait]
 pub trait QuorumStoreSender: Send + Clone {
-    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>);
-
     async fn request_batch(
         &self,
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
     ) -> anyhow::Result<BatchResponse>;
-
-    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
     async fn send_signed_batch_info_msg(
         &self,
@@ -474,12 +470,6 @@ impl NetworkSender {
 
 #[async_trait::async_trait]
 impl QuorumStoreSender for NetworkSender {
-    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>) {
-        fail_point!("consensus::send::batch_request", |_| ());
-        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
-        self.send(msg, recipients).await
-    }
-
     async fn request_batch(
         &self,
         request: BatchRequest,
@@ -504,12 +494,6 @@ impl QuorumStoreSender for NetworkSender {
             },
             _ => Err(anyhow!("Invalid batch response")),
         }
-    }
-
-    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
-        fail_point!("consensus::send::batch", |_| ());
-        let msg = ConsensusMsg::BatchResponse(Box::new(batch));
-        self.send(msg, recipients).await
     }
 
     async fn send_signed_batch_info_msg(

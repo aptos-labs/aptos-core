@@ -371,6 +371,13 @@ impl FunctionSignature {
             .iter()
             .any(|(parameter_name, _)| parameter_name == v)
     }
+
+    pub fn is_first_parameter(&self, v: &Var) -> bool {
+        self.parameters
+            .first()
+            .map(|(parameter_name, _)| parameter_name == v)
+            .unwrap_or(false)
+    }
 }
 
 impl Command_ {

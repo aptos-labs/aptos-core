@@ -126,6 +126,10 @@ pub enum FeatureFlag {
     UseCompatibilityCheckerV2,
     EnableEnumTypes,
     EnableResourceAccessControl,
+    RejectUnstableBytecodeForScript,
+    FederatedKeyless,
+    TransactionSimulationEnhancement,
+    CollectionOwner,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -332,6 +336,14 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableResourceAccessControl => {
                 AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL
             },
+            FeatureFlag::RejectUnstableBytecodeForScript => {
+                AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT
+            },
+            FeatureFlag::FederatedKeyless => AptosFeatureFlag::FEDERATED_KEYLESS,
+            FeatureFlag::TransactionSimulationEnhancement => {
+                AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
+            },
+            FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
         }
     }
 }
@@ -467,6 +479,14 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL => {
                 FeatureFlag::EnableResourceAccessControl
             },
+            AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT => {
+                FeatureFlag::RejectUnstableBytecodeForScript
+            },
+            AptosFeatureFlag::FEDERATED_KEYLESS => FeatureFlag::FederatedKeyless,
+            AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT => {
+                FeatureFlag::TransactionSimulationEnhancement
+            },
+            AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
         }
     }
 }

@@ -124,7 +124,7 @@ pub(crate) fn add_txns_to_mempool(
             TimelineState::NotReady,
             false,
             None,
-            BroadcastPeerPriority::Primary,
+            Some(BroadcastPeerPriority::Primary),
         );
         transactions.push(txn);
     }
@@ -154,7 +154,7 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
             TimelineState::NotReady,
             false,
             None,
-            BroadcastPeerPriority::Primary,
+            Some(BroadcastPeerPriority::Primary),
         )
         .code
     {

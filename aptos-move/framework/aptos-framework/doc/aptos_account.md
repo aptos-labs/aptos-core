@@ -585,7 +585,7 @@ TODO: once migration is complete, rename to just "transfer_only" and make it an 
 to transfer APT) - if we want to allow APT PFS without account itself
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -594,7 +594,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(
+<pre><code><b>public</b>(<b>friend</b>) entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(
     source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64
 ) {
     <b>let</b> sender_store = <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source));
@@ -1127,7 +1127,7 @@ Check if the AptosCoin under the address existed.
 ### Function `fungible_transfer_only`
 
 
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 

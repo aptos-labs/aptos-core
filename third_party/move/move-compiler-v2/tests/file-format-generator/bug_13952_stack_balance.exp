@@ -1,0 +1,38 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module cafe.Module0 {
+struct Struct0 has copy, drop {
+	x: bool
+}
+
+public function5(Arg0: bool, Arg1: bool) /* def_idx: 0 */ {
+L2:	loc0: &bool
+L3:	loc1: bool
+L4:	loc2: &bool
+B0:
+	0: ImmBorrowLoc[0](Arg0: bool)
+	1: StLoc[2](loc0: &bool)
+	2: CopyLoc[0](Arg0: bool)
+	3: BrFalse(7)
+B1:
+	4: LdTrue
+	5: StLoc[3](loc1: bool)
+	6: Branch(9)
+B2:
+	7: MoveLoc[1](Arg1: bool)
+	8: StLoc[3](loc1: bool)
+B3:
+	9: ImmBorrowLoc[3](loc1: bool)
+	10: StLoc[4](loc2: &bool)
+	11: MoveLoc[2](loc0: &bool)
+	12: MoveLoc[4](loc2: &bool)
+	13: Neq
+	14: MoveLoc[0](Arg0: bool)
+	15: Pack[0](Struct0)
+	16: Pop
+	17: Pop
+	18: Ret
+}
+}
+============ bytecode verification succeeded ========

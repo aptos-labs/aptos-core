@@ -1,10 +1,10 @@
 
 Diagnostics:
-error: cannot return a reference derived from global `A::T1`
+error: cannot return a reference derived from struct `A::T1` since it is not based on a parameter
    ┌─ tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_return_reference_invalid_1.move:10:9
    │
 10 │         borrow_global_mut<T1>(signer::address_of(account))
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │         │
-   │         returned here
-   │         previous mutable global borrow
+   │         return attempted here
+   │         struct `A::T1` previously mutably borrowed here

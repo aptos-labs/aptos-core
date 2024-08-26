@@ -735,7 +735,7 @@ mod database_mock {
                 ledger_version: Version,
             ) -> Result<TransactionAccumulatorSummary>;
 
-            fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+            fn get_state_item_count(&self, version: Version) -> Result<usize>;
 
             fn get_state_value_chunk_with_proof(
                 &self,

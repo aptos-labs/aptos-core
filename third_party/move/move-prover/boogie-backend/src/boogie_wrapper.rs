@@ -270,7 +270,8 @@ impl<'env> BoogieWrapper<'env> {
                 // Brute-force filter out "at" entries which look alike. This is cheaper than
                 // avoiding producing them, because of the step of converting locations to line
                 // numbers.
-                let display_str = format!("    {}{}", loc.display_line_only(self.env), info);
+                let display_str =
+                    format!("    {}{}", loc.display_file_name_and_line(self.env), info);
                 if (display.is_empty() || display[display.len() - 1] != display_str)
                     && !display_str.contains("<internal>")
                 {

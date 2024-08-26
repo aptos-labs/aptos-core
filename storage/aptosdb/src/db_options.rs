@@ -26,6 +26,7 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         STATE_VALUE_CF_NAME,
         TRANSACTION_CF_NAME,
         TRANSACTION_ACCUMULATOR_CF_NAME,
+        TRANSACTION_ACCUMULATOR_HASH_CF_NAME,
         TRANSACTION_AUXILIARY_DATA_CF_NAME,
         TRANSACTION_BY_ACCOUNT_CF_NAME,
         TRANSACTION_BY_HASH_CF_NAME,
@@ -52,6 +53,7 @@ pub(super) fn transaction_accumulator_db_column_families() -> Vec<ColumnFamilyNa
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         DB_METADATA_CF_NAME,
         TRANSACTION_ACCUMULATOR_CF_NAME,
+        TRANSACTION_ACCUMULATOR_HASH_CF_NAME,
     ]
 }
 

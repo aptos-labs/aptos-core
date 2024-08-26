@@ -3,7 +3,7 @@
 
 use super::{
     intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation,
-    ModuleStorageAdapter, Scope, ScriptHash, StructNameCache,
+    ModuleStorageAdapter, ScriptHash, StructNameCache,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -23,7 +23,7 @@ use std::{collections::BTreeMap, sync::Arc};
 // When code executes, indices in instructions are resolved against runtime structures
 // (rather than "compiled") to make available data needed for execution.
 #[derive(Clone, Debug)]
-pub(crate) struct Script {
+pub struct Script {
     // primitive pools
     pub(crate) script: Arc<CompiledScript>,
 
@@ -42,7 +42,6 @@ pub(crate) struct Script {
 impl Script {
     pub(crate) fn new(
         script: Arc<CompiledScript>,
-        script_hash: &ScriptHash,
         cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
     ) -> VMResult<Self> {
@@ -93,8 +92,6 @@ impl Script {
             });
         }
 
-        let scope = Scope::Script(*script_hash);
-
         let code: Vec<Bytecode> = script.code.code.clone();
         let parameters = script.signature_at(script.parameters).clone();
 
@@ -131,7 +128,6 @@ impl Script {
             is_native: def_is_native,
             is_friend_or_private: false,
             is_entry: false,
-            scope,
             name,
             // Script must not return values.
             return_tys: vec![],
@@ -194,8 +190,12 @@ impl Script {
         &self.function_refs[idx as usize]
     }
 
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &FunctionInstantiation {
-        &self.function_instantiations[idx as usize]
+    pub(crate) fn function_instantiation_handle_at(&self, idx: u16) -> &FunctionHandle {
+        &self.function_instantiations[idx as usize].handle
+    }
+
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
+        &self.function_instantiations[idx as usize].instantiation
     }
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
@@ -218,17 +218,14 @@ impl ScriptCache {
         }
     }
 
-    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<Arc<Function>> {
-        self.scripts.get(hash).map(|script| script.entry_point())
+    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<Arc<Script>> {
+        self.scripts.get(hash).cloned()
     }
 
-    pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Function> {
+    pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Script> {
         match self.get(&hash) {
             Some(cached) => cached,
-            None => {
-                let script = self.scripts.insert(hash, script);
-                script.entry_point()
-            },
+            None => self.scripts.insert(hash, script).clone(),
         }
     }
 }

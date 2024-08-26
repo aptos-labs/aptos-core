@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared_mempool::types::{MultiBatchId, QuorumStoreRequest};
+use crate::shared_mempool::types::{MempoolMessageId, QuorumStoreRequest};
 use anyhow::Error;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::Schema;
@@ -112,7 +112,7 @@ pub struct LogSchema<'a> {
     network_level: Option<usize>,
     upstream_network: Option<&'a NetworkId>,
     #[schema(debug)]
-    batch_id: Option<&'a MultiBatchId>,
+    message_id: Option<&'a MempoolMessageId>,
     backpressure: Option<bool>,
     num_txns: Option<usize>,
 }
@@ -139,7 +139,7 @@ impl<'a> LogSchema<'a> {
             state_sync_msg: None,
             network_level: None,
             upstream_network: None,
-            batch_id: None,
+            message_id: None,
             backpressure: None,
             num_txns: None,
         }

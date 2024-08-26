@@ -14,7 +14,9 @@ use crate::{
     counters::{self, BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
     network::BroadcastPeerPriority,
-    shared_mempool::types::MultiBucketTimelineIndexIds,
+    shared_mempool::types::{
+        MempoolSenderBucket, MultiBucketTimelineIndexIds, TimelineIndexIdentifier,
+    },
 };
 use aptos_config::config::MempoolConfig;
 use aptos_crypto::HashValue;
@@ -38,6 +40,13 @@ pub const TXN_INDEX_ESTIMATED_BYTES: usize = size_of::<crate::core_mempool::inde
     + (size_of::<u64>() * 3 + size_of::<AccountAddress>()) // timeline_index
     + (size_of::<HashValue>() + size_of::<u64>() + size_of::<AccountAddress>()); // hash_index
 
+pub fn sender_bucket(
+    address: &AccountAddress,
+    num_sender_buckets: MempoolSenderBucket,
+) -> MempoolSenderBucket {
+    address.as_ref()[address.as_ref().len() - 1] as MempoolSenderBucket % num_sender_buckets
+}
+
 /// TransactionStore is in-memory storage for all transactions in mempool.
 pub struct TransactionStore {
     // main DS
@@ -54,8 +63,12 @@ pub struct TransactionStore {
     // we keep it separate from `expiration_time_index` so Mempool can't be clogged
     //  by old transactions even if it hasn't received commit callbacks for a while
     system_ttl_index: TTLIndex,
-    // Broadcast-ready transactions, with a timeline per bucket.
-    timeline_index: MultiBucketTimelineIndex,
+    // Broadcast-ready transactions.
+    // For each sender bucket, we maintain a timeline per txn fee range.
+    timeline_index: HashMap<MempoolSenderBucket, MultiBucketTimelineIndex>,
+    // We divide the senders into buckets and maintain a separate set of timelines for each sender bucket.
+    // This is the number of sender buckets.
+    num_sender_buckets: MempoolSenderBucket,
     // keeps track of "non-ready" txns (transactions that can't be included in next block)
     parking_lot_index: ParkingLotIndex,
     // Index for looking up transaction by hash.
@@ -80,6 +93,13 @@ pub struct TransactionStore {
 
 impl TransactionStore {
     pub(crate) fn new(config: &MempoolConfig) -> Self {
+        let mut timeline_index = HashMap::new();
+        for sender_bucket in 0..config.num_sender_buckets {
+            timeline_index.insert(
+                sender_bucket,
+                MultiBucketTimelineIndex::new(config.broadcast_buckets.clone()).unwrap(),
+            );
+        }
         Self {
             // main DS
             transactions: HashMap::new(),
@@ -91,8 +111,8 @@ impl TransactionStore {
                 Duration::from_secs(t.txn.expiration_timestamp_secs())
             })),
             priority_index: PriorityIndex::new(),
-            timeline_index: MultiBucketTimelineIndex::new(config.broadcast_buckets.clone())
-                .unwrap(),
+            timeline_index,
+            num_sender_buckets: config.num_sender_buckets,
             parking_lot_index: ParkingLotIndex::new(),
             hash_index: HashMap::new(),
             // estimated size in bytes
@@ -156,12 +176,14 @@ impl TransactionStore {
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<(&InsertionInfo, &str, &BroadcastPeerPriority)> {
+    ) -> Option<(&InsertionInfo, String, String)> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
             return Some((
                 &txn.insertion_info,
-                self.get_bucket(txn.ranking_score),
-                &txn.priority_of_sender,
+                self.get_bucket(txn.ranking_score, address),
+                txn.priority_of_sender
+                    .clone()
+                    .map_or_else(|| "Unknown".to_string(), |priority| priority.to_string()),
             ));
         }
         None
@@ -179,12 +201,23 @@ impl TransactionStore {
     }
 
     #[inline]
-    pub(crate) fn get_bucket(&self, ranking_score: u64) -> &str {
-        self.timeline_index.get_bucket(ranking_score)
+    pub(crate) fn get_bucket(&self, ranking_score: u64, sender: &AccountAddress) -> String {
+        let sender_bucket = sender_bucket(sender, self.num_sender_buckets);
+        let bucket = self
+            .timeline_index
+            .get(&sender_bucket)
+            .unwrap()
+            .get_bucket(ranking_score)
+            .to_string();
+        format!("{}_{}", sender_bucket, bucket)
     }
 
     pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
         self.sequence_numbers.get(address)
+    }
+
+    pub(crate) fn num_sender_buckets(&self) -> MempoolSenderBucket {
+        self.num_sender_buckets
     }
 
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
@@ -292,9 +325,22 @@ impl TransactionStore {
         );
         counters::core_mempool_index_size(
             counters::TIMELINE_INDEX_LABEL,
-            self.timeline_index.size(),
+            self.timeline_index
+                .values()
+                .map(|timelines| timelines.size())
+                .sum(),
         );
-        counters::core_mempool_timeline_index_size(&self.timeline_index.get_sizes());
+
+        let mut bucket_min_size_pairs = vec![];
+        for (sender_bucket, timelines) in self.timeline_index.iter() {
+            for (timeline_index_identifier, size) in timelines.get_sizes() {
+                bucket_min_size_pairs.push((
+                    format!("{}_{}", sender_bucket, timeline_index_identifier),
+                    size,
+                ));
+            }
+        }
+        counters::core_mempool_timeline_index_size(bucket_min_size_pairs);
         counters::core_mempool_index_size(
             counters::TRANSACTION_HASH_INDEX_LABEL,
             self.hash_index.len(),
@@ -419,25 +465,41 @@ impl TransactionStore {
     ///   TimelineIndex (txns for SharedMempool).
     /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
     fn process_ready_transactions(&mut self, address: &AccountAddress, sequence_num: u64) {
+        let sender_bucket = sender_bucket(address, self.num_sender_buckets);
         if let Some(txns) = self.transactions.get_mut(address) {
             let mut min_seq = sequence_num;
 
             while let Some(txn) = txns.get_mut(&min_seq) {
                 let process_ready = !self.priority_index.contains(txn);
+
                 self.priority_index.insert(txn);
 
                 let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
                 if process_broadcast_ready {
-                    self.timeline_index.insert(txn);
+                    self.timeline_index
+                        .get_mut(&sender_bucket)
+                        .unwrap()
+                        .insert(txn);
                 }
 
                 if process_ready {
+                    let bucket = self
+                        .timeline_index
+                        .get(&sender_bucket)
+                        .unwrap()
+                        .get_bucket(txn.ranking_score)
+                        .to_string();
+                    let bucket = format!("{}_{}", sender_bucket, bucket);
+
                     Self::log_ready_transaction(
                         txn.ranking_score,
-                        self.timeline_index.get_bucket(txn.ranking_score),
+                        bucket.as_str(),
                         &mut txn.insertion_info,
                         process_broadcast_ready,
-                        txn.priority_of_sender.to_string().as_str(),
+                        txn.priority_of_sender
+                            .clone()
+                            .map_or_else(|| "Unknown".to_string(), |priority| priority.to_string())
+                            .as_str(),
                     );
                 }
 
@@ -545,7 +607,16 @@ impl TransactionStore {
         self.system_ttl_index.remove(txn);
         self.expiration_time_index.remove(txn);
         self.priority_index.remove(txn);
-        self.timeline_index.remove(txn);
+        let sender_bucket = sender_bucket(&txn.get_sender(), self.num_sender_buckets);
+        self.timeline_index
+            .get_mut(&sender_bucket)
+            .unwrap_or_else(|| {
+                panic!(
+                    "Unable to get the timeline index for the sender bucket {}",
+                    sender_bucket
+                )
+            })
+            .remove(txn);
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
@@ -568,6 +639,7 @@ impl TransactionStore {
     /// and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
+        sender_bucket: MempoolSenderBucket,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
@@ -581,6 +653,13 @@ impl TransactionStore {
         // Add as many transactions to the batch as possible
         for (i, bucket) in self
             .timeline_index
+            .get(&sender_bucket)
+            .unwrap_or_else(|| {
+                panic!(
+                    "Unable to get the timeline index for the sender bucket {}",
+                    sender_bucket
+                )
+            })
             .read_timeline(timeline_id, count, before)
             .iter()
             .enumerate()
@@ -603,17 +682,17 @@ impl TransactionStore {
                         if let TimelineState::Ready(timeline_id) = txn.timeline_state {
                             last_timeline_id[i] = timeline_id;
                         }
-                        let bucket = self.timeline_index.get_bucket(txn.ranking_score);
+                        let bucket = self.get_bucket(txn.ranking_score, &txn.get_sender());
                         Mempool::log_txn_latency(
                             &txn.insertion_info,
-                            bucket,
+                            bucket.as_str(),
                             BROADCAST_BATCHED_LABEL,
                             priority_of_receiver.to_string().as_str(),
                         );
                         counters::core_mempool_txn_ranking_score(
                             BROADCAST_BATCHED_LABEL,
                             BROADCAST_BATCHED_LABEL,
-                            bucket,
+                            bucket.as_str(),
                             txn.ranking_score,
                         );
                     }
@@ -626,9 +705,17 @@ impl TransactionStore {
 
     pub(crate) fn timeline_range(
         &self,
-        start_end_pairs: &[(u64, u64)],
+        sender_bucket: MempoolSenderBucket,
+        start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>,
     ) -> Vec<(SignedTransaction, u64)> {
         self.timeline_index
+            .get(&sender_bucket)
+            .unwrap_or_else(|| {
+                panic!(
+                    "Unable to get the timeline index for the sender bucket {}",
+                    sender_bucket
+                )
+            })
             .timeline_range(start_end_pairs)
             .iter()
             .filter_map(|(account, sequence_number)| {
@@ -729,7 +816,16 @@ impl TransactionStore {
                 for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
                     self.priority_index.remove(t);
-                    self.timeline_index.remove(t);
+                    let sender_bucket = sender_bucket(&t.get_sender(), self.num_sender_buckets);
+                    self.timeline_index
+                        .get_mut(&sender_bucket)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Unable to get the timeline index for the sender bucket {}",
+                                sender_bucket
+                            )
+                        })
+                        .remove(t);
                     if let TimelineState::Ready(_) = t.timeline_state {
                         t.timeline_state = TimelineState::NotReady;
                     }

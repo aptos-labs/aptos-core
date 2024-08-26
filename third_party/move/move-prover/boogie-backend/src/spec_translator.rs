@@ -10,9 +10,9 @@ use crate::{
         boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
         boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
         boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_type,
-        boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
-        boogie_well_formed_expr_bv,
+        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_type, boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob,
+        boogie_well_formed_expr, boogie_well_formed_expr_bv,
     },
     options::BoogieOptions,
 };
@@ -274,9 +274,11 @@ impl<'env> SpecTranslator<'env> {
             self.error(&fun.loc, "function or tuple result type not yet supported");
             return;
         }
-        let recursive = self
+        let qid = module_env.get_id().qualified(id);
+        let recursive = self.env.is_spec_fun_recursive(qid);
+        let type_reflection = self
             .env
-            .is_spec_fun_recursive(module_env.get_id().qualified(id));
+            .spec_fun_uses_generic_type_reflection(&qid.instantiate(self.type_inst.clone()));
         emitln!(
             self.writer,
             "// {}spec fun {}",
@@ -306,6 +308,18 @@ impl<'env> SpecTranslator<'env> {
             } else {
                 boogie_type
             }
+        };
+        let type_info_params = if type_reflection {
+            (0..fun.type_params.len())
+                .map(|i| {
+                    format!(
+                        "{}_info: $TypeParamInfo",
+                        boogie_type(self.env, &Type::TypeParameter(i as u16))
+                    )
+                })
+                .collect_vec()
+        } else {
+            vec![]
         };
         let result_type = ty_str_fn(bv_flag_result)(self.env, &self.inst(&fun.result_type));
         // it is possible that the spec fun may refer to the same memory after monomorphization,
@@ -352,7 +366,10 @@ impl<'env> SpecTranslator<'env> {
             });
         self.writer.set_location(&fun.loc);
         let boogie_name = boogie_spec_fun_name(module_env, id, &self.type_inst, bv_flag_result);
-        let param_list = mem_params.chain(params).join(", ");
+        let param_list = type_info_params
+            .into_iter()
+            .chain(mem_params.chain(params))
+            .join(", ");
         let attrs = if fun.uninterpreted || recursive {
             ""
         } else {
@@ -829,14 +846,20 @@ impl<'env> SpecTranslator<'env> {
             Operation::SpecFunction(module_id, fun_id, memory_labels) => {
                 self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, memory_labels)
             },
-            Operation::Pack(_, _, Some(_)) => {
-                self.error(&loc, "variants not yet supported");
+            Operation::Pack(mid, sid, Some(variant)) => {
+                self.translate_pack_variant(node_id, *mid, *sid, variant, args)
             },
             Operation::Pack(mid, sid, None) => self.translate_pack(node_id, *mid, *sid, args),
             Operation::Tuple if args.len() == 1 => self.translate_exp(&args[0]),
             Operation::Tuple => self.error(&loc, "Tuple not yet supported"),
             Operation::Select(module_id, struct_id, field_id) => {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
+            },
+            Operation::SelectVariants(module_id, struct_id, field_ids) => {
+                self.translate_select(node_id, *module_id, *struct_id, field_ids[0], args);
+            },
+            Operation::TestVariants(module_id, struct_id, variants) => {
+                self.translate_test_variants(node_id, *module_id, *struct_id, variants, args);
             },
             Operation::UpdateField(module_id, struct_id, field_id) => {
                 self.translate_update_field(node_id, *module_id, *struct_id, *field_id, args)
@@ -1020,6 +1043,30 @@ impl<'env> SpecTranslator<'env> {
         emit!(self.writer, ")");
     }
 
+    fn translate_pack_variant(
+        &self,
+        node_id: NodeId,
+        mid: ModuleId,
+        sid: StructId,
+        variant: &Symbol,
+        args: &[Exp],
+    ) {
+        let struct_env = &self.env.get_module(mid).into_struct(sid);
+        let inst = &self.get_node_instantiation(node_id);
+        emit!(
+            self.writer,
+            "{}(",
+            boogie_struct_variant_name(struct_env, inst, *variant)
+        );
+        let mut sep = "";
+        for arg in args {
+            emit!(self.writer, sep);
+            self.translate_exp(arg);
+            sep = ", ";
+        }
+        emit!(self.writer, ")");
+    }
+
     fn translate_spec_fun_call(
         &self,
         node_id: NodeId,
@@ -1031,14 +1078,69 @@ impl<'env> SpecTranslator<'env> {
         let inst = &self.get_node_instantiation(node_id);
         let module_env = &self.env.get_module(module_id);
         let fun_decl = module_env.get_spec_fun(fun_id);
+        if self.try_translate_spec_fun_reflection_call(module_env, fun_decl, inst) {
+            return;
+        }
+
+        // regular path
         let global_state = &self
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
+        let is_vector_table_module = module_env.is_std_vector() || module_env.is_table();
+        let bv_flag = if is_vector_table_module && !args.is_empty() {
+            global_state.get_node_num_oper(args[0].node_id()) == Bitwise
+        } else {
+            global_state.get_node_num_oper(node_id) == Bitwise
+        };
+        let name = boogie_spec_fun_name(module_env, fun_id, inst, bv_flag);
+        emit!(self.writer, "{}(", name);
+        let mut first = true;
+        let mut maybe_comma = || {
+            if first {
+                first = false;
+            } else {
+                emit!(self.writer, ", ");
+            }
+        };
+        // Start with type info parameters
+        if self
+            .env
+            .spec_fun_uses_generic_type_reflection(&module_id.qualified_inst(fun_id, inst.clone()))
+        {
+            for i in 0..fun_decl.type_params.len() {
+                maybe_comma();
+                emit!(
+                    self.writer,
+                    "{}_info",
+                    boogie_type(self.env, &Type::TypeParameter(i as u16))
+                )
+            }
+        }
+        // Add memory parameters.
+        let label_at = |i| memory_labels.as_ref().map(|labels| labels[i]);
+        let mut i = 0;
+        for memory in &fun_decl.used_memory {
+            let memory = &memory.to_owned().instantiate(inst);
+            maybe_comma();
+            let memory = boogie_resource_memory_name(self.env, memory, &label_at(i));
+            emit!(self.writer, &memory);
+            i = usize::saturating_add(i, 1);
+        }
+        // Finally add argument expressions
+        for exp in args {
+            maybe_comma();
+            self.translate_exp(exp);
+        }
+        emit!(self.writer, ")");
+    }
 
-        // special casing for type reflection
-        let mut processed = false;
-
+    fn try_translate_spec_fun_reflection_call(
+        &self,
+        module_env: &ModuleEnv,
+        fun_decl: &SpecFunDecl,
+        inst: &[Type],
+    ) -> bool {
         // TODO(mengxu): change it to a better address name instead of extlib
         if self.env.get_extlib_address() == *module_env.get_name().addr() {
             let qualified_name = format!(
@@ -1053,7 +1155,7 @@ impl<'env> SpecTranslator<'env> {
                     "{}",
                     boogie_reflection_type_name(self.env, &inst[0], false)
                 );
-                processed = true;
+                true
             } else if qualified_name == TYPE_INFO_SPEC {
                 assert_eq!(inst.len(), 1);
                 // TODO(mengxu): by ignoring the first return value of this function, we are
@@ -1061,7 +1163,7 @@ impl<'env> SpecTranslator<'env> {
                 // invoking `type_info` on a primitive type like: `type_info<bool>`.
                 let (_, info) = boogie_reflection_type_info(self.env, &inst[0]);
                 emit!(self.writer, "{}", info);
-                processed = true;
+                true
             } else if qualified_name == TYPE_SPEC_IS_STRUCT {
                 assert_eq!(inst.len(), 1);
                 emit!(
@@ -1069,11 +1171,11 @@ impl<'env> SpecTranslator<'env> {
                     "{}",
                     boogie_reflection_type_is_struct(self.env, &inst[0])
                 );
-                processed = true;
+                true
+            } else {
+                false
             }
-        }
-
-        if self.env.get_stdlib_address() == *module_env.get_name().addr() {
+        } else if self.env.get_stdlib_address() == *module_env.get_name().addr() {
             let qualified_name = format!(
                 "{}::{}",
                 module_env.get_name().name().display(self.env.symbol_pool()),
@@ -1086,42 +1188,12 @@ impl<'env> SpecTranslator<'env> {
                     "{}",
                     boogie_reflection_type_name(self.env, &inst[0], true)
                 );
-                processed = true;
-            }
-        }
-
-        let is_vector_table_module = module_env.is_std_vector() || module_env.is_table();
-        // regular path
-        if !processed {
-            let bv_flag = if is_vector_table_module && !args.is_empty() {
-                global_state.get_node_num_oper(args[0].node_id()) == Bitwise
+                true
             } else {
-                global_state.get_node_num_oper(node_id) == Bitwise
-            };
-            let name = boogie_spec_fun_name(module_env, fun_id, inst, bv_flag);
-            emit!(self.writer, "{}(", name);
-            let mut first = true;
-            let mut maybe_comma = || {
-                if first {
-                    first = false;
-                } else {
-                    emit!(self.writer, ", ");
-                }
-            };
-            let label_at = |i| memory_labels.as_ref().map(|labels| labels[i]);
-            let mut i = 0;
-            for memory in &fun_decl.used_memory {
-                let memory = &memory.to_owned().instantiate(inst);
-                maybe_comma();
-                let memory = boogie_resource_memory_name(self.env, memory, &label_at(i));
-                emit!(self.writer, &memory);
-                i = usize::saturating_add(i, 1);
+                false
             }
-            for exp in args {
-                maybe_comma();
-                self.translate_exp(exp);
-            }
-            emit!(self.writer, ")");
+        } else {
+            false
         }
     }
 
@@ -1145,6 +1217,38 @@ impl<'env> SpecTranslator<'env> {
         let field_env = struct_env.get_field(field_id);
         self.translate_exp(&args[0]);
         emit!(self.writer, "->{}", boogie_field_sel(&field_env));
+    }
+
+    fn translate_test_variants(
+        &self,
+        node_id: NodeId,
+        module_id: ModuleId,
+        struct_id: StructId,
+        variants: &[Symbol],
+        args: &[Exp],
+    ) {
+        let struct_env = self.env.get_module(module_id).into_struct(struct_id);
+        if struct_env.is_intrinsic() {
+            self.env.error(
+                &self.env.get_node_loc(node_id),
+                "cannot test variants of intrinsic struct",
+            );
+        }
+        let struct_type = &self.get_node_type(args[0].node_id());
+        let (_, _, _) = struct_type.skip_reference().require_struct();
+        let inst = self.env.get_node_instantiation(node_id);
+        let inst = &self.inst_slice(&inst);
+        let test_var_result = self.fresh_var_name("test_variant_var");
+        emit!(self.writer, "(var {} := ", test_var_result);
+        self.translate_exp(&args[0]);
+        emit!(self.writer, ";");
+        let mut condition = vec![];
+        for variant in variants {
+            let struct_variant_name = boogie_struct_variant_name(&struct_env, inst, *variant);
+            let call = format!("{} is {}", test_var_result, struct_variant_name);
+            condition.push(call.clone());
+        }
+        emitln!(self.writer, "{})", condition.join(" || "),);
     }
 
     fn translate_update_field(
