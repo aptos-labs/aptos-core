@@ -2551,7 +2551,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         // Process argument list
         let mut args = BTreeMap::new();
-        let (field_decls, _is_positional) =
+        let (field_decls, is_positional) =
             self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
         let field_decls = field_decls.clone();
 
@@ -2602,14 +2602,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     args.insert(field_data.offset, translated);
                 }
             }
-        } else if !field_decls.is_empty() {
-            self.error(
-                loc,
-                &format!(
-                    "no arguments provided for unpack, expected {}",
-                    field_decls.len()
-                ),
-            )
+        } else {
+            let expected_args = if variant.is_some() || is_positional {
+                field_decls.len()
+            } else {
+                // For structs need to account for the dummy field added by v1 compiler
+                field_decls
+                    .iter()
+                    .filter(|d| d.0 != &self.parent.dummy_field_name())
+                    .count()
+            };
+            if expected_args != 0 {
+                self.error(
+                    loc,
+                    &format!("no arguments provided for pack, expected {}", expected_args),
+                )
+            }
         }
 
         let mut args = args
@@ -2617,7 +2625,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .sorted_by_key(|(i, _)| *i)
             .map(|(_, value)| value)
             .collect_vec();
-        if variant.is_none() && args.is_empty() {
+        if variant.is_none() && args.is_empty() && !is_positional {
             // The v1 move compiler inserts a dummy field with the value of false
             // for structs with no fields. We simulate this here for now.
             let id = self.new_node_id_with_type_loc(&Type::new_prim(PrimitiveType::Bool), loc);
@@ -4621,14 +4629,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     bindings.insert(*exp_idx, (var, translated_field_exp));
                 }
             }
-        } else if !field_decls.is_empty() {
-            self.error(
-                loc,
-                &format!(
-                    "no arguments provided for pack, expected {}",
-                    field_decls.len()
-                ),
-            )
+        } else {
+            let expected_args = if variant.is_some() || is_positional_constructor {
+                field_decls.len()
+            } else {
+                // For structs need to account for the dummy field added by v1 compiler
+                field_decls
+                    .iter()
+                    .filter(|d| d.0 != &self.parent.dummy_field_name())
+                    .count()
+            };
+            if expected_args != 0 {
+                self.error(
+                    loc,
+                    &format!("no arguments provided for pack, expected {}", expected_args),
+                )
+            }
         }
         let bindings = bindings
             .into_iter()
@@ -4644,7 +4660,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let struct_ty = struct_inst_id.to_type();
         let struct_ty = self.check_type(loc, &struct_ty, &expected_type, context);
         let mut field_args = args.into_iter().map(|e| e.into_exp()).collect_vec();
-        if variant.is_none() && field_args.is_empty() {
+        if variant.is_none() && field_args.is_empty() && !is_positional_constructor {
             // The move compiler inserts a dummy field with the value of false
             // for structs with no fields. This is also what we find in the
             // Model metadata (i.e. a field `dummy_field`). We simulate this here

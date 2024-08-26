@@ -2753,7 +2753,7 @@ fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Bo
 //      StructDecl =
 //          native struct <StructDefName> <Abilities>? ";"
 //        | "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}" (<Abilities> ";")?
-//        | "struct" <StructDefName> "(" Comma<Type> ")" <Abilities>?";"
+//        | "struct" <StructDefName> ( "(" Comma<Type> ")" )? <Abilities>?";"
 //        | "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}" (<Abilities> ";")?
 //      StructDefName =
 //          <Identifier> <StructTypeParameter>
@@ -2840,7 +2840,7 @@ fn parse_struct_decl(
                     abilities = parse_abilities(context)?;
                     consume_token(context.tokens, Tok::Semicolon)?;
                     (list, true)
-                } else {
+                } else if context.tokens.peek() == Tok::LBrace {
                     let list = parse_comma_list(
                         context,
                         Tok::LBrace,
@@ -2850,6 +2850,12 @@ fn parse_struct_decl(
                     )?;
                     parse_postfix_abilities(context, &mut abilities)?;
                     (list, false)
+                } else {
+                    // Assume positional with 0 fields.
+                    let loc = current_token_loc(context.tokens);
+                    require_move_2(context, loc, "struct declaration without field list");
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    (vec![], true)
                 };
                 StructLayout::Singleton(list, is_positional)
             }

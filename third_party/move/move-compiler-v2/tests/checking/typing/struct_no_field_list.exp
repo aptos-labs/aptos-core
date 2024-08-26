@@ -1,0 +1,8 @@
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    struct S {
+    }
+    private fun f(_s: m::S): m::S {
+        pack m::S()
+    }
+} // end 0x42::m

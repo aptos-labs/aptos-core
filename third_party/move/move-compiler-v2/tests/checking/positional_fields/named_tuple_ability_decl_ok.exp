@@ -1,7 +1,6 @@
 // -- Model dump before bytecode pipeline
 module 0x42::test {
     struct S {
-        dummy_field: bool,
     }
     struct S1 {
         0: u8,
@@ -23,6 +22,5 @@ module 0x42::test {
         1: test::S3<#0>,
     }
     struct S6 {
-        dummy_field: bool,
     }
 } // end 0x42::test
