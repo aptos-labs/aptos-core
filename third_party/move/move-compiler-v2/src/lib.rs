@@ -27,6 +27,7 @@ use crate::{
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         flush_writes_processor::FlushWritesProcessor,
+        lint_processor::LintProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety::{reference_safety_processor_v2, reference_safety_processor_v3},
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
@@ -425,6 +426,13 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if options.experiment_on(Experiment::ABILITY_CHECK) {
         pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
         pipeline.add_processor(Box::new(AbilityProcessor {}));
+    }
+
+    // --- Lint checks: run before optimizations and after correctness checks
+    if options.experiment_on(Experiment::LINT_CHECKS) {
+        // Some lint checks need live variable analysis.
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+        pipeline.add_processor(Box::new(LintProcessor {}));
     }
 
     // --- Optimizations

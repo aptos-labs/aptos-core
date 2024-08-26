@@ -167,3 +167,6 @@ warning: [lint] Comparison is always false, consider rewriting the code to remov
    │                   ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+
+
+============ bytecode verification succeeded ========
