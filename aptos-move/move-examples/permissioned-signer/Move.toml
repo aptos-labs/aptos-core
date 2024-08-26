@@ -1,0 +1,10 @@
+[package]
+name = "SignerCap"
+version = "1.0.0"
+authors = []
+
+[addresses]
+permissioned_signer = "0x2"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
