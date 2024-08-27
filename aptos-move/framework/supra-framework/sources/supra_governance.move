@@ -831,7 +831,7 @@ module supra_framework::supra_governance {
             @supra_framework,
             proposal_id
         );
-        assert!(timestamp::now_seconds() >= proposal_expiration, error::invalid_argument(EPROPOSAL_IS_EXPIRE));
+        assert!(timestamp::now_seconds() <= proposal_expiration, error::invalid_argument(EPROPOSAL_IS_EXPIRE));
 
         multisig_voting::vote<GovernanceProposal>(
             voter,
