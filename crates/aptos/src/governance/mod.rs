@@ -1020,7 +1020,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             next_execution_hash,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts.build_options(&move_options);
+        let options = included_artifacts.build_options(&move_options)?;
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
 

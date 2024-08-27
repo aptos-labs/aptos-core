@@ -52,7 +52,7 @@ use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_compiler_v2::Experiment;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_model::metadata::LanguageVersion;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
@@ -387,7 +387,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
             ..self
                 .included_artifacts_args
                 .included_artifacts
-                .build_options(&self.move_options)
+                .build_options(&self.move_options)?
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
@@ -441,7 +441,7 @@ impl CompileScript {
     async fn compile_script(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
-            ..IncludedArtifacts::None.build_options(&self.move_options)
+            ..IncludedArtifacts::None.build_options(&self.move_options)?
         };
         let package_dir = self.move_options.get_package_path()?;
         let pack = BuiltPackage::build(package_dir, build_options)
@@ -751,7 +751,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         let options = self
             .included_artifacts_args
             .included_artifacts
-            .build_options(&self.move_options);
+            .build_options(&self.move_options)?;
         let package = BuiltPackage::build(package_path, options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         let compiled_units = package.extract_code();
@@ -828,7 +828,10 @@ fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<Strin
 }
 
 impl IncludedArtifacts {
-    pub(crate) fn build_options(self, move_options: &MovePackageDir) -> BuildOptions {
+    pub(crate) fn build_options(
+        self,
+        move_options: &MovePackageDir,
+    ) -> CliTypedResult<BuildOptions> {
         self.build_options_with_experiments(move_options, vec![], false)
     }
 
@@ -837,7 +840,7 @@ impl IncludedArtifacts {
         move_options: &MovePackageDir,
         mut more_experiments: Vec<String>,
         _skip_codegen: bool, // we currently cannot do this, so ignore it.
-    ) -> BuildOptions {
+    ) -> CliTypedResult<BuildOptions> {
         let dev = move_options.dev;
         let skip_fetch_latest_git_deps = move_options.skip_fetch_latest_git_deps;
         let named_addresses = move_options.named_addresses();
@@ -852,6 +855,29 @@ impl IncludedArtifacts {
         let mut experiments = experiments_from_opt_level(&optimization_level);
         experiments.append(&mut move_options.experiments.clone());
         experiments.append(&mut more_experiments);
+
+        if matches!(move_options.compiler_version, Some(CompilerVersion::V1)) {
+            if !matches!(
+                optimization_level,
+                Option::None | Some(OptimizationLevel::Standard)
+            ) {
+                return Err(CliError::CommandArgumentError(
+                    "`--optimization-level` flag is not compatible with Move Compiler V1"
+                        .to_string(),
+                ));
+            };
+            if move_options.lint {
+                return Err(CliError::CommandArgumentError(
+                    "`--lint` flag is not compatible with Move Compiler V1".to_string(),
+                ));
+            };
+            if !experiments.is_empty() {
+                return Err(CliError::CommandArgumentError(
+                    "`--experiments` flag is not compatible with Move Compiler V1".to_string(),
+                ));
+            };
+        }
+
         let base_options = BuildOptions {
             dev,
             // Always enable error map bytecode injection
@@ -869,7 +895,7 @@ impl IncludedArtifacts {
             ..BuildOptions::default()
         };
         use IncludedArtifacts::*;
-        match self {
+        Ok(match self {
             None => BuildOptions {
                 with_srcs: false,
                 with_abis: false,
@@ -888,7 +914,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 ..base_options
             },
-        }
+        })
     }
 }
 
@@ -997,7 +1023,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         let options = self
             .included_artifacts_args
             .included_artifacts
-            .build_options(&self.move_options);
+            .build_options(&self.move_options)?;
         let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
         let message = format!(
             "Do you want to publish this package at object address {}",
@@ -1065,7 +1091,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         let options = self
             .included_artifacts_args
             .included_artifacts
-            .build_options(&self.move_options);
+            .build_options(&self.move_options)?;
         let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
         let url = self
             .txn_options
@@ -1264,7 +1290,7 @@ fn build_package_options(
 ) -> anyhow::Result<BuiltPackage> {
     let options = included_artifacts_args
         .included_artifacts
-        .build_options(&move_options);
+        .build_options(&move_options)?;
     BuiltPackage::build(move_options.get_package_path()?, options)
 }
 
@@ -1356,7 +1382,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts_args
             .included_artifacts
-            .build_options(&move_options);
+            .build_options(&move_options)?;
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
 
@@ -1502,7 +1528,7 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.bytecode_version,
                 self.move_options.language_version,
             ),
-            ..self.included_artifacts.build_options(&self.move_options)
+            ..self.included_artifacts.build_options(&self.move_options)?
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;

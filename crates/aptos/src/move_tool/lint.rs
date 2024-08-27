@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::IncludedArtifactsArgs;
-use crate::common::types::{CliCommand, CliTypedResult, MovePackageDir, OptimizationLevel};
+use crate::common::types::{
+    CliCommand, CliError, CliTypedResult, MovePackageDir, OptimizationLevel,
+};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use async_trait::async_trait;
 use clap::Parser;
@@ -43,13 +45,12 @@ impl CliCommand<&'static str> for LintPackage {
             ..self.move_options.clone()
         };
         if matches!(
-            self.move_options.language_version,
-            Some(LanguageVersion::V1)
-        ) || (matches!(
             self.move_options.compiler_version,
             Some(CompilerVersion::V1)
-        )) {
-            panic!("Error: `aptos move lint` is not compatible with Move Language V1 or Move Compiler V1");
+        ) {
+            return Err(CliError::CommandArgumentError(
+                "`aptos move lint` is not compatible with Move Compiler V1".to_string(),
+            ));
         };
         let more_experiments = vec![
             Experiment::LINT_CHECKS.to_string(),
@@ -62,7 +63,7 @@ impl CliCommand<&'static str> for LintPackage {
             ..self
                 .included_artifacts_args
                 .included_artifacts
-                .build_options_with_experiments(&move_options, more_experiments, true)
+                .build_options_with_experiments(&move_options, more_experiments, true)?
         };
         BuiltPackage::build(self.move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
