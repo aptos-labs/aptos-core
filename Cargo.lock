@@ -4180,7 +4180,6 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "aptos-bitvec",
- "aptos-bounded-executor",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-dkg",
