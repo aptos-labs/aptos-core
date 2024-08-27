@@ -8,6 +8,7 @@ use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_types::transaction::EntryABI;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 
 #[derive(Subcommand)]
 pub enum ShowTool {
@@ -60,6 +61,19 @@ impl CliCommand<Vec<EntryABI>> for ShowAbi {
                 .included_artifacts_args
                 .included_artifacts
                 .build_options(&self.move_options)
+        };
+        if self.move_options.lint
+            && (matches!(
+                self.move_options.language_version,
+                Some(LanguageVersion::V1)
+            ) || (matches!(
+                self.move_options.compiler_version,
+                Some(CompilerVersion::V1)
+            )))
+        {
+            panic!(
+                "Error: `--lint` flag is not compatible with Move Language V1 or Move Compiler V1"
+            );
         };
 
         // Build the package.

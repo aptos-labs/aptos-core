@@ -836,7 +836,7 @@ impl IncludedArtifacts {
         self,
         move_options: &MovePackageDir,
         mut more_experiments: Vec<String>,
-        skip_codegen: bool,
+        _skip_codegen: bool, // we currently cannot do this, so ignore it.
     ) -> BuildOptions {
         let dev = move_options.dev;
         let skip_fetch_latest_git_deps = move_options.skip_fetch_latest_git_deps;

@@ -9,6 +9,12 @@ use clap::Parser;
 use move_compiler_v2::Experiment;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 
+/// Compile the package with --lint flag to show lint warnings, in addition
+/// to ordinary warnings/and or errors if found.
+///
+/// Ideally, we would skip code generation, but there seems to be no great
+/// way to do that today, so it is equivalent to `aptos move build --lint --move-2`
+/// and a few extra warning passes.
 #[derive(Parser)]
 pub struct LintPackage {
     // TODO: add some options to select certain lint/warning passes?
@@ -39,10 +45,11 @@ impl CliCommand<&'static str> for LintPackage {
         if matches!(
             self.move_options.language_version,
             Some(LanguageVersion::V1)
-        ) {
-            eprintln!("Note that `aptos move lint` requires Move Language Version 2 and above");
-            static EINVAL: i32 = 22;
-            std::process::exit(EINVAL);
+        ) || (matches!(
+            self.move_options.compiler_version,
+            Some(CompilerVersion::V1)
+        )) {
+            panic!("Error: `aptos move lint` is not compatible with Move Language V1 or Move Compiler V1");
         };
         let more_experiments = vec![
             Experiment::LINT_CHECKS.to_string(),
