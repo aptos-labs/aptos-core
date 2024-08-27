@@ -28,11 +28,11 @@ pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
         return Err(anyhow!("not a federated iss"));
     }
 
-    let jwt_kid: String;
-    match payload.header.kid {
-        Some(kid) => jwt_kid = kid,
+    let jwt_kid: String = match payload.header.kid {
+        Some(kid) => kid,
         None => return Err(anyhow!("no kid found on jwt header")),
-    }
+    };
+
     let jwk_url = format!("{}.well-known/jwks.json", &payload.claims.iss);
     let keys = fetch_jwks(&jwk_url).await?;
     let key = keys
