@@ -43,7 +43,7 @@ use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream, WriteColor},
 };
-pub use experiments::Experiment;
+pub use experiments::{Experiment, EXPERIMENTS};
 use log::{debug, info, log_enabled, Level};
 use move_binary_format::{binary_views::BinaryIndexedView, errors::VMError};
 use move_bytecode_source_map::source_map::SourceMap;
@@ -95,6 +95,10 @@ where
     let mut env = run_checker_and_rewriters(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
 
+    if options.experiment_on(Experiment::STOP_BEFORE_STACKLESS_BYTECODE) {
+        std::process::exit(0)
+    }
+
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;
@@ -124,6 +128,10 @@ where
         pipeline.run(&env, &mut targets)
     }
     check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
+
+    if options.experiment_on(Experiment::STOP_BEFORE_FILE_FORMAT) {
+        std::process::exit(0)
+    }
 
     let modules_and_scripts = run_file_format_gen(&mut env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;

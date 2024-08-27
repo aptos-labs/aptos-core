@@ -19,6 +19,7 @@ use itertools::Itertools;
 use move_binary_format::CompiledModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use move_compiler_v2::{options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -262,6 +263,12 @@ impl BuiltPackage {
             model.report_diag(&mut error_writer, Severity::Warning);
             if model.has_errors() {
                 bail!("extended checks failed")
+            }
+        }
+
+        if let Some(model_options) = model.get_extension::<Options>() {
+            if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
+                std::process::exit(0)
             }
         }
 

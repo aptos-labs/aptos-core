@@ -129,8 +129,18 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         },
         Experiment {
             name: Experiment::OPTIMIZE.to_string(),
-            description: "Turns on or off a group of optimizations".to_string(),
+            description: "Turns on standard group of optimizations".to_string(),
             default: Given(true),
+        },
+        Experiment {
+            name: Experiment::OPTIMIZE_NONE.to_string(),
+            description: "Use no optional optimizations".to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::OPTIMIZE_FULL.to_string(),
+            description: "Use most aggressive optimizations".to_string(),
+            default: Given(false),
         },
         Experiment {
             name: Experiment::COPY_PROPAGATION.to_string(),
@@ -185,7 +195,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             name: Experiment::AST_SIMPLIFY_FULL.to_string(),
             description: "Whether to run the ast simplifier, including code elimination"
                 .to_string(),
-            default: Given(false),
+            default: Inherited(Experiment::OPTIMIZE_FULL.to_string()),
         },
         Experiment {
             name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
@@ -208,6 +218,32 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             name: Experiment::FLUSH_WRITES_OPTIMIZATION.to_string(),
             description: "Whether to run flush writes processor and optimization".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
+        },
+        Experiment {
+            name: Experiment::STOP_BEFORE_STACKLESS_BYTECODE.to_string(),
+            description:
+                "Exit quietly just before converting to stackless bytecode (after AST passes)"
+                    .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::STOP_BEFORE_FILE_FORMAT.to_string(),
+            description:
+                "Exit quietly just before generating file format (after stackless bytecode  passes)"
+                    .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::STOP_BEFORE_EXTENDED_CHECKS.to_string(),
+            description: "Exit quietly just before extended checks (after file format generation)"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::STOP_AFTER_EXTENDED_CHECKS.to_string(),
+            description: "Exit quietly just after extended checks (after file format generation)"
+                .to_string(),
+            default: Given(false),
         },
     ];
     experiments
@@ -236,6 +272,8 @@ impl Experiment {
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";
+    pub const OPTIMIZE_FULL: &'static str = "optimize-full";
+    pub const OPTIMIZE_NONE: &'static str = "optimize-none";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
@@ -244,6 +282,10 @@ impl Experiment {
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
+    pub const STOP_AFTER_EXTENDED_CHECKS: &'static str = "stop-after-extended-checks";
+    pub const STOP_BEFORE_EXTENDED_CHECKS: &'static str = "stop-before-extended-checks";
+    pub const STOP_BEFORE_FILE_FORMAT: &'static str = "stop-before-file-format";
+    pub const STOP_BEFORE_STACKLESS_BYTECODE: &'static str = "stop-before-stackless-bytecode";
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
     pub const UNUSED_ASSIGNMENT_CHECK: &'static str = "unused-assignment-check";
     pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";

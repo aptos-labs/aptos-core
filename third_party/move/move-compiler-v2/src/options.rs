@@ -62,6 +62,7 @@ pub struct Options {
     pub testing: bool,
 
     /// Active experiments. Experiments alter default behavior of the compiler.
+    /// Each element is `name[=on/off]` to enable experiment `name`.
     /// See `Experiment` struct.
     #[clap(short)]
     #[clap(

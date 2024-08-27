@@ -18,7 +18,7 @@ use crate::{
     genesis::git::from_yaml,
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
-use anyhow::Context;
+use anyhow::{bail, Context};
 use aptos_api_types::ViewFunction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
@@ -1022,6 +1022,41 @@ impl RestOptions {
     }
 }
 
+/// Options for optimization level
+#[derive(Debug, Clone, Parser)]
+pub enum OptimizationLevel {
+    /// No optimizations
+    None,
+    /// Default optimization level
+    Standard,
+    /// Extra optimizations (-O3)
+    Full,
+}
+
+impl Default for OptimizationLevel {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+impl FromStr for OptimizationLevel {
+    type Err = anyhow::Error;
+
+    /// Parses a language version. If the caller only provides a major
+    /// version number, this chooses the latest stable minor version (if any).
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "NONE" => Ok(Self::None),
+            "STANDARD" => Ok(Self::Standard),
+            "FULL" => Ok(Self::Full),
+            _ => bail!(
+                "unrecognized optimization level `{}` (supported versions: `none`, `standard`, `full`)",
+                s
+            ),
+        }
+    }
+}
+
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
@@ -1066,13 +1101,13 @@ pub struct MovePackageDir {
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
-    /// Currently, default to `v1`
+    /// Currently, defaults to `v1`
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Specify the language version to be supported.
-    /// Currently, default to `v1`
+    /// Currently, defaults to `v1`
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            default_value_if("move_2", "true", "2.0"))]
     pub language_version: Option<LanguageVersion>,
@@ -1090,6 +1125,14 @@ pub struct MovePackageDir {
     /// Select bytecode, language, compiler for Move 2
     #[clap(long)]
     pub move_2: bool,
+
+    /// Select optimization level
+    #[clap(long, value_parser = clap::value_parser!(OptimizationLevel))]
+    pub optimization_level: Option<OptimizationLevel>,
+
+    /// Enable lint
+    #[clap(long)]
+    pub lint: bool,
 }
 
 impl MovePackageDir {
@@ -1107,6 +1150,8 @@ impl MovePackageDir {
             skip_attribute_checks: false,
             check_test_code: false,
             move_2: false,
+            optimization_level: None,
+            lint: false,
         }
     }
 

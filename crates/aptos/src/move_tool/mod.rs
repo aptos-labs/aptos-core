@@ -8,9 +8,9 @@ use crate::{
         types::{
             load_account_arg, ArgWithTypeJSON, CliConfig, CliError, CliTypedResult,
             ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
-            MoveManifestAccountWrapper, MovePackageDir, OverrideSizeCheckOption, ProfileOptions,
-            PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments, TransactionOptions,
-            TransactionSummary,
+            MoveManifestAccountWrapper, MovePackageDir, OptimizationLevel, OverrideSizeCheckOption,
+            ProfileOptions, PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments,
+            TransactionOptions, TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -22,6 +22,7 @@ use crate::{
         bytecode::{Decompile, Disassemble},
         coverage::SummaryCoverage,
         fmt::Fmt,
+        lint::LintPackage,
         manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     },
     CliCommand, CliResult,
@@ -48,13 +49,11 @@ use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
-use move_command_line_common::env::MOVE_HOME;
+use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
+use move_compiler_v2::Experiment;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_model::metadata::{CompilerVersion, LanguageVersion};
-use move_package::{
-    source_package::{layout::SourcePackageLayout, std_lib::StdVersion},
-    BuildConfig, CompilerConfig,
-};
+use move_model::metadata::LanguageVersion;
+use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
@@ -73,6 +72,7 @@ mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
 mod fmt;
+mod lint;
 mod manifest;
 pub mod package_hooks;
 mod show;
@@ -108,6 +108,7 @@ pub enum MoveTool {
     Document(DocumentPackage),
     Download(DownloadPackage),
     Init(InitPackage),
+    Lint(LintPackage),
     List(ListPackage),
     Prove(ProvePackage),
     #[clap(alias = "deploy")]
@@ -156,6 +157,7 @@ impl MoveTool {
             MoveTool::View(tool) => tool.execute_serialized().await,
             MoveTool::Replay(tool) => tool.execute_serialized().await,
             MoveTool::Fmt(tool) => tool.execute_serialized().await,
+            MoveTool::Lint(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -385,17 +387,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
             ..self
                 .included_artifacts_args
                 .included_artifacts
-                .build_options(
-                    self.move_options.dev,
-                    self.move_options.skip_fetch_latest_git_deps,
-                    self.move_options.named_addresses(),
-                    self.move_options.override_std.clone(),
-                    self.move_options.bytecode_version,
-                    self.move_options.compiler_version,
-                    self.move_options.language_version,
-                    self.move_options.skip_attribute_checks,
-                    self.move_options.check_test_code,
-                )
+                .build_options(&self.move_options)
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
@@ -449,17 +441,7 @@ impl CompileScript {
     async fn compile_script(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
-            ..IncludedArtifacts::None.build_options(
-                self.move_options.dev,
-                self.move_options.skip_fetch_latest_git_deps,
-                self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
-                self.move_options.bytecode_version,
-                self.move_options.compiler_version,
-                self.move_options.language_version,
-                self.move_options.skip_attribute_checks,
-                self.move_options.check_test_code,
-            )
+            ..IncludedArtifacts::None.build_options(&self.move_options)
         };
         let package_dir = self.move_options.get_package_path()?;
         let pack = BuiltPackage::build(package_dir, build_options)
@@ -524,6 +506,17 @@ pub struct TestPackage {
     pub dump_state: bool,
 }
 
+fn fix_bytecode_version(
+    bytecode_version_in: Option<u32>,
+    language_version: Option<LanguageVersion>,
+) -> Option<u32> {
+    if let Some(language_version) = language_version {
+        Some(language_version.infer_bytecode_version(bytecode_version_in))
+    } else {
+        bytecode_version_in
+    }
+}
+
 #[async_trait]
 impl CliCommand<&'static str> for TestPackage {
     fn command_name(&self) -> &'static str {
@@ -542,8 +535,13 @@ impl CliCommand<&'static str> for TestPackage {
             compiler_config: CompilerConfig {
                 known_attributes: known_attributes.clone(),
                 skip_attribute_checks: self.move_options.skip_attribute_checks,
+                bytecode_version: fix_bytecode_version(
+                    self.move_options.bytecode_version,
+                    self.move_options.language_version,
+                ),
                 compiler_version: self.move_options.compiler_version,
                 language_version: self.move_options.language_version,
+                experiments: experiments_from_opt_level(&self.move_options.optimization_level),
                 ..Default::default()
             },
             ..Default::default()
@@ -558,6 +556,17 @@ impl CliCommand<&'static str> for TestPackage {
                 report_stacktrace_on_abort: true,
                 report_storage_on_error: self.dump_state,
                 ignore_compile_warnings: self.ignore_compile_warnings,
+                named_address_values: self
+                    .move_options
+                    .named_addresses
+                    .iter()
+                    .map(|(name, addr_wrap)| {
+                        (
+                            name.clone(),
+                            NumericalAddress::from_account_address(addr_wrap.account_address),
+                        )
+                    })
+                    .collect(),
                 ..UnitTestingConfig::default_with_bound(None)
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
@@ -624,7 +633,7 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
-                move_options.bytecode_version,
+                fix_bytecode_version(move_options.bytecode_version, move_options.language_version),
                 move_options.compiler_version,
                 move_options.language_version,
                 move_options.skip_attribute_checks,
@@ -666,24 +675,23 @@ impl CliCommand<&'static str> for DocumentPackage {
         } = self;
         let build_options = BuildOptions {
             dev: move_options.dev,
-            with_srcs: false,
-            with_abis: false,
-            with_source_maps: false,
             with_error_map: false,
             with_docs: true,
-            install_dir: None,
             named_addresses: move_options.named_addresses(),
             override_std: move_options.override_std.clone(),
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
-            bytecode_version: move_options.bytecode_version,
+            bytecode_version: fix_bytecode_version(
+                move_options.bytecode_version,
+                move_options.language_version,
+            ),
             compiler_version: move_options.compiler_version,
             language_version: move_options.language_version,
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
-            experiments: vec![],
             move_2: move_options.move_2,
+            ..BuildOptions::default()
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
@@ -743,17 +751,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         let options = self
             .included_artifacts_args
             .included_artifacts
-            .build_options(
-                self.move_options.dev,
-                self.move_options.skip_fetch_latest_git_deps,
-                self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
-                self.move_options.bytecode_version,
-                self.move_options.compiler_version,
-                self.move_options.language_version,
-                self.move_options.skip_attribute_checks,
-                self.move_options.check_test_code,
-            );
+            .build_options(&self.move_options);
         let package = BuiltPackage::build(package_path, options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         let compiled_units = package.extract_code();
@@ -813,20 +811,36 @@ impl FromStr for IncludedArtifacts {
     }
 }
 
+fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
+    match optlevel {
+        None | Some(OptimizationLevel::Standard) => {
+            vec![format("{}=on", Experiment::OPTIMIZE.to_string())]
+        },
+        Some(OptimizationLevel::None) => vec![
+            format("{}=on", Experiment::OPTIMIZE_NONE.to_string()),
+            format("{}=off", Experiment::OPTIMIZE.to_string()),
+        ],
+        Some(OptimizationLevel::Full) => vec![
+            format("{}=on", Experiment::OPTIMIZE_FULL.to_string()),
+            format("{}=on", Experiment::OPTIMIZE.to_string()),
+        ],
+    }
+}
+
 impl IncludedArtifacts {
-    pub(crate) fn build_options(
-        self,
-        dev: bool,
-        skip_fetch_latest_git_deps: bool,
-        named_addresses: BTreeMap<String, AccountAddress>,
-        override_std: Option<StdVersion>,
-        bytecode_version: Option<u32>,
-        compiler_version: Option<CompilerVersion>,
-        language_version: Option<LanguageVersion>,
-        skip_attribute_checks: bool,
-        check_test_code: bool,
-    ) -> BuildOptions {
-        use IncludedArtifacts::*;
+    pub(crate) fn build_options(self, move_options: &MovePackageDir) -> BuildOptions {
+        let dev = move_options.dev;
+        let skip_fetch_latest_git_deps = move_options.skip_fetch_latest_git_deps;
+        let named_addresses = move_options.named_addresses();
+        let override_std = move_options.override_std.clone();
+        let bytecode_version =
+            fix_bytecode_version(move_options.bytecode_version, move_options.language_version);
+        let compiler_version = move_options.compiler_version;
+        let language_version = move_options.language_version;
+        let skip_attribute_checks = move_options.skip_attribute_checks;
+        let check_test_code = move_options.check_test_code;
+        let optimization_level = move_options.optimization_level.clone();
+        let base_experiments = experiments_from_opt_level(&optimization_level);
         let base_options = BuildOptions {
             dev,
             // Always enable error map bytecode injection
@@ -840,8 +854,10 @@ impl IncludedArtifacts {
             skip_attribute_checks,
             check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
+            experiments: base_experiments,
             ..BuildOptions::default()
         };
+        use IncludedArtifacts::*;
         match self {
             None => BuildOptions {
                 with_srcs: false,
@@ -970,17 +986,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         let options = self
             .included_artifacts_args
             .included_artifacts
-            .build_options(
-                self.move_options.dev,
-                self.move_options.skip_fetch_latest_git_deps,
-                self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
-                self.move_options.bytecode_version,
-                self.move_options.compiler_version,
-                self.move_options.language_version,
-                self.move_options.skip_attribute_checks,
-                self.move_options.check_test_code,
-            );
+            .build_options(&self.move_options);
         let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
         let message = format!(
             "Do you want to publish this package at object address {}",
@@ -1048,17 +1054,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         let options = self
             .included_artifacts_args
             .included_artifacts
-            .build_options(
-                self.move_options.dev,
-                self.move_options.skip_fetch_latest_git_deps,
-                self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
-                self.move_options.bytecode_version,
-                self.move_options.compiler_version,
-                self.move_options.language_version,
-                self.move_options.skip_attribute_checks,
-                self.move_options.check_test_code,
-            );
+            .build_options(&self.move_options);
         let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
         let url = self
             .txn_options
@@ -1255,17 +1251,9 @@ fn build_package_options(
     move_options: &MovePackageDir,
     included_artifacts_args: &IncludedArtifactsArgs,
 ) -> anyhow::Result<BuiltPackage> {
-    let options = included_artifacts_args.included_artifacts.build_options(
-        move_options.dev,
-        move_options.skip_fetch_latest_git_deps,
-        move_options.named_addresses(),
-        move_options.override_std.clone(),
-        move_options.bytecode_version,
-        move_options.compiler_version,
-        move_options.language_version,
-        move_options.skip_attribute_checks,
-        move_options.check_test_code,
-    );
+    let options = included_artifacts_args
+        .included_artifacts
+        .build_options(&move_options);
     BuiltPackage::build(move_options.get_package_path()?, options)
 }
 
@@ -1355,17 +1343,9 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         move_options.add_named_address(address_name, resource_address.to_string());
 
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts_args.included_artifacts.build_options(
-            move_options.dev,
-            move_options.skip_fetch_latest_git_deps,
-            move_options.named_addresses(),
-            move_options.override_std,
-            move_options.bytecode_version,
-            move_options.compiler_version,
-            move_options.language_version,
-            move_options.skip_attribute_checks,
-            move_options.check_test_code,
-        );
+        let options = included_artifacts_args
+            .included_artifacts
+            .build_options(&move_options);
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
 
@@ -1507,18 +1487,11 @@ impl CliCommand<&'static str> for VerifyPackage {
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
-            bytecode_version: self.move_options.bytecode_version,
-            ..self.included_artifacts.build_options(
-                self.move_options.dev,
-                self.move_options.skip_fetch_latest_git_deps,
-                self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
+            bytecode_version: fix_bytecode_version(
                 self.move_options.bytecode_version,
-                self.move_options.compiler_version,
                 self.move_options.language_version,
-                self.move_options.skip_attribute_checks,
-                self.move_options.check_test_code,
-            )
+            ),
+            ..self.included_artifacts.build_options(&self.move_options)
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;

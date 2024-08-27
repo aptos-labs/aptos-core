@@ -1809,5 +1809,4 @@ pub enum NoRandomnessReason {
     KeyPairDeserializationError(bcs::Error),
     KeyPairSerializationError(bcs::Error),
     KeyPairPersistError(anyhow::Error),
-    MyPkNotFoundInValidatorSet,
 }
