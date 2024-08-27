@@ -814,15 +814,15 @@ impl FromStr for IncludedArtifacts {
 fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
     match optlevel {
         None | Some(OptimizationLevel::Standard) => {
-            vec![format("{}=on", Experiment::OPTIMIZE.to_string())]
+            vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]
         },
         Some(OptimizationLevel::None) => vec![
-            format("{}=on", Experiment::OPTIMIZE_NONE.to_string()),
-            format("{}=off", Experiment::OPTIMIZE.to_string()),
+            format!("{}=on", Experiment::OPTIMIZE_NONE.to_string()),
+            format!("{}=off", Experiment::OPTIMIZE.to_string()),
         ],
         Some(OptimizationLevel::Full) => vec![
-            format("{}=on", Experiment::OPTIMIZE_FULL.to_string()),
-            format("{}=on", Experiment::OPTIMIZE.to_string()),
+            format!("{}=on", Experiment::OPTIMIZE_FULL.to_string()),
+            format!("{}=on", Experiment::OPTIMIZE.to_string()),
         ],
     }
 }

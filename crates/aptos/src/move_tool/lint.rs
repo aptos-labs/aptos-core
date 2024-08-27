@@ -26,7 +26,7 @@ impl CliCommand<&'static str> for LintPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        let mut move_options = MovePackageDir {
+        let move_options = MovePackageDir {
             lint: true,
             optimization_level: Some(OptimizationLevel::None),
             move_2: true,
@@ -34,9 +34,12 @@ impl CliCommand<&'static str> for LintPackage {
             language_version: Some(LanguageVersion::V2_0),
             compiler_version: Some(CompilerVersion::V2_0),
             bytecode_version: Some(7),
-            ..self.move_options
+            ..self.move_options.clone()
         };
-        if matches(self.options.compiler_version, CompilerLanguage::V1) {
+        if matches!(
+            self.move_options.language_version,
+            Some(LanguageVersion::V1)
+        ) {
             eprintln!("Note that `aptos move lint` requires Move Language Version 2 and above");
             static EINVAL: i32 = 22;
             std::process::exit(EINVAL);
@@ -48,7 +51,6 @@ impl CliCommand<&'static str> for LintPackage {
                 Experiment::SEQS_IN_BINOPS_CHECK.to_string(),
                 Experiment::ACCESS_CHECK.to_string(),
                 Experiment::STOP_AFTER_EXTENDED_CHECKS.to_string(),
-                Experiment::
             ],
             ..self
                 .included_artifacts_args
