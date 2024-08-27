@@ -13,7 +13,7 @@ use std::{collections::HashSet, convert::TryInto, io::Read};
 impl CompiledScript {
     /// Deserializes a &[u8] slice into a `CompiledScript` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -38,7 +38,7 @@ impl CompiledScript {
 impl CompiledModule {
     /// Deserialize a &[u8] slice into a `CompiledModule` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
         Self::deserialize_with_config(binary, &config)
     }
 
