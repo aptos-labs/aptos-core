@@ -12,8 +12,8 @@ Particular care should be taken with Move examples that contain complex cryptogr
 
 # Additional Resources
 
-- We have another repo [move-by-examples](https://github.com/aptos-labs/move-by-examples). It has more newer examples and is actively maintained.
-- [Aptos Learn](https://learn.aptoslabs.com/) provides more step-by-step guides on some high-quality examples. 
+-  [Aptos Learn](https://learn.aptoslabs.com/code-examples/) provides more step-by-step guides on some high-quality examples. 
+- We also have another repo [move-by-examples](https://github.com/aptos-labs/move-by-examples). It has more newer examples and is actively maintained.
 
 # Contributing
 
