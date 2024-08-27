@@ -172,6 +172,10 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+
+            FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+            FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
+            FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE,
         ]
     }
 }
