@@ -44,6 +44,10 @@ on:
         required: false
         type: string
         description: Number of validator fullnodes to use for the forge test
+      FORGE_RETAIN_DEBUG_LOGS:
+        required: false
+        type: boolean
+        description: Retain debug logs for all nodes
 
 permissions:
   contents: read
@@ -66,6 +70,7 @@ jobs:
           echo "FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}"
           echo "FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}"
           echo "FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}"
+          echo "FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}"
     outputs:
       gitSha: ${{ inputs.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
@@ -91,3 +96,4 @@ jobs:
       FORGE_ENABLE_HAPROXY: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableHaproxy }}
       FORGE_NUM_VALIDATORS: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidators }}
       FORGE_NUM_VALIDATOR_FULLNODES: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidatorFullnodes }}
+      FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
