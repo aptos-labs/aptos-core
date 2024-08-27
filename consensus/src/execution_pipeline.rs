@@ -122,7 +122,6 @@ impl ExecutionPipeline {
             });
             return;
         }
-        debug!("prepare_block received block {}. debug 1", block.id());
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
         let input_txns = input_txns.expect("input_txns must be Some.");
         tokio::task::spawn_blocking(move || {
@@ -137,7 +136,6 @@ impl ExecutionPipeline {
                         .map(|t| t.into())
                         .collect::<Vec<_>>()
                 });
-            debug!("prepare_block received block {}. debug 2", block.id());
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
@@ -201,7 +199,6 @@ impl ExecutionPipeline {
                 .await
             )
             .expect("Failed to spawn_blocking.");
-        debug!("execute_stage received block {}. debug 1", block_id);
 
             ledger_apply_tx
                 .send(LedgerApplyCommand {

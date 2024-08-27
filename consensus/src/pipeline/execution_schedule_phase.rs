@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    pipeline::{
+    counters::{NUM_NON_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS}, pipeline::{
         execution_wait_phase::ExecutionWaitRequest,
         pipeline_phase::{CountedRequest, StatelessPipeline},
-    },
-    state_computer::{PipelineExecutionResult, StateComputeResultFut, SyncStateComputeResultFut},
-    state_replication::StateComputer,
+    }, state_computer::{PipelineExecutionResult, StateComputeResultFut, SyncStateComputeResultFut}, state_replication::StateComputer
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
@@ -86,6 +84,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             match self.execution_futures.entry(block.id()) {
                 dashmap::mapref::entry::Entry::Occupied(_) => {
                     info!("[PreExecution] block was pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                    NUM_PREEXECUTED_BLOCKS.inc();
                 }
                 dashmap::mapref::entry::Entry::Vacant(entry) => {
                     info!("[PreExecution] block was not pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
@@ -94,6 +93,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                         .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned())
                         .await;
                     entry.insert(fut);
+                    NUM_NON_PREEXECUTED_BLOCKS.inc();
                 }
             }
         }
@@ -109,13 +109,17 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             // after all executor calls are over
             for block in &ordered_blocks {
                 debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
-                if let Some((_, fut)) = execution_futures.remove(&block.id()) {
-                    results.push(fut.await)
-                } else {
-                    return Err(ExecutorError::internal_err(format!(
-                        "Failed to find compute result for block {}",
-                        block.id()
-                    )));
+                match execution_futures.entry(block_id) {
+                    dashmap::mapref::entry::Entry::Occupied(entry) => {
+                        let fut = entry.remove();
+                        results.push(fut.await);
+                    }
+                    dashmap::mapref::entry::Entry::Vacant(_) => {
+                        return Err(ExecutorError::internal_err(format!(
+                            "Failed to find compute result for block {}",
+                            block.id()
+                        )));
+                    }
                 }
             }
             let results = itertools::zip_eq(ordered_blocks, results)

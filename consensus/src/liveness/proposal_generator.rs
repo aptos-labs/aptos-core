@@ -517,7 +517,7 @@ impl ProposalGenerator {
         });
 
         observe_block(timestamp, BlockStage::CHECKED_RAND);
-        info!("[ProposalGeneration] Check randomness took: {:?}, round {}", self.time_service.get_current_timestamp() - start_time, round);
+        info!("[ProposalGeneration] Check randomness took: {:?}, round {}, maybe_require_randomness {:?}", self.time_service.get_current_timestamp() - start_time, round, maybe_require_randomness);
 
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(

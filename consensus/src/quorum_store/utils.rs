@@ -595,7 +595,7 @@ impl ProofQueue {
             return_non_full = return_non_full,
             proof_with_data = proof_with_data,
             proof_without_data = proof_without_data,
-            "Pull payloads from QuorumStore: internal"
+            "daniel debug Pull payloads from QuorumStore: internal"
         );
 
         if full || return_non_full {

@@ -55,7 +55,6 @@ impl StatelessPipeline for PreExecutionPhase {
                     .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned())
                     .await;
                 entry.insert(fut);
-                info!("[PreExecution] inserted pre-execute block of epoch {} round {} id {}", block.epoch(), block.round(), block.id());
             }
         }
     }
