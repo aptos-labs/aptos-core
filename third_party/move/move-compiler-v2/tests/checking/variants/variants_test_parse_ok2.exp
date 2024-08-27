@@ -1,0 +1,15 @@
+// -- Model dump before bytecode pipeline
+module 0x815::m {
+    enum Color {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    private fun test_red_or_rgb(c: m::Color): bool {
+        test_variants m::Color::Red(c)
+    }
+} // end 0x815::m

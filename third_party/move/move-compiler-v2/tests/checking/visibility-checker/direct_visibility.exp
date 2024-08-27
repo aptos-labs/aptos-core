@@ -1,0 +1,22 @@
+// -- Model dump before bytecode pipeline
+module 0x815::b {
+    friend fun f() {
+        Tuple()
+    }
+} // end 0x815::b
+module 0x815::a {
+    friend fun f() {
+        Tuple()
+    }
+    friend fun g() {
+        Tuple()
+    }
+} // end 0x815::a
+module 0x815::c {
+    public fun f() {
+        a::f();
+        a::g();
+        b::f();
+        Tuple()
+    }
+} // end 0x815::c
