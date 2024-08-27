@@ -133,11 +133,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(true),
         },
         Experiment {
-            name: Experiment::OPTIMIZE_NONE.to_string(),
-            description: "Use no optional optimizations".to_string(),
-            default: Given(false),
-        },
-        Experiment {
             name: Experiment::OPTIMIZE_FULL.to_string(),
             description: "Use most aggressive optimizations".to_string(),
             default: Given(false),
@@ -273,7 +268,6 @@ impl Experiment {
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const OPTIMIZE_FULL: &'static str = "optimize-full";
-    pub const OPTIMIZE_NONE: &'static str = "optimize-none";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";

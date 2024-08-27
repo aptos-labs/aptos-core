@@ -1045,10 +1045,10 @@ impl FromStr for OptimizationLevel {
     /// Parses a language version. If the caller only provides a major
     /// version number, this chooses the latest stable minor version (if any).
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
-            "NONE" => Ok(Self::None),
-            "STANDARD" => Ok(Self::Standard),
-            "FULL" => Ok(Self::Full),
+        match s.to_lowercase().as_str() {
+            "none" => Ok(Self::None),
+            "standard" => Ok(Self::Standard),
+            "full" => Ok(Self::Full),
             _ => bail!(
                 "unrecognized optimization level `{}` (supported versions: `none`, `standard`, `full`)",
                 s
@@ -1130,10 +1130,6 @@ pub struct MovePackageDir {
     #[clap(long, value_parser = clap::value_parser!(OptimizationLevel))]
     pub optimization_level: Option<OptimizationLevel>,
 
-    /// Enable lint
-    #[clap(long)]
-    pub lint: bool,
-
     /// Experiments
     #[clap(long, hide(true))]
     pub experiments: Vec<String>,
@@ -1155,7 +1151,6 @@ impl MovePackageDir {
             check_test_code: false,
             move_2: false,
             optimization_level: None,
-            lint: false,
             experiments: vec![],
         }
     }

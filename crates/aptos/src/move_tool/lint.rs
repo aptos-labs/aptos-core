@@ -11,12 +11,13 @@ use clap::Parser;
 use move_compiler_v2::Experiment;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 
-/// Compile the package with --lint flag to show lint warnings, in addition
-/// to ordinary warnings/and or errors if found.
+/// Compile the package with LINT pass enabled to show lint warnings, in addition to ordinary
+/// warnings/and or errors if found.
 ///
-/// Ideally, we would skip code generation, but there seems to be no great
-/// way to do that today, so it is equivalent to `aptos move build --lint --move-2`
-/// and a few extra warning passes.
+/// Ideally, we would skip code generation, but currently this is not possible, but we omit
+/// metadata generation, which hopefully renders the output not able to be uploaded.
+///
+/// We do turn optimizations off, to hopefully make this a little faster.
 #[derive(Parser)]
 pub struct LintPackage {
     // TODO: add some options to select certain lint/warning passes?
@@ -35,7 +36,6 @@ impl CliCommand<&'static str> for LintPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         let move_options = MovePackageDir {
-            lint: true,
             optimization_level: Some(OptimizationLevel::None),
             move_2: true,
             // TODO: These should be set more automatically.

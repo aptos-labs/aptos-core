@@ -510,8 +510,12 @@ fn fix_bytecode_version(
     bytecode_version_in: Option<u32>,
     language_version: Option<LanguageVersion>,
 ) -> Option<u32> {
-    if let Some(language_version) = language_version {
-        Some(language_version.infer_bytecode_version(bytecode_version_in))
+    if bytecode_version_in.is_none() {
+        if let Some(language_version) = language_version {
+            Some(language_version.infer_bytecode_version(bytecode_version_in))
+        } else {
+            bytecode_version_in
+        }
     } else {
         bytecode_version_in
     }
@@ -542,7 +546,6 @@ impl CliCommand<&'static str> for TestPackage {
                 compiler_version: self.move_options.compiler_version,
                 language_version: self.move_options.language_version,
                 experiments: experiments_from_opt_level(&self.move_options.optimization_level),
-                ..Default::default()
             },
             ..Default::default()
         };
@@ -816,10 +819,7 @@ fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<Strin
         None | Some(OptimizationLevel::Standard) => {
             vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]
         },
-        Some(OptimizationLevel::None) => vec![
-            format!("{}=on", Experiment::OPTIMIZE_NONE.to_string()),
-            format!("{}=off", Experiment::OPTIMIZE.to_string()),
-        ],
+        Some(OptimizationLevel::None) => vec![format!("{}=off", Experiment::OPTIMIZE.to_string())],
         Some(OptimizationLevel::Full) => vec![
             format!("{}=on", Experiment::OPTIMIZE_FULL.to_string()),
             format!("{}=on", Experiment::OPTIMIZE.to_string()),
@@ -866,12 +866,7 @@ impl IncludedArtifacts {
                         .to_string(),
                 ));
             };
-            if move_options.lint {
-                return Err(CliError::CommandArgumentError(
-                    "`--lint` flag is not compatible with Move Compiler V1".to_string(),
-                ));
-            };
-            if !experiments.is_empty() {
+            if !move_options.experiments.is_empty() {
                 return Err(CliError::CommandArgumentError(
                     "`--experiments` flag is not compatible with Move Compiler V1".to_string(),
                 ));
@@ -1290,7 +1285,7 @@ fn build_package_options(
 ) -> anyhow::Result<BuiltPackage> {
     let options = included_artifacts_args
         .included_artifacts
-        .build_options(&move_options)?;
+        .build_options(move_options)?;
     BuiltPackage::build(move_options.get_package_path()?, options)
 }
 
