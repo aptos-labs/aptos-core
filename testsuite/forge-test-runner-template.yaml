@@ -36,6 +36,8 @@ spec:
           value: {FORGE_TEST_SUITE}
         - name: FORGE_USERNAME
           value: {FORGE_USERNAME}
+        - name: FORGE_RETAIN_DEBUG_LOGS
+          value: "{FORGE_RETAIN_DEBUG_LOGS}"
         - name: PROMETHEUS_URL
           valueFrom:
             secretKeyRef:

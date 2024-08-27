@@ -553,20 +553,39 @@ impl Modifiers {
 // ModuleMemberModifiers checks for uniqueness, meaning each individual ModuleMemberModifier can
 // appear only once
 fn parse_module_member_modifiers(context: &mut Context) -> Result<Modifiers, Box<Diagnostic>> {
+    let check_previous_vis = |context: &mut Context, mods: &mut Modifiers, vis: &Visibility| {
+        if let Some(prev_vis) = &mods.visibility {
+            let msg = "Duplicate visibility modifier".to_string();
+            let prev_msg = "Visibility modifier previously given here".to_string();
+            context.env.add_diag(diag!(
+                Declarations::DuplicateItem,
+                (vis.loc().unwrap(), msg),
+                (prev_vis.loc().unwrap(), prev_msg),
+            ));
+        }
+    };
     let mut mods = Modifiers::empty();
     loop {
         match context.tokens.peek() {
             Tok::Public => {
                 let vis = parse_visibility(context)?;
-                if let Some(prev_vis) = mods.visibility {
-                    let msg = "Duplicate visibility modifier".to_string();
-                    let prev_msg = "Visibility modifier previously given here".to_string();
-                    context.env.add_diag(diag!(
-                        Declarations::DuplicateItem,
-                        (vis.loc().unwrap(), msg),
-                        (prev_vis.loc().unwrap(), prev_msg),
-                    ));
-                }
+                check_previous_vis(context, &mut mods, &vis);
+                mods.visibility = Some(vis)
+            },
+            Tok::Friend => {
+                let loc = current_token_loc(context.tokens);
+                context.tokens.advance()?;
+                require_move_2(context, loc, "direct `friend` declaration");
+                let vis = Visibility::Friend(loc);
+                check_previous_vis(context, &mut mods, &vis);
+                mods.visibility = Some(vis)
+            },
+            Tok::Identifier if context.tokens.content() == "package" => {
+                let loc = current_token_loc(context.tokens);
+                context.tokens.advance()?;
+                require_move_2(context, loc, "direct `package` declaration");
+                let vis = Visibility::Package(loc);
+                check_previous_vis(context, &mut mods, &vis);
                 mods.visibility = Some(vis)
             },
             Tok::Native => {
@@ -605,6 +624,8 @@ fn parse_module_member_modifiers(context: &mut Context) -> Result<Modifiers, Box
 
 // Parse a function visibility modifier:
 //      Visibility = "public" ( "(" "script" | "friend" | "package" ")" )?
+// Notice that "package" and "friend" visibility can also directly be provided
+// without "public" in declarations, but this is not handled by this function
 fn parse_visibility(context: &mut Context) -> Result<Visibility, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     consume_token(context.tokens, Tok::Public)?;
@@ -3266,7 +3287,12 @@ fn parse_module(
                 },
                 // Regular move constructs
                 Tok::Use => ModuleMember::Use(parse_use_decl(attributes, context)?),
-                Tok::Friend => ModuleMember::Friend(parse_friend_decl(attributes, context)?),
+                Tok::Friend if context.tokens.lookahead()? != Tok::Fun => {
+                    // Only interpret as module friend declaration if not directly
+                    // followed by fun keyword. This is invalid syntax in v1, so
+                    // we can re-interpret it for Move 2.
+                    ModuleMember::Friend(parse_friend_decl(attributes, context)?)
+                },
                 _ => {
                     context.tokens.match_doc_comments();
                     let start_loc = context.tokens.start_loc();
