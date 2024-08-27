@@ -69,7 +69,7 @@ pub struct PipelinedBlock {
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,
     execution_summary: Arc<OnceCell<ExecutionSummary>>,
-    committed_transactions: OnceCell<Vec<HashValue>>,
+    committed_transactions: Arc<OnceCell<Vec<HashValue>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -121,6 +121,12 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             randomness,
         } = SerializedBlock::deserialize(deserializer)?;
 
+        info!(
+            "Deserialized PipelinedBlock: ({}, {}) {}",
+            block.epoch(),
+            block.round(),
+            block.id()
+        );
         let block = PipelinedBlock {
             block,
             block_window,
@@ -129,7 +135,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
-            committed_transactions: OnceCell::new(),
+            committed_transactions: Arc::new(OnceCell::new()),
         };
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -203,6 +209,12 @@ impl PipelinedBlock {
         if self.committed_transactions.get().is_some() {
             error!("Re-inserting committed transactions");
         } else {
+            info!(
+                "Setting committed transactions: ({}, {}) {}",
+                self.epoch(),
+                self.round(),
+                self.id()
+            );
             self.committed_transactions
                 .set(committed_transactions)
                 .expect("inserting into empty committed transactions");
@@ -255,7 +267,7 @@ impl PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
-            committed_transactions: OnceCell::new(),
+            committed_transactions: Arc::new(OnceCell::new()),
         }
     }
 
@@ -276,7 +288,7 @@ impl PipelinedBlock {
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: Arc::new(OnceCell::new()),
-            committed_transactions: OnceCell::new(),
+            committed_transactions: Arc::new(OnceCell::new()),
         }
     }
 
@@ -384,8 +396,25 @@ impl PipelinedBlock {
         self.execution_summary.get().cloned()
     }
 
-    pub fn wait_for_committed_transactions(&self) -> &Vec<HashValue> {
-        self.committed_transactions.wait()
+    pub fn wait_for_committed_transactions(&self) -> &[HashValue] {
+        if self.block().is_genesis_block() || self.block.is_nil_block() {
+            return &[];
+        }
+
+        info!(
+            "Waiting for committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        let result = self.committed_transactions.wait();
+        info!(
+            "Done waiting for committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        result
     }
 }
 

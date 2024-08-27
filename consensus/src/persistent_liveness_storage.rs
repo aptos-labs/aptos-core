@@ -438,6 +438,8 @@ impl PersistentLivenessStorage for StorageWriteProxy {
     }
 
     fn start(&self, order_vote_enabled: bool, window_size: usize) -> LivenessStorageData {
+        // TODO: during consensus recovery, set committed transactions for any blocks in the window
+        // TODO: where it is missing. at this point aptos_db should be up to date.
         info!("Start consensus recovery.");
         let raw_data = self
             .db
