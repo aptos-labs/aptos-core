@@ -829,6 +829,15 @@ fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<Strin
 
 impl IncludedArtifacts {
     pub(crate) fn build_options(self, move_options: &MovePackageDir) -> BuildOptions {
+        self.build_options_with_experiments(move_options, vec![], false)
+    }
+
+    pub(crate) fn build_options_with_experiments(
+        self,
+        move_options: &MovePackageDir,
+        mut more_experiments: Vec<String>,
+        skip_codegen: bool,
+    ) -> BuildOptions {
         let dev = move_options.dev;
         let skip_fetch_latest_git_deps = move_options.skip_fetch_latest_git_deps;
         let named_addresses = move_options.named_addresses();
@@ -840,7 +849,9 @@ impl IncludedArtifacts {
         let skip_attribute_checks = move_options.skip_attribute_checks;
         let check_test_code = move_options.check_test_code;
         let optimization_level = move_options.optimization_level.clone();
-        let base_experiments = experiments_from_opt_level(&optimization_level);
+        let mut experiments = experiments_from_opt_level(&optimization_level);
+        experiments.append(&mut move_options.experiments.clone());
+        experiments.append(&mut more_experiments);
         let base_options = BuildOptions {
             dev,
             // Always enable error map bytecode injection
@@ -853,8 +864,8 @@ impl IncludedArtifacts {
             language_version,
             skip_attribute_checks,
             check_test_code,
+            experiments,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
-            experiments: base_experiments,
             ..BuildOptions::default()
         };
         use IncludedArtifacts::*;

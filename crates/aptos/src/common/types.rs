@@ -1133,6 +1133,10 @@ pub struct MovePackageDir {
     /// Enable lint
     #[clap(long)]
     pub lint: bool,
+
+    /// Experiments
+    #[clap(long, hide(true))]
+    pub experiments: Vec<String>,
 }
 
 impl MovePackageDir {
@@ -1152,6 +1156,7 @@ impl MovePackageDir {
             move_2: false,
             optimization_level: None,
             lint: false,
+            experiments: vec![],
         }
     }
 

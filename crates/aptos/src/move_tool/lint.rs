@@ -44,18 +44,18 @@ impl CliCommand<&'static str> for LintPackage {
             static EINVAL: i32 = 22;
             std::process::exit(EINVAL);
         };
+        let more_experiments = vec![
+            Experiment::LINT_CHECKS.to_string(),
+            Experiment::SPEC_CHECK.to_string(),
+            Experiment::SEQS_IN_BINOPS_CHECK.to_string(),
+            Experiment::ACCESS_CHECK.to_string(),
+            Experiment::STOP_AFTER_EXTENDED_CHECKS.to_string(),
+        ];
         let build_options = BuildOptions {
-            experiments: vec![
-                Experiment::LINT_CHECKS.to_string(),
-                Experiment::SPEC_CHECK.to_string(),
-                Experiment::SEQS_IN_BINOPS_CHECK.to_string(),
-                Experiment::ACCESS_CHECK.to_string(),
-                Experiment::STOP_AFTER_EXTENDED_CHECKS.to_string(),
-            ],
             ..self
                 .included_artifacts_args
                 .included_artifacts
-                .build_options(&move_options)
+                .build_options_with_experiments(&move_options, more_experiments, true)
         };
         BuiltPackage::build(self.move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
