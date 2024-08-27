@@ -354,8 +354,8 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             num_bounded_executor_tasks: 16,
-            optimistic_sig_verification_for_votes: false,
-            optimistic_sig_verification_for_order_votes: false,
+            optimistic_sig_verification_for_votes: true,
+            optimistic_sig_verification_for_order_votes: true,
         }
     }
 }

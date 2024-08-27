@@ -150,7 +150,8 @@ impl Hash for ValidatorVerifier {
         self.quorum_voting_power.hash(state);
         self.total_voting_power.hash(state);
 
-        let mut entries: Vec<(&AccountAddress, &usize)> = self.address_to_validator_index.iter().collect();
+        let mut entries: Vec<(&AccountAddress, &usize)> =
+            self.address_to_validator_index.iter().collect();
         entries.sort_by(|a, b| a.0.cmp(b.0));
         entries.hash(state);
     }

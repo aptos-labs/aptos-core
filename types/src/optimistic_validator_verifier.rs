@@ -3,19 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_address::AccountAddress, aggregate_signature::{AggregateSignature, PartialSignatures}, ledger_info::LedgerInfo, validator_verifier::{ValidatorVerifier, VerifyError}
+    account_address::AccountAddress,
+    aggregate_signature::{AggregateSignature, PartialSignatures},
+    ledger_info::LedgerInfo,
+    validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use anyhow::Result;
 use aptos_crypto::bls12381;
+use lru::LruCache;
 // use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::Serialize;
 use std::{
     collections::HashMap,
-    sync::Arc,
-    marker::{Send + Sync},
+    marker::{Send, Sync},
+    sync::{Arc, RwLock},
 };
-use lru::LruCache;
 
 pub enum VerificationResult<VoteType> {
     Verified((HashMap<AccountAddress, VoteType>, AggregateSignature)),
@@ -40,10 +43,10 @@ struct SignatureData<VoteType> {
 #[derive(Debug)]
 pub struct OptimisticValidatorVerifier<VoteType> {
     validator_verifier: Arc<ValidatorVerifier>,
-    vote_data: Arc<HashMap<LedgerInfo, SignatureData<VoteType>>>,
-    // Cache of the most recent aggregated messages. If more votes are received for these messages, 
+    vote_data: Arc<RwLock<HashMap<LedgerInfo, Arc<RwLock<SignatureData<VoteType>>>>>>,
+    // Cache of the most recent aggregated messages. If more votes are received for these messages,
     // we can ignore the votes.
-    recent_aggregated_blocks: Arc<LruCache<LedgerInfo, ()>>,
+    recent_aggregated_blocks: Arc<RwLock<LruCache<LedgerInfo, ()>>>,
     verification_frequency: u64,
 }
 
@@ -51,20 +54,17 @@ pub struct OptimisticValidatorVerifier<VoteType> {
 // TODO: How do we handle when a vote verification fails and a validator becomes untrusted?
 // TODO: After an aggregate signature is formed for a message, should we remove immediately? How to handle the next set of votes received for the same message?
 // TODO: Need to make sure the verificaiton can be done in parallel. This may not be the case when having mut signature_data.
-
 impl<VoteType: Sync + Send + Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> {
-    pub fn new(
-        validator_verifier: Arc<ValidatorVerifier>,
-        verification_frequency: u64,
-    ) -> Self {
+    pub fn new(validator_verifier: Arc<ValidatorVerifier>, verification_frequency: u64) -> Self {
         Self {
             validator_verifier,
-            vote_data: Arc::new(HashMap::new()),
-            recent_aggregated_blocks: Arc::new(LruCache::new(50)),
+            vote_data: Arc::new(RwLock::new(HashMap::new())),
+            recent_aggregated_blocks: Arc::new(RwLock::new(LruCache::new(50))),
             verification_frequency,
         }
     }
 
+    // TODO: unwrap() is used in a bunch of places when locking the RwLock. Should we handle this differently?
     pub fn verify(
         &self,
         author: AccountAddress,
@@ -73,22 +73,34 @@ impl<VoteType: Sync + Send + Sized + Clone + PartialEq> OptimisticValidatorVerif
         vote: &VoteType,
     ) -> Result<VerificationResult<VoteType>, VerifyError> {
         // Check if the block is already present in recent_aggregated_blocks
-        if self.recent_aggregated_blocks.contains(block) {
+        if self
+            .recent_aggregated_blocks
+            .read()
+            .unwrap()
+            .contains(block)
+        {
             return Ok(VerificationResult::AggregatedBefore);
         }
 
         if self.validator_verifier.get_voting_power(&author).is_none() {
             return Err(VerifyError::UnknownAuthor);
         }
-        
-        let signature_data = self.vote_data.entry(block.clone()).or_insert_with(|| SignatureData {
-            unverified_votes: HashMap::new(),
-            verified_votes: HashMap::new(),
-            aggregated_signature: None,
-            first_vote_timestamp_usecs: aptos_infallible::duration_since_epoch().as_micros() as u64,
-            last_vote_timestamp_usecs: aptos_infallible::duration_since_epoch().as_micros() as u64,
+
+        // TODO: As vote_data is being locked here, does this mean the verify operation is sequential?
+        let mut vote_data = self.vote_data.write().unwrap();
+        let signature_data = vote_data.entry(block.clone()).or_insert_with(|| {
+            Arc::new(RwLock::new(SignatureData {
+                unverified_votes: HashMap::new(),
+                verified_votes: HashMap::new(),
+                aggregated_signature: None,
+                first_vote_timestamp_usecs: aptos_infallible::duration_since_epoch().as_micros()
+                    as u64,
+                last_vote_timestamp_usecs: aptos_infallible::duration_since_epoch().as_micros()
+                    as u64,
+            }))
         });
-        
+
+        let mut signature_data = signature_data.write().unwrap();
         // Check if a verified signature is already received for the author.
         if signature_data.verified_votes.contains_key(&author) {
             return Ok(VerificationResult::DuplicateVote);
@@ -105,35 +117,75 @@ impl<VoteType: Sync + Send + Sized + Clone + PartialEq> OptimisticValidatorVerif
             return Ok(VerificationResult::DuplicateVote);
         }
 
-        signature_data.unverified_votes.insert(author, (signature.clone(), vote.clone()));
+        signature_data
+            .unverified_votes
+            .insert(author, (signature.clone(), vote.clone()));
 
         // If there are enough votes, aggregate the unverified votes and verify the signature.
-        let voted_authors = signature_data.verified_votes.keys().chain(signature_data.unverified_votes.keys());
-        let has_enough_voting_power = self.validator_verifier.check_voting_power(voted_authors, true).is_ok();
-        if has_enough_voting_power || signature_data.unverified_votes.len() as u64 >= self.verification_frequency {
+        let voted_authors = signature_data
+            .verified_votes
+            .keys()
+            .chain(signature_data.unverified_votes.keys());
+        let has_enough_voting_power = self
+            .validator_verifier
+            .check_voting_power(voted_authors, true)
+            .is_ok();
+        if has_enough_voting_power
+            || signature_data.unverified_votes.len() as u64 >= self.verification_frequency
+        {
             let aggregated_signature = self.validator_verifier.aggregate_signatures(
-                &PartialSignatures::new(signature_data.unverified_votes.iter().map(|(account_address, (signature, _))| (*account_address, signature.clone())).collect()),
-                signature_data.aggregated_signature.clone()
+                &PartialSignatures::new(
+                    signature_data
+                        .unverified_votes
+                        .iter()
+                        .map(|(account_address, (signature, _))| {
+                            (*account_address, signature.clone())
+                        })
+                        .collect(),
+                ),
+                signature_data.aggregated_signature.clone(),
             )?;
-            match self.validator_verifier.verify_multi_signatures(block, &aggregated_signature) {
+            match self
+                .validator_verifier
+                .verify_multi_signatures(block, &aggregated_signature)
+            {
                 Ok(_) => {
+                    let unverified_votes = signature_data
+                        .unverified_votes
+                        .iter()
+                        .map(|(account_address, (_signature, vote))| {
+                            (*account_address, vote.clone())
+                        })
+                        .collect::<Vec<_>>();
+                    signature_data.verified_votes.extend(unverified_votes);
                     signature_data.aggregated_signature = Some(aggregated_signature.clone());
-                    signature_data.verified_votes.extend(signature_data.unverified_votes.iter().map(|(account_address, (_signature, vote))| (*account_address, vote.clone())).collect::<Vec<_>>());
                     signature_data.unverified_votes.clear();
                 },
                 Err(err) => {
                     // TODO: Need to return/print this error.
                     println!("Failed to verify aggregated signature {:?}", err);
-                    let unverified_signatures = signature_data.unverified_votes.iter().map(|(account_address, (signature, _vote))| (*account_address, signature.clone())).collect::<Vec<_>>();
-                    let verified_votes = unverified_signatures.into_par_iter().flat_map(|(account_address, signature)| {
-                        match self.validator_verifier.verify(account_address, block, &signature) {
-                            Ok(_) => Some((account_address, signature)),
-                            Err(_) => None,
-                        }
-                    }).collect::<Vec<_>>();
+                    let unverified_signatures = signature_data
+                        .unverified_votes
+                        .iter()
+                        .map(|(account_address, (signature, _vote))| {
+                            (*account_address, signature.clone())
+                        })
+                        .collect::<Vec<_>>();
+                    let verified_votes = unverified_signatures
+                        .into_par_iter()
+                        .flat_map(|(account_address, signature)| {
+                            match self
+                                .validator_verifier
+                                .verify(account_address, block, &signature)
+                            {
+                                Ok(_) => Some((account_address, signature)),
+                                Err(_) => None,
+                            }
+                        })
+                        .collect::<Vec<_>>();
                     let aggregated_signature = self.validator_verifier.aggregate_signatures(
                         &PartialSignatures::new(verified_votes.iter().cloned().collect()),
-                        signature_data.aggregated_signature.clone()
+                        signature_data.aggregated_signature.clone(),
                     )?;
                     signature_data.aggregated_signature = Some(aggregated_signature.clone());
                     for (author, _) in verified_votes {
@@ -141,12 +193,22 @@ impl<VoteType: Sync + Send + Sized + Clone + PartialEq> OptimisticValidatorVerif
                         signature_data.verified_votes.insert(author, vote);
                     }
                     signature_data.unverified_votes.clear();
-                }
+                },
             }
 
-            if self.validator_verifier.check_voting_power(signature_data.verified_votes.keys(), true).is_ok() {
-                self.recent_aggregated_blocks.put(block.clone(), ());
-                return Ok(VerificationResult::Verified((signature_data.verified_votes.clone(), aggregated_signature)));
+            if self
+                .validator_verifier
+                .check_voting_power(signature_data.verified_votes.keys(), true)
+                .is_ok()
+            {
+                self.recent_aggregated_blocks
+                    .write()
+                    .unwrap()
+                    .put(block.clone(), ());
+                return Ok(VerificationResult::Verified((
+                    signature_data.verified_votes.clone(),
+                    aggregated_signature,
+                )));
             } else {
                 return Ok(VerificationResult::NotEnoughVotes);
             }

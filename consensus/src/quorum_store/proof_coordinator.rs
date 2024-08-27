@@ -122,9 +122,10 @@ impl IncrementalProofState {
         }
         self.completed = true;
 
-        match validator_verifier
-            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature.clone()), None)
-        {
+        match validator_verifier.aggregate_signatures(
+            &PartialSignatures::new(self.aggregated_signature.clone()),
+            None,
+        ) {
             Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         }

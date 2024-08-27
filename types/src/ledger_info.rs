@@ -40,7 +40,9 @@ use std::{
 /// LedgerInfo with the `version` being the latest version that will be committed if B gets 2f+1
 /// votes. It sets `consensus_data_hash` to represent B so that if those 2f+1 votes are gathered a
 /// QC is formed on B.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(
+    Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct LedgerInfo {
     commit_info: BlockInfo,
