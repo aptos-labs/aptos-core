@@ -19,6 +19,8 @@ use strum_macros::{Display, EnumString};
 pub enum LintChecker {
     AvoidCopyOnIdentityComparison,
     BlocksInConditions,
+    NeedlessBool,
+    SimplerNumericExpression,
     UnnecessaryBooleanIdentityComparison,
     UnnecessaryNumericalExtremeComparison,
     WhileTrue,
