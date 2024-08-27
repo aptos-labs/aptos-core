@@ -83,7 +83,7 @@ jobs:
       forgeNumValidatorFullnodes: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
 
   adhoc-forge-test:
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@aluon/retain-all-forge-logs
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     needs: [determine-forge-run-metadata]
     secrets: inherit
     with:
