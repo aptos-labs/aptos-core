@@ -462,6 +462,8 @@ impl BlockStore {
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn set_back_pressure_for_test(&self, back_pressure: bool) {
+        use std::sync::atomic::Ordering;
+
         self.back_pressure_for_test
             .store(back_pressure, Ordering::Relaxed)
     }
@@ -513,6 +515,7 @@ impl BlockReader for BlockStore {
         self.inner.read().path_from_commit_root(block_id)
     }
 
+    #[cfg(test)]
     fn highest_certified_block(&self) -> Arc<PipelinedBlock> {
         self.inner.read().highest_certified_block()
     }

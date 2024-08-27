@@ -366,6 +366,7 @@ impl serde::Serialize for any_public_key::Type {
             Self::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
             Self::Secp256r1Ecdsa => "TYPE_SECP256R1_ECDSA",
             Self::Keyless => "TYPE_KEYLESS",
+            Self::FederatedKeyless => "TYPE_FEDERATED_KEYLESS",
         };
         serializer.serialize_str(variant)
     }
@@ -382,6 +383,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
             "TYPE_SECP256K1_ECDSA",
             "TYPE_SECP256R1_ECDSA",
             "TYPE_KEYLESS",
+            "TYPE_FEDERATED_KEYLESS",
         ];
 
         struct GeneratedVisitor;
@@ -429,6 +431,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
                     "TYPE_SECP256K1_ECDSA" => Ok(any_public_key::Type::Secp256k1Ecdsa),
                     "TYPE_SECP256R1_ECDSA" => Ok(any_public_key::Type::Secp256r1Ecdsa),
                     "TYPE_KEYLESS" => Ok(any_public_key::Type::Keyless),
+                    "TYPE_FEDERATED_KEYLESS" => Ok(any_public_key::Type::FederatedKeyless),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -4162,6 +4165,9 @@ impl serde::Serialize for MoveStruct {
         if self.is_native {
             len += 1;
         }
+        if self.is_event {
+            len += 1;
+        }
         if !self.abilities.is_empty() {
             len += 1;
         }
@@ -4177,6 +4183,9 @@ impl serde::Serialize for MoveStruct {
         }
         if self.is_native {
             struct_ser.serialize_field("isNative", &self.is_native)?;
+        }
+        if self.is_event {
+            struct_ser.serialize_field("isEvent", &self.is_event)?;
         }
         if !self.abilities.is_empty() {
             let v = self.abilities.iter().cloned().map(|v| {
@@ -4204,6 +4213,8 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
             "name",
             "is_native",
             "isNative",
+            "is_event",
+            "isEvent",
             "abilities",
             "generic_type_params",
             "genericTypeParams",
@@ -4214,6 +4225,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
         enum GeneratedField {
             Name,
             IsNative,
+            IsEvent,
             Abilities,
             GenericTypeParams,
             Fields,
@@ -4240,6 +4252,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                         match value {
                             "name" => Ok(GeneratedField::Name),
                             "isNative" | "is_native" => Ok(GeneratedField::IsNative),
+                            "isEvent" | "is_event" => Ok(GeneratedField::IsEvent),
                             "abilities" => Ok(GeneratedField::Abilities),
                             "genericTypeParams" | "generic_type_params" => Ok(GeneratedField::GenericTypeParams),
                             "fields" => Ok(GeneratedField::Fields),
@@ -4264,6 +4277,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
             {
                 let mut name__ = None;
                 let mut is_native__ = None;
+                let mut is_event__ = None;
                 let mut abilities__ = None;
                 let mut generic_type_params__ = None;
                 let mut fields__ = None;
@@ -4280,6 +4294,12 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                                 return Err(serde::de::Error::duplicate_field("isNative"));
                             }
                             is_native__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::IsEvent => {
+                            if is_event__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("isEvent"));
+                            }
+                            is_event__ = Some(map.next_value()?);
                         }
                         GeneratedField::Abilities => {
                             if abilities__.is_some() {
@@ -4304,6 +4324,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                 Ok(MoveStruct {
                     name: name__.unwrap_or_default(),
                     is_native: is_native__.unwrap_or_default(),
+                    is_event: is_event__.unwrap_or_default(),
                     abilities: abilities__.unwrap_or_default(),
                     generic_type_params: generic_type_params__.unwrap_or_default(),
                     fields: fields__.unwrap_or_default(),

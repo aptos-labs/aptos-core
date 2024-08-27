@@ -252,7 +252,12 @@ impl ReleaseEntry {
                     ),
                     None => {
                         match client {
-                            Some(client) => Some(fetch_config::<GasScheduleV2>(client)?),
+                            Some(_client) => {
+                                // We could return `Some(fetch_config::<GasScheduleV2>(client)?)`,
+                                // but this makes certain test scenarios flaky, so just return
+                                // None here
+                                None
+                            },
                             None => {
                                 println!("!!! WARNING !!!");
                                 println!("Generating gas schedule upgrade without a base for comparison.");

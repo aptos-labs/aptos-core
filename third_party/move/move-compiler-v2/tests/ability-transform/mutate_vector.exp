@@ -121,54 +121,51 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      var $t5: &mut m::Scalar
      var $t6: u64
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t2 := m::scalar_zero()
      # live vars: $t0, $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t5 := borrow_local($t2)
      # live vars: $t0, $t2, $t5
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[]}
-     # locals: {$t2=@100,$t5=@101}
-     # globals: {}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`] at line 11
      #
   2: $t4 := borrow_field<m::Scalar>.data($t5)
      # live vars: $t0, $t2, $t4
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[borrow_mut.data -> @201],@201=derived[]}
-     # locals: {$t2=@100,$t4=@201}
-     # globals: {}
-     # derived-from: @201=$t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `data`] at line 11
      #
   3: $t6 := 0
      # live vars: $t0, $t2, $t4, $t6
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[borrow_mut.data -> @201],@201=derived[]}
-     # locals: {$t2=@100,$t4=@201}
-     # globals: {}
-     # derived-from: @201=$t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `data`] at line 11
      #
   4: $t3 := vector::borrow_mut<u8>($t4, $t6)
      # live vars: $t0, $t2, $t3
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[borrow_mut.data -> @201],@201=derived[call_mut@4 -> @400],@400=derived[]}
-     # locals: {$t2=@100,$t3=@400}
-     # globals: {}
-     # derived-from: @201=$t5,@400=$t4
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [local `s`, field `data`] at line 11
      #
   5: write_ref($t3, $t0)
      # live vars: $t2
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   6: $t1 := infer($t2)
      # live vars: $t1
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   7: return $t1
 }
@@ -179,21 +176,15 @@ public fun m::scalar_zero(): m::Scalar {
      var $t0: m::Scalar
      var $t1: vector<u8>
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t1 := [0]
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t0 := pack m::Scalar($t1)
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: return $t0
 }
@@ -210,61 +201,58 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      var $t6: u64
      # abort state: {returns,aborts}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t2 := m::scalar_zero()
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t5 := borrow_local($t2)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t5
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[]}
-     # locals: {$t2=@100,$t5=@101}
-     # globals: {}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => (mut) #5 via [local `s`] at line 11
      #
   2: $t4 := borrow_field<m::Scalar>.data($t5)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[borrow_mut.data -> @201],@201=derived[]}
-     # locals: {$t2=@100,$t4=@201}
-     # globals: {}
-     # derived-from: @201=$t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `data`] at line 11
      #
   3: $t6 := 0
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4, $t6
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[borrow_mut.data -> @201],@201=derived[]}
-     # locals: {$t2=@100,$t4=@201}
-     # globals: {}
-     # derived-from: @201=$t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => (mut) #4 via [local `s`, field `data`] at line 11
      #
   4: $t3 := vector::borrow_mut<u8>($t4, $t6)
      # abort state: {returns}
      # live vars: $t0, $t2, $t3
-     # graph: {@100=local($t2)[borrow_mut -> @101],@101=derived[borrow_mut.data -> @201],@201=derived[call_mut@4 -> @400],@400=derived[]}
-     # locals: {$t2=@100,$t3=@400}
-     # globals: {}
-     # derived-from: @201=$t5,@400=$t4
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [local `s`, field `data`] at line 11
      #
   5: write_ref($t3, $t0)
      # abort state: {returns}
      # live vars: $t2
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   6: $t1 := infer($t2)
      # abort state: {returns}
      # live vars: $t1
-     # graph: {@100=local($t2)[]}
-     # locals: {$t2=@100}
-     # globals: {}
+     # refs: []
      #
   7: return $t1
 }
@@ -276,23 +264,17 @@ public fun m::scalar_zero(): m::Scalar {
      var $t1: vector<u8>
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t1 := [0]
      # abort state: {returns}
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t0 := pack m::Scalar($t1)
      # abort state: {returns}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: return $t0
 }

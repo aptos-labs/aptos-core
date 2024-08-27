@@ -36,14 +36,14 @@ module aptos_std::any {
     }
 
     /// Unpack a value from the `Any` representation. This aborts if the value has not the expected type `T`.
-    public fun unpack<T>(x: Any): T {
-        assert!(type_info::type_name<T>() == x.type_name, error::invalid_argument(ETYPE_MISMATCH));
-        from_bytes<T>(x.data)
+    public fun unpack<T>(self: Any): T {
+        assert!(type_info::type_name<T>() == self.type_name, error::invalid_argument(ETYPE_MISMATCH));
+        from_bytes<T>(self.data)
     }
 
     /// Returns the type name of this Any
-    public fun type_name(x: &Any): &String {
-        &x.type_name
+    public fun type_name(self: &Any): &String {
+        &self.type_name
     }
 
     #[test_only]

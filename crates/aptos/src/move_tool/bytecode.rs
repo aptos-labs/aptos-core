@@ -214,6 +214,7 @@ impl BytecodeCommand {
             only_externally_visible: false,
             print_basic_blocks: true,
             print_locals: true,
+            print_bytecode_stats: false,
         };
         let no_loc = Spanned::unsafe_no_loc(()).loc;
         let module: CompiledModule;

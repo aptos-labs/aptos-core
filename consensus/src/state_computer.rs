@@ -34,7 +34,11 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc, time::Duration};
+use std::{
+    boxed::Box,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
@@ -214,6 +218,7 @@ impl StateComputer for ExecutionProxy {
             block.new_block_metadata(&validators).into()
         };
 
+        let pipeline_entry_time = Instant::now();
         let fut = self
             .execution_pipeline
             .queue(
@@ -224,6 +229,9 @@ impl StateComputer for ExecutionProxy {
                 block_executor_onchain_config,
             )
             .await;
+        observe_block(timestamp, BlockStage::EXECUTION_PIPELINE_INSERTED);
+        counters::PIPELINE_ENTRY_TO_INSERTED_TIME.observe_duration(pipeline_entry_time.elapsed());
+        let pipeline_inserted_timestamp = Instant::now();
 
         Box::pin(async move {
             let pipeline_execution_result = fut.await?;
@@ -235,6 +243,8 @@ impl StateComputer for ExecutionProxy {
             let result = &pipeline_execution_result.result;
 
             observe_block(timestamp, BlockStage::EXECUTED);
+            counters::PIPELINE_INSERTION_TO_EXECUTED_TIME
+                .observe_duration(pipeline_inserted_timestamp.elapsed());
 
             let compute_status = result.compute_status_for_input_txns();
             // the length of compute_status is user_txns.len() + num_vtxns + 1 due to having blockmetadata
@@ -313,7 +323,7 @@ impl StateComputer for ExecutionProxy {
             "commit_block",
             tokio::task::spawn_blocking(move || {
                 executor
-                    .commit_blocks_ext(block_ids, proof, false)
+                    .commit_blocks(block_ids, proof)
                     .expect("Failed to commit blocks");
             })
             .await
@@ -478,11 +488,10 @@ async fn test_commit_sync_race() {
             todo!()
         }
 
-        fn commit_blocks_ext(
+        fn commit_blocks(
             &self,
             _block_ids: Vec<HashValue>,
             ledger_info_with_sigs: LedgerInfoWithSignatures,
-            _save_state_snapshots: bool,
         ) -> ExecutorResult<()> {
             *self.time.lock() = LogicalTime::new(
                 ledger_info_with_sigs.ledger_info().epoch(),

@@ -11,7 +11,7 @@ use aptos_keyless_pepper_service::{
     vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     HandlerTrait,
     ProcessingFailure::{BadRequest, InternalError},
-    V0FetchHandler, V0SignatureHandler,
+    V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
 };
 use aptos_logger::{error, info};
 use aptos_types::keyless::test_utils::get_sample_iss;
@@ -45,6 +45,7 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
         (&Method::POST, "/v0/signature") => {
             generate_response(origin, req, &V0SignatureHandler).await
         },
+        (&Method::POST, "/v0/verify") => generate_response(origin, req, &V0VerifyHandler).await,
         (&Method::POST, "/v0/fetch") => generate_response(origin, req, &V0FetchHandler).await,
         (&Method::OPTIONS, _) => hyper::Response::builder()
             .status(StatusCode::OK)

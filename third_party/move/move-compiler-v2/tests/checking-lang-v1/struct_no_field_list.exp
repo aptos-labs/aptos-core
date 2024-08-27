@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unsupported language construct
+  ┌─ tests/checking-lang-v1/struct_no_field_list.move:3:28
+  │
+3 │     struct S has copy, drop;
+  │                            ^ Move 2 language construct is not enabled: struct declaration without field list

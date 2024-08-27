@@ -107,6 +107,17 @@ impl<'a> EliminateImmRefs<'a> {
                         aa,
                     ));
                 },
+                BorrowVariantField(mid, sid, variants, type_actuals, offset)
+                    if self.is_imm_ref(dests[0]) =>
+                {
+                    self.builder.emit(Call(
+                        attr_id,
+                        dests,
+                        GetVariantField(mid, sid, variants, type_actuals, offset),
+                        srcs,
+                        aa,
+                    ));
+                },
                 BorrowGlobal(mid, sid, type_actuals) if self.is_imm_ref(dests[0]) => {
                     self.builder.emit(Call(
                         attr_id,

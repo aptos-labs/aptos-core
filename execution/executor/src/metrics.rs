@@ -4,7 +4,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    register_int_counter_vec, register_int_gauge_vec, Histogram, HistogramVec, IntCounter,
+    IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -236,6 +237,15 @@ pub static APTOS_PROCESSED_TXNS_AUTHENTICATOR: Lazy<IntCounterVec> = Lazy::new(|
         "aptos_processed_txns_authenticator",
         "Counter of authenticators by type, for processed transactions",
         &["process", "auth_type"]
+    )
+    .unwrap()
+});
+
+pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_executor_call_concurrency",
+        "Call concurrency by API.",
+        &["executor", "call"]
     )
     .unwrap()
 });

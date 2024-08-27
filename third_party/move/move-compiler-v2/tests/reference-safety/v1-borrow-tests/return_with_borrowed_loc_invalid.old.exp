@@ -1,0 +1,40 @@
+
+Diagnostics:
+error: cannot return a reference derived from value since it is not a parameter
+  ┌─ tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_invalid.move:7:9
+  │
+7 │         &x
+  │         ^^
+  │         │
+  │         returned here
+  │         previous local borrow
+
+error: cannot return a reference derived from value since it is not a parameter
+   ┌─ tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_invalid.move:13:9
+   │
+12 │         let y = &x;
+   │                 -- previous local borrow
+13 │         copy y
+   │         ^^^^^^ returned here
+
+error: cannot return a reference derived from local `s` since it is not a parameter
+   ┌─ tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_invalid.move:21:9
+   │
+18 │         let x = &s;
+   │                 -- previous local borrow
+19 │         let y = &x.y;
+   │                 ---- used by field borrow
+20 │         let u = &y.u;
+21 │         move u
+   │         ^^^^^^ returned here
+
+error: cannot return a reference derived from local `s` since it is not a parameter
+   ┌─ tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_invalid.move:29:9
+   │
+26 │         let x = &s;
+   │                 -- previous local borrow
+27 │         let y = &x.y;
+   │                 ---- used by field borrow
+28 │         let u = &y.u;
+29 │         copy u
+   │         ^^^^^^ returned here

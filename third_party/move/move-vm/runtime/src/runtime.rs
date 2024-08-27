@@ -365,7 +365,7 @@ impl VMRuntime {
 
     fn execute_function_impl(
         &self,
-        func: LoadedFunction,
+        function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
@@ -373,13 +373,13 @@ impl VMRuntime {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
-        let LoadedFunction { ty_args, function } = func;
         let ty_builder = self.loader().ty_builder();
+        let ty_args = function.ty_args();
 
         let param_tys = function
             .param_tys()
             .iter()
-            .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let mut_ref_args = param_tys
@@ -396,13 +396,12 @@ impl VMRuntime {
         let return_tys = function
             .return_tys()
             .iter()
-            .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 
         let return_values = Interpreter::entrypoint(
             function,
-            ty_args,
             deserialized_args,
             data_store,
             module_store,

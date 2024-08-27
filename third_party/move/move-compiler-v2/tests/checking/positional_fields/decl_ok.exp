@@ -1,0 +1,38 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    enum E1 {
+        V1,
+        V2,
+        V3 {
+            0: u8,
+            1: bool,
+        }
+    }
+    struct S1 {
+        dummy_field: bool,
+    }
+    struct S2 {
+        0: u8,
+        1: bool,
+    }
+    struct S3 {
+        0: #1,
+        1: u8,
+        2: #0,
+    }
+    private fun bar(x: test::S2) {
+        select test::S2.0<test::S2>(x);
+        Tuple()
+    }
+    private fun baz() {
+        pack test::E1::V1();
+        pack test::E1::V2();
+        pack test::E1::V3(42, true);
+        Tuple()
+    }
+    private fun foo(x: test::S2) {
+        select test::S2.0<test::S2>(x);
+        select test::S2.1<test::S2>(x);
+        Tuple()
+    }
+} // end 0x42::test

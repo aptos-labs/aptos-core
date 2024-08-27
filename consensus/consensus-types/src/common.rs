@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    payload::OptQuorumStorePayload,
+    payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
 use anyhow::bail;
@@ -282,8 +282,11 @@ impl Payload {
             Payload::DirectMempool(_) => {
                 panic!("Payload is in direct mempool format");
             },
-            Payload::OptQuorumStore(_) => {
-                unreachable!("OptQuorumStore Payload is incompatible with QuorumStoreV2");
+            Payload::OptQuorumStore(mut opt_qs_payload) => {
+                opt_qs_payload.set_execution_limit(PayloadExecutionLimit::max_txns_to_execute(
+                    max_txns_to_execute,
+                ));
+                Payload::OptQuorumStore(opt_qs_payload)
             },
         }
     }
@@ -414,6 +417,18 @@ impl Payload {
                 p3.extend(p2);
                 Payload::QuorumStoreInlineHybrid(b2, p3, m3)
             },
+            (
+                Payload::QuorumStoreInlineHybrid(_inline_batches, _proofs, _limit),
+                Payload::OptQuorumStore(_opt_qs),
+            )
+            | (
+                Payload::OptQuorumStore(_opt_qs),
+                Payload::QuorumStoreInlineHybrid(_inline_batches, _proofs, _limit),
+            ) => {
+                unimplemented!(
+                    "Cannot extend OptQuorumStore with QuorumStoreInlineHybrid or viceversa"
+                )
+            },
             (Payload::OptQuorumStore(opt_qs1), Payload::OptQuorumStore(opt_qs2)) => {
                 let opt_qs3 = opt_qs1.extend(opt_qs2);
                 Payload::OptQuorumStore(opt_qs3)
@@ -505,8 +520,8 @@ impl Payload {
             (true, Payload::OptQuorumStore(opt_quorum_store)) => {
                 let proof_with_data = opt_quorum_store.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
-                // TODO(ibalajiarun): Remove this when ready to support OptQuorumStore.
-                bail!("OptQuorumStore is not supported yet.");
+                // TODO(ibalajiarun): Remove this log when OptQS is enabled.
+                bail!("OptQuorumStore Payload is not expected yet");
             },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",

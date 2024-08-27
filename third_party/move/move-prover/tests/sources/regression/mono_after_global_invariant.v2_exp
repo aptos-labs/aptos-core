@@ -10,7 +10,6 @@ error: global memory invariant does not hold
    =         s = <redacted>
    =         v = <redacted>
    =     at tests/sources/regression/mono_after_global_invariant.move:31: put_r
-   =         <redacted> = <redacted>
    =     at tests/sources/regression/mono_after_global_invariant.move:9: put_b
    =         s = <redacted>
    =     at tests/sources/regression/mono_after_global_invariant.move:10: put_b

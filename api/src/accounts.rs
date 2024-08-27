@@ -185,7 +185,7 @@ pub struct Account {
     /// Address of account
     address: Address,
     /// Lookup ledger version
-    ledger_version: u64,
+    pub ledger_version: u64,
     /// Where to start for pagination
     start: Option<StateKey>,
     /// Max number of items to retrieve
@@ -483,7 +483,7 @@ impl Account {
             })?;
 
         // Find the resource and retrieve the struct field
-        let resource = self.find_resource(&struct_tag)?;
+        let (_, resource) = self.find_resource(&struct_tag)?;
         let (_id, value) = resource
             .into_iter()
             .find(|(id, _)| id == &field_name)
@@ -523,12 +523,19 @@ impl Account {
         Ok(*event_handle.key())
     }
 
-    /// Find a resource associated with an account
+    /// Find a resource associated with an account. If the resource is an enum variant,
+    /// returns the variant name in the option.
     fn find_resource(
         &self,
         resource_type: &StructTag,
-    ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
-        let (ledger_info, ledger_version, state_view) =
+    ) -> Result<
+        (
+            Option<Identifier>,
+            Vec<(Identifier, move_core_types::value::MoveValue)>,
+        ),
+        BasicErrorWith404,
+    > {
+        let (ledger_info, requested_ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
 
         let bytes = state_view
@@ -546,7 +553,12 @@ impl Account {
                 )
             })?
             .ok_or_else(|| {
-                resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
+                resource_not_found(
+                    self.address,
+                    resource_type,
+                    requested_ledger_version,
+                    &ledger_info,
+                )
             })?;
 
         state_view

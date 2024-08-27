@@ -409,15 +409,17 @@ pub fn format_livevar_annotation(
 ) -> Option<String> {
     if let Some(LiveVarAnnotation(map)) = target.get_annotations().get::<LiveVarAnnotation>() {
         if let Some(map_at) = map.get(&code_offset) {
-            let mut res = map_at
-                .before
-                .keys()
-                .map(|idx| {
-                    let name = target.get_local_raw_name(*idx);
-                    format!("{}", name.display(target.symbol_pool()))
-                })
-                .join(", ");
-            res.insert_str(0, "live vars: ");
+            let mut res = "live vars: ".to_string();
+            res.push_str(
+                &map_at
+                    .before
+                    .keys()
+                    .map(|idx| {
+                        let name = target.get_local_raw_name(*idx);
+                        format!("{}", name.display(target.symbol_pool()))
+                    })
+                    .join(", "),
+            );
             return Some(res);
         }
     }

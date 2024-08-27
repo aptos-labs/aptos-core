@@ -37,20 +37,29 @@ impl TransactionMetadata {
     pub fn new(txn: &SignedTransaction) -> Self {
         Self {
             sender: txn.sender(),
-            authentication_key: txn.authenticator().sender().authentication_key().to_vec(),
+            authentication_key: txn
+                .authenticator()
+                .sender()
+                .authentication_key()
+                .map_or_else(Vec::new, |auth_key| auth_key.to_vec()),
             secondary_signers: txn.authenticator().secondary_signer_addresses(),
             secondary_authentication_keys: txn
                 .authenticator()
                 .secondary_signers()
                 .iter()
-                .map(|account_auth| account_auth.authentication_key().to_vec())
+                .map(|account_auth| {
+                    account_auth
+                        .authentication_key()
+                        .map_or_else(Vec::new, |auth_key| auth_key.to_vec())
+                })
                 .collect(),
             sequence_number: txn.sequence_number(),
             fee_payer: txn.authenticator_ref().fee_payer_address(),
-            fee_payer_authentication_key: txn
-                .authenticator()
-                .fee_payer_signer()
-                .map(|signer| signer.authentication_key().to_vec()),
+            fee_payer_authentication_key: txn.authenticator().fee_payer_signer().map(|signer| {
+                signer
+                    .authentication_key()
+                    .map_or_else(Vec::new, |auth_key| auth_key.to_vec())
+            }),
             max_gas_amount: txn.max_gas_amount().into(),
             gas_unit_price: txn.gas_unit_price().into(),
             transaction_size: (txn.raw_txn_bytes_len() as u64).into(),

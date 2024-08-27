@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: invalid attribute
+  ┌─ tests/lints/model_ast_lints/bad_lint_attribute_09.move:2:7
+  │
+2 │     #[lint::skip(while_true)]
+  │       ^^^^^^^^^^
+  │       │
+  │       Attribute 'lint::skip' is not expected with a use
+  │       Expected to be used with one of the following: module, function

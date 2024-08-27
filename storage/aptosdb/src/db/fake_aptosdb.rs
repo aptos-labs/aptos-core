@@ -900,8 +900,8 @@ impl DbReader for FakeAptosDB {
             .map_err(Into::into)
     }
 
-    fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
-        self.inner.get_state_leaf_count(version)
+    fn get_state_item_count(&self, version: Version) -> Result<usize> {
+        self.inner.get_state_item_count(version)
     }
 
     fn get_state_value_chunk_with_proof(

@@ -222,7 +222,8 @@ pub struct StructDefinition {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructLayout {
-    Singleton(Vec<(Field, Type)>),
+    // the second field is true iff the struct has positional fields
+    Singleton(Vec<(Field, Type)>, bool),
     Variants(Vec<StructVariant>),
     Native(Loc),
 }
@@ -233,6 +234,7 @@ pub struct StructVariant {
     pub loc: Loc,
     pub name: VariantName,
     pub fields: Vec<(Field, Type)>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -505,13 +507,39 @@ new_name!(Var);
 pub enum Bind_ {
     // x
     Var(Var),
-    // T { f1: b1, ... fn: bn }
-    // T<t1, ... , tn> { f1: b1, ... fn: bn }
-    Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<(Field, Bind)>),
+    // T { f1: b1, ... fn: bn, ".."? }
+    // T<t1, ... , tn> { f1: b1, ... fn: bn, ".."? }
+    Unpack(
+        Box<NameAccessChain>,
+        Option<Vec<Type>>,
+        Vec<BindFieldOrDotDot>,
+    ),
+    // T(e1, ..., en)
+    // T<t1, ... , tn>(e1, ..., en)
+    // where each e_i is an expression or a ".."
+    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotDot>),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
 pub type BindList = Spanned<Vec<Bind>>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindFieldOrDotDot_ {
+    // f : b
+    FieldBind(Field, Bind),
+    // ..
+    DotDot,
+}
+pub type BindFieldOrDotDot = Spanned<BindFieldOrDotDot_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindOrDotDot_ {
+    // a bind
+    Bind(Bind),
+    // ..
+    DotDot,
+}
+pub type BindOrDotDot = Spanned<BindOrDotDot_>;
 
 pub type BindWithRange = Spanned<(Bind, Exp)>;
 pub type BindWithRangeList = Spanned<Vec<BindWithRange>>;
@@ -699,6 +727,9 @@ pub enum Exp_ {
     Cast(Box<Exp>, Type),
     // (e: t)
     Annotate(Box<Exp>, Type),
+
+    // (e is t1 | .. | tn)
+    Test(Box<Exp>, Vec<Type>),
 
     // spec { ... }
     Spec(SpecBlock),
@@ -1312,7 +1343,7 @@ impl AstDebug for StructDefinition {
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         match layout {
-            StructLayout::Singleton(fields) => w.block(|w| {
+            StructLayout::Singleton(fields, _) => w.block(|w| {
                 w.semicolon(fields, |w, (f, st)| {
                     w.write(&format!("{}: ", f));
                     st.ast_debug(w);
@@ -1928,6 +1959,16 @@ impl AstDebug for Exp_ {
                 ty.ast_debug(w);
                 w.write(")");
             },
+            E::Test(e, tys) => {
+                w.write("(");
+                e.ast_debug(w);
+                w.write(" is ");
+                w.list(tys, "|", |w, item| {
+                    item.ast_debug(w);
+                    false
+                });
+                w.write(")");
+            },
             E::Index(e, i) => {
                 e.ast_debug(w);
                 w.write("[");
@@ -2021,6 +2062,29 @@ impl AstDebug for Vec<Bind> {
     }
 }
 
+impl AstDebug for BindOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindOrDotDot_ as B;
+        match self {
+            B::Bind(b) => b.ast_debug(w),
+            B::DotDot => w.write(".."),
+        }
+    }
+}
+
+impl AstDebug for BindFieldOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindFieldOrDotDot_ as B;
+        match self {
+            B::FieldBind(f, b) => {
+                w.write(&format!("{}: ", f));
+                b.ast_debug(w);
+            },
+            B::DotDot => w.write(".."),
+        }
+    }
+}
+
 impl AstDebug for Vec<Vec<Exp>> {
     fn ast_debug(&self, w: &mut AstWriter) {
         for trigger in self {
@@ -2044,11 +2108,21 @@ impl AstDebug for Bind_ {
                     w.write(">");
                 }
                 w.write("{");
-                w.comma(fields, |w, (f, b)| {
-                    w.write(&format!("{}: ", f));
-                    b.ast_debug(w);
+                w.comma(fields, |w, field| {
+                    field.ast_debug(w);
                 });
                 w.write("}");
+            },
+            B::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(args, |w, b| b.ast_debug(w));
+                w.write(")");
             },
         }
     }
