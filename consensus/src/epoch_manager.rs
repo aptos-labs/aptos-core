@@ -115,7 +115,7 @@ use std::{
     hash::Hash,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -1531,6 +1531,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
                 if let UnverifiedEvent::VoteMsg(vote_msg) = unverified_event {
                     if optimistic_sig_verification_for_votes {
+                        let start_time = Instant::now();
                         match vote_msg.partial_verify(&epoch_state.verifier) {
                             Ok(_) => {
                                 match optimistic_vote_verifier
@@ -1562,11 +1563,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 );
                             }
                         }
+                        counters::VERIFY_MSG
+                            .with_label_values(&["optimistic_vote"])
+                            .observe(start_time.elapsed().as_secs_f64());
                     } else {
                         verify_and_forward_unverified_event(peer_id, UnverifiedEvent::VoteMsg(vote_msg));
                     }
                 } else if let UnverifiedEvent::OrderVoteMsg(order_vote_msg) = unverified_event {
                     if optimistic_sig_verification_for_order_votes {
+                        let start_time = Instant::now();
                         match order_vote_msg.partial_verify() {
                             Ok(_) => {
                                 match optimistic_order_vote_verifier
@@ -1598,6 +1603,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 );
                             }
                         }
+                        counters::VERIFY_MSG
+                            .with_label_values(&["optimistic_order_vote"])
+                            .observe(start_time.elapsed().as_secs_f64());
                     } else {
                         verify_and_forward_unverified_event(peer_id, UnverifiedEvent::OrderVoteMsg(order_vote_msg));
                     }
