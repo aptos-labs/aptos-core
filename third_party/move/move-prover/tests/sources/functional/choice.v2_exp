@@ -49,12 +49,8 @@ error: post-condition does not hold
    =         <redacted> = <redacted>
    =         v_ref = <redacted>
    =     at tests/sources/functional/choice.move:79: test_not_using_min_incorrect
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:80: test_not_using_min_incorrect
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:81: test_not_using_min_incorrect
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/choice.move:82: test_not_using_min_incorrect
    =         v = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:84: test_not_using_min_incorrect

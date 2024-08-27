@@ -1337,6 +1337,15 @@ impl RoundManager {
                         qc
                     ))?;
                 if self.onchain_config.order_vote_enabled() {
+                    // This check is already done in safety rules. As printing the "failed to broadcast order vote"
+                    // in humio logs could sometimes look scary, we are doing the same check again here.
+                    if let Some(last_sent_vote) = self.round_state.vote_sent() {
+                        if let Some((two_chain_timeout, _)) = last_sent_vote.two_chain_timeout() {
+                            if round <= two_chain_timeout.round() {
+                                return Ok(());
+                            }
+                        }
+                    }
                     // Broadcast order vote if the QC is successfully aggregated
                     // Even if broadcast order vote fails, the function will return Ok
                     if let Err(e) = self.broadcast_order_vote(vote, qc.clone()).await {
@@ -1598,16 +1607,17 @@ impl RoundManager {
                 },
                 Some((result, block, start_time)) = self.futures.next() => {
                     let elapsed = start_time.elapsed().as_secs_f64();
+                    let id = block.id();
                     match result {
                         Ok(()) => {
                             counters::CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION.with_label_values(&["success"]).observe(elapsed);
                             if let Err(e) = monitor!("payload_fetch_proposal_process", self.check_backpressure_and_process_proposal(block)).await {
-                                warn!("error {}", e);
+                                warn!("failed process proposal after payload fetch for block {}: {}", id, e);
                             }
                         },
                         Err(err) => {
                             counters::CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION.with_label_values(&["error"]).observe(elapsed);
-                            warn!("unable to get transactions: {}", err);
+                            warn!("unable to fetch payload for block {}: {}", id, err);
                         },
                     };
                 },

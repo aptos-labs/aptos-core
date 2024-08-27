@@ -1,29 +1,22 @@
 
 Diagnostics:
-error: cannot freeze local `s` since other mutable usages for this reference exist
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:12:9
    │
+11 │         let f = &mut s.f;
+   │                 -------- field `f` previously mutably borrowed here
 12 │         freeze(s);
    │         ^^^^^^^^^ frozen here
 13 │         *f;
-   │         -- used here
+   │         -- conflicting reference `f` used here
 
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:18:17
-   │
-17 │         let f = &s.f;
-   │                 ---- previous field borrow
-18 │         let g = &mut s.f; // error in v2
-   │                 ^^^^^^^^ mutable borrow attempted here
-19 │         freeze(s);
-20 │         *f;
-   │         -- requirement enforced here
-
-error: cannot freeze local `s` since other mutable usages for this reference exist
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:19:9
    │
+18 │         let g = &mut s.f; // error in v2
+   │                 -------- field `f` previously mutably borrowed here
 19 │         freeze(s);
    │         ^^^^^^^^^ frozen here
 20 │         *f;
 21 │         *g;
-   │         -- used here
+   │         -- conflicting reference `g` used here

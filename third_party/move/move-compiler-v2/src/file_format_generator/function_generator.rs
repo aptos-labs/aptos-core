@@ -7,7 +7,10 @@ use crate::{
         module_generator::{ModuleContext, ModuleGenerator, SOURCE_MAP_OK},
         peephole_optimizer, Options, MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
     },
-    pipeline::livevar_analysis_processor::LiveVarAnnotation,
+    pipeline::{
+        flush_writes_processor::FlushWritesAnnotation,
+        livevar_analysis_processor::LiveVarAnnotation,
+    },
 };
 use move_binary_format::{
     file_format as FF,
@@ -36,7 +39,10 @@ pub struct FunctionGenerator<'a> {
     /// A map from a temporary to information associated with it.
     temps: BTreeMap<TempIndex, TempInfo>,
     /// The value stack, represented by the temporaries which are located on it.
-    stack: Vec<TempIndex>,
+    /// Each temporary is paired with a bool, indicating whether the value was copied onto
+    /// the stack from a local.
+    /// If a value was copied onto the stack, then we don't have to save it back to the local.
+    stack: Vec<(TempIndex, bool)>,
     /// The locals which have been used so far. This contains the parameters of the function.
     locals: Vec<Type>,
     /// A map from branching labels to information about them.
@@ -341,22 +347,31 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Balance the stack such that it exactly contains the `result` temps and nothing else. This
-    /// is used for instructions like `return` or `abort` which terminate a block und must leave
-    /// the stack empty at end.
+    /// is used for instructions like `branch`, `return` or `abort` which terminate a block
+    /// and must leave the stack empty at end.
     fn balance_stack_end_of_block(
         &mut self,
         ctx: &BytecodeContext,
         result: impl AsRef<[TempIndex]>,
     ) {
         let result = result.as_ref();
-        // First ensure the arguments are on the stack.
-        self.abstract_push_args(ctx, result, None);
-        if self.stack.len() != result.len() {
-            // Unfortunately, there is more on the stack than needed.
-            // Need to flush and push again so the stack is empty after return.
+        let stack = self.stack.iter().map(|(t, _)| *t).collect::<Vec<_>>();
+        // If the stack already contains exactly the result and none of the temps are used after
+        // or were copied from locals, nothing to do.
+        // [TODO]: we could further optimize this when:
+        //   1. `stack == result` and
+        //   2. some stack temps are alive after and were not copied from locals;
+        // then we can flush only until the lowest such temp on the stack, and then push them back,
+        // instead of always fully flushing the stack.
+        let stack_ready = stack == result
+            && self
+                .stack
+                .iter()
+                .all(|(temp, copied)| *copied || !ctx.is_alive_after(*temp, &[], false));
+        if !stack_ready {
+            // Flush the stack and push the result.
             self.abstract_flush_stack_before(ctx, 0);
-            self.abstract_push_args(ctx, result.as_ref(), None);
-            assert_eq!(self.stack.len(), result.len())
+            self.abstract_push_args(ctx, result, None);
         }
     }
 
@@ -552,8 +567,6 @@ impl<'a> FunctionGenerator<'a> {
             },
             Operation::ReadRef => self.gen_builtin(ctx, dest, FF::Bytecode::ReadRef, source),
             Operation::WriteRef => {
-                // TODO: WriteRef in FF bytecode and in stackless bytecode use different operand
-                // order, perhaps we should fix this.
                 self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
             },
             Operation::Release => {
@@ -606,6 +619,7 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::OpaqueCallBegin(_, _, _)
             | Operation::OpaqueCallEnd(_, _, _)
             | Operation::GetField(_, _, _, _)
+            | Operation::GetVariantField(_, _, _, _, _)
             | Operation::GetGlobal(_, _, _)
             | Operation::Uninit
             | Operation::Havoc(_)
@@ -913,10 +927,14 @@ impl<'a> FunctionGenerator<'a> {
         // Now compute which temps need to be pushed, on top of any which are already on the stack
         let mut temps_to_push = self.analyze_stack(temps);
         // If any of the temps we need to push now are actually underneath the temps already on the stack,
-        // we need to even flush more of the stack to reach them.
+        // and their values were not copied from locals, we need to even flush more of the stack to reach them.
         let mut stack_to_flush = self.stack.len();
         for temp in temps_to_push {
-            if let Some(offs) = self.stack.iter().position(|t| t == temp) {
+            if let Some(offs) = self
+                .stack
+                .iter()
+                .position(|(t, copied)| !*copied && t == temp)
+            {
                 // The lowest point in the stack we need to flush.
                 stack_to_flush = std::cmp::min(offs, stack_to_flush);
                 // Unfortunately, whatever is on the stack already, needs to be flushed out and
@@ -928,31 +946,40 @@ impl<'a> FunctionGenerator<'a> {
         // Finally, push `temps_to_push` onto the stack.
         for (pos, temp) in temps_to_push.iter().enumerate() {
             let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), *temp);
+            let copied;
             match push_kind {
                 Some(AssignKind::Move) => {
+                    copied = false;
                     self.emit(FF::Bytecode::MoveLoc(local));
                 },
                 Some(AssignKind::Copy) => {
+                    copied = true;
                     self.emit(FF::Bytecode::CopyLoc(local));
                 },
                 Some(AssignKind::Inferred) | Some(AssignKind::Store) => {
+                    copied = false;
                     fun_ctx
                         .internal_error("Inferred and Store AssignKind should be not appear here.");
                 },
                 None => {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
-                    if fun_ctx.is_copyable(*temp)
-                        && (ctx.is_alive_after(*temp, true)
-                            || temps_to_push[pos + 1..].contains(temp))
-                    {
+                    if ctx.is_alive_after(*temp, &temps_to_push[pos + 1..], true) {
+                        if !fun_ctx.is_copyable(*temp) {
+                            fun_ctx.module.internal_error(
+                                &ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id),
+                                format!("value in `$t{}` expected to be copyable", temp),
+                            )
+                        }
+                        copied = true;
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
+                        copied = false;
                         self.emit(FF::Bytecode::MoveLoc(local));
                     }
                 },
             }
-            self.stack.push(*temp)
+            self.stack.push((*temp, copied));
         }
     }
 
@@ -972,18 +999,23 @@ impl<'a> FunctionGenerator<'a> {
         let dests = BTreeSet::from_iter(dests.iter());
         let sources = BTreeSet::from_iter(sources.iter());
         let conflicts = dests.difference(&sources).collect::<BTreeSet<_>>();
-        if let Some(pos) = self.stack.iter().position(|t| conflicts.contains(&t)) {
+        if let Some(pos) = self.stack.iter().position(|(t, _)| conflicts.contains(&t)) {
             self.abstract_flush_stack_before(ctx, pos);
         }
     }
 
-    /// Ensures that all `temps` which are on the stack and used after this program
-    /// point are saved to locals. This flushes the stack as deep as needed for this.
+    /// Ensures that all `temps` which are on the stack, were not copied from a local,
+    /// and used after this program point are saved to locals. This flushes the stack
+    /// as deep as needed for this.
     fn save_used_after(&mut self, ctx: &BytecodeContext, temps: &[TempIndex]) {
         let mut stack_to_flush = self.stack.len();
-        for temp in temps {
-            if let Some(pos) = self.stack.iter().position(|t| t == temp) {
-                if ctx.is_alive_after(*temp, true) {
+        for (i, temp) in temps.iter().enumerate() {
+            if let Some(pos) = self
+                .stack
+                .iter()
+                .position(|(t, copied)| !*copied && t == temp)
+            {
+                if ctx.is_alive_after(*temp, &temps[i + 1..], true) {
                     // Determine new lowest point to which we need to flush
                     stack_to_flush = std::cmp::min(stack_to_flush, pos);
                 }
@@ -998,8 +1030,9 @@ impl<'a> FunctionGenerator<'a> {
     /// returns the temps which are not and need to be pushed.
     fn analyze_stack<'t>(&mut self, temps: &'t [TempIndex]) -> &'t [TempIndex] {
         let mut temps_to_push = temps; // worst case need to push all
+        let stack = self.stack.iter().map(|(t, _)| *t).collect::<Vec<_>>();
         for end in (1..=temps.len()).rev() {
-            if self.stack.ends_with(&temps[0..end]) {
+            if stack.ends_with(&temps[0..end]) {
                 // We found 0..end temps which are already on top of the stack. The remaining ones
                 // need to be pushed.
                 temps_to_push = &temps[end..temps.len()];
@@ -1015,12 +1048,15 @@ impl<'a> FunctionGenerator<'a> {
     fn abstract_flush_stack(&mut self, ctx: &BytecodeContext, top: usize, before: bool) {
         let fun_ctx = ctx.fun_ctx;
         while self.stack.len() > top {
-            let temp = self.stack.pop().unwrap();
-            if before && ctx.is_alive_before(temp)
-                || !before && ctx.is_alive_after(temp, false)
-                || self.pinned.contains(&temp)
+            let (temp, copied) = self.stack.pop().unwrap();
+            if !copied
+                && ((before && ctx.is_alive_before(temp))
+                    || (!before && ctx.is_alive_after(temp, &[], false))
+                    || self.pinned.contains(&temp)
+                    || !ctx.fun_ctx.is_droppable(temp))
             {
-                // Only need to save to a local if the temp is still used afterwards
+                // Only need to save to a local if the temp is: not copied from a local AND,
+                // still used afterwards, is pinned, or is not droppable.
                 let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), temp);
                 self.emit(FF::Bytecode::StLoc(local));
             } else {
@@ -1041,17 +1077,36 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Push the result of an operation to the abstract stack.
     fn abstract_push_result(&mut self, ctx: &BytecodeContext, result: impl AsRef<[TempIndex]>) {
-        let mut flush_mark = usize::MAX;
-        for temp in result.as_ref() {
+        let pre_stack_len = self.stack.len();
+        let result = result.as_ref();
+        // `flush_mark` is used to find the lowest index in `result` from which we flush.
+        let mut flush_mark = result.len();
+        // Push the temps in `result` onto the stack.
+        // Make `flush_mark` the index of the earliest temp that is pinned.
+        for (i, temp) in result.iter().enumerate() {
             if self.pinned.contains(temp) {
                 // need to flush this right away and maintain a local for it
-                flush_mark = flush_mark.min(self.stack.len())
+                flush_mark = flush_mark.min(i);
             }
-            self.stack.push(*temp);
+            // The result was not copied from a local.
+            self.stack.push((*temp, false));
         }
-        if flush_mark != usize::MAX {
-            self.abstract_flush_stack_after(ctx, flush_mark)
+        // Check if there are any temps that could be flushed right away.
+        // We only need to check from below the `flush_mark` (everything at `flush_mark`
+        // and above will be flushed anyway). We work down the `result` and if we find a
+        // temp that doesn't need to be flushed, we stop. Because, that temp could get
+        // consumed by a subsequent instruction and may never need to be flushed.
+        if let Some(flush_writes) = ctx.get_writes_to_flush() {
+            for (i, temp) in result[..flush_mark].iter().enumerate().rev() {
+                if flush_writes.contains(temp) {
+                    flush_mark = i;
+                } else {
+                    break;
+                }
+            }
         }
+        let stack_flush_mark = pre_stack_len + flush_mark;
+        self.abstract_flush_stack_after(ctx, stack_flush_mark);
     }
 
     /// Pop a value from the abstract stack.
@@ -1141,14 +1196,32 @@ impl<'env> FunctionContext<'env> {
             .type_abilities(self.temp_type(temp), &self.type_parameters)
             .has_ability(FF::Ability::Copy)
     }
+
+    /// Returns true of the given temporary can/should be dropped when flushing the stack.
+    pub fn is_droppable(&self, temp: TempIndex) -> bool {
+        self.module
+            .env
+            .type_abilities(self.temp_type(temp), &self.type_parameters)
+            .has_ability(FF::Ability::Drop)
+    }
 }
 
 impl<'env> BytecodeContext<'env> {
-    /// Determine whether `temp` is alive (used) in the reachable code after this point.
-    /// When `dest_check` is true, we additionally check if `temp` is also written to
-    /// by the current instruction; if it is, then the definition of `temp` being
-    /// considered here is killed, making it not alive after this point.
-    pub fn is_alive_after(&self, temp: TempIndex, dest_check: bool) -> bool {
+    /// Determine whether `temp` is alive (used) in the reachable code after this point,
+    /// or is part of the remaining argument list. When `dest_check` is true, we additionally
+    /// check if `temp` is also written to by the current instruction; if it is, then the
+    /// definition of `temp` being considered here is killed, making it not alive after this point.
+    pub fn is_alive_after(
+        &self,
+        temp: TempIndex,
+        remaining_args: &[TempIndex],
+        dest_check: bool,
+    ) -> bool {
+        if remaining_args.contains(&temp) {
+            // Temp is used another time in the same argument list of this instruction, and
+            // is alive after even if it is a destination
+            return true;
+        }
         let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
         if dest_check && bc.dests().contains(&temp) {
             return false;
@@ -1176,5 +1249,14 @@ impl<'env> BytecodeContext<'env> {
         an.get_live_var_info_at(self.code_offset)
             .map(|a| a.before.contains_key(&temp))
             .unwrap_or(false)
+    }
+
+    /// Get the set of temps to flush if possible at the current code offset.
+    pub fn get_writes_to_flush(&self) -> Option<&BTreeSet<TempIndex>> {
+        self.fun_ctx
+            .fun
+            .get_annotations()
+            .get::<FlushWritesAnnotation>()
+            .and_then(|annotation| annotation.0.get(&self.code_offset))
     }
 }

@@ -32,7 +32,7 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
-    LanguageVersion,
+    well_known, LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -1728,18 +1728,18 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let orig_sym = et.symbol_pool().make(orig_name);
                     let remapped_sym = et.symbol_pool().make(remapped_name);
                     let preset_arg_syms = preset_args
-                            .iter()
-                            .map(|v| {
-                                let sym = et.symbol_pool().make(v.value().as_str());
-                                if et.lookup_local(sym, false).is_none() {
-                                    et.error(
-                                        loc,
-                                        "[internal] error in finding used local variables in lambda calls",
-                                    );
-                                }
-                                sym
-                            })
-                            .collect();
+                        .iter()
+                        .map(|v| {
+                            let sym = et.symbol_pool().make(v.value().as_str());
+                            if et.lookup_local(sym, false).is_none() {
+                                et.error(
+                                    loc,
+                                    "[internal] error in finding used local variables in lambda calls",
+                                );
+                            }
+                            sym
+                        })
+                        .collect();
                     et.fun_ptrs_table
                         .insert(orig_sym, (remapped_sym, preset_arg_syms));
                 }
@@ -1776,7 +1776,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_params(loc, &entry.type_params, false);
                 if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
+                    let lang_ver_ge_2 =
+                        et.env().language_version.is_at_least(LanguageVersion::V2_0);
                     for f in fields.values() {
+                        // In Aptos Move 2.0 and above, field `self` is omitted from local bindings
+                        // so `self` can be used to refer to `self` parameter.
+                        if lang_ver_ge_2
+                            && f.name.display(et.symbol_pool()).to_string()
+                                == well_known::RECEIVER_PARAM_NAME
+                        {
+                            continue;
+                        }
                         et.define_local(
                             loc,
                             f.name,
@@ -1788,6 +1798,20 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             )),
                             None,
                         );
+                    }
+                    if lang_ver_ge_2 {
+                        let receiver_param_name =
+                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        et.define_local(loc, receiver_param_name, struct_type, None, None);
+                    }
+                } else if let StructLayout::Variants(_) = &entry.layout {
+                    et.enter_scope();
+                    if et.env().language_version.is_at_least(LanguageVersion::V2_0) {
+                        let receiver_param_name =
+                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        et.define_local(loc, receiver_param_name, struct_type, None, None);
                     }
                 }
 
@@ -2202,9 +2226,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             _ => {
                 if !additional_exps.is_empty() {
                     et.error(
-                          loc,
-                          "additional expressions only allowed with `aborts_if`, `aborts_with`, `modifies`, or `emits`",
-                      );
+                        loc,
+                        "additional expressions only allowed with `aborts_if`, `aborts_with`, `modifies`, or `emits`",
+                    );
                 }
                 (et.translate_exp(exp, &expected_type).into_exp(), vec![])
             },

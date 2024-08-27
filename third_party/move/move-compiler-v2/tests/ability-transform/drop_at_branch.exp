@@ -65,51 +65,35 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
 fun explicate_drop::drop_at_branch($t0: bool): u8 {
      var $t1: u8
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: if ($t0) goto 1 else goto 4
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: label L0
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: $t1 := 1
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   3: goto 6
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   4: label L1
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   5: $t1 := 0
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   6: label L2
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   7: return $t1
 }
@@ -121,58 +105,42 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      var $t1: u8
      # abort state: {returns}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: if ($t0) goto 1 else goto 4
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: label L0
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: $t1 := 1
      # abort state: {returns}
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   3: goto 6
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   4: label L1
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   5: $t1 := 0
      # abort state: {returns}
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   6: label L2
      # abort state: {returns}
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   7: return $t1
 }

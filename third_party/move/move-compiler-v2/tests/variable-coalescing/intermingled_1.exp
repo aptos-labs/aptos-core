@@ -119,13 +119,11 @@ B0:
 	2: StLoc[0](loc0: u64)
 	3: CopyLoc[0](loc0: u64)
 	4: Add
-	5: CopyLoc[0](loc0: u64)
-	6: MoveLoc[0](loc0: u64)
-	7: Add
-	8: StLoc[0](loc0: u64)
-	9: Pop
-	10: MoveLoc[0](loc0: u64)
-	11: Ret
+	5: Pop
+	6: CopyLoc[0](loc0: u64)
+	7: MoveLoc[0](loc0: u64)
+	8: Add
+	9: Ret
 }
 }
 ============ bytecode verification succeeded ========

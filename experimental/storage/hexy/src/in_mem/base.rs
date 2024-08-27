@@ -1,9 +1,11 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{NodePosition, ARITY};
+use crate::{metrics::TIMER, NodePosition, ARITY};
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::HOT_STATE_PLACE_HOLDER_HASH, HashValue};
+use aptos_experimental_layered_map::LayeredMap;
+use aptos_metrics_core::TimerHelper;
 
 struct BigVector<T> {
     chunks: Vec<Vec<T>>,
@@ -38,6 +40,12 @@ where
         let chunk = index / Self::CHUNK_SIZE;
         let offset = index % Self::CHUNK_SIZE;
         &self.chunks[chunk][offset]
+    }
+
+    pub fn expect_mut(&mut self, index: usize) -> &mut T {
+        let chunk = index / Self::CHUNK_SIZE;
+        let offset = index % Self::CHUNK_SIZE;
+        &mut self.chunks[chunk][offset]
     }
 }
 
@@ -110,8 +118,31 @@ impl HexyBase {
         }
     }
 
+    pub fn get_hash_mut(&mut self, position: NodePosition) -> Result<&mut HashValue> {
+        let num_leaves = self.num_leaves();
+        ensure!(
+            position.level_height < self.height_u8(),
+            "level_height out of bound. num_of_leaves: {:?}, requested position: {:?}",
+            num_leaves,
+            position,
+        );
+        let level = self.expect_level_mut(position);
+        ensure!(
+            position.index_in_level < level.len() as u32,
+            "index_in_level out of bound. num_of_leaves: {:?}, requested position: {:?}",
+            num_leaves,
+            position,
+        );
+
+        Ok(level.expect_mut(position.index_in_level as usize))
+    }
+
     fn expect_level(&self, position: NodePosition) -> &BigVector<HashValue> {
         &self.levels_by_height[position.level_height as usize]
+    }
+
+    fn expect_level_mut(&mut self, position: NodePosition) -> &mut BigVector<HashValue> {
+        &mut self.levels_by_height[position.level_height as usize]
     }
 
     pub fn expect_hash(&self, position: NodePosition) -> HashValue {
@@ -129,5 +160,18 @@ impl HexyBase {
         self.levels_by_height
             .last()
             .map_or(*HOT_STATE_PLACE_HOLDER_HASH, |level| *level.expect(0))
+    }
+
+    pub fn merge(&self, overlay: LayeredMap<NodePosition, HashValue>) -> Result<()> {
+        let _timer = TIMER.timer_with(&["merge"]);
+
+        for (position, hash) in overlay.iter() {
+            unsafe {
+                let raw_self = self as *const Self as *mut Self;
+                let mut_self = raw_self.as_mut().expect("self is null.");
+                *(mut_self.get_hash_mut(position)?) = hash;
+            }
+        }
+        Ok(())
     }
 }

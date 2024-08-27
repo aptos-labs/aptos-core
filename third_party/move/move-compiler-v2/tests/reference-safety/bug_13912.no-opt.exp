@@ -1,12 +1,2 @@
 
-Diagnostics:
-error: cannot copy local `var4` which is still mutably borrowed
-  ┌─ tests/reference-safety/bug_13912.move:5:30
-  │
-5 │         (&mut (var4) != &mut (copy var4))
-  │         ---------------------^^^^^^^^^^^-
-  │         ││                   │
-  │         ││                   copied here
-  │         │previous mutable local borrow
-  │         │used by freeze
-  │         conflicting reference used here
+============ bytecode verification succeeded ========

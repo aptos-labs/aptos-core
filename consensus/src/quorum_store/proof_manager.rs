@@ -4,11 +4,7 @@
 use super::batch_store::BatchStore;
 use crate::{
     monitor,
-    quorum_store::{
-        batch_generator::BackPressure,
-        counters,
-        utils::{BatchSortKey, ProofQueue},
-    },
+    quorum_store::{batch_generator::BackPressure, batch_proof_queue::BatchProofQueue, counters},
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
@@ -21,13 +17,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use rand::{seq::SliceRandom, thread_rng};
-use std::{
-    cmp::min,
-    collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
-    time::Duration,
-};
+use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -37,99 +27,8 @@ pub enum ProofManagerCommand {
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
-pub struct BatchQueue {
-    batch_store: Arc<BatchStore>,
-    // Queue per peer to ensure fairness between peers and priority within peer
-    author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
-}
-
-impl BatchQueue {
-    pub fn new(batch_store: Arc<BatchStore>) -> Self {
-        Self {
-            batch_store,
-            author_to_batches: HashMap::new(),
-        }
-    }
-
-    pub fn add_batches(&mut self, batches: Vec<BatchInfo>) {
-        for batch in batches.into_iter() {
-            let queue = self.author_to_batches.entry(batch.author()).or_default();
-            queue.insert(BatchSortKey::from_info(&batch), batch.clone());
-        }
-    }
-
-    pub fn remove_batch(&mut self, batch: &BatchInfo) {
-        if let Some(batch_tree) = self.author_to_batches.get_mut(&batch.author()) {
-            batch_tree.remove(&BatchSortKey::from_info(batch));
-        }
-    }
-
-    pub fn remove_expired_batches(&mut self) {
-        let authors = self.author_to_batches.keys().cloned().collect::<Vec<_>>();
-        for author in authors {
-            if let Some(batch_tree) = self.author_to_batches.get_mut(&author) {
-                batch_tree.retain(|_batch_key, batch| !batch.is_expired());
-            }
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.author_to_batches
-            .values()
-            .map(|batch_tree| batch_tree.len())
-            .sum()
-    }
-
-    pub fn pull_batches(
-        &mut self,
-        max_txns: PayloadTxnsSize,
-        excluded_batches: Vec<BatchInfo>,
-    ) -> (Vec<(BatchInfo, Vec<SignedTransaction>)>, PayloadTxnsSize) {
-        let mut result: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
-        let mut num_txns = PayloadTxnsSize::zero();
-        let mut iters = vec![];
-        let mut full = false;
-        for (_, batches) in self.author_to_batches.iter() {
-            iters.push(batches.iter().rev());
-        }
-        while !iters.is_empty() {
-            iters.shuffle(&mut thread_rng());
-            iters.retain_mut(|iter| {
-                if full {
-                    return false;
-                }
-                if let Some((_sort_key, batch)) = iter.next() {
-                    if excluded_batches.contains(batch) {
-                        true
-                    } else if num_txns + batch.size() <= max_txns
-                    {
-                        if let Ok(mut persisted_value) =
-                            self.batch_store.get_batch_from_local(batch.digest())
-                        {
-                            if let Some(txns) = persisted_value.take_payload() {
-                                num_txns += batch.size();
-                                result.push((batch.clone(), txns.clone()));
-                            }
-                        } else {
-                            warn!("Couldn't find a batch in local storage while creating inline block: {:?}", batch.digest());
-                        }
-                        true
-                    } else {
-                        full = true;
-                        false
-                    }
-                } else {
-                    false
-                }
-            })
-        }
-        (result, num_txns)
-    }
-}
-
 pub struct ProofManager {
-    proofs_for_consensus: ProofQueue,
-    batch_queue: BatchQueue,
+    batch_proof_queue: BatchProofQueue,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
@@ -148,8 +47,7 @@ impl ProofManager {
         enable_opt_quorum_store: bool,
     ) -> Self {
         Self {
-            proofs_for_consensus: ProofQueue::new(my_peer_id),
-            batch_queue: BatchQueue::new(batch_store),
+            batch_proof_queue: BatchProofQueue::new(my_peer_id, batch_store),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -161,26 +59,17 @@ impl ProofManager {
 
     pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
         for proof in proofs.into_iter() {
-            self.batch_queue.remove_batch(proof.info());
-            self.proofs_for_consensus.push(proof);
+            self.batch_proof_queue.insert_proof(proof);
         }
         (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.proofs_for_consensus.remaining_txns_and_proofs();
+            self.batch_proof_queue.remaining_txns_and_proofs();
     }
 
     pub(crate) fn receive_batches(
         &mut self,
         batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
-        if self.allow_batches_without_pos_in_proposal {
-            let batches = batch_summaries
-                .iter()
-                .map(|(batch_info, _)| batch_info.clone())
-                .collect();
-            self.batch_queue.add_batches(batches);
-        }
-        self.proofs_for_consensus
-            .add_batch_summaries(batch_summaries);
+        self.batch_proof_queue.insert_batches(batch_summaries);
     }
 
     pub(crate) fn handle_commit_notification(
@@ -192,15 +81,11 @@ impl ProofManager {
             "QS: got clean request from execution at block timestamp {}",
             block_timestamp
         );
-        self.batch_queue.remove_expired_batches();
-        for batch in &batches {
-            self.batch_queue.remove_batch(batch);
-        }
-        self.proofs_for_consensus.mark_committed(batches);
-        self.proofs_for_consensus
+        self.batch_proof_queue.mark_committed(batches);
+        self.batch_proof_queue
             .handle_updated_block_timestamp(block_timestamp);
         (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.proofs_for_consensus.remaining_txns_and_proofs();
+            self.batch_proof_queue.remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
@@ -217,54 +102,48 @@ impl ProofManager {
                 let max_txns_with_proof = request
                     .max_txns
                     .compute_pct(100 - request.opt_batch_txns_pct);
-                let batch_store_ref = match request.return_all_txns {
-                    true => Some(&self.batch_queue.batch_store),
-                    false => None,
-                };
 
                 let (
                     proof_block,
-                    qs_transactions,
                     txns_with_proof_size,
                     cur_unique_txns,
                     proof_queue_fully_utilized,
-                ) = self.proofs_for_consensus.pull_proofs(
+                    qs_transactions,
+                ) = self.batch_proof_queue.pull_proofs(
                     &excluded_batches,
                     max_txns_with_proof,
                     request.max_txns_after_filtering,
                     request.soft_max_txns_after_filtering,
                     request.return_non_full,
                     request.block_timestamp,
-                    batch_store_ref,
+                    request.return_all_txns,
                 );
 
-                counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
+                counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
+                    .observe(self.batch_proof_queue.num_batches_without_proof() as f64);
                 counters::PROOF_QUEUE_FULLY_UTILIZED
                     .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-                let excluded_batches: Vec<_> = excluded_batches.iter().cloned().collect();
-
-                let (opt_batches, opt_qs_transactions, opt_batch_txns_size) = if self.enable_opt_quorum_store {
+                let (opt_batches, opt_batch_txns_size, opt_batch_txns) = if self.enable_opt_quorum_store {
                     // TODO(ibalajiarun): Support unique txn calculation
                     let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
-                    let (opt_batches, size) = self
-                        .batch_queue
-                        .pull_batches(max_opt_batch_txns_size, excluded_batches.clone());
-
-                    (
-                        opt_batches
-                            .clone()
-                            .into_iter()
-                            .map(|(batch_info, _)| batch_info)
+                    let (opt_batches, opt_payload_size, _, opt_batch_txns) = self.batch_proof_queue.pull_batches(
+                        &excluded_batches
+                            .iter()
+                            .cloned()
+                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
                             .collect(),
-                        opt_batches
-                            .into_iter()
-                            .flat_map(|(_, txns)| txns)
-                            .collect::<Vec<SignedTransaction>>(),
-                        size,
-                    )
+                        max_opt_batch_txns_size,
+                        request.max_txns_after_filtering,
+                        request.soft_max_txns_after_filtering,
+                        request.return_non_full,
+                        request.block_timestamp,
+                        request.return_all_txns,
+                    );
+
+                    (opt_batches , opt_payload_size, opt_batch_txns)
                 } else {
-                    (Vec::new(), Vec::new(), PayloadTxnsSize::zero())
+                    (Vec::new(), PayloadTxnsSize::zero(), Vec::new())
                 };
 
                 let cur_txns = txns_with_proof_size + opt_batch_txns_size;
@@ -280,14 +159,20 @@ impl ProofManager {
                                 .max_txns_after_filtering
                                 .saturating_sub(cur_unique_txns),
                         ));
-                        self.batch_queue.pull_batches(
-                            max_inline_txns_to_pull,
-                            excluded_batches
-                                .iter()
-                                .cloned()
-                                .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                                .collect(),
-                        )
+                        let (inline_batches, inline_payload_size, _) =
+                            self.batch_proof_queue.pull_batches_with_transactions(
+                                &excluded_batches
+                                    .iter()
+                                    .cloned()
+                                    .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                                    .collect(),
+                                max_inline_txns_to_pull,
+                                request.max_txns_after_filtering,
+                                request.soft_max_txns_after_filtering,
+                                request.return_non_full,
+                                request.block_timestamp,
+                            );
+                        (inline_batches, inline_payload_size)
                     } else {
                         (Vec::new(), PayloadTxnsSize::zero())
                     };
@@ -326,7 +211,7 @@ impl ProofManager {
 
                 let all_transactions = qs_transactions
                     .into_iter()
-                    .chain(opt_qs_transactions.into_iter())
+                    .chain(opt_batch_txns.into_iter())
                     .chain(inline_transactions.into_iter())
                     .collect::<Vec<SignedTransaction>>();
 
