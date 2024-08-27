@@ -121,6 +121,8 @@ impl CliCommand<()> for InitTool {
             if input.is_empty() {
                 eprintln!("No network given, using devnet...");
                 Network::Devnet
+            } else if input.eq_ignore_ascii_case("testnet") && self.skip_faucet {
+                Network::Testnet
             } else {
                 Network::from_str(input)?
             }
@@ -349,7 +351,9 @@ impl CliCommand<()> for InitTool {
             .profile_name()
             .unwrap_or(DEFAULT_PROFILE);
         eprintln!(
-            "\n---\nMovement CLI is now set up for account {} as profile {}!\n See the account here: {}\n Run `movement --help` for more information about commands",
+            "\n---\nMovement CLI is now set up for account {} as profile {}!\n See the account here: {}\n 
+            Run `movement --help` for more information about commands. \n 
+            Visit https://faucet.movementlabs.xyz to use the testnet faucet.",
             address,
             profile_name,
             explorer_account_link(address, Some(network))
@@ -465,7 +469,11 @@ impl FromStr for Network {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().trim() {
             // "mainnet" => Self::Mainnet,
-            "testnet" => Self::Testnet,
+            "testnet" => {
+                return Err(CliError::CommandArgumentError(format!(
+                    "To use testnet, run `movement init --skip-faucet`, follow the prompts to create an account address, then visit the faucet UI  at https://faucet.movementlabs.xyz to fund the account."
+                )));
+            },
             "devnet" => Self::Devnet,
             "local" => Self::Local,
             "custom" => Self::Custom,
