@@ -14,6 +14,9 @@ use serde_json::Value;
 use std::{sync::Arc, time::Duration};
 use tokio::time::Instant;
 
+static AUTH_0_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^https://[a-zA-Z0-9-]+\.us\.auth0\.com/$").unwrap());
+
 /// The JWK in-mem cache.
 pub static DECODING_KEY_CACHE: Lazy<DashMap<Issuer, DashMap<KeyID, Arc<RSA_JWK>>>> =
     Lazy::new(DashMap::new);
@@ -21,10 +24,7 @@ pub static DECODING_KEY_CACHE: Lazy<DashMap<Issuer, DashMap<KeyID, Arc<RSA_JWK>>
 pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
     let payload = parse(jwt)?;
 
-    let re = Regex::new(r"^https://[a-zA-Z0-9-]+\.us\.auth0\.com/$").unwrap();
-
-    if !re.is_match(&payload.claims.iss) {
-        println!("{}", payload.claims.iss);
+    if !AUTH_0_REGEX.is_match(&payload.claims.iss) {
         return Err(anyhow!("not a federated iss"));
     }
 
