@@ -360,15 +360,12 @@ async fn process_common(
 
     let cached_key = jwk::cached_decoding_key_as_rsa(&claims.claims.iss, &key_id);
 
-    let jwk;
-    match cached_key {
-        Ok(key) => jwk = key,
-        Err(_) => {
-            jwk = get_federated_jwk(&jwt)
-                .await
-                .map_err(|e| BadRequest(format!("JWK not found: {e}")))?
-        },
-    }
+    let jwk = match cached_key {
+        Ok(key) => key,
+        Err(_) => get_federated_jwk(&jwt)
+            .await
+            .map_err(|e| BadRequest(format!("JWK not found: {e}")))?,
+    };
     let jwk_decoding_key = DecodingKey::from_rsa_components(&jwk.n, &jwk.e)
         .map_err(|e| BadRequest(format!("JWK not found: {e}")))?;
 
