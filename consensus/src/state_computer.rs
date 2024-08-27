@@ -34,13 +34,13 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction},
 };
 use fail::fail_point;
-use futures::{future::BoxFuture, Future, SinkExt, StreamExt};
+use futures::{future::{BoxFuture, Shared}, Future, FutureExt, SinkExt, StreamExt};
 use std::{boxed::Box, pin::Pin, sync::Arc, time::Duration};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
-pub type SyncBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 'a>>;
+pub type SyncBoxFuture<'a, T> = Shared<Pin<Box<dyn Future<Output = T> + Send + 'a>>>;
 pub type SyncStateComputeResultFut = SyncBoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -233,7 +233,7 @@ impl StateComputer for ExecutionProxy {
             )
             .await;
 
-        Box::pin(async move {
+        async move {
             let pipeline_execution_result = fut.await?;
             debug!(
                 block_id = block_id,
@@ -273,7 +273,7 @@ impl StateComputer for ExecutionProxy {
             }
 
             Ok(pipeline_execution_result)
-        })
+        }.boxed().shared()
     }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.

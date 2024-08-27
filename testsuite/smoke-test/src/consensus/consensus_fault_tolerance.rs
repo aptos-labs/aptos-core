@@ -211,6 +211,7 @@ async fn test_no_failures() {
     )
     .await
     .unwrap();
+panic!("test_no_failures");
 }
 
 #[tokio::test]

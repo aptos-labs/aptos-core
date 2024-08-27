@@ -25,6 +25,7 @@ use aptos_types::{
     },
 };
 use fail::fail_point;
+use futures::FutureExt;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
@@ -88,7 +89,7 @@ impl ExecutionPipeline {
             })
             .expect("Failed to send block to execution pipeline.");
 
-        Box::pin(async move {
+        async move {
             result_rx
                 .await
                 .map_err(|err| ExecutorError::InternalError {
@@ -97,7 +98,7 @@ impl ExecutionPipeline {
                         block_id, err
                     ),
                 })?
-        })
+        }.boxed().shared()
     }
 
     async fn prepare_block(
@@ -121,6 +122,7 @@ impl ExecutionPipeline {
             });
             return;
         }
+        debug!("prepare_block received block {}. debug 1", block.id());
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
         let input_txns = input_txns.expect("input_txns must be Some.");
         tokio::task::spawn_blocking(move || {
@@ -135,6 +137,7 @@ impl ExecutionPipeline {
                         .map(|t| t.into())
                         .collect::<Vec<_>>()
                 });
+            debug!("prepare_block received block {}. debug 2", block.id());
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
@@ -198,6 +201,7 @@ impl ExecutionPipeline {
                 .await
             )
             .expect("Failed to spawn_blocking.");
+        debug!("execute_stage received block {}. debug 1", block_id);
 
             ledger_apply_tx
                 .send(LedgerApplyCommand {

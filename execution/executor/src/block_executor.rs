@@ -258,6 +258,7 @@ where
                     });
                     V::execute_transaction_block(transactions, state_view, onchain_config.clone())?
                 };
+                debug!("chunk_output: block_id {:?}", block_id);
 
                 let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                     .with_label_values(&["state_checkpoint"])
