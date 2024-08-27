@@ -1,9 +1,0 @@
----
-profiles:
-  default:
-    network: Testnet
-    private_key: "0x533ec968be7481004693402410fc5d4a623a668218506c1443f3225fb2d10c2b"
-    public_key: "0x8980d4eebfd2ebd08e7a886bf6fcbb229767a1cc10a24eb2599322a1ef2a0152"
-    account: 0779feaacef83fcee0f6e4816c0ec8e1c46668aceced78b4469808ddf6809798
-    rest_url: "https://aptos.testnet.suzuka.movementlabs.xyz/v1/"
-    faucet_url: "https://faucet.testnet.suzuka.movementlabs.xyz/"
