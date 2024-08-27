@@ -1201,30 +1201,11 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                 // then it may be followed by a colon and a type annotation, an 'as' and a type,
                 // or an 'is' and a list of variants.
                 let e = parse_exp(context)?;
-                if match_token(context.tokens, Tok::Colon)? {
-                    let ty = parse_type(context)?;
-                    consume_token(context.tokens, Tok::RParen)?;
-                    Exp_::Annotate(Box::new(e), ty)
-                } else if match_token(context.tokens, Tok::As)? {
-                    let ty = parse_type(context)?;
-                    consume_token(context.tokens, Tok::RParen)?;
-                    Exp_::Cast(Box::new(e), ty)
-                } else if context.tokens.peek() == Tok::Identifier
-                    && context.tokens.content() == "is"
+                if let Some(exp) =
+                    parse_cast_or_test_exp(context, &e, /*allow_colon_exp*/ true)?
                 {
-                    require_move_2(
-                        context,
-                        current_token_loc(context.tokens),
-                        "`is` expression",
-                    );
-                    context.tokens.advance()?;
-                    let types = parse_list(
-                        context,
-                        |ctx| match_token(ctx.tokens, Tok::Pipe),
-                        parse_type,
-                    )?;
                     consume_token(context.tokens, Tok::RParen)?;
-                    Exp_::Test(Box::new(e), types)
+                    exp
                 } else {
                     if context.tokens.peek() != Tok::RParen {
                         consume_token(context.tokens, Tok::Comma)?;
@@ -1269,6 +1250,35 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         end_loc,
         term,
     ))
+}
+
+fn parse_cast_or_test_exp(
+    context: &mut Context,
+    e: &Exp,
+    allow_colon_exp: bool,
+) -> Result<Option<Exp_>, Box<Diagnostic>> {
+    if allow_colon_exp && match_token(context.tokens, Tok::Colon)? {
+        let ty = parse_type(context)?;
+        Ok(Some(Exp_::Annotate(Box::new(e.clone()), ty)))
+    } else if match_token(context.tokens, Tok::As)? {
+        let ty = parse_type(context)?;
+        Ok(Some(Exp_::Cast(Box::new(e.clone()), ty)))
+    } else if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "is" {
+        require_move_2(
+            context,
+            current_token_loc(context.tokens),
+            "`is` expression",
+        );
+        context.tokens.advance()?;
+        let types = parse_list(
+            context,
+            |ctx| match_token(ctx.tokens, Tok::Pipe),
+            parse_type,
+        )?;
+        Ok(Some(Exp_::Test(Box::new(e.clone()), types)))
+    } else {
+        Ok(None)
+    }
 }
 
 fn is_control_exp(tok: Tok) -> bool {
@@ -1822,6 +1832,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 //          | <Quantifier>                  spec only
 //          | <BinOpExp>
 //          | <UnaryExp> "=" <Exp>
+//          | <UnaryExp> ("as" | "is") Type
 fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let token = context.tokens.peek();
@@ -1840,10 +1851,21 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         Tok::Identifier if is_quant(context) => parse_quant(context)?,
         _ => {
             // This could be either an assignment or a binary operator
-            // expression.
+            // expression, or a cast or test
             let lhs = parse_unary_exp(context)?;
             if context.tokens.peek() != Tok::Equal {
-                return parse_binop_exp(context, lhs, /* min_prec */ 1);
+                if let Some(exp) =
+                    parse_cast_or_test_exp(context, &lhs, /*allow_colon_exp*/ false)?
+                {
+                    let loc = make_loc(
+                        context.tokens.file_hash(),
+                        start_loc,
+                        context.tokens.previous_end_loc(),
+                    );
+                    return Ok(sp(loc, exp));
+                } else {
+                    return parse_binop_exp(context, lhs, /* min_prec */ 1);
+                }
             }
             context.tokens.advance()?; // consume the "="
             let rhs = Box::new(parse_exp(context)?);
