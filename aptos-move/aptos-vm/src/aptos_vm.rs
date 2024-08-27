@@ -78,7 +78,7 @@ use aptos_vm_types::{
     environment::Environment,
     module_write_set::ModuleWriteSet,
     output::VMOutput,
-    resolver::{ExecutorView, ResourceGroupView},
+    resolver::{BlockSynchronizationEvent, ExecutorView, ResourceGroupView},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use ark_bn254::Bn254;
@@ -1791,6 +1791,10 @@ impl AptosVM {
                 self.gas_feature_version,
                 change_set_configs,
             ));
+        // TODO: hint on sequence numbers, then signal.
+        resolver
+            .as_executor_view()
+            .signal_sync_event(BlockSynchronizationEvent::UserPrologueFinish);
 
         let is_account_init_for_sponsored_transaction = unwrap_or_discard!(
             is_account_init_for_sponsored_transaction(&txn_data, self.features(), resolver)
@@ -2428,6 +2432,16 @@ impl AptosVM {
             let discarded_output = discarded_output(vm_status.status_code());
             return Ok((vm_status, discarded_output));
         }
+
+        let write_barrier = matches!(
+            txn.expect_valid(),
+            Transaction::BlockMetadata(_)
+                | Transaction::BlockMetadataExt(_)
+                | Transaction::GenesisTransaction(_)
+        );
+        resolver
+            .as_executor_view()
+            .signal_sync_event(BlockSynchronizationEvent::TransactionStart { write_barrier });
 
         Ok(match txn.expect_valid() {
             Transaction::BlockMetadata(block_metadata) => {

@@ -25,8 +25,8 @@ use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
     change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
-        TResourceGroupView, TResourceView,
+        BlockSynchronizationEvent, BlockSynchronizationView, ExecutorView, ResourceGroupSize,
+        ResourceGroupView, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
     },
 };
 use bytes::Bytes;
@@ -56,6 +56,13 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
             base_resource_group_view,
             change_set,
         }
+    }
+}
+
+impl<'r> BlockSynchronizationView for ExecutorViewWithChangeSet<'r> {
+    fn signal_sync_event(&self, event: BlockSynchronizationEvent) {
+        // Forward the signal.
+        self.base_executor_view.signal_sync_event(event);
     }
 }
 

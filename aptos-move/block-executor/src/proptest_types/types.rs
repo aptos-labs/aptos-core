@@ -25,7 +25,7 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
-use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
+use aptos_vm_types::resolver::{BlockSynchronizationEvent, TExecutorView, TResourceGroupView};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
 use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
@@ -865,6 +865,12 @@ where
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
+        let write_barrier = txn_idx == 0 || txn_idx == 100;
+        view.signal_sync_event(BlockSynchronizationEvent::TransactionStart { write_barrier });
+        // view.signal_sync_event(BlockSynchronizationEvent::TransactionStart {
+        //     write_barrier: false,
+        // });
+
         match txn {
             MockTransaction::Write {
                 incarnation_counter,
