@@ -93,10 +93,6 @@ pub struct SourceCoverage {
     #[clap(long = "module")]
     pub module_name: String,
 
-    /// Include inline function calls in coverage info shown
-    #[clap(long = "inlines")]
-    pub inlines: bool,
-
     /// Colorize output based on coverage
     #[clap(long, default_value_t = ColorChoice::Default)]
     pub color: ColorChoice,
@@ -125,8 +121,7 @@ impl CliCommand<()> for SourceCoverage {
             }) => (module, source_map),
             _ => panic!("Should all be modules"),
         };
-        let source_coverage =
-            SourceCoverageBuilder::new(module, &coverage_map, source_map, self.inlines);
+        let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
         let source_coverage = source_coverage.compute_source_coverage(source_path);
         let output_result =
             source_coverage.output_source_coverage(&mut std::io::stdout(), self.color, self.tag);

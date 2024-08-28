@@ -38,7 +38,6 @@ pub struct FunctionSourceCoverage {
 pub struct SourceCoverageBuilder<'a> {
     uncovered_locations: BTreeMap<Identifier, FunctionSourceCoverage>,
     source_map: &'a SourceMap,
-    inlines: bool,
 }
 
 #[derive(Debug, Serialize, Eq, PartialEq, Ord)]
@@ -189,7 +188,6 @@ impl<'a> SourceCoverageBuilder<'a> {
         module: &CompiledModule,
         coverage_map: &CoverageMap,
         source_map: &'a SourceMap,
-        inlines: bool,
     ) -> Self {
         let module_name = module.self_id();
         let unified_exec_map = coverage_map.to_unified_exec_map();
@@ -259,7 +257,6 @@ impl<'a> SourceCoverageBuilder<'a> {
         Self {
             uncovered_locations,
             source_map,
-            inlines,
         }
     }
 
@@ -371,14 +368,11 @@ impl SourceCoverage {
             TextIndicator::Explicit | TextIndicator::On => {
                 write!(
                     output_writer,
-                    "Code coverage per line of code:\n{}\n{}\nSource code follows:\n",
-                    "  + indicates the line is not executable or is fully covered during execution"
-                        .to_string()
-                        .green(),
-                    "  - indicates the line is executable but NOT fully covered during execution"
-                        .to_string()
-                        .bold()
-                        .red()
+                    "Code coverage per line of code:\n  {} {}\n  {} {}\nSource code follows:\n",
+                    "+".to_string().green(),
+                    "indicates the line is not executable or is fully covered during execution",
+                    "-".to_string().bold().red(),
+                    "indicates the line is executable but NOT fully covered during execution",
                 )?;
                 true
             },
@@ -389,11 +383,15 @@ impl SourceCoverage {
                 let has_uncovered = line
                     .iter()
                     .any(|string_segment| matches!(string_segment, StringSegment::Uncovered(_)));
-                if has_uncovered {
-                    write!(output_writer, "- ")?;
-                } else {
-                    write!(output_writer, "+ ")?;
-                }
+                write!(
+                    output_writer,
+                    "{} ",
+                    if has_uncovered {
+                        "-".to_string().red()
+                    } else {
+                        "+".to_string().green()
+                    }
+                )?;
             }
             for string_segment in line.iter() {
                 match string_segment {

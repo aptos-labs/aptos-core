@@ -31,10 +31,6 @@ pub enum CoverageSummaryOptions {
     Source {
         #[clap(long = "module")]
         module_name: String,
-
-        /// Whether to show inline function coverage
-        #[clap(long)]
-        inlines: bool,
     },
     /// Display coverage information about the module against disassembled bytecode
     #[clap(name = "bytecode")]
@@ -74,10 +70,7 @@ impl Coverage {
             })
             .collect();
         match self.options {
-            CoverageSummaryOptions::Source {
-                module_name,
-                inlines,
-            } => {
+            CoverageSummaryOptions::Source { module_name } => {
                 let unit = package.get_module_by_name_from_root(&module_name)?;
                 let source_path = &unit.source_path;
                 let (module, source_map) = match &unit.unit {
@@ -86,8 +79,7 @@ impl Coverage {
                     }) => (module, source_map),
                     _ => panic!("Should all be modules"),
                 };
-                let source_coverage =
-                    SourceCoverageBuilder::new(module, &coverage_map, source_map, inlines);
+                let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
                 let t1 = source_coverage.compute_source_coverage(source_path);
                 t1.output_source_coverage(&mut std::io::stdout(), self.color, self.tag)
                     .unwrap();
