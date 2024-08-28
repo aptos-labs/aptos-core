@@ -111,7 +111,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                 debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 match execution_futures.entry(block_id) {
                     dashmap::mapref::entry::Entry::Occupied(entry) => {
-                        let fut = entry.remove();
+                        let fut = entry.get().clone();
                         results.push(fut.await);
                     }
                     dashmap::mapref::entry::Entry::Vacant(_) => {

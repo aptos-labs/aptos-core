@@ -7,7 +7,6 @@ use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use serde::{Deserialize, Serialize};
-use core::panic;
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
 
 /// Publish the `on-chain-dice` example module,

@@ -10,14 +10,13 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction, PeerId};
 use serde::{Deserialize, Serialize};
 use std::{
-    fmt::{Display, Formatter},
-    ops::Deref,
+    fmt::{Display, Formatter}, mem, ops::Deref, sync::Arc
 };
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub struct PersistedValue {
     info: BatchInfo,
-    maybe_payload: Option<Vec<SignedTransaction>>,
+    maybe_payload: Arc<Option<Vec<SignedTransaction>>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -30,24 +29,24 @@ impl PersistedValue {
     pub(crate) fn new(info: BatchInfo, maybe_payload: Option<Vec<SignedTransaction>>) -> Self {
         Self {
             info,
-            maybe_payload,
+            maybe_payload: Arc::new(maybe_payload),
         }
     }
 
     pub(crate) fn payload_storage_mode(&self) -> StorageMode {
-        match self.maybe_payload {
+        match self.maybe_payload.as_ref() {
             Some(_) => StorageMode::MemoryAndPersisted,
             None => StorageMode::PersistedOnly,
         }
     }
 
-    pub(crate) fn take_payload(&mut self) -> Option<Vec<SignedTransaction>> {
-        self.maybe_payload.take()
+    pub(crate) fn take_payload(&self) -> Option<Vec<SignedTransaction>> {
+        self.maybe_payload.as_ref().clone()
     }
 
     #[allow(dead_code)]
     pub(crate) fn remove_payload(&mut self) {
-        self.maybe_payload = None;
+        mem::replace(&mut self.maybe_payload, Arc::new(None));
     }
 
     pub fn batch_info(&self) -> &BatchInfo {
@@ -55,11 +54,15 @@ impl PersistedValue {
     }
 
     pub fn payload(&self) -> &Option<Vec<SignedTransaction>> {
-        &self.maybe_payload
+        self.maybe_payload.as_ref()
+    }
+
+    pub fn payload_arc(&self) -> Arc<Option<Vec<SignedTransaction>>> {
+        self.maybe_payload.clone()
     }
 
     pub fn summary(&self) -> Vec<TxnSummaryWithExpiration> {
-        if let Some(payload) = &self.maybe_payload {
+        if let Some(payload) = self.maybe_payload.as_ref() {
             return payload
                 .iter()
                 .map(|txn| {
@@ -76,7 +79,7 @@ impl PersistedValue {
     }
 
     pub fn unpack(self) -> (BatchInfo, Option<Vec<SignedTransaction>>) {
-        (self.info, self.maybe_payload)
+        (self.info, self.maybe_payload.as_ref().clone())
     }
 }
 
@@ -99,6 +102,8 @@ impl TryFrom<PersistedValue> for Batch {
                 author,
                 value
                     .maybe_payload
+                    .as_ref()
+                    .clone()
                     .ok_or_else(|| anyhow::anyhow!("Payload not exist"))?,
             ),
         })

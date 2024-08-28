@@ -173,10 +173,6 @@ impl ExecutionProxy {
             .compute_result()
             .transactions_to_commit(input_txns, executed_block.id())
     }
-
-    pub fn get_state_view(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<CachedStateView> {
-        self.executor.get_state_view(block_id, parent_block_id)
-    }
 }
 
 #[async_trait::async_trait]
@@ -510,10 +506,6 @@ async fn test_commit_sync_race() {
         }
 
         fn finish(&self) {}
-
-        fn get_state_view(&self) -> ExecutorResult<CachedStateView> {
-            todo!()
-        }
     }
 
     #[async_trait::async_trait]

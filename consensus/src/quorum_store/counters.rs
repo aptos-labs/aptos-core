@@ -877,3 +877,19 @@ pub static BATCH_RECEIVED_LATE_REPLIES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static BATCH_WITH_DATA: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_with_data",
+        "Number of batches that have data when pulled."
+    )
+    .unwrap()
+});
+
+pub static BATCH_WITHOUT_DATA: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_without_data",
+        "Number of batches that have no data when pulled."
+    )
+    .unwrap()
+});

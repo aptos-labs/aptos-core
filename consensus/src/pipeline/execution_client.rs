@@ -102,9 +102,6 @@ pub trait TExecutionClient: Send + Sync {
     async fn end_epoch(&self);
 
     async fn pre_execute(&self, block: &Arc<PipelinedBlock>);
-
-    // fn get_state_view(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<CachedStateView>;
-    fn get_execution_proxy(&self) -> Arc<ExecutionProxy>;
 }
 
 struct BufferManagerHandle {
@@ -312,10 +309,6 @@ impl ExecutionProxyClient {
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
         tokio::spawn(buffer_manager.start());
-    }
-
-    pub fn get_state_view(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<CachedStateView> {
-        self.execution_proxy.get_state_view(block_id, parent_block_id)
     }
 }
 
@@ -532,14 +525,6 @@ impl TExecutionClient for ExecutionProxyClient {
             debug!("Failed to send to buffer manager, maybe epoch ends");
         }
     }
-
-    // fn get_state_view(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<CachedStateView> {
-    //     self.execution_proxy.get_state_view(block_id, parent_block_id)
-    // }
-
-    fn get_execution_proxy(&self) -> Arc<ExecutionProxy> {
-        self.execution_proxy.clone()
-    }
 }
 
 pub struct DummyExecutionClient;
@@ -591,12 +576,4 @@ impl TExecutionClient for DummyExecutionClient {
     async fn end_epoch(&self) {}
 
     async fn pre_execute(&self, _block: &Arc<PipelinedBlock>) {}
-
-    // fn get_state_view(&self, _: HashValue, _: HashValue) -> ExecutorResult<CachedStateView> {
-    //     todo!();
-    // }
-
-    fn get_execution_proxy(&self) -> Arc<ExecutionProxy> {
-        todo!()
-    }
 }

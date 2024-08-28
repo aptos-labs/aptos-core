@@ -3,8 +3,7 @@
 
 use crate::error::QuorumStoreError;
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter},
-    utils::PayloadTxnsSize,
+    common::{Payload, PayloadFilter}, request_response::PayloadTxns, utils::PayloadTxnsSize
 };
 use aptos_types::{transaction::SignedTransaction, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool::TransactionFilter;
@@ -28,7 +27,7 @@ pub struct PayloadPullParameters {
     pub pending_uncommitted_blocks: usize,
     pub recent_max_fill_fraction: f32,
     pub block_timestamp: Duration,
-    pub return_all_txns: bool,
+    pub return_payload_txns: bool,
 }
 
 impl PayloadPullParameters {
@@ -46,7 +45,7 @@ impl PayloadPullParameters {
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
         block_timestamp: Duration,
-        return_all_txns: bool,
+        return_payload_txns: bool,
     ) -> Self {
         Self {
             max_poll_time,
@@ -60,7 +59,7 @@ impl PayloadPullParameters {
             pending_uncommitted_blocks,
             recent_max_fill_fraction,
             block_timestamp,
-            return_all_txns,
+            return_payload_txns,
         }
     }
 }
@@ -83,7 +82,7 @@ impl fmt::Debug for PayloadPullParameters {
             )
             .field("recent_max_fill_fraction", &self.recent_max_fill_fraction)
             .field("block_timestamp", &self.block_timestamp)
-            .field("return_all_txns", &self.return_all_txns)
+            .field("return_all_txns", &self.return_payload_txns)
             .finish()
     }
 }
@@ -95,5 +94,5 @@ pub trait PayloadClient: Send + Sync {
         config: PayloadPullParameters,
         validator_txn_filter: TransactionFilter,
         wait_callback: BoxFuture<'static, ()>,
-    ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload, Vec<SignedTransaction>), QuorumStoreError>;
+    ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload, PayloadTxns), QuorumStoreError>;
 }

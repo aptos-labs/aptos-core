@@ -3,15 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::tracing::{observe_block, BlockStage},
-    consensus_observer::{
+    block_storage::tracing::{observe_block, BlockStage}, consensus_observer::{
         network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
-    },
-    counters::{self, log_executor_error_occurred},
-    monitor,
-    network::{IncomingCommitRequest, NetworkSender},
-    network_interface::ConsensusMsg,
-    pipeline::{
+    }, counters::{self, log_executor_error_occurred}, monitor, network::{IncomingCommitRequest, NetworkSender}, network_interface::ConsensusMsg, pipeline::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
         commit_reliable_broadcast::{AckState, CommitMessage},
@@ -20,8 +14,7 @@ use crate::{
         persisting_phase::PersistingRequest,
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
-    },
-    state_replication::StateComputerCommitCallBackType,
+    }, state_computer::SyncStateComputeResultFut, state_replication::StateComputerCommitCallBackType
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
@@ -151,6 +144,7 @@ pub struct BufferManager {
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 
     buffered_commit_votes: Arc<DashMap<HashValue, HashMap<Author, IncomingCommitRequest>>>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl BufferManager {
@@ -180,6 +174,7 @@ impl BufferManager {
         order_vote_enabled: bool,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -242,6 +237,7 @@ impl BufferManager {
             consensus_publisher,
 
             buffered_commit_votes: Arc::new(DashMap::new()),
+            execution_futures,
         }
     }
 
@@ -545,6 +541,7 @@ impl BufferManager {
         let executed_blocks = match inner {
             Ok(result) => result,
             Err(e) => {
+                self.execution_futures.remove(&block_id);
                 log_executor_error_occurred(
                     e,
                     &counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT,

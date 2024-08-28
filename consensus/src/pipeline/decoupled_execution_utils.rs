@@ -73,7 +73,7 @@ pub fn prepare_phases_and_buffer_manager(
         create_channel::<CountedRequest<ExecutionRequest>>();
     let (execution_schedule_phase_response_tx, execution_schedule_phase_response_rx) =
         create_channel::<ExecutionWaitRequest>();
-    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy, execution_futures);
+    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy, execution_futures.clone());
     let execution_schedule_phase = PipelinePhase::new(
         execution_schedule_phase_request_rx,
         Some(execution_schedule_phase_response_tx),
@@ -147,6 +147,7 @@ pub fn prepare_phases_and_buffer_manager(
             order_vote_enabled,
             consensus_observer_config,
             consensus_publisher,
+            execution_futures,
         ),
     )
 }

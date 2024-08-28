@@ -10,7 +10,7 @@ use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
+    request_response::{GetPayloadCommand, GetPayloadResponse, PayloadTxns},
     utils::PayloadTxnsSize,
 };
 use aptos_logger::prelude::*;
@@ -209,13 +209,15 @@ impl ProofManager {
                     )
                 };
 
-                let all_transactions = qs_transactions
+                let mut ref_txns = qs_transactions
                     .into_iter()
                     .chain(opt_batch_txns.into_iter())
-                    .chain(inline_transactions.into_iter())
-                    .collect::<Vec<SignedTransaction>>();
-
-                let res = GetPayloadResponse::GetPayloadResponse((response, all_transactions));
+                    .collect::<Vec<Arc<Option<Vec<SignedTransaction>>>>>();
+                let payload_txns = PayloadTxns {
+                    ref_txns,
+                    inline_txns: inline_transactions,
+                };
+                let res = GetPayloadResponse::GetPayloadResponse((response, payload_txns));
                 match request.callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),

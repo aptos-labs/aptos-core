@@ -5,7 +5,7 @@ use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, TransactionInProgress, TransactionSummary},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
+    request_response::{GetPayloadCommand, GetPayloadResponse, PayloadTxns},
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -121,7 +121,7 @@ impl DirectMempoolQuorumStore {
 
         let get_block_response_start_time = Instant::now();
         let payload = Payload::DirectMempool(txns.clone());
-        let result = match callback.send(Ok(GetPayloadResponse::GetPayloadResponse((payload, txns)))) {
+        let result = match callback.send(Ok(GetPayloadResponse::GetPayloadResponse((payload, PayloadTxns { ref_txns: vec![], inline_txns: txns } )))) {
             Err(_) => {
                 error!("Callback failed");
                 counters::CALLBACK_FAIL_LABEL
