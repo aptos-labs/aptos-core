@@ -36,7 +36,6 @@ impl RawData for LocalnetDataService {
         &self,
         req: Request<GetTransactionsRequest>,
     ) -> Result<Response<Self::GetTransactionsStream>, Status> {
-        println!(">> local net get txns");
         // Some node metadata
         let context = self.service_context.context.clone();
         let r = req.into_inner();
@@ -62,10 +61,8 @@ impl RawData for LocalnetDataService {
                 tx.clone(),
             );
             loop {
-                println!(">> b");
                 // Processes and sends batch of transactions to client
                 let results = coordinator.process_next_batch().await;
-                println!(">> 1");
                 if results.is_empty() {
                     info!(
                         start_version = starting_version,
@@ -87,7 +84,6 @@ impl RawData for LocalnetDataService {
         tokio::spawn(async move {
             let mut response_transactions_count = transactions_count;
             while let Some(response) = rx.recv().await {
-                println!(">> a");
                 if let Some(count) = response_transactions_count.as_ref() {
                     if *count == 0 {
                         break;

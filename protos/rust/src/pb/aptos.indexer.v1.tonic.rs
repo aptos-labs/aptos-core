@@ -102,7 +102,6 @@ pub mod raw_data_client {
             tonic::Response<tonic::codec::Streaming<super::TransactionsResponse>>,
             tonic::Status,
         > {
-            println!(">> get transactions");
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
                     tonic::Code::Unknown,
@@ -223,10 +222,6 @@ pub mod raw_data_server {
         }
 
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
-            println!(">>>> called");
-
-            println!("{}", req.uri().path());
-
             let inner = self.inner.clone();
             match req.uri().path() {
                 "/aptos.indexer.v1.RawData/GetTransactions" => {
@@ -246,7 +241,6 @@ pub mod raw_data_server {
                             request: tonic::Request<super::GetTransactionsRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            println!(">> aaa");
                             let fut = async move { (*inner).get_transactions(request).await };
                             Box::pin(fut)
                         }
@@ -257,7 +251,6 @@ pub mod raw_data_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        println!(">> inner fut");
                         let inner = inner.0;
                         let method = GetTransactionsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();

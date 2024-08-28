@@ -25,10 +25,8 @@ use futures::{channel::oneshot::Sender as OneShotSender, lock::Mutex};
 use poem::{http::Method, listener::TcpAcceptor, middleware::Cors, EndpointExt, Route, Server};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::{
-    fs::File, io::BufReader, net::TcpListener, path::PathBuf, pin::Pin, str::FromStr, sync::Arc,
-};
-use tokio::{sync::Semaphore, task::JoinSet};
+use std::{fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc};
+use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HandlerConfig {
@@ -190,7 +188,8 @@ impl RunConfig {
         let listener = TcpListener::bind((
             self.server_config.listen_address.clone(),
             self.server_config.listen_port,
-        ))?;
+        ))
+        .await?;
         let port = listener.local_addr()?.port();
 
         if let Some(tx) = port_tx {
@@ -198,7 +197,7 @@ impl RunConfig {
         }
 
         // Create a future for the API server.
-        let api_server_future = Server::new_with_acceptor(TcpAcceptor::from_std(listener)?).run(
+        let api_server_future = Server::new_with_acceptor(TcpAcceptor::from_tokio(listener)?).run(
             Route::new()
                 .nest(
                     &self.server_config.api_path_base,

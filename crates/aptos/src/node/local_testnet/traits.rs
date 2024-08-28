@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::health_checker::HealthChecker;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
-use futures::channel::oneshot;
-use std::{collections::HashSet, fmt::Debug, future::Future};
+use std::{collections::HashSet, fmt::Debug};
 use tracing::warn;
 
 #[async_trait]
@@ -24,7 +23,7 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
     /// can use to make sure prerequisite services have started. These are also used
     /// by the "ready server", a server that exposes a unified endpoint for checking
     /// if all services are ready.
-    //fn get_health_checkers(&self) -> HashSet<HealthChecker>;
+    fn get_health_checkers(&self) -> HashSet<HealthChecker>;
 
     /// Whereas get_health_checkers returns healthchecks that other downstream services
     /// can use, this should return health checkers for services that this service is
@@ -42,10 +41,7 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
     /// sure all the prerequisite services have started and then calls the inner
     /// function to run the service. The user should never need to override this
     /// implementation.
-    async fn run(
-        self: Box<Self>,
-        health_checkers_tx: oneshot::Sender<HashSet<HealthChecker>>,
-    ) -> Result<()> {
+    async fn run(self: Box<Self>) -> Result<()> {
         // We make a new function here so that each task waits for its prereqs within
         // its own run function. This way we can start each service in any order.
         let name = self.get_name();
@@ -56,7 +52,7 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
                 .await
                 .context("Prerequisite service did not start up successfully")?;
         }
-        self.run_service(health_checkers_tx)
+        self.run_service()
             .await
             .context("Service ended with an error")?;
         warn!(
@@ -64,25 +60,6 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
             name_clone
         );
         Ok(())
-    }
-
-    fn run_and_get_health_checkers(
-        self: Box<Self>,
-    ) -> (
-        impl Future<Output = Result<HashSet<HealthChecker>>>,
-        impl Future<Output = Result<()>>,
-    ) {
-        let name = self.get_name();
-
-        let (health_checkers_tx, health_checkers_rx) = oneshot::channel();
-        let health_checkers_fut = async move {
-            health_checkers_rx
-                .await
-                .map_err(|_| anyhow!("did not receive health checkers for {}", name))
-        };
-        let run_fut = self.run(health_checkers_tx);
-
-        (health_checkers_fut, run_fut)
     }
 
     /// The ServiceManager may return PostHealthySteps. The tool will run these after
@@ -107,10 +84,7 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
 
     /// This function is responsible for running the service. It should return an error
     /// if the service ends unexpectedly. It gets called by `run`.
-    async fn run_service(
-        self: Box<Self>,
-        health_checkers_tx: oneshot::Sender<HashSet<HealthChecker>>,
-    ) -> Result<()>;
+    async fn run_service(self: Box<Self>) -> Result<()>;
 }
 
 /// If a service wants to do something after it is healthy, it can define a struct,

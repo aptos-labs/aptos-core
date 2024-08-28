@@ -209,11 +209,21 @@ pub struct AptosHandle {
     _indexer_db_runtime: Option<Runtime>,
 }
 
-/// Start an Aptos node
 pub fn start(
     config: NodeConfig,
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
+) -> anyhow::Result<()> {
+    start_ex(config, log_file, create_global_rayon_pool, None, None)
+}
+
+/// Start an Aptos node
+pub fn start_ex(
+    config: NodeConfig,
+    log_file: Option<PathBuf>,
+    create_global_rayon_pool: bool,
+    api_port_tx: Option<oneshot::Sender<u16>>,
+    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<()> {
     // Setup panic handler
     aptos_crash_handler::setup_panic_handler();
@@ -252,8 +262,13 @@ pub fn start(
     }
 
     // Set up the node environment and start it
-    let _node_handle =
-        setup_environment_and_start_node(config, remote_log_receiver, Some(logger_filter_update))?;
+    let _node_handle = setup_environment_and_start_node_ex(
+        config,
+        remote_log_receiver,
+        Some(logger_filter_update),
+        api_port_tx,
+        indexer_grpc_port_tx,
+    )?;
     let term = Arc::new(AtomicBool::new(false));
     while !term.load(Ordering::Acquire) {
         thread::park();

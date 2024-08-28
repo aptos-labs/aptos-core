@@ -17,7 +17,7 @@ use bollard::{
     models::{HostConfig, PortBinding},
 };
 use clap::Parser;
-use futures::{channel::oneshot, TryStreamExt};
+use futures::TryStreamExt;
 use maplit::{hashmap, hashset};
 use reqwest::Url;
 use std::{collections::HashSet, path::PathBuf};
@@ -117,23 +117,22 @@ impl ServiceManager for IndexerApiManager {
         Ok(())
     }
 
+    /// In this case we we return two HealthCheckers, one for whether the Hasura API
+    /// is up at all and one for whether the metadata is applied.
+    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
+        hashset! {
+            // This first one just checks if the API is up at all.
+            HealthChecker::Http(self.get_url(), "Indexer API".to_string()),
+            // This second one checks if the metadata is applied.
+            HealthChecker::IndexerApiMetadata(self.get_url()),
+        }
+    }
+
     fn get_prerequisite_health_checkers(&self) -> HashSet<&HealthChecker> {
         self.prerequisite_health_checkers.iter().collect()
     }
 
-    async fn run_service(
-        self: Box<Self>,
-        health_checkers_tx: oneshot::Sender<HashSet<HealthChecker>>,
-    ) -> Result<()> {
-        health_checkers_tx
-            .send(hashset! {
-                // This first one just checks if the API is up at all.
-                HealthChecker::Http(self.get_url(), "Indexer API".to_string()),
-                // This second one checks if the metadata is applied.
-                HealthChecker::IndexerApiMetadata(self.get_url()),
-            })
-            .map_err(|_| anyhow!("failed to send health checkers for {}", self.get_name()))?;
-
+    async fn run_service(self: Box<Self>) -> Result<()> {
         setup_docker_logging(&self.test_dir, "indexer-api", INDEXER_API_CONTAINER_NAME)?;
 
         // This is somewhat hard to maintain. If it requires any further maintenance we

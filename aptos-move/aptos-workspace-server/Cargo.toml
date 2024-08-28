@@ -16,7 +16,7 @@ aptos = { workspace = true }
 aptos-config = { workspace = true }
 aptos-node = { workspace = true }
 aptos-types = { workspace = true }
-aptos-node-identity = { workspace = true }
+aptos-faucet-core = { workspace = true }
 aptos-cached-packages = { workspace = true }
 
 anyhow = { workspace = true }

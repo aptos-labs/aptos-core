@@ -8,7 +8,6 @@ use aptos_config::config::{NodeConfig, DEFAULT_GRPC_STREAM_PORT};
 use aptos_node::{load_node_config, start_test_environment_node};
 use async_trait::async_trait;
 use clap::Parser;
-use futures::channel::oneshot;
 use maplit::hashset;
 use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
@@ -180,10 +179,7 @@ impl ServiceManager for NodeManager {
     /// Spawn the node on a thread and then create a future that just waits for it to
     /// exit (which should never happen) forever. This is necessary because there is
     /// no async function we can use to run the node.
-    async fn run_service(
-        self: Box<Self>,
-        health_checkers_tx: oneshot::Sender<HashSet<HealthChecker>>,
-    ) -> Result<()> {
+    async fn run_service(self: Box<Self>) -> Result<()> {
         // Don't actually run the node, just idle.
         if self.no_node {
             loop {
