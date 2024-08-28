@@ -153,6 +153,7 @@ async fn schedule_compute_should_discover_validator_txns() {
         Arc::new(DummyStateSyncNotifier::new()),
         &Handle::current(),
         TransactionFilter::new(Filter::empty()),
+        true,
     );
 
     let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
@@ -206,6 +207,7 @@ async fn commit_should_discover_validator_txns() {
         state_sync_notifier.clone(),
         &Handle::current(),
         TransactionFilter::new(Filter::empty()),
+        true,
     );
 
     let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);

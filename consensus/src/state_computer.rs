@@ -87,6 +87,7 @@ impl ExecutionProxy {
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
         txn_filter: TransactionFilter,
+        enable_pre_commit: bool,
     ) -> Self {
         let (tx, mut rx) =
             aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
@@ -103,7 +104,8 @@ impl ExecutionProxy {
                 callback();
             }
         });
-        let execution_pipeline = ExecutionPipeline::spawn(executor.clone(), handle);
+        let execution_pipeline =
+            ExecutionPipeline::spawn(executor.clone(), handle, enable_pre_commit);
         Self {
             executor,
             txn_notifier,
@@ -549,6 +551,7 @@ async fn test_commit_sync_race() {
         recorded_commit.clone(),
         &tokio::runtime::Handle::current(),
         TransactionFilter::new(Filter::empty()),
+        true,
     );
 
     executor.new_epoch(
