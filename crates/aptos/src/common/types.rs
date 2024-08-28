@@ -1119,7 +1119,7 @@ pub struct MovePackageDir {
     #[clap(long, hide(true))]
     pub experiments: Vec<String>,
 
-    /// ...or --bytecode `BYTECODE_VERSION`
+    /// ...or `--bytecode BYTECODE_VERSION`
     /// Specify the version of the bytecode the compiler is going to emit.
     /// Defaults to `6`, or `7` if language version 2 is selected
     /// (through `--move-2` or `--language_version=2`), .
