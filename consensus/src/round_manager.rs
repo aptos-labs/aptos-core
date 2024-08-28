@@ -1109,11 +1109,19 @@ impl RoundManager {
                     .await?;
             } else {
                 ORDER_VOTE_VERY_OLD.inc();
-                info!(
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(30)),
+                    info!(
+                        "[sampled] Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
+                        order_vote_msg.order_vote().ledger_info().round(),
+                        self.block_store.sync_info().highest_ordered_round()
+                    )
+                );
+                debug!(
                     "Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
                     order_vote_msg.order_vote().ledger_info().round(),
                     self.block_store.sync_info().highest_ordered_round()
-                );
+                )
             }
         }
         Ok(())
