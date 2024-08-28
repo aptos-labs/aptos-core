@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    add_aptos_packages_to_data_store, check_aptos_packages_availability, compile_aptos_packages,
     data_state_view::DataStateView, dump_and_compile_from_package_metadata, is_aptos_package,
-    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex,
+    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex, APTOS_COMMONS,
 };
 use anyhow::{format_err, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_framework::natives::code::PackageMetadata;
+use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_rest_client::Client;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, TStateView},
@@ -164,7 +166,17 @@ impl DataCollection {
 
     pub async fn dump_data(&self, begin: Version, limit: u64) -> Result<()> {
         println!("begin dumping data");
-        let compilation_cache = Arc::new(Mutex::new(CompilationCache::default()));
+        let aptos_commons_path = self.current_dir.join(APTOS_COMMONS);
+        if !check_aptos_packages_availability(aptos_commons_path.clone()) {
+            return Err(anyhow::Error::msg("aptos packages are missing"));
+        }
+        let mut compiled_cache = CompilationCache::default();
+        let _ = compile_aptos_packages(
+            &aptos_commons_path,
+            &mut compiled_cache.compiled_package_cache_v1,
+            false,
+        );
+        let compilation_cache = Arc::new(Mutex::new(compiled_cache));
         let data_manager = Arc::new(Mutex::new(DataManager::new_with_dir_creation(
             &self.current_dir,
         )));
@@ -206,8 +218,18 @@ impl DataCollection {
                     let data_manager = data_manager.clone();
                     let index = index_writer.clone();
 
-                    let state_view =
-                        DataStateView::new_with_data_reads(self.debugger.clone(), version);
+                    let mut data_state = FakeDataStore::default();
+                    let cache_v1 = compilation_cache
+                        .lock()
+                        .unwrap()
+                        .compiled_package_cache_v1
+                        .clone();
+                    add_aptos_packages_to_data_store(&mut data_state, &cache_v1);
+                    let state_view = DataStateView::new_with_data_reads_and_code(
+                        self.debugger.clone(),
+                        version,
+                        data_state,
+                    );
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
                         let epoch_result_res =
