@@ -63,8 +63,10 @@ use aptos_consensus_types::{
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
     epoch_retrieval::EpochRetrievalRequest,
+    order_vote_msg::OrderVoteMsg,
     proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
+    vote_msg::VoteMsg,
 };
 use aptos_crypto::bls12381::PrivateKey;
 use aptos_dkg::{
@@ -89,6 +91,7 @@ use aptos_types::{
         OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
         RandomnessConfigSeqNum, ValidatorSet,
     },
+    optimistic_validator_verifier::{OptimisticValidatorVerifier, VerificationResult},
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -112,7 +115,7 @@ use std::{
     hash::Hash,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -176,6 +179,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
+    optimistic_vote_verifier: Option<Arc<OptimisticValidatorVerifier<Box<VoteMsg>>>>,
+    optimistic_order_vote_verifier: Option<Arc<OptimisticValidatorVerifier<Box<OrderVoteMsg>>>>,
     key_storage: PersistentSafetyStorage,
 }
 
@@ -247,6 +252,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .build(),
             consensus_publisher,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
+            optimistic_vote_verifier: None,
+            optimistic_order_vote_verifier: None,
             key_storage,
         }
     }
@@ -1088,12 +1095,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
+        let validator_verifier: ValidatorVerifier = (&validator_set).into();
         let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
-            verifier: (&validator_set).into(),
+            verifier: validator_verifier.clone(),
         });
-
         self.epoch_state = Some(epoch_state.clone());
+        self.optimistic_vote_verifier = Some(Arc::new(OptimisticValidatorVerifier::new(
+            Arc::new(validator_verifier.clone()),
+            16,
+        )));
+        self.optimistic_order_vote_verifier = Some(Arc::new(OptimisticValidatorVerifier::new(
+            Arc::new(validator_verifier),
+            16,
+        )));
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
@@ -1115,8 +1130,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if let Err(error) = &randomness_config_move_struct {
             error!("Failed to read on-chain randomness config {}", error);
         }
-
-        self.epoch_state = Some(epoch_state.clone());
 
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
@@ -1445,57 +1458,161 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Err(err) => return Err(err),
             }
             // same epoch -> run well-formedness + signature check
+
             let epoch_state = self
                 .epoch_state
                 .clone()
                 .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
-            let proof_cache = self.proof_cache.clone();
-            let quorum_store_enabled = self.quorum_store_enabled;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
-            let buffered_proposal_tx = self.buffered_proposal_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
-            let my_peer_id = self.author;
-            let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
-            let max_batch_expiry_gap_usecs =
-                self.config.quorum_store.batch_expiry_gap_when_init_usecs;
+            let buffered_proposal_tx = self.buffered_proposal_tx.clone();
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
-            self.bounded_executor
-                .spawn(async move {
+            let optimistic_sig_verification_for_votes =
+                self.config.optimistic_sig_verification_for_votes;
+            let optimistic_sig_verification_for_order_votes =
+                self.config.optimistic_sig_verification_for_order_votes;
+            let optimistic_vote_verifier = self.optimistic_vote_verifier.clone();
+            let optimistic_order_vote_verifier = self.optimistic_order_vote_verifier.clone();
+            let proof_cache = self.proof_cache.clone();
+            let receiver_max_num_batches = self.config.quorum_store.receiver_max_num_batches;
+            let batch_expiry_gap_when_init_usecs =
+                self.config.quorum_store.batch_expiry_gap_when_init_usecs;
+            let quorum_store_enabled = self.quorum_store_enabled;
+            let self_peer_id = self.author;
+
+            tokio::task::spawn_blocking(move || {
+                let forward_verified_event = |event_author, verified_event| {
+                    Self::forward_event(
+                        quorum_store_msg_tx.clone(),
+                        round_manager_tx.clone(),
+                        buffered_proposal_tx.clone(),
+                        event_author,
+                        verified_event,
+                        payload_manager.clone(),
+                        pending_blocks.clone(),
+                    );
+                };
+
+                let verify_and_forward_unverified_event = |event_author, unverified_event: UnverifiedEvent| {
                     match monitor!(
                         "verify_message",
                         unverified_event.clone().verify(
-                            peer_id,
+                            event_author,
                             &epoch_state.verifier,
                             &proof_cache,
                             quorum_store_enabled,
-                            peer_id == my_peer_id,
-                            max_num_batches,
-                            max_batch_expiry_gap_usecs,
+                            event_author == self_peer_id,
+                            receiver_max_num_batches,
+                            batch_expiry_gap_when_init_usecs,
                         )
                     ) {
                         Ok(verified_event) => {
                             Self::forward_event(
-                                quorum_store_msg_tx,
-                                round_manager_tx,
-                                buffered_proposal_tx,
-                                peer_id,
+                                quorum_store_msg_tx.clone(),
+                                round_manager_tx.clone(),
+                                buffered_proposal_tx.clone(),
+                                event_author,
                                 verified_event,
-                                payload_manager,
-                                pending_blocks,
+                                payload_manager.clone(),
+                                pending_blocks.clone(),
                             );
                         },
                         Err(e) => {
                             error!(
                                 SecurityEvent::ConsensusInvalidMessage,
-                                remote_peer = peer_id,
+                                remote_peer = event_author,
                                 error = ?e,
                                 unverified_event = unverified_event
                             );
                         },
                     }
-                })
-                .await;
+                };
+
+                if let UnverifiedEvent::VoteMsg(vote_msg) = unverified_event {
+                    if optimistic_sig_verification_for_votes {
+                        let start_time = Instant::now();
+                        match vote_msg.partial_verify(&epoch_state.verifier) {
+                            Ok(_) => {
+                                match optimistic_vote_verifier
+                                        .as_ref()
+                                        .expect("Optimistic vote verifier is not initialized for verifying vote")
+                                        .verify(peer_id, vote_msg.vote().ledger_info(), vote_msg.vote().signature(), &vote_msg) {
+                                    Ok(VerificationResult::Verified((votes, _))) => {
+                                        for (author, vote) in votes {
+                                            forward_verified_event(author, VerifiedEvent::VoteMsg(vote));
+                                        }
+                                    },
+                                    Ok(_) => {},
+                                    Err(e) => {
+                                        error!(
+                                            SecurityEvent::ConsensusInvalidMessage,
+                                            remote_peer = peer_id,
+                                            error = ?e,
+                                            unverified_event = UnverifiedEvent::VoteMsg(vote_msg)
+                                        );
+                                    }
+                                }
+                            },
+                            Err(e) => {
+                                error!(
+                                    SecurityEvent::ConsensusInvalidMessage,
+                                    remote_peer = peer_id,
+                                    error = ?e,
+                                    unverified_event = UnverifiedEvent::VoteMsg(vote_msg)
+                                );
+                            }
+                        }
+                        counters::VERIFY_MSG
+                            .with_label_values(&["optimistic_vote"])
+                            .observe(start_time.elapsed().as_secs_f64());
+                    } else {
+                        verify_and_forward_unverified_event(peer_id, UnverifiedEvent::VoteMsg(vote_msg));
+                    }
+                } else if let UnverifiedEvent::OrderVoteMsg(order_vote_msg) = unverified_event {
+                    if optimistic_sig_verification_for_order_votes {
+                        let start_time = Instant::now();
+                        match order_vote_msg.partial_verify() {
+                            Ok(_) => {
+                                match optimistic_order_vote_verifier
+                                        .as_ref()
+                                        .expect("Optimistic vote verifier is not initialized for verifying vote")
+                                        .verify(peer_id, order_vote_msg.order_vote().ledger_info(), order_vote_msg.order_vote().signature(), &order_vote_msg) {
+                                    Ok(VerificationResult::Verified((order_vote_msgs, _))) => {
+                                        for (author, order_vote_msg) in order_vote_msgs {
+                                            forward_verified_event(author, VerifiedEvent::OrderVoteMsg(order_vote_msg));
+                                        }
+                                    },
+                                    Ok(_) => {},
+                                    Err(e) => {
+                                        error!(
+                                            SecurityEvent::ConsensusInvalidMessage,
+                                            remote_peer = peer_id,
+                                            error = ?e,
+                                            unverified_event = UnverifiedEvent::OrderVoteMsg(order_vote_msg)
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!(
+                                    SecurityEvent::ConsensusInvalidMessage,
+                                    remote_peer = peer_id,
+                                    error = ?e,
+                                    unverified_event = UnverifiedEvent::OrderVoteMsg(order_vote_msg)
+                                );
+                            }
+                        }
+                        counters::VERIFY_MSG
+                            .with_label_values(&["optimistic_order_vote"])
+                            .observe(start_time.elapsed().as_secs_f64());
+                    } else {
+                        verify_and_forward_unverified_event(peer_id, UnverifiedEvent::OrderVoteMsg(order_vote_msg));
+                    }
+                } else {
+                    verify_and_forward_unverified_event(peer_id, unverified_event);
+                }
+            }).await?;
         }
         Ok(())
     }

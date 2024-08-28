@@ -582,7 +582,7 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
             let aggregated_signature = match self
                 .epoch_state
                 .verifier
-                .aggregate_signatures(partial_signatures)
+                .aggregate_signatures(partial_signatures, None)
             {
                 Ok(signature) => signature,
                 Err(_) => return Err(anyhow::anyhow!("Signature aggregation failed")),

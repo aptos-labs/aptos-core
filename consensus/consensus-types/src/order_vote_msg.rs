@@ -8,7 +8,7 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct OrderVoteMsg {
     order_vote: OrderVote,
     quorum_cert: QuorumCert,
@@ -44,15 +44,21 @@ impl OrderVoteMsg {
         self.order_vote.epoch()
     }
 
-    /// This function verifies the order_vote component in the order_vote_msg.
-    /// The quorum cert is verified in the round manager when the quorum certificate is used.
-    pub fn verify_order_vote(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn partial_verify(&self) -> anyhow::Result<()> {
         ensure!(
             self.quorum_cert().certified_block() == self.order_vote().ledger_info().commit_info(),
             "QuorumCert and OrderVote do not match"
         );
+        self.order_vote.partial_verify()?;
+        Ok(())
+    }
+
+    /// This function verifies the order_vote component in the order_vote_msg.
+    /// The quorum cert is verified in the round manager when the quorum certificate is used.
+    pub fn verify_order_vote(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.partial_verify()?;
         self.order_vote
-            .verify(validator)
+            .signature_verify(validator)
             .context("[OrderVoteMsg] OrderVote verification failed")?;
         Ok(())
     }
