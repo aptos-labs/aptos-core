@@ -7,8 +7,10 @@ use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_coverage::{
-    coverage_map::CoverageMap, format_csv_summary, format_human_summary,
-    source_coverage::SourceCoverageBuilder, summary::summarize_inst_cov,
+    coverage_map::CoverageMap,
+    format_csv_summary, format_human_summary,
+    source_coverage::{ColorChoice, SourceCoverageBuilder, TextIndicator},
+    summary::summarize_inst_cov,
 };
 use move_disassembler::disassembler::Disassembler;
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig, CompilerConfig};
@@ -95,6 +97,14 @@ pub struct SourceCoverage {
     #[clap(long = "inlines")]
     pub inlines: bool,
 
+    /// Colorize output based on coverage
+    #[clap(long, default_value_t = ColorChoice::Default)]
+    pub color: ColorChoice,
+
+    /// Tag each line with a textual indication of coverage
+    #[clap(long, default_value_t = TextIndicator::Explicit)]
+    pub tag: TextIndicator,
+
     #[clap(flatten)]
     pub move_options: MovePackageDir,
 }
@@ -117,9 +127,11 @@ impl CliCommand<()> for SourceCoverage {
         };
         let source_coverage =
             SourceCoverageBuilder::new(module, &coverage_map, source_map, self.inlines);
-        let t1 = source_coverage.compute_source_coverage(source_path);
-        let t2 = t1.output_source_coverage(&mut std::io::stdout());
-        t2.map_err(|err| CliError::UnexpectedError(format!("Failed to get coverage {}", err)))
+        let source_coverage = source_coverage.compute_source_coverage(source_path);
+        let output_result =
+            source_coverage.output_source_coverage(&mut std::io::stdout(), self.color, self.tag);
+        output_result
+            .map_err(|err| CliError::UnexpectedError(format!("Failed to get coverage {}", err)))
     }
 }
 

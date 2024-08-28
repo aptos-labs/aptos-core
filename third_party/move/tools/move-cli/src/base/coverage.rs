@@ -5,8 +5,10 @@ use super::reroot_path;
 use clap::*;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_coverage::{
-    coverage_map::CoverageMap, format_csv_summary, format_human_summary,
-    source_coverage::SourceCoverageBuilder, summary::summarize_inst_cov,
+    coverage_map::CoverageMap,
+    format_csv_summary, format_human_summary,
+    source_coverage::{ColorChoice, SourceCoverageBuilder, TextIndicator},
+    summary::summarize_inst_cov,
 };
 use move_disassembler::disassembler::Disassembler;
 use move_package::BuildConfig;
@@ -49,6 +51,14 @@ pub enum CoverageSummaryOptions {
 pub struct Coverage {
     #[clap(subcommand)]
     pub options: CoverageSummaryOptions,
+
+    /// Colorize output based on coverage
+    #[clap(long, default_value_t = ColorChoice::Default)]
+    pub color: ColorChoice,
+
+    /// Tag each line with a textual indication of coverage
+    #[clap(long, default_value_t = TextIndicator::Explicit)]
+    pub tag: TextIndicator,
 }
 
 impl Coverage {
@@ -79,7 +89,8 @@ impl Coverage {
                 let source_coverage =
                     SourceCoverageBuilder::new(module, &coverage_map, source_map, inlines);
                 let t1 = source_coverage.compute_source_coverage(source_path);
-                t1.output_source_coverage(&mut std::io::stdout()).unwrap();
+                t1.output_source_coverage(&mut std::io::stdout(), self.color, self.tag)
+                    .unwrap();
             },
             CoverageSummaryOptions::Summary {
                 functions,

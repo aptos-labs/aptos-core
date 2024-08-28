@@ -5,8 +5,9 @@
 #![forbid(unsafe_code)]
 
 use crate::coverage_map::CoverageMap;
+use clap::ValueEnum;
 use codespan::{Files, Span};
-use colored::Colorize;
+use colored::{self, Colorize};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{CodeOffset, FunctionDefinitionIndex},
@@ -20,9 +21,11 @@ use serde::Serialize;
 use std::{
     cmp::Ordering,
     collections::BTreeMap,
+    fmt::{Display, Formatter},
     fs,
     io::{self, Write},
     path::Path,
+    str::FromStr,
 };
 
 #[derive(Clone, Debug, Serialize)]
@@ -53,6 +56,7 @@ impl AbstractSegment {
             BoundedRight { .. } => None,
         }
     }
+
     fn end(&self) -> Option<u32> {
         use AbstractSegment::*;
         match self {
@@ -71,6 +75,98 @@ impl PartialOrd for AbstractSegment {
             (Some(x), _, _, Some(y)) if y < x => Some(Ordering::Greater),
             (_, Some(x), Some(y), _) if x < y => Some(Ordering::Less),
             _ => None,
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Debug, Serialize)]
+pub enum ColorChoice {
+    None,
+    Default,
+    Always,
+}
+
+impl Display for ColorChoice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use ColorChoice::*;
+        match self {
+            None => f.write_str("none"),
+            Default => f.write_str("default"),
+            Always => f.write_str("always"),
+        }
+    }
+}
+
+impl FromStr for ColorChoice {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use ColorChoice::*;
+        match s {
+            "none" => Ok(None),
+            "default" => Ok(Default),
+            "always" => Ok(Always),
+            _ => Err("unknown variant"),
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Debug, Serialize)]
+pub enum TextIndicator {
+    None,
+    Explicit,
+    On,
+}
+
+impl Display for TextIndicator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use TextIndicator::*;
+        match self {
+            None => f.write_str("none"),
+            Explicit => f.write_str("explicit"),
+            On => f.write_str("on"),
+        }
+    }
+}
+
+impl FromStr for TextIndicator {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use TextIndicator::*;
+        match s {
+            "none" => Ok(None),
+            "explicit" => Ok(Explicit),
+            "on" => Ok(On),
+            _ => Err("unknown variant"),
+        }
+    }
+}
+
+impl ColorChoice {
+    fn execute(&self) {
+        use ColorChoice::*;
+        match self {
+            None => {
+                colored::control::set_override(false);
+            },
+            Default => {},
+            Always => {
+                colored::control::set_override(true);
+            },
+        }
+    }
+
+    fn undo(&self) {
+        use ColorChoice::*;
+        match self {
+            None => {
+                colored::control::unset_override();
+            },
+            Default => {},
+            Always => {
+                colored::control::unset_override();
+            },
         }
     }
 }
@@ -95,10 +191,6 @@ impl<'a> SourceCoverageBuilder<'a> {
         source_map: &'a SourceMap,
         inlines: bool,
     ) -> Self {
-        eprintln!("coverage_map is {:#?}", coverage_map);
-        eprintln!("source_map is {:#?}", source_map);
-        eprintln!("module is {:#?}", module);
-
         let module_name = module.self_id();
         let unified_exec_map = coverage_map.to_unified_exec_map();
         let module_map = unified_exec_map
@@ -163,7 +255,6 @@ impl<'a> SourceCoverageBuilder<'a> {
                 coverage.map(|x| (fn_name, x))
             })
             .collect();
-        eprintln!("uncovered_locations is {:#?}", uncovered_locations);
 
         Self {
             uncovered_locations,
@@ -173,38 +264,24 @@ impl<'a> SourceCoverageBuilder<'a> {
     }
 
     pub fn compute_source_coverage(&self, file_path: &Path) -> SourceCoverage {
-        eprintln!("Reading file {}", file_path.display());
         let file_contents = fs::read_to_string(file_path).unwrap();
-        let file_hash = FileHash::new(&file_contents);
-        if !self.source_map.check(&file_contents) {
-            eprintln!(
-                "File contents {} out of sync with source map",
-                file_path.display()
-            );
-            panic!(
-                "File contents {} out of sync with source map",
-                file_path.display()
-            );
-        };
+        assert!(
+            self.source_map.check(&file_contents),
+            "File contents {} out of sync with source map",
+            file_path.display()
+        );
+        let file_hash = self.source_map.definition_location.file_hash();
         let mut files = Files::new();
         let file_id = files.add(file_path.as_os_str().to_os_string(), file_contents.clone());
 
         let mut uncovered_segments = BTreeMap::new();
 
-        for (key, fn_cov) in self.uncovered_locations.iter() {
-            eprintln!("Looking at (key, fn_cov) = ({:#?}, {:#?})", key, fn_cov);
-            for span in merge_spans(&file_hash, fn_cov.clone()).into_iter() {
+        for (_key, fn_cov) in self.uncovered_locations.iter() {
+            for span in merge_spans(file_hash, fn_cov.clone()).into_iter() {
                 let start_loc = files.location(file_id, span.start()).unwrap();
                 let end_loc = files.location(file_id, span.end()).unwrap();
                 let start_line = start_loc.line.0;
                 let end_line = end_loc.line.0;
-                eprintln!(
-                    "Looking at span = ({}, {}), line = ({}, {})",
-                    span.start(),
-                    span.end(),
-                    start_line,
-                    end_line
-                );
                 let segments = uncovered_segments
                     .entry(start_line)
                     .or_insert_with(Vec::new);
@@ -234,11 +311,9 @@ impl<'a> SourceCoverageBuilder<'a> {
             }
         }
         uncovered_segments.values_mut().for_each(|v| v.sort());
-        eprintln!("uncovered_segments is {:#?}", uncovered_segments);
 
         let mut annotated_lines = Vec::new();
         for (line_number, mut line) in file_contents.lines().map(|x| x.to_owned()).enumerate() {
-            eprintln!("looking at {}, {}", line_number, line);
             match uncovered_segments.get(&(line_number as u32)) {
                 None => annotated_lines.push(vec![StringSegment::Covered(line)]),
                 Some(segments) => {
@@ -249,7 +324,6 @@ impl<'a> SourceCoverageBuilder<'a> {
                     for segment in segments {
                         match segment {
                             AbstractSegment::Bounded { start, end } => {
-                                eprintln!("Bounded {}, {}, cursor = {}", start, end, cursor);
                                 let length = end - start;
                                 let (before, after) = line.split_at((start - cursor) as usize);
                                 let (uncovered, rest) = after.split_at(length as usize);
@@ -259,14 +333,12 @@ impl<'a> SourceCoverageBuilder<'a> {
                                 cursor = *end;
                             },
                             AbstractSegment::BoundedRight { end } => {
-                                eprintln!("BoundedRight {}, cursor = {}", end, cursor);
                                 let (uncovered, rest) = line.split_at((end - cursor) as usize);
                                 line_acc.push(StringSegment::Uncovered(uncovered.to_string()));
                                 line = rest.to_string();
                                 cursor = *end;
                             },
                             AbstractSegment::BoundedLeft { start } => {
-                                eprintln!("BoundedLeft {}, cursor = {}", start, cursor);
                                 let (before, after) = line.split_at((start - cursor) as usize);
                                 line_acc.push(StringSegment::Covered(before.to_string()));
                                 line_acc.push(StringSegment::Uncovered(after.to_string()));
@@ -288,8 +360,41 @@ impl<'a> SourceCoverageBuilder<'a> {
 }
 
 impl SourceCoverage {
-    pub fn output_source_coverage<W: Write>(&self, output_writer: &mut W) -> io::Result<()> {
+    pub fn output_source_coverage<W: Write>(
+        &self,
+        output_writer: &mut W,
+        color: ColorChoice,
+        text_indicator: TextIndicator,
+    ) -> io::Result<()> {
+        color.execute();
+        let be_explicit = match text_indicator {
+            TextIndicator::Explicit | TextIndicator::On => {
+                write!(
+                    output_writer,
+                    "Code coverage per line of code:\n{}\n{}\nSource code follows:\n",
+                    "  + indicates the line is not executable or is fully covered during execution"
+                        .to_string()
+                        .green(),
+                    "  - indicates the line is executable but NOT fully covered during execution"
+                        .to_string()
+                        .bold()
+                        .red()
+                )?;
+                true
+            },
+            TextIndicator::None => false,
+        };
         for line in self.annotated_lines.iter() {
+            if be_explicit {
+                let has_uncovered = line
+                    .iter()
+                    .any(|string_segment| matches!(string_segment, StringSegment::Uncovered(_)));
+                if has_uncovered {
+                    write!(output_writer, "- ")?;
+                } else {
+                    write!(output_writer, "+ ")?;
+                }
+            }
             for string_segment in line.iter() {
                 match string_segment {
                     StringSegment::Covered(s) => write!(output_writer, "{}", s.green())?,
@@ -298,11 +403,12 @@ impl SourceCoverage {
             }
             writeln!(output_writer)?;
         }
+        color.undo();
         Ok(())
     }
 }
 
-fn merge_spans(file_hash: &FileHash, cov: FunctionSourceCoverage) -> Vec<Span> {
+fn merge_spans(file_hash: FileHash, cov: FunctionSourceCoverage) -> Vec<Span> {
     if cov.uncovered_locations.is_empty() {
         return vec![];
     }
@@ -310,7 +416,7 @@ fn merge_spans(file_hash: &FileHash, cov: FunctionSourceCoverage) -> Vec<Span> {
     let mut covs: Vec<_> = cov
         .uncovered_locations
         .iter()
-        .filter(|loc| loc.file_hash() == *file_hash)
+        .filter(|loc| loc.file_hash() == file_hash)
         .map(|loc| Span::new(loc.start(), loc.end()))
         .collect();
     covs.sort();
