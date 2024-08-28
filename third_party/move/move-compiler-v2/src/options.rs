@@ -62,8 +62,9 @@ pub struct Options {
     pub testing: bool,
 
     /// Active experiments. Experiments alter default behavior of the compiler.
+    /// Each element is `name[=on/off]` to enable/disable experiment `name`.
     /// See `Experiment` struct.
-    #[clap(short)]
+    #[clap(short, hide(true))]
     #[clap(
         long = "experiment",
         num_args = 0..
@@ -88,6 +89,7 @@ pub struct Options {
     #[clap(skip)]
     pub sources_deps: Vec<String>,
 
+    /// Warn about use of deprecated functions, modules, etc.
     #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
            default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
     pub warn_deprecated: bool,
@@ -95,7 +97,7 @@ pub struct Options {
     /// Show warnings about use of deprecated usage in the Aptos libraries,
     /// which we should generally not bother users with.
     /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
+    #[clap(hide(true), long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
            default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
