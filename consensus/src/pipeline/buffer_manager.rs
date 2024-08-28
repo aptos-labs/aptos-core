@@ -475,7 +475,7 @@ impl BufferManager {
             ResetSignal::TargetRound(round) => {
                 self.highest_committed_round = round;
                 self.latest_round = round;
-            }
+            },
         }
 
         self.reset().await;

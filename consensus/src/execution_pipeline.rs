@@ -51,7 +51,11 @@ pub struct ExecutionPipeline {
 }
 
 impl ExecutionPipeline {
-    pub fn spawn(executor: Arc<dyn BlockExecutorTrait>, runtime: &tokio::runtime::Handle) -> Self {
+    pub fn spawn(
+        executor: Arc<dyn BlockExecutorTrait>,
+        runtime: &tokio::runtime::Handle,
+        enable_pre_commit: bool,
+    ) -> Self {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
@@ -70,6 +74,7 @@ impl ExecutionPipeline {
             ledger_apply_rx,
             pre_commit_tx,
             executor.clone(),
+            enable_pre_commit,
         ));
         runtime.spawn(Self::pre_commit_stage(pre_commit_rx, executor));
 
@@ -240,6 +245,7 @@ impl ExecutionPipeline {
         mut block_rx: mpsc::UnboundedReceiver<LedgerApplyCommand>,
         pre_commit_tx: mpsc::UnboundedSender<PreCommitCommand>,
         executor: Arc<dyn BlockExecutorTrait>,
+        enable_pre_commit: bool,
     ) {
         while let Some(LedgerApplyCommand {
             input_txns,
@@ -269,7 +275,7 @@ impl ExecutionPipeline {
             .await;
             let pipeline_res = res.map(|(output, execution_duration)| {
                 let pre_commit_fut: BoxFuture<'static, ExecutorResult<()>> =
-                    if output.epoch_state().is_some() {
+                    if output.epoch_state().is_some() || !enable_pre_commit {
                         // hack: it causes issue if pre-commit is finished at an epoch ending, and
                         // we switch to state sync, so we do the pre-commit only after we actually
                         // decide to commit (in the commit phase)
