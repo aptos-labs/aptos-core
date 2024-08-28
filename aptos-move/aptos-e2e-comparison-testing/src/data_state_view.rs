@@ -35,13 +35,25 @@ impl DataStateView {
         }
     }
 
-    pub fn new_with_data_reads(
+    pub fn _new_with_data_reads(
         db: Arc<dyn AptosValidatorInterface + Send>,
         version: Version,
     ) -> Self {
         Self {
             debugger_view: DebuggerStateView::new(db, version),
             code_data: None,
+            data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
+        }
+    }
+
+    pub fn new_with_data_reads_and_code(
+        db: Arc<dyn AptosValidatorInterface + Send>,
+        version: Version,
+        code_data: FakeDataStore,
+    ) -> Self {
+        Self {
+            debugger_view: DebuggerStateView::new(db, version),
+            code_data: Some(code_data),
             data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
         }
     }
