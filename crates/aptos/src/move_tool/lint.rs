@@ -21,7 +21,7 @@ pub struct LintPackage {
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
 
-    /// Sepcify the path to save the compiled bytecode files which lint generates while
+    /// Specify the path to save the compiled bytecode files which lint generates while
     /// running checks.
     /// Defaults to `<package_dir>/build`
     #[clap(long, value_parser)]

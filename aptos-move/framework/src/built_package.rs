@@ -257,6 +257,13 @@ impl BuiltPackage {
 
         // Run extended checks as well derive runtime metadata
         let model = &model_opt.expect("move model");
+
+        if let Some(model_options) = model.get_extension::<Options>() {
+            if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
+                std::process::exit(0)
+            }
+        }
+
         let runtime_metadata = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
             let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
@@ -268,7 +275,7 @@ impl BuiltPackage {
 
         if let Some(model_options) = model.get_extension::<Options>() {
             if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
-                bail!("exiting after extended checking")
+                std::process::exit(0)
             }
         }
 
