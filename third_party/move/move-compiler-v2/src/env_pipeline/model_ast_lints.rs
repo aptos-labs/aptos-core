@@ -4,6 +4,8 @@
 //! This module (and its submodules) contain various model-AST-based lint checks.
 
 mod blocks_in_conditions;
+mod needless_bool;
+mod simpler_numeric_expression;
 mod unnecessary_boolean_identity_comparison;
 mod unnecessary_numerical_extreme_comparison;
 mod while_true;
@@ -94,6 +96,8 @@ fn get_applicable_lints(lint_skips: BTreeSet<LintChecker>) -> Vec<Box<dyn Expres
 fn get_default_expression_linter_pipeline() -> Vec<Box<dyn ExpressionLinter>> {
     vec![
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
+        Box::<needless_bool::NeedlessBool>::default(),
+        Box::<simpler_numeric_expression::SimplerNumericExpression>::default(),
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),
