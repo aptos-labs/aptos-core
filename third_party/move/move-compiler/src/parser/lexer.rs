@@ -41,6 +41,7 @@ pub enum Tok {
     LessEqual,
     LessLess,
     Equal,
+    PlusEqual,
     EqualEqual,
     EqualGreater,
     EqualEqualGreater,
@@ -105,6 +106,7 @@ impl fmt::Display for Tok {
             RBracket => "]",
             Star => "*",
             Plus => "+",
+            PlusEqual => "+=",
             Comma => ",",
             Minus => "-",
             Period => ".",
@@ -564,7 +566,13 @@ fn find_token(
         '[' => (Tok::LBracket, 1),
         ']' => (Tok::RBracket, 1),
         '*' => (Tok::Star, 1),
-        '+' => (Tok::Plus, 1),
+        '+' => {
+            if text.starts_with("+=") {
+                (Tok::PlusEqual, 2)
+            } else {
+                (Tok::Plus, 1)
+            }
+        },
         ',' => (Tok::Comma, 1),
         '-' => (Tok::Minus, 1),
         '.' => {
