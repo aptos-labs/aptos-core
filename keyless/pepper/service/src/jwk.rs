@@ -3,18 +3,43 @@
 
 use crate::{metrics::JWK_FETCH_SECONDS, Issuer, KeyID};
 use anyhow::{anyhow, Result};
+use aptos_keyless_pepper_common::jwt::parse;
 use aptos_logger::warn;
 use aptos_types::jwks::rsa::RSA_JWK;
 use dashmap::DashMap;
 use jsonwebtoken::DecodingKey;
 use once_cell::sync::Lazy;
+use regex::Regex;
 use serde_json::Value;
 use std::{sync::Arc, time::Duration};
 use tokio::time::Instant;
 
+static AUTH_0_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^https://[a-zA-Z0-9-]+\.us\.auth0\.com/$").unwrap());
+
 /// The JWK in-mem cache.
 pub static DECODING_KEY_CACHE: Lazy<DashMap<Issuer, DashMap<KeyID, Arc<RSA_JWK>>>> =
     Lazy::new(DashMap::new);
+
+pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
+    let payload = parse(jwt)?;
+
+    if !AUTH_0_REGEX.is_match(&payload.claims.iss) {
+        return Err(anyhow!("not a federated iss"));
+    }
+
+    let jwt_kid: String = match payload.header.kid {
+        Some(kid) => kid,
+        None => return Err(anyhow!("no kid found on jwt header")),
+    };
+
+    let jwk_url = format!("{}.well-known/jwks.json", &payload.claims.iss);
+    let keys = fetch_jwks(&jwk_url).await?;
+    let key = keys
+        .get(&jwt_kid)
+        .ok_or_else(|| anyhow!("unknown kid: {}", jwt_kid))?;
+    Ok(key.clone())
+}
 
 /// Send a request to a JWK endpoint and return its JWK map.
 pub async fn fetch_jwks(jwk_url: &str) -> Result<DashMap<KeyID, Arc<RSA_JWK>>> {

@@ -37,7 +37,8 @@ use aptos_types::{
     },
 };
 use firestore::{async_trait, paths, struct_path::path};
-use jsonwebtoken::{Algorithm::RS256, Validation};
+use jsonwebtoken::{Algorithm::RS256, DecodingKey, Validation};
+use jwk::get_federated_jwk;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -357,13 +358,22 @@ async fn process_common(
         .kid
         .ok_or_else(|| BadRequest("missing kid in JWT".to_string()))?;
 
-    let sig_pub_key = jwk::cached_decoding_key(&claims.claims.iss, &key_id)
+    let cached_key = jwk::cached_decoding_key_as_rsa(&claims.claims.iss, &key_id);
+
+    let jwk = match cached_key {
+        Ok(key) => key,
+        Err(_) => get_federated_jwk(&jwt)
+            .await
+            .map_err(|e| BadRequest(format!("JWK not found: {e}")))?,
+    };
+    let jwk_decoding_key = DecodingKey::from_rsa_components(&jwk.n, &jwk.e)
         .map_err(|e| BadRequest(format!("JWK not found: {e}")))?;
+
     let mut validation_with_sig_verification = Validation::new(RS256);
     validation_with_sig_verification.validate_exp = false; // Don't validate the exp time
     let _claims = jsonwebtoken::decode::<Claims>(
         jwt.as_str(),
-        &sig_pub_key,
+        &jwk_decoding_key,
         &validation_with_sig_verification,
     ) // Signature verification happens here.
     .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
