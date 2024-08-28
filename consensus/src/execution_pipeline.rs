@@ -85,6 +85,7 @@ impl ExecutionPipeline {
                 parent_block_id,
                 block_preparer: txn_generator,
                 result_tx,
+                command_creation_time: Instant::now(),
             })
             .expect("Failed to send block to execution pipeline.");
 
@@ -111,8 +112,9 @@ impl ExecutionPipeline {
             parent_block_id,
             block_preparer,
             result_tx,
+            command_creation_time,
         } = command;
-
+        counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
         let input_txns = block_preparer.prepare_block(&block).await;
         if let Err(e) = input_txns {
@@ -126,6 +128,7 @@ impl ExecutionPipeline {
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
+            let sig_verification_start = Instant::now();
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
                 SIG_VERIFY_POOL.install(|| {
                     let num_txns = txns_to_execute.len();
@@ -135,6 +138,8 @@ impl ExecutionPipeline {
                         .map(|t| t.into())
                         .collect::<Vec<_>>()
                 });
+            counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
+                .observe_duration(sig_verification_start.elapsed());
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
@@ -142,6 +147,7 @@ impl ExecutionPipeline {
                     parent_block_id,
                     block_executor_onchain_config,
                     result_tx,
+                    command_creation_time: Instant::now(),
                 })
                 .expect("Failed to send block to execution pipeline.");
         })
@@ -173,8 +179,10 @@ impl ExecutionPipeline {
             parent_block_id,
             block_executor_onchain_config,
             result_tx,
+            command_creation_time,
         }) = block_rx.recv().await
         {
+            counters::EXECUTE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
             let block_id = block.block_id;
             debug!("execute_stage received block {}.", block_id);
             let executor = executor.clone();
@@ -206,6 +214,7 @@ impl ExecutionPipeline {
                     parent_block_id,
                     state_checkpoint_output,
                     result_tx,
+                    command_creation_time: Instant::now(),
                 })
                 .expect("Failed to send block to ledger_apply stage.");
         }
@@ -222,8 +231,10 @@ impl ExecutionPipeline {
             parent_block_id,
             state_checkpoint_output: execution_result,
             result_tx,
+            command_creation_time,
         }) = block_rx.recv().await
         {
+            counters::APPLY_LEDGER_WAIT_TIME.observe_duration(command_creation_time.elapsed());
             debug!("ledger_apply stage received block {}.", block_id);
             let res = async {
                 let (state_checkpoint_output, execution_duration) = execution_result?;
@@ -233,8 +244,8 @@ impl ExecutionPipeline {
                     tokio::task::spawn_blocking(move || {
                         executor.ledger_update(block_id, parent_block_id, state_checkpoint_output)
                     })
+                    .await
                 )
-                .await
                 .expect("Failed to spawn_blocking().")
                 .map(|output| (output, execution_duration))
             }
@@ -258,6 +269,7 @@ struct PrepareBlockCommand {
     parent_block_id: HashValue,
     block_preparer: BlockPreparer,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+    command_creation_time: Instant,
 }
 
 struct ExecuteBlockCommand {
@@ -266,6 +278,7 @@ struct ExecuteBlockCommand {
     parent_block_id: HashValue,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+    command_creation_time: Instant,
 }
 
 struct LedgerApplyCommand {
@@ -274,6 +287,7 @@ struct LedgerApplyCommand {
     parent_block_id: HashValue,
     state_checkpoint_output: ExecutorResult<(StateCheckpointOutput, Duration)>,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
+    command_creation_time: Instant,
 }
 
 fn process_failed_to_send_result(

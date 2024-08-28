@@ -119,3 +119,6 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    │             ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+
+
+============ bytecode verification succeeded ========
