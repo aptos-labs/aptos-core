@@ -5,6 +5,7 @@ mod access_path_test;
 mod account;
 mod aggregator;
 mod aggregator_v2;
+mod aggregator_v2_enums;
 mod aggregator_v2_events;
 mod aggregator_v2_runtime_checks;
 mod attributes;
