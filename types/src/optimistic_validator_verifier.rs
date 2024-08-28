@@ -53,7 +53,7 @@ pub struct OptimisticValidatorVerifier<VoteType> {
 // TODO: How does garbage collection happen?
 // TODO: How do we handle when a vote verification fails and a validator becomes untrusted?
 // TODO: After an aggregate signature is formed for a message, should we remove immediately? How to handle the next set of votes received for the same message?
-// TODO: Need to make sure the verificaiton can be done in parallel. This may not be the case when having mut signature_data.
+// TODO: Need to make sure the verification can be done in parallel. This may not be the case when having mut signature_data.
 impl<VoteType: Sync + Send + Sized + Clone + PartialEq> OptimisticValidatorVerifier<VoteType> {
     pub fn new(validator_verifier: Arc<ValidatorVerifier>, verification_frequency: u64) -> Self {
         Self {
@@ -86,20 +86,22 @@ impl<VoteType: Sync + Send + Sized + Clone + PartialEq> OptimisticValidatorVerif
             return Err(VerifyError::UnknownAuthor);
         }
 
-        // TODO: As vote_data is being locked here, does this mean the verify operation is sequential?
-        let mut vote_data = self.vote_data.write().unwrap();
-        let signature_data = vote_data.entry(block.clone()).or_insert_with(|| {
-            Arc::new(RwLock::new(SignatureData {
-                unverified_votes: HashMap::new(),
-                verified_votes: HashMap::new(),
-                aggregated_signature: None,
-                first_vote_timestamp_usecs: aptos_infallible::duration_since_epoch().as_micros()
-                    as u64,
-                last_vote_timestamp_usecs: aptos_infallible::duration_since_epoch().as_micros()
-                    as u64,
-            }))
-        });
-
+        if !self.vote_data.read().unwrap().contains_key(block) {
+            self.vote_data.write().unwrap().insert(
+                block.clone(),
+                Arc::new(RwLock::new(SignatureData {
+                    unverified_votes: HashMap::new(),
+                    verified_votes: HashMap::new(),
+                    aggregated_signature: None,
+                    first_vote_timestamp_usecs: aptos_infallible::duration_since_epoch().as_micros()
+                        as u64,
+                    last_vote_timestamp_usecs: aptos_infallible::duration_since_epoch().as_micros()
+                        as u64,
+                })),
+            );
+        }
+        let vote_data = self.vote_data.read().unwrap();
+        let signature_data = vote_data.get(block).unwrap();
         let mut signature_data = signature_data.write().unwrap();
         // Check if a verified signature is already received for the author.
         if signature_data.verified_votes.contains_key(&author) {
