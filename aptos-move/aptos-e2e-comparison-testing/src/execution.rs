@@ -44,7 +44,7 @@ fn add_packages_to_data_store(
     }
 }
 
-fn add_aptos_packages_to_data_store(
+pub(crate) fn add_aptos_packages_to_data_store(
     data_store: &mut FakeDataStore,
     compiled_package_map: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 ) {
