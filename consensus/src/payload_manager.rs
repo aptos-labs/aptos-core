@@ -438,55 +438,6 @@ impl TPayloadManager for QuorumStorePayloadManager {
     }
 }
 
-/// Returns the transactions for the consensus observer payload manager
-async fn get_transactions_for_observer(
-    block: &Block,
-    block_payloads: &Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
-    consensus_publisher: &Option<Arc<ConsensusPublisher>>,
-) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
-    // The data should already be available (as consensus observer will only ever
-    // forward a block to the executor once the data has been received and verified).
-    let block_payload = match block_payloads.lock().entry((block.epoch(), block.round())) {
-        Entry::Occupied(mut value) => match value.get_mut() {
-            BlockPayloadStatus::AvailableAndVerified(block_payload) => block_payload.clone(),
-            BlockPayloadStatus::AvailableAndUnverified(_) => {
-                // This shouldn't happen (the payload should already be verified)
-                let error = format!(
-                    "Payload data for block epoch {}, round {} is unverified!",
-                    block.epoch(),
-                    block.round()
-                );
-                return Err(InternalError { error });
-            },
-        },
-        Entry::Vacant(_) => {
-            // This shouldn't happen (the payload should already be present)
-            let error = format!(
-                "Missing payload data for block epoch {}, round {}!",
-                block.epoch(),
-                block.round()
-            );
-            return Err(InternalError { error });
-        },
-    };
-
-    // If the payload is valid, publish it to any downstream observers
-    let transaction_payload = block_payload.transaction_payload;
-    if let Some(consensus_publisher) = consensus_publisher {
-        let message = ConsensusObserverMessage::new_block_payload_message(
-            block.gen_block_info(HashValue::zero(), 0, None),
-            transaction_payload.clone(),
-        );
-        consensus_publisher.publish_message(message);
-    }
-
-    // Return the transactions and the transaction limit
-    Ok((
-        transaction_payload.transactions(),
-        transaction_payload.limit(),
-    ))
-}
-
 async fn request_txns_from_quorum_store(
     batches_and_responders: Vec<(BatchInfo, Vec<PeerId>)>,
     timestamp: u64,
@@ -693,7 +644,46 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
         &self,
         block: &Block,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
-        return get_transactions_for_observer(block, &self.txns_pool, &self.consensus_publisher)
-            .await;
+        // The data should already be available (as consensus observer will only ever
+        // forward a block to the executor once the data has been received and verified).
+        let block_payload = match self.txns_pool.lock().entry((block.epoch(), block.round())) {
+            Entry::Occupied(mut value) => match value.get_mut() {
+                BlockPayloadStatus::AvailableAndVerified(block_payload) => block_payload.clone(),
+                BlockPayloadStatus::AvailableAndUnverified(_) => {
+                    // This shouldn't happen (the payload should already be verified)
+                    let error = format!(
+                        "Payload data for block epoch {}, round {} is unverified!",
+                        block.epoch(),
+                        block.round()
+                    );
+                    return Err(InternalError { error });
+                },
+            },
+            Entry::Vacant(_) => {
+                // This shouldn't happen (the payload should already be present)
+                let error = format!(
+                    "Missing payload data for block epoch {}, round {}!",
+                    block.epoch(),
+                    block.round()
+                );
+                return Err(InternalError { error });
+            },
+        };
+
+        // Publish the payload to any downstream subscribers
+        let transaction_payload = block_payload.transaction_payload;
+        if let Some(consensus_publisher) = self.consensus_publisher.as_ref() {
+            let message = ConsensusObserverMessage::new_block_payload_message(
+                block.gen_block_info(HashValue::zero(), 0, None),
+                transaction_payload.clone(),
+            );
+            consensus_publisher.publish_message(message);
+        }
+
+        // Return the transactions and the transaction limit
+        Ok((
+            transaction_payload.transactions(),
+            transaction_payload.limit(),
+        ))
     }
 }
