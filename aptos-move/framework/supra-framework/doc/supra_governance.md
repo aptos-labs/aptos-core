@@ -41,11 +41,11 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `store_signer_cap`](#0x1_supra_governance_store_signer_cap)
 -  [Function `old_initialize`](#0x1_supra_governance_old_initialize)
 -  [Function `initialize`](#0x1_supra_governance_initialize)
--  [Function `update_governance_config`](#0x1_supra_governance_update_governance_config)
 -  [Function `update_supra_governance_config`](#0x1_supra_governance_update_supra_governance_config)
 -  [Function `initialize_partial_voting`](#0x1_supra_governance_initialize_partial_voting)
 -  [Function `get_voting_duration_secs`](#0x1_supra_governance_get_voting_duration_secs)
 -  [Function `get_min_voting_threshold`](#0x1_supra_governance_get_min_voting_threshold)
+-  [Function `get_voters_list`](#0x1_supra_governance_get_voters_list)
 -  [Function `get_required_proposer_stake`](#0x1_supra_governance_get_required_proposer_stake)
 -  [Function `has_entirely_voted`](#0x1_supra_governance_has_entirely_voted)
 -  [Function `get_remaining_voting_power`](#0x1_supra_governance_get_remaining_voting_power)
@@ -1316,65 +1316,12 @@ This function is private because it's called directly from the vm.
 
 </details>
 
-<a id="0x1_supra_governance_update_governance_config"></a>
-
-## Function `update_governance_config`
-
-Update the governance configurations. This can only be called as part of resolving a proposal in this same
-AptosGovernance.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_update_governance_config">update_governance_config</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_update_governance_config">update_governance_config</a>(
-    supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    min_voting_threshold: u128,
-    required_proposer_stake: u64,
-    voting_duration_secs: u64,
-) <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_GovernanceConfig">GovernanceConfig</a>, <a href="supra_governance.md#0x1_supra_governance_GovernanceEvents">GovernanceEvents</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
-
-    <b>let</b> governance_config = <b>borrow_global_mut</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@supra_framework);
-    governance_config.voting_duration_secs = voting_duration_secs;
-    governance_config.min_voting_threshold = min_voting_threshold;
-    governance_config.required_proposer_stake = required_proposer_stake;
-
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="supra_governance.md#0x1_supra_governance_UpdateConfig">UpdateConfig</a> {
-                min_voting_threshold,
-                required_proposer_stake,
-                voting_duration_secs
-            },
-        )
-    };
-    <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@supra_framework);
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="supra_governance.md#0x1_supra_governance_UpdateConfigEvent">UpdateConfigEvent</a>&gt;(
-        &<b>mut</b> events.update_config_events,
-        <a href="supra_governance.md#0x1_supra_governance_UpdateConfigEvent">UpdateConfigEvent</a> {
-            min_voting_threshold,
-            required_proposer_stake,
-            voting_duration_secs
-        },
-    );
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_supra_governance_update_supra_governance_config"></a>
 
 ## Function `update_supra_governance_config`
 
+Update the governance configurations. This can only be called as part of resolving a proposal in this same
+AptosGovernance.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_update_supra_governance_config">update_supra_governance_config</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, voting_duration_secs: u64, min_voting_threshold: u64, voters: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
@@ -1475,8 +1422,8 @@ proposals with a signer for the supra_framework (0x1) account.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_voting_duration_secs">get_voting_duration_secs</a>(): u64 <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_GovernanceConfig">GovernanceConfig</a> {
-    <b>borrow_global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@supra_framework).voting_duration_secs
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_voting_duration_secs">get_voting_duration_secs</a>(): u64 <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a> {
+    <b>borrow_global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(@supra_framework).voting_duration_secs
 }
 </code></pre>
 
@@ -1491,7 +1438,7 @@ proposals with a signer for the supra_framework (0x1) account.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_min_voting_threshold">get_min_voting_threshold</a>(): u128
+<b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_min_voting_threshold">get_min_voting_threshold</a>(): u64
 </code></pre>
 
 
@@ -1500,8 +1447,33 @@ proposals with a signer for the supra_framework (0x1) account.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_min_voting_threshold">get_min_voting_threshold</a>(): u128 <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_GovernanceConfig">GovernanceConfig</a> {
-    <b>borrow_global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@supra_framework).min_voting_threshold
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_min_voting_threshold">get_min_voting_threshold</a>(): u64 <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a> {
+    <b>borrow_global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(@supra_framework).min_voting_threshold
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_supra_governance_get_voters_list"></a>
+
+## Function `get_voters_list`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_voters_list">get_voters_list</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_voters_list">get_voters_list</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a> {
+    <b>borrow_global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(@supra_framework).voters
 }
 </code></pre>
 
@@ -2246,7 +2218,7 @@ cannot vote on the proposal even after partial governance voting is enabled.
         @supra_framework,
         proposal_id
     );
-    <b>assert</b>!(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= proposal_expiration, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="supra_governance.md#0x1_supra_governance_EPROPOSAL_IS_EXPIRE">EPROPOSAL_IS_EXPIRE</a>));
+    <b>assert</b>!(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= proposal_expiration, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="supra_governance.md#0x1_supra_governance_EPROPOSAL_IS_EXPIRE">EPROPOSAL_IS_EXPIRE</a>));
 
     <a href="multisig_voting.md#0x1_multisig_voting_vote">multisig_voting::vote</a>&lt;GovernanceProposal&gt;(
         voter,

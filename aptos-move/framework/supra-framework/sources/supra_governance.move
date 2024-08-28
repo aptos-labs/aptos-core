@@ -317,39 +317,6 @@ module supra_framework::supra_governance {
 
     /// Update the governance configurations. This can only be called as part of resolving a proposal in this same
     /// AptosGovernance.
-    public fun update_governance_config(
-        supra_framework: &signer,
-        min_voting_threshold: u128,
-        required_proposer_stake: u64,
-        voting_duration_secs: u64,
-    ) acquires GovernanceConfig, GovernanceEvents {
-        system_addresses::assert_supra_framework(supra_framework);
-
-        let governance_config = borrow_global_mut<GovernanceConfig>(@supra_framework);
-        governance_config.voting_duration_secs = voting_duration_secs;
-        governance_config.min_voting_threshold = min_voting_threshold;
-        governance_config.required_proposer_stake = required_proposer_stake;
-
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                UpdateConfig {
-                    min_voting_threshold,
-                    required_proposer_stake,
-                    voting_duration_secs
-                },
-            )
-        };
-        let events = borrow_global_mut<GovernanceEvents>(@supra_framework);
-        event::emit_event<UpdateConfigEvent>(
-            &mut events.update_config_events,
-            UpdateConfigEvent {
-                min_voting_threshold,
-                required_proposer_stake,
-                voting_duration_secs
-            },
-        );
-    }
-
     public fun update_supra_governance_config(
         supra_framework: &signer,
         voting_duration_secs: u64,
@@ -399,13 +366,18 @@ module supra_framework::supra_governance {
     }
 
     #[view]
-    public fun get_voting_duration_secs(): u64 acquires GovernanceConfig {
-        borrow_global<GovernanceConfig>(@supra_framework).voting_duration_secs
+    public fun get_voting_duration_secs(): u64 acquires SupraGovernanceConfig {
+        borrow_global<SupraGovernanceConfig>(@supra_framework).voting_duration_secs
     }
 
     #[view]
-    public fun get_min_voting_threshold(): u128 acquires GovernanceConfig {
-        borrow_global<GovernanceConfig>(@supra_framework).min_voting_threshold
+    public fun get_min_voting_threshold(): u64 acquires SupraGovernanceConfig {
+        borrow_global<SupraGovernanceConfig>(@supra_framework).min_voting_threshold
+    }
+
+    #[view]
+    public fun get_voters_list(): vector<address> acquires SupraGovernanceConfig {
+        borrow_global<SupraGovernanceConfig>(@supra_framework).voters
     }
 
     #[view]
@@ -1666,23 +1638,28 @@ module supra_framework::supra_governance {
     #[test(supra_framework = @supra_framework)]
     public entry fun test_update_governance_config(
         supra_framework: signer,
-    ) acquires GovernanceConfig, GovernanceEvents {
+    ) acquires SupraGovernanceEvents, SupraGovernanceConfig {
         account::create_account_for_test(signer::address_of(&supra_framework));
-        old_initialize(&supra_framework, 1, 2, 3);
-        update_governance_config(&supra_framework, 10, 20, 30);
+        let voters = vector[@0xa1, @0xa2, @0xa3];
+        initialize(&supra_framework, 1000, 2, voters);
+        let updated_voters = vector[@0xa1, @0xa2, @0xa3, @0xa4, @0xa5];
+        update_supra_governance_config(&supra_framework, 1500, 3, updated_voters);
 
-        let config = borrow_global<GovernanceConfig>(@supra_framework);
-        assert!(config.min_voting_threshold == 10, 0);
-        assert!(config.required_proposer_stake == 20, 1);
-        assert!(config.voting_duration_secs == 30, 3);
+        let supra_config = borrow_global<SupraGovernanceConfig>(@supra_framework);
+        assert!(supra_config.min_voting_threshold == 3, 0);
+        assert!(supra_config.voters == updated_voters, 1);
+        assert!(supra_config.voting_duration_secs == 1500, 3);
     }
 
     #[test(account = @0x123)]
     #[expected_failure(abort_code = 0x50003, location = supra_framework::system_addresses)]
-    public entry fun test_update_governance_config_unauthorized_should_fail(
-        account: signer) acquires GovernanceConfig, GovernanceEvents {
-        old_initialize(&account, 1, 2, 3);
-        update_governance_config(&account, 10, 20, 30);
+    public entry fun test_update_governance_config_unauthorized_should_fail(account: signer)
+    acquires SupraGovernanceConfig, SupraGovernanceEvents {
+        account::create_account_for_test(signer::address_of(&account));
+
+        let voters = vector[@0xa1, @0xa2, @0xa3];
+        initialize(&account, 1000, 2, voters);
+        update_supra_governance_config(&account, 1500, 2, voters);
     }
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
