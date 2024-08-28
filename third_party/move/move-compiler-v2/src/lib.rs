@@ -6,6 +6,7 @@ mod bytecode_generator;
 pub mod env_pipeline;
 mod experiments;
 mod file_format_generator;
+pub mod lint_common;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
@@ -25,6 +26,7 @@ use crate::{
         copy_propagation::CopyPropagation,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
+        flush_writes_processor::FlushWritesProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety::{reference_safety_processor_v2, reference_safety_processor_v3},
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
@@ -459,7 +461,14 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
+    // There should be no "transforming" processors run after this point.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+
+    if options.experiment_on(Experiment::FLUSH_WRITES_OPTIMIZATION) {
+        // This processor only adds annotations, does not transform the bytecode.
+        pipeline.add_processor(Box::new(FlushWritesProcessor {}));
+    }
+
     pipeline
 }
 

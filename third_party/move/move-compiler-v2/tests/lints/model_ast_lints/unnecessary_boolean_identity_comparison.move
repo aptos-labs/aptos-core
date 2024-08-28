@@ -29,3 +29,10 @@ module 0xc0ffee::m {
         if ((*x && *y) == true) { bar() };
     }
 }
+
+module 0xc0ffee::no_warn {
+    #[lint::skip(unnecessary_boolean_identity_comparison)]
+    public fun test(x: bool) {
+        if (x == true) abort 1;
+    }
+}

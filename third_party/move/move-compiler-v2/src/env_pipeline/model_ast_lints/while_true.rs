@@ -4,7 +4,7 @@
 //! This module implements an expression linter that checks code of the form:
 //! `while (true) { ... }` and suggests to use `loop { ... }` instead.
 
-use crate::env_pipeline::model_ast_lints::ExpressionLinter;
+use crate::{env_pipeline::model_ast_lints::ExpressionLinter, lint_common::LintChecker};
 use move_compiler::parser::syntax::FOR_LOOP_UPDATE_ITER_FLAG;
 use move_model::{
     ast::{Exp, ExpData, Value},
@@ -15,8 +15,8 @@ use move_model::{
 pub struct WhileTrue;
 
 impl ExpressionLinter for WhileTrue {
-    fn get_name(&self) -> &'static str {
-        "while_true"
+    fn get_lint_checker(&self) -> LintChecker {
+        LintChecker::WhileTrue
     }
 
     fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
@@ -37,9 +37,9 @@ impl ExpressionLinter for WhileTrue {
             return;
         }
         // If we are here, it is `while (true) {...}`.
-        env.lint_diag(
+        self.warning(
+            env,
             &env.get_node_loc(*id),
-            self.get_name(),
             "Use the more explicit `loop` instead.",
         );
     }

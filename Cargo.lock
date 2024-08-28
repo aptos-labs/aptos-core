@@ -1309,6 +1309,7 @@ dependencies = [
  "aptos-network",
  "aptos-reliable-broadcast",
  "aptos-runtimes",
+ "aptos-safety-rules",
  "aptos-time-service",
  "aptos-types",
  "aptos-validator-transaction-pool",
@@ -2275,6 +2276,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-test-transactions"
+version = "1.0.0"
+dependencies = [
+ "aptos-protos 1.3.1",
+ "serde_json",
+]
+
+[[package]]
 name = "aptos-infallible"
 version = "0.1.0"
 
@@ -2354,6 +2363,7 @@ dependencies = [
  "aptos-network",
  "aptos-reliable-broadcast",
  "aptos-runtimes",
+ "aptos-safety-rules",
  "aptos-time-service",
  "aptos-types",
  "aptos-validator-transaction-pool",
@@ -3046,7 +3056,6 @@ dependencies = [
  "aptos-peer-monitoring-service-server",
  "aptos-peer-monitoring-service-types",
  "aptos-runtimes",
- "aptos-safety-rules",
  "aptos-state-sync-driver",
  "aptos-storage-interface",
  "aptos-storage-service-client",
@@ -3515,7 +3524,6 @@ dependencies = [
 name = "aptos-safety-rules"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-config",
  "aptos-consensus-types",
  "aptos-crypto",
@@ -3530,6 +3538,7 @@ dependencies = [
  "aptos-vault-client",
  "claims",
  "criterion",
+ "hex",
  "once_cell",
  "proptest",
  "rand 0.7.3",
@@ -10793,6 +10802,7 @@ dependencies = [
  "move-stdlib",
  "move-symbol-pool",
  "once_cell",
+ "pathdiff",
  "petgraph 0.5.1",
  "regex",
  "sha3 0.9.1",
@@ -10839,6 +10849,8 @@ dependencies = [
  "num 0.4.1",
  "once_cell",
  "petgraph 0.5.1",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
  "walkdir",
 ]
 
@@ -13385,7 +13397,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18bec9b0adc4eba778b33684b7ba3e7137789434769ee3ce3930463ef904cfca"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.48",

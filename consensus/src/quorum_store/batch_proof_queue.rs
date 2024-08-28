@@ -596,9 +596,9 @@ impl BatchProofQueue {
         if full || return_non_full {
             // Stable sort, so the order of proofs within an author will not change.
             result.sort_by_key(|item| Reverse(item.info.gas_bucket_start()));
-            (result, cur_all_txns, cur_unique_txns, !full)
+            (result, cur_all_txns, cur_unique_txns, full)
         } else {
-            (Vec::new(), PayloadTxnsSize::zero(), 0, !full)
+            (Vec::new(), PayloadTxnsSize::zero(), 0, full)
         }
     }
 

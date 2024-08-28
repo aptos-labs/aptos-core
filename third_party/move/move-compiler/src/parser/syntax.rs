@@ -553,20 +553,39 @@ impl Modifiers {
 // ModuleMemberModifiers checks for uniqueness, meaning each individual ModuleMemberModifier can
 // appear only once
 fn parse_module_member_modifiers(context: &mut Context) -> Result<Modifiers, Box<Diagnostic>> {
+    let check_previous_vis = |context: &mut Context, mods: &mut Modifiers, vis: &Visibility| {
+        if let Some(prev_vis) = &mods.visibility {
+            let msg = "Duplicate visibility modifier".to_string();
+            let prev_msg = "Visibility modifier previously given here".to_string();
+            context.env.add_diag(diag!(
+                Declarations::DuplicateItem,
+                (vis.loc().unwrap(), msg),
+                (prev_vis.loc().unwrap(), prev_msg),
+            ));
+        }
+    };
     let mut mods = Modifiers::empty();
     loop {
         match context.tokens.peek() {
             Tok::Public => {
                 let vis = parse_visibility(context)?;
-                if let Some(prev_vis) = mods.visibility {
-                    let msg = "Duplicate visibility modifier".to_string();
-                    let prev_msg = "Visibility modifier previously given here".to_string();
-                    context.env.add_diag(diag!(
-                        Declarations::DuplicateItem,
-                        (vis.loc().unwrap(), msg),
-                        (prev_vis.loc().unwrap(), prev_msg),
-                    ));
-                }
+                check_previous_vis(context, &mut mods, &vis);
+                mods.visibility = Some(vis)
+            },
+            Tok::Friend => {
+                let loc = current_token_loc(context.tokens);
+                context.tokens.advance()?;
+                require_move_2(context, loc, "direct `friend` declaration");
+                let vis = Visibility::Friend(loc);
+                check_previous_vis(context, &mut mods, &vis);
+                mods.visibility = Some(vis)
+            },
+            Tok::Identifier if context.tokens.content() == "package" => {
+                let loc = current_token_loc(context.tokens);
+                context.tokens.advance()?;
+                require_move_2(context, loc, "direct `package` declaration");
+                let vis = Visibility::Package(loc);
+                check_previous_vis(context, &mut mods, &vis);
                 mods.visibility = Some(vis)
             },
             Tok::Native => {
@@ -605,6 +624,8 @@ fn parse_module_member_modifiers(context: &mut Context) -> Result<Modifiers, Box
 
 // Parse a function visibility modifier:
 //      Visibility = "public" ( "(" "script" | "friend" | "package" ")" )?
+// Notice that "package" and "friend" visibility can also directly be provided
+// without "public" in declarations, but this is not handled by this function
 fn parse_visibility(context: &mut Context) -> Result<Visibility, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     consume_token(context.tokens, Tok::Public)?;
@@ -1180,30 +1201,11 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                 // then it may be followed by a colon and a type annotation, an 'as' and a type,
                 // or an 'is' and a list of variants.
                 let e = parse_exp(context)?;
-                if match_token(context.tokens, Tok::Colon)? {
-                    let ty = parse_type(context)?;
-                    consume_token(context.tokens, Tok::RParen)?;
-                    Exp_::Annotate(Box::new(e), ty)
-                } else if match_token(context.tokens, Tok::As)? {
-                    let ty = parse_type(context)?;
-                    consume_token(context.tokens, Tok::RParen)?;
-                    Exp_::Cast(Box::new(e), ty)
-                } else if context.tokens.peek() == Tok::Identifier
-                    && context.tokens.content() == "is"
+                if let Some(exp) =
+                    parse_cast_or_test_exp(context, &e, /*allow_colon_exp*/ true)?
                 {
-                    require_move_2(
-                        context,
-                        current_token_loc(context.tokens),
-                        "`is` expression",
-                    );
-                    context.tokens.advance()?;
-                    let types = parse_list(
-                        context,
-                        |ctx| match_token(ctx.tokens, Tok::Pipe),
-                        parse_type,
-                    )?;
                     consume_token(context.tokens, Tok::RParen)?;
-                    Exp_::Test(Box::new(e), types)
+                    exp
                 } else {
                     if context.tokens.peek() != Tok::RParen {
                         consume_token(context.tokens, Tok::Comma)?;
@@ -1248,6 +1250,35 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         end_loc,
         term,
     ))
+}
+
+fn parse_cast_or_test_exp(
+    context: &mut Context,
+    e: &Exp,
+    allow_colon_exp: bool,
+) -> Result<Option<Exp_>, Box<Diagnostic>> {
+    if allow_colon_exp && match_token(context.tokens, Tok::Colon)? {
+        let ty = parse_type(context)?;
+        Ok(Some(Exp_::Annotate(Box::new(e.clone()), ty)))
+    } else if match_token(context.tokens, Tok::As)? {
+        let ty = parse_type(context)?;
+        Ok(Some(Exp_::Cast(Box::new(e.clone()), ty)))
+    } else if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "is" {
+        require_move_2(
+            context,
+            current_token_loc(context.tokens),
+            "`is` expression",
+        );
+        context.tokens.advance()?;
+        let types = parse_list(
+            context,
+            |ctx| match_token(ctx.tokens, Tok::Pipe),
+            parse_type,
+        )?;
+        Ok(Some(Exp_::Test(Box::new(e.clone()), types)))
+    } else {
+        Ok(None)
+    }
 }
 
 fn is_control_exp(tok: Tok) -> bool {
@@ -1801,6 +1832,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 //          | <Quantifier>                  spec only
 //          | <BinOpExp>
 //          | <UnaryExp> "=" <Exp>
+//          | <UnaryExp> ("as" | "is") Type
 fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let token = context.tokens.peek();
@@ -1819,10 +1851,21 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         Tok::Identifier if is_quant(context) => parse_quant(context)?,
         _ => {
             // This could be either an assignment or a binary operator
-            // expression.
+            // expression, or a cast or test
             let lhs = parse_unary_exp(context)?;
             if context.tokens.peek() != Tok::Equal {
-                return parse_binop_exp(context, lhs, /* min_prec */ 1);
+                if let Some(exp) =
+                    parse_cast_or_test_exp(context, &lhs, /*allow_colon_exp*/ false)?
+                {
+                    let loc = make_loc(
+                        context.tokens.file_hash(),
+                        start_loc,
+                        context.tokens.previous_end_loc(),
+                    );
+                    return Ok(sp(loc, exp));
+                } else {
+                    return parse_binop_exp(context, lhs, /* min_prec */ 1);
+                }
             }
             context.tokens.advance()?; // consume the "="
             let rhs = Box::new(parse_exp(context)?);
@@ -2732,7 +2775,7 @@ fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Bo
 //      StructDecl =
 //          native struct <StructDefName> <Abilities>? ";"
 //        | "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}" (<Abilities> ";")?
-//        | "struct" <StructDefName> "(" Comma<Type> ")" <Abilities>?";"
+//        | "struct" <StructDefName> ( "(" Comma<Type> ")" )? <Abilities>?";"
 //        | "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}" (<Abilities> ";")?
 //      StructDefName =
 //          <Identifier> <StructTypeParameter>
@@ -2819,7 +2862,7 @@ fn parse_struct_decl(
                     abilities = parse_abilities(context)?;
                     consume_token(context.tokens, Tok::Semicolon)?;
                     (list, true)
-                } else {
+                } else if context.tokens.peek() == Tok::LBrace {
                     let list = parse_comma_list(
                         context,
                         Tok::LBrace,
@@ -2829,6 +2872,12 @@ fn parse_struct_decl(
                     )?;
                     parse_postfix_abilities(context, &mut abilities)?;
                     (list, false)
+                } else {
+                    // Assume positional with 0 fields.
+                    let loc = current_token_loc(context.tokens);
+                    require_move_2(context, loc, "struct declaration without field list");
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    (vec![], true)
                 };
                 StructLayout::Singleton(list, is_positional)
             }
@@ -3266,7 +3315,12 @@ fn parse_module(
                 },
                 // Regular move constructs
                 Tok::Use => ModuleMember::Use(parse_use_decl(attributes, context)?),
-                Tok::Friend => ModuleMember::Friend(parse_friend_decl(attributes, context)?),
+                Tok::Friend if context.tokens.lookahead()? != Tok::Fun => {
+                    // Only interpret as module friend declaration if not directly
+                    // followed by fun keyword. This is invalid syntax in v1, so
+                    // we can re-interpret it for Move 2.
+                    ModuleMember::Friend(parse_friend_decl(attributes, context)?)
+                },
                 _ => {
                     context.tokens.match_doc_comments();
                     let start_loc = context.tokens.start_loc();

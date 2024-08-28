@@ -86,3 +86,60 @@ module 0xc0ffee::m {
         }
     }
 }
+
+#[lint::skip(blocks_in_conditions)]
+module 0xc0ffee::no_warn_1 {
+    fun foo(): bool {
+        true
+    }
+
+    fun bar() {}
+
+    enum Blah {
+        Baz(u64),
+        Qux(u64),
+    }
+
+    fun blah(): Blah {
+        Blah::Baz(42)
+    }
+
+    /****** Suppress warnings *****/
+
+    public fun test_warn_1() {
+        if ({let x = foo(); !x}) {
+            bar();
+        }
+    }
+
+    #[lint::skip(blocks_in_conditions)]
+    public fun test_warn_2(x: bool) {
+        if ({x = x && foo(); x}) {
+            bar();
+        }
+    }
+
+    public fun test_warn_3() {
+        match ({let x = blah(); x}) {
+            Blah::Baz(_) => bar(),
+            Blah::Qux(_) => {},
+        }
+    }
+}
+
+module 0xc0ffee::no_warn_2 {
+    fun foo(): bool {
+        true
+    }
+
+    fun bar() {}
+
+    /****** Suppress warnings *****/
+
+    #[lint::skip(blocks_in_conditions)]
+    public fun test_warn_1() {
+        if ({let x = foo(); !x}) {
+            bar();
+        }
+    }
+}
