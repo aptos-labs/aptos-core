@@ -2235,6 +2235,7 @@ dependencies = [
  "futures",
  "google-cloud-storage",
  "hyper 0.14.28",
+ "itertools 0.13.0",
  "rocksdb",
  "serde",
  "serde_json",
@@ -2243,7 +2244,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.10",
- "tonic 0.11.0",
 ]
 
 [[package]]
