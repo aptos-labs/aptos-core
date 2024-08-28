@@ -1155,6 +1155,12 @@ pub struct MovePackageDir {
     pub move_2: bool,
 }
 
+impl Default for MovePackageDir {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MovePackageDir {
     pub fn new() -> Self {
         Self {

@@ -77,7 +77,7 @@ pub struct LintPackage {
 }
 
 impl LintPackage {
-    fn to_move_options(self) -> MovePackageDir {
+    fn to_move_options(&self) -> MovePackageDir {
         let LintPackage {
             dev,
             package_dir,
