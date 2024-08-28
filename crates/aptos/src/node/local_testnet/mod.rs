@@ -15,7 +15,6 @@ mod utils;
 
 use self::{
     faucet::FaucetArgs,
-    health_checker::HealthChecker,
     indexer_api::IndexerApiArgs,
     logging::ThreadNameMakeWriter,
     node::NodeArgs,
@@ -39,6 +38,8 @@ use anyhow::{Context, Result};
 use aptos_indexer_grpc_server_framework::setup_logging;
 use async_trait::async_trait;
 use clap::Parser;
+pub use health_checker::HealthChecker;
+use maplit::hashset;
 use std::{
     collections::HashSet,
     fs::{create_dir_all, remove_dir_all},
@@ -190,7 +191,9 @@ impl CliCommand<()> for RunLocalnet {
             setup_logging(None);
         }
 
+        /*
         let global_config = GlobalConfig::load().context("Failed to load global config")?;
+
         let test_dir = match &self.test_dir {
             Some(test_dir) => test_dir.clone(),
             None => global_config
@@ -217,6 +220,11 @@ impl CliCommand<()> for RunLocalnet {
             })?;
             info!("Created test directory: {:?}", test_dir);
         }
+        */
+
+        let test_dir = tempfile::tempdir().unwrap();
+        let test_dir = test_dir.path().to_owned();
+        println!("test dir {}", test_dir.display());
 
         // We set up directory based logging after we have created test_dir.
         if !self.log_to_stdout {
@@ -246,14 +254,21 @@ impl CliCommand<()> for RunLocalnet {
         };
         info!("Binding host services to {}", bind_to);
 
-        let mut managers: Vec<Box<dyn ServiceManager>> = Vec::new();
-
         // Build the node manager. We do this unconditionally.
         let node_manager = NodeManager::new(&self, bind_to, test_dir.clone())
             .context("Failed to build node service manager")?;
-        let node_health_checkers = node_manager.get_health_checkers();
+
+        let mut join_set = JoinSet::new();
+        let mut health_checkers = hashset! {};
+
+        let (node_health_chekers_fut, node_fut) =
+            Box::new(node_manager).run_and_get_health_checkers();
+        join_set.spawn(node_fut);
+        let node_health_checkers = node_health_chekers_fut.await?;
+        health_checkers.extend(node_health_checkers.clone());
 
         // If configured to do so, build the faucet manager.
+
         if !self.faucet_args.no_faucet {
             let faucet_manager = FaucetManager::new(
                 &self,
@@ -263,14 +278,20 @@ impl CliCommand<()> for RunLocalnet {
                 node_manager.get_node_api_url(),
             )
             .context("Failed to build faucet service manager")?;
-            managers.push(Box::new(faucet_manager));
+            let (faucet_health_checkers_fut, faucet_fut) =
+                Box::new(faucet_manager).run_and_get_health_checkers();
+            join_set.spawn(faucet_fut);
+            health_checkers.extend(faucet_health_checkers_fut.await?);
         }
 
         if self.indexer_api_args.with_indexer_api {
             let postgres_manager = postgres::PostgresManager::new(&self, test_dir.clone())
                 .context("Failed to build postgres service manager")?;
-            let postgres_health_checkers = postgres_manager.get_health_checkers();
-            managers.push(Box::new(postgres_manager));
+            let (postgres_health_checkers_fut, postgres_fut) =
+                Box::new(postgres_manager).run_and_get_health_checkers();
+            join_set.spawn(postgres_fut);
+            let postgres_health_checkers = postgres_health_checkers_fut.await?;
+            health_checkers.extend(postgres_health_checkers.clone());
 
             let processor_preqrequisite_healthcheckers =
                 [node_health_checkers, postgres_health_checkers]
@@ -285,16 +306,15 @@ impl CliCommand<()> for RunLocalnet {
             )
             .context("Failed to build processor service managers")?;
 
-            let processor_health_checkers = processor_managers
-                .iter()
-                .flat_map(|m| m.get_health_checkers())
-                .collect();
-
-            let mut processor_managers = processor_managers
-                .into_iter()
-                .map(|m| Box::new(m) as Box<dyn ServiceManager>)
-                .collect();
-            managers.append(&mut processor_managers);
+            let mut processor_health_checkers = hashset! {};
+            for processor_manager in processor_managers {
+                let (health_checkers_fut, fut) =
+                    Box::new(processor_manager).run_and_get_health_checkers();
+                join_set.spawn(fut);
+                let health_checkers = health_checkers_fut.await?;
+                processor_health_checkers.extend(health_checkers.clone());
+                health_checkers.extend(health_checkers);
+            }
 
             let indexer_api_manager = IndexerApiManager::new(
                 &self,
@@ -303,35 +323,32 @@ impl CliCommand<()> for RunLocalnet {
                 self.postgres_args.get_connection_string(None, false),
             )
             .context("Failed to build indexer API service manager")?;
-            managers.push(Box::new(indexer_api_manager));
+            let (health_checkers_fut, fut) =
+                Box::new(indexer_api_manager).run_and_get_health_checkers();
+            join_set.spawn(fut);
+            health_checkers.extend(health_checkers);
         }
-
-        // We put the node manager into managers at the end just so we have access to
-        // it before this so we can call things like `node_manager.get_node_api_url()`.
-        managers.push(Box::new(node_manager));
-
-        // Get the healthcheckers from all the managers. We'll pass to this
-        // `wait_for_startup`.
-        let health_checkers: HashSet<HealthChecker> = managers
-            .iter()
-            .flat_map(|m| m.get_health_checkers())
-            .collect();
 
         // The final manager we add is the ready server. This must happen last since
         // it use the health checkers from all the other services.
-        managers.push(Box::new(ReadyServerManager::new(
+        let (health_checkers_fut, fut) = Box::new(ReadyServerManager::new(
             &self,
             bind_to,
             health_checkers.clone(),
-        )?));
+        )?)
+        .run_and_get_health_checkers();
+        join_set.spawn(fut);
+        health_checkers.extend(health_checkers);
 
         // Collect steps to run on shutdown. We run these in reverse. This is somewhat
         // arbitrary, each shutdown step should work no matter the order it is run in.
+        /*
         let shutdown_steps: Vec<Box<dyn ShutdownStep>> = managers
             .iter()
             .flat_map(|m| m.get_shutdown_steps())
             .rev()
             .collect();
+        */
 
         // Run any pre-run steps.
         for manager in &managers {
@@ -346,17 +363,12 @@ impl CliCommand<()> for RunLocalnet {
         );
 
         // Collect post healthy steps to run after the services start.
-        let post_healthy_steps: Vec<Box<dyn PostHealthyStep>> = managers
-            .iter()
-            .flat_map(|m| m.get_post_healthy_steps())
-            .collect();
+        //let post_healthy_steps: Vec<Box<dyn PostHealthyStep>> = managers
+        //    .iter()
+        //    .flat_map(|m| m.get_post_healthy_steps())
+        //    .collect();
 
         let mut join_set = JoinSet::new();
-
-        // Start each of the services.
-        for manager in managers.into_iter() {
-            join_set.spawn(manager.run());
-        }
 
         // Wait for all the services to start up. While doing so we also wait for any
         // of the services to end. This is not meant to ever happen (except for ctrl-c,
@@ -369,7 +381,7 @@ impl CliCommand<()> for RunLocalnet {
             },
             res = join_set.join_next() => {
                 eprintln!("\nOne of the services failed to start up, running shutdown steps...");
-                run_shutdown_steps(shutdown_steps).await?;
+                //run_shutdown_steps(shutdown_steps).await?;
                 eprintln!("Ran shutdown steps");
                 return Err(CliError::UnexpectedError(format!(
                     "\nOne of the services crashed on startup:\n{:#?}\nPlease check the logs in {}",
@@ -384,12 +396,14 @@ impl CliCommand<()> for RunLocalnet {
         eprintln!("\nApplying post startup steps...");
 
         // Run any post healthy steps.
+        /*
         for post_healthy_step in post_healthy_steps {
             post_healthy_step
                 .run()
                 .await
                 .context("Failed to run post startup step")?;
         }
+        */
 
         eprintln!("\nSetup is complete, you can now use the localnet!");
 
@@ -439,7 +453,7 @@ impl CliCommand<()> for RunLocalnet {
         });
 
         // Run post shutdown steps, if any.
-        run_shutdown_steps(shutdown_steps).await?;
+        //run_shutdown_steps(shutdown_steps).await?;
 
         eprintln!("Done, goodbye!");
 

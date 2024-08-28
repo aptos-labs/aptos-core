@@ -19,9 +19,13 @@ use aptos_protos::{
 };
 use aptos_storage_interface::DbReader;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
+use futures::channel::oneshot;
 use std::{net::ToSocketAddrs, sync::Arc};
-use tokio::runtime::Runtime;
-use tonic::{codec::CompressionEncoding, transport::Server};
+use tokio::{net::TcpListener, runtime::Runtime};
+use tonic::{
+    codec::CompressionEncoding,
+    transport::{server::TcpIncoming, Server},
+};
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
@@ -35,6 +39,7 @@ pub fn bootstrap(
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     indexer_reader: Option<Arc<dyn IndexerReader>>,
+    port_tx: Option<oneshot::Sender<u16>>,
 ) -> Option<Runtime> {
     if !config.indexer_grpc.enabled {
         return None;
@@ -105,11 +110,18 @@ pub fn bootstrap(
                 tonic_server.add_service(svc)
             },
         };
+
+        let listener = TcpListener::bind(address).await.unwrap();
+        if let Some(port_tx) = port_tx {
+            port_tx.send(listener.local_addr().unwrap().port()).unwrap();
+        }
+        let incoming = TcpIncoming::from_listener(listener, false, None).unwrap();
+
         // Make port into a config
-        router
-            .serve(address.to_socket_addrs().unwrap().next().unwrap())
-            .await
-            .unwrap();
+        router.serve_with_incoming(incoming).await.unwrap();
+
+        println!("[indexer-grpc] Started GRPC server");
+
         info!(address = address, "[indexer-grpc] Started GRPC server");
     });
     Some(runtime)

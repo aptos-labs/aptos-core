@@ -83,10 +83,13 @@ impl IndexerStreamCoordinator {
     /// 3. Convert into protobuf objects
     /// 4. Encode protobuf objects (base64)
     pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
+        println!(">> process next batch");
         let fetching_start_time = std::time::Instant::now();
         // Stage 1: fetch transactions from storage.
         let sorted_transactions_from_storage_with_size =
             self.fetch_transactions_from_storage().await;
+        println!(">> txns fetched");
+
         let first_version = sorted_transactions_from_storage_with_size
             .first()
             .map(|(txn, _)| txn.version)
@@ -210,7 +213,9 @@ impl IndexerStreamCoordinator {
     /// Fetches transactions from storage with each transaction's size.
     /// Results are transactions sorted by version.
     async fn fetch_transactions_from_storage(&mut self) -> Vec<(TransactionOnChainData, usize)> {
+        println!(">> fetch txns from storage");
         let batches = self.get_batches().await;
+        println!(">> got batches");
         let mut storage_fetch_tasks = vec![];
         let ledger_version = self.highest_known_version;
         for batch in batches {
@@ -261,7 +266,10 @@ impl IndexerStreamCoordinator {
 
     /// This will create batches based on the configuration of the request
     async fn get_batches(&mut self) -> Vec<TransactionBatchInfo> {
+        println!("get batches");
         self.ensure_highest_known_version().await;
+
+        println!("ensure highest known");
 
         let mut starting_version = self.current_version;
         let mut num_fetches = 0;

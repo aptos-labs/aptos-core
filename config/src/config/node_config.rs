@@ -18,7 +18,10 @@ use crate::{
 use aptos_crypto::x25519;
 use aptos_logger::info;
 use aptos_temppath::TempPath;
-use aptos_types::account_address::AccountAddress as PeerId;
+use aptos_types::{
+    account_address::AccountAddress as PeerId,
+    network_address::{NetworkAddress, Protocol},
+};
 use rand::{prelude::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -86,6 +89,8 @@ pub struct NodeConfig {
     pub validator_network: Option<NetworkConfig>,
     #[serde(default)]
     pub indexer_db_config: InternalIndexerDBConfig,
+    #[serde(default)]
+    pub use_random_ports: bool,
 }
 
 impl NodeConfig {
@@ -192,6 +197,29 @@ impl NodeConfig {
         }
         for network in self.full_node_networks.iter_mut() {
             network.listen_address = crate::utils::get_available_port_in_multiaddr(true);
+        }
+    }
+
+    pub fn zero_ports(&mut self) {
+        self.admin_service.port = 0;
+        self.api.address.set_port(0);
+        self.inspection_service.port = 0;
+        self.storage.backup_service_address.set_port(0);
+        self.indexer_grpc.address.set_port(0);
+
+        if let Some(network) = self.validator_network.as_mut() {
+            network.listen_address = NetworkAddress::from_protocols(vec![
+                Protocol::Ip4("0.0.0.0".parse().unwrap()),
+                Protocol::Tcp(0),
+            ])
+            .unwrap();
+        }
+        for network in self.full_node_networks.iter_mut() {
+            network.listen_address = NetworkAddress::from_protocols(vec![
+                Protocol::Ip4("0.0.0.0".parse().unwrap()),
+                Protocol::Tcp(0),
+            ])
+            .unwrap();
         }
     }
 

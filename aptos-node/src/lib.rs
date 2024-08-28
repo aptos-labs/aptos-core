@@ -26,7 +26,7 @@ use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, Logger
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
 use clap::Parser;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
@@ -592,11 +592,27 @@ where
     Ok(node_config)
 }
 
-/// Initializes the node environment and starts the node
 pub fn setup_environment_and_start_node(
+    node_config: NodeConfig,
+    remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
+    logger_filter_update_job: Option<LoggerFilterUpdater>,
+) -> anyhow::Result<AptosHandle> {
+    setup_environment_and_start_node_ex(
+        node_config,
+        remote_log_rx,
+        logger_filter_update_job,
+        None,
+        None,
+    )
+}
+
+/// Initializes the node environment and starts the node
+pub fn setup_environment_and_start_node_ex(
     mut node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
+    api_port_tx: Option<oneshot::Sender<u16>>,
+    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<AptosHandle> {
     // Log the node config at node startup
     node_config.log_all_configs();
@@ -687,7 +703,14 @@ pub fn setup_environment_and_start_node(
         indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
-    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id, indexer_db_opt)?;
+    ) = services::bootstrap_api_and_indexer(
+        &node_config,
+        db_rw.clone(),
+        chain_id,
+        indexer_db_opt,
+        api_port_tx,
+        indexer_grpc_port_tx,
+    )?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =

@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use async_trait::async_trait;
 use clap::Parser;
+use futures::channel::oneshot;
 use maplit::hashset;
 use reqwest::Url;
 use std::{collections::HashSet, net::Ipv4Addr, path::PathBuf};
@@ -72,18 +73,28 @@ impl ServiceManager for FaucetManager {
         "Faucet".to_string()
     }
 
-    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
-        hashset! {HealthChecker::http_checker_from_port(
-            self.config.server_config.listen_port,
-            self.get_name(),
-        )}
-    }
-
     fn get_prerequisite_health_checkers(&self) -> HashSet<&HealthChecker> {
         self.prerequisite_health_checkers.iter().collect()
     }
 
-    async fn run_service(self: Box<Self>) -> Result<()> {
-        self.config.run().await
+    async fn run_service(
+        self: Box<Self>,
+        health_chckers_tx: oneshot::Sender<HashSet<HealthChecker>>,
+    ) -> Result<()> {
+        let name = self.get_name();
+
+        let (port_tx, port_rx) = oneshot::channel();
+
+        let run_fut = self.config.run_and_report_port(port_tx);
+        let port = port_rx.await?;
+
+        health_chckers_tx
+            .send(hashset! {HealthChecker::http_checker_from_port(
+                port,
+                name.clone(),
+            )})
+            .map_err(|_| anyhow!("failed to send health checkers for {}", name));
+
+        run_fut.await
     }
 }

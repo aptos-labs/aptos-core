@@ -67,6 +67,8 @@ pub async fn create_data_service_grpc_client(
     address: Url,
     max_elapsed_time: Option<Duration>,
 ) -> Result<GrpcDataServiceClientType> {
+    println!("grpc client addr {}", address);
+
     let mut backoff = backoff::ExponentialBackoff::default();
     if let Some(max_elapsed_time) = max_elapsed_time {
         backoff.max_elapsed_time = Some(max_elapsed_time);
