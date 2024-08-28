@@ -133,8 +133,8 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(true),
         },
         Experiment {
-            name: Experiment::OPTIMIZE_FULL.to_string(),
-            description: "Use most aggressive optimizations".to_string(),
+            name: Experiment::OPTIMIZE_EXTRA.to_string(),
+            description: "Use extra optimizations".to_string(),
             default: Given(false),
         },
         Experiment {
@@ -190,7 +190,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             name: Experiment::AST_SIMPLIFY_FULL.to_string(),
             description: "Whether to run the ast simplifier, including code elimination"
                 .to_string(),
-            default: Inherited(Experiment::OPTIMIZE_FULL.to_string()),
+            default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
         },
         Experiment {
             name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
@@ -267,7 +267,7 @@ impl Experiment {
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";
-    pub const OPTIMIZE_FULL: &'static str = "optimize-full";
+    pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";

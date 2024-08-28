@@ -545,7 +545,7 @@ impl CliCommand<&'static str> for TestPackage {
                 ),
                 compiler_version: self.move_options.compiler_version,
                 language_version: self.move_options.language_version,
-                experiments: experiments_from_opt_level(&self.move_options.optimization_level),
+                experiments: experiments_from_opt_level(&self.move_options.optimize),
             },
             ..Default::default()
         };
@@ -816,12 +816,12 @@ impl FromStr for IncludedArtifacts {
 
 fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
     match optlevel {
-        None | Some(OptimizationLevel::Standard) => {
+        None | Some(OptimizationLevel::Default) => {
             vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]
         },
         Some(OptimizationLevel::None) => vec![format!("{}=off", Experiment::OPTIMIZE.to_string())],
-        Some(OptimizationLevel::Full) => vec![
-            format!("{}=on", Experiment::OPTIMIZE_FULL.to_string()),
+        Some(OptimizationLevel::Extra) => vec![
+            format!("{}=on", Experiment::OPTIMIZE_EXTRA.to_string()),
             format!("{}=on", Experiment::OPTIMIZE.to_string()),
         ],
     }
@@ -851,16 +851,13 @@ impl IncludedArtifacts {
         let language_version = move_options.language_version;
         let skip_attribute_checks = move_options.skip_attribute_checks;
         let check_test_code = move_options.check_test_code;
-        let optimization_level = move_options.optimization_level.clone();
-        let mut experiments = experiments_from_opt_level(&optimization_level);
+        let optimize = move_options.optimize.clone();
+        let mut experiments = experiments_from_opt_level(&optimize);
         experiments.append(&mut move_options.experiments.clone());
         experiments.append(&mut more_experiments);
 
         if matches!(move_options.compiler_version, Some(CompilerVersion::V1)) {
-            if !matches!(
-                optimization_level,
-                Option::None | Some(OptimizationLevel::Standard)
-            ) {
+            if !matches!(optimize, Option::None | Some(OptimizationLevel::Default)) {
                 return Err(CliError::CommandArgumentError(
                     "`--optimization-level` flag is not compatible with Move Compiler V1"
                         .to_string(),

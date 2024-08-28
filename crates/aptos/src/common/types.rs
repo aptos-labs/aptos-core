@@ -1028,29 +1028,28 @@ pub enum OptimizationLevel {
     /// No optimizations
     None,
     /// Default optimization level
-    Standard,
-    /// Extra optimizations (-O3)
-    Full,
+    Default,
+    /// Extra optimizations, that may take more time
+    Extra,
 }
 
 impl Default for OptimizationLevel {
     fn default() -> Self {
-        Self::Standard
+        Self::Default
     }
 }
 
 impl FromStr for OptimizationLevel {
     type Err = anyhow::Error;
 
-    /// Parses a language version. If the caller only provides a major
-    /// version number, this chooses the latest stable minor version (if any).
+    /// Parses an optimization level, or default.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "none" => Ok(Self::None),
-            "standard" => Ok(Self::Standard),
-            "full" => Ok(Self::Full),
+            "" | "default" => Ok(Self::Default),
+            "extra" => Ok(Self::Extra),
             _ => bail!(
-                "unrecognized optimization level `{}` (supported versions: `none`, `standard`, `full`)",
+                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `aggressive`)",
                 s
             ),
         }
@@ -1060,22 +1059,16 @@ impl FromStr for OptimizationLevel {
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
-    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
-    ///
-    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
-    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
-    ///
-    /// Currently, it also additionally pulls in all test compilation artifacts
-    #[clap(long)]
-    pub dev: bool,
-    /// Path to a move package (the folder with a Move.toml file)
+    /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
+
     /// Path to save the compiled move package
     ///
     /// Defaults to `<package_dir>/build`
     #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
+
     /// Named addresses for the move binary
     ///
     /// Example: alice=0x1234, bob=0x5678
@@ -1096,25 +1089,18 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub(crate) skip_fetch_latest_git_deps: bool,
 
-    /// Specify the version of the bytecode the compiler is going to emit.
-    #[clap(long, default_value_if("move_2", "true", "7"))]
-    pub bytecode_version: Option<u32>,
-
-    /// Specify the version of the compiler.
-    /// Currently, defaults to `v1`
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move_2", "true", "2.0"))]
-    pub compiler_version: Option<CompilerVersion>,
-
-    /// Specify the language version to be supported.
-    /// Currently, defaults to `v1`
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", "2.0"))]
-    pub language_version: Option<LanguageVersion>,
-
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
+
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
+    #[clap(long)]
+    pub dev: bool,
 
     /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
@@ -1122,24 +1108,58 @@ pub struct MovePackageDir {
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
 
-    /// Select bytecode, language, compiler for Move 2
-    #[clap(long)]
-    pub move_2: bool,
-
-    /// Select optimization level
-    #[clap(long, value_parser = clap::value_parser!(OptimizationLevel))]
-    pub optimization_level: Option<OptimizationLevel>,
+    /// Select optimization level.  Choices are "none", "default", or "extra".
+    /// Level "extra" may spend more time on expensive optimizations in the future.
+    /// Level "none" does no optimizations, possibly leading to use of too many runtime resources.
+    /// Level "default" is the recommended level, and the default if not provided.
+    #[clap(long, alias = "optimization_level", value_parser = clap::value_parser!(OptimizationLevel))]
+    pub optimize: Option<OptimizationLevel>,
 
     /// Experiments
     #[clap(long, hide(true))]
     pub experiments: Vec<String>,
+
+    ///     or `--bytecode <BYTECODE_VERSION>`
+    /// Specify the version of the bytecode the compiler is going to emit.
+    /// Defaults to `6`, or `7` if language version 2 is selected
+    /// (through `--move-2` or `--language_version=2`), .
+    #[clap(
+        long,
+        default_value_if("move_2", "true", "7"),
+        alias = "bytecode",
+        verbatim_doc_comment
+    )]
+    pub bytecode_version: Option<u32>,
+
+    ///     or `--compiler <COMPILER_VERSION>`
+    /// Specify the version of the compiler.
+    /// Defaults to `1`, or `2` if `--move-2` is selected.
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           alias = "compiler",
+           default_value_if("move_2", "true", "2.0"),
+           verbatim_doc_comment)]
+    pub compiler_version: Option<CompilerVersion>,
+
+    ///     or `--language <LANGUAGE_VERSION>`
+    /// Specify the language version to be supported.
+    /// Currently, defaults to `1`, unless `--move-2` is selected.
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           alias = "language",
+           default_value_if("move_2", "true", "2.0"),
+           verbatim_doc_comment)]
+    pub language_version: Option<LanguageVersion>,
+
+    /// Select bytecode, language version, and compiler to support Move 2:
+    /// Same as `--bytecode_version=7 --language_version=2.0 --compiler_version=2.0`
+    #[clap(long, verbatim_doc_comment)]
+    pub move_2: bool,
 }
 
 impl MovePackageDir {
-    pub fn new(package_dir: PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {
             dev: false,
-            package_dir: Some(package_dir),
+            package_dir: None,
             output_dir: None,
             named_addresses: Default::default(),
             override_std: None,
@@ -1150,7 +1170,7 @@ impl MovePackageDir {
             skip_attribute_checks: false,
             check_test_code: false,
             move_2: false,
-            optimization_level: None,
+            optimize: None,
             experiments: vec![],
         }
     }
