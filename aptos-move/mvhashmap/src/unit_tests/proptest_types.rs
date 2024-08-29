@@ -329,7 +329,7 @@ where
                                     Err(Unresolved(d)) => {
                                         assert_eq!(
                                             baseline,
-                                            ExpectedOutput::Unresolved(d),
+                                            ExpectedOutput::Unresolved(*d),
                                             "{:?}",
                                             idx
                                         );

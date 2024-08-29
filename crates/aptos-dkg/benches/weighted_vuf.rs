@@ -871,7 +871,7 @@ fn pinkas_wvuf_derive_eval_rks_multiexps<R: rand_core::RngCore + rand_core::Cryp
                     )
                 },
                 |(proof, rks, lagr, ranges)| {
-                    let rks = rks.iter().map(|e| e).collect::<Vec<&Vec<G1Projective>>>();
+                    let rks = rks.iter().collect::<Vec<&Vec<G1Projective>>>();
                     let _ = PinkasWUF::rk_multiexps(&proof, rks, &lagr, &ranges, &pool);
                 },
             )
