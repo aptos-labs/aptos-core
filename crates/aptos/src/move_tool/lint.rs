@@ -27,7 +27,7 @@ pub struct LintPackage {
     #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
 
-    /// ...or `--language LANGUAGE_VERSION`
+    /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
     /// Currently, defaults to `2.0`.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),

@@ -53,7 +53,7 @@ base64 = { workspace = true }
 bcs = { workspace = true }
 bollard = { workspace = true }
 chrono = { workspace = true }
-clap = { workspace = true, features = ["env", "unstable-styles"] }
+clap = { workspace = true, features = ["env", "unstable-styles", "wrap_help"] }
 clap_complete = { workspace = true }
 dashmap = { workspace = true }
 diesel = { workspace = true, features = [
