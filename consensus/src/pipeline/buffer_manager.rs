@@ -152,6 +152,7 @@ pub struct BufferManager {
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
+    back_pressure_enabled: bool,
     highest_committed_round: Round,
     latest_round: Round,
 
@@ -184,6 +185,7 @@ impl BufferManager {
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
         order_vote_enabled: bool,
+        back_pressure_enabled: bool,
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
@@ -242,6 +244,7 @@ impl BufferManager {
             reset_flag,
             bounded_executor: executor,
             order_vote_enabled,
+            back_pressure_enabled,
             highest_committed_round,
             latest_round: highest_committed_round,
 
@@ -793,10 +796,10 @@ impl BufferManager {
             .set(pending_aggregated as i64);
     }
 
-    fn need_backpressure(&self) -> bool {
+    fn need_back_pressure(&self) -> bool {
         const MAX_BACKLOG: Round = 20;
 
-        self.highest_committed_round + MAX_BACKLOG < self.latest_round
+        self.back_pressure_enabled && self.highest_committed_round + MAX_BACKLOG < self.latest_round
     }
 
     pub async fn start(mut self) {
@@ -825,7 +828,7 @@ impl BufferManager {
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             ::tokio::select! {
-                Some(blocks) = self.block_rx.next(), if !self.need_backpressure() => {
+                Some(blocks) = self.block_rx.next(), if !self.need_back_pressure() => {
                     self.latest_round = blocks.latest_round();
                     monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;

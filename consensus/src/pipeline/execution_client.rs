@@ -192,6 +192,7 @@ impl ExecutionProxyClient {
         onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
+        buffer_manager_back_pressure_enabled: bool,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) {
@@ -277,6 +278,7 @@ impl ExecutionProxyClient {
             epoch_state,
             self.bounded_executor.clone(),
             onchain_consensus_config.order_vote_enabled(),
+            buffer_manager_back_pressure_enabled,
             highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
@@ -315,6 +317,7 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_consensus_config,
             rand_msg_rx,
             highest_committed_round,
+            self.consensus_config.enable_pre_commit,
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
         );
