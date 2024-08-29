@@ -154,14 +154,14 @@ impl MoveVmExt {
             .features()
             .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
 
-        // TODO(loader_v2): Instead, propagate environment down to Block-STM.
+        // TODO(loader_v2): Refresh environment when configs change.
         set_runtime_environment(
             vm_config.clone(),
             aptos_natives_with_builder(&mut builder, inject_create_signer_for_gov_sim),
         );
         let vm = if env.features().is_loader_v2_enabled() {
             // TODO(loader_v2): For now re-create the VM every time. Later we can have a
-            //                  single VM created once.
+            //                  single VM created once, which also holds the environment.
             MoveVM::new_with_runtime_environment(fetch_runtime_environment())
         } else {
             WarmVmCache::get_warm_vm(
