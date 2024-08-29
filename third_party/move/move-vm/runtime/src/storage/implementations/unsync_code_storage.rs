@@ -4,7 +4,7 @@
 use crate::{
     script_hash,
     storage::{
-        environment::WithEnvironment,
+        environment::WithRuntimeEnvironment,
         implementations::unsync_module_storage::IntoUnsyncModuleStorage,
         module_storage::{ambassador_impl_ModuleStorage, ModuleBytesStorage},
     },
@@ -61,7 +61,7 @@ impl<'e, B: ModuleBytesStorage> IntoUnsyncCodeStorage<'e, B> for B {
     }
 }
 
-impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
+impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
     /// Create a new storage with no scripts. There are no constrains on which
     /// modules exist in module storage.
     fn new(module_storage: M) -> Self {
@@ -123,7 +123,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
     }
 }
 
-impl<M: ModuleStorage + WithEnvironment> CodeStorage for UnsyncCodeStorage<M> {
+impl<M: ModuleStorage + WithRuntimeEnvironment> CodeStorage for UnsyncCodeStorage<M> {
     fn deserialize_and_cache_script(
         &self,
         serialized_script: &[u8],
@@ -174,7 +174,7 @@ impl<M: ModuleStorage + WithEnvironment> CodeStorage for UnsyncCodeStorage<M> {
 }
 
 #[cfg(test)]
-impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
+impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
     fn matches<P: Fn(&ScriptStorageEntry) -> bool>(
         &self,
         script_hashes: impl IntoIterator<Item = [u8; 32]>,
