@@ -306,13 +306,13 @@ async fn test_insert_vote() {
             voter,
         )
         .unwrap();
-        let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
+        let vote_res = pending_votes.insert_vote(&vote, &validator_verifier, true);
 
         // first vote of an author is accepted
         assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u128));
         // filter out duplicates
         assert_eq!(
-            pending_votes.insert_vote(&vote, &validator_verifier),
+            pending_votes.insert_vote(&vote, &validator_verifier, true),
             VoteReceptionResult::DuplicateVote,
         );
         // qc is still not there
@@ -335,7 +335,7 @@ async fn test_insert_vote() {
         final_voter,
     )
     .unwrap();
-    match pending_votes.insert_vote(&vote, &validator_verifier) {
+    match pending_votes.insert_vote(&vote, &validator_verifier, true) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());
             block_store

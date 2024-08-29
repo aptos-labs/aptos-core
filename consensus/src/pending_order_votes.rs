@@ -56,6 +56,7 @@ impl PendingOrderVotes {
         &mut self,
         order_vote: &OrderVote,
         validator_verifier: &ValidatorVerifier,
+        verified: bool,
     ) -> OrderVoteReceptionResult {
         // derive data from order vote
         let li_digest = order_vote.ledger_info().hash();
@@ -190,13 +191,13 @@ mod tests {
 
         // first time a new order vote is added -> OrderVoteAdded
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator),
+            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator, true),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
         // same author voting for the same thing -> OrderVoteAdded
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator),
+            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator, true),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
@@ -208,7 +209,7 @@ mod tests {
             signers[1].sign(&li2).expect("Unable to sign ledger info"),
         );
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_2_author_1, &validator),
+            pending_order_votes.insert_order_vote(&order_vote_2_author_1, &validator, true),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
@@ -220,7 +221,7 @@ mod tests {
             li2.clone(),
             signers[2].sign(&li2).expect("Unable to sign ledger info"),
         );
-        match pending_order_votes.insert_order_vote(&order_vote_2_author_2, &validator) {
+        match pending_order_votes.insert_order_vote(&order_vote_2_author_2, &validator, true) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
                 assert!(li_with_sig.check_voting_power(&validator).is_ok());
             },

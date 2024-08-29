@@ -293,9 +293,10 @@ impl RoundState {
         &mut self,
         vote: &Vote,
         verifier: &ValidatorVerifier,
+        verified: bool,
     ) -> VoteReceptionResult {
         if vote.vote_data().proposed().round() == self.current_round {
-            self.pending_votes.insert_vote(vote, verifier)
+            self.pending_votes.insert_vote(vote, verifier, verified)
         } else {
             VoteReceptionResult::UnexpectedRound(
                 vote.vote_data().proposed().round(),

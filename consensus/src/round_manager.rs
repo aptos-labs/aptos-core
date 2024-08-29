@@ -36,20 +36,7 @@ use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block,
-    block_data::BlockType,
-    common::{Author, Round},
-    delayed_qc_msg::DelayedQcMsg,
-    order_vote_msg::OrderVoteMsg,
-    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    quorum_cert::QuorumCert,
-    sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutCertificate,
-    vote::Vote,
-    vote_data::VoteData,
-    vote_msg::VoteMsg,
-    wrapped_ledger_info::WrappedLedgerInfo,
+    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, order_vote_msg::OrderVoteMsg, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
@@ -79,7 +66,7 @@ use tokio::{
     time::{sleep, Instant},
 };
 
-#[derive(Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
@@ -1075,46 +1062,50 @@ impl RoundManager {
         Ok(vote)
     }
 
-    async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {
+    async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg, verified: bool) -> anyhow::Result<()> {
         if self.onchain_config.order_vote_enabled() {
             fail_point!("consensus::process_order_vote_msg", |_| {
                 Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
             });
 
-            let order_vote = order_vote_msg.order_vote();
             self.new_qc_from_order_vote_msg(&order_vote_msg).await?;
 
-            debug!(
-                self.new_log(LogEvent::ReceiveOrderVote)
-                    .remote_peer(order_vote.author()),
-                epoch = order_vote.ledger_info().epoch(),
-                round = order_vote.ledger_info().round(),
-                id = order_vote.ledger_info().consensus_block_id(),
-            );
+            self.process_order_vote(order_vote_msg.order_vote(), verified).await?;
+        }
+        Ok(())
+    }
 
-            if self
+    async fn process_order_vote(&mut self, order_vote: &OrderVote, verified: bool) -> anyhow::Result<()> {
+        debug!(
+            self.new_log(LogEvent::ReceiveOrderVote)
+                .remote_peer(order_vote.author()),
+            epoch = order_vote.ledger_info().epoch(),
+            round = order_vote.ledger_info().round(),
+            id = order_vote.ledger_info().consensus_block_id(),
+        );
+
+        if self
+            .pending_order_votes
+            .has_enough_order_votes(order_vote.ledger_info())
+        {
+            return Ok(());
+        }
+
+        if order_vote.ledger_info().round()
+            > self.block_store.sync_info().highest_ordered_round()
+        {
+            let vote_reception_result = self
                 .pending_order_votes
-                .has_enough_order_votes(order_vote_msg.order_vote().ledger_info())
-            {
-                return Ok(());
-            }
-
-            if order_vote_msg.order_vote().ledger_info().round()
-                > self.block_store.sync_info().highest_ordered_round()
-            {
-                let vote_reception_result = self
-                    .pending_order_votes
-                    .insert_order_vote(order_vote_msg.order_vote(), &self.epoch_state.verifier);
-                self.process_order_vote_reception_result(vote_reception_result)
-                    .await?;
-            } else {
-                ORDER_VOTE_VERY_OLD.inc();
-                info!(
-                    "Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
-                    order_vote_msg.order_vote().ledger_info().round(),
-                    self.block_store.sync_info().highest_ordered_round()
-                );
-            }
+                .insert_order_vote(order_vote, &self.epoch_state.verifier, verified);
+            self.process_order_vote_reception_result(vote_reception_result)
+                .await?;
+        } else {
+            ORDER_VOTE_VERY_OLD.inc();
+            info!(
+                "Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
+                order_vote.ledger_info().round(),
+                self.block_store.sync_info().highest_ordered_round()
+            );
         }
         Ok(())
     }
@@ -1158,7 +1149,7 @@ impl RoundManager {
     /// potential attacks).
     /// 2. Add the vote to the pending votes and check whether it finishes a QC.
     /// 3. Once the QC/TC successfully formed, notify the RoundState.
-    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> anyhow::Result<()> {
+    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg, verified: bool) -> anyhow::Result<()> {
         fail_point!("consensus::process_vote_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_vote_msg"))
         });
@@ -1172,7 +1163,7 @@ impl RoundManager {
             .await
             .context("[RoundManager] Stop processing vote")?
         {
-            self.process_vote(vote_msg.vote())
+            self.process_vote(vote_msg.vote(), verified)
                 .await
                 .context("[RoundManager] Add a new vote")?;
         }
@@ -1183,7 +1174,7 @@ impl RoundManager {
     /// If a new QC / TC is formed then
     /// 1) fetch missing dependencies if required, and then
     /// 2) call process_certificates(), which will start a new round in return.
-    async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
+    async fn process_vote(&mut self, vote: &Vote, verified: bool) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
 
         if vote.is_timeout() {
@@ -1230,7 +1221,7 @@ impl RoundManager {
         }
         let vote_reception_result = self
             .round_state
-            .insert_vote(vote, &self.epoch_state.verifier);
+            .insert_vote(vote, &self.epoch_state.verifier, verified);
         self.process_vote_reception_result(vote, vote_reception_result)
             .await
     }
@@ -1448,9 +1439,13 @@ impl RoundManager {
     #[allow(clippy::unwrap_used)]
     pub async fn start(
         mut self,
-        mut event_rx: aptos_channel::Receiver<
+        mut verified_event_rx: aptos_channel::Receiver<
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
+        >,
+        mut unverified_event_rx: aptos_channel::Receiver<
+            (Author, Discriminant<UnverifiedEvent>),
+            (Author, UnverifiedEvent),
         >,
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         mut delayed_qc_rx: UnboundedReceiver<DelayedQcMsg>,
@@ -1540,13 +1535,13 @@ impl RoundManager {
                         },
                     };
                 },
-                (peer_id, event) = event_rx.select_next_some() => {
+                (peer_id, event) = verified_event_rx.select_next_some() => {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
-                            monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
+                            monitor!("process_vote", self.process_vote_msg(*vote_msg, true).await)
                         }
                         VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
-                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg).await)
+                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg, true).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
@@ -1558,7 +1553,28 @@ impl RoundManager {
                             "process_local_timeout",
                             self.process_local_timeout(round).await
                         ),
-                        unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
+                        unexpected_event => unreachable!("Unexpected verified event: {:?}", unexpected_event),
+                    }
+                    .with_context(|| format!("from peer {}", peer_id));
+
+                    let round_state = self.round_state();
+                    match result {
+                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                        Err(e) => {
+                            counters::ERROR_COUNT.inc();
+                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
+                        }
+                    }
+                },
+                (peer_id, event) = unverified_event_rx.select_next_some() => {
+                    let result = match event {
+                        UnverifiedEvent::VoteMsg(vote_msg) => {
+                            monitor!("process_vote", self.process_vote_msg(*vote_msg, false).await)
+                        }
+                        UnverifiedEvent::OrderVoteMsg(order_vote_msg) => {
+                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg, false).await)
+                        }
+                        unexpected_event => unreachable!("Unexpected unverified event: {:?}", unexpected_event),
                     }
                     .with_context(|| format!("from peer {}", peer_id));
 

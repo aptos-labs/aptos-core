@@ -646,7 +646,7 @@ fn process_and_vote_on_proposal(
         for vote_msg in votes {
             timed_block_on(
                 runtime,
-                proposer_node.round_manager.process_vote_msg(vote_msg),
+                proposer_node.round_manager.process_vote_msg(vote_msg, true),
             )
             .unwrap();
         }
@@ -696,7 +696,7 @@ fn new_round_on_quorum_cert() {
             .unwrap();
         let vote_msg = node.next_vote().await;
         // Adding vote to form a QC
-        node.round_manager.process_vote_msg(vote_msg).await.unwrap();
+        node.round_manager.process_vote_msg(vote_msg, true).await.unwrap();
 
         // round 2 should start
         let proposal_msg = node.next_proposal().await;
@@ -1562,7 +1562,7 @@ fn sync_on_partial_newer_sync_info() {
                 .unwrap();
             let vote_msg = node.next_vote().await;
             // Adding vote to form a QC
-            node.round_manager.process_vote_msg(vote_msg).await.unwrap();
+            node.round_manager.process_vote_msg(vote_msg, true).await.unwrap();
         }
         let block_4 = node.next_proposal().await;
         node.round_manager
@@ -1657,7 +1657,7 @@ fn safety_rules_crash() {
 
             // sign proposal
             reset_safety_rules(&mut node);
-            node.round_manager.process_vote_msg(vote_msg).await.unwrap();
+            node.round_manager.process_vote_msg(vote_msg, true).await.unwrap();
         }
 
         // verify the last sign proposal happened
@@ -1696,7 +1696,7 @@ fn echo_timeout() {
         // node 0 doesn't timeout and should echo the timeout after 2 timeout message
         for i in 0..3 {
             let timeout_vote = node_0.next_vote().await;
-            let result = node_0.round_manager.process_vote_msg(timeout_vote).await;
+            let result = node_0.round_manager.process_vote_msg(timeout_vote, true).await;
             // first and third message should not timeout
             if i == 0 || i == 2 {
                 assert!(result.is_ok());
@@ -1713,7 +1713,7 @@ fn echo_timeout() {
             let timeout_vote = node_1.next_vote().await;
             node_1
                 .round_manager
-                .process_vote_msg(timeout_vote)
+                .process_vote_msg(timeout_vote, true)
                 .await
                 .unwrap();
         }
@@ -2036,7 +2036,7 @@ pub fn forking_retrieval_test() {
                 if node.id != behind_node {
                     let result = node
                         .round_manager
-                        .process_vote_msg(vote_msg_on_timeout)
+                        .process_vote_msg(vote_msg_on_timeout, true)
                         .await;
 
                     if node.id == forking_node && i == 2 {

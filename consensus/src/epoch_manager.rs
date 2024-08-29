@@ -150,8 +150,14 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // channels to rand manager
     rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>,
     // channels to round manager
-    round_manager_tx: Option<
+    // Channel to send verified transactions to round manager
+    round_manager_verified_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+    >,
+    // Channel to send unverified transactions to round manager. It's round manager's responsibility
+    // to verify these transactions before using them.
+    round_manager_unverified_tx: Option<
+        aptos_channel::Sender<(Author, Discriminant<UnverifiedEvent>), (Author, UnverifiedEvent)>,
     >,
     buffered_proposal_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
@@ -223,7 +229,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pool,
             reconfig_events,
             rand_manager_msg_tx: None,
-            round_manager_tx: None,
+            round_manager_verified_tx: None,
+            round_manager_unverified_tx: None,
             round_manager_close_tx: None,
             buffered_proposal_tx: None,
             epoch_state: None,
@@ -612,7 +619,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .await
                 .expect("[EpochManager] Fail to drop round manager");
         }
-        self.round_manager_tx = None;
+        self.round_manager_verified_tx = None;
+        self.round_manager_unverified_tx = None;
 
         if let Some(close_tx) = self.dag_shutdown_tx.take() {
             // Release the previous RoundManager, especially the SafetyRule client
@@ -658,7 +666,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
-        self.round_manager_tx = Some(recovery_manager_tx);
+        self.round_manager_verified_tx = Some(recovery_manager_tx);
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
         let recovery_manager = RecoveryManager::new(
@@ -875,7 +883,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
         );
-        let (round_manager_tx, round_manager_rx) = aptos_channel::new(
+        let (round_manager_verified_tx, round_manager_verified_rx) = aptos_channel::new(
+            QueueStyle::KLAST,
+            10,
+            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+        );
+
+        let (round_manager_unverified_tx, round_manager_unverified_rx) = aptos_channel::new(
             QueueStyle::KLAST,
             10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
@@ -886,7 +900,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
-        self.round_manager_tx = Some(round_manager_tx.clone());
+        self.round_manager_verified_tx = Some(round_manager_verified_tx.clone());
+        self.round_manager_unverified_tx = Some(round_manager_unverified_tx.clone());
         self.buffered_proposal_tx = Some(buffered_proposal_tx.clone());
         let max_blocks_allowed = self
             .config
@@ -914,7 +929,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
         tokio::spawn(round_manager.start(
-            round_manager_rx,
+            round_manager_verified_rx,
+            round_manager_unverified_rx,
             buffered_proposal_rx,
             delayed_qc_rx,
             close_rx,
@@ -1453,13 +1469,38 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let quorum_store_enabled = self.quorum_store_enabled;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
             let buffered_proposal_tx = self.buffered_proposal_tx.clone();
-            let round_manager_tx = self.round_manager_tx.clone();
+            let round_manager_verified_tx = self.round_manager_verified_tx.clone();
+            let round_manager_unverified_tx = self.round_manager_unverified_tx.clone();
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
             let max_batch_expiry_gap_usecs =
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
+            
+            if self.config.optimistic_sig_verification_for_order_votes && self.round_manager_unverified_tx.is_some() {
+                if let UnverifiedEvent::OrderVoteMsg(order_vote) = &unverified_event {
+                    Self::forward_event_to(
+                        round_manager_unverified_tx,
+                        (peer_id, discriminant(&UnverifiedEvent::OrderVoteMsg(order_vote.clone()))),
+                        (peer_id, UnverifiedEvent::OrderVoteMsg(order_vote.clone())),
+                    )
+                    .context("round manager sending unverified order vote to round manager")?;
+                    return Ok(());
+                }
+            }
+            if self.config.optimistic_sig_verification_for_votes && self.round_manager_unverified_tx.is_some() {
+                if let UnverifiedEvent::VoteMsg(vote) = &unverified_event {
+                    Self::forward_event_to(
+                        round_manager_unverified_tx,
+                        (peer_id, discriminant(&UnverifiedEvent::VoteMsg(vote.clone()))),
+                        (peer_id, UnverifiedEvent::VoteMsg(vote.clone())),
+                    )
+                    .context("round manager sending unverified vote to round manager")?;
+                    return Ok(());
+                }
+            }
+
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -1475,9 +1516,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         )
                     ) {
                         Ok(verified_event) => {
-                            Self::forward_event(
+                            Self::forward_verified_event(
                                 quorum_store_msg_tx,
-                                round_manager_tx,
+                                round_manager_verified_tx,
                                 buffered_proposal_tx,
                                 peer_id,
                                 verified_event,
@@ -1601,9 +1642,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn forward_event(
+    fn forward_verified_event(
         quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
-        round_manager_tx: Option<
+        round_manager_verified_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
         buffered_proposal_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
@@ -1638,7 +1679,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     .context("proposal precheck sender")
             },
             round_manager_event => Self::forward_event_to(
-                round_manager_tx,
+                round_manager_verified_tx,
                 (peer_id, discriminant(&round_manager_event)),
                 (peer_id, round_manager_event),
             )
@@ -1708,7 +1749,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn process_local_timeout(&mut self, round: u64) {
-        let Some(sender) = self.round_manager_tx.as_mut() else {
+        let Some(sender) = self.round_manager_verified_tx.as_mut() else {
             warn!(
                 "Received local timeout for round {} without Round Manager",
                 round
