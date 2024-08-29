@@ -1288,38 +1288,40 @@ module supra_framework::supra_governance {
 
     #[test_only]
     public entry fun test_can_remove_approved_hash_if_executed_directly_via_voting_generic(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
         multi_step: bool,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        setup_voting(&supra_framework, &proposer, &yes_voter, &no_voter);
+    ) acquires ApprovedExecutionHashes, GovernanceResponsbility, SupraGovernanceEvents, SupraGovernanceConfig {
+        let voters = vector[signer::address_of(proposer), signer::address_of(yes_voter), signer::address_of(no_voter)];
+        supra_setup_voting(supra_framework, voters);
 
-        create_proposal_for_test(&proposer, multi_step);
-        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
-        vote(&no_voter, signer::address_of(&no_voter), 0, false);
+        supra_create_proposal_for_test(proposer, multi_step);
+        supra_vote(proposer, 0, true);
+        supra_vote(yes_voter, 0, true);
+        supra_vote(no_voter, 0, false);
 
         // Add approved script hash.
         timestamp::update_global_time_for_test(100001000000);
-        add_approved_script_hash(0);
+        add_supra_approved_script_hash(0);
 
         // Resolve the proposal.
         if (multi_step) {
             let execution_hash = vector::empty<u8>();
             let next_execution_hash = vector::empty<u8>();
             vector::push_back(&mut execution_hash, 1);
-            voting::resolve_proposal_v2<GovernanceProposal>(@supra_framework, 0, next_execution_hash);
-            assert!(voting::is_resolved<GovernanceProposal>(@supra_framework, 0), 0);
+            multisig_voting::resolve_proposal_v2<GovernanceProposal>(@supra_framework, 0, next_execution_hash);
+            assert!(multisig_voting::is_resolved<GovernanceProposal>(@supra_framework, 0), 0);
             if (vector::length(&next_execution_hash) == 0) {
-                remove_approved_hash(0);
+                remove_supra_approved_hash(0);
             } else {
-                add_approved_script_hash(0)
+                add_supra_approved_script_hash(0)
             };
         } else {
-            voting::resolve<GovernanceProposal>(@supra_framework, 0);
-            assert!(voting::is_resolved<GovernanceProposal>(@supra_framework, 0), 0);
-            remove_approved_hash(0);
+            multisig_voting::resolve<GovernanceProposal>(@supra_framework, 0);
+            assert!(multisig_voting::is_resolved<GovernanceProposal>(@supra_framework, 0), 0);
+            remove_supra_approved_hash(0);
         };
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@supra_framework).hashes;
         assert!(!simple_map::contains_key(&approved_hashes, &0), 1);
@@ -1327,11 +1329,11 @@ module supra_framework::supra_governance {
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_can_remove_approved_hash_if_executed_directly_via_voting(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
+    ) acquires ApprovedExecutionHashes, GovernanceResponsbility, SupraGovernanceEvents, SupraGovernanceConfig {
         test_can_remove_approved_hash_if_executed_directly_via_voting_generic(
             supra_framework,
             proposer,
@@ -1343,11 +1345,11 @@ module supra_framework::supra_governance {
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_can_remove_approved_hash_if_executed_directly_via_voting_multi_step(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
+    ) acquires ApprovedExecutionHashes, GovernanceResponsbility, SupraGovernanceEvents, SupraGovernanceConfig {
         test_can_remove_approved_hash_if_executed_directly_via_voting_generic(
             supra_framework,
             proposer,
