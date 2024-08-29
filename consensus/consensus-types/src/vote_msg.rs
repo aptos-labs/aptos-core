@@ -54,7 +54,9 @@ impl VoteMsg {
         self.vote.vote_data().proposed().id()
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    // Performs the basic checks on the vote message, excluding the signature verification on
+    // the vote.
+    pub fn partial_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.vote().epoch() == self.sync_info.epoch(),
             "VoteMsg has different epoch"
@@ -72,6 +74,11 @@ impl VoteMsg {
         // We're not verifying SyncInfo here yet: we are going to verify it only in case we need
         // it. This way we avoid verifying O(n) SyncInfo messages while aggregating the votes
         // (O(n^2) signature verifications).
-        self.vote().verify(validator)
+        self.vote().partial_verify(validator)
+    }
+
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.partial_verify(validator)?;
+        self.vote().signature_verify(validator)
     }
 }

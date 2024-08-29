@@ -137,16 +137,13 @@ impl Vote {
         self.two_chain_timeout.is_some()
     }
 
-    /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,
-    /// and then verifies the signature.
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    /// Peforms basic verification such as verifying that the consensus data hash of LedgerInfo
+    /// corresponds to the vote info. Does not perform any signature verification.
+    pub fn partial_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.ledger_info.consensus_data_hash() == self.vote_data.hash(),
             "Vote's hash mismatch with LedgerInfo"
         );
-        validator
-            .verify(self.author(), &self.ledger_info, &self.signature)
-            .context("Failed to verify Vote")?;
         if let Some((timeout, signature)) = &self.two_chain_timeout {
             ensure!(
                 (timeout.epoch(), timeout.round())
@@ -161,5 +158,19 @@ impl Vote {
         // Let us verify the vote data as well
         self.vote_data().verify()?;
         Ok(())
+    }
+
+    pub fn signature_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        validator
+            .verify(self.author(), &self.ledger_info, &self.signature)
+            .context("Failed to verify Vote signature")?;
+        Ok(())
+    }
+
+    /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,
+    /// and then verifies the signature.
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.partial_verify(validator)?;
+        self.signature_verify(validator)
     }
 }
