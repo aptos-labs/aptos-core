@@ -149,7 +149,6 @@ module aptos_framework::managed_coin {
         aptos_framework::account::create_account_for_test(source_addr);
         aptos_framework::account::create_account_for_test(destination_addr);
         aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
-        aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(
             &mod_account,
@@ -232,7 +231,6 @@ module aptos_framework::managed_coin {
         aptos_framework::account::create_account_for_test(source_addr);
         aptos_framework::account::create_account_for_test(signer::address_of(&destination));
         aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
-        aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
         coin::register<FakeMoney>(&mod_account);
@@ -254,7 +252,6 @@ module aptos_framework::managed_coin {
         aptos_framework::account::create_account_for_test(source_addr);
         aptos_framework::account::create_account_for_test(signer::address_of(&destination));
         aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
-        aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
         coin::register<FakeMoney>(&mod_account);

@@ -250,6 +250,16 @@ collected when executing the block.
 ## Constants
 
 
+<a id="0x1_transaction_fee_ENO_LONGER_SUPPORTED"></a>
+
+No longer supported.
+
+
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>: u64 = 4;
+</code></pre>
+
+
+
 <a id="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
 
 Gas fees are already being collected and the struct holding
@@ -280,15 +290,60 @@ The burn percentage is out of range [0, 100].
 
 
 
-<a id="0x1_transaction_fee_ENO_LONGER_SUPPORTED"></a>
+<a id="0x1_transaction_fee_initialize_fee_collection_and_distribution"></a>
 
-No longer supported.
+## Function `initialize_fee_collection_and_distribution`
+
+DEPRECATED
 
 
-<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>: u64 = 4;
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _burn_percentage: u8)
 </code></pre>
 
 
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _burn_percentage: u8) {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_upgrade_burn_percentage"></a>
+
+## Function `upgrade_burn_percentage`
+
+DEPRECATED
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _new_burn_percentage: u8)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(
+    _aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    _new_burn_percentage: u8
+) {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_transaction_fee_burn_fee"></a>
 

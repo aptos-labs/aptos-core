@@ -39,7 +39,7 @@ module aptos_framework::aptos_coin {
     public(friend) fun initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let (burn_cap, freeze_cap, mint_cap) = coin::initialize_with_parallelizable_supply<AptosCoin>(
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<AptosCoin>(
             aptos_framework,
             string::utf8(b"Aptos Coin"),
             string::utf8(b"APT"),
@@ -171,9 +171,6 @@ module aptos_framework::aptos_coin {
     public fun ensure_initialized_with_apt_fa_metadata_for_test() {
         let aptos_framework = account::create_signer_for_test(@aptos_framework);
         if (!exists<MintCapStore>(@aptos_framework)) {
-            if (!aggregator_factory::aggregator_factory_exists_for_testing()) {
-                aggregator_factory::initialize_aggregator_factory_for_test(&aptos_framework);
-            };
             let (burn_cap, mint_cap) = initialize(&aptos_framework);
             coin::destroy_burn_cap(burn_cap);
             coin::destroy_mint_cap(mint_cap);
@@ -184,7 +181,6 @@ module aptos_framework::aptos_coin {
 
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
-        aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
         let (burn_cap, mint_cap) = initialize(aptos_framework);
         coin::create_coin_conversion_map(aptos_framework);
         coin::create_pairing<AptosCoin>(aptos_framework);

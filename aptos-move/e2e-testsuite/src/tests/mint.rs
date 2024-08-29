@@ -17,7 +17,7 @@ fn mint_to_new_account() {
     // many were there before.
     let new_account = executor.create_raw_account_data(0, 0);
     executor.add_account_data(&new_account);
-    let supply_before = executor.read_coin_supply().unwrap();
+    let supply_before = executor.read_apt_coin_supply_resource().unwrap().get();
 
     let mint_amount = 1_000_000;
     let txn = root
@@ -32,7 +32,7 @@ fn mint_to_new_account() {
 
     // Check that supply changed.
     executor.apply_write_set(output.write_set());
-    let supply_after = executor.read_coin_supply().unwrap();
+    let supply_after = executor.read_apt_coin_supply_resource().unwrap().get();
     assert_eq!(supply_after, supply_before + (mint_amount as u128));
 
     assert_eq!(

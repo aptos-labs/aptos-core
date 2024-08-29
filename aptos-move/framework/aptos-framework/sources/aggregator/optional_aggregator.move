@@ -4,7 +4,6 @@ module aptos_framework::optional_aggregator {
     use std::error;
     use std::option::{Self, Option};
 
-    use aptos_framework::aggregator_factory;
     use aptos_framework::aggregator::{Self, Aggregator};
 
     friend aptos_framework::coin;
@@ -71,18 +70,28 @@ module aptos_framework::optional_aggregator {
         integer: Option<Integer>,
     }
 
-    /// Creates a new optional aggregator.
-    public(friend) fun new(limit: u128, parallelizable: bool): OptionalAggregator {
-        if (parallelizable) {
-            OptionalAggregator {
-                aggregator: option::some(aggregator_factory::create_aggregator_internal(limit)),
-                integer: option::none(),
-            }
+    public(friend) fun new_empty(): OptionalAggregator {
+        OptionalAggregator {
+            aggregator: option::none(),
+            integer: option::none(),
+        }
+    }
+
+    public(friend) fun is_empty(optional_aggregator: &OptionalAggregator): bool {
+        !option::is_some(&optional_aggregator.aggregator) && !option::is_some(&optional_aggregator.integer)
+    }
+
+    public(friend) fun make_empty(optional_aggregator: &mut OptionalAggregator): u128 {
+        if (is_parallelizable(optional_aggregator)) {
+            let aggregator = option::extract(&mut optional_aggregator.aggregator);
+            let value = aggregator::read(&aggregator);
+            aggregator::destroy(aggregator);
+            value
         } else {
-            OptionalAggregator {
-                aggregator: option::none(),
-                integer: option::some(new_integer(limit)),
-            }
+            let integer = option::extract(&mut optional_aggregator.integer);
+            let value = read_integer(&integer);
+            destroy_integer(integer);
+            value
         }
     }
 
@@ -154,111 +163,5 @@ module aptos_framework::optional_aggregator {
     /// Returns true if optional aggregator uses parallelizable implementation.
     public fun is_parallelizable(optional_aggregator: &OptionalAggregator): bool {
         option::is_some(&optional_aggregator.aggregator)
-    }
-
-    #[test(account = @aptos_framework)]
-    fun optional_aggregator_test_integer(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-
-        let aggregator = new(30, false);
-        assert!(!is_parallelizable(&aggregator), 0);
-
-        add(&mut aggregator, 12);
-        add(&mut aggregator, 3);
-        assert!(read(&aggregator) == 15, 0);
-
-        sub(&mut aggregator, 10);
-        assert!(read(&aggregator) == 5, 0);
-    }
-
-    #[test(account = @aptos_framework)]
-    fun optional_aggregator_test_aggregator(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(5, true);
-
-        assert!(is_parallelizable(&aggregator), 0);
-        assert!(read(&aggregator) == 5, 0);
-
-        add(&mut aggregator, 12);
-        add(&mut aggregator, 3);
-        assert!(read(&aggregator) == 20, 0);
-
-        sub(&mut aggregator, 10);
-        assert!(read(&aggregator) == 10, 0);
-
-        // Switch back!
-        switch(&mut aggregator);
-        assert!(!is_parallelizable(&aggregator), 0);
-        assert!(read(&aggregator) == 10, 0);
-
-        destroy(aggregator);
-    }
-
-    #[test(account = @aptos_framework)]
-    fun optional_aggregator_destroy_test(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-
-        let aggregator = new(30, false);
-        destroy(aggregator);
-
-        let aggregator = new(30, true);
-        destroy(aggregator);
-
-        let aggregator = new(12, false);
-        assert!(destroy_optional_integer(aggregator) == 12, 0);
-
-        let aggregator = new(21, true);
-        assert!(destroy_optional_aggregator(aggregator) == 21, 0);
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x020001, location = Self)]
-    fun non_parallelizable_aggregator_overflow_test(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(15, false);
-
-        // Overflow!
-        add(&mut aggregator, 16);
-
-        destroy(aggregator);
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x020002, location = Self)]
-    fun non_parallelizable_aggregator_underflow_test(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(100, false);
-
-        // Underflow!
-        sub(&mut aggregator, 100);
-        add(&mut aggregator, 100);
-
-        destroy(aggregator);
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x020001, location = aptos_framework::aggregator)]
-    fun parallelizable_aggregator_overflow_test(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(15, true);
-
-        // Overflow!
-        add(&mut aggregator, 16);
-
-        destroy(aggregator);
-    }
-
-    #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x020002, location = aptos_framework::aggregator)]
-    fun parallelizable_aggregator_underflow_test(account: signer) {
-        aggregator_factory::initialize_aggregator_factory(&account);
-        let aggregator = new(100, true);
-
-        // Underflow!
-        add(&mut aggregator, 99);
-        sub(&mut aggregator, 100);
-        add(&mut aggregator, 100);
-
-        destroy(aggregator);
     }
 }

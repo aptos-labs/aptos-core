@@ -25,7 +25,7 @@ use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
-        ConcurrentSupply, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
+        ConcurrentSupply, NewBlockEvent, CoinSupplyResource, ObjectGroupResource, CORE_CODE_ADDRESS,
     },
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
@@ -76,7 +76,6 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    str::FromStr,
     sync::{Arc, Mutex},
     time::Instant,
 };
@@ -414,15 +413,14 @@ impl FakeExecutor {
 
         if let Some(new_added_supply) = account_data.coin_balance() {
             if new_added_supply != 0 {
-                let coin_info_resource = self
-                    .read_apt_coin_info_resource()
-                    .expect("coin info must exist in data store");
-                let old_supply = self.read_coin_supply().unwrap();
-                self.data_store.add_write_set(
-                    &coin_info_resource
-                        .to_writeset(old_supply + (new_added_supply as u128))
-                        .unwrap(),
-                )
+                let mut coin_supply_resource = self
+                    .read_apt_coin_supply_resource()
+                    .expect("coin supply must exist in data store");
+
+                coin_supply_resource.set(coin_supply_resource.get() + (new_added_supply as u128));
+
+                self.data_store
+                    .add_write_set(&coin_supply_resource.to_writeset().unwrap());
             }
         }
 
@@ -540,27 +538,14 @@ impl FakeExecutor {
         self.read_apt_coin_store_resource_at_address(account.address())
     }
 
-    /// Reads supply from CoinInfo resource value from this executor's data store.
-    pub fn read_coin_supply(&mut self) -> Option<u128> {
-        let bytes = self
-            .execute_view_function(
-                str::parse("0x1::coin::supply").unwrap(),
-                vec![move_core_types::language_storage::TypeTag::from_str(
-                    "0x1::aptos_coin::AptosCoin",
-                )
-                .unwrap()],
-                vec![],
-            )
-            .values
-            .unwrap()
-            .pop()
-            .unwrap();
-        bcs::from_bytes::<Option<u128>>(bytes.as_slice()).unwrap()
-    }
-
     /// Reads the CoinInfo resource value from this executor's data store.
     pub fn read_apt_coin_info_resource(&self) -> Option<CoinInfoResource<AptosCoinType>> {
         self.read_resource(&AptosCoinType::coin_info_address())
+    }
+
+    /// Reads the CoinInfo resource value from this executor's data store.
+    pub fn read_apt_coin_supply_resource(&self) -> Option<CoinSupplyResource<AptosCoinType>> {
+        self.read_resource::<CoinSupplyResource<AptosCoinType>>(&AccountAddress::ONE)
     }
 
     /// Reads the CoinStore resource value for an account under the given address from this executor's
