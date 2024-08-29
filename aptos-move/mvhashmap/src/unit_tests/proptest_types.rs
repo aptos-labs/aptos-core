@@ -13,6 +13,7 @@ use aptos_types::{
     state_store::state_value::StateValue,
     write_set::{TransactionWrite, WriteOpKind},
 };
+use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use claims::assert_none;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
@@ -240,8 +241,13 @@ where
         let value = Value::new(None);
         let idx = idx as TxnIndex;
         if test_group {
-            map.group_data()
-                .write(key.clone(), idx, 0, vec![(5, (value, None))]);
+            map.group_data().write(
+                key.clone(),
+                idx,
+                0,
+                vec![(5, (value, None))],
+                ResourceGroupSize::zero_combined(),
+            );
             map.group_data().mark_estimate(&key, idx);
         } else {
             map.data().write(key.clone(), idx, 0, Arc::new(value), None);
@@ -349,8 +355,13 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(None);
                         if test_group {
-                            map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
+                            map.group_data().write(
+                                key,
+                                idx as TxnIndex,
+                                1,
+                                vec![(5, (value, None))],
+                                ResourceGroupSize::zero_combined(),
+                            );
                         } else {
                             map.data()
                                 .write(key, idx as TxnIndex, 1, Arc::new(value), None);
@@ -360,8 +371,13 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(Some(v.clone()));
                         if test_group {
-                            map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
+                            map.group_data().write(
+                                key,
+                                idx as TxnIndex,
+                                1,
+                                vec![(5, (value, None))],
+                                ResourceGroupSize::zero_combined(),
+                            );
                         } else {
                             map.data()
                                 .write(key, idx as TxnIndex, 1, Arc::new(value), None);

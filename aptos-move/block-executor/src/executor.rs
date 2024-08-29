@@ -43,7 +43,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
-use aptos_vm_types::change_set::randomly_check_layout_matches;
+use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
@@ -124,6 +124,12 @@ where
             .map_or(HashSet::new(), |keys| keys.collect());
 
         let mut read_set = sync_view.take_parallel_reads();
+        if read_set.is_incorrect_use() {
+            return Err(PanicOr::from(code_invariant_error(format!(
+                "Incorrect use detected in CapturedReads after executing txn = {} incarnation = {}",
+                idx_to_execute, incarnation
+            ))));
+        }
 
         // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
         // May happen, for instance, when the recent execution wrote outside of the previous write/delta
@@ -134,7 +140,7 @@ where
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
             PanicError,
         > {
-            for (group_key, group_metadata_op, group_ops) in
+            for (group_key, group_metadata_op, group_size, group_ops) in
                 output.resource_group_write_set().into_iter()
             {
                 if prev_modified_keys.remove(&group_key).is_none() {
@@ -155,6 +161,7 @@ where
                     idx_to_execute,
                     incarnation,
                     group_ops.into_iter(),
+                    group_size,
                 ) {
                     needs_suffix_validation = true;
                 }
@@ -990,10 +997,10 @@ where
             unsync_map.write(key, write_op, layout);
         }
 
-        for (group_key, metadata_op, group_ops) in output.resource_group_write_set().into_iter() {
-            for (value_tag, (group_op, maybe_layout)) in group_ops.into_iter() {
-                unsync_map.insert_group_op(&group_key, value_tag, group_op, maybe_layout)?;
-            }
+        for (group_key, metadata_op, group_size, group_ops) in
+            output.resource_group_write_set().into_iter()
+        {
+            unsync_map.insert_group_ops(&group_key, group_ops, group_size)?;
             unsync_map.write(group_key, Arc::new(metadata_op), None);
         }
 
@@ -1180,22 +1187,26 @@ where
                         // previously failed in bcs serialization for preparing final transaction outputs.
                         // TODO: remove this fallback when txn errors can be created from block executor.
 
-                        let finalize = |group_key| -> BTreeMap<_, _> {
-                            unsync_map
-                                .finalize_group(&group_key)
-                                .map(|(resource_tag, value_with_layout)| {
-                                    let value = match value_with_layout {
-                                        ValueWithLayout::RawFromStorage(value)
-                                        | ValueWithLayout::Exchanged(value, _) => value,
-                                    };
-                                    (
-                                        resource_tag,
-                                        value
-                                            .extract_raw_bytes()
-                                            .expect("Deletions should already be applied"),
-                                    )
-                                })
-                                .collect()
+                        let finalize = |group_key| -> (BTreeMap<_, _>, ResourceGroupSize) {
+                            let (group, size) = unsync_map.finalize_group(&group_key);
+
+                            (
+                                group
+                                    .map(|(resource_tag, value_with_layout)| {
+                                        let value = match value_with_layout {
+                                            ValueWithLayout::RawFromStorage(value)
+                                            | ValueWithLayout::Exchanged(value, _) => value,
+                                        };
+                                        (
+                                            resource_tag,
+                                            value
+                                                .extract_raw_bytes()
+                                                .expect("Deletions should already be applied"),
+                                        )
+                                    })
+                                    .collect(),
+                                size,
+                            )
                         };
 
                         // The IDs are not exchanged but it doesn't change the types (Bytes) or size.
@@ -1207,16 +1218,25 @@ where
                                     true
                                 });
 
-                                let finalized_group = finalize(group_key.clone());
-                                bcs::to_bytes(&finalized_group).is_err()
+                                let (finalized_group, group_size) = finalize(group_key.clone());
+                                match bcs::to_bytes(&finalized_group) {
+                                    Ok(group) => {
+                                        (!finalized_group.is_empty() || group_size.get() != 0)
+                                            && group.len() as u64 != group_size.get()
+                                    },
+                                    Err(_) => true,
+                                }
                             })
                             || output.resource_group_write_set().into_iter().any(
-                                |(group_key, _, group_ops)| {
+                                |(group_key, _, output_group_size, group_ops)| {
                                     fail_point!("fail-point-resource-group-serialization", |_| {
                                         true
                                     });
 
-                                    let mut finalized_group = finalize(group_key);
+                                    let (mut finalized_group, group_size) = finalize(group_key);
+                                    if output_group_size.get() != group_size.get() {
+                                        return false;
+                                    }
                                     for (value_tag, (group_op, _)) in group_ops {
                                         if group_op.is_deletion() {
                                             finalized_group.remove(&value_tag);
@@ -1229,7 +1249,13 @@ where
                                             );
                                         }
                                     }
-                                    bcs::to_bytes(&finalized_group).is_err()
+                                    match bcs::to_bytes(&finalized_group) {
+                                        Ok(group) => {
+                                            (!finalized_group.is_empty() || group_size.get() != 0)
+                                                && group.len() as u64 != group_size.get()
+                                        },
+                                        Err(_) => true,
+                                    }
                                 },
                             );
 
@@ -1256,8 +1282,9 @@ where
                     {
                         let finalized_groups = groups_to_finalize!(output,)
                             .map(|((group_key, metadata_op), is_read_needing_exchange)| {
-                                let finalized_group =
-                                    Ok(unsync_map.finalize_group(&group_key).collect());
+                                let (group_ops_iter, group_size) =
+                                    unsync_map.finalize_group(&group_key);
+                                let finalized_group = Ok((group_ops_iter.collect(), group_size));
                                 map_finalized_group::<T>(
                                     group_key,
                                     finalized_group,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    types::{GroupReadResult, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
+    types::{GroupReadResult, MVGroupError, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
     utils::module_hash,
     BlockStateStats,
 };
@@ -13,8 +13,7 @@ use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
     write_set::TransactionWrite,
 };
-use aptos_vm_types::resource_group_adapter::group_size_as_sum;
-use move_binary_format::errors::PartialVMResult;
+use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
 use std::{
@@ -44,7 +43,7 @@ pub struct UnsyncMap<
     resource_map: RefCell<HashMap<K, ValueWithLayout<V>>>,
     // Optional hash can store the hash of the module to avoid re-computations.
     module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
-    group_cache: RefCell<HashMap<K, RefCell<HashMap<T, ValueWithLayout<V>>>>>,
+    group_cache: RefCell<HashMap<K, RefCell<(HashMap<T, ValueWithLayout<V>>, ResourceGroupSize)>>>,
     executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
     executable_bytes: RefCell<usize>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
@@ -102,18 +101,25 @@ impl<
         &self,
         group_key: K,
         base_values: impl IntoIterator<Item = (T, V)>,
-    ) {
-        let base_map = base_values
+    ) -> Result<(), MVGroupError> {
+        let base_map: HashMap<T, ValueWithLayout<V>> = base_values
             .into_iter()
             .map(|(t, v)| (t, ValueWithLayout::RawFromStorage(Arc::new(v))))
             .collect();
+        let base_size = group_size_as_sum(
+            base_map
+                .iter()
+                .flat_map(|(t, v)| v.bytes_len().map(|s| (t, s))),
+        )
+        .map_err(MVGroupError::TagSerializationError)?;
         assert!(
             self.group_cache
                 .borrow_mut()
-                .insert(group_key, RefCell::new(base_map))
+                .insert(group_key, RefCell::new((base_map, base_size)))
                 .is_none(),
             "UnsyncMap group cache must be empty to provide base values"
         );
+        Ok(())
     }
 
     pub fn update_tagged_base_value_with_layout(
@@ -128,19 +134,15 @@ impl<
             .get_mut(&group_key)
             .expect("Unable to fetch the entry for the group key in group_cache")
             .borrow_mut()
+            .0
             .insert(tag, ValueWithLayout::Exchanged(Arc::new(value), layout));
     }
 
-    pub fn get_group_size(&self, group_key: &K) -> PartialVMResult<GroupReadResult> {
-        Ok(match self.group_cache.borrow().get(group_key) {
-            Some(group_map) => GroupReadResult::Size(group_size_as_sum(
-                group_map
-                    .borrow()
-                    .iter()
-                    .flat_map(|(t, v)| v.bytes_len().map(|s| (t, s))),
-            )?),
+    pub fn get_group_size(&self, group_key: &K) -> GroupReadResult {
+        match self.group_cache.borrow().get(group_key) {
+            Some(entry) => GroupReadResult::Size(entry.borrow_mut().1),
             None => GroupReadResult::Uninitialized,
-        })
+        }
     }
 
     pub fn fetch_group_tagged_data(
@@ -153,6 +155,7 @@ impl<
             |group_map| {
                 group_map
                     .borrow()
+                    .0
                     .get(value_tag)
                     .cloned()
                     .ok_or(UnsyncGroupError::TagNotFound)
@@ -161,17 +164,41 @@ impl<
     }
 
     /// Contains the latest group ops for the given group key.
-    pub fn finalize_group(&self, group_key: &K) -> impl Iterator<Item = (T, ValueWithLayout<V>)> {
-        self.group_cache
-            .borrow()
+    pub fn finalize_group(
+        &self,
+        group_key: &K,
+    ) -> (
+        impl Iterator<Item = (T, ValueWithLayout<V>)>,
+        ResourceGroupSize,
+    ) {
+        let binding = self.group_cache.borrow();
+        let group = binding
             .get(group_key)
             .expect("Resource group must be cached")
-            .borrow()
-            .clone()
-            .into_iter()
+            .borrow();
+
+        (group.0.clone().into_iter(), group.1)
     }
 
-    pub fn insert_group_op(
+    pub fn insert_group_ops(
+        &self,
+        group_key: &K,
+        group_ops: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
+        group_size: ResourceGroupSize,
+    ) -> Result<(), PanicError> {
+        for (value_tag, (group_op, maybe_layout)) in group_ops.into_iter() {
+            self.insert_group_op(group_key, value_tag, group_op, maybe_layout)?;
+        }
+        self.group_cache
+            .borrow_mut()
+            .get_mut(group_key)
+            .expect("Resource group must be cached")
+            .borrow_mut()
+            .1 = group_size;
+        Ok(())
+    }
+
+    fn insert_group_op(
         &self,
         group_key: &K,
         value_tag: T,
@@ -186,6 +213,7 @@ impl<
                 .get_mut(group_key)
                 .expect("Resource group must be cached")
                 .borrow_mut()
+                .0
                 .entry(value_tag.clone()),
             v.write_op_kind(),
         ) {
@@ -227,6 +255,7 @@ impl<
         self.group_cache.borrow().get(key).map(|group_map| {
             group_map
                 .borrow()
+                .0
                 .iter()
                 .map(|(tag, value)| (Arc::new(tag.clone()), value.clone()))
                 .collect()
@@ -327,7 +356,7 @@ mod test {
         map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>,
         key: &KeyType<Vec<u8>>,
     ) -> HashMap<usize, ValueWithLayout<TestValue>> {
-        map.finalize_group(key).collect()
+        map.finalize_group(key).0.collect()
     }
 
     // TODO[agg_v2](test) Add tests with non trivial layout
@@ -340,7 +369,8 @@ mod test {
             ap.clone(),
             // base tag 1, 2, 3
             (1..4).map(|i| (i, TestValue::with_kind(i, true))),
-        );
+        )
+        .unwrap();
         assert_ok!(map.insert_group_op(&ap, 2, TestValue::with_kind(202, false), None));
         assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(203, false), None));
         let committed = finalize_group_as_hashmap(&map, &ap);
@@ -424,11 +454,11 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
-        map.set_group_base_values(
+        let _ = map.set_group_base_values(
             ap.clone(),
             (1..4).map(|i| (i, TestValue::with_kind(i, true))),
         );
-        map.set_group_base_values(
+        let _ = map.set_group_base_values(
             ap.clone(),
             (1..4).map(|i| (i, TestValue::with_kind(i, true))),
         );
@@ -449,7 +479,7 @@ mod test {
         let ap = KeyType(b"/foo/b".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
-        let _ = map.finalize_group(&ap).collect::<Vec<_>>();
+        let _ = map.finalize_group(&ap).0.collect::<Vec<_>>();
     }
 
     #[test]
@@ -457,13 +487,14 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
-        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Uninitialized);
+        assert_eq!(map.get_group_size(&ap), GroupReadResult::Uninitialized);
 
         map.set_group_base_values(
             ap.clone(),
             // base tag 1, 2, 3, 4
             (1..5).map(|i| (i, TestValue::creation_with_len(1))),
-        );
+        )
+        .unwrap();
 
         let tag: usize = 5;
         let one_entry_len = TestValue::creation_with_len(1).bytes().unwrap().len();
@@ -471,13 +502,9 @@ mod test {
         let three_entry_len = TestValue::creation_with_len(3).bytes().unwrap().len();
         let four_entry_len = TestValue::creation_with_len(4).bytes().unwrap().len();
 
-        let exp_size = group_size_as_sum(vec![(&tag, one_entry_len); 4].into_iter()).unwrap();
-        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
+        let base_size = group_size_as_sum(vec![(&tag, one_entry_len); 4].into_iter()).unwrap();
+        assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(base_size));
 
-        assert_err!(map.insert_group_op(&ap, 0, TestValue::modification_with_len(2), None));
-        assert_ok!(map.insert_group_op(&ap, 0, TestValue::creation_with_len(2), None));
-        assert_err!(map.insert_group_op(&ap, 1, TestValue::creation_with_len(2), None));
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::modification_with_len(2), None));
         let exp_size = group_size_as_sum(vec![(&tag, two_entry_len); 2].into_iter().chain(vec![
             (
                 &tag,
@@ -486,10 +513,26 @@ mod test {
             3
         ]))
         .unwrap();
-        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
+        assert_err!(map.insert_group_ops(
+            &ap,
+            vec![(0, (TestValue::modification_with_len(2), None))],
+            exp_size,
+        ));
+        assert_err!(map.insert_group_ops(
+            &ap,
+            vec![(1, (TestValue::creation_with_len(2), None))],
+            exp_size,
+        ));
+        assert_ok!(map.insert_group_ops(
+            &ap,
+            vec![
+                (0, (TestValue::creation_with_len(2), None)),
+                (1, (TestValue::modification_with_len(2), None))
+            ],
+            exp_size
+        ));
+        assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
 
-        assert_ok!(map.insert_group_op(&ap, 4, TestValue::modification_with_len(3), None));
-        assert_ok!(map.insert_group_op(&ap, 5, TestValue::creation_with_len(3), None));
         let exp_size = group_size_as_sum(
             vec![(&tag, one_entry_len); 2]
                 .into_iter()
@@ -497,10 +540,18 @@ mod test {
                 .chain(vec![(&tag, three_entry_len); 2]),
         )
         .unwrap();
-        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
+        assert_ok!(map.insert_group_ops(
+            &ap,
+            vec![
+                (4, (TestValue::modification_with_len(3), None)),
+                (5, (TestValue::creation_with_len(3), None)),
+            ],
+            exp_size
+        ));
+        // assert_ok!(map.insert_group_op(&ap, 4, TestValue::modification_with_len(3), None));
+        // assert_ok!(map.insert_group_op(&ap, 5, TestValue::creation_with_len(3), None));
+        assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
 
-        assert_ok!(map.insert_group_op(&ap, 0, TestValue::modification_with_len(4), None));
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::modification_with_len(4), None));
         let exp_size = group_size_as_sum(
             vec![(&tag, one_entry_len); 2]
                 .into_iter()
@@ -508,7 +559,15 @@ mod test {
                 .chain(vec![(&tag, four_entry_len); 2]),
         )
         .unwrap();
-        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
+        assert_ok!(map.insert_group_ops(
+            &ap,
+            vec![
+                (0, (TestValue::modification_with_len(4), None)),
+                (1, (TestValue::modification_with_len(4), None))
+            ],
+            exp_size
+        ));
+        assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
     }
 
     #[test]
@@ -526,7 +585,8 @@ mod test {
             ap.clone(),
             // base tag 1, 2, 3, 4
             (1..5).map(|i| (i, TestValue::creation_with_len(i))),
-        );
+        )
+        .unwrap();
 
         for i in 1..5 {
             assert_ok_eq!(

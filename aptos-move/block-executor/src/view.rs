@@ -140,7 +140,11 @@ trait ResourceState<T: Transaction> {
 }
 
 trait ResourceGroupState<T: Transaction> {
-    fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>);
+    fn set_raw_group_base_values(
+        &self,
+        group_key: T::Key,
+        base_values: Vec<(T::Tag, T::Value)>,
+    ) -> PartialVMResult<()>;
 
     fn read_cached_group_tagged_data(
         &self,
@@ -663,10 +667,28 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
 }
 
 impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<'a, T, X> {
-    fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>) {
-        self.versioned_map
+    fn set_raw_group_base_values(
+        &self,
+        group_key: T::Key,
+        base_values: Vec<(T::Tag, T::Value)>,
+    ) -> PartialVMResult<()> {
+        if self
+            .versioned_map
             .group_data()
-            .set_raw_base_values(group_key.clone(), base_values);
+            .set_raw_base_values(group_key.clone(), base_values)
+            .is_err()
+        {
+            self.captured_reads.borrow_mut().mark_incorrect_use();
+            return Err(
+                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR).with_message(
+                    format!(
+                        "Tag serialization error in resource group at {:? }",
+                        group_key
+                    ),
+                ),
+            );
+        }
+        Ok(())
     }
 
     fn read_cached_group_tagged_data(
@@ -867,9 +889,27 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
 }
 
 impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialState<'a, T, X> {
-    fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>) {
-        self.unsync_map
-            .set_group_base_values(group_key.clone(), base_values);
+    fn set_raw_group_base_values(
+        &self,
+        group_key: T::Key,
+        base_values: Vec<(T::Tag, T::Value)>,
+    ) -> PartialVMResult<()> {
+        if self
+            .unsync_map
+            .set_group_base_values(group_key.clone(), base_values)
+            .is_err()
+        {
+            *self.incorrect_use.borrow_mut() = true;
+            return Err(
+                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR).with_message(
+                    format!(
+                        "Tag serialization error in resource group at {:? }",
+                        group_key
+                    ),
+                ),
+            );
+        }
+        Ok(())
     }
 
     fn read_cached_group_tagged_data(
@@ -1257,7 +1297,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         return Ok(None);
                     }
                     match self.get_resource_state_value_metadata(key)? {
-                        Some(metadata) => match unsync_map.get_group_size(key)? {
+                        Some(metadata) => match unsync_map.get_group_size(key) {
                             GroupReadResult::Size(group_size) => {
                                 Ok(Some((key.clone(), (metadata, group_size.get()))))
                             },
@@ -1372,7 +1412,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
         self.latest_view
             .get_resource_group_state()
-            .set_raw_group_base_values(group_key.clone(), base_group_sentinel_ops);
+            .set_raw_group_base_values(group_key.clone(), base_group_sentinel_ops)?;
         self.latest_view.get_resource_state().set_base_value(
             group_key.clone(),
             ValueWithLayout::RawFromStorage(Arc::new(metadata_op)),
@@ -1439,7 +1479,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     ) -> PartialVMResult<ResourceGroupSize> {
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
-            ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
+            ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
         };
 
         if matches!(group_read, GroupReadResult::Uninitialized) {
@@ -1447,7 +1487,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
 
             group_read = match &self.latest_view {
                 ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
-                ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
+                ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
             }
         };
 
@@ -1487,22 +1527,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         };
 
         Ok(group_read.into_value().0)
-    }
-
-    fn resource_size_in_group(
-        &self,
-        _group_key: &Self::GroupKey,
-        _resource_tag: &Self::ResourceTag,
-    ) -> PartialVMResult<usize> {
-        unimplemented!("Currently resolved by ResourceGroupAdapter");
-    }
-
-    fn resource_exists_in_group(
-        &self,
-        _group_key: &Self::GroupKey,
-        _resource_tag: &Self::ResourceTag,
-    ) -> PartialVMResult<bool> {
-        unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 
     fn release_group_cache(

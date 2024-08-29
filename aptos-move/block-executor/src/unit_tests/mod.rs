@@ -28,8 +28,9 @@ use aptos_types::{
     contract_event::TransactionEvent,
     executable::{ExecutableTestType, ModulePath},
     state_store::state_value::StateValueMetadata,
+    write_set::WriteOpKind,
 };
-use claims::assert_matches;
+use claims::{assert_matches, assert_ok};
 use fail::FailScenario;
 use rand::{prelude::*, random};
 use std::{
@@ -40,6 +41,60 @@ use std::{
     marker::PhantomData,
     sync::Arc,
 };
+
+#[test]
+fn test_resource_group_deletion() {
+    let mut group_creation: MockIncarnation<KeyType<u32>, MockEvent> =
+        MockIncarnation::new(vec![KeyType::<u32>(1, false)], vec![], vec![], vec![], 10);
+    group_creation.group_writes.push((
+        KeyType::<u32>(100, false),
+        StateValueMetadata::none(),
+        HashMap::from([(101, ValueType::from_value(vec![5], true))]),
+    ));
+    let mut group_deletion: MockIncarnation<KeyType<u32>, MockEvent> =
+        MockIncarnation::new(vec![KeyType::<u32>(1, false)], vec![], vec![], vec![], 10);
+    group_deletion.group_writes.push((
+        KeyType::<u32>(100, false),
+        StateValueMetadata::none(),
+        HashMap::from([(
+            101,
+            ValueType::new(None, StateValueMetadata::none(), WriteOpKind::Deletion),
+        )]),
+    ));
+    let t_0 = MockTransaction::from_behavior(group_creation);
+    let t_1 = MockTransaction::from_behavior(group_deletion);
+
+    let transactions = Vec::from([t_0, t_1]);
+
+    let data_view = NonEmptyGroupDataView::<KeyType<u32>> {
+        group_keys: HashSet::new(),
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        NonEmptyGroupDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        ExecutableTestType,
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    );
+
+    assert_ok!(block_executor.execute_transactions_sequential(
+        (),
+        &transactions,
+        &data_view,
+        false
+    ));
+    assert_ok!(block_executor.execute_transactions_parallel(&(), &transactions, &data_view));
+}
 
 #[test]
 fn resource_group_bcs_fallback() {
