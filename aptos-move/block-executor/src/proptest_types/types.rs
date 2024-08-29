@@ -33,6 +33,7 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
 use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
+use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -843,12 +844,23 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 // Mock transaction executor implementation.
 ///////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
-pub(crate) struct MockTask<K, E>(PhantomData<(K, E)>);
+pub(crate) struct MockTask<K, E> {
+    runtime_environment: RuntimeEnvironment,
+    phantom_data: PhantomData<(K, E)>,
+}
 
 impl<K, E> MockTask<K, E> {
     pub fn new() -> Self {
-        Self(PhantomData)
+        Self {
+            runtime_environment: RuntimeEnvironment::test(),
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<K, E> WithRuntimeEnvironment for MockTask<K, E> {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        &self.runtime_environment
     }
 }
 
