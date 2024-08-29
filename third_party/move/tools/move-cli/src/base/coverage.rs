@@ -79,9 +79,11 @@ impl Coverage {
                     }) => (module, source_map),
                     _ => panic!("Should all be modules"),
                 };
-                let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
-                let t1 = source_coverage.compute_source_coverage(source_path);
-                t1.output_source_coverage(&mut std::io::stdout(), self.color, self.tag)
+                let source_coverage_builder =
+                    SourceCoverageBuilder::new(module, &coverage_map, source_map);
+                let source_coverage = source_coverage_builder.compute_source_coverage(source_path);
+                source_coverage
+                    .output_source_coverage(&mut std::io::stdout(), self.color, self.tag)
                     .unwrap();
             },
             CoverageSummaryOptions::Summary {

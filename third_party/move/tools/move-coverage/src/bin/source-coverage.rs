@@ -45,9 +45,9 @@ struct Args {
     /// Colorize output based on coverage
     #[clap(long, default_value_t = ColorChoice::Default)]
     pub color: ColorChoice,
-    /// Provide textual indication of coverage
-    #[clap(long, default_value_t = Indicator::Explicit)]
-    pub explicit: TextIndicator,
+    /// Tag each line with a textual indication of coverage
+    #[clap(long, default_value_t = TextIndicator::Explicit)]
+    pub tag: TextIndicator,
 }
 
 fn main() {
@@ -78,9 +78,9 @@ fn main() {
         None => Box::new(io::stdout()),
     };
 
-    let t1 = source_cov.compute_source_coverage(source_path);
-    let t2 = t1
-        .output_source_coverage(&mut coverage_writer, args.color, args.indicator)
+    let source_coverage = source_cov.compute_source_coverage(source_path);
+    source_coverage
+        .output_source_coverage(&mut coverage_writer, args.color, args.tag)
         .unwrap();
 }
 

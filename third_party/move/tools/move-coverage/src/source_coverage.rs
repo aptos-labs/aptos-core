@@ -46,10 +46,20 @@ pub enum AbstractSegment {
     BoundedLeft { start: u32 },
 }
 
+/// Option to control use of color escape codes in coverage output
+/// to indicate source code coverage.  Unless `None`
+/// is selected, code which is covered is green, uncovered
+/// code is red.  By `Default`, color is only shown when
+/// output goes to a terminal.  If `Always`, then color
+/// escapes are included in the output even to a file
+/// or other program.
 #[derive(ValueEnum, Clone, Debug, Serialize)]
 pub enum ColorChoice {
+    /// Color is never shown
     None,
+    /// Color is shown only on a terminal
     Default,
+    /// Color is always shown
     Always,
 }
 
@@ -78,10 +88,18 @@ impl FromStr for ColorChoice {
     }
 }
 
+/// Option to control use of explicit textual indication of lines
+/// covered or not in test coverage listings.  If `On` or
+/// `Explicit` is selected, then lines with missing coverage
+/// are tagged with `-`; otherwise, they have `+`.
 #[derive(ValueEnum, Clone, Debug, Serialize)]
 pub enum TextIndicator {
+    /// No textual indicator of coverage.
     None,
+    /// Prefix each line with some code missing coverage by `-`;
+    /// other lines are prefixed with `+`.
     Explicit,
+    /// Same behavior as Explicit.
     On,
 }
 
@@ -383,6 +401,9 @@ fn merge_spans(file_hash: FileHash, cov: FunctionSourceCoverage) -> Vec<Span> {
         .filter(|loc| loc.file_hash() == file_hash)
         .map(|loc| Span::new(loc.start(), loc.end()))
         .collect();
+    if covs.is_empty() {
+        return vec![];
+    }
     covs.sort();
 
     let mut unioned = Vec::new();

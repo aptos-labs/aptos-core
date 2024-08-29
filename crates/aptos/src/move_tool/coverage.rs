@@ -170,7 +170,7 @@ fn compile_coverage(
         skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
         compiler_config: CompilerConfig {
             known_attributes: extended_checks::get_all_attribute_names().clone(),
-            skip_attribute_checks: false,
+            skip_attribute_checks: move_options.skip_attribute_checks,
             bytecode_version: fix_bytecode_version(
                 move_options.bytecode_version,
                 move_options.language_version,
