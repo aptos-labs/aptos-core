@@ -237,7 +237,6 @@ module supra_framework::supra_governance {
         voters: vector<address>,
     }
 
-
     /// Can be called during genesis or by the governance itself.
     /// Stores the signer capability for a given address.
     public fun store_signer_cap(
@@ -1100,6 +1099,31 @@ module supra_framework::supra_governance {
     }
 
     #[test_only]
+    public entry fun supra_create_proposal_for_test(
+        proposer: &signer,
+        multi_step: bool,
+    ) acquires SupraGovernanceConfig, SupraGovernanceEvents {
+        let execution_hash = vector::empty<u8>();
+        vector::push_back(&mut execution_hash, 1);
+        if (multi_step) {
+            supra_create_proposal_v2(
+                proposer,
+                execution_hash,
+                b"",
+                b"",
+                true,
+            );
+        } else {
+            supra_create_proposal(
+                proposer,
+                execution_hash,
+                b"",
+                b"",
+            );
+        };
+    }
+
+    #[test_only]
     public fun resolve_proposal_for_test(
         proposal_id: u64,
         signer_address: address,
@@ -1121,6 +1145,27 @@ module supra_framework::supra_governance {
     }
 
     #[test_only]
+    public fun supra_resolve_proposal_for_test(
+        proposal_id: u64,
+        signer_address: address,
+        multi_step: bool,
+        finish_multi_step_execution: bool
+    ): signer acquires ApprovedExecutionHashes, GovernanceResponsbility {
+        if (multi_step) {
+            let execution_hash = vector::empty<u8>();
+            vector::push_back(&mut execution_hash, 1);
+
+            if (finish_multi_step_execution) {
+                resolve_supra_multi_step_proposal(proposal_id, signer_address, vector::empty<u8>())
+            } else {
+                resolve_supra_multi_step_proposal(proposal_id, signer_address, execution_hash)
+            }
+        } else {
+            supra_resolve(proposal_id, signer_address)
+        }
+    }
+
+    #[test_only]
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
     public fun toggle_features_for_test(enable: vector<u64>, disable: vector<u64>) {
         toggle_features(&account::create_signer_for_test(@0x1), enable, disable);
@@ -1128,24 +1173,26 @@ module supra_framework::supra_governance {
 
     #[test_only]
     public entry fun test_voting_generic(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
         multi_step: bool,
         use_generic_resolve_function: bool,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        setup_voting(&supra_framework, &proposer, &yes_voter, &no_voter);
+    ) acquires ApprovedExecutionHashes, SupraGovernanceConfig, GovernanceResponsbility, SupraGovernanceEvents {
+        let voters = vector[signer::address_of(proposer), signer::address_of(yes_voter), signer::address_of(no_voter)];
+        supra_setup_voting(supra_framework, voters);
 
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
 
-        create_proposal_for_test(&proposer, multi_step);
+        supra_create_proposal_for_test(proposer, multi_step);
 
-        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
-        vote(&no_voter, signer::address_of(&no_voter), 0, false);
+        supra_vote(proposer, 0, true);
+        supra_vote(yes_voter, 0, true);
+        supra_vote(no_voter, 0, false);
 
-        test_resolving_proposal_generic(supra_framework, use_generic_resolve_function, execution_hash);
+        supra_test_resolving_proposal_generic(supra_framework, use_generic_resolve_function, execution_hash);
     }
 
     #[test_only]
@@ -1173,44 +1220,69 @@ module supra_framework::supra_governance {
         assert!(!simple_map::contains_key(&approved_hashes, &0), 3);
     }
 
+    #[test_only]
+    public entry fun supra_test_resolving_proposal_generic(
+        supra_framework: &signer,
+        use_generic_resolve_function: bool,
+        execution_hash: vector<u8>,
+    ) acquires ApprovedExecutionHashes, GovernanceResponsbility {
+        // Once expiration time has passed, the proposal should be considered resolve now as there are more yes votes
+        // than no.
+        timestamp::update_global_time_for_test(100001000000);
+        let proposal_state = multisig_voting::get_proposal_state<GovernanceProposal>(signer::address_of(supra_framework), 0);
+        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, proposal_state);
+
+        // Add approved script hash.
+        add_supra_approved_script_hash(0);
+        let approved_hashes = borrow_global<ApprovedExecutionHashes>(@supra_framework).hashes;
+        assert!(*simple_map::borrow(&approved_hashes, &0) == execution_hash, 0);
+
+        // Resolve the proposal.
+        let account = supra_resolve_proposal_for_test(0, @supra_framework, use_generic_resolve_function, true);
+        assert!(signer::address_of(&account) == @supra_framework, 1);
+        assert!(multisig_voting::is_resolved<GovernanceProposal>(@supra_framework, 0), 2);
+        let approved_hashes = borrow_global<ApprovedExecutionHashes>(@supra_framework).hashes;
+        assert!(!simple_map::contains_key(&approved_hashes, &0), 3);
+    }
+
     #[test(supra_framework = @supra_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_voting(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
+    ) acquires ApprovedExecutionHashes, SupraGovernanceConfig, GovernanceResponsbility, SupraGovernanceEvents {
         test_voting_generic(supra_framework, proposer, yes_voter, no_voter, false, false);
     }
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_voting_multi_step(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
+    ) acquires ApprovedExecutionHashes, SupraGovernanceConfig, GovernanceResponsbility, SupraGovernanceEvents {
         test_voting_generic(supra_framework, proposer, yes_voter, no_voter, true, true);
     }
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
-    #[expected_failure(abort_code = 0x5000a, location = supra_framework::voting)]
+    #[expected_failure(abort_code = 0x5000a, location = supra_framework::multisig_voting)]
     public entry fun test_voting_multi_step_cannot_use_single_step_resolve(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
+    ) acquires ApprovedExecutionHashes, SupraGovernanceConfig, GovernanceResponsbility, SupraGovernanceEvents {
         test_voting_generic(supra_framework, proposer, yes_voter, no_voter, true, false);
     }
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_voting_single_step_can_use_generic_resolve_function(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
+    ) acquires ApprovedExecutionHashes, SupraGovernanceConfig, GovernanceResponsbility, SupraGovernanceEvents {
         test_voting_generic(supra_framework, proposer, yes_voter, no_voter, false, true);
     }
 
@@ -1574,6 +1646,24 @@ module supra_framework::supra_governance {
         stake::create_stake_pool(no_voter, coin::mint(5, &mint_cap), coin::mint(5, &mint_cap), 10000);
         coin::destroy_mint_cap<SupraCoin>(mint_cap);
         coin::destroy_burn_cap<SupraCoin>(burn_cap);
+    }
+    #[test_only]
+    public fun supra_setup_voting(
+        supra_framework: &signer,
+        voters: vector<address>,
+    ) acquires GovernanceResponsbility {
+        use supra_framework::account;
+
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        account::create_account_for_test(signer::address_of(supra_framework));
+
+        // Initialize the governance.
+        initialize(supra_framework, 1000, 2, voters);
+        store_signer_cap(
+            supra_framework,
+            @supra_framework,
+            account::create_test_signer_cap(@supra_framework),
+        );
     }
 
     #[test_only]
