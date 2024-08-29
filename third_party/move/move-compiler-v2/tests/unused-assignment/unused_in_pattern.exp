@@ -45,18 +45,6 @@ warning: Unused assignment to `y`. Consider removing or prefixing with an unders
    │         ^^^^^^^^^^
 
 warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/unused-assignment/unused_in_pattern.move:20:7
-   │
-20 │         let S { x, y } = s;
-   │             ^^^^^^^^^^
-
-warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
-   ┌─ tests/unused-assignment/unused_in_pattern.move:20:7
-   │
-20 │         let S { x, y } = s;
-   │             ^^^^^^^^^^
-
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
    ┌─ tests/unused-assignment/unused_in_pattern.move:28:10
    │
 28 │         T { z: S { x, y } } = t;
@@ -67,15 +55,3 @@ warning: Unused assignment to `y`. Consider removing or prefixing with an unders
    │
 28 │         T { z: S { x, y } } = t;
    │                ^^^^^^^^^^
-
-warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/unused-assignment/unused_in_pattern.move:33:14
-   │
-33 │         let T { z: S { x, y } } = t;
-   │                    ^^^^^^^^^^
-
-warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
-   ┌─ tests/unused-assignment/unused_in_pattern.move:33:14
-   │
-33 │         let T { z: S { x, y } } = t;
-   │                    ^^^^^^^^^^

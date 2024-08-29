@@ -93,7 +93,7 @@ module 0x42::freeze_mut_ref {
     }
     private fun t8(cond: bool,s: &mut freeze_mut_ref::S,other: &freeze_mut_ref::S) {
         {
-          let _x: &freeze_mut_ref::S = if cond {
+          let _: &freeze_mut_ref::S = if cond {
             Freeze(false)(s)
           } else {
             other

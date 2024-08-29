@@ -1,3 +1,12 @@
-processed 1 task
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 1 task
+= 
++ task 0 'run'. lines 1-30:
++ warning: Unused assignment to `y_ref`. Consider removing or prefixing with an underscore: `_y_ref`
++    ┌─ TEMPFILE:13:5
++    │
++ 13 │     y_ref = x_ref;
++    │     ^^^^^^^^^^^^^
++ 
++ 
++ 

@@ -66,7 +66,6 @@ fun test::no_optimize_vector() {
      var $t5: vector<vector<u64>>
      var $t6: u64
      var $t7: u64
-     var $t8: &mut u64
   0: $t5 := ["[\"1\", \"2\"]"]
   1: $t4 := borrow_local($t5)
   2: $t6 := 0
@@ -75,8 +74,7 @@ fun test::no_optimize_vector() {
   5: $t1 := borrow_local($t2)
   6: $t7 := 1
   7: $t0 := vector::borrow_mut<u64>($t1, $t7)
-  8: $t8 := infer($t0)
-  9: return ()
+  8: return ()
 }
 
 
@@ -102,15 +100,13 @@ fun test::optimize_vector() {
      var $t3: &mut vector<vector<u64>>
      var $t4: u64
      var $t5: u64
-     var $t6: &mut u64
   0: $t0 := ["[\"1\", \"2\"]"]
   1: $t3 := borrow_local($t0)
   2: $t4 := 0
   3: $t2 := vector::borrow_mut<vector<u64>>($t3, $t4)
   4: $t5 := 1
   5: $t1 := vector::borrow_mut<u64>($t2, $t5)
-  6: $t6 := infer($t1)
-  7: return ()
+  6: return ()
 }
 
 

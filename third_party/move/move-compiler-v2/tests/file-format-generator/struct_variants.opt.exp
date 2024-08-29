@@ -98,24 +98,20 @@ B5:
 public is_inner1(Arg0: &Inner): bool /* def_idx: 1 */ {
 L1:	loc0: bool
 B0:
-	0: CopyLoc[0](Arg0: &Inner)
+	0: MoveLoc[0](Arg0: &Inner)
 	1: TestVariant[0](Inner/Inner1)
-	2: BrFalse(8)
+	2: BrFalse(6)
 B1:
-	3: MoveLoc[0](Arg0: &Inner)
-	4: Pop
-	5: LdTrue
-	6: StLoc[1](loc0: bool)
-	7: Branch(13)
+	3: LdTrue
+	4: StLoc[1](loc0: bool)
+	5: Branch(9)
 B2:
-	8: MoveLoc[0](Arg0: &Inner)
-	9: Pop
-	10: LdFalse
-	11: StLoc[1](loc0: bool)
-	12: Branch(13)
+	6: LdFalse
+	7: StLoc[1](loc0: bool)
+	8: Branch(9)
 B3:
-	13: MoveLoc[1](loc0: bool)
-	14: Ret
+	9: MoveLoc[1](loc0: bool)
+	10: Ret
 }
 public is_some<Ty0>(Arg0: &Option<Ty0>): bool /* def_idx: 2 */ {
 L1:	loc0: bool

@@ -25,9 +25,9 @@ module 0xcafe::vectors {
               }
             };
             {
-              let _v: vector<u8> = Copy(flips);
+              let _: vector<u8> = Copy(flips);
               {
-                let _v2: vector<u8> = flips;
+                let _: vector<u8> = flips;
                 {
                   let x: &vector<u8> = flipsref5;
                   vector::length<u8>(x)

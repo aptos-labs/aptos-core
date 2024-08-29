@@ -19,21 +19,12 @@ public fun m::test2(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
   0: $t1 := 40
   1: $t3 := move($t1)
   2: $t2 := infer($t3)
-  3: $t4 := infer($t1)
-  4: $t0 := infer($t2)
-  5: return $t0
+  3: $t0 := infer($t2)
+  4: return $t0
 }
 
 
-Diagnostics:
-error: cannot move local `x` since it is still in use
-  ┌─ tests/bytecode-generator/wildcard6.move:4:23
-  │
-4 │         let (y, _) = (move x, x);
-  │                 -     ^^^^^^ attempted to move here
-  │                 │
-  │                 used here
+============ bytecode verification succeeded ========

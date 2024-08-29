@@ -1001,16 +1001,12 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             return Some(body.clone());
         }
 
-        // The following is disabled for now until we figure out whether there is a fix
-        // for #12475.  If that is fixed, then we can safely rewrite unused variable
-        // definitions to wildcards.
-        //
-        // // (3) If some pattern vars are unused in the body, turn them into wildcards.
-        // let new_pat = if !unused_bound_vars.is_empty() {
-        //     Some(pat.clone().remove_vars(&unused_bound_vars))
-        // } else {
-        //     None
-        // };
+        // (3) If some pattern vars are unused in the body, turn them into wildcards.
+        let new_pat = if !unused_bound_vars.is_empty() {
+            Some(pat.clone().remove_vars(&unused_bound_vars))
+        } else {
+            None
+        };
 
         // // Ideas not yet implemented:
         // //     (4) simplify the pattern: if subpat is wildcard and subexpr is side-effect-free,
@@ -1021,19 +1017,17 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         // //         then merge patterns and blocks
         // //     (7) if pattern is a singleton `Tuple` and binding is a `Tuple`, turn it into let x = val.
 
-        // if let Some(pat) = new_pat {
-        //     let exp = ExpData::Block(id, pat, opt_binding.clone(), body.clone()).into_exp();
-        //     trace!(
-        //         "Dropping some vars  for rewrite_block(id={}), result = {}",
-        //         id.as_usize(),
-        //         exp.display_verbose(self.env()),
-        //     );
-        //     Some(exp)
-        // } else {
-        //     None
-        // }
-
-        None
+        if let Some(pat) = new_pat {
+            let exp = ExpData::Block(id, pat, opt_binding.clone(), body.clone()).into_exp();
+            // trace!(
+            //         "Dropping some vars  for rewrite_block(id={}), result = {}",
+            //         id.as_usize(),
+            //         exp.display_verbose(self.env()),
+            //     );
+            Some(exp)
+        } else {
+            None
+        }
     }
 
     fn rewrite_if_else(&mut self, _id: NodeId, cond: &Exp, then: &Exp, else_: &Exp) -> Option<Exp> {

@@ -237,22 +237,20 @@ public fun m::inner_value($t0: m::Inner): u64 {
 public fun m::is_inner1($t0: &m::Inner): bool {
      var $t1: bool
      var $t2: bool
-     var $t3: &m::Inner
-     var $t4: u64
+     var $t3: u64
   0: $t2 := test_variant m::Inner::Inner1($t0)
   1: if ($t2) goto 2 else goto 5
   2: label L2
   3: $t1 := true
-  4: goto 12
+  4: goto 11
   5: label L1
-  6: $t3 := infer($t0)
-  7: $t1 := false
-  8: goto 12
-  9: label L3
- 10: $t4 := 15621340914461310977
- 11: abort($t4)
- 12: label L0
- 13: return $t1
+  6: $t1 := false
+  7: goto 11
+  8: label L3
+  9: $t3 := 15621340914461310977
+ 10: abort($t3)
+ 11: label L0
+ 12: return $t1
 }
 
 
@@ -285,24 +283,22 @@ public fun m::is_some_dropped<#0>($t0: m::Option<#0>): bool {
      var $t1: bool
      var $t2: &m::Option<#0>
      var $t3: bool
-     var $t4: m::Option<#0>
-     var $t5: u64
+     var $t4: u64
   0: $t2 := borrow_local($t0)
   1: $t3 := test_variant m::Option<#0>::None($t2)
   2: if ($t3) goto 3 else goto 7
   3: label L2
   4: unpack_variant m::Option<#0>::None($t0)
   5: $t1 := false
-  6: goto 14
+  6: goto 13
   7: label L1
-  8: $t4 := infer($t0)
-  9: $t1 := true
- 10: goto 14
- 11: label L3
- 12: $t5 := 15621340914461310977
- 13: abort($t5)
- 14: label L0
- 15: return $t1
+  8: $t1 := true
+  9: goto 13
+ 10: label L3
+ 11: $t4 := 15621340914461310977
+ 12: abort($t4)
+ 13: label L0
+ 14: return $t1
 }
 
 

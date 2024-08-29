@@ -10,7 +10,7 @@ warning: Unused parameter `z`. Consider removing or prefixing with an underscore
 module 0x42::Test {
     public inline fun foo(f: |(u64, u64)|,z: u64) {
         {
-          let (z: u64): (u64) = Tuple(z);
+          let (_: u64): (u64) = Tuple(z);
           (f)(3, 5);
           Tuple()
         };

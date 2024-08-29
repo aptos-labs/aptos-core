@@ -10,7 +10,7 @@ module 0x42::test {
         acquires test::R(*)
      {
         {
-          let test::R{ dummy_field: _dummy_field } = MoveFrom<test::R>(addr);
+          let test::R{ dummy_field: _ } = MoveFrom<test::R>(addr);
           Tuple()
         }
     }
