@@ -20,6 +20,7 @@ use aptos_types::{
         EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
+    AptosCoinType,
 };
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use move_core_types::move_resource::MoveStructType;
@@ -171,8 +172,11 @@ impl Account {
     ///
     /// Use this to retrieve or publish the Account CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
-        AccessPath::resource_access_path(self.addr, CoinStoreResource::struct_tag())
-            .expect("access path in  test")
+        AccessPath::resource_access_path(
+            self.addr,
+            CoinStoreResource::<AptosCoinType>::struct_tag(),
+        )
+        .expect("access path in  test")
     }
 
     /// Changes the keys for this account to the provided ones.
@@ -381,7 +385,7 @@ impl CoinStore {
 
     /// Returns the Move Value for the account's CoinStore
     pub fn to_bytes(&self) -> Vec<u8> {
-        let coin_store = CoinStoreResource::new(
+        let coin_store = CoinStoreResource::<AptosCoinType>::new(
             self.coin,
             self.frozen,
             self.deposit_events.clone(),
@@ -507,7 +511,8 @@ impl AccountData {
                 WriteOp::legacy_modification(self.to_bytes().into()),
             ),
             (
-                StateKey::resource_typed::<CoinStoreResource>(self.address()).unwrap(),
+                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(self.address())
+                    .unwrap(),
                 WriteOp::legacy_modification(self.coin_store.to_bytes().into()),
             ),
         ];

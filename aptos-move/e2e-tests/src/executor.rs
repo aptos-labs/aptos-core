@@ -45,6 +45,7 @@ use aptos_types::{
     },
     vm_status::VMStatus,
     write_set::WriteSet,
+    AptosCoinType, CoinType,
 };
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
@@ -391,7 +392,7 @@ impl FakeExecutor {
         // if new_added_supply = 0, it is a noop.
         if new_added_supply != 0 {
             let coin_info_resource = self
-                .read_coin_info_resource()
+                .read_apt_coin_info_resource()
                 .expect("coin info must exist in data store");
             let old_supply = self.read_coin_supply().unwrap();
             self.data_store.add_write_set(
@@ -439,8 +440,11 @@ impl FakeExecutor {
     }
 
     /// Reads the CoinStore resource value for an account from this executor's data store.
-    pub fn read_coin_store_resource(&self, account: &Account) -> Option<CoinStoreResource> {
-        self.read_coin_store_resource_at_address(account.address())
+    pub fn read_apt_coin_store_resource(
+        &self,
+        account: &Account,
+    ) -> Option<CoinStoreResource<AptosCoinType>> {
+        self.read_apt_coin_store_resource_at_address(account.address())
     }
 
     /// Reads supply from CoinInfo resource value from this executor's data store.
@@ -462,16 +466,16 @@ impl FakeExecutor {
     }
 
     /// Reads the CoinInfo resource value from this executor's data store.
-    pub fn read_coin_info_resource(&self) -> Option<CoinInfoResource> {
-        self.read_resource(&AccountAddress::ONE)
+    pub fn read_apt_coin_info_resource(&self) -> Option<CoinInfoResource<AptosCoinType>> {
+        self.read_resource(&AptosCoinType::coin_info_address())
     }
 
     /// Reads the CoinStore resource value for an account under the given address from this executor's
     /// data store.
-    pub fn read_coin_store_resource_at_address(
+    pub fn read_apt_coin_store_resource_at_address(
         &self,
         addr: &AccountAddress,
-    ) -> Option<CoinStoreResource> {
+    ) -> Option<CoinStoreResource<AptosCoinType>> {
         self.read_resource(addr)
     }
 

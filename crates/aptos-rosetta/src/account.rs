@@ -18,7 +18,7 @@ use crate::{
 use aptos_logger::{debug, trace, warn};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource},
+    account_config::{AccountResource, CoinStoreResourceUntyped},
 };
 use std::{collections::HashSet, str::FromStr};
 use warp::Filter;
@@ -165,7 +165,7 @@ async fn get_balances(
                 (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE) => {
                     // Only show coins on the base account
                     if account.is_base_account() {
-                        let coin_store: CoinStoreResource = bcs::from_bytes(&bytes)?;
+                        let coin_store: CoinStoreResourceUntyped = bcs::from_bytes(&bytes)?;
                         if let Some(coin_type) = struct_tag.type_args.first() {
                             // Only display supported coins
                             if coin_type == &native_coin_tag() {
