@@ -59,19 +59,8 @@ impl CliCommand<Vec<EntryABI>> for ShowAbi {
             ..self
                 .included_artifacts_args
                 .included_artifacts
-                .build_options(
-                    self.move_options.dev,
-                    self.move_options.skip_fetch_latest_git_deps,
-                    self.move_options.named_addresses(),
-                    self.move_options.override_std.clone(),
-                    self.move_options.bytecode_version,
-                    self.move_options.compiler_version,
-                    self.move_options.language_version,
-                    self.move_options.skip_attribute_checks,
-                    self.move_options.check_test_code,
-                )
+                .build_options(&self.move_options)?
         };
-
         // Build the package.
         let package = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;

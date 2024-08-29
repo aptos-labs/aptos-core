@@ -689,11 +689,9 @@ impl CompiledPackage {
                     known_attributes: known_attributes.clone(),
                     language_version: Some(effective_language_version),
                     compile_test_code: flags.keep_testing_functions(),
+                    experiments: config.experiments.clone(),
                     ..Default::default()
                 };
-                for experiment in &config.experiments {
-                    options = options.set_experiment(experiment, true)
-                }
                 options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
                 compiler_driver_v2(options)?
             },

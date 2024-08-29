@@ -277,6 +277,7 @@ impl ExecutionProxyClient {
             epoch_state,
             self.bounded_executor.clone(),
             onchain_consensus_config.order_vote_enabled(),
+            highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
         );

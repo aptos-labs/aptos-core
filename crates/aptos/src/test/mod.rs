@@ -1097,7 +1097,8 @@ impl CliTestFramework {
         MovePackageDir {
             dev: true,
             named_addresses: Self::named_addresses(account_strs),
-            ..MovePackageDir::new(self.move_dir())
+            package_dir: Some(self.move_dir()),
+            ..MovePackageDir::new()
         }
     }
 
