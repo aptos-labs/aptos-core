@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageDir};
+use crate::{
+    common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageDir},
+    move_tool::{experiments_from_opt_level, fix_bytecode_version},
+};
 use aptos_framework::extended_checks;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
@@ -162,14 +165,23 @@ fn compile_coverage(
         dev_mode: move_options.dev,
         additional_named_addresses: move_options.named_addresses(),
         test_mode: false,
+        full_model_generation: move_options.check_test_code,
         install_dir: move_options.output_dir.clone(),
+        skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
         compiler_config: CompilerConfig {
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             skip_attribute_checks: false,
-            ..Default::default()
+            bytecode_version: fix_bytecode_version(
+                move_options.bytecode_version,
+                move_options.language_version,
+            ),
+            compiler_version: move_options.compiler_version,
+            language_version: move_options.language_version,
+            experiments: experiments_from_opt_level(&move_options.optimize),
         },
         ..Default::default()
     };
+
     let path = move_options.get_package_path()?;
     let coverage_map =
         CoverageMap::from_binary_file(path.join(".coverage_map.mvcov")).map_err(|err| {
