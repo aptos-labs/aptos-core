@@ -180,6 +180,6 @@ impl RuntimeEnvironment {
 }
 
 /// Represents any type that contains a [RuntimeEnvironment].
-pub trait WithEnvironment {
+pub trait WithRuntimeEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment;
 }
