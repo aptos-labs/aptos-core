@@ -189,9 +189,9 @@ async fn warn_detailed_error(
             (None, None)
         };
     let balance = rest_client
-        .get_account_balance(sender)
+        .view_apt_account_balance(sender)
         .await
-        .map_or(-1, |v| v.into_inner().get() as i128);
+        .map_or(-1, |v| v.into_inner() as i128);
 
     warn!(
         "[{:?}] Failed {} transaction: {:?}, seq num: {}, gas: unit {} and max {}, for account {}, last seq_num {:?}, balance of {} and last transaction for account: {:?}",
@@ -301,13 +301,22 @@ fn is_account_not_found(error: &RestError) -> bool {
 impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64> {
         Ok(FETCH_ACCOUNT_RETRY_POLICY
-            .retry(move || {
-                self.random_rest_client()
-                    .get_account_balance(account_address)
-            })
+            .retry_if(
+                move || {
+                    self.random_rest_client()
+                        .view_apt_account_balance(account_address)
+                },
+                |error: &RestError| match error {
+                    RestError::Api(error) => !matches!(
+                        error.error.error_code,
+                        AptosErrorCode::AccountNotFound | AptosErrorCode::InvalidInput
+                    ),
+                    RestError::Unknown(_) => false,
+                    _ => true,
+                },
+            )
             .await?
-            .into_inner()
-            .get())
+            .into_inner())
     }
 
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64> {
