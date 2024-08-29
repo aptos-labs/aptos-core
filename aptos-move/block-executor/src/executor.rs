@@ -48,7 +48,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
-use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize, environment::fetch_runtime_environment};
+use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
@@ -851,7 +851,6 @@ where
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
-        runtime_environment: &RuntimeEnvironment,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
@@ -863,6 +862,9 @@ where
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(env.clone(), base_view);
         drop(init_timer);
+
+        // Shared environment used by each executor.
+        let runtime_environment = executor.runtime_environment();
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::Retry;
@@ -1023,7 +1025,6 @@ where
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        let runtime_environment = fetch_runtime_environment();
         self.executor_thread_pool.scope(|s| {
             for _ in 0..num_workers {
                 s.spawn(|_| {
@@ -1034,7 +1035,6 @@ where
                         &versioned_cache,
                         &scheduler,
                         base_view,
-                        &runtime_environment,
                         start_shared_counter,
                         &shared_counter,
                         &shared_commit_state,
@@ -1180,6 +1180,8 @@ where
         let executor = E::init(env, base_view);
         drop(init_timer);
 
+        let runtime_environment = executor.runtime_environment();
+
         let start_counter = gen_id_start_value(true);
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
@@ -1192,11 +1194,10 @@ where
         let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
             TxnLastInputOutput::new(num_txns as TxnIndex);
 
-        let runtime_environment = fetch_runtime_environment();
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
-                runtime_environment.as_ref(),
+                runtime_environment,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
@@ -1385,7 +1386,7 @@ where
                     // Apply the writes.
                     let resource_write_set = output.resource_write_set();
                     Self::apply_output_sequential(
-                        runtime_environment.as_ref(),
+                        runtime_environment,
                         &unsync_map,
                         &output,
                         resource_write_set.clone(),

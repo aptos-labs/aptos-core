@@ -112,7 +112,7 @@ use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_linker_error,
     module_traversal::{TraversalContext, TraversalStorage},
-    TemporaryModuleStorage, UnreachableCodeStorage,
+    RuntimeEnvironment, TemporaryModuleStorage, UnreachableCodeStorage,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -310,6 +310,11 @@ impl AptosVM {
     #[inline(always)]
     fn chain_id(&self) -> ChainId {
         self.move_vm.env.chain_id()
+    }
+
+    #[inline(always)]
+    pub fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.move_vm.runtime_environment()
     }
 
     /// Sets execution concurrency level when invoked the first time.

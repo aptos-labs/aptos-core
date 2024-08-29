@@ -19,6 +19,7 @@ use aptos_vm_types::{
     resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::WithRuntimeEnvironment;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -52,7 +53,7 @@ pub struct Accesses<K> {
 
 /// Trait for single threaded transaction executor.
 // TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
-pub trait ExecutorTask: Sync {
+pub trait ExecutorTask: Sync + WithRuntimeEnvironment {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 

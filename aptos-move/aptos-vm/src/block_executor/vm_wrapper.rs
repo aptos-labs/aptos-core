@@ -20,11 +20,18 @@ use aptos_vm_types::{
 };
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use std::sync::Arc;
 
 pub(crate) struct AptosExecutorTask {
     vm: AptosVM,
     id: StateViewId,
+}
+
+impl WithRuntimeEnvironment for AptosExecutorTask {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.vm.runtime_environment()
+    }
 }
 
 impl ExecutorTask for AptosExecutorTask {
