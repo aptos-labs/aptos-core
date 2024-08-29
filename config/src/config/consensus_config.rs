@@ -353,7 +353,7 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             num_bounded_executor_tasks: 16,
-            enable_pre_commit: true,
+            enable_pre_commit: false,
         }
     }
 }
