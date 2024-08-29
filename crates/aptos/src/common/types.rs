@@ -1119,7 +1119,7 @@ pub struct MovePackageDir {
     #[clap(long, hide(true))]
     pub experiments: Vec<String>,
 
-    /// ...or `--bytecode BYTECODE_VERSION`
+    /// ...or --bytecode BYTECODE_VERSION
     /// Specify the version of the bytecode the compiler is going to emit.
     /// Defaults to `6`, or `7` if language version 2 is selected
     /// (through `--move-2` or `--language_version=2`), .
@@ -1131,7 +1131,7 @@ pub struct MovePackageDir {
     )]
     pub bytecode_version: Option<u32>,
 
-    /// ...or `--compiler COMPILER_VERSION`
+    /// ...or --compiler COMPILER_VERSION
     /// Specify the version of the compiler.
     /// Defaults to `1`, or `2` if `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
@@ -1140,7 +1140,7 @@ pub struct MovePackageDir {
            verbatim_doc_comment)]
     pub compiler_version: Option<CompilerVersion>,
 
-    /// ...or `--language LANGUAGE_VERSION`
+    /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
     /// Currently, defaults to `1`, unless `--move-2` is selected.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
