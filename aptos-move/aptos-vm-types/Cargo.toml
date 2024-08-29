@@ -18,7 +18,6 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
-aptos-native-interface = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }

@@ -11,7 +11,7 @@ use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
-    transaction::{AbortInfo, ExecutionStatus, TransactionPayload},
+    transaction::{ExecutionStatus, TransactionPayload},
 };
 use claims::assert_ok;
 use move_core_types::{

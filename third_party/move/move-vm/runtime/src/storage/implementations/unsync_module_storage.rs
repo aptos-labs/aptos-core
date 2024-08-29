@@ -4,7 +4,7 @@
 use crate::{
     module_cyclic_dependency_error, module_linker_error,
     storage::{
-        environment::{RuntimeEnvironment, WithEnvironment},
+        environment::{RuntimeEnvironment, WithRuntimeEnvironment},
         module_storage::{ModuleBytesStorage, ModuleStorage},
     },
     Module,
@@ -281,7 +281,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     }
 }
 
-impl<'e, B: ModuleBytesStorage> WithEnvironment for UnsyncModuleStorage<'e, B> {
+impl<'e, B: ModuleBytesStorage> WithRuntimeEnvironment for UnsyncModuleStorage<'e, B> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.runtime_environment
     }
