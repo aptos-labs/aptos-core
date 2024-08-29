@@ -19,7 +19,6 @@ use move_core_types::identifier::Identifier;
 use move_ir_types::location::Loc;
 use serde::Serialize;
 use std::{
-    cmp::Ordering,
     collections::BTreeMap,
     fmt::{Display, Formatter},
     fs,
@@ -40,42 +39,11 @@ pub struct SourceCoverageBuilder<'a> {
     source_map: &'a SourceMap,
 }
 
-#[derive(Debug, Serialize, Eq, PartialEq, Ord)]
+#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub enum AbstractSegment {
     Bounded { start: u32, end: u32 },
     BoundedRight { end: u32 },
     BoundedLeft { start: u32 },
-}
-
-impl AbstractSegment {
-    fn start(&self) -> Option<u32> {
-        use AbstractSegment::*;
-        match self {
-            BoundedLeft { start: s } | Bounded { start: s, .. } => Some(*s),
-            BoundedRight { .. } => None,
-        }
-    }
-
-    fn end(&self) -> Option<u32> {
-        use AbstractSegment::*;
-        match self {
-            BoundedRight { end: e } | Bounded { end: e, .. } => Some(*e),
-            BoundedLeft { .. } => None,
-        }
-    }
-}
-
-impl PartialOrd for AbstractSegment {
-    fn partial_cmp(&self, other: &AbstractSegment) -> Option<Ordering> {
-        match (self.start(), self.end(), other.start(), other.end()) {
-            (Some(x1), Some(x2), Some(y1), Some(y2)) if (x1 >= x2) || (y1 >= y2) => {
-                panic!("Coverage data is inconsistent");
-            },
-            (Some(x), _, _, Some(y)) if y < x => Some(Ordering::Greater),
-            (_, Some(x), Some(y), _) if x < y => Some(Ordering::Less),
-            _ => None,
-        }
-    }
 }
 
 #[derive(ValueEnum, Clone, Debug, Serialize)]
@@ -368,11 +336,9 @@ impl SourceCoverage {
             TextIndicator::Explicit | TextIndicator::On => {
                 write!(
                     output_writer,
-                    "Code coverage per line of code:\n  {} {}\n  {} {}\nSource code follows:\n",
+                    "Code coverage per line of code:\n  {} indicates the line is not executable or is fully covered during execution\n  {} indicates the line is executable but NOT fully covered during execution\nSource code follows:\n",
                     "+".to_string().green(),
-                    "indicates the line is not executable or is fully covered during execution",
                     "-".to_string().bold().red(),
-                    "indicates the line is executable but NOT fully covered during execution",
                 )?;
                 true
             },
