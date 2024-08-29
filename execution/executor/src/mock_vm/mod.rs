@@ -72,7 +72,7 @@ impl TransactionBlockExecutor for MockVM {
 
 impl VMExecutor for MockVM {
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {

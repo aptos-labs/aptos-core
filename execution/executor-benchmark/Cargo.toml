@@ -32,7 +32,9 @@ aptos-node-resource-metrics = { workspace = true }
 aptos-push-metrics =  { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
+aptos-streaming-partitioner = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
+aptos-transaction-orderer = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 async-trait = { workspace = true }

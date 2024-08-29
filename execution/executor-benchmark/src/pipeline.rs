@@ -5,7 +5,7 @@ use crate::{
     block_preparation::BlockPreparationStage, ledger_update_stage::LedgerUpdateStage,
     metrics::NUM_TXNS, OverallMeasuring, TransactionCommitter, TransactionExecutor,
 };
-use aptos_block_partitioner::v2::config::PartitionerV2Config;
+use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
@@ -39,7 +39,8 @@ pub struct PipelineConfig {
     pub use_global_executor: bool,
     #[derivative(Default(value = "4"))]
     pub num_generator_workers: usize,
-    pub partitioner_config: PartitionerV2Config,
+    #[derivative(Default(value = "Box::<PartitionerV2Config>::default()"))]
+    pub partitioner_config: Box<dyn PartitionerConfig>,
 }
 
 pub struct Pipeline<V> {
@@ -109,7 +110,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config);
+            BlockPreparationStage::new(num_partitioner_shards, config.partitioner_config.as_ref());
 
         let mut exe = TransactionExecutor::new(
             executor_1,

@@ -43,7 +43,7 @@ fn test_mock_vm_different_senders() {
     }
 
     let outputs = MockVM::execute_block_no_limit(
-        &into_signature_verified_block(txns.clone()),
+        into_signature_verified_block(txns.clone()),
         &MockStateView,
     )
     .expect("MockVM should not fail to start");
@@ -82,7 +82,7 @@ fn test_mock_vm_same_sender() {
     }
 
     let outputs =
-        MockVM::execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+        MockVM::execute_block_no_limit(into_signature_verified_block(txns), &MockStateView)
             .expect("MockVM should not fail to start");
 
     for (i, output) in outputs.iter().enumerate() {
@@ -117,7 +117,7 @@ fn test_mock_vm_payment() {
     ];
 
     let output =
-        MockVM::execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+        MockVM::execute_block_no_limit(into_signature_verified_block(txns), &MockStateView)
             .expect("MockVM should not fail to start");
 
     let mut output_iter = output.iter();

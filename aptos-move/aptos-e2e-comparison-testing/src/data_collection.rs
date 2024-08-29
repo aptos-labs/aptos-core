@@ -92,7 +92,7 @@ impl DataCollection {
         // FIXME(#10412): remove the assert
         let val = debugger_state_view.get_state_value(TOTAL_SUPPLY_STATE_KEY.deref());
         assert!(val.is_ok() && val.unwrap().is_some());
-        AptosVM::execute_block_no_limit(&sig_verified_txns, debugger_state_view)
+        AptosVM::execute_block_no_limit(sig_verified_txns, debugger_state_view)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 

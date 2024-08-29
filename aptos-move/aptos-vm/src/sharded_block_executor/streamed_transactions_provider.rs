@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::sync::{Arc, Condvar, Mutex};
+use serde::{Deserialize, Serialize};
 use aptos_block_executor::transaction_provider::TxnProvider;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_types::transaction::BlockExecutableTransaction;
 use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 
 pub struct StreamedTransactionsProvider {

@@ -9,19 +9,22 @@ use aptos_types::{
     block_executor::partitioner::ShardId, state_store::state_key::StateKey,
     transaction::TransactionOutput, vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::{coordinator_client::CoordinatorClient, ExecutorShardCommand, StreamedExecutorShardCommand};
-use crossbeam_channel::{Receiver, Sender};
+use aptos_vm::sharded_block_executor::{coordinator_client::CoordinatorClient, ExecuteV3PartitionStreamedInitCommand, ExecutorShardCommand};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc, thread};
 use std::ops::AddAssign;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 use std::sync::Mutex;
+use aptos_block_executor::txn_provider::sharded::{BlockingTransaction, CrossShardClientForV3, ShardedTransaction, ShardedTxnProvider};
 use aptos_logger::info;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use aptos_vm::sharded_block_executor::sharded_executor_service::{CmdsAndMetaData, TransactionIdxAndOutput};
+use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
+use aptos_vm::sharded_block_executor::sharded_executor_service::{CmdsAndMetaData, OutputStreamHookImpl, TransactionIdxAndOutput, V3CmdsOrMetaData, V3CmdsOrMetaDataRef, V3MetaData, V3MetaDataRef};
 use aptos_vm::sharded_block_executor::streamed_transactions_provider::BlockingTransactionsProvider;
+use crate::remote_cross_shard_client::{RemoteCrossShardClient, RemoteCrossShardClientV3};
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
@@ -29,16 +32,20 @@ pub struct RemoteCoordinatorClient {
     //result_tx: Sender<Message>,
     result_tx: OutboundRpcHelper,
     shard_id: ShardId,
+    num_shards: usize,
     cmd_rx_msg_duration_since_epoch: Arc<AtomicU64>,
     is_block_init_done: Arc<AtomicBool>,//Mutex<bool>,
     cmd_rx_thread_pool: Arc<rayon::ThreadPool>,
+    remote_cross_shard_client: Arc<RemoteCrossShardClientV3>,
 }
 
 impl RemoteCoordinatorClient {
     pub fn new(
         shard_id: ShardId,
+        num_shards: usize,
         controller: &mut NetworkController,
         coordinator_address: SocketAddr,
+        remote_cross_shard_client: Arc<RemoteCrossShardClientV3>,
     ) -> Self {
         let execute_command_type = format!("execute_command_{}", shard_id);
         let execute_result_type = format!("execute_result_{}", shard_id);
@@ -61,9 +68,11 @@ impl RemoteCoordinatorClient {
             command_rx: Arc::new(command_rx),
             result_tx,
             shard_id,
+            num_shards,
             cmd_rx_msg_duration_since_epoch: Arc::new(AtomicU64::new(0)),
             is_block_init_done: Arc::new(AtomicBool::new(false)),
             cmd_rx_thread_pool,
+            remote_cross_shard_client,
         }
     }
 
@@ -112,28 +121,29 @@ impl RemoteCoordinatorClient {
 
     fn receive_execute_command_stream_follow_up(state_view_client: Arc<RemoteStateViewClient>,
                                                 command_rx: Arc<Receiver<Message>>,
-                                                blocking_transactions_provider: Arc<BlockingTransactionsProvider>,
+                                                blocking_transactions: Arc<Vec<ShardedTransaction<SignatureVerifiedTransaction>>>,
                                                 num_txns_in_the_block: usize,
-                                                mut num_txns_processed: usize,
+                                                num_shards: usize,
                                                 shard_id: ShardId,
+                                                cross_shard_client: Arc<RemoteCrossShardClientV3>,
                                                 cmd_rx_msg_duration_since_epoch: Arc<AtomicU64>,
                                                 is_block_init_done: Arc<AtomicBool>,
-                                                cmd_rx_thread_pool: Arc<rayon::ThreadPool>,) {
-        if num_txns_processed == num_txns_in_the_block {
-            //info!("Breaking out initially .............................");
-            return;
-        }
-        //let num_txns_processed_rc = Arc::new(AtomicUsize::new(num_txns_processed));
-        let mut break_out = false;
+                                                cmd_rx_thread_pool: Arc<rayon::ThreadPool>,
+                                                init_sender: Option<Sender<ExecutorShardCommand<RemoteStateViewClient>>>,) {
+        let mut num_txns_processed = 0;
+        let mut all_cmds_recvd = false;
+        let mut stream_init_done = init_sender.is_none();
+        let blocking_transactions_clone = blocking_transactions.clone();
+
         loop {
-            if break_out {
+            if stream_init_done && all_cmds_recvd {
                 //info!("Breaking out of the loop.............................");
                 break;
             }
             match command_rx.recv() {
                 Ok(message) => {
                     let state_view_client_clone = state_view_client.clone();
-                    let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
+                   // let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
                     let cmd_rx_msg_duration_since_epoch_clone = cmd_rx_msg_duration_since_epoch.clone();
                     let is_block_init_done_clone = is_block_init_done.clone();
                     let cmd_rx_thread_pool_clone = cmd_rx_thread_pool.clone();
@@ -148,32 +158,73 @@ impl RemoteCoordinatorClient {
                     let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
                         .with_label_values(&[&shard_id.to_string(), "cmd_rx_bcs_deser"])
                         .start_timer();
-                    let txns: CmdsAndMetaData = bcs::from_bytes(&message.data).unwrap();
+                    let cmds_or_metadata: V3CmdsOrMetaData = bcs::from_bytes(&message.data).unwrap();
                     drop(bcs_deser_timer);
 
-                    let transactions = txns.cmds;
-                    num_txns_processed += transactions.len();
-                    info!("txns considered is ********* {}; num txns in block {}", num_txns_processed, num_txns_in_the_block);
-                    if num_txns_processed == num_txns_in_the_block {
-                        is_block_init_done_clone.store(false, std::sync::atomic::Ordering::Relaxed);
-                        break_out = true;
+                    match cmds_or_metadata {
+                        V3CmdsOrMetaData::MetaData(meta_data) => {
+                            match init_sender.as_ref() {
+                                None => {
+                                    panic!("We got more than one V3CmdsOrMetaData::MetaData message!!!!");
+                                }
+                                Some(sender) => {
+                                    let dummy: [u8; 32] = [0; 32];
+                                    let (stream_results_tx, stream_results_rx) = unbounded();
+                                    let output_stream_hook = OutputStreamHookImpl {
+                                        stream_results_tx,
+                                    };
+                                    let txn_provider = ShardedTxnProvider::new(
+                                        dummy,
+                                        num_shards,
+                                        shard_id,
+                                        cross_shard_client.clone(),
+                                        blocking_transactions_clone.clone(),
+                                        meta_data.global_idxs,
+                                        meta_data.local_idx_by_global,
+                                        meta_data.key_sets_by_dep,
+                                        meta_data.follower_shard_sets,
+                                        Some(output_stream_hook),
+                                    );
+                                    let _ = sender.send(ExecutorShardCommand::ExecuteV3PartitionStreamedInit(
+                                        ExecuteV3PartitionStreamedInitCommand {
+                                            state_view: state_view_client_clone,
+                                            blocking_transactions_provider: txn_provider,
+                                            stream_results_receiver: stream_results_rx,
+                                            num_txns: meta_data.num_txns,
+                                            onchain_config: meta_data.onchain_config,
+                                        }
+                                    ));
+                                    stream_init_done = true;
+                                }
+                            }
+                        }
+                        V3CmdsOrMetaData::Cmds(cmds) => {
+                            let transactions = cmds.cmds;
+                            num_txns_processed += transactions.len();
+                            info!("txns considered is ********* {}; num txns in block {}", num_txns_processed, num_txns_in_the_block);
+                            if num_txns_processed == num_txns_in_the_block {
+                                is_block_init_done_clone.store(false, std::sync::atomic::Ordering::Relaxed);
+                                all_cmds_recvd = true;
+                            }
+
+                            let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
+                                .with_label_values(&[&shard_id.to_string(), "init_prefetch"])
+                                .start_timer();
+                            let blocking_transactions_clone2 = blocking_transactions.clone();
+                            cmd_rx_thread_pool_clone.spawn(move || {
+
+
+                                let batch_start_index = cmds.batch_start_index;
+                                let state_keys = Self::extract_state_keys_from_txns(&transactions);
+
+                                state_view_client_clone.pre_fetch_state_values(state_keys, false);
+
+                                let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
+                                    blocking_transactions_clone2[idx + batch_start_index].set_txn(txn.into_txn());
+                                });
+                            });
+                        }
                     }
-
-                    let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
-                        .with_label_values(&[&shard_id.to_string(), "init_prefetch"])
-                        .start_timer();
-                    cmd_rx_thread_pool_clone.spawn(move || {
-
-
-                        let batch_start_index = txns.batch_start_index;
-                        let state_keys = Self::extract_state_keys_from_txns(&transactions);
-
-                        state_view_client_clone.pre_fetch_state_values(state_keys, false);
-
-                        let _ = transactions.into_iter().enumerate().for_each(|(idx, txn)| {
-                            blocking_transactions_provider_clone.set_txn(idx + batch_start_index, txn);
-                        });
-                    });
                 },
                 Err(_) => { break; }
             }
@@ -195,94 +246,93 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
                     .with_label_values(&[&self.shard_id.to_string(), "cmd_rx_bcs_deser"])
                     .start_timer();
-                let request: RemoteExecutionRequest = bcs::from_bytes(&message.data).unwrap();
+                let cmds_or_metadata: V3CmdsOrMetaData = bcs::from_bytes(&message.data).unwrap();
                 drop(bcs_deser_timer);
 
-                match request {
-                    RemoteExecutionRequest::ExecuteBlock(command) => {
-                        let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
-                            .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
-                            .start_timer();
-                        let state_keys = Self::extract_state_keys(&command);
-                        self.state_view_client.init_for_block();
-                        self.state_view_client.pre_fetch_state_values(state_keys, false);
-                        drop(init_prefetch_timer);
-
-                        let (sub_blocks, concurrency, onchain_config) = command.into();
-                        ExecutorShardCommand::ExecuteSubBlocks(
-                            self.state_view_client.clone(),
-                            sub_blocks,
-                            concurrency,
-                            onchain_config,
-                        )
-                    },
-                }
-            },
-            Err(_) => ExecutorShardCommand::Stop,
-        }
-    }
-
-    fn receive_execute_command_stream(&self) -> StreamedExecutorShardCommand<RemoteStateViewClient> {
-        match self.command_rx.recv() {
-            Ok(message) => {
-                let delta = get_delta_time(message.start_ms_since_epoch.unwrap());
-                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
-                self.cmd_rx_msg_duration_since_epoch.store(message.start_ms_since_epoch.unwrap(), std::sync::atomic::Ordering::Relaxed);
-                let _rx_timer = REMOTE_EXECUTOR_TIMER
-                    .with_label_values(&[&self.shard_id.to_string(), "cmd_rx"])
-                    .start_timer();
-                let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
-                    .with_label_values(&[&self.shard_id.to_string(), "cmd_rx_bcs_deser"])
-                    .start_timer();
-                let txns: CmdsAndMetaData = bcs::from_bytes(&message.data).unwrap();
-                drop(bcs_deser_timer);
-
-
-                let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
-                    .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
-                    .start_timer();
-
-                self.state_view_client.init_for_block();
-                let state_keys = Self::extract_state_keys_from_txns(&txns.cmds);
-                self.state_view_client.pre_fetch_state_values(state_keys, false);
-                let num_txns = txns.num_txns;
-                let num_txns_in_the_batch = txns.cmds.len();
-                let shard_txns_start_index = txns.shard_txns_start_index;
-                let batch_start_index = txns.batch_start_index;
-                self.is_block_init_done.store(true, std::sync::atomic::Ordering::Relaxed);
-                let blocking_transactions_provider = Arc::new(BlockingTransactionsProvider::new(num_txns));
-
-                let command_rx = self.command_rx.clone();
-                let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
-                let shard_id = self.shard_id;
                 let cmd_rx_msg_duration_since_epoch_clone = self.cmd_rx_msg_duration_since_epoch.clone();
                 let state_view_client_clone = self.state_view_client.clone();
                 let is_block_init_done_clone = self.is_block_init_done.clone();
                 let cmd_rx_thread_pool_clone = self.cmd_rx_thread_pool.clone();
-                self.cmd_rx_thread_pool.spawn(move || {
-                    Self::receive_execute_command_stream_follow_up(
-                        state_view_client_clone,
-                        command_rx,
-                        blocking_transactions_provider_clone,
-                        num_txns,
-                        num_txns_in_the_batch,
-                        shard_id,
-                        cmd_rx_msg_duration_since_epoch_clone,
-                        is_block_init_done_clone,
-                        cmd_rx_thread_pool_clone);
-                });
+                let command_rx = self.command_rx.clone();
+                self.state_view_client.init_for_block();
+                let num_shards = self.num_shards;
+                let shard_id = self.shard_id;
+                let remote_cross_shard_client = self.remote_cross_shard_client.clone();
+                return match cmds_or_metadata {
+                    V3CmdsOrMetaData::MetaData(meta_data) => {
+                        let dummy: [u8; 32] = [0; 32];
+                        //let blocking_txns = Arc::new(vec![ShardedTransaction::BlockingTxn(BlockingTransaction::new()); meta_data.num_txns]);
+                        let mut blocking_txns = Vec::new();
+                        for _ in 0..meta_data.num_txns {
+                            blocking_txns.push(ShardedTransaction::BlockingTxn(BlockingTransaction::new()));
+                        }
+                        let blocking_txns_arc = Arc::new(blocking_txns);
+                        let (stream_results_tx, stream_results_rx) = unbounded();
+                        let output_stream_hook = OutputStreamHookImpl {
+                            stream_results_tx,
+                        };
+                        let txn_provider = ShardedTxnProvider::new(
+                            dummy,
+                            num_shards,
+                            shard_id,
+                            remote_cross_shard_client.clone(),
+                            blocking_txns_arc.clone(),
+                            meta_data.global_idxs,
+                            meta_data.local_idx_by_global,
+                            meta_data.key_sets_by_dep,
+                            meta_data.follower_shard_sets,
+                            Some(output_stream_hook),
+                        );
+                        self.cmd_rx_thread_pool.spawn(move || {
+                            Self::receive_execute_command_stream_follow_up(
+                                state_view_client_clone,
+                                command_rx,
+                                blocking_txns_arc,
+                                meta_data.num_txns,
+                                num_shards,
+                                shard_id,
+                                remote_cross_shard_client.clone(),
+                                cmd_rx_msg_duration_since_epoch_clone,
+                                is_block_init_done_clone,
+                                cmd_rx_thread_pool_clone,
+                                None);
+                        });
+                        ExecutorShardCommand::ExecuteV3PartitionStreamedInit(
+                            ExecuteV3PartitionStreamedInitCommand {
+                                state_view: self.state_view_client.clone(),
+                                blocking_transactions_provider: txn_provider,
+                                stream_results_receiver: stream_results_rx,
+                                num_txns: meta_data.num_txns,
+                                onchain_config: meta_data.onchain_config,
+                            }
+                        )
+                    }
+                    V3CmdsOrMetaData::Cmds(cmds) => {
+                        let (sender, receiver) = crossbeam_channel::unbounded();
+                        let mut blocking_txns = Vec::new();
+                        for _ in 0..cmds.num_txns_total {
+                            blocking_txns.push(ShardedTransaction::BlockingTxn(BlockingTransaction::new()));
+                        }
+                        self.cmd_rx_thread_pool.spawn(move || {
+                            Self::receive_execute_command_stream_follow_up(
+                                state_view_client_clone,
+                                command_rx,
+                                Arc::new(blocking_txns),
+                                cmds.num_txns_total,
+                                num_shards,
+                                shard_id,
+                                remote_cross_shard_client.clone(),
+                                cmd_rx_msg_duration_since_epoch_clone,
+                                is_block_init_done_clone,
+                                cmd_rx_thread_pool_clone,
+                                Some(sender));
+                        });
+                        receiver.recv().unwrap()
+                    }
+                };
 
-                return StreamedExecutorShardCommand::InitBatch(
-                    self.state_view_client.clone(),
-                    txns.cmds,
-                    num_txns,
-                    shard_txns_start_index,
-                    txns.onchain_config,
-                    batch_start_index,
-                    blocking_transactions_provider);
             },
-            Err(_) => StreamedExecutorShardCommand::Stop,
+            Err(_) => ExecutorShardCommand::Stop,
         }
     }
 

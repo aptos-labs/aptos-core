@@ -19,9 +19,10 @@ use std::{
     fmt::Debug,
     sync::Arc,
 };
+use serde::{Deserialize, Serialize};
 
 /// The execution result of a transaction
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully.
     Success(O),

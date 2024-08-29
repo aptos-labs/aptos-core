@@ -16,6 +16,7 @@ use crate::{
         DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
     },
     txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::{default::DefaultTxnProvider, DefaultIndexProvider},
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
@@ -83,12 +84,14 @@ fn resource_group_bcs_fallback() {
             .build()
             .unwrap(),
     );
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
         ExecutableTestType,
+        _,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -96,7 +99,7 @@ fn resource_group_bcs_fallback() {
     );
 
     // Execute the block normally.
-    let output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    let output = block_executor.execute_transactions_parallel((), txn_provider.clone(), &data_view);
     match output {
         Ok(block_output) => {
             let txn_outputs = block_output.into_transaction_outputs_forced();
@@ -114,11 +117,11 @@ fn resource_group_bcs_fallback() {
     fail::cfg("fail-point-resource-group-serialization", "return()").unwrap();
     assert!(!fail::list().is_empty());
 
-    let par_output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    let par_output = block_executor.execute_transactions_parallel((), txn_provider.clone(), &data_view);
     assert_matches!(par_output, Err(()));
 
     let seq_output =
-        block_executor.execute_transactions_sequential((), &transactions, &data_view, false);
+        block_executor.execute_transactions_sequential((), txn_provider.clone(), &data_view, false);
     assert_matches!(
         seq_output,
         Err(SequentialBlockExecutionError::ResourceGroupSerializationError)
@@ -126,14 +129,14 @@ fn resource_group_bcs_fallback() {
 
     // Now execute with fallback handling for resource group serialization error:
     let fallback_output = block_executor
-        .execute_transactions_sequential((), &transactions, &data_view, true)
+        .execute_transactions_sequential((), txn_provider.clone(), &data_view, true)
         .map_err(|e| match e {
             SequentialBlockExecutionError::ResourceGroupSerializationError => {
                 panic!("Unexpected error")
             },
             SequentialBlockExecutionError::ErrorToReturn(err) => err,
         });
-    let fallback_output_block = block_executor.execute_block((), &transactions, &data_view);
+    let fallback_output_block = block_executor.execute_block((), txn_provider.clone(), &data_view);
     for output in [fallback_output, fallback_output_block] {
         match output {
             Ok(block_output) => {
@@ -176,12 +179,14 @@ fn block_output_err_precedence() {
             .build()
             .unwrap(),
     );
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         DeltaDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
         ExecutableTestType,
+        _,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -194,7 +199,7 @@ fn block_output_err_precedence() {
     assert!(!fail::list().is_empty());
     // Pause the thread that processes the aborting txn1, so txn2 can halt the scheduler first.
     // Confirm that the fatal VM error is still detected and sequential fallback triggered.
-    let output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    let output = block_executor.execute_transactions_parallel((), txn_provider, &data_view);
     assert_matches!(output, Err(()));
     scenario.teardown();
 }
@@ -214,12 +219,14 @@ fn skip_rest_gas_limit() {
             .build()
             .unwrap(),
     );
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
         DeltaDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
         ExecutableTestType,
+        _,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
         executor_thread_pool,
@@ -227,7 +234,7 @@ fn skip_rest_gas_limit() {
     );
 
     // Should hit block limit on the skip transaction.
-    let _ = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    let _ = block_executor.execute_transactions_parallel((), txn_provider, &data_view);
 }
 
 // TODO: add unit test for block gas limit!
@@ -247,21 +254,23 @@ where
             .unwrap(),
     );
 
-    /*let output = BlockExecutor::<
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
+    let output = BlockExecutor::<
         MockTransaction<K, E>,
         MockTask<K, E>,
         DeltaDataView<K>,
         NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
         ExecutableTestType,
+        _,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
         None,
     )
-    .execute_transactions_parallel((), &transactions, &data_view);
+    .execute_transactions_parallel((), txn_provider, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);
-    baseline.assert_parallel_output(&output);*/
+    baseline.assert_parallel_output(&output);
 }
 
 fn random_value(delete_value: bool) -> ValueType {
@@ -525,7 +534,7 @@ fn early_skips() {
 
 #[test]
 fn scheduler_tasks() {
-    let s = Scheduler::new(5);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(5)));
 
     for i in 0..5 {
         // No validation tasks.
@@ -616,7 +625,7 @@ fn scheduler_tasks() {
 
 #[test]
 fn scheduler_first_wave() {
-    let s = Scheduler::new(6);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(6)));
 
     for i in 0..5 {
         // Nothing to validate.
@@ -653,7 +662,7 @@ fn scheduler_first_wave() {
 
 #[test]
 fn scheduler_dependency() {
-    let s = Scheduler::new(10);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(10)));
 
     for i in 0..5 {
         // Nothing to validate.
@@ -687,8 +696,8 @@ fn scheduler_dependency() {
 
 // Will return a scheduler in a state where all transactions are scheduled for
 // for execution, validation index = num_txns, and wave = 0.
-fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler {
-    let s = Scheduler::new(num_txns);
+fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler<DefaultIndexProvider> {
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(num_txns)));
 
     for i in 0..num_txns {
         // Get the first executions out of the way.
@@ -791,7 +800,7 @@ fn scheduler_incarnation() {
 
 #[test]
 fn scheduler_basic() {
-    let s = Scheduler::new(3);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(3)));
 
     for i in 0..3 {
         // Nothing to validate.
@@ -823,7 +832,7 @@ fn scheduler_basic() {
 
 #[test]
 fn scheduler_drain_idx() {
-    let s = Scheduler::new(3);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(3)));
 
     for i in 0..3 {
         // Nothing to validate.
@@ -945,7 +954,7 @@ fn no_conflict_task_count() {
 
     let num_txns: TxnIndex = 1000;
     for num_concurrent_tasks in [1, 5, 10, 20] {
-        let s = Scheduler::new(num_txns);
+        let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(num_txns)));
 
         let mut tasks = BTreeMap::new();
 

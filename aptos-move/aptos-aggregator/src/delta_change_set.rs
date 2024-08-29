@@ -5,6 +5,7 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
+use serde::{Deserialize, Serialize};
 use crate::{
     bounded_math::{BoundedMath, SignedU128},
     delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
@@ -85,7 +86,7 @@ impl DeltaWithMax {
 }
 
 /// Represents an update from aggregator's operation.
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DeltaOp {
     /// History computed during the transaction execution.
     history: DeltaHistory,

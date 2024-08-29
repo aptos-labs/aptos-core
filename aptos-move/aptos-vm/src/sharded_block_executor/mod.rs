@@ -13,7 +13,7 @@ use aptos_logger::info;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
-        partitioner::{PartitionedTransactions, SubBlocksForShard},
+        partitioner::{PartitionV3, PartitionedTransactions, SubBlocksForShard},
     },
     state_store::StateView,
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
@@ -21,6 +21,12 @@ use aptos_types::{
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
 use std::time::SystemTime;
+use crossbeam_channel::{Receiver, Sender};
+use aptos_block_executor::txn_provider::sharded::{BlockingTransaction, ShardedTransaction, ShardedTxnProvider};
+use aptos_mvhashmap::types::TxnIndex;
+use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
+use crate::block_executor::AptosTransactionOutput;
+use crate::sharded_block_executor::sharded_executor_service::OutputStreamHookImpl;
 use crate::sharded_block_executor::streamed_transactions_provider::BlockingTransactionsProvider;
 
 pub mod aggr_overridden_state_view;
@@ -50,20 +56,24 @@ pub enum ExecutorShardCommand<S> {
         usize,
         BlockExecutorConfigFromOnchain,
     ),
+    ExecuteV3Partition(ExecuteV3PartitionCommand<S>),
+    ExecuteV3PartitionStreamedInit(ExecuteV3PartitionStreamedInitCommand<S>),
     Stop,
 }
 
-pub enum StreamedExecutorShardCommand<S> {
-    InitBatch(
-        Arc<S>,
-        Vec<AnalyzedTransaction>,
-        usize,
-        usize,
-        BlockExecutorConfigFromOnchain,
-        usize,
-        Arc<BlockingTransactionsProvider>
-    ),
-    Stop,
+pub struct ExecuteV3PartitionCommand<S> {
+    pub state_view: Arc<S>,
+    pub partition: PartitionV3,
+    pub concurrency_level_per_shard: usize,
+    pub onchain_config: BlockExecutorConfigFromOnchain,
+}
+
+pub struct ExecuteV3PartitionStreamedInitCommand<S> {
+    pub state_view: Arc<S>,
+    pub blocking_transactions_provider: ShardedTxnProvider<SignatureVerifiedTransaction, AptosTransactionOutput, VMStatus, OutputStreamHookImpl>,
+    pub stream_results_receiver: Receiver<(TxnIndex, TransactionOutput)>,
+    pub num_txns: usize,
+    pub onchain_config: BlockExecutorConfigFromOnchain,
 }
 
 impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExecutor<S, C> {
@@ -76,6 +86,10 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
             executor_client,
             phantom: PhantomData,
         }
+    }
+
+    pub fn is_remote_executor_client(&self) -> bool {
+        self.executor_client.is_remote_executor_client()
     }
 
     pub fn num_shards(&self) -> usize {
@@ -100,6 +114,16 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
             "Block must be partitioned into {} sub-blocks",
             num_executor_shards
         );
+
+        if let PartitionedTransactions::V3(obj) = transactions {
+            return self.executor_client.execute_block_v3(
+                state_view,
+                obj,
+                concurrency_level_per_shard,
+                onchain_config,
+            );
+        }
+
         let (sharded_output, global_output) = self
             .executor_client
             .execute_block(
@@ -129,6 +153,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         // Lastly append the global output
         aggregated_results.extend(global_output);
 
+        info!("ShardedBlockExecutor Aggregated results size {}", aggregated_results.len());
         Ok(aggregated_results)
     }
 
@@ -161,36 +186,6 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
                 onchain_config,
                 duration_since_epoch,
             )
-        /*let (sharded_output, global_output) = self
-            .executor_client
-            .execute_block_remote(
-                state_view,
-                transactions,
-                concurrency_level_per_shard,
-                onchain_config,
-            )?
-            .into_inner();
-        // wait for all remote executors to send the result back and append them in order by shard id
-        info!("ShardedBlockExecutor Received all results");
-        let _aggregation_timer = SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS.start_timer();
-        let num_rounds = sharded_output[0].len();
-        let mut aggregated_results = vec![];
-        let mut ordered_results = vec![vec![]; num_executor_shards * num_rounds];
-        // Append the output from individual shards in the round order
-        for (shard_id, results_from_shard) in sharded_output.into_iter().enumerate() {
-            for (round, result) in results_from_shard.into_iter().enumerate() {
-                ordered_results[round * num_executor_shards + shard_id] = result;
-            }
-        }
-
-        for result in ordered_results.into_iter() {
-            aggregated_results.extend(result);
-        }
-
-        // Lastly append the global output
-        aggregated_results.extend(global_output);
-
-        Ok(aggregated_results)*/
     }
 
 

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use serde::{Deserialize, Serialize};
 use crate::{
     bounded_math::{ok_overflow, ok_underflow, BoundedMath, SignedU128},
     types::{
@@ -52,7 +53,7 @@ use crate::{
 ///   4. check -D does drop below zero
 ///
 /// Checking +X is irrelevant since +A >= +Z, and so Z is not stored here.
-#[derive(Clone, Hash, Copy, Default, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, Default, PartialOrd, Ord, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DeltaHistory {
     pub max_achieved_positive_delta: u128,
     pub min_achieved_negative_delta: u128,

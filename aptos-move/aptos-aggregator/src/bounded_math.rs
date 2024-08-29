@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum BoundedMathError {
     Overflow,
@@ -101,7 +103,7 @@ impl BoundedMath {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub enum SignedU128 {
     Positive(u128),
     Negative(u128),

@@ -44,6 +44,7 @@ proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 scopeguard = { workspace = true }
+serde = { version = "1.0.197", features = ["derive"] }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }

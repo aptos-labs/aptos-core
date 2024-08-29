@@ -11,7 +11,7 @@ use aptos_crypto::hash::TestOnlyHash;
 use aptos_crypto::HashValue;
 use aptos_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
 #[cfg(test)]
-use aptos_types::block_executor::partitioner::PartitionedTransactions;
+use aptos_types::block_executor::partitioner::PartitionedTransactionsV2;
 #[cfg(test)]
 use aptos_types::block_executor::partitioner::RoundId;
 #[cfg(test)]
@@ -152,7 +152,7 @@ impl P2PBlockGenerator {
 #[cfg(test)]
 pub fn verify_partitioner_output(
     input: &Vec<AnalyzedTransaction>,
-    output: &PartitionedTransactions,
+    output: &PartitionedTransactionsV2,
 ) {
     let old_txn_id_by_txn_hash: HashMap<HashValue, usize> = HashMap::from_iter(
         input
@@ -163,13 +163,13 @@ pub fn verify_partitioner_output(
 
     let mut total_comm_cost = 0;
     let num_txns = input.len();
-    let num_shards = output.sharded_txns().len();
+    let num_shards = output.sharded_txns.len();
     let num_rounds = output
-        .sharded_txns()
+        .sharded_txns
         .first()
         .map(|sbs| sbs.sub_blocks.len())
         .unwrap_or(0);
-    for sub_block_list in output.sharded_txns().iter().take(num_shards).skip(1) {
+    for sub_block_list in output.sharded_txns.iter().take(num_shards).skip(1) {
         assert_eq!(num_rounds, sub_block_list.sub_blocks.len());
     }
     let mut old_txn_idxs_by_sender: HashMap<Sender, Vec<usize>> = HashMap::new();
@@ -283,7 +283,7 @@ pub fn verify_partitioner_output(
     };
 
     for round_id in 0..num_rounds {
-        for (shard_id, sub_block_list) in output.sharded_txns().iter().enumerate() {
+        for (shard_id, sub_block_list) in output.sharded_txns.iter().enumerate() {
             let sub_block = sub_block_list.get_sub_block(round_id).unwrap();
             for_each_sub_block(
                 round_id,

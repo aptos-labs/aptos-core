@@ -24,7 +24,9 @@ use crate::{
     VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    txn_commit_hook::NoOpTransactionCommitHook, txn_provider::default::DefaultTxnProvider,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
@@ -2541,7 +2543,7 @@ impl VMExecutor for AptosVM {
     /// mutability. Writes to be applied to the data view are encoded in the write set part of a
     /// transaction output.
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
@@ -2559,17 +2561,14 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let streamed_transactions_provider = StreamedTransactionsProvider::from_slice(transactions);
-        //let null_output: Vec<TransactionOutput> = vec![];
-        //let null_ret = Ok(null_output);
 
         let ret = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            StreamedTransactionsProvider,
+            _,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            &streamed_transactions_provider,
+            Arc::new(DefaultTxnProvider::new(transactions)),
             state_view,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
@@ -2605,12 +2604,21 @@ impl VMExecutor for AptosVM {
         let _timer = TIMER
             .with_label_values(&["sharded_block_executor_coordinator_wrapper"])
             .start_timer();
-        let ret = sharded_block_executor.execute_block_remote(
-            state_view,
-            transactions,
-            AptosVM::get_concurrency_level(),
-            onchain_config,
-        );
+        let ret = if sharded_block_executor.is_remote_executor_client() {
+            sharded_block_executor.execute_block_remote(
+                state_view,
+                transactions,
+                AptosVM::get_concurrency_level(),
+                onchain_config,
+            )
+        } else {
+            sharded_block_executor.execute_block(
+                state_view,
+                (*transactions).clone(),
+                AptosVM::get_concurrency_level(),
+                onchain_config,
+            )
+        };
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
             BLOCK_TRANSACTION_COUNT.observe(count as f64);

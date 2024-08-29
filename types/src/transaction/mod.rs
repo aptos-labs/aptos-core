@@ -1179,12 +1179,77 @@ impl TransactionAuxiliaryData {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum SignedU128 {
+    Positive(u128),
+    Negative(u128),
+}
+
+impl PartialEq for SignedU128 {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Positive(v1), Self::Positive(v2)) | (Self::Negative(v1), Self::Negative(v2)) => {
+                v1 == v2
+            },
+            (Self::Positive(v1), Self::Negative(v2)) | (Self::Negative(v1), Self::Positive(v2)) => {
+                *v1 == 0 && *v2 == 0
+            },
+        }
+    }
+}
+
+impl Eq for SignedU128 {}
+
+impl SignedU128 {
+    pub fn is_zero(&self) -> bool {
+        match self {
+            Self::Positive(value) => *value == 0,
+            Self::Negative(value) => *value == 0,
+        }
+    }
+
+    pub fn delta(&self, positive: u128, negative: u128) -> Self {
+        if positive >= negative {
+            Self::Positive(positive - negative)
+        } else {
+            Self::Negative(negative - positive)
+        }
+    }
+
+    pub fn minus(&self) -> Self {
+        match self {
+            Self::Positive(value) => Self::Negative(*value),
+            Self::Negative(value) => Self::Positive(*value),
+        }
+    }
+
+    pub fn abs(&self) -> u128 {
+        match self {
+            Self::Positive(value) | Self::Negative(value) => *value,
+        }
+    }
+
+    pub fn add(&self, other: u128) -> u128 {
+        match self {
+            Self::Positive(value) => value + other,
+            Self::Negative(value) => {
+                assert!(other >= *value);
+                other - value
+            }
+        }
+    }
+}
+
 /// The output of executing a transaction.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionOutput {
     /// The list of writes this transaction intends to do.
     write_set: WriteSet,
 
+    /// A copy of the original total supply delta.
+    /// In sharded execution, the materialized total supply in field `write_set` is usually incorrect.
+    /// This field helps calculate the correct value during result aggregation.
+    pub total_supply_delta: Option<SignedU128>,
     /// The list of events emitted during this transaction.
     events: Vec<ContractEvent>,
 
@@ -1210,6 +1275,7 @@ impl TransactionOutput {
         // TODO: add feature flag to enable
         TransactionOutput {
             write_set,
+            total_supply_delta: None,
             events,
             gas_used,
             status,
@@ -1265,6 +1331,7 @@ impl TransactionOutput {
             gas_used,
             status,
             auxiliary_data,
+            ..
         } = self;
         (write_set, events, gas_used, status, auxiliary_data)
     }
@@ -1348,6 +1415,11 @@ impl TransactionOutput {
             }
         }
         Ok(None)
+    }
+
+    pub fn with_total_supply_delta(mut self, delta: Option<SignedU128>) -> Self {
+        self.total_supply_delta = delta;
+        self
     }
 }
 
@@ -2059,7 +2131,7 @@ impl TryFrom<Transaction> for SignedTransaction {
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
 pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + DeserializeOwned + Serialize;
     /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
     /// specifying a tag, and output requires merging all resources together (Note: this may change
     /// in the future if write-set format changes to be per-resource, could be more performant).
@@ -2090,7 +2162,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + ExtractWidth
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;
-    type Value: Send + Sync + Debug + Clone + TransactionWrite;
+    type Value: Send + Sync + Debug + Clone + TransactionWrite + DeserializeOwned + Serialize;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 
     /// Size of the user transaction in bytes, 0 otherwise

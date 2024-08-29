@@ -45,3 +45,9 @@ impl<T: TransactionOutput, E: Sync + Send> TransactionCommitHook
         // no-op
     }
 }
+
+pub trait OutputStreamHook: Send + Sync {
+    type Output;
+
+    fn stream_output(&self, txn_idx: TxnIndex, output: &Self::Output);
+}

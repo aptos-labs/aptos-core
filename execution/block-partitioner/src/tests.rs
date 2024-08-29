@@ -26,7 +26,7 @@ fn test_non_conflicting_txns() {
     }
     let partitioner = PartitionerV2Config::default().build();
     let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
-    verify_partitioner_output(&transactions, &partitioned_txns);
+    verify_partitioner_output(&transactions, partitioned_txns.as_v2_ref());
     assert_eq!(partitioned_txns.num_shards(), num_shards);
     // Verify that the transactions are in the same order as the original transactions and cross shard
     // dependencies are empty.

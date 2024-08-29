@@ -20,6 +20,7 @@ claims = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
+serde = { version = "1.0.197", features = ["derive"] }
 
 [dev-dependencies]
 once_cell = { workspace = true }

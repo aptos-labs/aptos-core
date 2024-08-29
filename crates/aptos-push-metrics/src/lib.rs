@@ -158,14 +158,21 @@ impl MetricsPusher {
     }
 
     fn push_metrics_extra_labels(chain_name: &str, namespace: &str) -> Vec<String> {
-        vec![
+        let basic = vec![
             format!("chain_name={}", chain_name),
             "cluster=unknown".into(),
             "metrics_source=unknown".into(),
             "kubernetes_pod_name=unknown".into(),
             "role=unknown".into(),
             format!("namespace={}", namespace),
-        ]
+        ];
+        let extra = std::env::vars()
+            .filter(|(key, val)| key.starts_with("PUSH_METRICS_EXTRA_LABEL__"))
+            .map(|(key, val)| {
+                let unwrapped_key = key.replace("PUSH_METRICS_EXTRA_LABEL__", "");
+                format!("{}={}", unwrapped_key, val)
+            }).collect();
+        [basic, extra].concat()
     }
 
     /// start starts a new thread and periodically pushes the metrics to a pushgateway endpoint

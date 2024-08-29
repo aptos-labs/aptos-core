@@ -44,6 +44,8 @@ enum EntryCell<V> {
     /// Option<u128> is a shortcut to aggregated value (to avoid traversing down
     /// beyond this index), which is created after the corresponding txn is committed.
     Delta(DeltaOp, Option<u128>),
+
+    Unspecified,
 }
 
 /// A versioned value internally is represented as a BTreeMap from indices of
@@ -59,6 +61,13 @@ pub struct VersionedData<K, V> {
 }
 
 impl<V> Entry<V> {
+    fn new_predicted_dep() -> Entry<V> {
+        Entry {
+            cell: EntryCell::Unspecified,
+            flag: Flag::Estimate,
+        }
+    }
+
     fn new_write_from(incarnation: Incarnation, value: ValueWithLayout<V>) -> Entry<V> {
         Entry {
             cell: EntryCell::Write(incarnation, value),
@@ -199,6 +208,9 @@ impl<V: TransactionWrite> VersionedValue<V> {
                     // Initialize the accumulator and continue traversal.
                     accumulator = Some(Ok(*delta))
                 },
+                (EntryCell::Unspecified, _) => {
+                    unreachable!()
+                },
             }
         }
 
@@ -245,6 +257,15 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .get_mut(&ShiftedTxnIndex::new(txn_idx))
             .expect("Entry by the txn must exist to mark estimate")
             .mark_estimate();
+    }
+
+    /// A variant of `mark_estimate()` that does not require the entry exist.
+    pub fn force_mark_estimate(&self, key: K, txn_idx: TxnIndex) {
+        let mut v = self.values.entry(key).or_default();
+        v.versioned_map.insert(
+            ShiftedTxnIndex::new(txn_idx),
+            CachePadded::new(Entry::new_predicted_dep()),
+        );
     }
 
     /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
