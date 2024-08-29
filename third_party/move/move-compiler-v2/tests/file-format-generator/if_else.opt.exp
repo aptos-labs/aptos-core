@@ -9,58 +9,59 @@ L2:	loc0: u64
 L3:	loc1: u64
 B0:
 	0: MoveLoc[0](Arg0: bool)
-	1: BrFalse(7)
+	1: BrFalse(8)
 B1:
 	2: MoveLoc[1](Arg1: u64)
 	3: LdU64(1)
 	4: Add
 	5: StLoc[2](loc0: u64)
-	6: Branch(11)
 B2:
-	7: MoveLoc[1](Arg1: u64)
-	8: LdU64(1)
-	9: Sub
-	10: StLoc[2](loc0: u64)
+	6: MoveLoc[2](loc0: u64)
+	7: Ret
 B3:
-	11: MoveLoc[2](loc0: u64)
-	12: Ret
+	8: MoveLoc[1](Arg1: u64)
+	9: LdU64(1)
+	10: Sub
+	11: StLoc[2](loc0: u64)
+	12: Branch(6)
 }
 if_else_nested(Arg0: bool, Arg1: u64): u64 /* def_idx: 1 */ {
 L2:	loc0: u64
 L3:	loc1: u64
+L4:	loc2: u64
 B0:
 	0: MoveLoc[0](Arg0: bool)
-	1: BrFalse(7)
+	1: BrFalse(21)
 B1:
 	2: CopyLoc[1](Arg1: u64)
 	3: LdU64(1)
 	4: Add
 	5: StLoc[2](loc0: u64)
-	6: Branch(11)
 B2:
-	7: CopyLoc[1](Arg1: u64)
-	8: LdU64(1)
-	9: Sub
-	10: StLoc[2](loc0: u64)
+	6: MoveLoc[2](loc0: u64)
+	7: LdU64(10)
+	8: Gt
+	9: BrFalse(16)
 B3:
-	11: MoveLoc[2](loc0: u64)
-	12: LdU64(10)
-	13: Gt
-	14: BrFalse(20)
+	10: MoveLoc[1](Arg1: u64)
+	11: LdU64(2)
+	12: Mul
+	13: StLoc[3](loc1: u64)
 B4:
-	15: MoveLoc[1](Arg1: u64)
-	16: LdU64(2)
-	17: Mul
-	18: StLoc[2](loc0: u64)
-	19: Branch(24)
+	14: MoveLoc[3](loc1: u64)
+	15: Ret
 B5:
-	20: MoveLoc[1](Arg1: u64)
-	21: LdU64(2)
-	22: Div
-	23: StLoc[2](loc0: u64)
+	16: MoveLoc[1](Arg1: u64)
+	17: LdU64(2)
+	18: Div
+	19: StLoc[3](loc1: u64)
+	20: Branch(14)
 B6:
-	24: MoveLoc[2](loc0: u64)
-	25: Ret
+	21: CopyLoc[1](Arg1: u64)
+	22: LdU64(1)
+	23: Sub
+	24: StLoc[2](loc0: u64)
+	25: Branch(6)
 }
 }
 ============ bytecode verification succeeded ========

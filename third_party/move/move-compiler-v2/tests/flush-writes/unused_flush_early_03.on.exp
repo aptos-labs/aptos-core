@@ -42,51 +42,39 @@ public fun m::test1() {
      # live vars: $t0, $t1, $t2, $t4
   2: $t3 := ==($t0, $t4)
      # live vars: $t1, $t2, $t3
-  3: if ($t3) goto 4 else goto 7
+  3: if ($t3) goto 4 else goto 6
      # live vars: $t1, $t2
   4: label L0
      # live vars: $t1, $t2
   5: m::bar()
      # live vars: $t1, $t2
-  6: goto 8
+  6: label L2
      # live vars: $t1, $t2
-  7: label L1
-     # live vars: $t1, $t2
-  8: label L2
-     # live vars: $t1, $t2
-  9: $t0 := 0
+  7: $t0 := 0
      # live vars: $t0, $t1, $t2
- 10: $t3 := ==($t1, $t0)
+  8: $t3 := ==($t1, $t0)
      # live vars: $t2, $t3
- 11: if ($t3) goto 12 else goto 15
+  9: if ($t3) goto 10 else goto 12
      # live vars: $t2
- 12: label L3
+ 10: label L3
      # live vars: $t2
- 13: m::bar()
+ 11: m::bar()
      # live vars: $t2
- 14: goto 16
+ 12: label L5
      # live vars: $t2
- 15: label L4
-     # live vars: $t2
- 16: label L5
-     # live vars: $t2
- 17: $t0 := 0
+ 13: $t0 := 0
      # live vars: $t0, $t2
- 18: $t3 := ==($t2, $t0)
+ 14: $t3 := ==($t2, $t0)
      # live vars: $t3
- 19: if ($t3) goto 20 else goto 23
+ 15: if ($t3) goto 16 else goto 18
      # live vars:
- 20: label L6
+ 16: label L6
      # live vars:
- 21: m::bar()
+ 17: m::bar()
      # live vars:
- 22: goto 24
+ 18: label L8
      # live vars:
- 23: label L7
-     # live vars:
- 24: label L8
-     # live vars:
- 25: return ()
+ 19: return ()
 }
 
 
@@ -116,28 +104,25 @@ B0:
 	2: StLoc[1](loc1: u64)
 	3: LdU64(0)
 	4: Eq
-	5: BrFalse(8)
+	5: BrFalse(7)
 B1:
 	6: Call bar()
-	7: Branch(8)
 B2:
-	8: MoveLoc[1](loc1: u64)
-	9: LdU64(0)
-	10: Eq
-	11: BrFalse(14)
+	7: MoveLoc[1](loc1: u64)
+	8: LdU64(0)
+	9: Eq
+	10: BrFalse(12)
 B3:
-	12: Call bar()
-	13: Branch(14)
+	11: Call bar()
 B4:
-	14: MoveLoc[0](loc0: u64)
-	15: LdU64(0)
-	16: Eq
-	17: BrFalse(20)
+	12: MoveLoc[0](loc0: u64)
+	13: LdU64(0)
+	14: Eq
+	15: BrFalse(17)
 B5:
-	18: Call bar()
-	19: Branch(20)
+	16: Call bar()
 B6:
-	20: Ret
+	17: Ret
 }
 }
 ============ bytecode verification succeeded ========
