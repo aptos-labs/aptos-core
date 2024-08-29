@@ -1320,6 +1320,7 @@ fn downgrade_lvalue_inlining_to_expansion(val: &T::LValue) -> E::LValue {
                     Some(rewritten_ty_args)
                 },
                 rewritten_fields,
+                None,
             )
         },
     };

@@ -1,0 +1,21 @@
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    struct S {
+        dummy_field: bool,
+    }
+    private fun f(_s: m::S): m::S {
+        pack m::S(false)
+    }
+    private fun d() {
+        {
+          let m::S{ dummy_field: _ } = pack m::S(false);
+          {
+            let m::S{ dummy_field: _ } = pack m::S(false);
+            {
+              let m::S{ dummy_field: _ } = pack m::S(false);
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::m

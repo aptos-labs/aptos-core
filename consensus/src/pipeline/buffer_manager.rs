@@ -5,7 +5,8 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     consensus_observer::{
-        network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
+        network::observer_message::ConsensusObserverMessage,
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     counters::{self, log_executor_error_occurred},
     monitor,
@@ -25,8 +26,12 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    pipelined_block::PipelinedBlock,
+};
 use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -75,6 +80,15 @@ pub struct OrderedBlocks {
     pub callback: StateComputerCommitCallBackType,
 }
 
+impl OrderedBlocks {
+    pub fn latest_round(&self) -> Round {
+        self.ordered_blocks
+            .last()
+            .expect("OrderedBlocks empty.")
+            .round()
+    }
+}
+
 pub type BufferItemRootType = Cursor;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -111,8 +125,8 @@ pub struct BufferManager {
     commit_msg_rx:
         Option<aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>>,
 
-    // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
+    persisting_phase_rx: Receiver<ExecutorResult<Round>>,
 
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
@@ -138,6 +152,8 @@ pub struct BufferManager {
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
+    highest_committed_round: Round,
+    latest_round: Round,
 
     // Consensus publisher for downstream observers.
     consensus_observer_config: ConsensusObserverConfig,
@@ -160,6 +176,7 @@ impl BufferManager {
             IncomingCommitRequest,
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
+        persisting_phase_rx: Receiver<ExecutorResult<Round>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
         epoch_state: Arc<EpochState>,
@@ -167,6 +184,7 @@ impl BufferManager {
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
         order_vote_enabled: bool,
+        highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
@@ -207,6 +225,7 @@ impl BufferManager {
             commit_msg_rx: Some(commit_msg_rx),
 
             persisting_phase_tx,
+            persisting_phase_rx,
 
             block_rx,
             reset_rx,
@@ -223,6 +242,8 @@ impl BufferManager {
             reset_flag,
             bounded_executor: executor,
             order_vote_enabled,
+            highest_committed_round,
+            latest_round: highest_committed_round,
 
             consensus_observer_config,
             consensus_publisher,
@@ -450,7 +471,14 @@ impl BufferManager {
         info!("Receive reset");
         self.reset_flag.store(true, Ordering::SeqCst);
 
-        self.stop = matches!(signal, ResetSignal::Stop);
+        match signal {
+            ResetSignal::Stop => self.stop = true,
+            ResetSignal::TargetRound(round) => {
+                self.highest_committed_round = round;
+                self.latest_round = round;
+            },
+        }
+
         self.reset().await;
         let _ = tx.send(ResetAck::default());
         self.reset_flag.store(false, Ordering::SeqCst);
@@ -765,6 +793,12 @@ impl BufferManager {
             .set(pending_aggregated as i64);
     }
 
+    fn need_backpressure(&self) -> bool {
+        const MAX_BACKLOG: Round = 20;
+
+        self.highest_committed_round + MAX_BACKLOG < self.latest_round
+    }
+
     pub async fn start(mut self) {
         info!("Buffer manager starts.");
         let (verified_commit_msg_tx, mut verified_commit_msg_rx) = create_channel();
@@ -790,23 +824,24 @@ impl BufferManager {
         });
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
-            ::futures::select! {
-                blocks = self.block_rx.select_next_some() => {
+            ::tokio::select! {
+                Some(blocks) = self.block_rx.next(), if !self.need_backpressure() => {
+                    self.latest_round = blocks.latest_round();
                     monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;
                     if self.execution_root.is_none() {
                         self.advance_execution_root();
                     }});
                 },
-                reset_event = self.reset_rx.select_next_some() => {
+                Some(reset_event) = self.reset_rx.next() => {
                     monitor!("buffer_manager_process_reset",
                     self.process_reset_request(reset_event).await);
                 },
-                response = self.execution_schedule_phase_rx.select_next_some() => {
+                Some(response) = self.execution_schedule_phase_rx.next() => {
                     monitor!("buffer_manager_process_execution_schedule_response", {
                     self.process_execution_schedule_response(response).await;
                 })},
-                response = self.execution_wait_phase_rx.select_next_some() => {
+                Some(response) = self.execution_wait_phase_rx.next() => {
                     monitor!("buffer_manager_process_execution_wait_response", {
                     let response_block_id = response.block_id;
                     self.process_execution_response(response).await;
@@ -825,17 +860,21 @@ impl BufferManager {
                         self.advance_signing_root().await;
                     }});
                 },
-                _ = self.execution_schedule_retry_rx.select_next_some() => {
+                _ = self.execution_schedule_retry_rx.next() => {
                     monitor!("buffer_manager_process_execution_schedule_retry",
                     self.retry_schedule_phase().await);
                 },
-                response = self.signing_phase_rx.select_next_some() => {
+                Some(response) = self.signing_phase_rx.next() => {
                     monitor!("buffer_manager_process_signing_response", {
                     self.process_signing_response(response).await;
                     self.advance_signing_root().await
                     })
                 },
-                rpc_request = verified_commit_msg_rx.select_next_some() => {
+                Some(Ok(round)) = self.persisting_phase_rx.next() => {
+                    // see where `need_backpressure()` is called.
+                    self.highest_committed_round = round
+                },
+                Some(rpc_request) = verified_commit_msg_rx.next() => {
                     monitor!("buffer_manager_process_commit_message",
                     if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
                         self.advance_head(aggregated_block_id).await;

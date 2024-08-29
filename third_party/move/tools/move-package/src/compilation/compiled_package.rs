@@ -689,11 +689,9 @@ impl CompiledPackage {
                     known_attributes: known_attributes.clone(),
                     language_version: Some(effective_language_version),
                     compile_test_code: flags.keep_testing_functions(),
+                    experiments: config.experiments.clone(),
                     ..Default::default()
                 };
-                for experiment in &config.experiments {
-                    options = options.set_experiment(experiment, true)
-                }
                 options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
                 compiler_driver_v2(options)?
             },
@@ -1059,7 +1057,8 @@ pub(crate) fn apply_named_address_renaming(
         .collect()
 }
 
-pub(crate) fn make_source_and_deps_for_compiler(
+/// Collects source and dependency files with their address mappings.
+pub fn make_source_and_deps_for_compiler(
     resolution_graph: &ResolvedGraph,
     root: &ResolvedPackage,
     deps: Vec<(

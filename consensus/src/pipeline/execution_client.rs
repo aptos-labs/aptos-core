@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::publisher::ConsensusPublisher,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     counters,
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
@@ -33,11 +33,11 @@ use aptos_consensus_types::{
     common::{Author, Round},
     pipelined_block::PipelinedBlock,
 };
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
-use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -58,6 +58,7 @@ pub trait TExecutionClient: Send + Sync {
     /// Initialize the execution phase for a new epoch.
     async fn start_epoch(
         &self,
+        maybe_consensus_key: Option<Arc<PrivateKey>>,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -183,6 +184,7 @@ impl ExecutionProxyClient {
 
     fn spawn_decoupled_execution(
         &self,
+        maybe_consensus_key: Option<Arc<PrivateKey>>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
@@ -215,10 +217,9 @@ impl ExecutionProxyClient {
                 let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
 
                 let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
-                let consensus_key =
-                    load_consensus_key_from_secure_storage(&self.consensus_config.safety_rules)
-                        .expect("Failed in loading consensus key for ExecutionProxyClient.");
-                let signer = Arc::new(ValidatorSigner::new(self.author, consensus_key));
+                let consensus_sk = maybe_consensus_key
+                    .expect("consensus key unavailable for ExecutionProxyClient");
+                let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
 
                 let rand_manager = RandManager::<Share, AugmentedData>::new(
                     self.author,
@@ -276,6 +277,7 @@ impl ExecutionProxyClient {
             epoch_state,
             self.bounded_executor.clone(),
             onchain_consensus_config.order_vote_enabled(),
+            highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
         );
@@ -292,6 +294,7 @@ impl ExecutionProxyClient {
 impl TExecutionClient for ExecutionProxyClient {
     async fn start_epoch(
         &self,
+        maybe_consensus_key: Option<Arc<PrivateKey>>,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -304,6 +307,7 @@ impl TExecutionClient for ExecutionProxyClient {
         highest_committed_round: Round,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
+            maybe_consensus_key,
             commit_signer_provider,
             epoch_state.clone(),
             rand_config,
@@ -483,6 +487,7 @@ pub struct DummyExecutionClient;
 impl TExecutionClient for DummyExecutionClient {
     async fn start_epoch(
         &self,
+        _maybe_consensus_key: Option<Arc<PrivateKey>>,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,

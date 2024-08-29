@@ -288,7 +288,14 @@ impl BatchProofQueue {
     fn gc_expired_batch_summaries_without_proofs(&mut self) {
         let timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
         self.items.retain(|_, item| {
-            item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp
+            if item.is_committed() || item.proof.is_some() || item.info.expiration() > timestamp {
+                true
+            } else {
+                self.author_to_batches
+                    .get_mut(&item.info.author())
+                    .map(|queue| queue.remove(&BatchSortKey::from_info(&item.info)));
+                false
+            }
         });
     }
 
@@ -589,9 +596,9 @@ impl BatchProofQueue {
         if full || return_non_full {
             // Stable sort, so the order of proofs within an author will not change.
             result.sort_by_key(|item| Reverse(item.info.gas_bucket_start()));
-            (result, cur_all_txns, cur_unique_txns, !full)
+            (result, cur_all_txns, cur_unique_txns, full)
         } else {
-            (Vec::new(), PayloadTxnsSize::zero(), 0, !full)
+            (Vec::new(), PayloadTxnsSize::zero(), 0, full)
         }
     }
 

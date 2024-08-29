@@ -166,7 +166,11 @@ impl ValidatorNodeConfig {
         // Init safety rules
         let validator_identity_file = self.dir.join(VALIDATOR_IDENTITY);
         config.consensus.safety_rules.initial_safety_rules_config =
-            InitialSafetyRulesConfig::from_file(validator_identity_file, waypoint_config.clone());
+            InitialSafetyRulesConfig::from_file(
+                validator_identity_file,
+                vec![],
+                waypoint_config.clone(),
+            );
         config.base.waypoint = waypoint_config;
     }
 

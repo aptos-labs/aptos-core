@@ -28,9 +28,9 @@ B3:
 	11: MoveLoc[2](loc0: &bool)
 	12: MoveLoc[4](loc2: &bool)
 	13: Neq
-	14: MoveLoc[0](Arg0: bool)
-	15: Pack[0](Struct0)
-	16: Pop
+	14: Pop
+	15: MoveLoc[0](Arg0: bool)
+	16: Pack[0](Struct0)
 	17: Pop
 	18: Ret
 }

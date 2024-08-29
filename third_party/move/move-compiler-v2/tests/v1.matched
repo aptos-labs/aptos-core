@@ -188,6 +188,7 @@ move-compiler/tests/move_check/inlining/double_nesting.exp   move-compiler-v2/te
 move-compiler/tests/move_check/inlining/inline_accessing_constant.exp   move-compiler-v2/tests/checking/inlining/inline_accessing_constant.exp
 move-compiler/tests/move_check/inlining/lambda.exp   move-compiler-v2/tests/checking/inlining/lambda.exp
 move-compiler/tests/move_check/inlining/lambda_param.exp   move-compiler-v2/tests/checking/inlining/lambda_param.exp
+move-compiler/tests/move_check/inlining/lambda_param_mismatch.exp   move-compiler-v2/tests/checking/inlining/lambda_param_mismatch.exp
 move-compiler/tests/move_check/inlining/lambda_return.exp   move-compiler-v2/tests/checking/inlining/lambda_return.exp
 move-compiler/tests/move_check/inlining/multiple_nesting.exp   move-compiler-v2/tests/checking/inlining/multiple_nesting.exp
 move-compiler/tests/move_check/inlining/native_inline.exp   move-compiler-v2/tests/checking/inlining/native_inline.exp
