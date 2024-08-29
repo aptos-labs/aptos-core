@@ -309,6 +309,15 @@ fn handle_committed_blocks(
     // the new ledger info round is greater than the current root
     // round. Otherwise, this can race with the state sync process.
     if ledger_info.commit_info().round() > root.commit_info().round() {
+        info!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Updating the root ledger info! Old root: (epoch: {:?}, round: {:?}). New root: (epoch: {:?}, round: {:?})",
+                root.commit_info().epoch(),
+                root.commit_info().round(),
+                ledger_info.commit_info().epoch(),
+                ledger_info.commit_info().round(),
+            ))
+        );
         *root = ledger_info;
     }
 }

@@ -632,7 +632,7 @@ mod test {
         // Elapse enough time to trigger the peer optimality check
         let mock_time_service = time_service.clone().into_mock();
         mock_time_service.advance(Duration::from_millis(
-            consensus_observer_config.peer_optimality_check_interval_ms + 1,
+            consensus_observer_config.subscription_peer_check_interval_ms + 1,
         ));
 
         // Check the active subscription and verify that it is removed (the peer is suboptimal)
