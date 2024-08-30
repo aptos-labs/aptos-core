@@ -15,7 +15,9 @@ pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
 
     fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);
 
-    fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>);
+    fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>, rand_result_rx_thread: usize, seq_num: u64);
 
     fn record_execution_complete_time_on_shard(&self);
+
+    fn reset_state_view(&self) -> () {}
 }

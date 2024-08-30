@@ -24,6 +24,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tonic-reflection = { workspace = true }
+num_cpus = "1.16.0"
 
 [dev-dependencies]
 aptos-config = { workspace = true }

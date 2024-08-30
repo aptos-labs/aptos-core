@@ -17,8 +17,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 use std::sync::RwLock;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use tokio::{runtime::Runtime, sync::oneshot};
+use tokio::time::timeout;
 use tonic::{
     transport::{Channel, Server},
     Request, Response, Status,
@@ -108,8 +109,8 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             Some(ms_since_epoch) => Message::create_with_metadata(
                 network_message.message,
                 ms_since_epoch,
-                network_message.seq_no.unwrap(),
-                network_message.shard_id.unwrap(),
+                network_message.seq_no.unwrap_or_default(),
+                network_message.shard_id.unwrap_or_default(),
             ),
             None => Message::new(network_message.message),
         };
@@ -122,6 +123,9 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             if curr_time > msg.start_ms_since_epoch.unwrap() {
                 delta = (curr_time - msg.start_ms_since_epoch.unwrap());
             }
+            // REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+            //     .with_label_values(&["network_message_latency"]).observe(delta as f64);
+
             if message_type.get_type() == "remote_kv_request" {
                 REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                     .with_label_values(&["2_kv_req_coord_grpc_recv"]).observe(delta as f64);
@@ -148,8 +152,8 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
                     REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
                         .with_label_values(&["4_cmd_tx_msg_grpc_recv"]).observe(delta as f64);
                 } else if message_type.get_type().starts_with("execute_result_") {
-                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["9_results_tx_msg_grpc_recv"]).observe(delta as f64);
+                    // REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                    //     .with_label_values(&["9_results_tx_msg_grpc_recv"]).observe(delta as f64);
                 }
             }
             // Send the message to the registered handler
@@ -192,10 +196,11 @@ impl GRPCNetworkMessageServiceClientWrapper {
         message: Message,
         mt: &MessageType,
     ) {
+        //let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         let request = tonic::Request::new(NetworkMessage {
-            message: message.data,
+            message: message.data.clone(),
             message_type: mt.get_type(),
-            ms_since_epoch: message.start_ms_since_epoch,
+            ms_since_epoch: message.start_ms_since_epoch, // Some(curr_time)
             seq_no: message.seq_num,
             shard_id: message.shard_id,
         });
@@ -220,8 +225,9 @@ impl GRPCNetworkMessageServiceClientWrapper {
                     .with_label_values(&["8_results_tx_msg_grpc_send"]).observe(delta as f64);
             }
         }
-
+        let msg_type = mt.get_type();
         // TODO: Retry with exponential backoff on failures
+        let timer1 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         match self.remote_channel.simple_msg_exchange(request).await {
             Ok(_) => {},
             Err(e) => {
@@ -230,6 +236,21 @@ impl GRPCNetworkMessageServiceClientWrapper {
                     e, self.remote_addr, sender_addr
                 );
             },
+        }
+        let timer2 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        let delta = (timer2 - timer1) as f64;
+        if msg_type == "remote_kv_request" {
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                .with_label_values(&["grpc_remote_kv_request"]).observe(delta);
+        } else if msg_type == "remote_kv_response" {
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                .with_label_values(&["grpc_remote_kv_response"]).observe(delta);
+        } else if msg_type.starts_with("execute_command_") {
+            REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                .with_label_values(&["grpc_execute_command"]).observe(delta);
+        } else if msg_type.starts_with("execute_result_") {
+            REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                .with_label_values(&["grpc_execute_result"]).observe(delta);
         }
     }
 }

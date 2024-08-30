@@ -45,4 +45,16 @@ impl OutboundRpcHelper {
                 .send_message(self.self_addr, msg, mt).await;
         });
     }
+
+    pub async fn send_async(&mut self, msg: Message, mt: &MessageType) {
+        if msg.start_ms_since_epoch.is_some() {
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            let mut delta = 0.0;
+            if curr_time > msg.start_ms_since_epoch.unwrap() {
+                delta = (curr_time - msg.start_ms_since_epoch.unwrap()) as f64;
+            }
+        }
+        self.grpc_client
+            .send_message(self.self_addr, msg, mt).await;
+    }
 }

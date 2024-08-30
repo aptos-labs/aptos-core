@@ -419,7 +419,7 @@ where
 
         let txn_local_index = self.local_index(txn_idx);
         for &shard_id in &self.follower_shard_sets[txn_local_index] {
-            info!("Sending cross shard commit message to shard {} for txn_idx {}", shard_id, txn_idx);
+            //info!("Sending cross shard commit message to shard {} for txn_idx {}", shard_id, txn_idx);
             self.cross_shard_client.send(
                 shard_id,
                 CrossShardMessage::Commit(CrossShardTxnResult {

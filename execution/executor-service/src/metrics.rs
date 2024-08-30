@@ -23,7 +23,8 @@ pub static REMOTE_EXECUTOR_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
          8. kv_req_deser: deserializing the remote key value requests; \
          9. kv_requests: processing the remote key value requests; \
          10. kv_resp_ser: serializing the remote key value responses; \
-         11. kv_requests_handler_timer: time spent by handler that spawns kv_request handling tasks on coordinator; ",
+         11. kv_requests_handler_timer: time spent by handler that spawns kv_request handling tasks on coordinator; \
+         12. get_txn_waiting_time: the time waited for a transaction to fetch from a local kv store; ",
         // metric labels (dimensions)
         &["shard_id", "name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
@@ -39,7 +40,7 @@ pub static REMOTE_EXECUTOR_REMOTE_KV_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         "KV counts on a shard for: \
          1. kv_responses: the number of remote key value responses received on a shard; \
          2. non_prefetch_kv: the number of remote key value responses received on a shard that were not prefetched; \
-         3. prefetch_kv: the number of remote key value responses received on a shard that were prefetched; ",
+         3. prefetch_kv: the number of remote key value responses received on a shard that were prefetched;",
         // metric labels (dimensions)
         &["shard_id", "name"],
     )

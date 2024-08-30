@@ -1455,13 +1455,16 @@ dependencies = [
  "crossbeam-channel",
  "ctrlc",
  "dashmap",
+ "fastrand 2.0.1",
  "itertools 0.12.1",
+ "log",
  "num_cpus",
  "once_cell",
  "rand 0.7.3",
  "rayon",
  "serde",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -3513,6 +3516,7 @@ dependencies = [
  "aptos-protos 1.3.0",
  "bcs 0.1.4",
  "crossbeam-channel",
+ "num_cpus",
  "once_cell",
  "serde",
  "thiserror",
@@ -3633,6 +3637,7 @@ dependencies = [
  "bcs 0.1.4",
  "crossbeam-channel",
  "dashmap",
+ "fastrand 2.0.1",
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",

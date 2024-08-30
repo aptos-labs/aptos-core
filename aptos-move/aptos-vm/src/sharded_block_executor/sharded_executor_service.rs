@@ -47,6 +47,9 @@ use rayon::{
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
 use std::thread;
+use std::time::SystemTime;
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use aptos_block_executor::txn_commit_hook::OutputStreamHook;
 use aptos_block_executor::txn_provider::sharded::ShardedTransaction;
@@ -79,7 +82,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 // We need two extra threads for the cross-shard commit receiver and the thread
                 // that is blocked on waiting for execute block to finish.
                 .thread_name(move |i| format!("sharded-executor-shard-{}-{}", shard_id, i))
-                .num_threads(num_threads + 2)
+                .num_threads(num_threads + 2 + 1)
                 .build()
                 .unwrap(),
         );
@@ -235,6 +238,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         );
 
         let mut cumulative_txns = 0;
+        let mut i = 0;
         loop {
             // info!("Looping back to recv cmd after execution of a block********************");
             let mut command = self.coordinator_client.lock().unwrap().receive_execute_command();
@@ -342,13 +346,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     } = cmd;
                     cumulative_txns += num_txns;
 
-                    let execution_done = Arc::new(AtomicBool::new(false));
-                    let execution_done_clone = execution_done.clone();
+                    //let execution_done = Arc::new(AtomicBool::new(false));
+                   // let execution_done_clone = execution_done.clone();
 
                     let coordinator_client_clone = self.coordinator_client.clone();
                     let stream_results_thread = thread::spawn(move || {
                         let batch_size = 200;
                         let mut num_outputs_received: usize = 0;
+                        let mut seq_num: u64 = 0;
+                        let mut rng = StdRng::from_entropy();
+                        let random_number = rng.gen_range(0, u64::MAX);
                         let mut curr_batch = vec![];
                         loop {
                             let ret = stream_results_receiver.recv().unwrap();
@@ -362,13 +369,14 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                             if num_outputs_received == num_txns { //todo: check if this works
                             //if execution_done_clone.load(std::sync::atomic::Ordering::Relaxed) {
                                 if !curr_batch.is_empty() {
-                                    coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+                                    coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch, random_number as usize, seq_num);
                                 }
                                 break;
                             }
                             if curr_batch.len() == batch_size {
-                                coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch);
+                                coordinator_client_clone.lock().unwrap().stream_execution_result(curr_batch, random_number as usize, seq_num);
                                 curr_batch = vec![];
+                                seq_num += 1;
                             }
                         }
                     });
@@ -400,8 +408,19 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         txn_idx: u32::MAX,
                         txn_output: TransactionOutput::default(),
                     }).unwrap(); // todo: this logic probably has a race condition*/
-                    execution_done.store(true, std::sync::atomic::Ordering::Relaxed); // todo: this logic probably has a race condition
+                   // execution_done.store(true, std::sync::atomic::Ordering::Relaxed); // todo: this logic probably has a race condition
                     stream_results_thread.join().unwrap();
+                    self.coordinator_client.lock().unwrap().reset_state_view();
+                    let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
+                        .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+                        .unwrap()
+                        .get_sample_sum();
+                    info!(
+                        "On shard execution tps {} txns/s ({} txns / {} s)",
+                        cumulative_txns as f64 / exe_time,
+                        cumulative_txns,
+                        exe_time
+                    );
                     //info!("Shard {} finished streaming results", self.shard_id);
                 },
                 ExecutorShardCommand::Stop => {
