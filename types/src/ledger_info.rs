@@ -437,11 +437,24 @@ impl LedgerInfoWithMixedSignatures {
         self.unverified_signatures.len()
     }
 
-    pub fn check_voting_power(
-        &self,
-        verifier: &ValidatorVerifier,
-    ) -> std::result::Result<u128, VerifyError> {
-        // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
+    pub fn verified_voters(&self) -> Vec<&AccountAddress> {
+        self.verified_signatures
+            .signatures()
+            .keys()
+            .collect_vec()
+            .clone()
+    }
+
+    pub fn unverified_voters(&self) -> Vec<&AccountAddress> {
+        self.unverified_signatures.keys().collect()
+    }
+
+    pub fn aggregated_voters(&self) -> usize {
+        self.verified_aggregate_signature.get_num_voters()
+    }
+
+    // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
+    pub fn all_voters(&self, verifier: &ValidatorVerifier) -> Vec<AccountAddress> {
         let authors = self.verified_aggregate_signature.get_signers_addresses(
             verifier
                 .get_ordered_account_addresses_iter()
@@ -451,8 +464,18 @@ impl LedgerInfoWithMixedSignatures {
         let authors = authors
             .iter()
             .chain(self.verified_signatures.signatures().keys());
-        let authors = authors.chain(self.unverified_signatures.keys());
-        verifier.check_voting_power(authors.collect::<HashSet<_>>().into_iter(), true)
+        let authors = authors
+            .chain(self.unverified_signatures.keys())
+            .collect::<HashSet<_>>();
+        authors.iter().cloned().cloned().collect()
+    }
+
+    pub fn check_voting_power(
+        &self,
+        verifier: &ValidatorVerifier,
+    ) -> std::result::Result<u128, VerifyError> {
+        let all_voters = self.all_voters(verifier);
+        verifier.check_voting_power(all_voters.iter().collect_vec().into_iter(), true)
     }
 
     pub fn aggregate_and_verify(

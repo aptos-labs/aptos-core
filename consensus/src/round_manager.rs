@@ -39,7 +39,6 @@ use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
     common::{Author, Round},
-    delayed_qc_msg::DelayedQcMsg,
     order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
@@ -71,7 +70,6 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, StreamExt};
-use futures_channel::mpsc::UnboundedReceiver;
 use lru::LruCache;
 use serde::Serialize;
 use std::{mem::Discriminant, pin::Pin, sync::Arc, time::Duration};
@@ -426,12 +424,12 @@ impl RoundManager {
             .iter()
             .map(|(_, li_with_sig)| {
                 let (voting_power, votes): (Vec<_>, Vec<_>) = li_with_sig
-                    .signatures()
-                    .keys()
+                    .all_voters(&epoch_state.verifier)
+                    .into_iter()
                     .map(|author| {
                         epoch_state
                             .verifier
-                            .get_voting_power(author)
+                            .get_voting_power(&author)
                             .map(|voting_power| (voting_power as u128, 1))
                             .unwrap_or((0u128, 0))
                     })
@@ -582,25 +580,6 @@ impl RoundManager {
         }
 
         self.process_verified_proposal(proposal).await
-    }
-
-    pub async fn process_delayed_qc_msg(&mut self, msg: DelayedQcMsg) -> anyhow::Result<()> {
-        ensure!(
-            msg.vote.vote_data().proposed().round() == self.round_state.current_round(),
-            "Discarding stale delayed QC for round {}, current round {}",
-            msg.vote.vote_data().proposed().round(),
-            self.round_state.current_round()
-        );
-        let vote = msg.vote().clone();
-        let vote_reception_result = self
-            .round_state
-            .process_delayed_qc_msg(&self.epoch_state.verifier, msg);
-        trace!(
-            "Received delayed QC message and vote reception result is {:?}",
-            vote_reception_result
-        );
-        self.process_vote_reception_result(&vote, vote_reception_result)
-            .await
     }
 
     /// Sync to the sync info sending from peer if it has newer certificates.
@@ -1475,7 +1454,6 @@ impl RoundManager {
             (Author, UnverifiedEvent),
         >,
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
-        mut delayed_qc_rx: UnboundedReceiver<DelayedQcMsg>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
@@ -1489,19 +1467,6 @@ impl RoundManager {
                     }
                     break;
                 }
-                delayed_qc_msg = delayed_qc_rx.select_next_some() => {
-                    let result = monitor!(
-                        "process_delayed_qc",
-                        self.process_delayed_qc_msg(delayed_qc_msg).await
-                    );
-                    match result {
-                        Ok(_) => trace!(RoundStateLogSchema::new(self.round_state())),
-                        Err(e) => {
-                            counters::ERROR_COUNT.inc();
-                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(self.round_state()));
-                        }
-                    }
-                },
                 proposal = buffered_proposal_rx.select_next_some() => {
                     let mut proposals = vec![proposal];
                     while let Some(Some(proposal)) = buffered_proposal_rx.next().now_or_never() {

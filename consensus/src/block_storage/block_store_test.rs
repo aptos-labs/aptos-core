@@ -8,9 +8,7 @@ use crate::{
     test_utils::{
         build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
     },
-    util::mock_time_service::SimulatedTimeService,
 };
-use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
     block::{
         block_test_utils::{
@@ -27,9 +25,8 @@ use aptos_crypto::{HashValue, PrivateKey};
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
-use futures_channel::mpsc::unbounded;
 use proptest::prelude::*;
-use std::{cmp::min, collections::HashSet, sync::Arc};
+use std::{cmp::min, collections::HashSet};
 
 #[tokio::test]
 async fn test_highest_block_and_quorum_cert() {
@@ -284,11 +281,8 @@ async fn test_insert_vote() {
     let block = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
         .await;
-    let time_service = Arc::new(SimulatedTimeService::new());
-    let (delayed_qc_tx, _) = unbounded();
 
-    let mut pending_votes =
-        PendingVotes::new(time_service, delayed_qc_tx, QcAggregatorType::NoDelay);
+    let mut pending_votes = PendingVotes::new();
 
     assert!(block_store.get_quorum_cert_for_block(block.id()).is_none());
     for (i, voter) in signers.iter().enumerate().take(10).skip(1) {
