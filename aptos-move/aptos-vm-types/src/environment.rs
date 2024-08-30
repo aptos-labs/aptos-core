@@ -13,7 +13,7 @@ use aptos_types::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::{
-    config::VMConfig, native_functions::NativeFunction, use_loader_v2_based_on_env,
+    config::VMConfig, native_functions::NativeFunction, use_loader_v1_based_on_env,
     RuntimeEnvironment,
 };
 use move_vm_types::loaded_data::runtime_types::TypeBuilder;
@@ -72,8 +72,8 @@ pub struct Environment {
 impl Environment {
     pub fn new(state_view: &impl StateView) -> Self {
         let mut features = Features::fetch_config(state_view).unwrap_or_default();
-        if use_loader_v2_based_on_env() {
-            features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        if use_loader_v1_based_on_env() {
+            features.disable(FeatureFlag::ENABLE_LOADER_V2);
         }
 
         // If no chain ID is in storage, we assume we are in a testing environment.
