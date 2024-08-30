@@ -13,7 +13,6 @@ use bytes::Bytes;
 #[cfg(test)]
 use claims::assert_some;
 use move_binary_format::{
-    access::ModuleAccess,
     errors::{Location, PartialVMError, VMResult},
     CompiledModule,
 };
@@ -72,10 +71,20 @@ impl ModuleBytesStorage for LocalModuleBytesStorage {
 /// An entry in [UnsyncModuleStorage]. As modules are accessed, entries can be
 /// "promoted", e.g., a deserialized representation can be converted into the
 /// verified one.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ModuleStorageEntry {
     Deserialized(Arc<CompiledModule>, usize),
     Verified(Arc<Module>),
+}
+
+impl ModuleStorageEntry {
+    /// Returns the verified module if the entry is verified, and [None] otherwise.
+    fn into_verified(self) -> Option<Arc<Module>> {
+        match self {
+            Self::Deserialized(_, _) => None,
+            Self::Verified(module) => Some(module),
+        }
+    }
 }
 
 /// Implementation of (not thread-safe) module storage used for Move unit tests,
@@ -165,52 +174,19 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         Ok(())
     }
 
-    /// Returns true if the specified module is stored as deserialized.
-    /// In case it is not cached, the function will cache it.
-    fn is_deserialized(&self, address: &AccountAddress, module_name: &IdentStr) -> VMResult<bool> {
-        use ModuleStorageEntry::*;
-
-        self.initialize_module_storage_entry(address, module_name)?;
-        let module_storage = self.module_storage.borrow();
-        let entry = get_module_entry_or_panic(&module_storage, address, module_name);
-        Ok(matches!(entry, Deserialized(..)))
-    }
-
-    /// Same as [self.fetch_verified_module], but keeps track of visited modules to
-    /// detect and prevent cyclic dependencies.
-    fn fetch_verified_module_recursive(
+    /// Returns the entry in module storage (deserialized or verified) and an error if it
+    /// does not exist. This API clones the underlying entry pointers.
+    fn fetch_existing_module_storage_entry(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-        visited: &mut BTreeSet<ModuleId>,
-    ) -> VMResult<Arc<Module>> {
-        use ModuleStorageEntry::*;
-
+    ) -> VMResult<ModuleStorageEntry> {
         self.initialize_module_storage_entry(address, module_name)?;
-        let mut module_storage = self.module_storage.borrow_mut();
-        let entry = get_module_entry_mut_or_panic(&mut module_storage, address, module_name);
-        match entry {
-            Verified(module) => return Ok(module.clone()),
-            Deserialized(compiled_module, size)
-                if compiled_module.num_immediate_dependencies() == 0 =>
-            {
-                let module = Arc::new(
-                    self.runtime_environment.build_verified_module(
-                        self.runtime_environment
-                            .build_partially_verified_module(compiled_module.clone(), *size)?,
-                        &[],
-                    )?,
-                );
-                *entry = Verified(module.clone());
-                return Ok(module);
-            },
-            _ => {
-                // Otherwise, do drop the borrow, so we can traverse the transitive closure.
-                drop(module_storage);
-            },
-        }
 
-        self.visit_and_verify_all_transitive_dependencies(address, module_name, visited)
+        // At this point module storage contains a deserialized entry, because the function
+        // above puts it there if it was not cached already.
+        let module_storage = self.module_storage.borrow();
+        Ok(get_module_entry_or_panic(&module_storage, address, module_name).clone())
     }
 
     /// Visits the dependencies of the given module. If dependencies form a cycle (which
@@ -227,7 +203,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     /// dependencies or friends. Hence, A cannot discover C and vice-versa, making detection
     /// of such corner cases only possible if **all existing modules are checked**, which
     /// is clearly infeasible.
-    fn visit_and_verify_all_transitive_dependencies(
+    fn fetch_verified_module_and_visit_all_transitive_dependencies(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -235,11 +211,14 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     ) -> VMResult<Arc<Module>> {
         use ModuleStorageEntry::*;
 
+        // Get the module, and in case it is verified, return early.
+        let entry = self.fetch_existing_module_storage_entry(address, module_name)?;
+        let (compiled_module, size) = match entry {
+            Deserialized(compiled_module, size) => (compiled_module, size),
+            Verified(module) => return Ok(module),
+        };
+
         // Step 1: verify compiled module locally.
-        let compiled_module = self.fetch_deserialized_module(address, module_name)?;
-        let size = self
-            .fetch_module_size_in_bytes(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))?;
         let partially_verified_module = self
             .runtime_environment
             .build_partially_verified_module(compiled_module, size)?;
@@ -247,13 +226,24 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         // Step 2: visit all dependencies and collect them for later verification.
         let mut verified_immediate_dependencies = vec![];
         for (addr, name) in partially_verified_module.immediate_dependencies_iter() {
-            let module_id = ModuleId::new(*addr, name.to_owned());
-            if !visited.insert(module_id) && self.is_deserialized(addr, name)? {
-                return Err(module_cyclic_dependency_error!(address, module_name));
+            // Check if the module has been already visited and verified.
+            let dep_entry = self.fetch_existing_module_storage_entry(addr, name)?;
+            if let Some(dep_module) = dep_entry.into_verified() {
+                verified_immediate_dependencies.push(dep_module);
+                continue;
             }
 
-            let verified_dependency = self.fetch_verified_module_recursive(addr, name, visited)?;
-            verified_immediate_dependencies.push(verified_dependency);
+            // Otherwise, either we have visited this module but not yet verified (hence,
+            // we found a cycle) or we have not visited it yet and need to verify it.
+            let module_id = ModuleId::new(*addr, name.to_owned());
+            if visited.insert(module_id) {
+                let module = self.fetch_verified_module_and_visit_all_transitive_dependencies(
+                    addr, name, visited,
+                )?;
+                verified_immediate_dependencies.push(module);
+            } else {
+                return Err(module_cyclic_dependency_error!(address, module_name));
+            }
         }
 
         // Step 3: verify module with dependencies.
@@ -356,7 +346,11 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         module_name: &IdentStr,
     ) -> VMResult<Arc<Module>> {
         let mut visited = BTreeSet::new();
-        self.fetch_verified_module_recursive(address, module_name, &mut visited)
+        self.fetch_verified_module_and_visit_all_transitive_dependencies(
+            address,
+            module_name,
+            &mut visited,
+        )
     }
 }
 
@@ -440,7 +434,7 @@ pub(crate) mod test {
         friends: impl IntoIterator<Item = &'a str>,
     ) {
         let (module, bytes) = module(module_name, dependencies, friends);
-        module_bytes_storage.add_module_bytes(module.address(), module.name(), bytes);
+        module_bytes_storage.add_module_bytes(module.self_addr(), module.self_name(), bytes);
     }
 
     #[test]
