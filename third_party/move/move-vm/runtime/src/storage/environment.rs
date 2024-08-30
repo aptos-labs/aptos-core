@@ -8,7 +8,7 @@ use crate::{
     Module, Script,
 };
 use move_binary_format::{
-    access::ModuleAccess,
+    access::{ModuleAccess, ScriptAccess},
     errors::{Location, VMResult},
     file_format::CompiledScript,
     CompiledModule,
@@ -42,6 +42,14 @@ impl PartiallyVerifiedModule {
 /// Wrapper around partially verified compiled script, i.e., one that passed
 /// local bytecode verification, but not the dependency checks yet.
 pub struct PartiallyVerifiedScript(Arc<CompiledScript>);
+
+impl PartiallyVerifiedScript {
+    pub fn immediate_dependencies_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.0.immediate_dependencies_iter()
+    }
+}
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared
 /// between the VM and the code cache.
