@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::backup_restore::gcs::GcsBackupRestoreOperator;
+use crate::{
+    backup_restore::gcs::GcsBackupRestoreOperator, snapshot_folder_name, snapshot_folder_prefix,
+};
 use anyhow::{Context, Error};
 use aptos_api::context::Context as ApiContext;
 use aptos_api_types::TransactionOnChainData;
@@ -266,8 +268,8 @@ impl TableInfoService {
         end_early_if_pending_on_empty: bool,
     ) -> EndVersion {
         let start_time = std::time::Instant::now();
-        let start_version = raw_txns.first().map(|txn| txn.version).unwrap();
-        let end_version = raw_txns.last().map(|txn| txn.version).unwrap();
+        let start_version = raw_txns[0].version;
+        let end_version = raw_txns.last().unwrap().version;
         let num_transactions = raw_txns.len();
 
         Self::parse_table_info(
@@ -377,7 +379,7 @@ impl TableInfoService {
         let snapshot_dir = context
             .node_config
             .get_data_dir()
-            .join(format!("chain_{}_epoch_{}", chain_id, epoch));
+            .join(snapshot_folder_name(chain_id as u64, epoch));
         // rocksdb will create a checkpoint to take a snapshot of full db and then save it to snapshot_path
         indexer_async_v2
             .create_checkpoint(&snapshot_dir)
@@ -395,7 +397,8 @@ impl TableInfoService {
         context: Arc<ApiContext>,
         backup_restore_operator: Arc<GcsBackupRestoreOperator>,
     ) {
-        let target_snapshot_directory_prefix = format!("chain_{}_epoch_", context.chain_id().id());
+        let target_snapshot_directory_prefix =
+            snapshot_folder_prefix(context.chain_id().id() as u64);
         // Scan the data directory to find the latest epoch to upload.
         let mut epochs_to_backup = vec![];
         for entry in std::fs::read_dir(context.node_config.get_data_dir()).unwrap() {
@@ -430,10 +433,10 @@ impl TableInfoService {
             backup_the_snapshot_and_cleanup(
                 context.clone(),
                 backup_restore_operator.clone(),
-                epoch)
-                .await;
+                epoch,
+            )
+            .await;
         }
-        
     }
 
     /// TODO(jill): consolidate it with `ensure_highest_known_version`
@@ -478,11 +481,7 @@ async fn backup_the_snapshot_and_cleanup(
     backup_restore_operator: Arc<GcsBackupRestoreOperator>,
     epoch: u64,
 ) {
-    let snapshot_folder_name = format!(
-        "chain_{}_epoch_{}",
-        context.chain_id().id(),
-        epoch
-    );
+    let snapshot_folder_name = snapshot_folder_name(context.chain_id().id() as u64, epoch);
 
     let ledger_chain_id = context.chain_id().id();
     // Validate the runtime.
@@ -514,11 +513,7 @@ async fn backup_the_snapshot_and_cleanup(
     }
 
     backup_restore_operator
-        .backup_db_snapshot_and_update_metadata(
-            ledger_chain_id as u64,
-            epoch,
-            snapshot_dir.clone(),
-        )
+        .backup_db_snapshot_and_update_metadata(ledger_chain_id as u64, epoch, snapshot_dir.clone())
         .await
         .expect("Failed to upload snapshot in table info service");
 
@@ -554,7 +549,7 @@ fn transactions_in_epochs(
         .db
         .get_block_info_by_version(last_version)
         .unwrap_or_else(|_| panic!("Could not get block_info for last version {}", last_version));
-    let split_off_index =  if first_version >= epoch_first_version {
+    let split_off_index = if first_version >= epoch_first_version {
         // All transactions are in the this epoch.
         // Previous epoch is empty, i.e., [0, 0), and this epoch is [first_version, last_version].
         0
@@ -563,9 +558,8 @@ fn transactions_in_epochs(
         // Previous epoch is [0, epoch_first_version - first_version), and the rest.
         epoch_first_version - first_version
     };
-    
-    let transactions_in_this_epoch =
-            transactions.split_off(split_off_index as usize);
+
+    let transactions_in_this_epoch = transactions.split_off(split_off_index as usize);
     // The rest of the transactions are in the previous epoch.
     let transactions_in_previous_epoch = transactions;
     (
