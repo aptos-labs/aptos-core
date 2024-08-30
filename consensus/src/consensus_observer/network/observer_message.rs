@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_observer::error::Error;
+use crate::consensus_observer::common::error::Error;
 use aptos_consensus_types::{
     common::{BatchPayload, Payload},
     pipelined_block::PipelinedBlock,
@@ -1221,18 +1221,6 @@ mod test {
             1,
             0,
         )
-    }
-
-    /// Creates and returns a new block with the given block info
-    fn create_block(block_info: BlockInfo) -> Block {
-        let block_data = BlockData::new_for_testing(
-            block_info.epoch(),
-            block_info.round(),
-            block_info.timestamp_usecs(),
-            QuorumCert::dummy(),
-            BlockType::Genesis,
-        );
-        Block::new_for_testing(block_info.id(), block_data, None)
     }
 
     /// Creates and returns a new ordered block with the given block ID

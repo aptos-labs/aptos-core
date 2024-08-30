@@ -798,6 +798,7 @@ dependencies = [
  "clap 4.4.14",
  "futures",
  "itertools 0.13.0",
+ "move-binary-format",
  "move-compiler",
  "move-core-types",
  "move-model",
@@ -970,6 +971,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4",
+ "derivative",
  "fail",
  "futures",
  "itertools 0.13.0",
@@ -6061,6 +6063,7 @@ dependencies = [
  "anstyle",
  "clap_lex 0.6.0",
  "strsim 0.10.0",
+ "terminal_size",
 ]
 
 [[package]]
@@ -15837,6 +15840,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
+dependencies = [
+ "rustix 0.38.28",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

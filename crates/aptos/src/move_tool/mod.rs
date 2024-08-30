@@ -506,7 +506,7 @@ pub struct TestPackage {
     pub dump_state: bool,
 }
 
-fn fix_bytecode_version(
+pub(crate) fn fix_bytecode_version(
     bytecode_version_in: Option<u32>,
     language_version: Option<LanguageVersion>,
 ) -> Option<u32> {
@@ -814,7 +814,7 @@ impl FromStr for IncludedArtifacts {
     }
 }
 
-fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
+pub(crate) fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
     match optlevel {
         None | Some(OptimizationLevel::Default) => {
             vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]

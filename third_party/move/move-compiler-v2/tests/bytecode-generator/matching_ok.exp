@@ -226,7 +226,7 @@ public fun m::inner_value($t0: m::Inner): u64 {
  12: $t1 := +($t5, $t6)
  13: goto 17
  14: label L3
- 15: $t7 := 15621340914461310977
+ 15: $t7 := 14566554180833181697
  16: abort($t7)
  17: label L0
  18: return $t1
@@ -249,7 +249,7 @@ public fun m::is_inner1($t0: &m::Inner): bool {
   7: $t1 := false
   8: goto 12
   9: label L3
- 10: $t4 := 15621340914461310977
+ 10: $t4 := 14566554180833181697
  11: abort($t4)
  12: label L0
  13: return $t1
@@ -273,7 +273,7 @@ public fun m::is_some<#0>($t0: &m::Option<#0>): bool {
   9: $t1 := true
  10: goto 14
  11: label L3
- 12: $t3 := 15621340914461310977
+ 12: $t3 := 14566554180833181697
  13: abort($t3)
  14: label L0
  15: return $t1
@@ -299,7 +299,7 @@ public fun m::is_some_dropped<#0>($t0: m::Option<#0>): bool {
   9: $t1 := true
  10: goto 14
  11: label L3
- 12: $t5 := 15621340914461310977
+ 12: $t5 := 14566554180833181697
  13: abort($t5)
  14: label L0
  15: return $t1
@@ -339,7 +339,7 @@ public fun m::is_some_specialized($t0: &m::Option<m::Option<u64>>): bool {
  23: $t1 := true
  24: goto 28
  25: label L6
- 26: $t5 := 15621340914461310977
+ 26: $t5 := 14566554180833181697
  27: abort($t5)
  28: label L0
  29: return $t1
@@ -385,7 +385,7 @@ public fun m::outer_value($t0: m::Outer): u64 {
  23: $t1 := +($t7, $t8)
  24: goto 28
  25: label L5
- 26: $t11 := 15621340914461310977
+ 26: $t11 := 14566554180833181697
  27: abort($t11)
  28: label L0
  29: return $t1
@@ -446,7 +446,7 @@ public fun m::outer_value_nested($t0: m::Outer): u64 {
  35: $t1 := +($t10, $t11)
  36: goto 40
  37: label L8
- 38: $t14 := 15621340914461310977
+ 38: $t14 := 14566554180833181697
  39: abort($t14)
  40: label L0
  41: return $t1
@@ -511,7 +511,7 @@ public fun m::outer_value_with_cond($t0: m::Outer): u64 {
  37: $t1 := +($t12, $t13)
  38: goto 42
  39: label L8
- 40: $t16 := 15621340914461310977
+ 40: $t16 := 14566554180833181697
  41: abort($t16)
  42: label L0
  43: return $t1
@@ -556,7 +556,7 @@ public fun m::outer_value_with_cond_ref($t0: &m::Outer): bool {
  27: $t1 := m::is_inner1($t5)
  28: goto 32
  29: label L8
- 30: $t6 := 15621340914461310977
+ 30: $t6 := 14566554180833181697
  31: abort($t6)
  32: label L0
  33: return $t1
@@ -595,7 +595,7 @@ fun m::select_common_fields($t0: m::CommonFields): u64 {
  15: $t5 := infer($t10)
  16: goto 20
  17: label L3
- 18: $t12 := 15621340914461310977
+ 18: $t12 := 14566554180833181697
  19: abort($t12)
  20: label L0
  21: $t1 := +($t2, $t5)

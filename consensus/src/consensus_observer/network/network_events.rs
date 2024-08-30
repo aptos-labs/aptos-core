@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_observer::network_message::{
+use crate::consensus_observer::network::observer_message::{
     ConsensusObserverMessage, ConsensusObserverResponse,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};

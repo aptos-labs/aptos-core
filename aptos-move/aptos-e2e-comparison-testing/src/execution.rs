@@ -19,6 +19,7 @@ use aptos_types::{
 use aptos_validator_interface::AptosValidatorInterface;
 use clap::ValueEnum;
 use itertools::Itertools;
+use move_binary_format::file_format_common::VERSION_6;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_model::metadata::CompilerVersion;
 use std::{cmp, collections::HashMap, path::PathBuf, sync::Arc};
@@ -101,7 +102,7 @@ impl Execution {
         Self {
             input_path,
             execution_mode,
-            bytecode_version: 6,
+            bytecode_version: VERSION_6,
         }
     }
 

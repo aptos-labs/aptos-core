@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
-    logging::{LogEntry, LogSchema},
-    metrics,
-    network_message::OrderedBlock,
-    payload_store::BlockPayloadStore,
+    common::{
+        logging::{LogEntry, LogSchema},
+        metrics,
+    },
+    network::observer_message::OrderedBlock,
+    observer::payload_store::BlockPayloadStore,
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_infallible::Mutex;
@@ -180,7 +182,10 @@ impl PendingBlockStore {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::consensus_observer::network_message::{BlockPayload, BlockTransactionPayload};
+    use crate::consensus_observer::{
+        network::observer_message::{BlockPayload, BlockTransactionPayload},
+        observer::payload_store::BlockPayloadStore,
+    };
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},

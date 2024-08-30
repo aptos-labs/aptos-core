@@ -12,12 +12,7 @@ use async_trait::async_trait;
 use clap::{Args, Parser};
 use move_command_line_common::files::find_move_filenames;
 use move_package::source_package::layout::SourcePackageLayout;
-use std::{
-    collections::BTreeMap,
-    fs,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{collections::BTreeMap, fs, path::PathBuf, process::Command};
 
 /// Format the Move source code.
 #[derive(Debug, Parser)]
@@ -121,15 +116,19 @@ impl FmtCommand {
         let package_path = dir_default_to_current(package_opt.clone()).unwrap();
         let root_res = SourcePackageLayout::try_find_root(&package_path.clone());
         if let Ok(root_package_path) = root_res {
+            let mut path_vec = vec![];
             let sources_path = root_package_path.join(SourcePackageLayout::Sources.path());
+            if sources_path.exists() {
+                path_vec.push(sources_path.clone());
+            }
             let scripts_path = root_package_path.join(SourcePackageLayout::Scripts.path());
-            if let Ok(move_sources) =
-                find_move_filenames(&[sources_path.clone(), scripts_path.clone()], false)
-            {
+            if scripts_path.exists() {
+                path_vec.push(scripts_path.clone());
+            }
+            if let Ok(move_sources) = find_move_filenames(&path_vec, false) {
                 for source in &move_sources {
-                    let source_path = sources_path.join(Path::new(source));
                     let mut cur_cmd = create_cmd();
-                    cur_cmd.arg(format!("--file-path={}", source_path.display()));
+                    cur_cmd.arg(format!("--file-path={}", source));
                     let out = cur_cmd.output().map_err(to_cli_error)?;
                     if !out.status.success() {
                         return Err(CliError::UnexpectedError(format!(
@@ -138,7 +137,7 @@ impl FmtCommand {
                             String::from_utf8(out.stderr).unwrap_or_default()
                         )));
                     } else {
-                        eprintln!("Formatting file:{:?}", source_path);
+                        eprintln!("Formatting file:{:?}", source);
                         match String::from_utf8(out.stdout) {
                             Ok(output) => {
                                 eprint!("{}", output);

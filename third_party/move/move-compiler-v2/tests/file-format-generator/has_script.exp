@@ -9,12 +9,10 @@ B0:
 	0: LdTrue
 	1: BrFalse(3)
 B1:
-	2: Branch(5)
+	2: Ret
 B2:
 	3: LdU64(1)
 	4: Abort
-B3:
-	5: Ret
 }
 }
 ============ bytecode verification succeeded ========

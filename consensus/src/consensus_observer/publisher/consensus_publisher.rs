@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
-    logging::{LogEntry, LogEvent, LogSchema},
-    metrics,
-    network_client::ConsensusObserverClient,
-    network_handler::ConsensusPublisherNetworkMessage,
-    network_message::{
-        ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
-        ConsensusObserverResponse,
+    common::{
+        logging::{LogEntry, LogEvent, LogSchema},
+        metrics,
+    },
+    network::{
+        network_handler::ConsensusPublisherNetworkMessage,
+        observer_client::ConsensusObserverClient,
+        observer_message::{
+            ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
+            ConsensusObserverResponse,
+        },
     },
 };
 use aptos_channels::aptos_channel::Receiver;
@@ -318,8 +322,8 @@ fn spawn_message_serializer_and_sender(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::consensus_observer::{
-        network_events::ResponseSender, network_message::BlockTransactionPayload,
+    use crate::consensus_observer::network::{
+        network_events::ResponseSender, observer_message::BlockTransactionPayload,
     };
     use aptos_config::network_id::NetworkId;
     use aptos_crypto::HashValue;

@@ -90,6 +90,7 @@ pub struct ConsensusConfig {
     pub num_bounded_executor_tasks: u64,
     pub optimistic_sig_verification_for_votes: bool,
     pub optimistic_sig_verification_for_order_votes: bool,
+    pub enable_pre_commit: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -356,6 +357,7 @@ impl Default for ConsensusConfig {
             num_bounded_executor_tasks: 16,
             optimistic_sig_verification_for_votes: true,
             optimistic_sig_verification_for_order_votes: true,
+            enable_pre_commit: true,
         }
     }
 }

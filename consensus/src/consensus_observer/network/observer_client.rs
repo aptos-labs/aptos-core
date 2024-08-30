@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
-    error::Error,
-    logging::{LogEntry, LogEvent, LogSchema},
-    metrics,
-    network_message::{
+    common::{
+        error::Error,
+        logging::{LogEntry, LogEvent, LogSchema},
+        metrics,
+    },
+    network::observer_message::{
         ConsensusObserverDirectSend, ConsensusObserverMessage, ConsensusObserverRequest,
         ConsensusObserverResponse,
     },
