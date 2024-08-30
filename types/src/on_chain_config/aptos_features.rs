@@ -10,7 +10,7 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
-use move_vm_runtime::use_loader_v2_based_on_env;
+use move_vm_runtime::use_loader_v1_based_on_env;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
 
@@ -175,9 +175,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
-            // TODO(loader_v2): Enable the feature flag once ready, for now the feature is
-            //                  enabled using an environment variable.
-            // FeatureFlag::USE_LOADER_V2,
+            FeatureFlag::ENABLE_LOADER_V2,
         ]
     }
 }
@@ -199,8 +197,8 @@ impl Default for Features {
             features.enable(feature);
         }
 
-        if use_loader_v2_based_on_env() {
-            features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        if use_loader_v1_based_on_env() {
+            features.disable(FeatureFlag::ENABLE_LOADER_V2);
         }
 
         features
