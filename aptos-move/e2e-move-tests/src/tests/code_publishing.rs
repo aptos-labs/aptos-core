@@ -10,7 +10,7 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     move_utils::MemberId,
-    on_chain_config::{FeatureFlag, Features, OnChainConfig},
+    on_chain_config::FeatureFlag,
     transaction::{ExecutionStatus, TransactionPayload},
 };
 use claims::assert_ok;
@@ -424,12 +424,6 @@ fn code_publishing_friend_as_private(enabled: Vec<FeatureFlag>, disabled: Vec<Fe
 #[test]
 fn test_module_publishing_does_not_fallback() {
     let mut executor = FakeExecutor::from_head_genesis().set_parallel();
-
-    // First, enable loader V2 implementation and disable the fallback which
-    // is used by the V1 implementation.
-    let mut features = Features::fetch_config(executor.data_store()).unwrap_or_default();
-    features.enable(FeatureFlag::ENABLE_LOADER_V2);
-    executor.data_store_mut().set_features(features);
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
