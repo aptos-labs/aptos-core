@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId},
+    move_vm_ext::{
+        warm_vm_cache::{CachedRuntimeEnvironment, WarmVmCache},
+        AptosMoveResolver, SessionExt, SessionId,
+    },
     natives::aptos_natives_with_builder,
 };
 use aptos_crypto::HashValue;
@@ -19,10 +22,7 @@ use aptos_types::{
     vm::configs::aptos_prod_vm_config,
 };
 use aptos_vm_types::{
-    environment::{
-        aptos_default_ty_builder, aptos_prod_ty_builder, fetch_runtime_environment,
-        set_runtime_environment, Environment,
-    },
+    environment::{aptos_default_ty_builder, aptos_prod_ty_builder, Environment},
     module_and_script_storage::{AptosCodeStorageAdapter, AsAptosCodeStorage},
     storage::change_set_configs::ChangeSetConfigs,
 };
@@ -138,7 +138,7 @@ impl MoveVmExt {
             },
         };
 
-        let mut builder = SafeNativeBuilder::new(
+        let builder = SafeNativeBuilder::new(
             gas_feature_version,
             native_gas_params,
             misc_gas_params,
@@ -150,19 +150,18 @@ impl MoveVmExt {
         // TODO(George): Move gas configs to environment to avoid this clone!
         let mut vm_config = env.vm_config().clone();
         vm_config.ty_builder = ty_builder;
-        vm_config.disallow_dispatch_for_native = env
-            .features()
-            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
 
-        // TODO(loader_v2): Refresh environment when configs change.
-        set_runtime_environment(
-            vm_config.clone(),
-            aptos_natives_with_builder(&mut builder, inject_create_signer_for_gov_sim),
-        );
         let vm = if env.features().is_loader_v2_enabled() {
             // TODO(loader_v2): For now re-create the VM every time. Later we can have a
             //                  single VM created once, which also holds the environment.
-            MoveVM::new_with_runtime_environment(fetch_runtime_environment())
+            let runtime_environment = CachedRuntimeEnvironment::get_cached_runtime_environment(
+                builder,
+                vm_config,
+                resolver,
+                env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+                inject_create_signer_for_gov_sim,
+            ).expect("should be able to create runtime environment; check if there are duplicated natives");
+            MoveVM::new_with_runtime_environment(runtime_environment)
         } else {
             WarmVmCache::get_warm_vm(
                 builder,
