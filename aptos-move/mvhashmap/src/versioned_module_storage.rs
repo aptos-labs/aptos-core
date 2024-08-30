@@ -166,7 +166,12 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
 
     /// Writes a published module to the storage, which is also visible for
     /// the transactions with higher indices.
-    pub fn write_published(&self, key: &K, idx_to_publish: TxnIndex, entry: ModuleStorageEntry) {
+    pub(crate) fn write_published(
+        &self,
+        key: &K,
+        idx_to_publish: TxnIndex,
+        entry: ModuleStorageEntry,
+    ) {
         let mut versioned_entry = self
             .entries
             .get_mut(key)

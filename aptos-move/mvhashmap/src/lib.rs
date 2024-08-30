@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    versioned_data::VersionedData, versioned_delayed_fields::VersionedDelayedFields,
-    versioned_group_data::VersionedGroupData, versioned_module_storage::VersionedModuleStorage,
+    versioned_code_storage::VersionedCodeStorage, versioned_data::VersionedData,
+    versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
     versioned_modules::VersionedModules,
 };
 use aptos_types::{
@@ -16,12 +16,14 @@ use std::{fmt::Debug, hash::Hash};
 
 pub mod types;
 pub mod unsync_map;
+pub mod versioned_code_storage;
 pub mod versioned_data;
 pub mod versioned_delayed_fields;
 pub mod versioned_group_data;
 pub mod versioned_module_storage;
 pub mod versioned_modules;
 
+mod scripts;
 #[cfg(test)]
 mod unit_tests;
 
@@ -39,7 +41,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
-    module_storage: VersionedModuleStorage<K>,
+    code_storage: VersionedCodeStorage<K>,
 }
 
 impl<
@@ -60,7 +62,7 @@ impl<
             delayed_fields: VersionedDelayedFields::new(),
             modules: VersionedModules::new(),
 
-            module_storage: VersionedModuleStorage::empty(),
+            code_storage: VersionedCodeStorage::empty(),
         }
     }
 
@@ -94,8 +96,8 @@ impl<
         &self.modules
     }
 
-    pub fn module_storage(&self) -> &VersionedModuleStorage<K> {
-        &self.module_storage
+    pub fn code_storage(&self) -> &VersionedCodeStorage<K> {
+        &self.code_storage
     }
 }
 

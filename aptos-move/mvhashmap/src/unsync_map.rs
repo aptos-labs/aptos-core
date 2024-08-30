@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    scripts::ScriptCacheEntry,
     types::{GroupReadResult, UnsyncGroupError, ValueWithLayout},
     BlockStateStats,
 };
@@ -14,8 +15,9 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::{errors::PartialVMResult, file_format::CompiledScript};
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::Script;
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -46,7 +48,9 @@ pub struct UnsyncMap<
     group_cache: RefCell<HashMap<K, RefCell<HashMap<T, ValueWithLayout<V>>>>>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 
+    // Code caches for loader V2 implementations: module storage and script cache.
     module_storage: RefCell<HashMap<K, Arc<ModuleStorageEntry>>>,
+    script_cache: RefCell<HashMap<[u8; 32], ScriptCacheEntry>>,
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
@@ -70,6 +74,7 @@ impl<
             resource_map: RefCell::new(HashMap::new()),
             module_map: RefCell::new(HashMap::new()),
             module_storage: RefCell::new(HashMap::new()),
+            script_cache: RefCell::new(HashMap::new()),
             group_cache: RefCell::new(HashMap::new()),
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
@@ -249,6 +254,35 @@ impl<
         self.module_storage.borrow().get(key).cloned()
     }
 
+    pub fn get_deserialized_script(&self, hash: &[u8; 32]) -> Option<Arc<CompiledScript>> {
+        Some(self.script_cache.borrow().get(hash)?.as_compiled_script())
+    }
+
+    pub fn cache_deserialized_script(&self, hash: [u8; 32], compiled_script: Arc<CompiledScript>) {
+        use ScriptCacheEntry::*;
+        self.script_cache
+            .borrow_mut()
+            .insert(hash, Deserialized(compiled_script));
+    }
+
+    pub fn get_verified_script(
+        &self,
+        hash: &[u8; 32],
+    ) -> Option<Result<Arc<Script>, Arc<CompiledScript>>> {
+        use ScriptCacheEntry::*;
+        Some(match self.script_cache.borrow().get(hash)? {
+            Verified(script) => Ok(script.clone()),
+            Deserialized(compiled_script) => Err(compiled_script.clone()),
+        })
+    }
+
+    pub fn cache_verified_script(&self, hash: [u8; 32], script: Arc<Script>) {
+        use ScriptCacheEntry::*;
+        self.script_cache
+            .borrow_mut()
+            .insert(hash, Verified(script));
+    }
+
     pub fn fetch_delayed_field(&self, id: &I) -> Option<DelayedFieldValue> {
         self.delayed_field_map.borrow().get(id).cloned()
     }
@@ -266,6 +300,14 @@ impl<
     }
 
     pub fn write_module_storage_entry(&self, key: K, entry: Arc<ModuleStorageEntry>) {
+        self.module_storage.borrow_mut().insert(key, entry);
+    }
+
+    pub fn publish_module_storage_entry(&self, key: K, entry: Arc<ModuleStorageEntry>) {
+        // Flush the script cache if there is a module upgrade.
+        let mut script_cache = self.script_cache.borrow_mut();
+        script_cache.clear();
+
         self.module_storage.borrow_mut().insert(key, entry);
     }
 
