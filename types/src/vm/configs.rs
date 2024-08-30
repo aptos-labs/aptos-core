@@ -110,7 +110,7 @@ pub fn aptos_prod_vm_config(
         // manually where applicable.
         delayed_field_optimization_enabled: false,
         ty_builder,
-        disallow_dispatch_for_native: false,
+        disallow_dispatch_for_native: features.is_enabled(FeatureFlag::DISALLOW_USER_NATIVES),
         use_compatibility_checker_v2,
         use_loader_v2: features.is_loader_v2_enabled(),
     }
