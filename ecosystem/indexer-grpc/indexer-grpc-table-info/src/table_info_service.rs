@@ -409,8 +409,7 @@ impl TableInfoService {
                 && file_name.starts_with(&target_snapshot_directory_prefix)
                 && !file_name.ends_with(".tmp")
             {
-                let epoch = file_name
-                    .replace(&target_snapshot_directory_prefix, "");
+                let epoch = file_name.replace(&target_snapshot_directory_prefix, "");
                 let epoch = epoch.parse::<u64>().unwrap();
                 epochs_to_backup.push(epoch);
             }
