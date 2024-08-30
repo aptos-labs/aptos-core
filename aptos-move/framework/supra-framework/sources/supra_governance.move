@@ -57,12 +57,8 @@ module supra_framework::supra_governance {
     const EMETADATA_HASH_TOO_LONG: u64 = 10;
     /// Account is not authorized to call this function.
     const EUNAUTHORIZED: u64 = 11;
-    /// The stake pool is using voting power more than it has.
-    const EVOTING_POWER_OVERFLOW: u64 = 12;
     /// Partial voting feature hasn't been properly initialized.
     const EPARTIAL_VOTING_NOT_INITIALIZED: u64 = 13;
-    /// The proposal in the argument is not a partial voting proposal.
-    const ENOT_PARTIAL_VOTING_PROPOSAL: u64 = 14;
     /// The account does not have permission to propose or vote
     const EACCOUNT_NOT_AUTHORIZED: u64 = 15;
     /// Proposal is expired
@@ -554,7 +550,6 @@ module supra_framework::supra_governance {
         proposal_id
     }
 
-
     /// Create a single-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
@@ -640,31 +635,6 @@ module supra_framework::supra_governance {
             },
         );
         proposal_id
-    }
-
-    /// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
-    public entry fun batch_vote(
-        voter: &signer,
-        stake_pools: vector<address>,
-        proposal_id: u64,
-        should_pass: bool,
-    ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        vector::for_each(stake_pools, |stake_pool| {
-            vote_internal(voter, stake_pool, proposal_id, MAX_U64, should_pass);
-        });
-    }
-
-    /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
-    public entry fun batch_partial_vote(
-        voter: &signer,
-        stake_pools: vector<address>,
-        proposal_id: u64,
-        voting_power: u64,
-        should_pass: bool,
-    ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        vector::for_each(stake_pools, |stake_pool| {
-            vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass);
-        });
     }
 
     /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
@@ -835,10 +805,6 @@ module supra_framework::supra_governance {
         if (proposal_state == PROPOSAL_STATE_SUCCEEDED) {
             add_supra_approved_script_hash(proposal_id);
         }
-    }
-
-    public entry fun add_approved_script_hash_script(proposal_id: u64) acquires ApprovedExecutionHashes {
-        add_approved_script_hash(proposal_id)
     }
 
     public entry fun add_supra_approved_script_hash_script(proposal_id: u64) acquires ApprovedExecutionHashes {
@@ -1457,44 +1423,6 @@ module supra_framework::supra_governance {
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 10, 2);
 
         // No enough Yes. The proposal cannot be resolved.
-        test_resolving_proposal_generic(supra_framework, true, execution_hash);
-    }
-
-    #[test(supra_framework = @supra_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    public entry fun test_batch_vote(
-        supra_framework: signer,
-        proposer: signer,
-        voter_1: signer,
-        voter_2: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        features::change_feature_flags_for_testing(&supra_framework, vector[features::get_coin_to_fungible_asset_migration_feature()], vector[]);
-        setup_partial_voting(&supra_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
-        stake::set_delegated_voter(&voter_2, voter_1_addr);
-        create_proposal_for_test(&proposer, true);
-        batch_vote(&voter_1, vector[voter_1_addr, voter_2_addr], 0, true);
-        test_resolving_proposal_generic(supra_framework, true, execution_hash);
-    }
-
-    #[test(supra_framework = @supra_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    public entry fun test_batch_partial_vote(
-        supra_framework: signer,
-        proposer: signer,
-        voter_1: signer,
-        voter_2: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        features::change_feature_flags_for_testing(&supra_framework, vector[features::get_coin_to_fungible_asset_migration_feature()], vector[]);
-        setup_partial_voting(&supra_framework, &proposer, &voter_1, &voter_2);
-        let execution_hash = vector::empty<u8>();
-        vector::push_back(&mut execution_hash, 1);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
-        stake::set_delegated_voter(&voter_2, voter_1_addr);
-        create_proposal_for_test(&proposer, true);
-        batch_partial_vote(&voter_1, vector[voter_1_addr, voter_2_addr], 0, 9, true);
         test_resolving_proposal_generic(supra_framework, true, execution_hash);
     }
 
