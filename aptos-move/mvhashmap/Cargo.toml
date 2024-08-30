@@ -24,6 +24,7 @@ crossbeam = { workspace = true }
 dashmap = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
+move-vm-runtime = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
