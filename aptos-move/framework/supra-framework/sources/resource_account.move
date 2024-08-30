@@ -208,6 +208,24 @@ module supra_framework::resource_account {
     }
 
     #[test(user = @0x1111)]
+    #[expected_failure(abort_code = 393217, location = Self)]
+    public entry fun test_create_account_and_retrieve_wrong_cap_should_fail(user: signer) acquires Container {
+        let user_addr = signer::address_of(&user);
+        account::create_account(user_addr);
+
+        let seed = x"01";
+
+        create_resource_account(&user, copy seed, vector::empty());
+        let container = borrow_global<Container>(user_addr);
+
+        let resource_addr = supra_framework::account::create_resource_address(&user_addr, seed);
+        let resource_cap = simple_map::borrow(&container.store, &resource_addr);
+
+        let resource = account::create_signer_with_capability(resource_cap);
+        let _resource_cap = retrieve_resource_account_cap(&resource, @0x1112);
+    }
+
+    #[test(user = @0x1111)]
     #[expected_failure(abort_code = 0x10002, location = aptos_std::simple_map)]
     public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(
         user: signer
