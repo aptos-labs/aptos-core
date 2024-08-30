@@ -191,7 +191,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let (change_set, module_write_set) = Self::convert_change_set(
             &woc,
             change_set,
-            self.is_loader_v2_enabled,
             resource_group_change_set,
             events,
             table_change_set,
@@ -388,7 +387,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn convert_change_set(
         woc: &WriteOpConverter,
         change_set: ChangeSet,
-        is_loader_v2_enabled: bool,
         resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         table_change_set: TableChangeSet,
@@ -491,13 +489,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             events,
         )?;
 
-        // Modules must not be published through the V1 flow if we are using V2.
-        if is_loader_v2_enabled && !module_write_ops.is_empty() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Non-empty V1 module write set in V2 flow".to_string()),
-            );
-        }
         let module_write_set =
             ModuleWriteSet::new(has_modules_published_to_special_address, module_write_ops);
 
