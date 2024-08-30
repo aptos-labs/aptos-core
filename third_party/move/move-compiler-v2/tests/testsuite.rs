@@ -717,6 +717,20 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
         },
+        // Unreachable code remover
+        TestConfig {
+            name: "plus-equal",
+            runner: |p| run_test(p, get_config_by_name("plus-equal")),
+            include: vec!["/plus-equal/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone(),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });

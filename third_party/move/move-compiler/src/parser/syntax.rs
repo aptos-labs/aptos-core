@@ -1903,7 +1903,21 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                             Exp_::Block(sequence)
                         }
                         _ => {
-                            todo!()
+                            // let lhs = sp(lhs_loc, lhs_);
+                            let use_decl = vec![];
+                            let tmp_name = Symbol::from("__lhs");
+                            let bind_ = Bind_::Var(Var(sp(lhs_loc, tmp_name)));
+                            let bind_ls = sp(lhs_loc, vec![sp(lhs_loc, bind_)]);
+                            let tmp = Exp_::Name(sp(lhs_loc, NameAccessChain_::One(sp(lhs_loc, tmp_name))), None);
+                            let mut_borrow_lhs = sp(lhs_loc, Exp_::Borrow(true, Box::new(sp(lhs_loc, lhs_))));
+                            let sequence_item = sp(lhs_loc, SequenceItem_::Bind(bind_ls, None, Box::new(mut_borrow_lhs)));
+                            let deref_tmp = sp(lhs_loc, Exp_::Dereference(Box::new(sp(lhs_loc, tmp.clone()))));
+                            let rhs_expanded_ = Exp_::BinopExp(Box::new(deref_tmp.clone()), sp(rhs.loc, BinOp_::Add), rhs);
+                            let rhs_expanded = sp(rhs_loc, rhs_expanded_);
+                            let exp_ = Exp_::Assign(Box::new(deref_tmp), Box::new(rhs_expanded));
+                            let exp = sp(block_loc, exp_);
+                            let sequence = (use_decl, vec![sequence_item], Some(block_loc), Box::new(Some(exp)));
+                            Exp_::Block(sequence)
                         }
                     }
                 },
