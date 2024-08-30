@@ -404,21 +404,14 @@ impl TableInfoService {
         for entry in std::fs::read_dir(context.node_config.get_data_dir()).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
-
+            let file_name = path.file_name().unwrap().to_string_lossy();
             if path.is_dir()
-                && path
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .starts_with(&target_snapshot_directory_prefix)
+                && file_name.starts_with(&target_snapshot_directory_prefix)
+                && !file_name.ends_with(".tmp")
             {
-                let epoch = path
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .replace(&target_snapshot_directory_prefix, "")
-                    .parse::<u64>()
-                    .unwrap();
+                let epoch = file_name
+                    .replace(&target_snapshot_directory_prefix, "");
+                let epoch = epoch.parse::<u64>().unwrap();
                 epochs_to_backup.push(epoch);
             }
         }
