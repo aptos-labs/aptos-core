@@ -3,7 +3,12 @@
 
 use crate::{loader::Script, ModuleStorage};
 use ambassador::delegatable_trait;
-use move_binary_format::{errors::VMResult, file_format::CompiledScript};
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::{Location, PartialVMError, VMResult},
+    file_format::CompiledScript,
+};
+use move_core_types::vm_status::StatusCode;
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
@@ -12,6 +17,18 @@ pub fn script_hash(serialized_script: &[u8]) -> [u8; 32] {
     let mut sha3_256 = Sha3_256::new();
     sha3_256.update(serialized_script);
     sha3_256.finalize().into()
+}
+
+pub fn deserialize_script(
+    serialized_script: &[u8],
+    deserializer_config: &DeserializerConfig,
+) -> VMResult<CompiledScript> {
+    CompiledScript::deserialize_with_config(serialized_script, deserializer_config).map_err(|err| {
+        let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+        PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+            .with_message(msg)
+            .finish(Location::Script)
+    })
 }
 
 /// Represents storage which in addition to modules, also caches scripts. The

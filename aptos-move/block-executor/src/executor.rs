@@ -195,6 +195,7 @@ where
                     // TODO(loader_v2): We do not need to clone out all module writes in V2 design
                     //                  since we do not store them anymore.
                     versioned_cache
+                        .code_storage()
                         .module_storage()
                         .write_pending(k, idx_to_execute)
                 } else {
@@ -300,7 +301,10 @@ where
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
                 Module => {
                     if runtime_environment.vm_config().use_loader_v2 {
-                        versioned_cache.module_storage().remove(&k, idx_to_execute);
+                        versioned_cache
+                            .code_storage()
+                            .module_storage()
+                            .remove(&k, idx_to_execute);
                     } else {
                         versioned_cache.modules().remove(&k, idx_to_execute);
                     }
@@ -371,7 +375,10 @@ where
 
         let is_valid = read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
-            && read_set.validate_module_reads(versioned_cache.module_storage(), idx_to_validate);
+            && read_set.validate_module_reads(
+                versioned_cache.code_storage().module_storage(),
+                idx_to_validate,
+            );
         Ok(is_valid)
     }
 
@@ -548,13 +555,11 @@ where
                 if runtime_environment.vm_config().use_loader_v2 {
                     if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
                         executed_at_commit = true;
-                        for (key, v) in module_write_set.into_iter() {
-                            let entry =
-                                ModuleStorageEntry::from_transaction_write(runtime_environment, v)?;
-                            versioned_cache
-                                .module_storage()
-                                .write_published(&key, txn_idx, entry);
-                        }
+                        versioned_cache.code_storage().write_published_modules(
+                            txn_idx,
+                            runtime_environment,
+                            module_write_set.into_iter(),
+                        )?;
                     }
                 }
 
@@ -579,13 +584,11 @@ where
             // decrease the validation index.
             if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
                 if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
-                    for (key, v) in module_write_set.into_iter() {
-                        let entry =
-                            ModuleStorageEntry::from_transaction_write(runtime_environment, v)?;
-                        versioned_cache
-                            .module_storage()
-                            .write_published(&key, txn_idx, entry);
-                    }
+                    versioned_cache.code_storage().write_published_modules(
+                        txn_idx,
+                        runtime_environment,
+                        module_write_set.into_iter(),
+                    )?;
                     scheduler.finish_execution_during_commit(txn_idx)?;
                 }
             }
@@ -1082,7 +1085,7 @@ where
             if runtime_environment.vm_config().use_loader_v2 {
                 let entry =
                     ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
-                unsync_map.write_module_storage_entry(key, Arc::new(entry));
+                unsync_map.publish_module_storage_entry(key, Arc::new(entry));
             } else {
                 unsync_map.write_module(key, write_op);
             }
