@@ -4,6 +4,7 @@
 use crate::{
     script_hash,
     storage::{
+        code_storage::deserialize_script,
         environment::WithRuntimeEnvironment,
         implementations::unsync_module_storage::IntoUnsyncModuleStorage,
         module_storage::{ambassador_impl_ModuleStorage, ModuleBytesStorage},
@@ -13,15 +14,9 @@ use crate::{
 use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
-    access::ScriptAccess,
-    errors::{Location, PartialVMError, VMResult},
-    file_format::CompiledScript,
-    CompiledModule,
+    access::ScriptAccess, errors::VMResult, file_format::CompiledScript, CompiledModule,
 };
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, metadata::Metadata,
-    vm_status::StatusCode,
-};
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 #[cfg(test)]
 use std::collections::BTreeSet;
 use std::{
@@ -84,15 +79,7 @@ impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
             .runtime_environment()
             .vm_config()
             .deserializer_config;
-        let compiled_script =
-            CompiledScript::deserialize_with_config(serialized_script, deserializer_config)
-                .map_err(|err| {
-                    // Note: we remap the error to be consistent with loader V1 implementation!
-                    let msg = format!("[VM] deserializer for script returned error: {:?}", err);
-                    PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                        .with_message(msg)
-                        .finish(Location::Script)
-                })?;
+        let compiled_script = deserialize_script(serialized_script, deserializer_config)?;
         Ok(Arc::new(compiled_script))
     }
 

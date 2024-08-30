@@ -5,6 +5,7 @@
 use crate::{
     loader::{Loader, ModuleStorageAdapter},
     logging::expect_no_verification_errors,
+    storage::code_storage::deserialize_script,
     ModuleStorage,
 };
 use bytes::Bytes;
@@ -313,18 +314,7 @@ impl<'r> TransactionDataCache<'r> {
         match cache.entry(hash_value) {
             btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
             btree_map::Entry::Vacant(entry) => {
-                let script = match CompiledScript::deserialize_with_config(
-                    script_blob,
-                    &self.deserializer_config,
-                ) {
-                    Ok(script) => script,
-                    Err(err) => {
-                        let msg = format!("[VM] deserializer for script returned error: {:?}", err);
-                        return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                            .with_message(msg)
-                            .finish(Location::Script));
-                    },
-                };
+                let script = deserialize_script(script_blob, &self.deserializer_config)?;
                 Ok(entry.insert(Arc::new(script)).clone())
             },
         }
