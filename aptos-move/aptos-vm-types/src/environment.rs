@@ -11,31 +11,9 @@ use aptos_types::{
     state_store::StateView,
     vm::configs::{aptos_prod_vm_config, get_timed_feature_override},
 };
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use move_vm_runtime::{
-    config::VMConfig, native_functions::NativeFunction, use_loader_v1_based_on_env,
-    RuntimeEnvironment,
-};
+use move_vm_runtime::{config::VMConfig, use_loader_v1_based_on_env};
 use move_vm_types::loaded_data::runtime_types::TypeBuilder;
-use std::sync::{Arc, OnceLock};
-
-// TODO(loader_v2): Remove this, it is for tests only.
-static ENV: OnceLock<Arc<RuntimeEnvironment>> = OnceLock::new();
-
-pub fn set_runtime_environment(
-    vm_config: VMConfig,
-    natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-) {
-    ENV.set(Arc::new(RuntimeEnvironment::new(vm_config, natives, None)))
-        .ok();
-}
-
-pub fn fetch_runtime_environment() -> Arc<RuntimeEnvironment> {
-    match ENV.get() {
-        Some(runtime_environment) => runtime_environment.clone(),
-        None => unreachable!(),
-    }
-}
+use std::sync::Arc;
 
 // TODO(George): move configs here from types crate.
 pub fn aptos_prod_ty_builder(
