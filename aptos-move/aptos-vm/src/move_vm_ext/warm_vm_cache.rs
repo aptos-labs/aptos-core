@@ -16,9 +16,72 @@ use move_core_types::{
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, RuntimeEnvironment};
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
+
+// TODO(loader_v2): Remove this, right now it mimics warm vm cache to bypass
+//                  the problem of the initializing the VM from environment
+//                  from the state.
+/// Caches a single runtime environment used by executor instances running in parallel. We
+/// need to keep a map because there can be multiple instances of executions running at
+/// the same time (e.g., unit tests), enabling & disabling features.
+pub(crate) struct CachedRuntimeEnvironment(RwLock<HashMap<WarmVmId, Arc<RuntimeEnvironment>>>);
+
+static RUNTIME_ENVIRONMENT: Lazy<CachedRuntimeEnvironment> =
+    Lazy::new(|| CachedRuntimeEnvironment(RwLock::new(HashMap::new())));
+
+impl CachedRuntimeEnvironment {
+    pub(crate) fn get_cached_runtime_environment(
+        native_builder: SafeNativeBuilder,
+        vm_config: VMConfig,
+        resolver: &impl AptosMoveResolver,
+        bin_v7_enabled: bool,
+        inject_create_signer_for_gov_sim: bool,
+    ) -> VMResult<Arc<RuntimeEnvironment>> {
+        RUNTIME_ENVIRONMENT.get(
+            native_builder,
+            vm_config,
+            resolver,
+            bin_v7_enabled,
+            inject_create_signer_for_gov_sim,
+        )
+    }
+
+    fn get(
+        &self,
+        mut native_builder: SafeNativeBuilder,
+        vm_config: VMConfig,
+        resolver: &impl AptosMoveResolver,
+        bin_v7_enabled: bool,
+        inject_create_signer_for_gov_sim: bool,
+    ) -> VMResult<Arc<RuntimeEnvironment>> {
+        let id = {
+            WarmVmId::new(
+                &native_builder,
+                &vm_config,
+                resolver,
+                bin_v7_enabled,
+                inject_create_signer_for_gov_sim,
+            )?
+        };
+
+        if let Some(runtime_environment) = self.0.read().get(&id) {
+            return Ok(runtime_environment.clone());
+        }
+
+        let mut cached_runtime_environment = self.0.write();
+        if let Some(runtime_environment) = cached_runtime_environment.get(&id) {
+            return Ok(runtime_environment.clone());
+        }
+
+        let natives =
+            aptos_natives_with_builder(&mut native_builder, inject_create_signer_for_gov_sim);
+        let runtime_environment = Arc::new(RuntimeEnvironment::new(vm_config, natives, None));
+        cached_runtime_environment.insert(id, runtime_environment.clone());
+        Ok(runtime_environment)
+    }
+}
 
 const WARM_VM_CACHE_SIZE: usize = 8;
 
