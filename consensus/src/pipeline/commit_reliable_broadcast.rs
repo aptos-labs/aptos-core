@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{network::NetworkSender, network_interface::ConsensusMsg};
+use crate::{counters, network::NetworkSender, network_interface::ConsensusMsg};
 use anyhow::bail;
 use aptos_consensus_types::{
     common::Author,
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -36,8 +36,22 @@ impl CommitMessage {
     /// Verify the signatures on the message
     pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         match self {
-            CommitMessage::Vote(vote) => vote.verify(verifier),
-            CommitMessage::Decision(decision) => decision.verify(verifier),
+            CommitMessage::Vote(vote) => {
+                let start_time = Instant::now();
+                let result = vote.verify(verifier);
+                counters::VERIFY_MSG
+                    .with_label_values(&["commit_vote"])
+                    .observe(start_time.elapsed().as_secs_f64());
+                result
+            },
+            CommitMessage::Decision(decision) => {
+                let start_time = Instant::now();
+                let result = decision.verify(verifier);
+                counters::VERIFY_MSG
+                    .with_label_values(&["commit_decision"])
+                    .observe(start_time.elapsed().as_secs_f64());
+                result
+            },
             CommitMessage::Ack(_) => bail!("Unexpected ack in incoming commit message"),
             CommitMessage::Nack => bail!("Unexpected NACK in incoming commit message"),
         }
