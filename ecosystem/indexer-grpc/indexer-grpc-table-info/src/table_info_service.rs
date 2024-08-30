@@ -11,7 +11,7 @@ use aptos_indexer_grpc_fullnode::stream_coordinator::{
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
-use aptos_types::{account_config::NewBlockEvent, write_set::WriteSet};
+use aptos_types::write_set::WriteSet;
 use itertools::Itertools;
 use std::{sync::Arc, time::Duration};
 
@@ -61,11 +61,8 @@ impl TableInfoService {
         // TODO: fix the restore logic.
         let backup_is_enabled = match self.backup_restore_operator.clone() {
             Some(backup_restore_operator) => {
-                let backup_restore_operator = backup_restore_operator.clone();
                 let context = self.context.clone();
                 let _task = tokio::spawn(async move {
-                    let backup_restore_operator = backup_restore_operator.clone();
-                    let context = context.clone();
                     loop {
                         Self::backup_snapshot_if_present(
                             context.clone(),
@@ -87,16 +84,13 @@ impl TableInfoService {
             let start_time = std::time::Instant::now();
             let ledger_version = self.get_highest_known_version().await.unwrap_or_default();
             let batches = self.get_batches(ledger_version).await;
-            let transactions = self
-                .fetch_batches(batches.clone(), ledger_version)
-                .await
-                .unwrap();
+            let transactions = self.fetch_batches(batches, ledger_version).await.unwrap();
             let num_transactions = transactions.len();
             let last_version = transactions
                 .last()
                 .map(|txn| txn.version)
                 .unwrap_or_default();
-            let (transactions_in_previous_epoch, transactions_in_current_epoch, latest_block_event) =
+            let (transactions_in_previous_epoch, transactions_in_current_epoch, epoch) =
                 transactions_in_epochs(&self.context, transactions);
 
             // At the end of the epoch, snapshot the database.
@@ -106,7 +100,7 @@ impl TableInfoService {
                     transactions_in_previous_epoch,
                 )
                 .await;
-                let previous_epoch = latest_block_event.epoch() - 1;
+                let previous_epoch = epoch - 1;
                 if backup_is_enabled {
                     Self::snapshot_indexer_async_v2(
                         self.context.clone(),
@@ -403,7 +397,7 @@ impl TableInfoService {
     ) {
         let target_snapshot_directory_prefix = format!("chain_{}_epoch_", context.chain_id().id());
         // Scan the data directory to find the latest epoch to upload.
-        let mut latest_epoch = None;
+        let mut epochs_to_backup = vec![];
         for entry in std::fs::read_dir(context.node_config.get_data_dir()).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
@@ -422,66 +416,24 @@ impl TableInfoService {
                     .replace(&target_snapshot_directory_prefix, "")
                     .parse::<u64>()
                     .unwrap();
-                if latest_epoch.is_none() || epoch > latest_epoch.unwrap() {
-                    latest_epoch = Some(epoch);
-                }
+                epochs_to_backup.push(epoch);
             }
         }
         // If nothing to backup, return.
-        if latest_epoch.is_none() {
+        if epochs_to_backup.is_empty() {
             return;
         }
-        let block_event_epoch = latest_epoch.unwrap();
-        let snapshot_folder_name = format!(
-            "chain_{}_epoch_{}",
-            context.chain_id().id(),
-            latest_epoch.unwrap()
-        );
-
-        let ledger_chain_id = context.chain_id().id();
-        // Validate the runtime.
-        let backup_metadata = backup_restore_operator.get_metadata().await;
-        if let Some(metadata) = backup_metadata {
-            if metadata.chain_id != (ledger_chain_id as u64) {
-                panic!(
-                    "Table Info backup chain id does not match with current network. Expected: {}, found in backup: {}",
-                    context.chain_id().id(),
-                    metadata.chain_id
-                );
-            }
+        // Sort the epochs to backup.
+        epochs_to_backup.sort();
+        // Backup the existing snapshots and cleanup.
+        for epoch in epochs_to_backup {
+            backup_the_snapshot_and_cleanup(
+                context.clone(),
+                backup_restore_operator.clone(),
+                epoch)
+                .await;
         }
-
-        let start_time = std::time::Instant::now();
-        // temporary path to store the snapshot
-        let snapshot_dir = context
-            .node_config
-            .get_data_dir()
-            .join(snapshot_folder_name);
-
-        // If the backup is for old epoch, clean up and return.
-        if let Some(metadata) = backup_metadata {
-            if metadata.epoch >= block_event_epoch {
-                // Remove the snapshot directory.
-                std::fs::remove_dir_all(snapshot_dir).unwrap();
-                return;
-            }
-        }
-
-        backup_restore_operator
-            .backup_db_snapshot_and_update_metadata(
-                ledger_chain_id as u64,
-                block_event_epoch,
-                snapshot_dir.clone(),
-            )
-            .await
-            .expect("Failed to upload snapshot in table info service");
-
-        // TODO: use log_grpc_step to log the backup step.
-        info!(
-            backup_epoch = block_event_epoch,
-            backup_millis = start_time.elapsed().as_millis(),
-            "[Table Info] Table info db backed up successfully"
-        );
+        
     }
 
     /// TODO(jill): consolidate it with `ensure_highest_known_version`
@@ -521,38 +473,104 @@ impl TableInfoService {
     }
 }
 
-/// Split transactions into two epochs based on the **current** epoch first version.
+async fn backup_the_snapshot_and_cleanup(
+    context: Arc<ApiContext>,
+    backup_restore_operator: Arc<GcsBackupRestoreOperator>,
+    epoch: u64,
+) {
+    let snapshot_folder_name = format!(
+        "chain_{}_epoch_{}",
+        context.chain_id().id(),
+        epoch
+    );
+
+    let ledger_chain_id = context.chain_id().id();
+    // Validate the runtime.
+    let backup_metadata = backup_restore_operator.get_metadata().await;
+    if let Some(metadata) = backup_metadata {
+        if metadata.chain_id != (ledger_chain_id as u64) {
+            panic!(
+                "Table Info backup chain id does not match with current network. Expected: {}, found in backup: {}",
+                context.chain_id().id(),
+                metadata.chain_id
+            );
+        }
+    }
+
+    let start_time = std::time::Instant::now();
+    // temporary path to store the snapshot
+    let snapshot_dir = context
+        .node_config
+        .get_data_dir()
+        .join(snapshot_folder_name);
+
+    // If the backup is for old epoch, clean up and return.
+    if let Some(metadata) = backup_metadata {
+        if metadata.epoch >= epoch {
+            // Remove the snapshot directory.
+            std::fs::remove_dir_all(snapshot_dir).unwrap();
+            return;
+        }
+    }
+
+    backup_restore_operator
+        .backup_db_snapshot_and_update_metadata(
+            ledger_chain_id as u64,
+            epoch,
+            snapshot_dir.clone(),
+        )
+        .await
+        .expect("Failed to upload snapshot in table info service");
+
+    // TODO: use log_grpc_step to log the backup step.
+    info!(
+        backup_epoch = epoch,
+        backup_millis = start_time.elapsed().as_millis(),
+        "[Table Info] Table info db backed up successfully"
+    );
+}
+
+/// Split transactions into two epochs based on the first version in **this** epoch.
 /// If the first version of the transaction is less than the epoch first version, it will be in the previous epoch.
 /// Otherwise, it will be in the current epoch.
 fn transactions_in_epochs(
     context: &ApiContext,
-    transactions: Vec<TransactionOnChainData>,
+    mut transactions: Vec<TransactionOnChainData>,
 ) -> (
     Vec<TransactionOnChainData>,
     Vec<TransactionOnChainData>,
-    NewBlockEvent,
+    u64,
 ) {
     let last_version = transactions
         .last()
         .map(|txn| txn.version)
         .unwrap_or_default();
-    let mut transactions_in_previous_epoch = vec![];
-    let mut transactions_in_current_epoch = vec![];
+    let first_version = transactions
+        .first()
+        .map(|txn| txn.version)
+        .unwrap_or_default();
     // Get epoch information.
     let (epoch_first_version, _, block_epoch) = context
         .db
         .get_block_info_by_version(last_version)
-        .unwrap_or_else(|_| panic!("Could not get block_info for last version {}", last_version,));
-    for txn in transactions {
-        if txn.version < epoch_first_version {
-            transactions_in_previous_epoch.push(txn);
-        } else {
-            transactions_in_current_epoch.push(txn);
-        }
-    }
+        .unwrap_or_else(|_| panic!("Could not get block_info for last version {}", last_version));
+    let split_off_index =  if first_version >= epoch_first_version {
+        // All transactions are in the this epoch.
+        // Previous epoch is empty, i.e., [0, 0), and this epoch is [first_version, last_version].
+        0
+    } else {
+        // Some transactions are in the previous epoch.
+        // Previous epoch is [0, epoch_first_version - first_version), and the rest.
+        epoch_first_version - first_version
+    };
+    
+    let transactions_in_this_epoch =
+            transactions.split_off(split_off_index as usize);
+    // The rest of the transactions are in the previous epoch.
+    let transactions_in_previous_epoch = transactions;
     (
         transactions_in_previous_epoch,
-        transactions_in_current_epoch,
-        block_epoch,
+        transactions_in_this_epoch,
+        block_epoch.epoch(),
     )
 }
