@@ -1477,25 +1477,35 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
-            
-            if self.config.optimistic_sig_verification_for_order_votes && self.round_manager_unverified_tx.is_some() {
+
+            if self.config.optimistic_sig_verification_for_order_votes
+                && self.round_manager_unverified_tx.is_some()
+            {
                 if let UnverifiedEvent::OrderVoteMsg(order_vote) = &unverified_event {
                     order_vote.partial_verify()?;
                     Self::forward_event_to(
                         round_manager_unverified_tx,
-                        (peer_id, discriminant(&UnverifiedEvent::OrderVoteMsg(order_vote.clone()))),
+                        (
+                            peer_id,
+                            discriminant(&UnverifiedEvent::OrderVoteMsg(order_vote.clone())),
+                        ),
                         (peer_id, UnverifiedEvent::OrderVoteMsg(order_vote.clone())),
                     )
                     .context("round manager sending unverified order vote to round manager")?;
                     return Ok(());
                 }
             }
-            if self.config.optimistic_sig_verification_for_votes && self.round_manager_unverified_tx.is_some() {
+            if self.config.optimistic_sig_verification_for_votes
+                && self.round_manager_unverified_tx.is_some()
+            {
                 if let UnverifiedEvent::VoteMsg(vote) = &unverified_event {
                     vote.partial_verify(&epoch_state.verifier)?;
                     Self::forward_event_to(
                         round_manager_unverified_tx,
-                        (peer_id, discriminant(&UnverifiedEvent::VoteMsg(vote.clone()))),
+                        (
+                            peer_id,
+                            discriminant(&UnverifiedEvent::VoteMsg(vote.clone())),
+                        ),
                         (peer_id, UnverifiedEvent::VoteMsg(vote.clone())),
                     )
                     .context("round manager sending unverified vote to round manager")?;

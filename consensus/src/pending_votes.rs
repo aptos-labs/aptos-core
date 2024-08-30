@@ -105,7 +105,7 @@ impl PendingVotes {
         &mut self,
         vote: &Vote,
         validator_verifier: &ValidatorVerifier,
-        verified: bool,
+        _verified: bool,
     ) -> VoteReceptionResult {
         // derive data from vote
         let li_digest = vote.ledger_info().hash();

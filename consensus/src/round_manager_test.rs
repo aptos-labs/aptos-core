@@ -696,7 +696,10 @@ fn new_round_on_quorum_cert() {
             .unwrap();
         let vote_msg = node.next_vote().await;
         // Adding vote to form a QC
-        node.round_manager.process_vote_msg(vote_msg, true).await.unwrap();
+        node.round_manager
+            .process_vote_msg(vote_msg, true)
+            .await
+            .unwrap();
 
         // round 2 should start
         let proposal_msg = node.next_proposal().await;
@@ -1562,7 +1565,10 @@ fn sync_on_partial_newer_sync_info() {
                 .unwrap();
             let vote_msg = node.next_vote().await;
             // Adding vote to form a QC
-            node.round_manager.process_vote_msg(vote_msg, true).await.unwrap();
+            node.round_manager
+                .process_vote_msg(vote_msg, true)
+                .await
+                .unwrap();
         }
         let block_4 = node.next_proposal().await;
         node.round_manager
@@ -1657,7 +1663,10 @@ fn safety_rules_crash() {
 
             // sign proposal
             reset_safety_rules(&mut node);
-            node.round_manager.process_vote_msg(vote_msg, true).await.unwrap();
+            node.round_manager
+                .process_vote_msg(vote_msg, true)
+                .await
+                .unwrap();
         }
 
         // verify the last sign proposal happened
@@ -1696,7 +1705,10 @@ fn echo_timeout() {
         // node 0 doesn't timeout and should echo the timeout after 2 timeout message
         for i in 0..3 {
             let timeout_vote = node_0.next_vote().await;
-            let result = node_0.round_manager.process_vote_msg(timeout_vote, true).await;
+            let result = node_0
+                .round_manager
+                .process_vote_msg(timeout_vote, true)
+                .await;
             // first and third message should not timeout
             if i == 0 || i == 2 {
                 assert!(result.is_ok());

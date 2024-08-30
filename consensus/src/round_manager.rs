@@ -36,7 +36,21 @@ use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, order_vote_msg::OrderVoteMsg, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
+    block::Block,
+    block_data::BlockType,
+    common::{Author, Round},
+    delayed_qc_msg::DelayedQcMsg,
+    order_vote::OrderVote,
+    order_vote_msg::OrderVoteMsg,
+    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
+    proposal_msg::ProposalMsg,
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutCertificate,
+    vote::Vote,
+    vote_data::VoteData,
+    vote_msg::VoteMsg,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
@@ -1062,7 +1076,11 @@ impl RoundManager {
         Ok(vote)
     }
 
-    async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg, verified: bool) -> anyhow::Result<()> {
+    async fn process_order_vote_msg(
+        &mut self,
+        order_vote_msg: OrderVoteMsg,
+        verified: bool,
+    ) -> anyhow::Result<()> {
         if self.onchain_config.order_vote_enabled() {
             fail_point!("consensus::process_order_vote_msg", |_| {
                 Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
@@ -1070,12 +1088,17 @@ impl RoundManager {
 
             self.new_qc_from_order_vote_msg(&order_vote_msg).await?;
 
-            self.process_order_vote(order_vote_msg.order_vote(), verified).await?;
+            self.process_order_vote(order_vote_msg.order_vote(), verified)
+                .await?;
         }
         Ok(())
     }
 
-    async fn process_order_vote(&mut self, order_vote: &OrderVote, verified: bool) -> anyhow::Result<()> {
+    async fn process_order_vote(
+        &mut self,
+        order_vote: &OrderVote,
+        verified: bool,
+    ) -> anyhow::Result<()> {
         debug!(
             self.new_log(LogEvent::ReceiveOrderVote)
                 .remote_peer(order_vote.author()),
@@ -1091,12 +1114,12 @@ impl RoundManager {
             return Ok(());
         }
 
-        if order_vote.ledger_info().round()
-            > self.block_store.sync_info().highest_ordered_round()
-        {
-            let vote_reception_result = self
-                .pending_order_votes
-                .insert_order_vote(order_vote, &self.epoch_state.verifier, verified);
+        if order_vote.ledger_info().round() > self.block_store.sync_info().highest_ordered_round() {
+            let vote_reception_result = self.pending_order_votes.insert_order_vote(
+                order_vote,
+                &self.epoch_state.verifier,
+                verified,
+            );
             self.process_order_vote_reception_result(vote_reception_result)
                 .await?;
         } else {
@@ -1149,7 +1172,11 @@ impl RoundManager {
     /// potential attacks).
     /// 2. Add the vote to the pending votes and check whether it finishes a QC.
     /// 3. Once the QC/TC successfully formed, notify the RoundState.
-    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg, verified: bool) -> anyhow::Result<()> {
+    pub async fn process_vote_msg(
+        &mut self,
+        vote_msg: VoteMsg,
+        verified: bool,
+    ) -> anyhow::Result<()> {
         fail_point!("consensus::process_vote_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_vote_msg"))
         });
@@ -1219,9 +1246,9 @@ impl RoundManager {
         {
             return Ok(());
         }
-        let vote_reception_result = self
-            .round_state
-            .insert_vote(vote, &self.epoch_state.verifier, verified);
+        let vote_reception_result =
+            self.round_state
+                .insert_vote(vote, &self.epoch_state.verifier, verified);
         self.process_vote_reception_result(vote, vote_reception_result)
             .await
     }
