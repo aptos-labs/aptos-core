@@ -21,13 +21,13 @@ fun m::test($t0: bool, $t1: u64, $t2: u64): u64 {
 fun m::test($t0: bool, $t1: u64, $t2: u64): u64 {
      var $t3: u64
      var $t4: u64
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 6
   1: label L0
   2: $t4 := move($t1)
-  3: goto 6
-  4: label L1
-  5: $t4 := move($t2)
-  6: label L2
-  7: $t3 := move($t4)
-  8: return $t3
+  3: label L2
+  4: $t3 := move($t4)
+  5: return $t3
+  6: label L1
+  7: $t4 := move($t2)
+  8: goto 3
 }

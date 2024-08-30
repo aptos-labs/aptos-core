@@ -512,7 +512,7 @@ cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles"] }
+clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles", "wrap_help"] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = [

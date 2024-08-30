@@ -31,14 +31,13 @@ B0:
 	8: StLoc[3](loc3: bool)
 	9: StLoc[4](loc4: u64)
 	10: MoveLoc[3](loc3: bool)
-	11: BrFalse(14)
+	11: BrFalse(13)
 B1:
 	12: Call bar()
-	13: Branch(14)
 B2:
-	14: MoveLoc[4](loc4: u64)
-	15: MoveLoc[1](loc1: u64)
-	16: Ret
+	13: MoveLoc[4](loc4: u64)
+	14: MoveLoc[1](loc1: u64)
+	15: Ret
 }
 }
 ============ bytecode verification succeeded ========

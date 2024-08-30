@@ -27,6 +27,7 @@ pub struct StateProgressThreshold {
 pub enum LatencyType {
     Average,
     P50,
+    P70,
     P90,
     P99,
 }
@@ -531,6 +532,7 @@ impl SuccessCriteriaChecker {
             let latency = Duration::from_millis(match latency_type {
                 LatencyType::Average => stats_rate.latency as u64,
                 LatencyType::P50 => stats_rate.p50_latency,
+                LatencyType::P70 => stats_rate.p70_latency,
                 LatencyType::P90 => stats_rate.p90_latency,
                 LatencyType::P99 => stats_rate.p99_latency,
             });

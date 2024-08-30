@@ -88,6 +88,7 @@ pub struct ConsensusConfig {
     pub proof_cache_capacity: u64,
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
+    pub enable_pre_commit: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -352,6 +353,7 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             num_bounded_executor_tasks: 16,
+            enable_pre_commit: true,
         }
     }
 }

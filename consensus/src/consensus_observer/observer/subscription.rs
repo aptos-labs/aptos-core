@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_observer::{
+use crate::consensus_observer::common::{
     error::Error,
     logging::{LogEntry, LogSchema},
 };
@@ -286,8 +286,8 @@ mod test {
 
     // This is a simple mock of the DbReader (it generates a MockDatabaseReader)
     mock! {
-    pub DatabaseReader {}
-    impl DbReader for DatabaseReader {
+        pub DatabaseReader {}
+        impl DbReader for DatabaseReader {
             fn get_latest_ledger_info_version(&self) -> Result<Version>;
         }
     }

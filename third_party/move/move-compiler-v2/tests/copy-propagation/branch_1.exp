@@ -28,14 +28,12 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t4: u64
      var $t5: u64
   0: $t3 := move($t1)
-  1: if ($t0) goto 2 else goto 6
+  1: if ($t0) goto 2 else goto 5
   2: label L0
   3: $t4 := 0
   4: $t3 := move($t4)
-  5: goto 7
-  6: label L1
-  7: label L2
-  8: $t5 := 1
-  9: $t2 := +($t3, $t5)
- 10: return $t2
+  5: label L2
+  6: $t5 := 1
+  7: $t2 := +($t3, $t5)
+  8: return $t2
 }

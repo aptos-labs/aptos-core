@@ -17,3 +17,6 @@ warning: [lint] Use the more explicit `loop` instead.
    │ ╰─────────^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(while_true)]`.
+
+
+============ bytecode verification succeeded ========

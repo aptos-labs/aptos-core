@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
-    error::Error,
-    logging::{LogEntry, LogSchema},
-    metrics,
-    network_message::{BlockPayload, OrderedBlock},
+    common::{
+        error::Error,
+        logging::{LogEntry, LogSchema},
+        metrics,
+    },
+    network::observer_message::{BlockPayload, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
@@ -266,7 +268,7 @@ impl BlockPayloadStore {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::consensus_observer::network_message::BlockTransactionPayload;
+    use crate::consensus_observer::network::observer_message::BlockTransactionPayload;
     use aptos_bitvec::BitVec;
     use aptos_consensus_types::{
         block::Block,
@@ -286,7 +288,6 @@ mod test {
         PeerId,
     };
     use claims::assert_matches;
-    use rand::{rngs::OsRng, Rng};
 
     #[test]
     fn test_all_payloads_exist() {
@@ -1083,11 +1084,6 @@ mod test {
             LedgerInfo::new(BlockInfo::random_with_epoch(epoch, 0), HashValue::random()),
             AggregateSignature::empty(),
         )
-    }
-
-    /// Generates and returns a random number (u64)
-    pub fn get_random_u64() -> u64 {
-        OsRng.gen()
     }
 
     /// Returns the number of unverified payloads in the block payload store

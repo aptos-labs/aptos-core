@@ -29,13 +29,9 @@ B0:
 	4: StLoc[0](Arg0: u64)
 	5: MoveLoc[1](loc0: u64)
 	6: Eq
-	7: BrFalse(9)
+	7: BrFalse(0)
 B1:
-	8: Branch(10)
-B2:
-	9: Branch(0)
-B3:
-	10: Ret
+	8: Ret
 }
 public test2(Arg0: u64) /* def_idx: 2 */ {
 L1:	loc0: bool
@@ -47,13 +43,9 @@ B0:
 	4: StLoc[1](loc0: bool)
 	5: StLoc[0](Arg0: u64)
 	6: MoveLoc[1](loc0: bool)
-	7: BrFalse(9)
+	7: BrFalse(0)
 B1:
-	8: Branch(10)
-B2:
-	9: Branch(0)
-B3:
-	10: Ret
+	8: Ret
 }
 }
 ============ bytecode verification succeeded ========

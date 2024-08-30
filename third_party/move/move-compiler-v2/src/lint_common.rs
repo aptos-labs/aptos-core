@@ -17,7 +17,10 @@ use strum_macros::{Display, EnumString};
 #[derive(Copy, Clone, Ord, Eq, PartialEq, PartialOrd, EnumString, Display)]
 #[strum(serialize_all = "snake_case")]
 pub enum LintChecker {
+    AvoidCopyOnIdentityComparison,
     BlocksInConditions,
+    NeedlessBool,
+    SimplerNumericExpression,
     UnnecessaryBooleanIdentityComparison,
     UnnecessaryNumericalExtremeComparison,
     WhileTrue,
