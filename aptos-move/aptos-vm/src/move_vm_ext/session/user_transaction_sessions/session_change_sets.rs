@@ -38,6 +38,10 @@ impl UserSessionChangeSet {
         self.module_write_set.has_writes_to_special_address()
     }
 
+    pub(crate) fn module_write_set_is_empty_or_invariant_violation(&self) -> PartialVMResult<()> {
+        self.module_write_set.is_empty_or_invariant_violation()
+    }
+
     pub(crate) fn unpack(self) -> (VMChangeSet, ModuleWriteSet) {
         (self.change_set, self.module_write_set)
     }

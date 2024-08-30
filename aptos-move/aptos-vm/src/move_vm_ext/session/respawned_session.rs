@@ -60,10 +60,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         .build()
     }
 
-    pub fn execute<T, E>(
-        &mut self,
-        fun: impl FnOnce(&mut SessionExt) -> Result<T, E>,
-    ) -> Result<T, E> {
+    pub fn execute<T>(&mut self, fun: impl FnOnce(&mut SessionExt) -> T) -> T {
         self.with_session_mut(|session| {
             fun(session
                 .as_mut()

@@ -113,6 +113,16 @@ impl RuntimeEnvironment {
         &self.struct_name_index_map
     }
 
+    /// Returns the cloned environment, with a deep-clone of struct name index map.
+    pub fn clone_with_new_struct_name_index_map(&self) -> Self {
+        Self {
+            vm_config: self.vm_config.clone(),
+            natives: self.natives.clone(),
+            verifier_extension: self.verifier_extension.clone(),
+            struct_name_index_map: self.struct_name_index_map.clone(),
+        }
+    }
+
     /// Creates a partially verified compiled script by running:
     ///   1. Move bytecode verifier,
     ///   2. Verifier extension, if provided.
