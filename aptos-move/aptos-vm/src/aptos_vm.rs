@@ -1665,6 +1665,16 @@ impl AptosVM {
                 let compatability_checks =
                     Compatibility::new(check_struct_layout, check_friend_linking);
 
+                // TODO(loader_v2): Make sure to `validate_publish_request` passes to environment
+                //                  verifier extension in V2 design. This works for now for tests.
+                self.validate_publish_request(
+                    session,
+                    module_storage,
+                    modules,
+                    expected_modules,
+                    allowed_deps,
+                )?;
+
                 if self.features().is_loader_v2_enabled() {
                     // Create a temporary storage. If this fails, it means publishing
                     // is not possible. We use a new VM here so that struct index map
@@ -1674,8 +1684,6 @@ impl AptosVM {
                     let tmp_vm = self.move_vm.clone();
                     let tmp_module_storage = TemporaryModuleStorage::new_with_compat_config(
                         &destination,
-                        // TODO(loader_v2): Make sure to `validate_publish_request` passes to environment
-                        //                  verifier extension.
                         tmp_vm.runtime_environment(),
                         compatability_checks,
                         module_storage,
@@ -1739,14 +1747,6 @@ impl AptosVM {
 
                     Ok(Some((module_write_set, init_module_changes)))
                 } else {
-                    // Validate the module bundle
-                    self.validate_publish_request(
-                        session,
-                        modules,
-                        expected_modules,
-                        allowed_deps,
-                    )?;
-
                     // Check what modules exist before publishing.
                     let mut exists = BTreeSet::new();
                     for m in modules {
@@ -1798,6 +1798,7 @@ impl AptosVM {
     fn validate_publish_request(
         &self,
         session: &mut SessionExt,
+        module_storage: &impl AptosModuleStorage,
         modules: &[CompiledModule],
         mut expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
@@ -1842,13 +1843,22 @@ impl AptosVM {
             aptos_framework::verify_module_metadata(m, self.features(), self.timed_features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
+
+        let use_loader_v2 = self.features().is_enabled(FeatureFlag::ENABLE_LOADER_V2);
         verifier::resource_groups::validate_resource_groups(
             session,
+            module_storage,
             modules,
             self.features()
                 .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
+            use_loader_v2,
         )?;
-        verifier::event_validation::validate_module_events(session, modules)?;
+        verifier::event_validation::validate_module_events(
+            session,
+            module_storage,
+            modules,
+            use_loader_v2,
+        )?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
