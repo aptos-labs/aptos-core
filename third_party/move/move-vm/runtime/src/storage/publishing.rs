@@ -121,6 +121,8 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
                     .with_message(msg)
                     .finish(Location::Undefined));
             }
+
+            // TODO(loader_v2): Check that friends exist! Here or elsewhere.
         }
 
         Ok(Self {
