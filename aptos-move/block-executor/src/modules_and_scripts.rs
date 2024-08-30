@@ -20,7 +20,8 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
-    module_cyclic_dependency_error, module_linker_error, CodeStorage, Module, ModuleStorage, Script,
+    deserialize_script, module_cyclic_dependency_error, module_linker_error, script_hash,
+    CodeStorage, Module, ModuleStorage, Script,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -63,15 +64,79 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
 {
     fn deserialize_and_cache_script(
         &self,
-        _serialized_script: &[u8],
+        serialized_script: &[u8],
     ) -> VMResult<Arc<CompiledScript>> {
-        // TODO(loader_v2): Support scripts.
-        todo!()
+        let hash = script_hash(serialized_script);
+
+        let maybe_compiled_script = match &self.latest_view {
+            ViewState::Sync(state) => state
+                .versioned_map
+                .code_storage()
+                .get_deserialized_script(&hash),
+            ViewState::Unsync(state) => state.unsync_map.get_deserialized_script(&hash),
+        };
+
+        Ok(match maybe_compiled_script {
+            Some(compiled_script) => compiled_script,
+            None => {
+                let compiled_script = self.deserialize_script(serialized_script)?;
+
+                match &self.latest_view {
+                    ViewState::Sync(state) => state
+                        .versioned_map
+                        .code_storage()
+                        .cache_deserialized_script(hash, compiled_script.clone()),
+                    ViewState::Unsync(state) => state
+                        .unsync_map
+                        .cache_deserialized_script(hash, compiled_script.clone()),
+                }
+                compiled_script
+            },
+        })
     }
 
-    fn verify_and_cache_script(&self, _serialized_script: &[u8]) -> VMResult<Arc<Script>> {
-        // TODO(loader_v2): Support scripts.
-        todo!()
+    fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
+        let hash = script_hash(serialized_script);
+
+        let maybe_verified_script = match &self.latest_view {
+            ViewState::Sync(state) => state
+                .versioned_map
+                .code_storage()
+                .get_verified_script(&hash),
+            ViewState::Unsync(state) => state.unsync_map.get_verified_script(&hash),
+        };
+
+        let compiled_script = match maybe_verified_script {
+            Some(Ok(script)) => return Ok(script),
+            Some(Err(compiled_script)) => compiled_script,
+            None => self.deserialize_and_cache_script(serialized_script)?,
+        };
+
+        // Locally verify the script.
+        let partially_verified_script = self
+            .runtime_environment
+            .build_partially_verified_script(compiled_script)?;
+
+        // Verify the script by also looking at its dependencies.
+        let immediate_dependencies = partially_verified_script
+            .immediate_dependencies_iter()
+            .map(|(addr, name)| self.fetch_verified_module(addr, name))
+            .collect::<VMResult<Vec<_>>>()?;
+        let script = self
+            .runtime_environment
+            .build_verified_script(partially_verified_script, &immediate_dependencies)?;
+        let script = Arc::new(script);
+
+        match &self.latest_view {
+            ViewState::Sync(state) => state
+                .versioned_map
+                .code_storage()
+                .cache_verified_script(hash, script.clone()),
+            ViewState::Unsync(state) => {
+                state.unsync_map.cache_verified_script(hash, script.clone())
+            },
+        }
+        Ok(script)
     }
 }
 
@@ -179,14 +244,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
                 // Otherwise, we need to go to the multi-version data structure to get it, and
                 // record under captured reads.
-                let read =
-                    state
-                        .versioned_map
-                        .module_storage()
-                        .get_or_else(key, self.txn_idx, || {
-                            self.get_base_module_storage_entry(key)
-                        })?;
-
+                let read = state
+                    .versioned_map
+                    .code_storage()
+                    .module_storage()
+                    .get_or_else(key, self.txn_idx, || {
+                        self.get_base_module_storage_entry(key)
+                    })?;
                 state
                     .captured_reads
                     .borrow_mut()
@@ -308,11 +372,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         key.clone(),
                         ModuleStorageRead::Versioned(version.clone(), verified_entry.clone()),
                     );
-                state.versioned_map.module_storage().write_if_not_verified(
-                    &key,
-                    version,
-                    verified_entry,
-                );
+                state
+                    .versioned_map
+                    .code_storage()
+                    .module_storage()
+                    .write_if_not_verified(&key, version, verified_entry);
             },
             ViewState::Unsync(state) => {
                 state
@@ -321,5 +385,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             },
         }
         Ok(module)
+    }
+
+    /// Returns the deserialized script based on the current runtime environment.
+    fn deserialize_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
+        let deserializer_config = &self.runtime_environment.vm_config().deserializer_config;
+        let compiled_script = deserialize_script(serialized_script, deserializer_config)?;
+        Ok(Arc::new(compiled_script))
     }
 }
