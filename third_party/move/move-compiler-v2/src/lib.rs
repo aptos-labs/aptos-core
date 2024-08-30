@@ -23,6 +23,7 @@ use crate::{
     pipeline::{
         ability_processor::AbilityProcessor,
         avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        control_flow_graph_simplifier::ControlFlowGraphSimplifier,
         copy_propagation::CopyPropagation,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
@@ -448,6 +449,10 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // potentially delete or change code through these optimizations.
     // While this section of the pipeline is optional, some code that used to previously compile
     // may no longer compile without this section because of using too many local (temp) variables.
+
+    if options.experiment_on(Experiment::CFG_SIMPLIFICATION) {
+        pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
+    }
 
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
         pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
