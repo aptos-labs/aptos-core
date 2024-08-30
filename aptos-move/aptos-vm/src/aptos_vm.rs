@@ -3122,7 +3122,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
                 None,
             )
             .map_err(|e| e.finish(Location::Undefined))?;
-        return Ok(maybe_bytes.is_some());
+        return Ok(maybe_bytes.is_none());
     }
     Ok(false)
 }
