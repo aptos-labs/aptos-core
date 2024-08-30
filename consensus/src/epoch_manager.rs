@@ -105,7 +105,7 @@ use std::{
     hash::Hash,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -1482,7 +1482,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         .spawn(async move {
                             // The partial_verify function will potentially verify the signature of timeout.
                             // So, we need to spawn it in a separate task to avoid blocking the main task.
-                            match vote.partial_verify(&epoch_state.verifier) {
+                            let start_time = Instant::now();
+                            let result = vote.partial_verify(&epoch_state.verifier);
+                            counters::VERIFY_MSG
+                                .with_label_values(&["vote_partial_verify"])
+                                .observe(start_time.elapsed().as_secs_f64());
+                            match result {
                                 Ok(()) => {
                                     if let Err(e) = Self::forward_event_to(
                                         round_manager_unverified_tx,

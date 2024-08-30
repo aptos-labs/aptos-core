@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters;
 use aptos_consensus_types::{common::Author, order_vote::OrderVote};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
@@ -9,7 +10,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 /// Result of the order vote processing. The failure case (Verification error) is returned
 /// as the Error part of the result.
@@ -111,7 +112,13 @@ impl PendingOrderVotes {
                             aggregated_voting_power >= validator_verifier.quorum_voting_power(),
                             "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                         );
-                        match li_with_sig.aggregate_and_verify(validator_verifier) {
+                        let start_time = Instant::now();
+                        let verification_result =
+                            li_with_sig.aggregate_and_verify(validator_verifier);
+                        counters::VERIFY_MSG
+                            .with_label_values(&["order_vote_aggregate_and_verify"])
+                            .observe(start_time.elapsed().as_secs_f64());
+                        match verification_result {
                             Ok(ledger_info_with_sig) => {
                                 *status =
                                     OrderVoteStatus::EnoughVotes(ledger_info_with_sig.clone());

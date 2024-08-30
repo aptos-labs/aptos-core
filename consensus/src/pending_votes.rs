@@ -25,6 +25,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt,
     sync::Arc,
+    time::Instant,
 };
 
 /// Result of the vote processing. The failure case (Verification error) is returned
@@ -190,7 +191,12 @@ impl PendingVotes {
                         aggregated_voting_power >= validator_verifier.quorum_voting_power(),
                         "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                     );
-                return match li_with_sig.aggregate_and_verify(validator_verifier) {
+                let start_time = Instant::now();
+                let verification_result = li_with_sig.aggregate_and_verify(validator_verifier);
+                counters::VERIFY_MSG
+                    .with_label_values(&["vote_aggregate_and_verify"])
+                    .observe(start_time.elapsed().as_secs_f64());
+                return match verification_result {
                     Ok(ledger_info_with_sig) => {
                         VoteReceptionResult::NewQuorumCertificate(Arc::new(QuorumCert::new(
                             vote.vote_data().clone(),
