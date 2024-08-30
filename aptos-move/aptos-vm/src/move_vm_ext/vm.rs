@@ -203,6 +203,19 @@ impl MoveVmExt {
         )
     }
 
+    /// Creates a new VM with the same environment, but without shared across threads
+    /// struct name index map. This ensures that this VM is the only VM that observes
+    /// these indices, and so it is suitable for any temporary processing where we may
+    /// not want to persist the results of caching struct names.
+    pub(crate) fn spawn_with_new_struct_name_index_map(&self) -> Self {
+        let tmp_runtime_environment = self
+            .runtime_environment()
+            .clone_with_new_struct_name_index_map();
+        let vm = MoveVM::new_with_runtime_environment(Arc::new(tmp_runtime_environment));
+        let env = self.env.clone();
+        Self { inner: vm, env }
+    }
+
     pub fn new_session<'r, R: AptosMoveResolver>(
         &self,
         resolver: &'r R,

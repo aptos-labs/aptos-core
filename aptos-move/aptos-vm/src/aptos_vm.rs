@@ -112,7 +112,7 @@ use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_linker_error,
     module_traversal::{TraversalContext, TraversalStorage},
-    RuntimeEnvironment, TemporaryModuleStorage, UnreachableCodeStorage,
+    RuntimeEnvironment, UnreachableCodeStorage,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -280,6 +280,12 @@ impl AptosVM {
             storage_gas_params,
             pvk,
         }
+    }
+
+    /// Returns a new MoveVM with the same configs as itself, but a new, cloned,
+    /// struct name index map. Only to be used for module publishing.
+    pub(crate) fn move_vm_for_module_publishing_and_init_module(&self) -> MoveVmExt {
+        self.move_vm.spawn_with_new_struct_name_index_map()
     }
 
     pub fn new_session<'r, S: AptosMoveResolver>(
@@ -1551,247 +1557,194 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        let maybe_module_write_set_with_init_module_changes = session.execute(|session| {
-            if let Some(publish_request) = session.extract_publish_request() {
-                let PublishRequest {
-                    destination,
-                    bundle,
-                    expected_modules,
-                    allowed_deps,
-                    check_compat: _,
-                } = publish_request;
+        let maybe_publish_request = session.execute(|session| session.extract_publish_request());
+        if maybe_publish_request.is_none() {
+            let user_change_set = session.finish(change_set_configs, module_storage)?;
 
-                let modules = self.deserialize_module_bundle(&bundle)?;
-                let modules: &Vec<CompiledModule> =
-                    traversal_context.referenced_module_bundles.alloc(modules);
+            user_change_set
+                .module_write_set_is_empty_or_invariant_violation()
+                .map_err(|err| {
+                    err.with_message(
+                        "No modules should be published if there is no publish request".to_string(),
+                    )
+                    .finish(Location::Undefined)
+                    .into_vm_status()
+                })?;
 
-                // Note: Feature gating is needed here because the traversal of the dependencies could
-                //       result in shallow-loading of the modules and therefore subtle changes in
-                //       the error semantics.
-                if self.gas_feature_version >= 15 {
-                    // Charge old versions of existing modules, in case of upgrades.
-                    for module in modules.iter() {
-                        let addr = module.self_addr();
-                        let name = module.self_name();
-                        let state_key = StateKey::module(addr, name);
+            return Ok(user_change_set);
+        }
 
-                        // TODO: Allow the check of special addresses to be customized.
-                        if addr.is_special()
-                            || traversal_context.visited.insert((addr, name), ()).is_some()
-                        {
-                            continue;
-                        }
+        let PublishRequest {
+            destination,
+            bundle,
+            expected_modules,
+            allowed_deps,
+            check_compat: _,
+        } = maybe_publish_request.expect("Publish request exists");
 
-                        let size_if_module_exists = if self.features().is_loader_v2_enabled() {
-                            module_storage
-                                .fetch_module_size_in_bytes(addr, name)?
-                                .map(|v| v as u64)
-                        } else {
-                            resolver
-                                .as_executor_view()
-                                .get_module_state_value_size(&state_key)
-                                .map_err(|e| e.finish(Location::Undefined))?
-                        };
+        let modules = self.deserialize_module_bundle(&bundle)?;
+        let modules: &Vec<CompiledModule> =
+            traversal_context.referenced_module_bundles.alloc(modules);
 
-                        if let Some(size) = size_if_module_exists {
-                            gas_meter
-                                .charge_dependency(false, addr, name, NumBytes::new(size))
-                                .map_err(|err| {
-                                    err.finish(Location::Module(ModuleId::new(
-                                        *addr,
-                                        name.to_owned(),
-                                    )))
-                                })?;
-                        }
-                    }
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version >= 15 {
+            // Charge old versions of existing modules, in case of upgrades.
+            for module in modules.iter() {
+                let addr = module.self_addr();
+                let name = module.self_name();
+                let state_key = StateKey::module(addr, name);
 
-                    // Charge all modules in the bundle that is about to be published.
-                    for (module, blob) in modules.iter().zip(bundle.iter()) {
-                        let module_id = &module.self_id();
-                        gas_meter
-                            .charge_dependency(
-                                true,
-                                module_id.address(),
-                                module_id.name(),
-                                NumBytes::new(blob.code().len() as u64),
-                            )
-                            .map_err(|err| err.finish(Location::Undefined))?;
-                    }
-
-                    // Charge all dependencies.
-                    //
-                    // Must exclude the ones that are in the current bundle because they have not
-                    // been published yet.
-                    let module_ids_in_bundle = modules
-                        .iter()
-                        .map(|module| (module.self_addr(), module.self_name()))
-                        .collect::<BTreeSet<_>>();
-
-                    session.check_dependencies_and_charge_gas(
-                        module_storage,
-                        gas_meter,
-                        traversal_context,
-                        modules
-                            .iter()
-                            .flat_map(|module| {
-                                module
-                                    .immediate_dependencies_iter()
-                                    .chain(module.immediate_friends_iter())
-                            })
-                            .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
-                    )?;
-
-                    // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
-                }
-
-                if self
-                    .timed_features()
-                    .is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
+                // TODO: Allow the check of special addresses to be customized.
+                if addr.is_special() || traversal_context.visited.insert((addr, name), ()).is_some()
                 {
-                    for (module, blob) in modules.iter().zip(bundle.iter()) {
-                        // TODO(Gas): Make budget configurable.
-                        let budget = 2048 + blob.code().len() as u64 * 20;
-                        move_binary_format::check_complexity::check_module_complexity(
-                            module, budget,
-                        )
-                        .map_err(|err| err.finish(Location::Undefined))?;
-                    }
+                    continue;
                 }
 
-                let check_struct_layout = true;
-                let check_friend_linking = !self
-                    .features()
-                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
-                let compatability_checks =
-                    Compatibility::new(check_struct_layout, check_friend_linking);
-
-                // TODO(loader_v2): Make sure to `validate_publish_request` passes to environment
-                //                  verifier extension in V2 design. This works for now for tests.
-                self.validate_publish_request(
-                    session,
-                    module_storage,
-                    modules,
-                    expected_modules,
-                    allowed_deps,
-                )?;
-
-                if self.features().is_loader_v2_enabled() {
-                    // Create a temporary storage. If this fails, it means publishing
-                    // is not possible. We use a new VM here so that struct index map
-                    // in the environment, and the type cache inside loader are not
-                    // inconsistent.
-                    // TODO(loader_v2): Revisit this to make it less ugly.
-                    let tmp_vm = self.move_vm.clone();
-                    let tmp_module_storage = TemporaryModuleStorage::new_with_compat_config(
-                        &destination,
-                        tmp_vm.runtime_environment(),
-                        compatability_checks,
-                        module_storage,
-                        bundle.into_bytes(),
-                    )?;
-
-                    // Run init_module for each new module. We use a new session for that as well.
-                    let mut tmp_session = tmp_vm.new_session(
-                        resolver,
-                        SessionId::txn_meta(transaction_metadata),
-                        Some(transaction_metadata.as_user_transaction_context()),
-                    );
-
-                    let init_func_name = ident_str!("init_module");
-                    for module in modules {
-                        // Check if module existed previously.
-                        if module_storage
-                            .check_module_exists(module.self_addr(), module.self_name())?
-                        {
-                            continue;
-                        }
-
-                        let module_id = module.self_id();
-                        let init_function_exists = tmp_session
-                            .load_function(&tmp_module_storage, &module_id, init_func_name, &[])
-                            .is_ok();
-                        if init_function_exists {
-                            verifier::module_init::verify_module_init_function(module)
-                                .map_err(|e| e.finish(Location::Undefined))?;
-                            tmp_session.execute_function_bypass_visibility(
-                                &module_id,
-                                init_func_name,
-                                vec![],
-                                vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
-                                gas_meter,
-                                traversal_context,
-                                &tmp_module_storage,
-                            )?;
-                        }
-                    }
-
-                    // Create module write set for modules to be published. We do not care
-                    // here about writes to special addresses because there is no flushing.
-                    let write_ops = session
-                        .convert_modules_into_write_ops(
-                            module_storage,
-                            tmp_module_storage.release_verified_module_bundle(),
-                        )
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                    let module_write_set = ModuleWriteSet::new(false, write_ops);
-
-                    // Process init_module side-effects.
-                    let (init_module_changes, empty_write_set) =
-                        tmp_session.finish(change_set_configs, module_storage)?;
-                    empty_write_set
-                        .is_empty_or_invariant_violation()
-                        .map_err(|e| {
-                            e.with_message("init_module_cannot publish modules".to_string())
-                                .finish(Location::Undefined)
-                        })?;
-
-                    Ok(Some((module_write_set, init_module_changes)))
+                let size_if_module_exists = if self.features().is_loader_v2_enabled() {
+                    module_storage
+                        .fetch_module_size_in_bytes(addr, name)?
+                        .map(|v| v as u64)
                 } else {
-                    // Check what modules exist before publishing.
-                    let mut exists = BTreeSet::new();
-                    for m in modules {
-                        let id = m.self_id();
-                        #[allow(deprecated)]
-                        if session.exists_module(&id)? {
-                            exists.insert(id);
-                        }
-                    }
+                    resolver
+                        .as_executor_view()
+                        .get_module_state_value_size(&state_key)
+                        .map_err(|e| e.finish(Location::Undefined))?
+                };
 
-                    // Publish the bundle and execute initializers
-                    // publish_module_bundle doesn't actually load the published module into
-                    // the loader cache. It only puts the module data in the data cache.
-                    #[allow(deprecated)]
-                    session.publish_module_bundle_with_compat_config(
-                        bundle.into_inner(),
-                        destination,
-                        gas_meter,
-                        compatability_checks,
-                    )?;
-
-                    self.execute_module_initialization(
-                        session,
-                        gas_meter,
-                        modules,
-                        exists,
-                        &[destination],
-                        new_published_modules_loaded,
-                        traversal_context,
-                    )?;
-                    Ok(None)
+                if let Some(size) = size_if_module_exists {
+                    gas_meter
+                        .charge_dependency(false, addr, name, NumBytes::new(size))
+                        .map_err(|err| {
+                            err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
+                        })?;
                 }
-            } else {
-                let maybe_changes = self
-                    .features()
-                    .is_loader_v2_enabled()
-                    .then(|| (ModuleWriteSet::empty(), VMChangeSet::empty()));
-                Ok::<_, VMError>(maybe_changes)
             }
+
+            // Charge all modules in the bundle that is about to be published.
+            for (module, blob) in modules.iter().zip(bundle.iter()) {
+                let module_id = &module.self_id();
+                gas_meter
+                    .charge_dependency(
+                        true,
+                        module_id.address(),
+                        module_id.name(),
+                        NumBytes::new(blob.code().len() as u64),
+                    )
+                    .map_err(|err| err.finish(Location::Undefined))?;
+            }
+
+            // Charge all dependencies.
+            //
+            // Must exclude the ones that are in the current bundle because they have not
+            // been published yet.
+            let module_ids_in_bundle = modules
+                .iter()
+                .map(|module| (module.self_addr(), module.self_name()))
+                .collect::<BTreeSet<_>>();
+
+            session.execute(|session| {
+                session.check_dependencies_and_charge_gas(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    modules
+                        .iter()
+                        .flat_map(|module| {
+                            module
+                                .immediate_dependencies_iter()
+                                .chain(module.immediate_friends_iter())
+                        })
+                        .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+                )
+            })?;
+
+            // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+        }
+
+        if self
+            .timed_features()
+            .is_enabled(TimedFeatureFlag::ModuleComplexityCheck)
+        {
+            for (module, blob) in modules.iter().zip(bundle.iter()) {
+                // TODO(Gas): Make budget configurable.
+                let budget = 2048 + blob.code().len() as u64 * 20;
+                move_binary_format::check_complexity::check_module_complexity(module, budget)
+                    .map_err(|err| err.finish(Location::Undefined))?;
+            }
+        }
+
+        session.execute(|session| {
+            self.validate_publish_request(
+                session,
+                module_storage,
+                modules,
+                expected_modules,
+                allowed_deps,
+            )
         })?;
-        session.finish(
-            change_set_configs,
-            maybe_module_write_set_with_init_module_changes,
-            module_storage,
-        )
+
+        let check_struct_layout = true;
+        let check_friend_linking = !self
+            .features()
+            .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+        let compatability_checks = Compatibility::new(check_struct_layout, check_friend_linking);
+
+        if self.features().is_loader_v2_enabled() {
+            session.finish_with_module_publishing_and_initialization(
+                self,
+                resolver,
+                module_storage,
+                gas_meter,
+                transaction_metadata,
+                traversal_context,
+                change_set_configs,
+                destination,
+                bundle,
+                modules,
+                compatability_checks,
+            )
+        } else {
+            // Check what modules exist before publishing.
+            let mut exists = BTreeSet::new();
+            for m in modules {
+                let id = m.self_id();
+                if session.execute(|session| {
+                    #[allow(deprecated)]
+                    session.exists_module(&id)
+                })? {
+                    exists.insert(id);
+                }
+            }
+
+            // Publish the bundle and execute initializers
+            // publish_module_bundle doesn't actually load the published module into
+            // the loader cache. It only puts the module data in the data cache.
+            session.execute(|session| {
+                #[allow(deprecated)]
+                session.publish_module_bundle_with_compat_config(
+                    bundle.into_inner(),
+                    destination,
+                    gas_meter,
+                    compatability_checks,
+                )
+            })?;
+
+            session.execute(|session| {
+                self.execute_module_initialization(
+                    session,
+                    gas_meter,
+                    modules,
+                    exists,
+                    &[destination],
+                    new_published_modules_loaded,
+                    traversal_context,
+                )
+            })?;
+
+            session.finish(change_set_configs, module_storage)
+        }
     }
 
     /// Validate a publish request.
