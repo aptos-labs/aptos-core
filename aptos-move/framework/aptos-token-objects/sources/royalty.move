@@ -35,8 +35,8 @@ module aptos_token_objects::royalty {
 
     /// Add a royalty, given a ConstructorRef.
     public fun init(ref: &ConstructorRef, royalty: Royalty) {
-        let signer = object::generate_signer(ref);
-        move_to(&signer, royalty);
+        let write_ref = object::generate_write_resources_ref(&object::generate_extend_ref(ref));
+        move_to(&write_ref, royalty);
     }
 
     /// Set the royalty if it does not exist, replace it otherwise.
@@ -46,8 +46,8 @@ module aptos_token_objects::royalty {
             move_from<Royalty>(addr);
         };
 
-        let signer = object::generate_signer_for_extending(&mutator_ref.inner);
-        move_to(&signer, royalty);
+        let write_ref = object::generate_write_resources_ref(&mutator_ref.inner);
+        move_to(&write_ref, royalty);
     }
 
     /// Creates a new royalty, verifying that it is a valid percentage

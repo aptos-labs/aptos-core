@@ -513,7 +513,7 @@ module aptos_token_objects::collection {
         ref: &ExtendRef,
     ) acquires FixedSupply, UnlimitedSupply {
         let metadata_object_address = object::address_from_extend_ref(ref);
-        let metadata_object_signer = object::generate_signer_for_extending(ref);
+        let metadata_object_write_ref = object::generate_write_resources_ref(ref);
 
         let (supply, current_supply, total_minted, burn_events, mint_events) = if (exists<FixedSupply>(
             metadata_object_address
@@ -552,7 +552,7 @@ module aptos_token_objects::collection {
         // update current state:
         aggregator_v2::add(&mut supply.current_supply, current_supply);
         aggregator_v2::add(&mut supply.total_minted, total_minted);
-        move_to(&metadata_object_signer, supply);
+        move_to_with_ref(&metadata_object_write_ref, supply);
 
         event::destroy_handle(burn_events);
         event::destroy_handle(mint_events);
@@ -716,7 +716,7 @@ module aptos_token_objects::collection {
         ref: &ExtendRef,
     ) acquires ConcurrentSupply {
         let metadata_object_address = object::address_from_extend_ref(ref);
-        let metadata_object_signer = object::generate_signer_for_extending(ref);
+        let metadata_object_write_ref = object::generate_write_resources_ref(ref);
 
         let ConcurrentSupply {
             current_supply,
@@ -724,14 +724,14 @@ module aptos_token_objects::collection {
         } = move_from<ConcurrentSupply>(metadata_object_address);
 
         if (aggregator_v2::max_value(&current_supply) == MAX_U64) {
-            move_to(&metadata_object_signer, UnlimitedSupply {
+            move_to(&metadata_object_write_ref, UnlimitedSupply {
                 current_supply: aggregator_v2::read(&current_supply),
                 total_minted: aggregator_v2::read(&total_minted),
                 burn_events: object::new_event_handle(&metadata_object_signer),
                 mint_events: object::new_event_handle(&metadata_object_signer),
             });
         } else {
-            move_to(&metadata_object_signer, FixedSupply {
+            move_to(&metadata_object_write_ref, FixedSupply {
                 current_supply: aggregator_v2::read(&current_supply),
                 max_supply: aggregator_v2::max_value(&current_supply),
                 total_minted: aggregator_v2::read(&total_minted),

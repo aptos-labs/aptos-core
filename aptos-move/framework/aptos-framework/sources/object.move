@@ -28,6 +28,7 @@ module aptos_framework::object {
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event;
     use aptos_framework::guid;
+    use aptos_framework::move_to_auth::{Self, move_to_with_ref, WriteResourceRef};
 
     friend aptos_framework::coin;
     friend aptos_framework::primary_fungible_store;
@@ -323,12 +324,12 @@ module aptos_framework::object {
     ): ConstructorRef {
         assert!(!exists<ObjectCore>(object), error::already_exists(EOBJECT_EXISTS));
 
-        let object_signer = create_signer(object);
+        let object_write_ref = move_to_auth::create_write_ref_privileged(object);
         let guid_creation_num = INIT_GUID_CREATION_NUM;
         let transfer_events_guid = guid::create(object, &mut guid_creation_num);
 
-        move_to(
-            &object_signer,
+        move_to_with_ref(
+            &object_write_ref,
             ObjectCore {
                 guid_creation_num,
                 owner: creator_address,
@@ -363,8 +364,11 @@ module aptos_framework::object {
         DeriveRef { self: ref.self }
     }
 
+    #[deprecated]
     /// Create a signer for the ConstructorRef
     public fun generate_signer(ref: &ConstructorRef): signer {
+        // have special permission like "UseDeprecatedSignerForObjects"
+
         create_signer(ref.self)
     }
 
@@ -385,17 +389,23 @@ module aptos_framework::object {
 
     // Signer required functions
 
+    #[deprecated]
     /// Create a guid for the object, typically used for events
     public fun create_guid(object: &signer): guid::GUID acquires ObjectCore {
+        // have special permission like "UseDeprecatedSignerForObjects"
+
         let addr = signer::address_of(object);
         let object_data = borrow_global_mut<ObjectCore>(addr);
         guid::create(addr, &mut object_data.guid_creation_num)
     }
 
+    #[deprecated]
     /// Generate a new event handle.
     public fun new_event_handle<T: drop + store>(
         object: &signer,
     ): event::EventHandle<T> acquires ObjectCore {
+        // have special permission like "UseDeprecatedSignerForObjects"
+
         event::new_event_handle(create_guid(object))
     }
 
@@ -430,9 +440,17 @@ module aptos_framework::object {
 
     // Extension helpers
 
+    #[deprecated]
     /// Create a signer for the ExtendRef
+    /// DEPRECATED, use generate_write_resources_ref instead
     public fun generate_signer_for_extending(ref: &ExtendRef): signer {
+        // have special permission like "UseDeprecatedSignerForObjects"
+
         create_signer(ref.self)
+    }
+
+    public fun generate_write_resources_ref(ref: &ExtendRef): WriteResourceRef {
+        move_to_auth::create_write_ref_privileged(ref.self)
     }
 
     /// Returns an address from within a ExtendRef.
@@ -617,7 +635,7 @@ module aptos_framework::object {
         let original_owner = signer::address_of(owner);
         assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         let object_addr = object.inner;
-        move_to(&create_signer(object_addr), TombStone { original_owner });
+        move_to_with_ref(&move_to_auth::create_write_ref_privileged(object_addr), TombStone { original_owner });
         transfer_raw_inner(object_addr, BURN_ADDRESS);
     }
 

@@ -18,6 +18,7 @@ module aptos_framework::dispatchable_fungible_asset {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, TransferRef};
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object::{Self, ConstructorRef, Object};
+    use aptos_framework::move_to_auth::move_to_with_ref;
 
     use std::error;
     use std::features;
@@ -49,9 +50,9 @@ module aptos_framework::dispatchable_fungible_asset {
             deposit_function,
             derived_balance_function,
         );
-        let store_obj = &object::generate_signer(constructor_ref);
-        move_to<TransferRefStore>(
-            store_obj,
+        let store_write_ref = object::generate_write_resources_ref(&object::generate_extend_ref(constructor_ref));
+        move_to_with_ref(
+            &store_write_ref,
             TransferRefStore {
                 transfer_ref: fungible_asset::generate_transfer_ref(constructor_ref),
             }

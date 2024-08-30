@@ -6,6 +6,7 @@ module aptos_framework::fungible_asset {
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};
+    use aptos_framework::move_to_auth::move_to_with_ref;
     use std::string;
     use std::features;
 
@@ -1132,7 +1133,7 @@ module aptos_framework::fungible_asset {
         ref: &ExtendRef,
     ) acquires Supply {
         let metadata_object_address = object::address_from_extend_ref(ref);
-        let metadata_object_signer = object::generate_signer_for_extending(ref);
+        let metadata_object_write_ref = object::generate_write_resources_ref(ref);
         assert!(
             features::concurrent_fungible_assets_enabled(),
             error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED)
@@ -1152,7 +1153,7 @@ module aptos_framework::fungible_asset {
                 aggregator_v2::create_aggregator_with_value(current, option::extract(&mut maximum))
             },
         };
-        move_to(&metadata_object_signer, supply);
+        move_to_with_ref(&metadata_object_write_ref, supply);
     }
 
     public entry fun upgrade_store_to_concurrent<T: key>(
