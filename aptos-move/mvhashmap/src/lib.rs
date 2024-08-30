@@ -14,6 +14,7 @@ use aptos_types::{
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
 
+mod scripts;
 pub mod types;
 pub mod unsync_map;
 pub mod versioned_code_storage;
@@ -23,7 +24,6 @@ pub mod versioned_group_data;
 pub mod versioned_module_storage;
 pub mod versioned_modules;
 
-mod scripts;
 #[cfg(test)]
 mod unit_tests;
 
