@@ -92,14 +92,39 @@ impl BlockPreparer {
                 .collect::<Vec<_>>()
         );
 
+        let now = std::time::Instant::now();
         // TODO: we could do this incrementally, but for now just do it every time
         let mut committed_transactions = HashSet::new();
-        block_window.pipelined_blocks().iter().for_each(|b| {
-            // TODO: this wait means there is no pipeline with execution
-            for txn_hash in b.wait_for_committed_transactions() {
-                committed_transactions.insert(*txn_hash);
-            }
-        });
+
+        // TODO: lots of repeated code here
+        block_window
+            .pipelined_blocks()
+            .iter()
+            .filter(|window_block| window_block.round() < block.round() - 1)
+            .for_each(|b| {
+                // TODO: this wait means there is no pipeline with execution
+                for txn_hash in b.wait_for_committed_transactions() {
+                    committed_transactions.insert(*txn_hash);
+                }
+            });
+        info!(
+            "BlockPreparer: Waiting for part of committed transactions took {:?}",
+            now.elapsed()
+        );
+        block_window
+            .pipelined_blocks()
+            .iter()
+            .filter(|window_block| window_block.round() == block.round() - 1)
+            .for_each(|b| {
+                // TODO: this wait means there is no pipeline with execution
+                for txn_hash in b.wait_for_committed_transactions() {
+                    committed_transactions.insert(*txn_hash);
+                }
+            });
+        info!(
+            "BlockPreparer: Waiting for all committed transactions took {:?}",
+            now.elapsed()
+        );
 
         let (txns, max_txns_from_block_to_execute) = monitor!("get_transactions", {
             self.get_transactions(block, block_window).await?
@@ -112,10 +137,16 @@ impl BlockPreparer {
         let block_timestamp_usecs = block.timestamp_usecs();
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         tokio::task::spawn_blocking(move || {
+            let txns_len = txns.len();
             let filtered_txns = txns
                 .into_iter()
                 .filter(|txn| !committed_transactions.contains(&txn.committed_hash()))
                 .collect::<Vec<_>>();
+            info!(
+                "BlockPreparer: Filtered {}/{} committed transactions",
+                txns_len - filtered_txns.len(),
+                txns_len
+            );
             let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, filtered_txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
             let mut shuffled_txns = {
