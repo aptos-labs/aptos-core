@@ -1326,26 +1326,26 @@ module supra_framework::supra_governance {
     }
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    #[expected_failure(abort_code = 0x10004, location = supra_framework::voting)]
+    #[expected_failure(abort_code = 0x8000d, location = supra_framework::multisig_voting)]
     public entry fun test_cannot_double_vote(
-        supra_framework: signer,
-        proposer: signer,
-        voter_1: signer,
-        voter_2: signer,
-    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        setup_voting(&supra_framework, &proposer, &voter_1, &voter_2);
+        supra_framework: &signer,
+        proposer: &signer,
+        voter_1: &signer,
+        voter_2: &signer,
+    ) acquires ApprovedExecutionHashes, GovernanceResponsbility, SupraGovernanceConfig, SupraGovernanceEvents {
+        let voters = vector[signer::address_of(proposer), signer::address_of(voter_1), signer::address_of(voter_2)];
+        supra_setup_voting(supra_framework, voters);
 
-        create_proposal(
-            &proposer,
-            signer::address_of(&proposer),
-            b"",
+        supra_create_proposal(
+            proposer,
+            b"random-test",
             b"",
             b"",
         );
 
         // Double voting should throw an error.
-        vote(&voter_1, signer::address_of(&voter_1), 0, true);
-        vote(&voter_1, signer::address_of(&voter_1), 0, true);
+        supra_vote(voter_1, 0, true);
+        supra_vote(voter_1, 0, true);
     }
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
@@ -1684,20 +1684,22 @@ module supra_framework::supra_governance {
 
     #[test(supra_framework = @supra_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_replace_execution_hash(
-        supra_framework: signer,
-        proposer: signer,
-        yes_voter: signer,
-        no_voter: signer,
-    ) acquires GovernanceResponsbility, GovernanceConfig, ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        setup_voting(&supra_framework, &proposer, &yes_voter, &no_voter);
+        supra_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
+    ) acquires GovernanceResponsbility, ApprovedExecutionHashes, SupraGovernanceConfig, SupraGovernanceEvents {
+        let voters = vector[signer::address_of(proposer), signer::address_of(yes_voter), signer::address_of(no_voter)];
+        supra_setup_voting(supra_framework, voters);
 
-        create_proposal_for_test(&proposer, true);
-        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
-        vote(&no_voter, signer::address_of(&no_voter), 0, false);
+        supra_create_proposal_for_test(proposer, true);
+        supra_vote(proposer, 0, true);
+        supra_vote(yes_voter, 0, true);
+        supra_vote(no_voter, 0, false);
 
         // Add approved script hash.
         timestamp::update_global_time_for_test(100001000000);
-        add_approved_script_hash(0);
+        add_supra_approved_script_hash(0);
 
         // Resolve the proposal.
         let execution_hash = vector::empty<u8>();
@@ -1705,12 +1707,12 @@ module supra_framework::supra_governance {
         vector::push_back(&mut execution_hash, 1);
         vector::push_back(&mut next_execution_hash, 10);
 
-        voting::resolve_proposal_v2<GovernanceProposal>(@supra_framework, 0, next_execution_hash);
+        multisig_voting::resolve_proposal_v2<GovernanceProposal>(@supra_framework, 0, next_execution_hash);
 
         if (vector::length(&next_execution_hash) == 0) {
-            remove_approved_hash(0);
+            remove_supra_approved_hash(0);
         } else {
-            add_approved_script_hash(0)
+            add_supra_approved_script_hash(0)
         };
 
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@supra_framework).hashes;
