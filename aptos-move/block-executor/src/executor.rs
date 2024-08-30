@@ -521,7 +521,6 @@ where
             let mut executed_at_commit = false;
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
-                executed_at_commit = true;
 
                 Self::update_transaction_on_abort(
                     txn_idx,
@@ -550,6 +549,19 @@ where
                     ),
                 )?;
 
+                // Make sure we publish modules here before we wake up subsequent dependent
+                // transactions and decrease the validation index.
+                if runtime_environment.vm_config().use_loader_v2 {
+                    if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
+                        executed_at_commit = true;
+                        versioned_cache.code_storage().write_published_modules(
+                            txn_idx,
+                            runtime_environment,
+                            module_write_set.into_iter(),
+                        )?;
+                    }
+                }
+
                 scheduler.finish_execution_during_commit(txn_idx)?;
 
                 let validation_result =
@@ -566,14 +578,17 @@ where
                 }
             }
 
-            if runtime_environment.vm_config().use_loader_v2 {
+            // If transaction was committed without delayed fields failing, i.e., without
+            // re-execution, we make the published modules visible here. As a result, we need to
+            // decrease the validation index.
+            if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
                 if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
                     versioned_cache.code_storage().write_published_modules(
                         txn_idx,
                         runtime_environment,
                         module_write_set.into_iter(),
                     )?;
-                    scheduler.finish_module_publishing_after_commit(txn_idx, executed_at_commit);
+                    scheduler.finish_execution_during_commit(txn_idx)?;
                 }
             }
 
