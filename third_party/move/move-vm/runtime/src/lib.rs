@@ -35,7 +35,7 @@ mod storage;
 pub use loader::{LoadedFunction, Module, Script};
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, deserialize_script, script_hash, CodeStorage},
-    dummy::use_loader_v2_based_on_env,
+    dummy::use_loader_v1_based_on_env,
     environment::{RuntimeEnvironment, WithRuntimeEnvironment},
     implementations::{
         unreachable_code_storage::UnreachableCodeStorage,
