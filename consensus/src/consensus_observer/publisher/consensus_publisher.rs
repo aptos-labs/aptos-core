@@ -70,7 +70,7 @@ impl ConsensusPublisher {
         (consensus_publisher, outbound_message_receiver)
     }
 
-    /// Adds an active subscriber to the set of active subscribers
+    /// Adds the given subscriber to the set of active subscribers
     fn add_active_subscriber(&self, peer_network_id: PeerNetworkId) {
         self.active_subscribers.write().insert(peer_network_id);
     }
@@ -139,7 +139,7 @@ impl ConsensusPublisher {
         self.active_subscribers.read().clone()
     }
 
-    /// Removes an active subscriber from the set of active subscribers
+    /// Removes the given subscriber from the set of active subscribers
     fn remove_active_subscriber(&self, peer_network_id: &PeerNetworkId) {
         self.active_subscribers.write().remove(peer_network_id);
     }
