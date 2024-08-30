@@ -147,7 +147,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     round_manager_verified_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
-    // Channel to send unverified transactions to round manager. It's round manager's responsibility
+    // Channel to send unverified transactions to round manager. It is the round manager's responsibility
     // to verify these transactions before using them.
     round_manager_unverified_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<UnverifiedEvent>), (Author, UnverifiedEvent)>,

@@ -138,7 +138,7 @@ impl Vote {
     }
 
     /// Peforms basic verification such as verifying that the consensus data hash of LedgerInfo
-    /// corresponds to the vote info. Does not perform any signature verification.
+    /// corresponds to the vote info. Does not verify signature on the LedgerInfo.
     pub fn partial_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.ledger_info.consensus_data_hash() == self.vote_data.hash(),
@@ -160,6 +160,7 @@ impl Vote {
         Ok(())
     }
 
+    /// Verifies the signature on the LedgerInfo.
     pub fn signature_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
             .verify(self.author(), &self.ledger_info, &self.signature)
@@ -167,8 +168,7 @@ impl Vote {
         Ok(())
     }
 
-    /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,
-    /// and then verifies the signature.
+    /// Performs full verification including the signature verification.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         self.partial_verify(validator)?;
         self.signature_verify(validator)

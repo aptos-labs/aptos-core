@@ -85,6 +85,7 @@ impl OrderVote {
         Ok(())
     }
 
+    /// Performs full verification including the signature verification.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         self.partial_verify()?;
         self.signature_verify(validator)?;

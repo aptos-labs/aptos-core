@@ -77,6 +77,7 @@ impl VoteMsg {
         self.vote().partial_verify(validator)
     }
 
+    /// Verifies the vote message, including the signature verification on the vote.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         self.partial_verify(validator)?;
         self.vote().signature_verify(validator)

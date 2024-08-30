@@ -44,6 +44,7 @@ impl OrderVoteMsg {
         self.order_vote.epoch()
     }
 
+    /// Performs basic checks, excluding the signature verification.
     pub fn partial_verify(&self) -> anyhow::Result<()> {
         ensure!(
             self.quorum_cert().certified_block() == self.order_vote().ledger_info().commit_info(),
@@ -55,8 +56,9 @@ impl OrderVoteMsg {
     /// This function verifies the order_vote component in the order_vote_msg.
     /// The quorum cert is verified in the round manager when the quorum certificate is used.
     pub fn verify_order_vote(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.partial_verify()?;
         self.order_vote
-            .signature_verify(validator)
+            .verify(validator)
             .context("[OrderVoteMsg] OrderVote verification failed")?;
         Ok(())
     }
