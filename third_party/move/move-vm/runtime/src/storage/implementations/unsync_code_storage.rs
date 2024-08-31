@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    logging::expect_no_verification_errors,
     script_hash,
     storage::{
         code_storage::deserialize_script,
@@ -100,7 +101,11 @@ impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
             .build_partially_verified_script(compiled_script.clone())?;
         let immediate_dependencies = compiled_script
             .immediate_dependencies_iter()
-            .map(|(addr, name)| self.module_storage.fetch_verified_module(addr, name))
+            .map(|(addr, name)| {
+                self.module_storage
+                    .fetch_verified_module(addr, name)
+                    .map_err(|e| expect_no_verification_errors(e))
+            })
             .collect::<VMResult<Vec<_>>>()?;
         Ok(Arc::new(
             self.module_storage
