@@ -28,6 +28,7 @@ use aptos_vm_types::{
 };
 use move_vm_runtime::move_vm::MoveVM;
 use std::{ops::Deref, sync::Arc};
+use move_vm_runtime::RuntimeEnvironment;
 
 /// MoveVM wrapper which is used to run genesis initializations. Designed as a
 /// stand-alone struct to ensure all genesis configurations are in one place,
@@ -75,6 +76,10 @@ impl GenesisMoveVM {
         state_view: &'s S,
     ) -> AptosCodeStorageAdapter<'s, S> {
         state_view.as_aptos_code_storage(&self.vm)
+    }
+
+    pub fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.vm.runtime_environment()
     }
 
     pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {
