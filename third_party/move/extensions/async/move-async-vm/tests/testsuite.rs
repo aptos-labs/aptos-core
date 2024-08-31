@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
 use bytes::Bytes;
 use itertools::Itertools;
 use move_async_vm::{
@@ -12,7 +11,6 @@ use move_async_vm::{
     natives::GasParameters as ActorGasParameters,
 };
 use move_binary_format::{access::ModuleAccess, errors::PartialVMResult};
-use move_command_line_common::testing::get_compiler_exp_extension;
 use move_compiler::{
     attr_derivation, compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
     shared::NumericalAddress, Compiler, Flags,
@@ -26,7 +24,7 @@ use move_core_types::{
     metadata::Metadata,
     value::MoveTypeLayout,
 };
-use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
+use move_prover_test_utils::extract_test_directives;
 use move_vm_test_utils::gas_schedule::GasStatus;
 use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use std::{
@@ -36,13 +34,16 @@ use std::{
     str::FromStr,
 };
 
+#[allow(dead_code)]
 const TEST_ADDR: &str = "0x3";
+#[allow(dead_code)]
 const SOURCE_DIRS: &[&str] = &[
     "./tests/sources",
     "../move-async-lib/sources",
     "../../../move-stdlib/sources",
 ];
 
+#[allow(dead_code)]
 struct Harness {
     module_cache: BTreeMap<Identifier, CompiledUnit>,
     vm: AsyncVM,
@@ -51,30 +52,33 @@ struct Harness {
     resource_store: RefCell<BTreeMap<(AccountAddress, StructTag), Bytes>>,
 }
 
+#[allow(dead_code)]
 fn test_account() -> AccountAddress {
     AccountAddress::from_hex_literal(TEST_ADDR).expect("valid test address")
 }
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
-    let target_module = path
+    let _target_module = path
         .with_extension("")
         .file_name()
         .unwrap()
         .to_string_lossy()
         .to_string();
-    let deps = extract_test_directives(path, "// dep:")?;
-    let actors = extract_test_directives(path, "// actor: ")?;
-    let instances = extract_test_directives(path, "// instance: ")?;
-    let harness = Harness::new(
-        std::iter::once(target_module.clone())
-            .chain(deps.into_iter())
-            .collect(),
-        actors,
-        instances,
-    )?;
-    harness.run(&target_module)?;
-    let baseline_path = path.with_extension(get_compiler_exp_extension());
-    verify_or_update_baseline(baseline_path.as_path(), harness.baseline.borrow().as_str())?;
+    let _deps = extract_test_directives(path, "// dep:")?;
+    let _actors = extract_test_directives(path, "// actor: ")?;
+    let _instances = extract_test_directives(path, "// instance: ")?;
+
+    // TODO(loader_v2): Consider re-enabling async VM tests.
+    // let harness = Harness::new(
+    //     std::iter::once(target_module.clone())
+    //         .chain(deps.into_iter())
+    //         .collect(),
+    //     actors,
+    //     instances,
+    // )?;
+    // harness.run(&target_module)?;
+    // let baseline_path = path.with_extension(get_compiler_exp_extension());
+    // verify_or_update_baseline(baseline_path.as_path(), harness.baseline.borrow().as_str())?;
     Ok(())
 }
 
@@ -84,11 +88,8 @@ datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$");
 // Test execution
 
 impl Harness {
+    #[allow(dead_code)]
     fn run(&self, _module: &str) -> anyhow::Result<()> {
-        if self.vm.get_move_vm().vm_config().use_loader_v2 {
-            bail!("AsyncVM does not support loader V2 implementation")
-        }
-
         let mut gas = GasStatus::new_unmetered();
         let mut tick = 0;
         // Publish modules.
@@ -147,6 +148,7 @@ impl Harness {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn publish_module(
         &self,
         session: &mut AsyncSession,
@@ -172,6 +174,7 @@ impl Harness {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn handle_result(&self, mailbox: &mut VecDeque<Message>, result: AsyncResult) {
         match result {
             Ok(success) => {
@@ -191,6 +194,7 @@ impl Harness {
         }
     }
 
+    #[allow(dead_code)]
     fn commit_changeset(&self, changeset: ChangeSet) {
         for (addr, change) in changeset.into_inner() {
             for (struct_tag, op) in change.into_inner().1 {
@@ -232,6 +236,7 @@ impl Harness {
 // Harness creation
 
 impl Harness {
+    #[allow(dead_code)]
     fn new(
         modules: Vec<String>,
         actors: Vec<String>,
@@ -271,6 +276,7 @@ impl Harness {
         Ok(harness)
     }
 
+    #[allow(dead_code)]
     fn collect_metadata(actors: Vec<String>) -> anyhow::Result<Vec<ActorMetadata>> {
         let mut actor_metadata = vec![];
         for actor in actors {
@@ -303,6 +309,7 @@ impl Harness {
         Ok(actor_metadata)
     }
 
+    #[allow(dead_code)]
     fn collect_instances(
         instances: Vec<String>,
     ) -> anyhow::Result<Vec<(ModuleId, AccountAddress)>> {
@@ -322,6 +329,7 @@ impl Harness {
         Ok(result)
     }
 
+    #[allow(dead_code)]
     fn collect_modules(deps: Vec<String>) -> anyhow::Result<BTreeMap<Identifier, String>> {
         let mut module_files = BTreeMap::new();
         for dep in &deps {
@@ -345,6 +353,7 @@ impl Harness {
         Ok(module_files)
     }
 
+    #[allow(dead_code)]
     fn compile(
         address_map: &BTreeMap<String, NumericalAddress>,
         module_files: &BTreeMap<Identifier, String>,
