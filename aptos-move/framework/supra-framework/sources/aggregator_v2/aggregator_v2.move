@@ -229,6 +229,42 @@ module supra_framework::aggregator_v2 {
     }
 
     #[test]
+    fun test_aggregator_with_value() {
+        let agg = create_aggregator_with_value(0, 10);
+        assert!(try_add(&mut agg, 5), 1);
+        assert!(try_add(&mut agg, 5), 2);
+        assert!(read(&agg) == 10, 3);
+    }
+
+    #[test]
+    fun test_create_unbounded_aggregator_with_value() {
+        let agg = create_unbounded_aggregator_with_value(0);
+        assert!(try_add(&mut agg, 5), 1);
+        assert!(try_add(&mut agg, 5), 2);
+        assert!(read(&agg) == 10, 3);
+        assert!(try_add(&mut agg, 5), 4);
+        assert!(read(&agg) == 15, 5);
+        add(&mut agg, 5);
+        sub(&mut agg, 5);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 131073, location = Self)]
+    fun test_aggregator_overflow() {
+        let agg = create_aggregator(10);
+        add(&mut agg, 5);
+        add(&mut agg, 6);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 131074, location = Self)]
+    fun test_aggregator_underflow() {
+        let agg = create_aggregator(10);
+        sub(&mut agg, 5);
+        sub(&mut agg, 6);
+    }
+
+    #[test]
     fun test_correct_read() {
         let snapshot = create_snapshot(42);
         assert!(read_snapshot(&snapshot) == 42, 0);
