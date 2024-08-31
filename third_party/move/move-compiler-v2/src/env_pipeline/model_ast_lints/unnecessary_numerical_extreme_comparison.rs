@@ -12,7 +12,7 @@
 //!   `x > 0` ==> can be clarified to `x != 0`
 //! and similarly for comparing `x` with u64::MAX.
 
-use crate::env_pipeline::model_ast_lints::ExpressionLinter;
+use crate::{env_pipeline::model_ast_lints::ExpressionLinter, lint_common::LintChecker};
 use move_model::{
     ast::{ExpData, Operation, Value},
     model::GlobalEnv,
@@ -25,8 +25,8 @@ use std::fmt;
 pub struct UnnecessaryNumericalExtremeComparison;
 
 impl ExpressionLinter for UnnecessaryNumericalExtremeComparison {
-    fn get_name(&self) -> &'static str {
-        "unnecessary_numerical_extreme_comparison"
+    fn get_lint_checker(&self) -> LintChecker {
+        LintChecker::UnnecessaryNumericalExtremeComparison
     }
 
     fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
@@ -43,7 +43,7 @@ impl ExpressionLinter for UnnecessaryNumericalExtremeComparison {
             // get the type of the left-hand side.
             let ty = env.get_node_type(lhs.node_id());
             if let Some(result) = Self::check_comparisons_with_extremes(lhs, cmp, rhs, &ty) {
-                env.lint_diag(&env.get_node_loc(*id), self.get_name(), &result.to_string());
+                self.warning(env, &env.get_node_loc(*id), &result.to_string());
             }
         }
     }

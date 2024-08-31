@@ -902,6 +902,11 @@ impl GlobalEnv {
         self.diag(Severity::Error, loc, msg)
     }
 
+    /// Adds a warning to this environment, without notes.
+    pub fn warning(&self, loc: &Loc, msg: &str) {
+        self.diag(Severity::Warning, loc, msg)
+    }
+
     /// Adds an error to this environment, with notes.
     pub fn error_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
@@ -930,10 +935,10 @@ impl GlobalEnv {
         self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], vec![])
     }
 
-    /// Add a lint warning to this environment, given the `lint_name` and `msg`.
-    pub fn lint_diag(&self, loc: &Loc, lint_name: &str, msg: &str) {
-        let msg = format!("[lint: `{}`] {}", lint_name, msg);
-        self.diag(Severity::Warning, loc, &msg)
+    /// Add a lint warning to this environment, with the `msg` and `notes`.
+    pub fn lint_diag_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
+        let lint_msg = format!("[lint] {}", msg);
+        self.diag_with_notes(Severity::Warning, loc, &lint_msg, notes)
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.

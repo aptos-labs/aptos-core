@@ -50,12 +50,12 @@ fun m::test() {
      var $t2: u64
      var $t3: bool
      var $t4: u64
-     var $t5: u64
-     var $t6: u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
      # maybe
   0: $t0 := 0
      # maybe
@@ -71,43 +71,11 @@ fun m::test() {
      # maybe
   6: $t3 := ==($t0, $t4)
      # maybe
-  7: if ($t3) goto 8 else goto 14
+  7: if ($t3) goto 8 else goto 1
      # maybe
   8: label L2
      # maybe
-  9: goto 24
-     # no
- 10: $t6 := 1
-     # no
- 11: $t5 := +($t0, $t6)
-     # no
- 12: $t0 := move($t5)
-     # no
- 13: goto 19
-     # maybe
- 14: label L3
-     # maybe
- 15: goto 1
-     # no
- 16: $t8 := 1
-     # no
- 17: $t7 := +($t0, $t8)
-     # no
- 18: $t0 := move($t7)
-     # no
- 19: label L4
-     # no
- 20: $t10 := 1
-     # no
- 21: $t9 := +($t0, $t10)
-     # no
- 22: $t0 := move($t9)
-     # no
- 23: goto 1
-     # maybe
- 24: label L1
-     # maybe
- 25: return ()
+  9: return ()
 }
 
 ============ after UnreachableCodeRemover: ================
@@ -132,13 +100,9 @@ fun m::test() {
   4: $t0 := move($t1)
   5: $t4 := 10
   6: $t3 := ==($t0, $t4)
-  7: if ($t3) goto 8 else goto 10
+  7: if ($t3) goto 8 else goto 1
   8: label L2
-  9: goto 12
- 10: label L3
- 11: goto 1
- 12: label L1
- 13: return ()
+  9: return ()
 }
 
 

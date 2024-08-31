@@ -16,9 +16,10 @@ use codespan_reporting::{
     term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
-use move_binary_format::CompiledModule;
+use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use move_compiler_v2::{options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -83,11 +84,13 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
-    #[clap(long)]
+    #[clap(long, default_value_if("move_2", "true", "7"))]
     pub bytecode_version: Option<u32>,
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           default_value_if("move_2", "true", "2.0"))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -97,6 +100,9 @@ pub struct BuildOptions {
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
     pub experiments: Vec<String>,
+    /// Select bytecode, language, compiler for Move 2
+    #[clap(long)]
+    pub move_2: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -124,6 +130,7 @@ impl Default for BuildOptions {
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
+            move_2: false,
         }
     }
 }
@@ -131,6 +138,7 @@ impl Default for BuildOptions {
 impl BuildOptions {
     pub fn move_2() -> Self {
         BuildOptions {
+            bytecode_version: Some(VERSION_7),
             language_version: Some(LanguageVersion::V2_0),
             compiler_version: Some(CompilerVersion::V2_0),
             ..Self::default()
@@ -249,12 +257,25 @@ impl BuiltPackage {
 
         // Run extended checks as well derive runtime metadata
         let model = &model_opt.expect("move model");
+
+        if let Some(model_options) = model.get_extension::<Options>() {
+            if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
+                std::process::exit(0)
+            }
+        }
+
         let runtime_metadata = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
             let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
             model.report_diag(&mut error_writer, Severity::Warning);
             if model.has_errors() {
                 bail!("extended checks failed")
+            }
+        }
+
+        if let Some(model_options) = model.get_extension::<Options>() {
+            if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
+                std::process::exit(0)
             }
         }
 

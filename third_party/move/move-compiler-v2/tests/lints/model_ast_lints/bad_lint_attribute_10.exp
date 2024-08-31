@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/lints/model_ast_lints/bad_lint_attribute_10.move:3:9
+  │
+3 │         #[lint::skip(while_true)]
+  │         ^
+  │         │
+  │         Unexpected '#'
+  │         Expected an expression term

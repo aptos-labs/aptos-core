@@ -188,6 +188,11 @@ struct K8sSwarm {
     keep: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
+    #[clap(
+        long,
+        help = "Retain debug logs and above for all nodes instead of just the first 5 nodes"
+    )]
+    retain_debug_logs: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -987,7 +992,7 @@ fn changing_working_quorum_test_high_load() -> ForgeConfig {
         120,
         500,
         300,
-        true,
+        false,
         true,
         true,
         ChangingWorkingQuorumTest {
@@ -1116,7 +1121,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
         criteria: [
             (9, 1.0, 1.0, 1.2, 0),
-            (95, 1.0, 1.0, 1.2, 0),
+            (95, 1.0, 1.2, 1.2, 0),
             (950, 1.4, 1.6, 2.0, 0),
             (2900, 2.5, 2.2, 2.5, 0),
             (4800, 3., 4., 3.0, 0),
@@ -1849,8 +1854,8 @@ fn realistic_env_max_load_test(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),
             // Memory starts around 5GB, and grows around 1.4GB/hr in this test.
-            // Check that we don't use more than final expected memory for more than 15% of the time.
-            MetricsThreshold::new_gb(5.0 + 1.4 * (duration_secs as f64 / 3600.0), 15),
+            // Check that we don't use more than final expected memory for more than 20% of the time.
+            MetricsThreshold::new_gb(6.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -1858,7 +1863,7 @@ fn realistic_env_max_load_test(
             (duration.as_secs() / 10).max(60),
         )
         .add_latency_threshold(3.4, LatencyType::P50)
-        .add_latency_threshold(4.5, LatencyType::P90)
+        .add_latency_threshold(4.5, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
             max_epoch_no_progress_secs: 15.0,

@@ -46,6 +46,7 @@ move-compiler/tests/move_check/liveness/{
   trailing_semi_loops.move,
 }
 move-compiler/tests/move_check/locals/{
+  dont_warn_unused_self.move,
   use_after_move_if.move,
   use_after_move_if_else.move,
   use_after_move_loop.move,
@@ -86,6 +87,7 @@ move-compiler/tests/move_check/parser/{
   control_exp_associativity_unreachable_code.move,
   decimal_address.move,
   doc_comments_placement.move,
+  dotdot_not_supported.move,
   duplicate_entry_modifier.move,
   empty_file.move,
   entry_const.move,

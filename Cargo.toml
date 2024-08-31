@@ -122,6 +122,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
+    "ecosystem/indexer-grpc/indexer-test-transactions",
     "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
@@ -360,6 +361,7 @@ aptos-indexer-grpc-file-store-backfiller = { path = "ecosystem/indexer-grpc/inde
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
+aptos-indexer-test-transactions = { path = "ecosystem/indexer-grpc/indexer-test-transactions" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-infallible = { path = "crates/aptos-infallible" }
@@ -510,7 +512,7 @@ cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles"] }
+clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles", "wrap_help"] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = [

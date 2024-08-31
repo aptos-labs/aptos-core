@@ -88,6 +88,7 @@ pub struct ConsensusConfig {
     pub proof_cache_capacity: u64,
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
+    pub enable_pre_commit: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -241,25 +242,25 @@ impl Default for ConsensusConfig {
                     // Block enters the pipeline after consensus orders it, and leaves the
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 800,
+                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    max_sending_block_txns_after_filtering_override:
+                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    backpressure_proposal_delay_ms: 50,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 1500,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    back_pressure_pipeline_latency_limit_ms: 1900,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1600,
-                    max_sending_block_txns_after_filtering_override:
-                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
                 },
                 // with execution backpressure, only later start reducing block size
                 PipelineBackpressureValues {
@@ -352,6 +353,7 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             num_bounded_executor_tasks: 16,
+            enable_pre_commit: true,
         }
     }
 }

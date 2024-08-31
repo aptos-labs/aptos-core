@@ -82,12 +82,12 @@ impl InternalIndexerDBService {
             .state_sync_driver
             .bootstrapping_mode
             .is_fast_sync();
-        let mut main_db_synced_version = self.db_indexer.main_db_reader.get_synced_version()?;
+        let mut main_db_synced_version = self.db_indexer.main_db_reader.ensure_synced_version()?;
 
         // Wait till fast sync is done
         while fast_sync_enabled && main_db_synced_version == 0 {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            main_db_synced_version = self.db_indexer.main_db_reader.get_synced_version()?;
+            main_db_synced_version = self.db_indexer.main_db_reader.ensure_synced_version()?;
         }
 
         let start_version = self
