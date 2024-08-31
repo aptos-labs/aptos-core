@@ -4,15 +4,17 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_types::state_store::{
-    errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-    state_value::StateValue, TStateView,
+use aptos_types::{
+    executable::ModulePath,
+    state_store::{
+        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, TStateView,
+    },
+    write_set::WriteOp,
 };
 use bytes::Bytes;
 use move_core_types::language_storage::ModuleId;
 use std::collections::{BTreeMap, HashMap};
-use aptos_types::executable::ModulePath;
-use aptos_types::write_set::WriteOp;
 
 type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
