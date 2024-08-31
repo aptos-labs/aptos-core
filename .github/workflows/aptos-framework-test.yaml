@@ -3,12 +3,10 @@ name: Run aptos framework checks
 on:
   push:
     branches: 
-        - master
-        - integrate_consensus_key
+        - dev
   pull_request:
     branches:
-        - master
-        - integrate_consensus_key
+        - dev
 
 env:
   CARGO_TERM_COLOR: always
