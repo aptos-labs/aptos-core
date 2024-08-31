@@ -638,7 +638,9 @@ impl BufferManager {
             self.order_vote_enabled,
         );
         if let Some(commit_proof) = self.drain_pending_commit_proof_till(round) {
-            if commit_proof.ledger_info().commit_info().id() == block_id {
+            if !new_item.is_aggregated()
+                && commit_proof.ledger_info().commit_info().id() == block_id
+            {
                 new_item = new_item.try_advance_to_aggregated_with_ledger_info(commit_proof)
             }
         }
