@@ -10,7 +10,9 @@ use aptos_types::state_store::{
 };
 use bytes::Bytes;
 use move_core_types::language_storage::ModuleId;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use aptos_types::executable::ModulePath;
+use aptos_types::write_set::WriteOp;
 
 type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
@@ -29,6 +31,14 @@ impl GenesisStateView {
     pub(crate) fn add_module(&mut self, module_id: &ModuleId, blob: &[u8]) {
         self.state_data
             .insert(StateKey::module_id(module_id), blob.to_vec());
+    }
+
+    pub(crate) fn add_module_write_ops(&mut self, module_write_ops: BTreeMap<StateKey, WriteOp>) {
+        for (state_key, write_op) in module_write_ops {
+            assert!(state_key.is_module_path());
+            let bytes = write_op.bytes().expect("Modules cannot be deleted");
+            self.state_data.insert(state_key, bytes.to_vec());
+        }
     }
 }
 
