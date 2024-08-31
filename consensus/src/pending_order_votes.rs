@@ -10,7 +10,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use std::{collections::HashMap, time::Instant};
+use std::collections::HashMap;
 
 /// Result of the order vote processing. The failure case (Verification error) is returned
 /// as the Error part of the result.
@@ -112,12 +112,12 @@ impl PendingOrderVotes {
                             aggregated_voting_power >= validator_verifier.quorum_voting_power(),
                             "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                         );
-                        let start_time = Instant::now();
-                        let verification_result =
-                            li_with_sig.aggregate_and_verify(validator_verifier);
-                        counters::VERIFY_MSG
-                            .with_label_values(&["order_vote_aggregate_and_verify"])
-                            .observe(start_time.elapsed().as_secs_f64());
+                        let verification_result = {
+                            let _timer = counters::VERIFY_MSG
+                                .with_label_values(&["order_vote_aggregate_and_verify"])
+                                .start_timer();
+                            li_with_sig.aggregate_and_verify(validator_verifier)
+                        };
                         match verification_result {
                             Ok(ledger_info_with_sig) => {
                                 *status =

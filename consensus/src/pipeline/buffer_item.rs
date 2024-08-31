@@ -377,6 +377,9 @@ impl BufferItem {
                     .check_voting_power(verifier)
                     .is_ok()
                 {
+                    let _time = counters::VERIFY_MSG
+                        .with_label_values(&["commit_vote_aggregate_and_verify"])
+                        .start_timer();
                     if let Ok(commit_proof) = signed_item
                         .partial_commit_proof
                         .clone()
@@ -397,6 +400,10 @@ impl BufferItem {
                     .check_voting_power(verifier)
                     .is_ok()
                 {
+                    let _time = counters::VERIFY_MSG
+                        .with_label_values(&["commit_vote_aggregate_and_verify"])
+                        .start_timer();
+
                     if let Ok(commit_proof) = executed_item
                         .partial_commit_proof
                         .clone()
