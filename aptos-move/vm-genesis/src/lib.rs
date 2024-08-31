@@ -35,9 +35,8 @@ use aptos_types::{
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
         APTOS_MAX_KNOWN_VERSION,
     },
-    state_store::state_key::StateKey,
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
-    write_set::{TransactionWrite, WriteOp},
+    write_set::{TransactionWrite},
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -52,15 +51,13 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveTypeLayout, MoveValue},
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage, TemporaryModuleStorage,
-};
+use move_vm_runtime::{module_traversal::{TraversalContext, TraversalStorage}, ModuleStorage, TemporaryModuleStorage, UnreachableCodeStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use aptos_vm_types::change_set::VMChangeSet;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -181,16 +178,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Publish the framework, using a different session id, in case both scripts create tables.
     let mut new_id = [0u8; 32];
     new_id[31] = 1;
-    let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
 
-    let loader_v2_module_write_set = publish_framework(&mut session, &module_storage, framework);
-    let (additional_change_set, loader_v1_module_write_set) =
-        session.finish(&configs, &module_storage).unwrap();
-    assert!(
-        loader_v2_module_write_set.is_empty() && !loader_v1_module_write_set.is_empty()
-            || !loader_v2_module_write_set.is_empty() && loader_v1_module_write_set.is_empty()
-    );
-
+    let (additional_change_set, module_write_set) = publish_framework(&vm, HashValue::new(new_id), framework);
     change_set
         .squash_additional_change_set(additional_change_set)
         .unwrap();
@@ -207,11 +196,6 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
-    let module_write_set = if loader_v2_module_write_set.is_empty() {
-        loader_v1_module_write_set
-    } else {
-        loader_v2_module_write_set
-    };
     let change_set = change_set
         .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
@@ -324,16 +308,7 @@ pub fn encode_genesis_change_set(
     // Publish the framework, using a different id, in case both scripts create tables.
     let mut new_id = [0u8; 32];
     new_id[31] = 1;
-    let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
-
-    let loader_v2_module_write_set = publish_framework(&mut session, &module_storage, framework);
-    let (additional_change_set, loader_v1_module_write_set) =
-        session.finish(&configs, &module_storage).unwrap();
-    assert!(
-        loader_v2_module_write_set.is_empty() && !loader_v1_module_write_set.is_empty()
-            || !loader_v2_module_write_set.is_empty() && loader_v1_module_write_set.is_empty()
-    );
-
+    let (additional_change_set, module_write_set) = publish_framework(&vm, HashValue::new(new_id), framework);
     change_set
         .squash_additional_change_set(additional_change_set)
         .unwrap();
@@ -351,11 +326,6 @@ pub fn encode_genesis_change_set(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
-    let module_write_set = if loader_v2_module_write_set.is_empty() {
-        loader_v1_module_write_set
-    } else {
-        loader_v2_module_write_set
-    };
     change_set
         .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
@@ -866,69 +836,118 @@ fn initialize_package(
     );
 }
 
-/// Publish the framework release bundle.
+/// Produces the changes when a framework is published:
+///  1. Module write set with published code.
+///  2. Resources containing package information.
 fn publish_framework(
-    session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
+    vm: &GenesisMoveVM,
+    hash_value: HashValue,
     framework: &ReleaseBundle,
-) -> ModuleWriteSet {
-    let mut write_ops = BTreeMap::new();
-    for pack in &framework.packages {
-        publish_package(session, module_storage, &mut write_ops, pack)
+) -> (VMChangeSet, ModuleWriteSet) {
+    if vm.runtime_environment().vm_config().use_loader_v2 {
+        publish_framework_with_loader_v2(vm, hash_value, framework)
+    } else {
+        publish_framework_with_loader_v1(vm, hash_value, framework)
     }
-    ModuleWriteSet::new(true, write_ops)
 }
 
-/// Publish the given package.
-fn publish_package(
-    session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
-    write_ops: &mut BTreeMap<StateKey, WriteOp>,
-    pack: &ReleasePackage,
-) {
-    let modules = pack.sorted_code_and_modules();
-    let addr = *modules.first().unwrap().1.self_id().address();
+fn publish_framework_with_loader_v2(
+    vm: &GenesisMoveVM,
+    hash_value: HashValue,
+    framework: &ReleaseBundle,
+) -> (VMChangeSet, ModuleWriteSet) {
+    assert!(vm.runtime_environment().vm_config().use_loader_v2);
 
-    let vm = session.get_move_vm();
-    if vm.vm_config().use_loader_v2 {
+    let mut state_view = GenesisStateView::new();
+    let mut write_ops = BTreeMap::new();
+
+    for pack in &framework.packages {
+        let modules = pack.sorted_code_and_modules();
+        let addr = *modules.first().unwrap().1.self_id().address();
+
         let code = modules
             .into_iter()
             .map(|(c, _)| c.to_vec().into())
             .collect::<Vec<_>>();
 
-        // State view already contains all code, we just need to:
-        //  1) check it is publishable,
-        //  2) convert to write ops.
-        let tmp_module_storage =
-            TemporaryModuleStorage::new(&addr, vm.runtime_environment(), module_storage, code)
+        let module_storage = vm.as_aptos_code_storage(&state_view);
+        let resolver = state_view.as_move_resolver();
+        let session = vm.new_genesis_session(&resolver, hash_value);
+
+        // Code should be publishable.
+        let modules_to_publish =
+            TemporaryModuleStorage::new(&addr, vm.runtime_environment(), &module_storage, code)
                 .unwrap_or_else(|e| {
                     panic!(
-                        "Failure publishing package `{}`: {:?}",
+                        "Failure publishing package {}::{}: {:?}",
+                        addr,
                         pack.package_metadata().name,
                         e
                     )
-                });
-        initialize_package(session, &tmp_module_storage, addr, pack);
+                })
+                .release_verified_module_bundle();
 
         // Add modules to write set.
         let package_write_ops = session
-            .convert_modules_into_write_ops(
-                module_storage,
-                tmp_module_storage.release_verified_module_bundle(),
-            )
+            .convert_modules_into_write_ops(&module_storage, modules_to_publish)
             .unwrap_or_else(|e| {
                 panic!(
-                    "Failure when creating write ops for package `{}`: {:?}",
+                    "Failure when creating write ops for package {}::{}: {:?}",
+                    addr,
                     pack.package_metadata().name,
                     e
                 )
             });
-        write_ops.extend(package_write_ops);
-    } else {
+        write_ops.extend(package_write_ops.clone());
+
+        // Make sure to add modules to state view so subsequent packages can resolve
+        // their dependencies.
+        drop(session);
+        drop(module_storage);
+        state_view.add_module_write_ops(package_write_ops);
+    }
+    let module_write_set = ModuleWriteSet::new(true, write_ops);
+
+    // At this point we processed all packages, and the state view contains all the code.
+    // Run package initialization.
+
+    let module_storage = vm.as_aptos_code_storage(&state_view);
+    let resolver = state_view.as_move_resolver();
+    let mut session = vm.new_genesis_session(&resolver, hash_value);
+
+    for pack in &framework.packages {
+        let addr = *pack.sorted_code_and_modules().first().unwrap().1.self_id().address();
+        initialize_package(&mut session, &module_storage, addr, pack);
+    }
+
+    let configs = vm.genesis_change_set_configs();
+    let (change_set, empty_module_write_set) = session.finish(&configs, &module_storage).unwrap();
+    assert!(empty_module_write_set.is_empty());
+
+    (change_set, module_write_set)
+}
+
+fn publish_framework_with_loader_v1(
+    vm: &GenesisMoveVM,
+    hash_value: HashValue,
+    framework: &ReleaseBundle,
+) -> (VMChangeSet, ModuleWriteSet) {
+    assert!(!vm.runtime_environment().vm_config().use_loader_v2);
+
+    let state_view = GenesisStateView::new();
+    let module_storage = vm.as_aptos_code_storage(&state_view);
+    let resolver = state_view.as_move_resolver();
+
+    let mut session = vm.new_genesis_session(&resolver, hash_value);
+    for pack in &framework.packages {
+        let modules = pack.sorted_code_and_modules();
+
+        let addr = *modules.first().unwrap().1.self_id().address();
         let code = modules
             .into_iter()
             .map(|(c, _)| c.to_vec())
             .collect::<Vec<_>>();
+
         #[allow(deprecated)]
         session
             .publish_module_bundle(code, addr, &mut UnmeteredGasMeter)
@@ -939,8 +958,11 @@ fn publish_package(
                     e
                 )
             });
-        initialize_package(session, module_storage, addr, pack);
+        initialize_package(&mut session, &UnreachableCodeStorage, addr, pack);
     }
+
+    let configs = vm.genesis_change_set_configs();
+    session.finish(&configs, &module_storage).unwrap()
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
@@ -1225,23 +1247,11 @@ pub struct ValidatorWithCommissionRate {
 
 #[test]
 pub fn test_genesis_module_publishing() {
+    // TODO(loader_v2): This test did not catch a bug, assert more things?
     let vm = GenesisMoveVM::new(ChainId::test());
-
-    // create a state view for Move vm.
-    let mut state_view = GenesisStateView::new();
-    for (module_bytes, module) in
-        aptos_cached_packages::head_release_bundle().code_and_compiled_modules()
-    {
-        state_view.add_module(&module.self_id(), module_bytes);
-    }
-
-    let module_storage = vm.as_aptos_code_storage(&state_view);
-    let resolver = state_view.as_move_resolver();
-    let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
-
     let _ = publish_framework(
-        &mut session,
-        &module_storage,
+        &vm,
+        HashValue::zero(),
         aptos_cached_packages::head_release_bundle(),
     );
 }
