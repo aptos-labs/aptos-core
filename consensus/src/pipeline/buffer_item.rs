@@ -2,7 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
+use crate::{
+    counters, pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType,
+};
 use anyhow::anyhow;
 use aptos_consensus_types::{
     common::Author, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock,
@@ -63,6 +65,9 @@ fn verify_signatures(
             .clone()
             .into_par_iter()
             .flat_map(|(account_address, signature)| {
+                let _timer = counters::VERIFY_MSG
+                    .with_label_values(&["commit_votes_from_ordered_bufer_item"])
+                    .start_timer();
                 if verifier
                     .verify(account_address, commit_ledger_info, &signature)
                     .is_ok()
