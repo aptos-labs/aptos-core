@@ -155,6 +155,7 @@ pub struct BufferManager {
     back_pressure_enabled: bool,
     highest_committed_round: Round,
     latest_round: Round,
+    optimistic_sig_verification_for_commit_votes: bool,
 
     // Consensus publisher for downstream observers.
     consensus_observer_config: ConsensusObserverConfig,
@@ -189,6 +190,7 @@ impl BufferManager {
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        optimistic_sig_verification_for_commit_votes: bool,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -247,7 +249,7 @@ impl BufferManager {
             back_pressure_enabled,
             highest_committed_round,
             latest_round: highest_committed_round,
-
+            optimistic_sig_verification_for_commit_votes,
             consensus_observer_config,
             consensus_publisher,
         }
@@ -646,7 +648,10 @@ impl BufferManager {
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
                 if current_cursor.is_some() {
                     let mut item = self.buffer.take(&current_cursor);
-                    let new_item = match item.add_signature_if_matched(vote) {
+                    let new_item = match item.add_signature_if_matched(
+                        vote,
+                        self.optimistic_sig_verification_for_commit_votes,
+                    ) {
                         Ok(()) => {
                             let response =
                                 ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
@@ -813,13 +818,22 @@ impl BufferManager {
             while let Some(commit_msg) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
+                let optimistic_sig_verification_for_commit_votes =
+                    self.optimistic_sig_verification_for_commit_votes;
                 bounded_executor
                     .spawn(async move {
-                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
-                            Ok(_) => {
-                                let _ = tx.unbounded_send(commit_msg);
-                            },
-                            Err(e) => warn!("Invalid commit message: {}", e),
+                        // When this flag is enabled, we skip verification of commit vote for now.
+                        // Once enough commit votes are received, we will aggregate and verifyt them optimistically.
+                        if optimistic_sig_verification_for_commit_votes && commit_msg.req.is_vote()
+                        {
+                            let _ = tx.unbounded_send(commit_msg);
+                        } else {
+                            match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                                Ok(_) => {
+                                    let _ = tx.unbounded_send(commit_msg);
+                                },
+                                Err(e) => warn!("Invalid commit message: {}", e),
+                            }
                         }
                     })
                     .await;

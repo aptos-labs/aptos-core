@@ -282,6 +282,8 @@ impl ExecutionProxyClient {
             highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
+            self.consensus_config
+                .optimistic_sig_verification_for_commit_votes,
         );
 
         tokio::spawn(execution_schedule_phase.start());
