@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ambassador_impl_ModuleStorage, IntoUnsyncModuleStorage, Module, ModuleBytesStorage,
-    ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
+    ambassador_impl_ModuleStorage, module_linker_error, IntoUnsyncModuleStorage, Module,
+    ModuleBytesStorage, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -121,8 +121,6 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
                     .with_message(msg)
                     .finish(Location::Undefined));
             }
-
-            // TODO(loader_v2): Check that friends exist! Here or elsewhere.
         }
 
         Ok(Self {
@@ -207,12 +205,20 @@ impl<'a, M: ModuleStorage> TemporaryModuleStorage<'a, M> {
         let temporary_module_storage =
             temporary_module_bytes_storage.into_unsync_module_storage(env);
 
-        // Verify the bundle, performing linking checks (e.g., no cyclic dependencies).
+        // Verify the bundle, performing linking checks.
         for (addr, name) in temporary_module_storage
             .byte_storage()
             .staged_modules_iter()
         {
-            temporary_module_storage.fetch_verified_module(addr, name)?;
+            // Verify the module and its dependencies, and that they do not form a cycle.
+            let module = temporary_module_storage.fetch_verified_module(addr, name)?;
+
+            // Also verify that its friends exist.
+            for (friend_addr, friend_name) in module.module().immediate_friends_iter() {
+                if !temporary_module_storage.check_module_exists(friend_addr, friend_name)? {
+                    return Err(module_linker_error!(friend_addr, friend_name));
+                }
+            }
         }
 
         Ok(Self {

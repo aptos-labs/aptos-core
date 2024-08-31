@@ -15,13 +15,19 @@ macro_rules! module_storage_error {
     };
 }
 
+// TODO(loader_v2): The error message is formatted in the same way as V1, to
+//                  make tests pass, but ideally we should improve this.
 #[macro_export]
 macro_rules! module_linker_error {
     ($addr:ident, $name:ident) => {
         move_binary_format::errors::PartialVMError::new(
             move_core_types::vm_status::StatusCode::LINKER_ERROR,
         )
-        .with_message(format!("Module {}::{} does not exist", $addr, $name))
+        .with_message(format!(
+            "Linker Error: Module {}::{} doesn't exist",
+            $addr.to_hex(),
+            $name
+        ))
         .finish(move_binary_format::errors::Location::Undefined)
     };
 }
