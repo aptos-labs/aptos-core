@@ -36,14 +36,15 @@ use aptos_types::{
         APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
-    write_set::{TransactionWrite},
+    write_set::TransactionWrite,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{GenesisMoveVM, SessionExt},
 };
 use aptos_vm_types::{
-    module_and_script_storage::module_storage::AptosModuleStorage, module_write_set::ModuleWriteSet,
+    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWriteSet,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -51,13 +52,15 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveTypeLayout, MoveValue},
 };
-use move_vm_runtime::{module_traversal::{TraversalContext, TraversalStorage}, ModuleStorage, TemporaryModuleStorage, UnreachableCodeStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    ModuleStorage, TemporaryModuleStorage, UnreachableCodeStorage,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use aptos_vm_types::change_set::VMChangeSet;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -179,7 +182,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut new_id = [0u8; 32];
     new_id[31] = 1;
 
-    let (additional_change_set, module_write_set) = publish_framework(&vm, HashValue::new(new_id), framework);
+    let (additional_change_set, module_write_set) =
+        publish_framework(&vm, HashValue::new(new_id), framework);
     change_set
         .squash_additional_change_set(additional_change_set)
         .unwrap();
@@ -308,7 +312,8 @@ pub fn encode_genesis_change_set(
     // Publish the framework, using a different id, in case both scripts create tables.
     let mut new_id = [0u8; 32];
     new_id[31] = 1;
-    let (additional_change_set, module_write_set) = publish_framework(&vm, HashValue::new(new_id), framework);
+    let (additional_change_set, module_write_set) =
+        publish_framework(&vm, HashValue::new(new_id), framework);
     change_set
         .squash_additional_change_set(additional_change_set)
         .unwrap();
@@ -916,7 +921,13 @@ fn publish_framework_with_loader_v2(
     let mut session = vm.new_genesis_session(&resolver, hash_value);
 
     for pack in &framework.packages {
-        let addr = *pack.sorted_code_and_modules().first().unwrap().1.self_id().address();
+        let addr = *pack
+            .sorted_code_and_modules()
+            .first()
+            .unwrap()
+            .1
+            .self_id()
+            .address();
         initialize_package(&mut session, &module_storage, addr, pack);
     }
 

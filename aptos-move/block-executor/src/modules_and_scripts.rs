@@ -20,8 +20,8 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
-    deserialize_script, module_cyclic_dependency_error, module_linker_error, script_hash,
-    CodeStorage, Module, ModuleStorage, Script,
+    deserialize_script, logging::expect_no_verification_errors, module_cyclic_dependency_error,
+    module_linker_error, script_hash, CodeStorage, Module, ModuleStorage, Script,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -120,7 +120,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         // Verify the script by also looking at its dependencies.
         let immediate_dependencies = partially_verified_script
             .immediate_dependencies_iter()
-            .map(|(addr, name)| self.fetch_verified_module(addr, name))
+            .map(|(addr, name)| {
+                self.fetch_verified_module(addr, name)
+                    .map_err(|e| expect_no_verification_errors(e))
+            })
             .collect::<VMResult<Vec<_>>>()?;
         let script = self
             .runtime_environment
