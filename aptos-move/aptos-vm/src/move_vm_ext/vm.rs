@@ -26,9 +26,8 @@ use aptos_vm_types::{
     module_and_script_storage::{AptosCodeStorageAdapter, AsAptosCodeStorage},
     storage::change_set_configs::ChangeSetConfigs,
 };
-use move_vm_runtime::move_vm::MoveVM;
+use move_vm_runtime::{move_vm::MoveVM, RuntimeEnvironment};
 use std::{ops::Deref, sync::Arc};
-use move_vm_runtime::RuntimeEnvironment;
 
 /// MoveVM wrapper which is used to run genesis initializations. Designed as a
 /// stand-alone struct to ensure all genesis configurations are in one place,
