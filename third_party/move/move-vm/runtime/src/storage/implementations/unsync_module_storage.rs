@@ -217,6 +217,12 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
             Deserialized(compiled_module, size) => (compiled_module, size),
             Verified(module) => return Ok(module),
         };
+        self.runtime_environment
+            .paranoid_check_module_address_and_name(
+                compiled_module.as_ref(),
+                address,
+                module_name,
+            )?;
 
         // Step 1: verify compiled module locally.
         let partially_verified_module = self
