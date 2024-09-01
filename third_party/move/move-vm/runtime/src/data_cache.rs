@@ -6,7 +6,7 @@ use crate::{
     loader::{Loader, ModuleStorageAdapter},
     logging::expect_no_verification_errors,
     storage::code_storage::deserialize_script,
-    ModuleStorage,
+    ModuleStorage, RuntimeEnvironment,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -30,7 +30,6 @@ use move_vm_types::{
     value_serde::deserialize_and_allow_delayed_values,
     values::{GlobalValue, Value},
 };
-use sha3::{Digest, Sha3_256};
 use std::{
     collections::btree_map::{self, BTreeMap},
     sync::Arc,
@@ -324,6 +323,7 @@ impl<'r> TransactionDataCache<'r> {
         &mut self,
         id: ModuleId,
         allow_loading_failure: bool,
+        runtime_environment: &RuntimeEnvironment,
     ) -> VMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
         let cache = &mut self.compiled_modules;
         match cache.entry(id) {
@@ -340,25 +340,12 @@ impl<'r> TransactionDataCache<'r> {
                     },
                 };
 
-                let mut sha3_256 = Sha3_256::new();
-                sha3_256.update(&bytes);
-                let hash_value: [u8; 32] = sha3_256.finalize().into();
-
                 // for bytes obtained from the data store, they should always deserialize and verify.
                 // It is an invariant violation if they don't.
-                let module =
-                    CompiledModule::deserialize_with_config(&bytes, &self.deserializer_config)
-                        .map_err(|err| {
-                            let msg = format!("Deserialization error: {:?}", err);
-                            PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                                .with_message(msg)
-                                .finish(Location::Module(entry.key().clone()))
-                        })
-                        .map_err(expect_no_verification_errors)?;
-
-                Ok(entry
-                    .insert((Arc::new(module), bytes.len(), hash_value))
-                    .clone())
+                let (module, size, hash_value) = runtime_environment
+                    .deserialize_into_compiled_module(&bytes)
+                    .map_err(expect_no_verification_errors)?;
+                Ok(entry.insert((Arc::new(module), size, hash_value)).clone())
             },
         }
     }

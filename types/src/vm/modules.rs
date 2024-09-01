@@ -7,11 +7,8 @@ use crate::{
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
-    CompiledModule,
-};
-use move_core_types::{metadata::Metadata, vm_status::StatusCode};
+use move_binary_format::{errors::VMResult, CompiledModule};
+use move_core_types::metadata::Metadata;
 use move_vm_runtime::{Module, RuntimeEnvironment};
 use std::{fmt::Debug, sync::Arc};
 
@@ -33,6 +30,9 @@ pub trait ModuleStorageEntryInterface: Sized + Debug {
 
     /// Returns the state value metadata of the given module.
     fn state_value_metadata(&self) -> &StateValueMetadata;
+
+    /// Returns the hash of the given module.
+    fn hash(&self) -> [u8; 32];
 
     /// Returns module's metadata.
     fn metadata(&self) -> &[Metadata];
@@ -61,6 +61,7 @@ enum Representation {
 pub struct ModuleStorageEntry {
     /// Serialized representation of the module.
     serialized_module: Bytes,
+    hash: [u8; 32],
     /// The state value metadata associated with the module, when read from or
     /// written to storage.
     state_value_metadata: StateValueMetadata,
@@ -98,6 +99,7 @@ impl ModuleStorageEntry {
     pub fn make_verified(&self, module: Arc<Module>) -> Self {
         Self {
             serialized_module: self.serialized_module.clone(),
+            hash: self.hash,
             state_value_metadata: self.state_value_metadata.clone(),
             representation: Representation::Verified(module),
         }
@@ -129,19 +131,12 @@ impl ModuleStorageEntryInterface for ModuleStorageEntry {
         state_value: StateValue,
     ) -> VMResult<Self> {
         let (state_value_metadata, serialized_module) = state_value.unpack();
-
-        let deserializer_config = &runtime_environment.vm_config().deserializer_config;
-        let compiled_module =
-            CompiledModule::deserialize_with_config(&serialized_module, deserializer_config)
-                .map_err(|err| {
-                    let msg = format!("Deserialization error: {:?}", err);
-                    PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                        .with_message(msg)
-                        .finish(Location::Undefined)
-                })?;
+        let (compiled_module, _, hash) =
+            runtime_environment.deserialize_into_compiled_module(&serialized_module)?;
 
         Ok(Self {
             serialized_module,
+            hash,
             state_value_metadata,
             representation: Representation::Deserialized(Arc::new(compiled_module)),
         })
@@ -153,6 +148,10 @@ impl ModuleStorageEntryInterface for ModuleStorageEntry {
 
     fn state_value_metadata(&self) -> &StateValueMetadata {
         &self.state_value_metadata
+    }
+
+    fn hash(&self) -> [u8; 32] {
+        self.hash
     }
 
     fn metadata(&self) -> &[Metadata] {
