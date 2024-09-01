@@ -3,13 +3,14 @@
 
 use crate::{
     config::VMConfig,
+    loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
     storage::{struct_name_index_map::StructNameIndexMap, verifier::VerifierExtension},
     Module, Script,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
-    errors::{Location, VMResult},
+    errors::{Location, PartialVMError, VMResult},
     file_format::CompiledScript,
     CompiledModule,
 };
@@ -17,6 +18,7 @@ use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
+    vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use std::sync::Arc;
 
@@ -163,11 +165,12 @@ impl RuntimeEnvironment {
         compiled_module: Arc<CompiledModule>,
         module_size: usize,
     ) -> VMResult<PartiallyVerifiedModule> {
-        // TODO(loader_v2): In loader V1, we also have a paranoid check, and a call to check_natives.
         move_bytecode_verifier::verify_module_with_config(
             &self.vm_config().verifier_config,
             compiled_module.as_ref(),
         )?;
+        check_natives(compiled_module.as_ref())?;
+
         if let Some(verifier) = &self.verifier_extension {
             verifier.verify_module(compiled_module.as_ref())?;
         }
@@ -194,6 +197,34 @@ impl RuntimeEnvironment {
 
         // Note: loader V1 implementation does not set locations for this error.
         result.map_err(|e| e.finish(Location::Undefined))
+    }
+
+    /// Returns ann error is module's address and name do not match the expected values.
+    /// In general, we enforce this is the case at module publish time.
+    #[inline]
+    pub fn paranoid_check_module_address_and_name(
+        &self,
+        module: &CompiledModule,
+        expected_address: &AccountAddress,
+        expected_module_name: &IdentStr,
+    ) -> VMResult<()> {
+        if self.vm_config().paranoid_type_checks {
+            let actual_address = module.self_addr();
+            let actual_module_name = module.self_name();
+            if expected_address != actual_address || expected_module_name != actual_module_name {
+                let msg = format!(
+                    "Expected module {}::{}, but got {}::{}",
+                    expected_address, expected_module_name, actual_address, actual_module_name
+                );
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(msg)
+                        .with_sub_status(EPARANOID_FAILURE)
+                        .finish(Location::Undefined),
+                );
+            }
+        }
+        Ok(())
     }
 }
 

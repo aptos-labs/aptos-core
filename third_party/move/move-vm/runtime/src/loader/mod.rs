@@ -695,7 +695,7 @@ impl LoaderV1 {
             &self.vm_config().verifier_config,
             module,
         )?;
-        self.check_natives(module)?;
+        check_natives(module)?;
 
         let mut visited = BTreeSet::new();
         let mut friends_discovered = BTreeSet::new();
@@ -778,22 +778,6 @@ impl LoaderV1 {
                 }
             },
         )
-    }
-
-    fn check_natives(&self, module: &CompiledModule) -> VMResult<()> {
-        // TODO: fix check and error code if we leave something around for native structs.
-        // For now this generates the only error test cases care about...
-        for (idx, struct_def) in module.struct_defs().iter().enumerate() {
-            if struct_def.field_information == StructFieldInformation::Native {
-                return Err(verification_error(
-                    StatusCode::MISSING_DEPENDENCY,
-                    IndexKind::FunctionHandle,
-                    idx as TableIndex,
-                )
-                .finish(Location::Module(module.self_id())));
-            }
-        }
-        Ok(())
     }
 
     //
@@ -944,14 +928,8 @@ impl LoaderV1 {
     ) -> VMResult<(Arc<CompiledModule>, usize)> {
         let (module, size, hash_value) =
             data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
-
-        if self.vm_config().paranoid_type_checks && &module.self_id() != id {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Module self id mismatch with storage".to_string())
-                    .finish(Location::Module(id.clone())),
-            );
-        }
+        self.runtime_environment
+            .paranoid_check_module_address_and_name(module.as_ref(), id.address(), id.name())?;
 
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
@@ -964,8 +942,7 @@ impl LoaderV1 {
             VERIFIED_MODULES.lock().put(hash_value, ());
         }
 
-        self.check_natives(&module)
-            .map_err(expect_no_verification_errors)?;
+        check_natives(&module).map_err(expect_no_verification_errors)?;
         Ok((module, size))
     }
 
@@ -2503,4 +2480,20 @@ fn match_return_type<'a>(
         | (Type::MutableReference(_), _)
         | (Type::Reference(_), _) => false,
     }
+}
+
+pub(crate) fn check_natives(module: &CompiledModule) -> VMResult<()> {
+    // TODO: fix check and error code if we leave something around for native structs.
+    // For now this generates the only error test cases care about...
+    for (idx, struct_def) in module.struct_defs().iter().enumerate() {
+        if struct_def.field_information == StructFieldInformation::Native {
+            return Err(verification_error(
+                StatusCode::MISSING_DEPENDENCY,
+                IndexKind::FunctionHandle,
+                idx as TableIndex,
+            )
+            .finish(Location::Module(module.self_id())));
+        }
+    }
+    Ok(())
 }
