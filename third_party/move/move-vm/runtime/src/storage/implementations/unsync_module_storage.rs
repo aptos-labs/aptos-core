@@ -12,16 +12,12 @@ use crate::{
 use bytes::Bytes;
 #[cfg(test)]
 use claims::assert_some;
-use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
-    CompiledModule,
-};
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     metadata::Metadata,
-    vm_status::StatusCode,
 };
 use std::{
     cell::RefCell,
@@ -73,16 +69,22 @@ impl ModuleBytesStorage for LocalModuleBytesStorage {
 /// verified one.
 #[derive(Debug, Clone)]
 pub(crate) enum ModuleStorageEntry {
-    Deserialized(Arc<CompiledModule>, usize),
-    Verified(Arc<Module>),
+    Deserialized {
+        module: Arc<CompiledModule>,
+        module_size: usize,
+        module_hash: [u8; 32],
+    },
+    Verified {
+        module: Arc<Module>,
+    },
 }
 
 impl ModuleStorageEntry {
     /// Returns the verified module if the entry is verified, and [None] otherwise.
     fn into_verified(self) -> Option<Arc<Module>> {
         match self {
-            Self::Deserialized(_, _) => None,
-            Self::Verified(module) => Some(module),
+            Self::Deserialized { .. } => None,
+            Self::Verified { module } => Some(module),
         }
     }
 }
@@ -110,9 +112,9 @@ impl<'e, B: ModuleBytesStorage> IntoUnsyncModuleStorage<'e, B> for B {
 
 impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     /// Creates a new storage with empty module cache, but no constraints on the byte storage.
-    fn new(env: &'e RuntimeEnvironment, byte_storage: B) -> Self {
+    fn new(runtime_environment: &'e RuntimeEnvironment, byte_storage: B) -> Self {
         Self {
-            runtime_environment: env,
+            runtime_environment,
             module_storage: RefCell::new(BTreeMap::new()),
             byte_storage,
         }
@@ -148,28 +150,22 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 
         if !self.is_module_cached(address, module_name) {
             let bytes = self.get_existing_module_bytes(address, module_name)?;
-            let compiled_module = CompiledModule::deserialize_with_config(
-                &bytes,
-                &self.runtime_environment.vm_config().deserializer_config,
-            )
-            .map_err(|err| {
-                let msg = format!("Deserialization error: {:?}", err);
-                PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                    .with_message(msg)
-                    .finish(Location::Module(ModuleId::new(
-                        *address,
-                        module_name.to_owned(),
-                    )))
-            })?;
+            let (module, module_size, module_hash) = self
+                .runtime_environment
+                .deserialize_into_compiled_module(&bytes)?;
+            self.runtime_environment
+                .paranoid_check_module_address_and_name(&module, address, module_name)?;
+
             let mut module_storage = self.module_storage.borrow_mut();
             let account_module_storage = match module_storage.entry(*address) {
                 Occupied(entry) => entry.into_mut(),
                 Vacant(entry) => entry.insert(BTreeMap::new()),
             };
-            account_module_storage.insert(
-                module_name.to_owned(),
-                Deserialized(Arc::new(compiled_module), bytes.len()),
-            );
+            account_module_storage.insert(module_name.to_owned(), Deserialized {
+                module: Arc::new(module),
+                module_size,
+                module_hash,
+            });
         }
         Ok(())
     }
@@ -213,21 +209,21 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
 
         // Get the module, and in case it is verified, return early.
         let entry = self.fetch_existing_module_storage_entry(address, module_name)?;
-        let (compiled_module, size) = match entry {
-            Deserialized(compiled_module, size) => (compiled_module, size),
-            Verified(module) => return Ok(module),
+        let (module, module_size, module_hash) = match entry {
+            Deserialized {
+                module,
+                module_size,
+                module_hash,
+            } => (module, module_size, module_hash),
+            Verified { module } => return Ok(module),
         };
-        self.runtime_environment
-            .paranoid_check_module_address_and_name(
-                compiled_module.as_ref(),
-                address,
-                module_name,
-            )?;
 
         // Step 1: verify compiled module locally.
-        let partially_verified_module = self
-            .runtime_environment
-            .build_partially_verified_module(compiled_module, size)?;
+        let partially_verified_module = self.runtime_environment.build_partially_verified_module(
+            module,
+            module_size,
+            module_hash,
+        )?;
 
         // Step 2: visit all dependencies and collect them for later verification.
         let mut verified_immediate_dependencies = vec![];
@@ -262,7 +258,9 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         // Step 4: update storage representation to fully verified one.
         let mut module_storage = self.module_storage.borrow_mut();
         let entry = get_module_entry_mut_or_panic(&mut module_storage, address, module_name);
-        *entry = Verified(module.clone());
+        *entry = Verified {
+            module: module.clone(),
+        };
         Ok(module)
     }
 
@@ -341,8 +339,8 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         let entry = get_module_entry_or_panic(&module_storage, address, module_name);
 
         Ok(match entry {
-            Deserialized(compiled_module, _) => compiled_module.clone(),
-            Verified(module) => module.as_compiled_module(),
+            Deserialized { module, .. } => module.clone(),
+            Verified { module } => module.as_compiled_module(),
         })
     }
 
@@ -500,8 +498,8 @@ pub(crate) mod test {
             module("a", vec!["b", "c"], vec![]).0.metadata
         );
 
-        assert!(module_storage.matches(vec!["a"], |e| { matches!(e, Deserialized(..)) }));
-        assert!(module_storage.matches(vec![], |e| matches!(e, Verified(..))));
+        assert!(module_storage.matches(vec!["a"], |e| { matches!(e, Deserialized { .. }) }));
+        assert!(module_storage.matches(vec![], |e| matches!(e, Verified { .. })));
 
         let result =
             module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("c"));
@@ -510,8 +508,8 @@ pub(crate) mod test {
             &module("c", vec!["d", "e"], vec![]).0
         );
 
-        assert!(module_storage.matches(vec!["a", "c"], |e| { matches!(e, Deserialized(..)) }));
-        assert!(module_storage.matches(vec![], |e| matches!(e, Verified(..))));
+        assert!(module_storage.matches(vec!["a", "c"], |e| { matches!(e, Deserialized { .. }) }));
+        assert!(module_storage.matches(vec![], |e| matches!(e, Verified { .. })));
     }
 
     #[test]
@@ -530,13 +528,13 @@ pub(crate) mod test {
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("c"));
         assert_ok!(result);
-        assert!(module_storage.matches(vec![], |e| matches!(e, Deserialized(..))));
-        assert!(module_storage.matches(vec!["c", "d", "e"], |e| { matches!(e, Verified(..)) }));
+        assert!(module_storage.matches(vec![], |e| matches!(e, Deserialized { .. })));
+        assert!(module_storage.matches(vec!["c", "d", "e"], |e| { matches!(e, Verified { .. }) }));
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
         assert_ok!(result);
         assert!(module_storage.matches(vec!["a", "b", "c", "d", "e"], |e| {
-            matches!(e, Verified(..))
+            matches!(e, Verified { .. })
         }));
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
@@ -561,21 +559,23 @@ pub(crate) mod test {
 
         assert_ok!(module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("a")));
         assert_ok!(module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("c")));
-        assert!(module_storage.matches(vec!["a", "c"], |e| { matches!(e, Deserialized(..)) }));
-        assert!(module_storage.matches(vec![], |e| matches!(e, Verified(..))));
+        assert!(module_storage.matches(vec!["a", "c"], |e| { matches!(e, Deserialized { .. }) }));
+        assert!(module_storage.matches(vec![], |e| matches!(e, Verified { .. })));
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("d"));
         assert_ok!(result);
-        assert!(module_storage.matches(vec!["a", "c"], |e| { matches!(e, Deserialized(..)) }));
-        assert!(module_storage.matches(vec!["d", "e", "f", "g"], |e| { matches!(e, Verified(..)) }));
+        assert!(module_storage.matches(vec!["a", "c"], |e| { matches!(e, Deserialized { .. }) }));
+        assert!(module_storage.matches(vec!["d", "e", "f", "g"], |e| {
+            matches!(e, Verified { .. })
+        }));
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
         assert_ok!(result);
-        assert!(module_storage.matches(vec![], |e| matches!(e, Deserialized(..))));
+        assert!(module_storage.matches(vec![], |e| matches!(e, Deserialized { .. })));
         assert!(
             module_storage.matches(vec!["a", "b", "c", "d", "e", "f", "g"], |e| matches!(
                 e,
-                Verified(..)
+                Verified { .. }
             ),)
         );
     }
@@ -613,8 +613,8 @@ pub(crate) mod test {
         assert_ok!(result);
 
         // Since `c` has no dependencies, only it gets deserialized and verified.
-        assert!(module_storage.matches(vec![], |e| matches!(e, Deserialized(..))));
-        assert!(module_storage.matches(vec!["c"], |e| matches!(e, Verified(..))));
+        assert!(module_storage.matches(vec![], |e| matches!(e, Deserialized { .. })));
+        assert!(module_storage.matches(vec!["c"], |e| matches!(e, Verified { .. })));
     }
 
     #[test]
@@ -633,7 +633,7 @@ pub(crate) mod test {
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
         assert_ok!(result);
 
-        assert!(module_storage.matches(vec![], |e| matches!(e, Deserialized(..))));
-        assert!(module_storage.matches(vec!["a", "b", "c"], |e| { matches!(e, Verified(..)) }));
+        assert!(module_storage.matches(vec![], |e| matches!(e, Deserialized { .. })));
+        assert!(module_storage.matches(vec!["a", "b", "c"], |e| { matches!(e, Verified { .. }) }));
     }
 }

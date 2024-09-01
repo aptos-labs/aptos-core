@@ -9,7 +9,11 @@ pub mod environment;
 pub mod module_storage;
 pub mod verifier;
 
-// TODO(loader_v2): Remove when we no longer need the dummy implementation.
-pub mod dummy;
 pub mod implementations;
 pub mod publishing;
+
+// TODO(loader_v2): Temporary infra to still have loader V1 to test, run
+//                  and compare things e2e locally.
+pub fn use_loader_v1_based_on_env() -> bool {
+    std::env::var("USE_LOADER_V1").is_ok()
+}
