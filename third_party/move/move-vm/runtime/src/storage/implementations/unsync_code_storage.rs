@@ -3,7 +3,7 @@
 
 use crate::{
     logging::expect_no_verification_errors,
-    script_hash,
+    module_linker_error, script_hash,
     storage::{
         code_storage::deserialize_script,
         environment::WithRuntimeEnvironment,
@@ -102,9 +102,13 @@ impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
         let immediate_dependencies = compiled_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
-                self.module_storage
-                    .fetch_verified_module(addr, name)
-                    .map_err(expect_no_verification_errors)
+                if self.module_storage.check_module_exists(addr, name)? {
+                    self.module_storage
+                        .fetch_verified_module(addr, name)
+                        .map_err(expect_no_verification_errors)
+                } else {
+                    Err(module_linker_error!(addr, name))
+                }
             })
             .collect::<VMResult<Vec<_>>>()?;
         Ok(Arc::new(
@@ -260,9 +264,9 @@ mod test {
         assert!(code_storage.matches(vec![hash], |e| matches!(e, S::Verified(..))));
         assert!(code_storage
             .module_storage()
-            .matches(vec![], |e| matches!(e, M::Deserialized(..))));
+            .matches(vec![], |e| matches!(e, M::Deserialized { .. })));
         assert!(code_storage
             .module_storage()
-            .matches(vec!["a", "b", "c"], |e| matches!(e, M::Verified(..))));
+            .matches(vec!["a", "b", "c"], |e| matches!(e, M::Verified { .. })));
     }
 }

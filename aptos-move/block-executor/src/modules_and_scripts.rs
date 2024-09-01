@@ -121,8 +121,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         let immediate_dependencies = partially_verified_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
-                self.fetch_verified_module(addr, name)
-                    .map_err(expect_no_verification_errors)
+                if self.check_module_exists(addr, name)? {
+                    self.fetch_verified_module(addr, name)
+                        .map_err(expect_no_verification_errors)
+                } else {
+                    Err(module_linker_error!(addr, name))
+                }
             })
             .collect::<VMResult<Vec<_>>>()?;
         let script = self
@@ -321,13 +325,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         //  2. Entry exists at this index.
 
         // Otherwise, run the local verification first.
-        let size = entry.size_in_bytes();
         let cm = entry.as_compiled_module();
         self.runtime_environment
             .paranoid_check_module_address_and_name(cm.as_ref(), address, module_name)?;
+
+        let size = entry.size_in_bytes();
+        let hash = entry.hash();
         let partially_verified_module = self
             .runtime_environment
-            .build_partially_verified_module(cm, size)?;
+            .build_partially_verified_module(cm, size, hash)?;
 
         // Next, before we complete the verification by checking immediate dependencies, we need
         // to make sure all of them are also verified.
