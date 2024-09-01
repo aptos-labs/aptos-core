@@ -253,6 +253,10 @@ mod test {
             unreachable!()
         }
 
+        fn hash(&self) -> [u8; 32] {
+            unreachable!()
+        }
+
         fn metadata(&self) -> &[Metadata] {
             unreachable!()
         }

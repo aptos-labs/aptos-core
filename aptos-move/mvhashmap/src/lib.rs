@@ -9,7 +9,6 @@ use crate::{
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
-    vm::modules::ModuleStorageEntry,
     write_set::TransactionWrite,
 };
 use serde::Serialize;
@@ -42,7 +41,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
-    code_storage: VersionedCodeStorage<K, ModuleStorageEntry>,
+    code_storage: VersionedCodeStorage<K>,
 }
 
 impl<
@@ -97,7 +96,7 @@ impl<
         &self.modules
     }
 
-    pub fn code_storage(&self) -> &VersionedCodeStorage<K, ModuleStorageEntry> {
+    pub fn code_storage(&self) -> &VersionedCodeStorage<K> {
         &self.code_storage
     }
 }
