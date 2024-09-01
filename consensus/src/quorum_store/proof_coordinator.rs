@@ -20,7 +20,7 @@ use aptos_types::{
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{
     sync::{mpsc::Receiver, oneshot as TokioOneshot},
@@ -140,7 +140,7 @@ pub(crate) struct ProofCoordinator {
     proof_timeout_ms: usize,
     batch_info_to_proof: HashMap<BatchInfo, IncrementalProofState>,
     // to record the batch creation time
-    batch_info_to_time: HashMap<BatchInfo, u64>,
+    batch_info_to_time: HashMap<BatchInfo, Instant>,
     timeouts: Timeouts<BatchInfo>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -195,10 +195,9 @@ impl ProofCoordinator {
             signed_batch_info.batch_info().clone(),
             IncrementalProofState::new(signed_batch_info.batch_info().clone()),
         );
-        #[allow(deprecated)]
         self.batch_info_to_time
             .entry(signed_batch_info.batch_info().clone())
-            .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
+            .or_insert(Instant::now());
         debug!(
             LogSchema::new(LogEvent::ProofOfStoreInit),
             digest = signed_batch_info.digest(),
@@ -229,16 +228,15 @@ impl ProofCoordinator {
                 self.proof_cache
                     .insert(proof.info().clone(), proof.multi_signature().clone());
                 // quorum store measurements
-                #[allow(deprecated)]
-                let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
-                    - self
-                        .batch_info_to_time
-                        .remove(signed_batch_info.batch_info())
-                        .ok_or(
-                            // Batch created without recording the time!
-                            SignedBatchInfoError::NoTimeStamps,
-                        )?;
-                counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
+                let duration = self
+                    .batch_info_to_time
+                    .remove(signed_batch_info.batch_info())
+                    .ok_or(
+                        // Batch created without recording the time!
+                        SignedBatchInfoError::NoTimeStamps,
+                    )?
+                    .elapsed();
+                counters::BATCH_TO_POS_DURATION.observe_duration(duration);
                 return Ok(Some(proof));
             }
         } else {
