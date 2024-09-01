@@ -122,7 +122,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
                 self.fetch_verified_module(addr, name)
-                    .map_err(|e| expect_no_verification_errors(e))
+                    .map_err(expect_no_verification_errors)
             })
             .collect::<VMResult<Vec<_>>>()?;
         let script = self
@@ -310,6 +310,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         // Otherwise, run the local verification first.
         let size = entry.bytes().len();
         let cm = entry.as_compiled_module();
+        self.runtime_environment
+            .paranoid_check_module_address_and_name(cm.as_ref(), address, module_name)?;
         let partially_verified_module = self
             .runtime_environment
             .build_partially_verified_module(cm, size)?;
