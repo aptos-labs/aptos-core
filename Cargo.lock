@@ -10864,7 +10864,6 @@ dependencies = [
  "datatest-stable",
  "itertools 0.13.0",
  "move-binary-format",
- "move-command-line-common",
  "move-compiler",
  "move-core-types",
  "move-prover-test-utils",
