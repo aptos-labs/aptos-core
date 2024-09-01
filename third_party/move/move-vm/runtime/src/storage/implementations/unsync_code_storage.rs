@@ -104,7 +104,7 @@ impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
             .map(|(addr, name)| {
                 self.module_storage
                     .fetch_verified_module(addr, name)
-                    .map_err(|e| expect_no_verification_errors(e))
+                    .map_err(expect_no_verification_errors)
             })
             .collect::<VMResult<Vec<_>>>()?;
         Ok(Arc::new(
