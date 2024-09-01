@@ -850,6 +850,7 @@ impl LoaderV1 {
                     let (module, size, _) = data_store.load_compiled_module_to_cache(
                         ModuleId::new(*addr, name.to_owned()),
                         allow_loading_failure,
+                        self.runtime_environment(),
                     )?;
                     (module, size)
                 },
@@ -926,8 +927,11 @@ impl LoaderV1 {
         data_store: &mut TransactionDataCache,
         allow_loading_failure: bool,
     ) -> VMResult<(Arc<CompiledModule>, usize)> {
-        let (module, size, hash_value) =
-            data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
+        let (module, size, hash_value) = data_store.load_compiled_module_to_cache(
+            id.clone(),
+            allow_loading_failure,
+            self.runtime_environment(),
+        )?;
         self.runtime_environment
             .paranoid_check_module_address_and_name(module.as_ref(), id.address(), id.name())?;
 
@@ -2241,7 +2245,7 @@ impl Loader {
                 .struct_name_index_map()
                 .idx_to_struct_name(struct_name_idx);
 
-            // TODO(loader_v2): Revisit tis, because now we do share the VM...
+            // TODO(loader_v2): Revisit this, because now we do share the VM...
             println!(
                 "ERROR: Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached: {:?}",
                 &struct_name,

@@ -42,9 +42,6 @@ fn call_non_existent_module() {
             &module_storage,
         )
         .unwrap_err();
-
-    // TODO(loader_v2): This test is broken! This is an invariant violation, not a verification
-    //                  because we should not allow only non-existent entry functions.
     assert_eq!(err.status_type(), StatusType::Verification);
 }
 
@@ -84,8 +81,5 @@ fn call_non_existent_function() {
             &module_storage,
         )
         .unwrap_err();
-
-    // TODO(loader_v2): This test is broken! This is an invariant violation, not a verification
-    //                  because we should not allow only non-existent entry functions.
     assert_eq!(err.status_type(), StatusType::Verification);
 }
