@@ -248,9 +248,6 @@ fn test_malformed_module() {
                 &module_storage,
             )
             .unwrap_err();
-
-        // TODO(loader_v2): Loader V2 fails with Deserialization/Verification because we do not use
-        //                  expect_no_verification_errors which remaps those into invariant violations.
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -504,9 +501,6 @@ fn test_malformed_module_dependency() {
                 &module_storage,
             )
             .unwrap_err();
-
-        // TODO(loader_v2): Loader V2 fails with Deserialization/Verification because we do not use
-        //                  expect_no_verification_errors which remaps those into invariant violations.
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
@@ -597,9 +591,6 @@ fn test_unverifiable_module_dependency() {
                 &module_storage,
             )
             .unwrap_err();
-
-        // TODO(loader_v2): Loader V2 fails with Deserialization/Verification because we do not use
-        //                  expect_no_verification_errors which remaps those into invariant violations.
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
     }
 }
