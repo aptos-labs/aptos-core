@@ -1,16 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{get_additional_binaries_dir, update_binary, BinaryUpdater, UpdateRequiredInfo};
-use crate::common::{
-    types::{CliCommand, CliTypedResult},
-    utils::cli_build_information,
+use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
+use crate::{
+    common::types::{CliCommand, CliTypedResult},
+    update::update_helper::{build_updater, get_path},
 };
-use anyhow::{anyhow, bail, Context, Result};
-use aptos_build_info::BUILD_OS;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
-use self_update::{backends::github::Update, update::ReleaseUpdate};
+use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
 
 const REVELA_BINARY_NAME: &str = "revela";
@@ -91,44 +90,16 @@ impl BinaryUpdater for RevelaUpdateTool {
     }
 
     fn build_updater(&self, info: &UpdateRequiredInfo) -> Result<Box<dyn ReleaseUpdate>> {
-        // Determine the target we should download based on how the CLI itself was built.
-        let arch_str = get_arch();
-        let build_info = cli_build_information();
-        let target = match build_info.get(BUILD_OS).context("Failed to determine build info of current CLI")?.as_str() {
-            "linux-aarch64" | "linux-x86_64" => "unknown-linux-gnu",
-            "macos-aarch64" | "macos-x86_64" => "apple-darwin",
-            "windows-x86_64" => "pc-windows-gnu",
-            wildcard => bail!("Self-updating is not supported on your OS ({}) right now, please download the binary manually", wildcard),
-        };
-
-        let target = format!("{}-{}", arch_str, target);
-
-        let install_dir = match self.install_dir.clone() {
-            Some(dir) => dir,
-            None => {
-                let dir = get_additional_binaries_dir();
-                // Make the directory if it doesn't already exist.
-                std::fs::create_dir_all(&dir)
-                    .with_context(|| format!("Failed to create directory: {:?}", dir))?;
-                dir
-            },
-        };
-
-        let current_version = match &info.current_version {
-            Some(version) => version,
-            None => "0.0.0",
-        };
-
-        Update::configure()
-            .bin_install_dir(install_dir)
-            .bin_name(REVELA_BINARY_NAME)
-            .repo_owner(&self.repo_owner)
-            .repo_name(&self.repo_name)
-            .current_version(current_version)
-            .target_version_tag(&format!("v{}", info.target_version))
-            .target(&target)
-            .build()
-            .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
+        build_updater(
+            info,
+            self.install_dir.clone(),
+            self.repo_owner.clone(),
+            self.repo_name.clone(),
+            REVELA_BINARY_NAME,
+            "unknown-linux-gnu",
+            "apple-darwin",
+            "pc-windows-gnu",
+        )
     }
 }
 
@@ -143,43 +114,6 @@ impl CliCommand<String> for RevelaUpdateTool {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
-fn get_arch() -> &'static str {
-    "x86_64"
-}
-
-#[cfg(target_arch = "aarch64")]
-fn get_arch() -> &'static str {
-    "aarch64"
-}
-
-#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-fn get_arch() -> &'static str {
-    unimplemented!("Self-updating is not supported on your CPU architecture right now, please download the binary manually")
-}
-
 pub fn get_revela_path() -> Result<PathBuf> {
-    // Look at the environment variable first.
-    if let Ok(path) = std::env::var(REVELA_EXE_ENV) {
-        return Ok(PathBuf::from(path));
-    }
-
-    // See if it is present in the path where we usually install additional binaries.
-    let path = get_additional_binaries_dir().join(REVELA_BINARY_NAME);
-    if path.exists() && path.is_file() {
-        return Ok(path);
-    }
-
-    // See if we can find the binary in the PATH.
-    if let Some(path) = pathsearch::find_executable_in_path(REVELA_EXE) {
-        return Ok(path);
-    }
-
-    Err(anyhow!(
-        "Cannot locate the decompiler executable. \
-            Environment variable `{}` is not set, and `{}` is not in the PATH. \
-            Try running `aptos update revela` to download it.",
-        REVELA_EXE_ENV,
-        REVELA_EXE
-    ))
+    get_path("decompiler", REVELA_EXE_ENV, REVELA_BINARY_NAME, REVELA_EXE)
 }

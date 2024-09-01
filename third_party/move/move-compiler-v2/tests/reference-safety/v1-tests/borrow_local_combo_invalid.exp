@@ -1,52 +1,56 @@
 
 Diagnostics:
-error: cannot immutably borrow since mutable references exist
+error: cannot immutably borrow local `x` which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:13:17
    │
 12 │         if (cond) f = &mut s.f else f = &mut other.f;
-   │                       --------
-   │                       │    │
-   │                       │    previous mutable local borrow
-   │                       used by mutable field borrow
+   │                       -------- field `f` via local `s` previously mutably borrowed here
 13 │         let x = &s;
-   │                 ^^ immutable borrow attempted here
+   │                 ^^ borrow attempted here
 14 │         *f;
-   │         -- requirement enforced here
+   │         -- conflicting reference `f` used here
 
-error: cannot immutably borrow since mutable references exist
+error: cannot read local `x` since it is mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:23:9
+   │
+20 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                       -------- field `f` previously mutably borrowed here
+   ·
+23 │         *x;
+   │         ^^ read attempted here
+24 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot immutably borrow local `x` which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:30:17
    │
 29 │         if (cond) f = &mut s.f else f = &mut s.g;
-   │                       --------          --------
-   │                       │    │            │    │
-   │                       │    │            │    previous mutable local borrow
-   │                       │    │            used by mutable field borrow
-   │                       │    previous mutable local borrow
-   │                       used by mutable field borrow
+   │                       --------          -------- field `g` via local `s` previously mutably borrowed here
+   │                       │
+   │                       field `f` via local `s` previously mutably borrowed here
 30 │         let x = &s;
-   │                 ^^ immutable borrow attempted here
+   │                 ^^ borrow attempted here
 31 │         *f;
-   │         -- requirement enforced here
+   │         -- conflicting reference `f` used here
 
-error: cannot immutably borrow since mutable references exist
+error: cannot immutably borrow local `y` which is already mutably borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:38:17
    │
 37 │         if (cond) x = &mut s else x = other;
-   │                       ------ previous mutable local borrow
+   │                       ------ local `s` previously mutably borrowed here
 38 │         let y = &s;
-   │                 ^^ immutable borrow attempted here
+   │                 ^^ borrow attempted here
 39 │         *y;
-   │         -- requirement enforced here
 40 │         *x;
    │         -- conflicting reference `x` used here
 
-error: cannot immutably borrow since mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:38:17
+error: cannot read local `y` since it is mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:48:9
    │
-37 │         if (cond) x = &mut s else x = other;
-   │                       ------ previous mutable local borrow
-38 │         let y = &s;
-   │                 ^^ immutable borrow attempted here
-39 │         *y;
-40 │         *x;
-   │         -- requirement enforced here
+46 │         if (cond) x = &mut s else x = other;
+   │                       ------ previously mutably borrowed here
+47 │         let y = &mut s;
+48 │         *y;
+   │         ^^ read attempted here
+49 │         *x;
+   │         -- conflicting reference `x` used here

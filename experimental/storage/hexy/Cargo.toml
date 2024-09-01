@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-experimental-layered-map = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
@@ -29,4 +30,8 @@ rand = { workspace = true }
 
 [[bench]]
 name = "sort_dedup"
+harness = false
+
+[[bench]]
+name = "update"
 harness = false

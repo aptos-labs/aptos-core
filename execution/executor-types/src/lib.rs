@@ -53,9 +53,7 @@ pub mod state_checkpoint_output;
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
     /// are valid, executes them and returns the executed result for commit.
-    ///
-    /// TODO: Remove after all callsites split the execute / apply stage into two separate stages
-    ///       and pipe them up.
+    #[cfg(any(test, feature = "fuzzing"))]
     fn execute_chunk(
         &self,
         txn_list_with_proof: TransactionListWithProof,
@@ -70,9 +68,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
 
     /// Similar to `execute_chunk`, but instead of executing transactions, apply the transaction
     /// outputs directly to get the executed result.
-    ///
-    /// TODO: Remove after all callsites split the execute / apply stage into two separate stages
-    ///       and pipe them up.
+    #[cfg(any(test, feature = "fuzzing"))]
     fn apply_chunk(
         &self,
         txn_output_list_with_proof: TransactionOutputListWithProof,
@@ -139,6 +135,7 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     /// Executes a block - TBD, this API will be removed in favor of `execute_and_state_checkpoint`, followed
     /// by `ledger_update` once we have ledger update as a separate pipeline phase.
+    #[cfg(any(test, feature = "fuzzing"))]
     fn execute_block(
         &self,
         block: ExecutableBlock,
@@ -166,20 +163,27 @@ pub trait BlockExecutorTrait: Send + Sync {
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult>;
 
-    /// Saves eligible blocks to persistent storage.
-    /// If we have multiple blocks and not all of them have signatures, we may send them to storage
-    /// in a few batches. For example, if we have
-    /// ```text
-    /// A <- B <- C <- D <- E
-    /// ```
-    /// and only `C` and `E` have signatures, we will send `A`, `B` and `C` in the first batch,
-    /// then `D` and `E` later in the another batch.
-    /// Commits a block and all its ancestors in a batch manner.
+    #[cfg(any(test, feature = "fuzzing"))]
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
+    ) -> ExecutorResult<()> {
+        let mut parent_block_id = self.committed_block_id();
+        for block_id in block_ids {
+            self.pre_commit_block(block_id, parent_block_id)?;
+            parent_block_id = block_id;
+        }
+        self.commit_ledger(ledger_info_with_sigs)
+    }
+
+    fn pre_commit_block(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
     ) -> ExecutorResult<()>;
+
+    fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()>;
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
@@ -271,6 +275,7 @@ pub trait TransactionReplayer: Send {
 }
 
 /// A structure that holds relevant information about a chunk that was committed.
+#[derive(Clone)]
 pub struct ChunkCommitNotification {
     pub subscribable_events: Vec<ContractEvent>,
     pub committed_transactions: Vec<Transaction>,

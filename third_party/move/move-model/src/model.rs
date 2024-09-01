@@ -133,6 +133,11 @@ impl Loc {
         }
     }
 
+    /// Checks if `self` is an inlined location.
+    pub fn is_inlined(&self) -> bool {
+        self.inlined_from_loc.is_some()
+    }
+
     // If `self` is an inlined `Loc`, then add the same
     // inlining info to the parameter `loc`.
     fn inline_if_needed(&self, loc: Loc) -> Loc {
@@ -897,6 +902,11 @@ impl GlobalEnv {
         self.diag(Severity::Error, loc, msg)
     }
 
+    /// Adds a warning to this environment, without notes.
+    pub fn warning(&self, loc: &Loc, msg: &str) {
+        self.diag(Severity::Warning, loc, msg)
+    }
+
     /// Adds an error to this environment, with notes.
     pub fn error_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
@@ -923,6 +933,12 @@ impl GlobalEnv {
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
         self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], vec![])
+    }
+
+    /// Add a lint warning to this environment, with the `msg` and `notes`.
+    pub fn lint_diag_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
+        let lint_msg = format!("[lint] {}", msg);
+        self.diag_with_notes(Severity::Warning, loc, &lint_msg, notes)
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
@@ -4776,10 +4792,16 @@ impl ExpInfo {
 // =================================================================================================
 /// # Formatting
 
+enum Mode {
+    LineOnly,
+    FileAndLine,
+    Full,
+}
+
 pub struct LocDisplay<'env> {
     loc: &'env Loc,
     env: &'env GlobalEnv,
-    only_line: bool,
+    mode: Mode,
 }
 
 impl Loc {
@@ -4787,7 +4809,15 @@ impl Loc {
         LocDisplay {
             loc: self,
             env,
-            only_line: false,
+            mode: Mode::Full,
+        }
+    }
+
+    pub fn display_file_name_and_line<'env>(&'env self, env: &'env GlobalEnv) -> LocDisplay<'env> {
+        LocDisplay {
+            loc: self,
+            env,
+            mode: Mode::FileAndLine,
         }
     }
 
@@ -4795,7 +4825,7 @@ impl Loc {
         LocDisplay {
             loc: self,
             env,
-            only_line: true,
+            mode: Mode::LineOnly,
         }
     }
 }
@@ -4803,18 +4833,24 @@ impl Loc {
 impl<'env> fmt::Display for LocDisplay<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
-            if self.only_line {
-                write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
-            } else {
-                let offset = self.loc.span.end() - self.loc.span.start();
-                write!(
-                    f,
-                    "at {}:{}:{}+{}",
-                    fname,
-                    pos.line + LineOffset(1),
-                    pos.column + ColumnOffset(1),
-                    offset,
-                )
+            match &self.mode {
+                Mode::LineOnly => {
+                    write!(f, "at line {}", pos.line + LineOffset(1))
+                },
+                Mode::FileAndLine => {
+                    write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
+                },
+                Mode::Full => {
+                    let offset = self.loc.span.end() - self.loc.span.start();
+                    write!(
+                        f,
+                        "at {}:{}:{}+{}",
+                        fname,
+                        pos.line + LineOffset(1),
+                        pos.column + ColumnOffset(1),
+                        offset,
+                    )
+                },
             }
         } else {
             write!(f, "{:?}", self.loc)

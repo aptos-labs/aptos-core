@@ -1,25 +1,33 @@
 
 Diagnostics:
-error: cannot freeze local `s` since other mutable usages for this reference exist
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:13:9
    │
+12 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                       -------- field `f` previously mutably borrowed here
 13 │         freeze(s);
    │         ^^^^^^^^^ frozen here
 14 │         *f;
-   │         -- used here
+   │         -- conflicting reference `f` used here
 
-error: cannot freeze local `s` since other mutable usages for this reference exist
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:20:9
    │
+19 │         if (cond) f = &mut s.f else f = &mut s.g;
+   │                       --------          -------- field `g` previously mutably borrowed here
+   │                       │
+   │                       field `f` previously mutably borrowed here
 20 │         freeze(s);
    │         ^^^^^^^^^ frozen here
 21 │         *f;
-   │         -- used here
+   │         -- conflicting reference `f` used here
 
-error: cannot freeze local `s` since other mutable usages for this reference exist
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/freeze_combo_invalid.move:27:9
    │
+26 │         if (cond) x = s else x = other; // error in v2
+   │                   ----- previously mutably borrowed here
 27 │         freeze(s);
    │         ^^^^^^^^^ frozen here
 28 │         *x;
-   │         -- used here
+   │         -- conflicting reference `x` used here

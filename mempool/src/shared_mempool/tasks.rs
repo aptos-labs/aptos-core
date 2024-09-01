@@ -571,7 +571,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
     };
     // Send back to callback
     let result = if callback.send(Ok(resp)).is_err() {
-        error!(LogSchema::event_log(
+        debug!(LogSchema::event_log(
             LogEntry::QuorumStore,
             LogEvent::CallbackFail
         ));

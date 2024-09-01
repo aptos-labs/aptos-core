@@ -98,21 +98,15 @@ public fun M::f($t0: M::R): (M::R, u64) {
      var $t1: M::R
      var $t2: u64
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t1 := infer($t0)
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t2 := 0
      # live vars: $t1, $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: return ($t1, $t2)
 }
@@ -124,39 +118,47 @@ public fun M::g($t0: &signer) {
      var $t2: u64
      var $t3: u64
      # live vars: $t0
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   0: $t2 := 1
      # live vars: $t0, $t2
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   1: $t1 := pack M::R($t2)
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   2: $t3 := 3
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   3: ($t1, $t3) := M::f($t1)
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   4: move_to<M::R>($t0, $t1)
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   5: return ()
 }
@@ -169,23 +171,17 @@ public fun M::f($t0: M::R): (M::R, u64) {
      var $t2: u64
      # abort state: {returns}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t1 := infer($t0)
      # abort state: {returns}
      # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   1: $t2 := 0
      # abort state: {returns}
      # live vars: $t1, $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   2: return ($t1, $t2)
 }
@@ -198,44 +194,52 @@ public fun M::g($t0: &signer) {
      var $t3: u64
      # abort state: {returns,aborts}
      # live vars: $t0
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   0: $t2 := 1
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   1: $t1 := pack M::R($t2)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   2: $t3 := 3
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   3: ($t1, $t3) := M::f($t1)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
      #
   4: move_to<M::R>($t0, $t1)
      # abort state: {returns}
      # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   5: return ()
 }

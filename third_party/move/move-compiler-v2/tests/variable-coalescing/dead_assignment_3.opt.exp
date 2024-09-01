@@ -33,14 +33,14 @@ public fun m::test($t0: bool): u32 {
      var $t1: u32
      var $t2: u32
   0: $t2 := 1
-  1: if ($t0) goto 2 else goto 5
+  1: if ($t0) goto 2 else goto 6
   2: label L0
   3: $t1 := move($t2)
-  4: goto 7
-  5: label L1
-  6: $t1 := 9
-  7: label L2
-  8: return $t1
+  4: label L2
+  5: return $t1
+  6: label L1
+  7: $t1 := 9
+  8: goto 4
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -54,24 +54,24 @@ public fun m::test($t0: bool): u32 {
   0: $t2 := 1
      # live vars: $t0, $t2
      # events: e:$t0
-  1: if ($t0) goto 2 else goto 5
+  1: if ($t0) goto 2 else goto 6
      # live vars: $t2
   2: label L0
      # live vars: $t2
      # events: b:$t1
   3: $t1 := move($t2)
      # live vars: $t1
-  4: goto 7
+  4: label L2
+     # live vars: $t1
+  5: return $t1
      # live vars: $t2
      # events: e:$t2
-  5: label L1
+  6: label L1
      # live vars:
-  6: $t1 := 9
-     # live vars: $t1
-  7: label L2
+  7: $t1 := 9
      # live vars: $t1
      # events: e:$t1
-  8: return $t1
+  8: goto 4
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -81,14 +81,14 @@ public fun m::test($t0: bool): u32 {
      var $t1: u32
      var $t2: u32
   0: $t2 := 1
-  1: if ($t0) goto 2 else goto 5
+  1: if ($t0) goto 2 else goto 6
   2: label L0
   3: $t1 := move($t2)
-  4: goto 7
-  5: label L1
-  6: $t1 := 9
-  7: label L2
-  8: return $t1
+  4: label L2
+  5: return $t1
+  6: label L1
+  7: $t1 := 9
+  8: goto 4
 }
 
 ============ after DeadStoreElimination: ================
@@ -98,14 +98,14 @@ public fun m::test($t0: bool): u32 {
      var $t1: u32
      var $t2: u32
   0: $t2 := 1
-  1: if ($t0) goto 2 else goto 5
+  1: if ($t0) goto 2 else goto 6
   2: label L0
   3: $t1 := move($t2)
-  4: goto 7
-  5: label L1
-  6: $t1 := 9
-  7: label L2
-  8: return $t1
+  4: label L2
+  5: return $t1
+  6: label L1
+  7: $t1 := 9
+  8: goto 4
 }
 
 
@@ -121,17 +121,17 @@ B0:
 	0: LdU32(1)
 	1: StLoc[1](loc0: u32)
 	2: MoveLoc[0](Arg0: bool)
-	3: BrFalse(7)
+	3: BrFalse(8)
 B1:
 	4: MoveLoc[1](loc0: u32)
 	5: StLoc[2](loc1: u32)
-	6: Branch(9)
 B2:
-	7: LdU32(9)
-	8: StLoc[2](loc1: u32)
+	6: MoveLoc[2](loc1: u32)
+	7: Ret
 B3:
-	9: MoveLoc[2](loc1: u32)
-	10: Ret
+	8: LdU32(9)
+	9: StLoc[2](loc1: u32)
+	10: Branch(6)
 }
 }
 ============ bytecode verification succeeded ========

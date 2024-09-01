@@ -4,22 +4,29 @@
 //! This module contains a set of transformers and analyzers of global environment.
 //! Those can be arranged in a pipeline and executed in sequence.
 
-// TODO: move all other `&mut GlobalEnv` processors into this module.
-
 use log::trace;
 use move_model::model::GlobalEnv;
 use std::io::Write;
 
+pub mod acquires_checker;
+pub mod ast_simplifier;
+pub mod cyclic_instantiation_checker;
+pub mod flow_insensitive_checkers;
+pub mod function_checker;
+pub mod inliner;
 pub mod lambda_lifter;
+pub mod model_ast_lints;
+pub mod recursive_struct_checker;
 pub mod rewrite_target;
 pub mod seqs_in_binop_checker;
 pub mod spec_checker;
 pub mod spec_rewriter;
+pub mod unused_params_checker;
 
 /// Represents a pipeline of processors working on the global environment.
 #[derive(Default)]
 pub struct EnvProcessorPipeline<'a> {
-    /// A sequence of transformations to run on the model.
+    /// A sequence of checks and transformations to run on the model.
     /// For each processor, we store its name and the transformation function.
     processors: Vec<(String, Box<dyn Fn(&mut GlobalEnv) + 'a>)>,
 }

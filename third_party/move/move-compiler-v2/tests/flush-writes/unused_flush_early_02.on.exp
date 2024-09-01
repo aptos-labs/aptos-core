@@ -1,0 +1,88 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::bar() {
+     # live vars:
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test(): (u64, u64) {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     # flush: $t2
+     # live vars:
+  0: $t2 := m::one()
+     # live vars: $t2
+  1: $t3 := m::one()
+     # flush: $t4
+     # live vars: $t2, $t3
+  2: $t4 := m::one()
+     # live vars: $t2, $t3, $t4
+  3: $t6 := 0
+     # live vars: $t2, $t3, $t4, $t6
+  4: $t5 := ==($t3, $t6)
+     # live vars: $t2, $t4, $t5
+  5: if ($t5) goto 6 else goto 8
+     # live vars: $t2, $t4
+  6: label L0
+     # live vars: $t2, $t4
+  7: m::bar()
+     # live vars: $t2, $t4
+  8: label L2
+     # live vars: $t2, $t4
+  9: return ($t2, $t4)
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+bar() /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+one(): u64 /* def_idx: 1 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+public test(): u64 * u64 /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: Call one(): u64
+	1: StLoc[0](loc0: u64)
+	2: Call one(): u64
+	3: Call one(): u64
+	4: StLoc[1](loc1: u64)
+	5: LdU64(0)
+	6: Eq
+	7: BrFalse(9)
+B1:
+	8: Call bar()
+B2:
+	9: MoveLoc[0](loc0: u64)
+	10: MoveLoc[1](loc1: u64)
+	11: Ret
+}
+}
+============ bytecode verification succeeded ========

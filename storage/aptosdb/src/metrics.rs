@@ -239,3 +239,12 @@ pub static BACKUP_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_storage_api_concurrency",
+        "Call concurrency by API.",
+        &["name"]
+    )
+    .unwrap()
+});

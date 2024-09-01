@@ -52,14 +52,10 @@ fun m::test($t0: u64): u64 {
   8: $t7 := 1
   9: $t6 := +($t3, $t7)
  10: $t3 := move($t6)
- 11: goto 14
+ 11: goto 2
  12: label L3
- 13: goto 16
- 14: label L4
- 15: goto 2
- 16: label L1
- 17: $t1 := move($t2)
- 18: return $t1
+ 13: $t1 := move($t2)
+ 14: return $t1
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -104,24 +100,16 @@ fun m::test($t0: u64): u64 {
      # events: e:$t6
  10: $t3 := move($t6)
      # live vars: $t0, $t2, $t3
- 11: goto 14
-     # live vars: $t0, $t2, $t3
- 12: label L3
-     # live vars: $t2
- 13: goto 16
-     # live vars: $t0, $t2, $t3
- 14: label L4
+ 11: goto 2
      # live vars: $t0, $t2, $t3
      # events: e:$t0, e:$t3
- 15: goto 2
-     # live vars: $t2
- 16: label L1
+ 12: label L3
      # live vars: $t2
      # events: e:$t2, b:$t1
- 17: $t1 := move($t2)
+ 13: $t1 := move($t2)
      # live vars: $t1
      # events: e:$t1
- 18: return $t1
+ 14: return $t1
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -146,14 +134,10 @@ fun m::test($t0: u64): u64 {
   8: $t5 := 1
   9: $t5 := +($t3, $t5)
  10: $t3 := move($t5)
- 11: goto 14
+ 11: goto 2
  12: label L3
- 13: goto 16
- 14: label L4
- 15: goto 2
- 16: label L1
- 17: $t2 := move($t2)
- 18: return $t2
+ 13: $t2 := move($t2)
+ 14: return $t2
 }
 
 ============ after DeadStoreElimination: ================
@@ -178,13 +162,9 @@ fun m::test($t0: u64): u64 {
   8: $t5 := 1
   9: $t5 := +($t3, $t5)
  10: $t3 := move($t5)
- 11: goto 14
+ 11: goto 2
  12: label L3
- 13: goto 16
- 14: label L4
- 15: goto 2
- 16: label L1
- 17: return $t2
+ 13: return $t2
 }
 
 
@@ -199,29 +179,25 @@ L2:	loc1: u64
 L3:	loc2: u64
 B0:
 	0: LdU64(0)
-	1: LdU64(0)
-	2: StLoc[1](loc0: u64)
+	1: StLoc[1](loc0: u64)
+	2: LdU64(0)
 	3: StLoc[2](loc1: u64)
 B1:
-	4: CopyLoc[1](loc0: u64)
+	4: CopyLoc[2](loc1: u64)
 	5: LdU64(10)
 	6: Lt
 	7: BrFalse(15)
 B2:
 	8: CopyLoc[0](Arg0: u64)
-	9: StLoc[2](loc1: u64)
-	10: MoveLoc[1](loc0: u64)
+	9: StLoc[1](loc0: u64)
+	10: MoveLoc[2](loc1: u64)
 	11: LdU64(1)
 	12: Add
-	13: StLoc[1](loc0: u64)
-	14: Branch(16)
+	13: StLoc[2](loc1: u64)
+	14: Branch(4)
 B3:
-	15: Branch(17)
-B4:
-	16: Branch(4)
-B5:
-	17: MoveLoc[2](loc1: u64)
-	18: Ret
+	15: MoveLoc[1](loc0: u64)
+	16: Ret
 }
 }
 ============ bytecode verification succeeded ========
