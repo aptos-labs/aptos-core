@@ -55,14 +55,11 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `supra_create_proposal`](#0x1_supra_governance_supra_create_proposal)
 -  [Function `supra_create_proposal_v2`](#0x1_supra_governance_supra_create_proposal_v2)
 -  [Function `supra_create_proposal_v2_impl`](#0x1_supra_governance_supra_create_proposal_v2_impl)
--  [Function `batch_vote`](#0x1_supra_governance_batch_vote)
--  [Function `batch_partial_vote`](#0x1_supra_governance_batch_partial_vote)
 -  [Function `vote`](#0x1_supra_governance_vote)
 -  [Function `partial_vote`](#0x1_supra_governance_partial_vote)
 -  [Function `vote_internal`](#0x1_supra_governance_vote_internal)
 -  [Function `supra_vote`](#0x1_supra_governance_supra_vote)
 -  [Function `supra_vote_internal`](#0x1_supra_governance_supra_vote_internal)
--  [Function `add_approved_script_hash_script`](#0x1_supra_governance_add_approved_script_hash_script)
 -  [Function `add_supra_approved_script_hash_script`](#0x1_supra_governance_add_supra_approved_script_hash_script)
 -  [Function `add_approved_script_hash`](#0x1_supra_governance_add_approved_script_hash)
 -  [Function `add_supra_approved_script_hash`](#0x1_supra_governance_add_supra_approved_script_hash)
@@ -1080,16 +1077,6 @@ This account is not the designated voter of the specified stake pool
 
 
 
-<a id="0x1_supra_governance_ENOT_PARTIAL_VOTING_PROPOSAL"></a>
-
-The proposal in the argument is not a partial voting proposal.
-
-
-<pre><code><b>const</b> <a href="supra_governance.md#0x1_supra_governance_ENOT_PARTIAL_VOTING_PROPOSAL">ENOT_PARTIAL_VOTING_PROPOSAL</a>: u64 = 14;
-</code></pre>
-
-
-
 <a id="0x1_supra_governance_ENO_VOTING_POWER"></a>
 
 The specified stake pool must be part of the validator set
@@ -1146,16 +1133,6 @@ Account is not authorized to call this function.
 
 
 <pre><code><b>const</b> <a href="supra_governance.md#0x1_supra_governance_EUNAUTHORIZED">EUNAUTHORIZED</a>: u64 = 11;
-</code></pre>
-
-
-
-<a id="0x1_supra_governance_EVOTING_POWER_OVERFLOW"></a>
-
-The stake pool is using voting power more than it has.
-
-
-<pre><code><b>const</b> <a href="supra_governance.md#0x1_supra_governance_EVOTING_POWER_OVERFLOW">EVOTING_POWER_OVERFLOW</a>: u64 = 12;
 </code></pre>
 
 
@@ -1923,71 +1900,6 @@ Return proposal_id when a proposal is successfully created.
 
 </details>
 
-<a id="0x1_supra_governance_batch_vote"></a>
-
-## Function `batch_vote`
-
-Vote on proposal with proposal_id and all voting power from multiple stake_pools.
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_batch_vote">batch_vote</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pools: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, proposal_id: u64, should_pass: bool)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_batch_vote">batch_vote</a>(
-    voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    stake_pools: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
-    proposal_id: u64,
-    should_pass: bool,
-) <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="supra_governance.md#0x1_supra_governance_VotingRecords">VotingRecords</a>, <a href="supra_governance.md#0x1_supra_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="supra_governance.md#0x1_supra_governance_GovernanceEvents">GovernanceEvents</a> {
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(stake_pools, |stake_pool| {
-        <a href="supra_governance.md#0x1_supra_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, <a href="supra_governance.md#0x1_supra_governance_MAX_U64">MAX_U64</a>, should_pass);
-    });
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_supra_governance_batch_partial_vote"></a>
-
-## Function `batch_partial_vote`
-
-Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_batch_partial_vote">batch_partial_vote</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pools: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, proposal_id: u64, voting_power: u64, should_pass: bool)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_batch_partial_vote">batch_partial_vote</a>(
-    voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    stake_pools: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
-    proposal_id: u64,
-    voting_power: u64,
-    should_pass: bool,
-) <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="supra_governance.md#0x1_supra_governance_VotingRecords">VotingRecords</a>, <a href="supra_governance.md#0x1_supra_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="supra_governance.md#0x1_supra_governance_GovernanceEvents">GovernanceEvents</a> {
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(stake_pools, |stake_pool| {
-        <a href="supra_governance.md#0x1_supra_governance_vote_internal">vote_internal</a>(voter, stake_pool, proposal_id, voting_power, should_pass);
-    });
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_supra_governance_vote"></a>
 
 ## Function `vote`
@@ -2251,30 +2163,6 @@ cannot vote on the proposal even after partial governance voting is enabled.
     <b>if</b> (proposal_state == <a href="supra_governance.md#0x1_supra_governance_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>) {
         <a href="supra_governance.md#0x1_supra_governance_add_supra_approved_script_hash">add_supra_approved_script_hash</a>(proposal_id);
     }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_supra_governance_add_approved_script_hash_script"></a>
-
-## Function `add_approved_script_hash_script`
-
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_add_approved_script_hash_script">add_approved_script_hash_script</a>(proposal_id: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_add_approved_script_hash_script">add_approved_script_hash_script</a>(proposal_id: u64) <b>acquires</b> <a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a> {
-    <a href="supra_governance.md#0x1_supra_governance_add_approved_script_hash">add_approved_script_hash</a>(proposal_id)
 }
 </code></pre>
 
