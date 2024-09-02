@@ -157,7 +157,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
     block_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
-    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    quorum_store_verified_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    quorum_store_unverified_msg_tx: Option<aptos_channel::Sender<AccountAddress, UnverifiedEvent>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     batch_retrieval_tx:
@@ -228,7 +229,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffered_proposal_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
-            quorum_store_msg_tx: None,
+            quorum_store_verified_msg_tx: None,
+            quorum_store_unverified_msg_tx: None,
             quorum_store_coordinator_tx: None,
             quorum_store_storage,
             batch_retrieval_tx: None,
@@ -716,9 +718,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ))
         };
 
-        let (payload_manager, quorum_store_msg_tx) =
+        let (payload_manager, quorum_store_verified_msg_tx, quorum_store_unverified_msg_tx) =
             quorum_store_builder.init_payload_manager(self.consensus_publisher.clone());
-        self.quorum_store_msg_tx = quorum_store_msg_tx;
+        self.quorum_store_verified_msg_tx = quorum_store_verified_msg_tx;
+        self.quorum_store_unverified_msg_tx = quorum_store_unverified_msg_tx;
         self.payload_manager = payload_manager.clone();
 
         let payload_client = QuorumStoreClient::new(
@@ -1446,7 +1449,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
             let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
-            let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
+            let quorum_store_verified_msg_tx = self.quorum_store_verified_msg_tx.clone();
+            let quorum_store_unverified_msg_tx = self.quorum_store_unverified_msg_tx.clone();
             let buffered_proposal_tx = self.buffered_proposal_tx.clone();
             let round_manager_verified_tx = self.round_manager_verified_tx.clone();
             let round_manager_unverified_tx = self.round_manager_unverified_tx.clone();
@@ -1518,6 +1522,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             }
 
+            if self.config.optimistic_sig_verification_for_batch_info
+                && self.quorum_store_unverified_msg_tx.is_some()
+            {
+                if let UnverifiedEvent::SignedBatchInfo(signed_batch_info_msg) =
+                    unverified_event.clone()
+                {
+                    Self::forward_event_to(
+                        quorum_store_unverified_msg_tx,
+                        peer_id,
+                        UnverifiedEvent::SignedBatchInfo(signed_batch_info_msg),
+                    )
+                    .context("round manager sending unverified signed batch info msg ")?;
+                    return Ok(());
+                }
+            }
+
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -1534,7 +1554,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     ) {
                         Ok(verified_event) => {
                             Self::forward_verified_event(
-                                quorum_store_msg_tx,
+                                quorum_store_verified_msg_tx,
                                 round_manager_verified_tx,
                                 buffered_proposal_tx,
                                 peer_id,
@@ -1660,7 +1680,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn forward_verified_event(
-        quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        quorum_store_verified_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
         round_manager_verified_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
@@ -1680,7 +1700,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_event @ (VerifiedEvent::SignedBatchInfo(_)
             | VerifiedEvent::ProofOfStoreMsg(_)
             | VerifiedEvent::BatchMsg(_)) => {
-                Self::forward_event_to(quorum_store_msg_tx, peer_id, quorum_store_event)
+                Self::forward_event_to(quorum_store_verified_msg_tx, peer_id, quorum_store_event)
                     .context("quorum store sender")
             },
             proposal_event @ VerifiedEvent::ProposalMsg(_) => {

@@ -92,6 +92,7 @@ pub struct ConsensusConfig {
     pub optimistic_sig_verification_for_votes: bool,
     pub optimistic_sig_verification_for_order_votes: bool,
     pub optimistic_sig_verification_for_commit_votes: bool,
+    pub optimistic_sig_verification_for_batch_info: bool,
     pub enable_pre_commit: bool,
 }
 
@@ -323,6 +324,7 @@ impl Default for ConsensusConfig {
             optimistic_sig_verification_for_votes: true,
             optimistic_sig_verification_for_order_votes: true,
             optimistic_sig_verification_for_commit_votes: true,
+            optimistic_sig_verification_for_batch_info: true,
             enable_pre_commit: true,
         }
     }

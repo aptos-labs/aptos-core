@@ -289,6 +289,9 @@ pub enum SignedBatchInfoError {
     NotFound,
     AlreadyCommitted,
     NoTimeStamps,
+    UnableToAggregate,
+    LowVotingPower,
+    InvalidAggregatedSignature,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
