@@ -988,6 +988,14 @@ module supra_framework::account {
 
     #[test_only]
     /// Increment sequence number of account at address `addr`
+    public fun increment_sequence_number_for_test_using_source_code(
+        addr: address,
+    ) acquires Account {
+        increment_sequence_number(addr);
+    }
+
+    #[test_only]
+    /// Increment sequence number of account at address `addr`
     public fun increment_sequence_number_for_test(
         addr: address,
     ) acquires Account {
@@ -1037,6 +1045,22 @@ module supra_framework::account {
         assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
     }
 
+    #[test]
+    /// Verify source-code sequence number mocking
+    public entry fun mock_sequence_numbers_source_code()
+    acquires Account {
+        let addr: address = @0x1234; // Define test address
+        create_account(addr); // Initialize account resource
+        // Assert sequence number intializes to 0
+        assert!(borrow_global<Account>(addr).sequence_number == 0, 0);
+        increment_sequence_number_for_test_using_source_code(addr); // Increment sequence number
+        // Assert correct mock value post-increment
+        assert!(borrow_global<Account>(addr).sequence_number == 1, 1);
+        set_sequence_number(addr, 10); // Set mock sequence number
+        // Assert correct mock value post-modification
+        assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Test account helpers
     ///////////////////////////////////////////////////////////////////////////
@@ -1048,6 +1072,28 @@ module supra_framework::account {
         let pk = vector::empty<u8>();
         let sig = x"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
         rotate_authentication_key(&alice, ED25519_SCHEME, pk, ED25519_SCHEME, pk, sig, sig);
+    }
+
+    #[test(alice_address = @0xa11ce)]
+    #[expected_failure(abort_code = 524289, location = supra_framework::account)]
+    public entry fun test_create_account_twice_should_fail(alice_address: address) {
+        create_account_if_does_not_exist(alice_address);
+        create_account(alice_address);
+    }
+
+    #[test(alice_address = @0xa11ce)]
+    #[expected_failure(abort_code = 65541, location = supra_framework::account)]
+    public entry fun test_create_account_with_core_resource_address_should_fail(alice_address: address) {
+        create_account(alice_address);
+        create_account(@supra_framework);
+        create_account(@aptos_token);
+        create_account(@vm_reserved);
+    }
+
+    #[test(alice_address = @0xa11ce)]
+    #[expected_failure(abort_code = 327691, location = supra_framework::account)]
+    public entry fun test_create_framework_reserved_account_with_core_resource_address_should_fail(alice_address: address) {
+        create_framework_reserved_account(alice_address);
     }
 
     #[test(alice = @0xa11ce)]
