@@ -62,6 +62,8 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI
         run: scripts\cli\build_cli_release.ps1
+      - name: Publish Windows Aptos binary to Chocolatey
+        run: scripts\cli\publish_to_choco.ps1
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
