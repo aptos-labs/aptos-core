@@ -3,7 +3,17 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(s: &M::S,s_mut: &mut M::S): (u64, u64) {
-        Tuple(select M::S.f<&M::S>(s), select M::S.f<&mut M::S>(s_mut))
+    private fun t0(s: &0x8675309::M::S,s_mut: &mut 0x8675309::M::S): (u64, u64) {
+        Tuple(select M::S.f<&S>(s), select M::S.f<&mut S>(s_mut))
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    fun t0(s: &S, s_mut: &mut S): (u64, u64) {
+        (s.f, s_mut.f)
+    }
+}

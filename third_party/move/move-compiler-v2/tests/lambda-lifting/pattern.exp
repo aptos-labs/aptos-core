@@ -3,11 +3,11 @@ module 0xcafe::m {
     struct S {
         x: #0,
     }
-    private fun consume<T>(s: m::S<#0>,x: #0,f: |(m::S<#0>, #0)|#0): #0 {
+    private fun consume<T>(s: 0xcafe::m::S<#0>,x: #0,f: |(0xcafe::m::S<#0>, #0)|#0): #0 {
         (f)(s, x)
     }
-    private fun pattern(s: m::S<u64>,x: u64): u64 {
-        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (m::S<u64>, u64)| {
+    private fun pattern(s: 0xcafe::m::S<u64>,x: u64): u64 {
+        m::consume<u64>(s, x, |(m::S<u64>{ x }, _y: u64): (S<u64>, u64)| {
           let y: u64 = x;
           Add<u64>(x, y)
         })
@@ -20,13 +20,13 @@ module 0xcafe::m {
     struct S {
         x: #0,
     }
-    private fun consume<T>(s: m::S<#0>,x: #0,f: |(m::S<#0>, #0)|#0): #0 {
+    private fun consume<T>(s: 0xcafe::m::S<#0>,x: #0,f: |(0xcafe::m::S<#0>, #0)|#0): #0 {
         (f)(s, x)
     }
-    private fun pattern(s: m::S<u64>,x: u64): u64 {
+    private fun pattern(s: 0xcafe::m::S<u64>,x: u64): u64 {
         m::consume<u64>(s, x, closure m::pattern$lambda$1())
     }
-    private fun pattern$lambda$1(param$0: m::S<u64>,_y: u64): u64 {
+    private fun pattern$lambda$1(param$0: 0xcafe::m::S<u64>,_y: u64): u64 {
         {
           let m::S<u64>{ x } = param$0;
           {

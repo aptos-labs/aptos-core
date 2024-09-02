@@ -1,14 +1,14 @@
 // -- Model dump before bytecode pipeline
 module 0x42::m {
     spec {
-      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), {
       let (x: address): (address) = Tuple(a);
       {
         let r: bool = {
           let (a: address): (address) = Tuple(x);
-          Lt(select m::S.f<m::S>({
+          Lt(select m::S.f<0x42::m::S>({
             let (a: address): (address) = Tuple(a);
-            global<m::S>(a)
+            global<0x42::m::S>(a)
           }), 10)
         };
         r
@@ -78,3 +78,59 @@ module 0x42::m {
         BorrowGlobal(Immutable)<R>(a)
     }
 } // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    struct S has key {
+        f: u64,
+    }
+    /*
+     spec {
+      invariant {
+      let (x: num): (num) = Tuple(select m::S.f());
+      {
+        let r: bool = {
+          let (x: num): (num) = Tuple(x);
+          Gt(x, 0)
+        };
+        r
+      }
+    };
+    }
+
+    */
+    inline fun exec<T, R>(f: |T|R, x: T): R {
+        let r = f(x);
+
+        /* spec {
+          assert Eq<#1>(r, (f)($t1));
+        }
+         */
+        ;
+        r
+    }
+    fun function_code_spec_block(x: u64): u64 {
+
+        /* spec {
+          assert {
+          let (x: num): (num) = Tuple($t0);
+          {
+            let r: bool = {
+              let (y: num): (num) = Tuple(x);
+              Gt(y, 0)
+            };
+            r
+          }
+        };
+        }
+         */
+        ;
+        x + 1
+    }
+    fun function_spec_block(x: u64): u64 {
+        x + 1
+    }
+    inline fun get<R: key>(a: address): &R {
+        borrow_global<R>(a)
+    }
+}

@@ -3,10 +3,10 @@ module 0x42::objects {
     struct ReaderRef {
         addr: address,
     }
-    public fun get_addr<T>(ref: &objects::ReaderRef<#0>): address {
-        select objects::ReaderRef.addr<&objects::ReaderRef<T>>(ref)
+    public fun get_addr<T>(ref: &0x42::objects::ReaderRef<#0>): address {
+        select objects::ReaderRef.addr<&ReaderRef<T>>(ref)
     }
-    public inline fun reader<T>(ref: &objects::ReaderRef<#0>): &#0 {
+    public inline fun reader<T>(ref: &0x42::objects::ReaderRef<#0>): &#0 {
         BorrowGlobal(Immutable)<T>(objects::get_addr<T>(ref))
     }
 } // end 0x42::objects
@@ -15,15 +15,42 @@ module 0x42::token {
     struct Token {
         val: u64,
     }
-    public fun get_value(ref: &objects::ReaderRef<token::Token>): u64
-        acquires token::Token(*)
+    public fun get_value(ref: &0x42::objects::ReaderRef<0x42::token::Token>): u64
+        acquires 0x42::token::Token(*)
      {
-        select token::Token.val<&token::Token>({
-          let (ref: &objects::ReaderRef<token::Token>): (&objects::ReaderRef<token::Token>) = Tuple(ref);
-          BorrowGlobal(Immutable)<token::Token>(objects::get_addr<token::Token>(ref))
+        select token::Token.val<&Token>({
+          let (ref: &objects::ReaderRef<Token>): (&objects::ReaderRef<Token>) = Tuple(ref);
+          BorrowGlobal(Immutable)<Token>(objects::get_addr<Token>(ref))
         })
     }
 } // end 0x42::token
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::objects {
+    struct ReaderRef<phantom T: key> has store {
+        addr: address,
+    }
+    public fun get_addr<T: key>(ref: &ReaderRef<T>): address {
+        ref.addr
+    }
+    public inline fun reader<T: key>(ref: &ReaderRef<T>): &T {
+        borrow_global<T>(get_addr<T>(ref))
+    }
+}
+module 0x42::token {
+    use 0x42::objects;
+    struct Token has key {
+        val: u64,
+    }
+    public fun get_value(ref: &objects::ReaderRef<Token>): u64
+        acquires Token
+    {
+        {
+            let (ref) = (ref);
+            borrow_global<Token>(objects::get_addr<Token>(ref))
+        }.val
+    }
+}
 
 
 ============ bytecode verification succeeded ========

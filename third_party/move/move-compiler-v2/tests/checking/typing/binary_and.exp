@@ -3,13 +3,13 @@ module 0x8675309::M {
     struct R {
         f: bool,
     }
-    private fun t0(x: bool,r: M::R) {
+    private fun t0(x: bool,r: 0x8675309::M::R) {
         false;
         false;
         false;
         true;
         And(Copy(x), Move(x));
-        And(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        And(select M::R.f<R>(r), select M::R.f<R>(r));
         false;
         {
           let M::R{ f: _ } = r;
@@ -17,3 +17,20 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: bool,
+    }
+    fun t0(x: bool, r: R) {
+        false;
+        false;
+        false;
+        true;
+        (copy x) && (move x);
+        r.f && r.f;
+        false;
+        let R{f: _} = r;
+    }
+}

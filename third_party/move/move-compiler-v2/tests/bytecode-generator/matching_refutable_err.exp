@@ -6,7 +6,7 @@ module 0x815::m {
             0: u64,
         }
     }
-    private fun t(self: m::E): u64 {
+    private fun t(self: 0x815::m::E): u64 {
         {
           let m::E::Some{ 0: x } = self;
           x
@@ -14,13 +14,27 @@ module 0x815::m {
     }
 } // end 0x815::m
 
+// -- Sourcified model before bytecode pipeline
+module 0x815::m {
+    enum E {
+        None,
+        Some {
+            0: u64,
+        }
+    }
+    fun t(self: E): u64 {
+        let E::Some{0: x} = self;
+        x
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]
-fun m::t($t0: m::E): u64 {
+fun m::t($t0: 0x815::m::E): u64 {
      var $t1: u64
      var $t2: u64
-  0: $t2 := unpack_variant m::E::Some($t0)
+  0: $t2 := unpack_variant 0x815::m::E::Some($t0)
   1: $t1 := infer($t2)
   2: return $t1
 }

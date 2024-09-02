@@ -2,24 +2,48 @@
 module 0x8675309::M {
     struct S {
         f: u64,
-        x: M::X,
+        x: 0x8675309::M::X,
     }
     struct X {
         dummy_field: bool,
     }
-    private fun t0(x: &u64,x_mut: &mut u64,s: &M::S,s_mut: &mut M::S) {
+    private fun t0(x: &u64,x_mut: &mut u64,s: &0x8675309::M::S,s_mut: &mut 0x8675309::M::S) {
         Deref(x);
         Deref(x_mut);
         Deref(s);
-        Deref(Borrow(Immutable)(select M::S.f<&M::S>(s)));
-        select M::S.f<&M::S>(s);
-        Deref(Borrow(Immutable)(select M::S.x<&M::S>(s)));
+        Deref(Borrow(Immutable)(select M::S.f<&S>(s)));
+        select M::S.f<&S>(s);
+        Deref(Borrow(Immutable)(select M::S.x<&S>(s)));
         Deref(s_mut);
-        Deref(Borrow(Immutable)(select M::S.f<&mut M::S>(s_mut)));
-        Deref(Borrow(Mutable)(select M::S.f<&mut M::S>(s_mut)));
-        select M::S.f<&mut M::S>(s_mut);
-        Deref(Borrow(Immutable)(select M::S.x<&mut M::S>(s_mut)));
-        Deref(Borrow(Mutable)(select M::S.x<&mut M::S>(s_mut)));
+        Deref(Borrow(Immutable)(select M::S.f<&mut S>(s_mut)));
+        Deref(Borrow(Mutable)(select M::S.f<&mut S>(s_mut)));
+        select M::S.f<&mut S>(s_mut);
+        Deref(Borrow(Immutable)(select M::S.x<&mut S>(s_mut)));
+        Deref(Borrow(Mutable)(select M::S.x<&mut S>(s_mut)));
         Tuple()
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S has copy, drop {
+        f: u64,
+        x: X,
+    }
+    struct X has copy, drop {
+    }
+    fun t0(x: &u64, x_mut: &mut u64, s: &S, s_mut: &mut S) {
+        *x;
+        *x_mut;
+        *s;
+        *&s.f;
+        s.f;
+        *&s.x;
+        *s_mut;
+        *&s_mut.f;
+        *&mut s_mut.f;
+        s_mut.f;
+        *&s_mut.x;
+        *&mut s_mut.x;
+    }
+}

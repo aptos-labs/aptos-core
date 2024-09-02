@@ -29,23 +29,23 @@ module 0x42::test {
         x: #0,
         y: u8,
     }
-    private fun S0_inhabited(): test::S0 {
+    private fun S0_inhabited(): 0x42::test::S0 {
         pack test::S0(false)
     }
-    private fun S1_inhabited(): test::S1 {
+    private fun S1_inhabited(): 0x42::test::S1 {
         pack test::S1(0)
     }
-    private fun S2_inhabited(): test::S2 {
+    private fun S2_inhabited(): 0x42::test::S2 {
         pack test::S2(0, false)
     }
-    private fun S3_test<T>(x: #0): test::S3<#0> {
+    private fun S3_test<T>(x: #0): 0x42::test::S3<#0> {
         pack test::S3<T>(x, 0)
     }
-    private fun nested_0(): test::S3<test::S4> {
-        pack test::S3<test::S4>(pack test::S4(false), 0)
+    private fun nested_0(): 0x42::test::S3<0x42::test::S4> {
+        pack test::S3<S4>(pack test::S4(false), 0)
     }
-    private fun nested_1(): test::S5<test::S0> {
-        pack test::S5<test::S0>(pack test::S0(false), 0)
+    private fun nested_1(): 0x42::test::S5<0x42::test::S0> {
+        pack test::S5<S0>(pack test::S0(false), 0)
     }
     private fun test_variant() {
         pack test::E1::V1();
@@ -54,3 +54,57 @@ module 0x42::test {
         Tuple()
     }
 } // end 0x42::test
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::test {
+    enum E1 {
+        V1,
+        V2,
+        V3 {
+            0: u8,
+            1: bool,
+        }
+    }
+    struct S0 {
+    }
+    struct S1 {
+        0: u8,
+    }
+    struct S2 {
+        0: u8,
+        1: bool,
+    }
+    struct S3<T> {
+        0: T,
+        1: u8,
+    }
+    struct S4 {
+    }
+    struct S5<T> {
+        x: T,
+        y: u8,
+    }
+    fun S0_inhabited(): S0 {
+        S0{}
+    }
+    fun S1_inhabited(): S1 {
+        S1{0: 0u8}
+    }
+    fun S2_inhabited(): S2 {
+        S2{0: 0u8,1: false}
+    }
+    fun S3_test<T>(x: T): S3<T> {
+        S3<T>{0: x,1: 0u8}
+    }
+    fun nested_0(): S3<S4> {
+        S3<S4>{0: S4{},1: 0u8}
+    }
+    fun nested_1(): S5<S0> {
+        S5<S0>{x: S0{},y: 0u8}
+    }
+    fun test_variant() {
+        E1::V1{};
+        E1::V2{};
+        E1::V3{0: 42u8,1: true};
+    }
+}

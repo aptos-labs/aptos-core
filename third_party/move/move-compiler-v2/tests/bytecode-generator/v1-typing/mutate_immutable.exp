@@ -3,7 +3,7 @@ module 0x8675309::M {
     struct S {
         f: u64,
     }
-    private fun t0(s: &mut M::S) {
+    private fun t0(s: &mut 0x8675309::M::S) {
         s = pack M::S(0);
         Borrow(Immutable)(0) = 1;
         {
@@ -20,9 +20,24 @@ module 0x8675309::M {
     }
 } // end 0x8675309::M
 
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S has drop {
+        f: u64,
+    }
+    fun t0(s: &mut S) {
+        *s = S{f: 0};
+        *&0 = 1;
+        let x = 0;
+        let x_ref = &mut x;
+        let x_ref = /*freeze*/x_ref;
+        *x_ref = 0;
+    }
+}
+
 
 Diagnostics:
-error: expected `&mut` but found `&M::S`
+error: expected `&mut` but found `&S`
   ┌─ tests/bytecode-generator/v1-typing/mutate_immutable.move:5:11
   │
 5 │         *(s: &S) = S { f: 0 };

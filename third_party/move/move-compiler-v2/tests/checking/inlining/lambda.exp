@@ -94,5 +94,74 @@ module 0x42::LambdaTest {
     }
 } // end 0x42::LambdaTest
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::LambdaTest1 {
+    public inline fun inline_apply(f: |u64|u64, b: u64): u64 {
+        f(b)
+    }
+    public inline fun inline_apply1(f: |u64|u64, b: u64): u64 {
+        let (a,b) = (f(b) + 1, 12);
+        a * 12
+    }
+    public inline fun inline_mul(a: u64, b: u64): u64 {
+        a * b
+    }
+}
+module 0x42::LambdaTest2 {
+    use 0x42::LambdaTest1;
+    public inline fun foreach<T>(v: &vector<T>, action: |&T|) {
+        let i = 0;
+        while (i < 0x1::vector::length<T>(v)) {
+            action(0x1::vector::borrow<T>(v, i));
+            i = i + 1;
+        }
+    }
+    public inline fun inline_apply2(g: |u64|u64, c: u64): u64 {
+        {
+            let (b) = (g({
+                let (a,b) = (c, 3);
+                a * 3
+            }));
+            let (a,b) = ({
+                let (z) = (b);
+                z
+            } + 1, 12);
+            a * 12
+        } + 2
+    }
+    public inline fun inline_apply3(g: |u64|u64, c: u64): u64 {
+        LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x| LambdaTest1::inline_apply(|y| y, x), 3))) + 4
+    }
+    public fun test_inline_lambda() {
+        let product = 1;
+        {
+            let (v) = (&vector[1, 2, 3]);
+            let i = 0;
+            while (i < 0x1::vector::length<u64>(v)) {
+                {
+                    let (e) = (0x1::vector::borrow<u64>(v, i));
+                    product = {
+                        let (a,b) = (product, *e);
+                        a * b
+                    }
+                };
+                i = i + 1;
+            }
+        };
+    }
+}
+module 0x42::LambdaTest {
+    use 0x42::LambdaTest2;
+    public inline fun inline_apply(f: |u64|u64, b: u64): u64 {
+        f(b)
+    }
+    public inline fun inline_apply_test(): u64 {
+        1120
+    }
+    fun test_lambda() {
+        if (false) () else abort 0;
+    }
+}
+
 
 ============ bytecode verification succeeded ========

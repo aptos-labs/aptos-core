@@ -12,48 +12,74 @@ module 0x42::globals {
         f: u64,
     }
     private fun check(a: address): bool {
-        exists<globals::R>(a)
+        exists<R>(a)
     }
     private fun publish(s: &signer) {
-        MoveTo<globals::R>(s, pack globals::R(1));
+        MoveTo<R>(s, pack globals::R(1));
         Tuple()
     }
     private fun read(a: address): u64
-        acquires globals::R(*)
+        acquires 0x42::globals::R(*)
      {
         {
-          let r: &globals::R = BorrowGlobal(Immutable)<globals::R>(a);
-          select globals::R.f<&globals::R>(r)
+          let r: &R = BorrowGlobal(Immutable)<R>(a);
+          select globals::R.f<&R>(r)
         }
     }
     private fun write(a: address,x: u64): u64
-        acquires globals::R(*)
+        acquires 0x42::globals::R(*)
      {
         {
-          let r: &mut globals::R = BorrowGlobal(Mutable)<globals::R>(a);
-          select globals::R.f<&mut globals::R>(r) = 2;
+          let r: &mut R = BorrowGlobal(Mutable)<R>(a);
+          select globals::R.f<&mut R>(r) = 2;
           9
         }
     }
 } // end 0x42::globals
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::globals {
+    struct R has store, key {
+        f: u64,
+    }
+    fun check(a: address): bool {
+        exists<R>(a)
+    }
+    fun publish(s: &signer) {
+        move_to<R>(s, R{f: 1});
+    }
+    fun read(a: address): u64
+        acquires R
+    {
+        let r = borrow_global<R>(a);
+        r.f
+    }
+    fun write(a: address, x: u64): u64
+        acquires R
+    {
+        let r = borrow_global_mut<R>(a);
+        r.f = 2;
+        9
+    }
+}
 
 ============ initial bytecode ================
 
 [variant baseline]
 fun globals::check($t0: address): bool {
      var $t1: bool
-  0: $t1 := exists<globals::R>($t0)
+  0: $t1 := exists<0x42::globals::R>($t0)
   1: return $t1
 }
 
 
 [variant baseline]
 fun globals::publish($t0: &signer) {
-     var $t1: globals::R
+     var $t1: 0x42::globals::R
      var $t2: u64
   0: $t2 := 1
-  1: $t1 := pack globals::R($t2)
-  2: move_to<globals::R>($t0, $t1)
+  1: $t1 := pack 0x42::globals::R($t2)
+  2: move_to<0x42::globals::R>($t0, $t1)
   3: return ()
 }
 
@@ -61,10 +87,10 @@ fun globals::publish($t0: &signer) {
 [variant baseline]
 fun globals::read($t0: address): u64 {
      var $t1: u64
-     var $t2: &globals::R
+     var $t2: &0x42::globals::R
      var $t3: &u64
-  0: $t2 := borrow_global<globals::R>($t0)
-  1: $t3 := borrow_field<globals::R>.f($t2)
+  0: $t2 := borrow_global<0x42::globals::R>($t0)
+  1: $t3 := borrow_field<0x42::globals::R>.f($t2)
   2: $t1 := read_ref($t3)
   3: return $t1
 }
@@ -73,12 +99,12 @@ fun globals::read($t0: address): u64 {
 [variant baseline]
 fun globals::write($t0: address, $t1: u64): u64 {
      var $t2: u64
-     var $t3: &mut globals::R
+     var $t3: &mut 0x42::globals::R
      var $t4: u64
      var $t5: &mut u64
-  0: $t3 := borrow_global<globals::R>($t0)
+  0: $t3 := borrow_global<0x42::globals::R>($t0)
   1: $t4 := 2
-  2: $t5 := borrow_field<globals::R>.f($t3)
+  2: $t5 := borrow_field<0x42::globals::R>.f($t3)
   3: write_ref($t5, $t4)
   4: $t2 := 9
   5: return $t2

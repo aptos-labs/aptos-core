@@ -268,6 +268,7 @@ impl<'env> ModelBuilder<'env> {
             builder_struct_table: Some(&self.reverse_struct_table),
             module_name: None,
             display_type_vars: false,
+            used_modules: BTreeSet::new(),
         }
     }
 

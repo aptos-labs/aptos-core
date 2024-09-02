@@ -3,7 +3,7 @@ module 0x8675309::M {
     struct R {
         f: u64,
     }
-    private fun t0(x: u64,r: M::R) {
+    private fun t0(x: u64,r: 0x8675309::M::R) {
         true;
         false;
         true;
@@ -13,11 +13,32 @@ module 0x8675309::M {
         true;
         true;
         Le<u64>(Copy(x), Move(x));
-        Le<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
-        And(Le<u64>(1, select M::R.f<M::R>(r)), Le<u64>(select M::R.f<M::R>(r), 0));
+        Le<u64>(select M::R.f<R>(r), select M::R.f<R>(r));
+        And(Le<u64>(1, select M::R.f<R>(r)), Le<u64>(select M::R.f<R>(r), 0));
         {
           let M::R{ f: _ } = r;
           Tuple()
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    fun t0(x: u64, r: R) {
+        true;
+        false;
+        true;
+        true;
+        true;
+        true;
+        true;
+        true;
+        (copy x) <= (move x);
+        r.f <= r.f;
+        1 <= r.f && r.f <= 0;
+        let R{f: _} = r;
+    }
+}

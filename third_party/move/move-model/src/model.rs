@@ -179,9 +179,9 @@ impl Loc {
 
     /// Creates a location which encloses all the locations in the provided slice,
     /// which must not be empty. All locations are expected to be in the same file.
-    pub fn enclosing(locs: &[&Loc]) -> Loc {
+    pub fn enclosing(locs: &[Loc]) -> Loc {
         assert!(!locs.is_empty());
-        let loc = locs[0];
+        let loc = &locs[0];
         let mut start = loc.span.start();
         let mut end = loc.span.end();
         for l in locs.iter().skip(1) {
@@ -376,6 +376,12 @@ impl NodeId {
 
     pub fn as_usize(self) -> usize {
         self.0
+    }
+}
+
+impl AsRef<NodeId> for NodeId {
+    fn as_ref(&self) -> &NodeId {
+        self
     }
 }
 
@@ -3723,7 +3729,11 @@ impl<'env> StructEnv<'env> {
             .iter()
             .map(|param| param.0)
             .collect();
-        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        TypeDisplayContext {
+            module_name: Some(self.module_env.get_name().clone()),
+            used_modules: self.module_env.get_used_modules(false),
+            ..TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        }
     }
 }
 
@@ -4743,10 +4753,9 @@ impl<'env> FunctionEnv<'env> {
     }
 
     fn definition_view(&'env self) -> Option<FunctionDefinitionView<'env, CompiledModule>> {
-        assert!(
-            !self.is_inline(),
-            "attempt to access bytecode info for inline function"
-        );
+        if self.is_inline() {
+            return None;
+        }
         let module = self.module_env.data.compiled_module.as_ref()?;
         Some(FunctionDefinitionView::new(
             module,
@@ -4761,7 +4770,11 @@ impl<'env> FunctionEnv<'env> {
             .iter()
             .map(|param| param.0)
             .collect();
-        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        TypeDisplayContext {
+            module_name: Some(self.module_env.get_name().clone()),
+            used_modules: self.module_env.get_used_modules(false),
+            ..TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+        }
     }
 }
 

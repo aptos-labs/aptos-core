@@ -3,7 +3,7 @@ module 0x8675309::M {
     struct Coin {
         dummy_field: bool,
     }
-    private fun foo(c: M::Coin) {
+    private fun foo(c: 0x8675309::M::Coin) {
         M::Coin{ dummy_field: _ } = c;
         Tuple()
     }
@@ -27,3 +27,20 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct Coin {
+    }
+    fun foo(c: Coin) {
+        Coin{} = c;
+    }
+    fun t0() {
+        while (true) {
+            0 + (continue);
+        }
+    }
+    fun t1() {
+        while (true) foo(continue)
+    }
+}

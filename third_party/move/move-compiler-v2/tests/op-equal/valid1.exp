@@ -6,9 +6,9 @@ module 0x42::test {
     struct Wrapper {
         0: #0,
     }
-    private fun bitand_vec_coin_new(x: vector<test::Coin>,index: u64) {
+    private fun bitand_vec_coin_new(x: vector<0x42::test::Coin>,index: u64) {
         {
-          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(vector::borrow_mut<test::Coin>(Borrow(Mutable)(x), index)));
+          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<Coin>(vector::borrow_mut<Coin>(Borrow(Mutable)(x), index)));
           $t1 = BitAnd<u256>(Deref($t1), 42)
         };
         Tuple()
@@ -20,41 +20,41 @@ module 0x42::test {
         };
         Tuple()
     }
-    private fun coin_double(self: &mut test::Coin) {
+    private fun coin_double(self: &mut 0x42::test::Coin) {
         {
-          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut test::Coin>(self));
+          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut Coin>(self));
           $t1 = Mul<u256>(Deref($t1), 2)
         };
         Tuple()
     }
-    private fun coin_mod_2(self: &mut test::Coin) {
+    private fun coin_mod_2(self: &mut 0x42::test::Coin) {
         {
-          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut test::Coin>(self));
+          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut Coin>(self));
           $t1 = Mod<u256>(Deref($t1), 2)
         };
         Tuple()
     }
-    private fun half_wrapped_coin_new(x: &mut test::Wrapper<test::Coin>) {
+    private fun half_wrapped_coin_new(x: &mut 0x42::test::Wrapper<0x42::test::Coin>) {
         {
-          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(select test::Wrapper.0<&mut test::Wrapper<test::Coin>>(x)));
+          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<Coin>(select test::Wrapper.0<&mut Wrapper<Coin>>(x)));
           $t1 = Div<u256>(Deref($t1), 2)
         };
         Tuple()
     }
-    private fun shl_vec_wrapped_coin_old(x: vector<test::Wrapper<test::Coin>>,index: u64) {
+    private fun shl_vec_wrapped_coin_old(x: vector<0x42::test::Wrapper<0x42::test::Coin>>,index: u64) {
         {
-          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(select test::Wrapper.0<test::Wrapper<test::Coin>>(vector::borrow_mut<test::Wrapper<test::Coin>>(Borrow(Mutable)(x), index))));
+          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<Coin>(select test::Wrapper.0<Wrapper<Coin>>(vector::borrow_mut<Wrapper<Coin>>(Borrow(Mutable)(x), index))));
           $t1 = Shl<u256>(Deref($t1), 1)
         };
         Tuple()
     }
     private fun shr_coin_at(addr: address)
-        acquires test::Coin(*)
+        acquires 0x42::test::Coin(*)
      {
         {
-          let coin: &mut test::Coin = BorrowGlobal(Mutable)<test::Coin>(addr);
+          let coin: &mut Coin = BorrowGlobal(Mutable)<Coin>(addr);
           {
-            let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut test::Coin>(coin));
+            let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut Coin>(coin));
             $t1 = Shr<u256>(Deref($t1), 1)
           };
           Tuple()
@@ -67,28 +67,95 @@ module 0x42::test {
         };
         Tuple()
     }
-    private fun xor_vec_wrapped_coin_new(x: vector<test::Wrapper<test::Coin>>,index: u64) {
+    private fun xor_vec_wrapped_coin_new(x: vector<0x42::test::Wrapper<0x42::test::Coin>>,index: u64) {
         {
-          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(select test::Wrapper.0<test::Wrapper<test::Coin>>(vector::borrow_mut<test::Wrapper<test::Coin>>(Borrow(Mutable)(x), index))));
+          let $t1: &mut u256 = Borrow(Mutable)(select test::Coin.0<Coin>(select test::Wrapper.0<Wrapper<Coin>>(vector::borrow_mut<Wrapper<Coin>>(Borrow(Mutable)(x), index))));
           $t1 = Xor<u256>(Deref($t1), 1)
         };
         Tuple()
     }
 } // end 0x42::test
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::test {
+    struct Coin has drop, key {
+        0: u256,
+    }
+    struct Wrapper<T> has drop, key {
+        0: T,
+    }
+    fun bitand_vec_coin_new(x: vector<Coin>, index: u64) {
+        {
+            let $t1 = &mut 0x1::vector::borrow_mut<Coin>(&mut x, index).0;
+            *$t1 = *$t1 & 42u256
+        };
+    }
+    fun bitor_vec_new(x: &mut vector<u256>, index: u64) {
+        {
+            let $t1 = 0x1::vector::borrow_mut<u256>(x, index);
+            *$t1 = *$t1 | 42u256
+        };
+    }
+    fun coin_double(self: &mut Coin) {
+        {
+            let $t1 = &mut self.0;
+            *$t1 = *$t1 * 2u256
+        };
+    }
+    fun coin_mod_2(self: &mut Coin) {
+        {
+            let $t1 = &mut self.0;
+            *$t1 = *$t1 % 2u256
+        };
+    }
+    fun half_wrapped_coin_new(x: &mut Wrapper<Coin>) {
+        {
+            let $t1 = &mut x.0.0;
+            *$t1 = *$t1 / 2u256
+        };
+    }
+    fun shl_vec_wrapped_coin_old(x: vector<Wrapper<Coin>>, index: u64) {
+        {
+            let $t1 = &mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut x, index).0.0;
+            *$t1 = *$t1 << 1u8
+        };
+    }
+    fun shr_coin_at(addr: address)
+        acquires Coin
+    {
+        let coin = borrow_global_mut<Coin>(addr);
+        {
+            let $t1 = &mut coin.0;
+            *$t1 = *$t1 >> 1u8
+        };
+    }
+    fun sub1(x: &mut u256) {
+        {
+            let $t1 = x;
+            *$t1 = *$t1 - 1u256
+        };
+    }
+    fun xor_vec_wrapped_coin_new(x: vector<Wrapper<Coin>>, index: u64) {
+        {
+            let $t1 = &mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut x, index).0.0;
+            *$t1 = *$t1 ^ 1u256
+        };
+    }
+}
+
 ============ initial bytecode ================
 
 [variant baseline]
-fun test::bitand_vec_coin_new($t0: vector<test::Coin>, $t1: u64) {
+fun test::bitand_vec_coin_new($t0: vector<0x42::test::Coin>, $t1: u64) {
      var $t2: &mut u256
-     var $t3: &mut test::Coin
-     var $t4: &mut vector<test::Coin>
+     var $t3: &mut 0x42::test::Coin
+     var $t4: &mut vector<0x42::test::Coin>
      var $t5: u256
      var $t6: u256
      var $t7: u256
   0: $t4 := borrow_local($t0)
-  1: $t3 := vector::borrow_mut<test::Coin>($t4, $t1)
-  2: $t2 := borrow_field<test::Coin>.0($t3)
+  1: $t3 := vector::borrow_mut<0x42::test::Coin>($t4, $t1)
+  2: $t2 := borrow_field<0x42::test::Coin>.0($t3)
   3: $t6 := read_ref($t2)
   4: $t7 := 42
   5: $t5 := &($t6, $t7)
@@ -113,12 +180,12 @@ fun test::bitor_vec_new($t0: &mut vector<u256>, $t1: u64) {
 
 
 [variant baseline]
-fun test::coin_double($t0: &mut test::Coin) {
+fun test::coin_double($t0: &mut 0x42::test::Coin) {
      var $t1: &mut u256
      var $t2: u256
      var $t3: u256
      var $t4: u256
-  0: $t1 := borrow_field<test::Coin>.0($t0)
+  0: $t1 := borrow_field<0x42::test::Coin>.0($t0)
   1: $t3 := read_ref($t1)
   2: $t4 := 2
   3: $t2 := *($t3, $t4)
@@ -128,12 +195,12 @@ fun test::coin_double($t0: &mut test::Coin) {
 
 
 [variant baseline]
-fun test::coin_mod_2($t0: &mut test::Coin) {
+fun test::coin_mod_2($t0: &mut 0x42::test::Coin) {
      var $t1: &mut u256
      var $t2: u256
      var $t3: u256
      var $t4: u256
-  0: $t1 := borrow_field<test::Coin>.0($t0)
+  0: $t1 := borrow_field<0x42::test::Coin>.0($t0)
   1: $t3 := read_ref($t1)
   2: $t4 := 2
   3: $t2 := %($t3, $t4)
@@ -143,14 +210,14 @@ fun test::coin_mod_2($t0: &mut test::Coin) {
 
 
 [variant baseline]
-fun test::half_wrapped_coin_new($t0: &mut test::Wrapper<test::Coin>) {
+fun test::half_wrapped_coin_new($t0: &mut 0x42::test::Wrapper<0x42::test::Coin>) {
      var $t1: &mut u256
-     var $t2: &mut test::Coin
+     var $t2: &mut 0x42::test::Coin
      var $t3: u256
      var $t4: u256
      var $t5: u256
-  0: $t2 := borrow_field<test::Wrapper<test::Coin>>.0($t0)
-  1: $t1 := borrow_field<test::Coin>.0($t2)
+  0: $t2 := borrow_field<0x42::test::Wrapper<0x42::test::Coin>>.0($t0)
+  1: $t1 := borrow_field<0x42::test::Coin>.0($t2)
   2: $t4 := read_ref($t1)
   3: $t5 := 2
   4: $t3 := /($t4, $t5)
@@ -160,18 +227,18 @@ fun test::half_wrapped_coin_new($t0: &mut test::Wrapper<test::Coin>) {
 
 
 [variant baseline]
-fun test::shl_vec_wrapped_coin_old($t0: vector<test::Wrapper<test::Coin>>, $t1: u64) {
+fun test::shl_vec_wrapped_coin_old($t0: vector<0x42::test::Wrapper<0x42::test::Coin>>, $t1: u64) {
      var $t2: &mut u256
-     var $t3: &mut test::Coin
-     var $t4: &mut test::Wrapper<test::Coin>
-     var $t5: &mut vector<test::Wrapper<test::Coin>>
+     var $t3: &mut 0x42::test::Coin
+     var $t4: &mut 0x42::test::Wrapper<0x42::test::Coin>
+     var $t5: &mut vector<0x42::test::Wrapper<0x42::test::Coin>>
      var $t6: u256
      var $t7: u256
      var $t8: u8
   0: $t5 := borrow_local($t0)
-  1: $t4 := vector::borrow_mut<test::Wrapper<test::Coin>>($t5, $t1)
-  2: $t3 := borrow_field<test::Wrapper<test::Coin>>.0($t4)
-  3: $t2 := borrow_field<test::Coin>.0($t3)
+  1: $t4 := vector::borrow_mut<0x42::test::Wrapper<0x42::test::Coin>>($t5, $t1)
+  2: $t3 := borrow_field<0x42::test::Wrapper<0x42::test::Coin>>.0($t4)
+  3: $t2 := borrow_field<0x42::test::Coin>.0($t3)
   4: $t7 := read_ref($t2)
   5: $t8 := 1
   6: $t6 := <<($t7, $t8)
@@ -182,13 +249,13 @@ fun test::shl_vec_wrapped_coin_old($t0: vector<test::Wrapper<test::Coin>>, $t1: 
 
 [variant baseline]
 fun test::shr_coin_at($t0: address) {
-     var $t1: &mut test::Coin
+     var $t1: &mut 0x42::test::Coin
      var $t2: &mut u256
      var $t3: u256
      var $t4: u256
      var $t5: u8
-  0: $t1 := borrow_global<test::Coin>($t0)
-  1: $t2 := borrow_field<test::Coin>.0($t1)
+  0: $t1 := borrow_global<0x42::test::Coin>($t0)
+  1: $t2 := borrow_field<0x42::test::Coin>.0($t1)
   2: $t4 := read_ref($t2)
   3: $t5 := 1
   4: $t3 := >>($t4, $t5)
@@ -213,18 +280,18 @@ fun test::sub1($t0: &mut u256) {
 
 
 [variant baseline]
-fun test::xor_vec_wrapped_coin_new($t0: vector<test::Wrapper<test::Coin>>, $t1: u64) {
+fun test::xor_vec_wrapped_coin_new($t0: vector<0x42::test::Wrapper<0x42::test::Coin>>, $t1: u64) {
      var $t2: &mut u256
-     var $t3: &mut test::Coin
-     var $t4: &mut test::Wrapper<test::Coin>
-     var $t5: &mut vector<test::Wrapper<test::Coin>>
+     var $t3: &mut 0x42::test::Coin
+     var $t4: &mut 0x42::test::Wrapper<0x42::test::Coin>
+     var $t5: &mut vector<0x42::test::Wrapper<0x42::test::Coin>>
      var $t6: u256
      var $t7: u256
      var $t8: u256
   0: $t5 := borrow_local($t0)
-  1: $t4 := vector::borrow_mut<test::Wrapper<test::Coin>>($t5, $t1)
-  2: $t3 := borrow_field<test::Wrapper<test::Coin>>.0($t4)
-  3: $t2 := borrow_field<test::Coin>.0($t3)
+  1: $t4 := vector::borrow_mut<0x42::test::Wrapper<0x42::test::Coin>>($t5, $t1)
+  2: $t3 := borrow_field<0x42::test::Wrapper<0x42::test::Coin>>.0($t4)
+  3: $t2 := borrow_field<0x42::test::Coin>.0($t3)
   4: $t7 := read_ref($t2)
   5: $t8 := 1
   6: $t6 := ^($t7, $t8)
@@ -235,19 +302,19 @@ fun test::xor_vec_wrapped_coin_new($t0: vector<test::Wrapper<test::Coin>>, $t1: 
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-fun test::bitand_vec_coin_new($t0: vector<test::Coin>, $t1: u64) {
+fun test::bitand_vec_coin_new($t0: vector<0x42::test::Coin>, $t1: u64) {
      var $t2: &mut u256
-     var $t3: &mut test::Coin
-     var $t4: &mut vector<test::Coin>
+     var $t3: &mut 0x42::test::Coin
+     var $t4: &mut vector<0x42::test::Coin>
      var $t5: u256 [unused]
      var $t6: u256
      var $t7: u256
      # live vars: $t0, $t1
   0: $t4 := borrow_local($t0)
      # live vars: $t1, $t4
-  1: $t3 := vector::borrow_mut<test::Coin>($t4, $t1)
+  1: $t3 := vector::borrow_mut<0x42::test::Coin>($t4, $t1)
      # live vars: $t3
-  2: $t2 := borrow_field<test::Coin>.0($t3)
+  2: $t2 := borrow_field<0x42::test::Coin>.0($t3)
      # live vars: $t2
   3: $t6 := read_ref($t2)
      # live vars: $t2, $t6
@@ -283,13 +350,13 @@ fun test::bitor_vec_new($t0: &mut vector<u256>, $t1: u64) {
 
 
 [variant baseline]
-fun test::coin_double($t0: &mut test::Coin) {
+fun test::coin_double($t0: &mut 0x42::test::Coin) {
      var $t1: &mut u256
      var $t2: u256 [unused]
      var $t3: u256
      var $t4: u256
      # live vars: $t0
-  0: $t1 := borrow_field<test::Coin>.0($t0)
+  0: $t1 := borrow_field<0x42::test::Coin>.0($t0)
      # live vars: $t1
   1: $t3 := read_ref($t1)
      # live vars: $t1, $t3
@@ -304,13 +371,13 @@ fun test::coin_double($t0: &mut test::Coin) {
 
 
 [variant baseline]
-fun test::coin_mod_2($t0: &mut test::Coin) {
+fun test::coin_mod_2($t0: &mut 0x42::test::Coin) {
      var $t1: &mut u256
      var $t2: u256 [unused]
      var $t3: u256
      var $t4: u256
      # live vars: $t0
-  0: $t1 := borrow_field<test::Coin>.0($t0)
+  0: $t1 := borrow_field<0x42::test::Coin>.0($t0)
      # live vars: $t1
   1: $t3 := read_ref($t1)
      # live vars: $t1, $t3
@@ -325,16 +392,16 @@ fun test::coin_mod_2($t0: &mut test::Coin) {
 
 
 [variant baseline]
-fun test::half_wrapped_coin_new($t0: &mut test::Wrapper<test::Coin>) {
+fun test::half_wrapped_coin_new($t0: &mut 0x42::test::Wrapper<0x42::test::Coin>) {
      var $t1: &mut u256
-     var $t2: &mut test::Coin
+     var $t2: &mut 0x42::test::Coin
      var $t3: u256 [unused]
      var $t4: u256
      var $t5: u256
      # live vars: $t0
-  0: $t2 := borrow_field<test::Wrapper<test::Coin>>.0($t0)
+  0: $t2 := borrow_field<0x42::test::Wrapper<0x42::test::Coin>>.0($t0)
      # live vars: $t2
-  1: $t1 := borrow_field<test::Coin>.0($t2)
+  1: $t1 := borrow_field<0x42::test::Coin>.0($t2)
      # live vars: $t1
   2: $t4 := read_ref($t1)
      # live vars: $t1, $t4
@@ -349,22 +416,22 @@ fun test::half_wrapped_coin_new($t0: &mut test::Wrapper<test::Coin>) {
 
 
 [variant baseline]
-fun test::shl_vec_wrapped_coin_old($t0: vector<test::Wrapper<test::Coin>>, $t1: u64) {
+fun test::shl_vec_wrapped_coin_old($t0: vector<0x42::test::Wrapper<0x42::test::Coin>>, $t1: u64) {
      var $t2: &mut u256
-     var $t3: &mut test::Coin
-     var $t4: &mut test::Wrapper<test::Coin>
-     var $t5: &mut vector<test::Wrapper<test::Coin>>
+     var $t3: &mut 0x42::test::Coin
+     var $t4: &mut 0x42::test::Wrapper<0x42::test::Coin>
+     var $t5: &mut vector<0x42::test::Wrapper<0x42::test::Coin>>
      var $t6: u256 [unused]
      var $t7: u256
      var $t8: u8
      # live vars: $t0, $t1
   0: $t5 := borrow_local($t0)
      # live vars: $t1, $t5
-  1: $t4 := vector::borrow_mut<test::Wrapper<test::Coin>>($t5, $t1)
+  1: $t4 := vector::borrow_mut<0x42::test::Wrapper<0x42::test::Coin>>($t5, $t1)
      # live vars: $t4
-  2: $t3 := borrow_field<test::Wrapper<test::Coin>>.0($t4)
+  2: $t3 := borrow_field<0x42::test::Wrapper<0x42::test::Coin>>.0($t4)
      # live vars: $t3
-  3: $t2 := borrow_field<test::Coin>.0($t3)
+  3: $t2 := borrow_field<0x42::test::Coin>.0($t3)
      # live vars: $t2
   4: $t7 := read_ref($t2)
      # live vars: $t2, $t7
@@ -380,15 +447,15 @@ fun test::shl_vec_wrapped_coin_old($t0: vector<test::Wrapper<test::Coin>>, $t1: 
 
 [variant baseline]
 fun test::shr_coin_at($t0: address) {
-     var $t1: &mut test::Coin
+     var $t1: &mut 0x42::test::Coin
      var $t2: &mut u256
      var $t3: u256 [unused]
      var $t4: u256
      var $t5: u8
      # live vars: $t0
-  0: $t1 := borrow_global<test::Coin>($t0)
+  0: $t1 := borrow_global<0x42::test::Coin>($t0)
      # live vars: $t1
-  1: $t2 := borrow_field<test::Coin>.0($t1)
+  1: $t2 := borrow_field<0x42::test::Coin>.0($t1)
      # live vars: $t2
   2: $t4 := read_ref($t2)
      # live vars: $t2, $t4
@@ -422,22 +489,22 @@ fun test::sub1($t0: &mut u256) {
 
 
 [variant baseline]
-fun test::xor_vec_wrapped_coin_new($t0: vector<test::Wrapper<test::Coin>>, $t1: u64) {
+fun test::xor_vec_wrapped_coin_new($t0: vector<0x42::test::Wrapper<0x42::test::Coin>>, $t1: u64) {
      var $t2: &mut u256
-     var $t3: &mut test::Coin
-     var $t4: &mut test::Wrapper<test::Coin>
-     var $t5: &mut vector<test::Wrapper<test::Coin>>
+     var $t3: &mut 0x42::test::Coin
+     var $t4: &mut 0x42::test::Wrapper<0x42::test::Coin>
+     var $t5: &mut vector<0x42::test::Wrapper<0x42::test::Coin>>
      var $t6: u256 [unused]
      var $t7: u256
      var $t8: u256
      # live vars: $t0, $t1
   0: $t5 := borrow_local($t0)
      # live vars: $t1, $t5
-  1: $t4 := vector::borrow_mut<test::Wrapper<test::Coin>>($t5, $t1)
+  1: $t4 := vector::borrow_mut<0x42::test::Wrapper<0x42::test::Coin>>($t5, $t1)
      # live vars: $t4
-  2: $t3 := borrow_field<test::Wrapper<test::Coin>>.0($t4)
+  2: $t3 := borrow_field<0x42::test::Wrapper<0x42::test::Coin>>.0($t4)
      # live vars: $t3
-  3: $t2 := borrow_field<test::Coin>.0($t3)
+  3: $t2 := borrow_field<0x42::test::Coin>.0($t3)
      # live vars: $t2
   4: $t7 := read_ref($t2)
      # live vars: $t2, $t7

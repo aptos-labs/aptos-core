@@ -3,7 +3,7 @@ module 0x8675309::M {
     struct R {
         f: u64,
     }
-    private fun t0(x: u64,r: M::R) {
+    private fun t0(x: u64,r: 0x8675309::M::R) {
         Div<u64>(0, 0);
         Div<u64>(1, 0);
         0;
@@ -13,11 +13,32 @@ module 0x8675309::M {
         0;
         0;
         Div<u64>(Copy(x), Move(x));
-        Div<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
-        Div<u64>(Div<u64>(Div<u64>(1, select M::R.f<M::R>(r)), select M::R.f<M::R>(r)), 0);
+        Div<u64>(select M::R.f<R>(r), select M::R.f<R>(r));
+        Div<u64>(Div<u64>(Div<u64>(1, select M::R.f<R>(r)), select M::R.f<R>(r)), 0);
         {
           let M::R{ f: _ } = r;
           Tuple()
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    fun t0(x: u64, r: R) {
+        0 / 0;
+        1 / 0;
+        0;
+        0u8;
+        0u8;
+        0u128;
+        0u128;
+        0;
+        (copy x) / (move x);
+        r.f / r.f;
+        1 / r.f / r.f / 0;
+        let R{f: _} = r;
+    }
+}

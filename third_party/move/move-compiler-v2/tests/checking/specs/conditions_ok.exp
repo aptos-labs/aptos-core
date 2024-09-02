@@ -8,7 +8,7 @@ module 0x42::M {
         Deref(x)
     }
     spec {
-      aborts_if Or(Eq<u64>(Freeze(false)($t0), 0), Eq<u64>(select M::Ghost$some_global.v(global<M::Ghost$some_global>(0x0)), 0));
+      aborts_if Or(Eq<u64>(Freeze(false)($t0), 0), Eq<u64>(select M::Ghost$some_global.v(global<0x42::M::Ghost$some_global>(0x0)), 0));
       ensures Gt(Old<u64>($t0), $t0);
       ensures Eq<u64>(result0(), Freeze(false)($t0));
     }
@@ -30,3 +30,20 @@ module 0x42::M {
     }
 
 } // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    struct Ghost$some_global has copy, drop, store, key {
+        v: u64,
+    }
+    fun add_some(x: &mut u64): u64 {
+        *x = *x + 1;
+        *x
+    }
+    fun multiple_results(x: u64): (u64, bool) {
+        (x, true)
+    }
+    fun with_emits<T: drop>(_guid: vector<u8>, _msg: T, x: u64): u64 {
+        x
+    }
+}

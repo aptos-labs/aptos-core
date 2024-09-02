@@ -6,20 +6,20 @@ module 0x8675309::M {
     private fun bar(_s: &mut u64,_u: u64) {
         Tuple()
     }
-    private fun foo(_s: &M::S,_u: u64) {
+    private fun foo(_s: &0x8675309::M::S,_u: u64) {
         Tuple()
     }
-    private fun t0(s: &mut M::S) {
+    private fun t0(s: &mut 0x8675309::M::S) {
         {
           let x: u64 = 0;
           {
             let f: &mut u64 = x: u64 = Add<u64>(x, 1);
-            Borrow(Mutable)(select M::S.f<&mut M::S>(x: u64 = Add<u64>(x, 1);
+            Borrow(Mutable)(select M::S.f<&mut S>(x: u64 = Add<u64>(x, 1);
             1;
             s));
             if true {
               x: u64 = Add<u64>(x, 1);
-              M::foo(Freeze(true)<M::S>(s), x: u64 = Add<u64>(x, 1);
+              M::foo(Freeze(true)<S>(s), x: u64 = Add<u64>(x, 1);
               f = 0;
               1)
             } else {
@@ -34,11 +34,50 @@ module 0x8675309::M {
           }
         }
     }
-    private fun t1(s: &mut M::S) {
-        M::bar(Borrow(Mutable)(select M::S.f<&mut M::S>(s)), select M::S.f<&mut M::S>(s) = 0;
+    private fun t1(s: &mut 0x8675309::M::S) {
+        M::bar(Borrow(Mutable)(select M::S.f<&mut S>(s)), select M::S.f<&mut S>(s) = 0;
         1)
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    fun bar(_s: &mut u64, _u: u64) {
+    }
+    fun foo(_s: &S, _u: u64) {
+    }
+    fun t0(s: &mut S) {
+        let x = 0;
+        let f = {
+            x = x + 1;
+            &mut {
+                x = x + 1;
+                1;
+                s
+            }.f
+        };
+        if (true) {
+            x = x + 1;
+            foo(/*freeze*/s, {
+                *{
+                    x = x + 1;
+                    f
+                } = 0;
+                1
+            })
+        } else x = x + 1;
+        if (x == 4) () else abort 0;
+    }
+    fun t1(s: &mut S) {
+        bar(&mut s.f, {
+            s.f = 0;
+            1
+        })
+    }
+}
 
 
 Diagnostics:
