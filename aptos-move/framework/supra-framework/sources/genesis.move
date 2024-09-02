@@ -3,11 +3,13 @@ module supra_framework::genesis {
     use std::fixed_point32;
     use std::vector;
     use std::option;
+    use std::string::{Self, String};
 
     use aptos_std::simple_map;
     use supra_framework::supra_account;
     use supra_framework::delegation_pool;
     use supra_framework::pbo_delegation_pool;
+    use supra_framework::multisig_account;
 
     use supra_framework::account;
     use supra_framework::aggregator_factory;
@@ -251,6 +253,37 @@ module supra_framework::genesis {
             account
         }
     }
+    
+
+    fun create_multiple_multisig_accounts_with_schema(supra_framework: &signer,
+    owner: address, additional_owners: vector<address>,num_signatures_required:u64,metadata_keys:vector<String>,metadata_values:vector<vector<u8>>,
+    timeout_duration:u64, balance:u64, num_of_accounts: u32): vector<address> {
+
+        let counter = 0;
+        let result = vector::empty();
+        while (counter < num_of_accounts) {
+            let account_addr = create_multisig_account_with_balance(supra_framework, owner, additional_owners,
+                                num_signatures_required,metadata_keys,metadata_values,timeout_duration,balance);
+            vector::push_back(&mut result,account_addr);
+            counter = counter + 1;
+        };
+        result
+    }
+    fun create_multisig_account_with_balance(supra_framework: &signer, owner: address, additional_owners: vector<address>, 
+                                num_signatures_required:u64, metadata_keys: vector<String>,
+                                metadata_values: vector<vector<u8>>, timeout_duration: u64, balance:u64 ) : address {
+
+        
+        let addr = multisig_account::get_next_multisig_account_address(owner);
+        assert!(account::exists_at(owner),error::invalid_argument(EACCOUNT_DOES_NOT_EXIST));
+        assert!(vector::all(&additional_owners,|ao_addr|{account::exists_at(*ao_addr)}),error::invalid_argument(EACCOUNT_DOES_NOT_EXIST));
+        let owner_signer = create_signer(owner);
+        multisig_account::create_with_owners(&owner_signer,additional_owners,num_signatures_required,metadata_keys,metadata_values,timeout_duration);
+        supra_coin::mint(supra_framework,addr,balance);   
+        addr                     
+
+        }
+    
 
     fun create_employee_validators(
         employee_vesting_start: u64,
