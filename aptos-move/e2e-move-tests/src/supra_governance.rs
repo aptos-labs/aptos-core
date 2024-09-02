@@ -5,11 +5,10 @@ use crate::harness::MoveHarness;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
-    account_address::AccountAddress, move_utils::MemberId, state_store::table::TableHandle,
+    account_address::AccountAddress, state_store::table::TableHandle,
     transaction::TransactionStatus,
 };
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Deserialize, Serialize)]
 struct PartialVotingProposals {
@@ -27,10 +26,9 @@ struct VotingRecordsV2 {
     pub votes: TableHandle,
 }
 
-pub fn create_proposal_v2(
+pub fn supra_create_proposal_v2(
     harness: &mut MoveHarness,
     account: &Account,
-    stake_pool: AccountAddress,
     execution_hash: Vec<u8>,
     metadata_location: Vec<u8>,
     metadata_hash: Vec<u8>,
@@ -38,8 +36,7 @@ pub fn create_proposal_v2(
 ) -> TransactionStatus {
     harness.run_transaction_payload(
         account,
-        aptos_stdlib::supra_governance_create_proposal_v2(
-            stake_pool,
+        aptos_stdlib::supra_governance_supra_create_proposal_v2(
             execution_hash,
             metadata_location,
             metadata_hash,
@@ -48,37 +45,17 @@ pub fn create_proposal_v2(
     )
 }
 
-pub fn partial_vote(
+pub fn supra_vote(
     harness: &mut MoveHarness,
     account: &Account,
-    stake_pool: AccountAddress,
     proposal_id: u64,
-    voting_power: u64,
     should_pass: bool,
 ) -> TransactionStatus {
     harness.run_transaction_payload(
         account,
-        aptos_stdlib::supra_governance_partial_vote(
-            stake_pool,
+        aptos_stdlib::supra_governance_supra_vote(
             proposal_id,
-            voting_power,
             should_pass,
         ),
     )
-}
-
-pub fn get_remaining_voting_power(
-    harness: &mut MoveHarness,
-    stake_pool: AccountAddress,
-    proposal_id: u64,
-) -> u64 {
-    let fun = MemberId::from_str("0x1::supra_governance::get_remaining_voting_power").unwrap();
-    let res = harness
-        .execute_view_function(fun, vec![], vec![
-            bcs::to_bytes(&stake_pool).unwrap(),
-            bcs::to_bytes(&proposal_id).unwrap(),
-        ])
-        .values
-        .unwrap();
-    bcs::from_bytes::<u64>(&res[0]).unwrap()
 }

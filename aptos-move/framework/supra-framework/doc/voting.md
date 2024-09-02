@@ -600,16 +600,6 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 ## Constants
 
 
-<a id="0x1_voting_EINVALID_MIN_VOTE_THRESHOLD"></a>
-
-Minimum vote threshold cannot be higher than early resolution threshold.
-
-
-<pre><code><b>const</b> <a href="voting.md#0x1_voting_EINVALID_MIN_VOTE_THRESHOLD">EINVALID_MIN_VOTE_THRESHOLD</a>: u64 = 7;
-</code></pre>
-
-
-
 <a id="0x1_voting_EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION"></a>
 
 If a proposal is multi-step, we need to use <code><a href="voting.md#0x1_voting_resolve_proposal_v2">resolve_proposal_v2</a>()</code> to resolve it.
@@ -776,6 +766,16 @@ Key used to track the resolvable time in the proposal's metadata.
 
 
 <pre><code><b>const</b> <a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [82, 69, 83, 79, 76, 86, 65, 66, 76, 69, 95, 84, 73, 77, 69, 95, 77, 69, 84, 65, 68, 65, 84, 65, 95, 75, 69, 89];
+</code></pre>
+
+
+
+<a id="0x1_voting_EINVALID_MIN_VOTE_THRESHOLD"></a>
+
+Minimum vote threshold cannot be higher than early resolution threshold.
+
+
+<pre><code><b>const</b> <a href="voting.md#0x1_voting_EINVALID_MIN_VOTE_THRESHOLD">EINVALID_MIN_VOTE_THRESHOLD</a>: u64 = 7;
 </code></pre>
 
 
