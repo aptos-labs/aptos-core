@@ -278,6 +278,8 @@ impl ExecutionProxyClient {
             onchain_consensus_config.order_vote_enabled(),
             consensus_observer_config,
             consensus_publisher,
+            self.consensus_config
+                .optimistic_sig_verification_for_commit_votes,
         );
 
         tokio::spawn(execution_schedule_phase.start());

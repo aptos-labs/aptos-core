@@ -8,9 +8,7 @@ use crate::{
     test_utils::{
         build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
     },
-    util::mock_time_service::SimulatedTimeService,
 };
-use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
     block::{
         block_test_utils::{
@@ -27,9 +25,8 @@ use aptos_crypto::{HashValue, PrivateKey};
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
-use futures_channel::mpsc::unbounded;
 use proptest::prelude::*;
-use std::{cmp::min, collections::HashSet, sync::Arc};
+use std::{cmp::min, collections::HashSet};
 
 #[tokio::test]
 async fn test_highest_block_and_quorum_cert() {
@@ -284,11 +281,8 @@ async fn test_insert_vote() {
     let block = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
         .await;
-    let time_service = Arc::new(SimulatedTimeService::new());
-    let (delayed_qc_tx, _) = unbounded();
 
-    let mut pending_votes =
-        PendingVotes::new(time_service, delayed_qc_tx, QcAggregatorType::NoDelay);
+    let mut pending_votes = PendingVotes::new();
 
     assert!(block_store.get_quorum_cert_for_block(block.id()).is_none());
     for (i, voter) in signers.iter().enumerate().take(10).skip(1) {
@@ -306,13 +300,13 @@ async fn test_insert_vote() {
             voter,
         )
         .unwrap();
-        let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
+        let vote_res = pending_votes.insert_vote(&vote, &validator_verifier, true);
 
         // first vote of an author is accepted
         assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u128));
         // filter out duplicates
         assert_eq!(
-            pending_votes.insert_vote(&vote, &validator_verifier),
+            pending_votes.insert_vote(&vote, &validator_verifier, true),
             VoteReceptionResult::DuplicateVote,
         );
         // qc is still not there
@@ -335,7 +329,7 @@ async fn test_insert_vote() {
         final_voter,
     )
     .unwrap();
-    match pending_votes.insert_vote(&vote, &validator_verifier) {
+    match pending_votes.insert_vote(&vote, &validator_verifier, true) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());
             block_store

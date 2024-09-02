@@ -50,6 +50,10 @@ impl CommitMessage {
             _ => None,
         }
     }
+
+    pub fn is_vote(&self) -> bool {
+        matches!(self, CommitMessage::Vote(_))
+    }
 }
 
 impl RBMessage for CommitMessage {}

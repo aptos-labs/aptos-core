@@ -2,12 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters;
 use aptos_consensus_types::{common::Author, order_vote::OrderVote};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    aggregate_signature::PartialSignatures,
-    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ pub enum OrderVoteReceptionResult {
 #[derive(Debug, PartialEq, Eq)]
 enum OrderVoteStatus {
     EnoughVotes(LedgerInfoWithSignatures),
-    NotEnoughVotes(LedgerInfoWithPartialSignatures),
+    NotEnoughVotes(LedgerInfoWithMixedSignatures),
 }
 
 /// A PendingVotes structure keep track of order votes for the last few rounds
@@ -56,6 +56,7 @@ impl PendingOrderVotes {
         &mut self,
         order_vote: &OrderVote,
         validator_verifier: &ValidatorVerifier,
+        verified: bool,
     ) -> OrderVoteReceptionResult {
         // derive data from order vote
         let li_digest = order_vote.ledger_info().hash();
@@ -63,9 +64,8 @@ impl PendingOrderVotes {
         // obtain the ledger info with signatures associated to the order vote's ledger info
         let status = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
             // if the ledger info with signatures doesn't exist yet, create it
-            OrderVoteStatus::NotEnoughVotes(LedgerInfoWithPartialSignatures::new(
+            OrderVoteStatus::NotEnoughVotes(LedgerInfoWithMixedSignatures::new(
                 order_vote.ledger_info().clone(),
-                PartialSignatures::empty(),
             ))
         });
 
@@ -94,16 +94,31 @@ impl PendingOrderVotes {
                         order_vote.author()
                     );
                 }
-                li_with_sig.add_signature(order_vote.author(), order_vote.signature().clone());
-                // check if we have enough signatures to create a QC
-                match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
-                    // a quorum of signature was reached, a new QC is formed
+                if verified {
+                    li_with_sig.add_verified_signature(
+                        order_vote.author(),
+                        order_vote.signature().clone(),
+                    );
+                } else {
+                    li_with_sig.add_unverified_signature(
+                        order_vote.author(),
+                        order_vote.signature().clone(),
+                    );
+                }
+
+                match li_with_sig.check_voting_power(validator_verifier) {
                     Ok(aggregated_voting_power) => {
                         assert!(
                             aggregated_voting_power >= validator_verifier.quorum_voting_power(),
                             "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                         );
-                        match li_with_sig.aggregate_signatures(validator_verifier) {
+                        let verification_result = {
+                            let _timer = counters::VERIFY_MSG
+                                .with_label_values(&["order_vote_aggregate_and_verify"])
+                                .start_timer();
+                            li_with_sig.aggregate_and_verify(validator_verifier)
+                        };
+                        match verification_result {
                             Ok(ledger_info_with_sig) => {
                                 *status =
                                     OrderVoteStatus::EnoughVotes(ledger_info_with_sig.clone());
@@ -114,13 +129,9 @@ impl PendingOrderVotes {
                             Err(e) => OrderVoteReceptionResult::ErrorAggregatingSignature(e),
                         }
                     },
-
-                    // not enough votes
                     Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => {
                         OrderVoteReceptionResult::VoteAdded(voting_power)
                     },
-
-                    // error
                     Err(error) => {
                         error!(
                             "MUST_FIX: order vote received could not be added: {}, order vote: {}",
@@ -129,6 +140,40 @@ impl PendingOrderVotes {
                         OrderVoteReceptionResult::ErrorAddingVote(error)
                     },
                 }
+                // // check if we have enough signatures to create a QC
+                // match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
+                //     // a quorum of signature was reached, a new QC is formed
+                //     Ok(aggregated_voting_power) => {
+                //         assert!(
+                //             aggregated_voting_power >= validator_verifier.quorum_voting_power(),
+                //             "QC aggregation should not be triggered if we don't have enough votes to form a QC"
+                //         );
+                //         match li_with_sig.aggregate_signatures(validator_verifier) {
+                //             Ok(ledger_info_with_sig) => {
+                //                 *status =
+                //                     OrderVoteStatus::EnoughVotes(ledger_info_with_sig.clone());
+                //                 OrderVoteReceptionResult::NewLedgerInfoWithSignatures(
+                //                     ledger_info_with_sig,
+                //                 )
+                //             },
+                //             Err(e) => OrderVoteReceptionResult::ErrorAggregatingSignature(e),
+                //         }
+                //     },
+
+                //     // not enough votes
+                //     Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => {
+                //         OrderVoteReceptionResult::VoteAdded(voting_power)
+                //     },
+
+                //     // error
+                //     Err(error) => {
+                //         error!(
+                //             "MUST_FIX: order vote received could not be added: {}, order vote: {}",
+                //             error, order_vote
+                //         );
+                //         OrderVoteReceptionResult::ErrorAddingVote(error)
+                //     },
+                // }
             },
         }
     }
@@ -190,13 +235,13 @@ mod tests {
 
         // first time a new order vote is added -> OrderVoteAdded
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator),
+            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator, true),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
         // same author voting for the same thing -> OrderVoteAdded
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator),
+            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator, true),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
@@ -208,7 +253,7 @@ mod tests {
             signers[1].sign(&li2).expect("Unable to sign ledger info"),
         );
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_2_author_1, &validator),
+            pending_order_votes.insert_order_vote(&order_vote_2_author_1, &validator, true),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
@@ -220,7 +265,7 @@ mod tests {
             li2.clone(),
             signers[2].sign(&li2).expect("Unable to sign ledger info"),
         );
-        match pending_order_votes.insert_order_vote(&order_vote_2_author_2, &validator) {
+        match pending_order_votes.insert_order_vote(&order_vote_2_author_2, &validator, true) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
                 assert!(li_with_sig.check_voting_power(&validator).is_ok());
             },

@@ -73,9 +73,10 @@ async fn test_proof_coordinator_basic() {
     for signer in &signers {
         let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone(), signer).unwrap();
         assert!(proof_coordinator_tx
-            .send(ProofCoordinatorCommand::AppendSignature(
-                SignedBatchInfoMsg::new(vec![signed_batch_info])
-            ))
+            .send(ProofCoordinatorCommand::AppendSignature((
+                SignedBatchInfoMsg::new(vec![signed_batch_info]),
+                true
+            )))
             .await
             .is_ok());
     }

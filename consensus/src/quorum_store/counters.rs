@@ -843,6 +843,16 @@ pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
+pub static SIGNED_BATCH_INFO_VERIFY_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_signed_batch_info_verify_duration",
+            "Histogram of the time durations for verifying signed batch info.",
+        )
+        .unwrap(),
+    )
+});
+
 pub static BATCH_SUCCESSFUL_CREATION: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_batch_successful_creation",
