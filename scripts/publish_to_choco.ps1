@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ###########################################
-# Build and package a release for the CLI #
+# Publish Aptos Cli to Chocolatey.org #
 ###########################################
 
 # Note: This must be run from the root of the aptos-core repository.
