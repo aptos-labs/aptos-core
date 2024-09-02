@@ -17,7 +17,7 @@ use crate::{
     env_pipeline::{
         acquires_checker, ast_simplifier, cyclic_instantiation_checker, flow_insensitive_checkers,
         function_checker, inliner, lambda_lifter, lambda_lifter::LambdaLiftingOptions,
-        model_ast_lints, recursive_struct_checker, rewrite_target::RewritingScope,
+        model_ast_lints, native_checker, recursive_struct_checker, rewrite_target::RewritingScope,
         seqs_in_binop_checker, spec_checker, spec_rewriter, unused_params_checker,
         EnvProcessorPipeline,
     },
@@ -295,6 +295,13 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         env_pipeline.add(
             "type parameter check",
             function_checker::check_for_function_typed_parameters,
+        );
+    }
+
+    if !for_v1_model && options.experiment_on(Experiment::NATIVE_CHECK) {
+        env_pipeline.add(
+            "native function and struct check",
+            native_checker::check_for_native_functions_and_structs,
         );
     }
 

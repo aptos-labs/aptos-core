@@ -16,6 +16,7 @@ pub mod function_checker;
 pub mod inliner;
 pub mod lambda_lifter;
 pub mod model_ast_lints;
+pub mod native_checker;
 pub mod recursive_struct_checker;
 pub mod rewrite_target;
 pub mod seqs_in_binop_checker;
