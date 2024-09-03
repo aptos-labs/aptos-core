@@ -173,8 +173,8 @@ impl ProofManager {
                     } else {
                         (Vec::new(), PayloadTxnsSize::zero())
                     };
-                counters::NUM_INLINE_BATCHES.observe(inline_block_size.count() as f64);
-                counters::NUM_INLINE_TXNS.observe(inline_block_size.size_in_bytes() as f64);
+                counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
+                counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
                 let response = if self.enable_opt_quorum_store {
                     let inline_batches = inline_block.into();
