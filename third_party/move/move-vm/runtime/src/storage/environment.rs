@@ -38,12 +38,6 @@ impl PartiallyVerifiedModule {
     ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
         self.0.immediate_dependencies_iter()
     }
-
-    pub fn immediate_friends_iter(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
-        self.0.immediate_friends_iter()
-    }
 }
 
 /// Wrapper around partially verified compiled script, i.e., one that passed
