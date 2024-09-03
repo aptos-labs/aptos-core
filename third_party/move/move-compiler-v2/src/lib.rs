@@ -483,7 +483,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
     // There should be no "transforming" processors run after this point.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
 
     if options.experiment_on(Experiment::FLUSH_WRITES_OPTIMIZATION) {
         // This processor only adds annotations, does not transform the bytecode.
