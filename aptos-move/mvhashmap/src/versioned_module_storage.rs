@@ -253,7 +253,7 @@ mod test {
             unreachable!()
         }
 
-        fn hash(&self) -> [u8; 32] {
+        fn hash(&self) -> &[u8; 32] {
             unreachable!()
         }
 
