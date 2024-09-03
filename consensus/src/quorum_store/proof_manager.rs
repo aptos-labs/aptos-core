@@ -70,6 +70,8 @@ impl ProofManager {
         batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
         self.batch_proof_queue.insert_batches(batch_summaries);
+        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+            self.batch_proof_queue.remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_commit_notification(
@@ -99,9 +101,7 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let max_txns_with_proof = request
-                    .max_txns
-                    .compute_pct(100 - request.opt_batch_txns_pct);
+                let max_txns_with_proof = request.max_txns;
 
                 let (
                     proof_block,
