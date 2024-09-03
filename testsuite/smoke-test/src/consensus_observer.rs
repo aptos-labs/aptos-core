@@ -5,10 +5,13 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     state_sync_utils,
     state_sync_utils::enable_consensus_observer,
-    utils::{create_test_accounts, execute_transactions, wait_for_all_nodes},
+    utils::{add_node_to_seeds, create_test_accounts, execute_transactions, wait_for_all_nodes},
 };
-use aptos_config::config::NodeConfig;
-use aptos_forge::{LocalNode, NodeExt};
+use aptos_config::{
+    config::{NodeConfig, OverrideNodeConfig, PeerRole},
+    network_id::NetworkId,
+};
+use aptos_forge::{LocalNode, NodeExt, Swarm};
 use aptos_types::on_chain_config::{
     ConsensusAlgorithmConfig, OnChainConsensusConfig, ValidatorTxnConfig,
 };
@@ -230,6 +233,64 @@ async fn test_consensus_observer_fullnode_sync_multiple_nodes() {
     .await;
 
     // Verify the VFNs are all able to sync
+    wait_for_all_nodes(&mut swarm).await;
+}
+
+#[tokio::test]
+async fn test_consensus_observer_public_fullnode_sync() {
+    // Create a VFN config with consensus observer enabled
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
+    enable_consensus_observer(true, &mut vfn_config);
+
+    // Create a swarm of 2 validators and 1 VFN with consensus observer enabled
+    let mut swarm = SwarmBuilder::new_local(2)
+        .with_num_fullnodes(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            enable_consensus_observer(true, config);
+        }))
+        .with_vfn_config(vfn_config)
+        .build()
+        .await;
+
+    // Create a PFN config with consensus observer enabled
+    let mut pfn_config = NodeConfig::get_default_pfn_config();
+    enable_consensus_observer(true, &mut pfn_config);
+
+    // Create the PFN and connect it to the VFN
+    let vfn_peer_id = swarm.full_nodes().next().unwrap().peer_id();
+    let vfn_config = swarm.fullnode(vfn_peer_id).unwrap().config();
+    add_node_to_seeds(
+        &mut pfn_config,
+        vfn_config,
+        NetworkId::Public,
+        PeerRole::PreferredUpstream,
+    );
+    swarm
+        .add_full_node(
+            &swarm.versions().max().unwrap(),
+            OverrideNodeConfig::new_with_default_base(pfn_config),
+        )
+        .await
+        .unwrap();
+
+    // Wait for the PFN to come up
+    wait_for_all_nodes(&mut swarm).await;
+
+    // Execute a number of transactions on the first validator
+    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
+    let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
+    let (mut account_0, account_1) = create_test_accounts(&mut swarm).await;
+    execute_transactions(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        false,
+    )
+    .await;
+
+    // Verify all nodes are able to sync
     wait_for_all_nodes(&mut swarm).await;
 }
 
