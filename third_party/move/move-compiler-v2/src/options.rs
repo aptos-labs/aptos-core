@@ -310,7 +310,7 @@ fn compiler_exp_var() -> Vec<String> {
         vec![]
     });
     if !read_env_var(OVERRIDE_EXP_CACHE).is_empty() {
-        for s in ["MVC_EXP", "MOVE_COMPILER_EXP"] {
+        for s in ["MOVE_COMPILER_EXP", "MVC_EXP"] {
             let s = read_env_var(s);
             if !s.is_empty() {
                 return s.split(',').map(|s| s.to_string()).collect();
