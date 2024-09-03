@@ -3,7 +3,7 @@
 
 use crate::{
     ambassador_impl_ModuleStorage, module_linker_error, IntoUnsyncModuleStorage, Module,
-    ModuleBytesStorage, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
+    ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -19,6 +19,7 @@ use move_core_types::{
     metadata::Metadata,
     vm_status::StatusCode,
 };
+use move_vm_types::storage::ModuleBytesStorage;
 use std::{
     collections::{btree_map, BTreeMap},
     sync::Arc,

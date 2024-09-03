@@ -5,7 +5,7 @@ use crate::{
     module_cyclic_dependency_error, module_linker_error,
     storage::{
         environment::{RuntimeEnvironment, WithRuntimeEnvironment},
-        module_storage::{ModuleBytesStorage, ModuleStorage},
+        module_storage::ModuleStorage,
     },
     Module,
 };
@@ -19,50 +19,12 @@ use move_core_types::{
     language_storage::ModuleId,
     metadata::Metadata,
 };
+use move_vm_types::storage::ModuleBytesStorage;
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap, BTreeSet},
     sync::Arc,
 };
-
-/// Represents an in-memory storage that contains modules' bytes.
-#[derive(Clone)]
-pub struct LocalModuleBytesStorage(BTreeMap<AccountAddress, BTreeMap<Identifier, Bytes>>);
-
-impl LocalModuleBytesStorage {
-    /// Create an empty storage for module bytes.
-    pub fn empty() -> Self {
-        Self(BTreeMap::new())
-    }
-
-    /// Adds serialized module to this module byte storage.
-    pub fn add_module_bytes(
-        &mut self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        bytes: Bytes,
-    ) {
-        use btree_map::Entry::*;
-        let account_module_storage = match self.0.entry(*address) {
-            Occupied(entry) => entry.into_mut(),
-            Vacant(entry) => entry.insert(BTreeMap::new()),
-        };
-        account_module_storage.insert(module_name.to_owned(), bytes);
-    }
-}
-
-impl ModuleBytesStorage for LocalModuleBytesStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.0.get(address) {
-            return Ok(account_storage.get(module_name).cloned());
-        }
-        Ok(None)
-    }
-}
 
 /// An entry in [UnsyncModuleStorage]. As modules are accessed, entries can be
 /// "promoted", e.g., a deserialized representation can be converted into the
@@ -415,6 +377,7 @@ pub(crate) mod test {
         file_format_common::VERSION_DEFAULT,
     };
     use move_core_types::{ident_str, vm_status::StatusCode};
+    use move_vm_test_utils::InMemoryStorage;
 
     fn module<'a>(
         module_name: &'a str,
@@ -432,19 +395,19 @@ pub(crate) mod test {
     }
 
     pub(crate) fn add_module_bytes<'a>(
-        module_bytes_storage: &mut LocalModuleBytesStorage,
+        storage: &mut InMemoryStorage,
         module_name: &'a str,
         dependencies: impl IntoIterator<Item = &'a str>,
         friends: impl IntoIterator<Item = &'a str>,
     ) {
         let (module, bytes) = module(module_name, dependencies, friends);
-        module_bytes_storage.add_module_bytes(module.self_addr(), module.self_name(), bytes);
+        storage.add_module_bytes(module.self_addr(), module.self_name(), bytes);
     }
 
     #[test]
     fn test_module_does_not_exist() {
         let env = RuntimeEnvironment::test();
-        let module_storage = LocalModuleBytesStorage::empty().into_unsync_module_storage(&env);
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage(&env);
 
         let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
         assert!(!assert_ok!(result));
@@ -467,11 +430,11 @@ pub(crate) mod test {
 
     #[test]
     fn test_module_exists() {
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-        add_module_bytes(&mut module_bytes_storage, "a", vec![], vec![]);
+        let mut storage = InMemoryStorage::new();
+        add_module_bytes(&mut storage, "a", vec![], vec![]);
 
         let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let module_storage = storage.into_unsync_module_storage(&env);
 
         let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
         assert!(assert_ok!(result));
@@ -482,15 +445,15 @@ pub(crate) mod test {
     fn test_deserialized_caching() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-        add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "b", vec![], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "c", vec!["d", "e"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "d", vec![], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "e", vec![], vec![]);
+        let mut storage = InMemoryStorage::new();
+        add_module_bytes(&mut storage, "a", vec!["b", "c"], vec![]);
+        add_module_bytes(&mut storage, "b", vec![], vec![]);
+        add_module_bytes(&mut storage, "c", vec!["d", "e"], vec![]);
+        add_module_bytes(&mut storage, "d", vec![], vec![]);
+        add_module_bytes(&mut storage, "e", vec![], vec![]);
 
         let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let module_storage = storage.into_unsync_module_storage(&env);
 
         let result = module_storage.fetch_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
         assert_eq!(
@@ -516,15 +479,15 @@ pub(crate) mod test {
     fn test_dependency_tree_traversal() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-        add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "b", vec![], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "c", vec!["d", "e"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "d", vec![], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "e", vec![], vec![]);
+        let mut storage = InMemoryStorage::new();
+        add_module_bytes(&mut storage, "a", vec!["b", "c"], vec![]);
+        add_module_bytes(&mut storage, "b", vec![], vec![]);
+        add_module_bytes(&mut storage, "c", vec!["d", "e"], vec![]);
+        add_module_bytes(&mut storage, "d", vec![], vec![]);
+        add_module_bytes(&mut storage, "e", vec![], vec![]);
 
         let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let module_storage = storage.into_unsync_module_storage(&env);
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("c"));
         assert_ok!(result);
@@ -545,17 +508,17 @@ pub(crate) mod test {
     fn test_dependency_dag_traversal() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-        add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "b", vec!["d"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "c", vec!["d"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "d", vec!["e", "f"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "e", vec!["g"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "f", vec!["g"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "g", vec![], vec![]);
+        let mut storage = InMemoryStorage::new();
+        add_module_bytes(&mut storage, "a", vec!["b", "c"], vec![]);
+        add_module_bytes(&mut storage, "b", vec!["d"], vec![]);
+        add_module_bytes(&mut storage, "c", vec!["d"], vec![]);
+        add_module_bytes(&mut storage, "d", vec!["e", "f"], vec![]);
+        add_module_bytes(&mut storage, "e", vec!["g"], vec![]);
+        add_module_bytes(&mut storage, "f", vec!["g"], vec![]);
+        add_module_bytes(&mut storage, "g", vec![], vec![]);
 
         let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let module_storage = storage.into_unsync_module_storage(&env);
 
         assert_ok!(module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("a")));
         assert_ok!(module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("c")));
@@ -582,13 +545,13 @@ pub(crate) mod test {
 
     #[test]
     fn test_cyclic_dependencies_traversal_fails() {
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-        add_module_bytes(&mut module_bytes_storage, "a", vec!["b"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "b", vec!["c"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "c", vec!["a"], vec![]);
+        let mut storage = InMemoryStorage::new();
+        add_module_bytes(&mut storage, "a", vec!["b"], vec![]);
+        add_module_bytes(&mut storage, "b", vec!["c"], vec![]);
+        add_module_bytes(&mut storage, "c", vec!["a"], vec![]);
 
         let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let module_storage = storage.into_unsync_module_storage(&env);
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("c"));
         assert_eq!(
@@ -601,13 +564,13 @@ pub(crate) mod test {
     fn test_cyclic_friends_are_allowed() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-        add_module_bytes(&mut module_bytes_storage, "a", vec![], vec!["b"]);
-        add_module_bytes(&mut module_bytes_storage, "b", vec![], vec!["c"]);
-        add_module_bytes(&mut module_bytes_storage, "c", vec![], vec!["a"]);
+        let mut storage = InMemoryStorage::new();
+        add_module_bytes(&mut storage, "a", vec![], vec!["b"]);
+        add_module_bytes(&mut storage, "b", vec![], vec!["c"]);
+        add_module_bytes(&mut storage, "c", vec![], vec!["a"]);
 
         let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let module_storage = storage.into_unsync_module_storage(&env);
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("c"));
         assert_ok!(result);
@@ -621,14 +584,14 @@ pub(crate) mod test {
     fn test_transitive_friends_are_allowed_to_be_transitive_dependencies() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-        add_module_bytes(&mut module_bytes_storage, "a", vec!["b"], vec!["d"]);
-        add_module_bytes(&mut module_bytes_storage, "b", vec!["c"], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "c", vec![], vec![]);
-        add_module_bytes(&mut module_bytes_storage, "d", vec![], vec!["c"]);
+        let mut storage = InMemoryStorage::new();
+        add_module_bytes(&mut storage, "a", vec!["b"], vec!["d"]);
+        add_module_bytes(&mut storage, "b", vec!["c"], vec![]);
+        add_module_bytes(&mut storage, "c", vec![], vec![]);
+        add_module_bytes(&mut storage, "d", vec![], vec!["c"]);
 
         let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let module_storage = storage.into_unsync_module_storage(&env);
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
         assert_ok!(result);

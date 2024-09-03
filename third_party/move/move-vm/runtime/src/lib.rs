@@ -39,11 +39,9 @@ pub use storage::{
     implementations::{
         unreachable_code_storage::UnreachableCodeStorage,
         unsync_code_storage::{IntoUnsyncCodeStorage, UnsyncCodeStorage},
-        unsync_module_storage::{
-            IntoUnsyncModuleStorage, LocalModuleBytesStorage, UnsyncModuleStorage,
-        },
+        unsync_module_storage::{IntoUnsyncModuleStorage, UnsyncModuleStorage},
     },
-    module_storage::{ambassador_impl_ModuleStorage, ModuleBytesStorage, ModuleStorage},
+    module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     publishing::TemporaryModuleStorage,
 };
 

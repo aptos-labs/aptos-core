@@ -29,6 +29,7 @@ pub mod gas;
 pub mod loaded_data;
 pub mod natives;
 pub mod resolver;
+pub mod storage;
 pub mod value_serde;
 pub mod value_traversal;
 pub mod values;

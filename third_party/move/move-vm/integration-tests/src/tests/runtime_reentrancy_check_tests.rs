@@ -9,8 +9,7 @@ use move_core_types::{
     language_storage::ModuleId, vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
-    IntoUnsyncModuleStorage, LocalModuleBytesStorage,
+    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction, IntoUnsyncModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -63,20 +62,17 @@ fn make_dispatch_d_native() -> NativeFunction {
     })
 }
 
-fn set_up_storage(modules: Vec<String>) -> (InMemoryStorage, LocalModuleBytesStorage) {
-    let mut resource_storage = InMemoryStorage::new();
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+fn set_up_storage(modules: Vec<String>) -> InMemoryStorage {
+    let mut storage = InMemoryStorage::new();
 
     for module in modules {
         let mut units = compile_units(&module).unwrap();
         let m = as_module(units.pop().unwrap());
         let mut blob = vec![];
         m.serialize(&mut blob).unwrap();
-
-        resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
-        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+        storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
     }
-    (resource_storage, module_bytes_storage)
+    storage
 }
 
 #[test]
@@ -155,14 +151,16 @@ fn runtime_reentrancy_check() {
         "#,
         TEST_ADDR.to_hex(),
     );
-    let (resource_storage, module_bytes_storage) = set_up_storage(vec![code_1, code_2, code_3]);
-    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
+    let storage = set_up_storage(vec![code_1, code_2, code_3]);
+    let module_storage = storage
+        .clone()
+        .into_unsync_module_storage(vm.runtime_environment());
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
     let fun_name = Identifier::new("foo1").unwrap();
     let args: Vec<Vec<u8>> = vec![];
 
-    let mut sess = vm.new_session(&resource_storage);
+    let mut sess = vm.new_session(&storage);
     let traversal_storage = TraversalStorage::new();
 
     // Call stack look like following:

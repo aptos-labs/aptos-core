@@ -4,9 +4,7 @@
 use move_binary_format::file_format::{
     Bytecode::*, CodeUnit, CompiledScript, Signature, SignatureIndex, SignatureToken::*,
 };
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage, LocalModuleBytesStorage,
-};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -52,13 +50,14 @@ fn leak_with_abort() {
 
     let vm = MoveVM::new(vec![]);
 
-    let code_storage =
-        LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
-    let resource_storage = InMemoryStorage::new();
+    let storage = InMemoryStorage::new();
+    let code_storage = storage
+        .clone()
+        .into_unsync_code_storage(vm.runtime_environment());
 
     let traversal_storage = TraversalStorage::new();
 
-    let mut session = vm.new_session(&resource_storage);
+    let mut session = vm.new_session(&storage);
     for _ in 0..100_000 {
         let _ = session.execute_script(
             script_bytes.as_slice(),

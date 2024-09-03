@@ -12,7 +12,6 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage,
-    LocalModuleBytesStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -117,16 +116,15 @@ fn script_large_ty() {
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();
 
-    let mut resource_storage = InMemoryStorage::new();
-    resource_storage.publish_or_overwrite_module(decompiled_module.self_id(), module.clone());
-
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-    module_bytes_storage.add_module_bytes(
+    let mut storage = InMemoryStorage::new();
+    storage.add_module_bytes(
         decompiled_module.self_addr(),
         decompiled_module.self_name(),
         module.into(),
     );
-    let code_storage = module_bytes_storage.into_unsync_code_storage(move_vm.runtime_environment());
+    let code_storage = storage
+        .clone()
+        .into_unsync_code_storage(move_vm.runtime_environment());
 
     // constructs a type with about 25^3 nodes
     let num_type_args = 25;
@@ -139,7 +137,7 @@ fn script_large_ty() {
         struct_name,
     );
 
-    let mut session = move_vm.new_session(&resource_storage);
+    let mut session = move_vm.new_session(&storage);
     let traversal_storage = TraversalStorage::new();
     let res = session
         .execute_script(

@@ -26,7 +26,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    IntoUnsyncModuleStorage, LocalModuleBytesStorage,
+    IntoUnsyncModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{zero_cost_schedule, CostTable, Gas, GasCost, GasStatus},
@@ -51,8 +51,7 @@ pub struct SharedTestingConfig {
     execution_bound: u64,
     cost_table: CostTable,
     vm: MoveVM,
-    starting_resource_storage: InMemoryStorage,
-    starting_module_storage: LocalModuleBytesStorage,
+    starting_storage_state: InMemoryStorage,
     #[allow(dead_code)] // used by some features
     source_files: Vec<String>,
     record_writeset: bool,
@@ -77,43 +76,22 @@ fn unit_cost_table() -> CostTable {
     cost_schedule
 }
 
-/// Setup storage state with the set of modules that will be needed for all tests.
+/// Setup storage state with the set of modules that will be needed for all tests
 fn setup_test_storage<'a>(
     modules: impl Iterator<Item = &'a CompiledModule>,
-    genesis_state: Option<ChangeSet>,
-) -> Result<(InMemoryStorage, LocalModuleBytesStorage)> {
-    let mut resource_storage = InMemoryStorage::new();
-    let mut module_storage = LocalModuleBytesStorage::empty();
-
+) -> Result<InMemoryStorage> {
+    let mut storage = InMemoryStorage::new();
     let modules = Modules::new(modules);
-    let dependency_graph = modules.compute_dependency_graph();
-    for module in dependency_graph.compute_topological_order()? {
-        let mut module_bytes = Vec::new();
+    for module in modules
+        .compute_dependency_graph()
+        .compute_topological_order()?
+    {
+        let mut module_bytes = vec![];
         module.serialize_for_version(Some(module.version), &mut module_bytes)?;
-        resource_storage.publish_or_overwrite_module(module.self_id(), module_bytes.clone());
-        module_storage.add_module_bytes(
-            module.self_addr(),
-            module.self_name(),
-            module_bytes.into(),
-        );
+        storage.add_module_bytes(module.self_addr(), module.self_name(), module_bytes.into());
     }
 
-    if let Some(genesis_state) = genesis_state {
-        // In V2 loader implementation, we differentiate between modules and resources, so
-        // store these separately.
-        for (addr, name, op) in genesis_state.modules() {
-            let module_bytes = match op {
-                Op::New(bytes) | Op::Modify(bytes) => bytes,
-                Op::Delete => unreachable!("Genesis state cannot contain a deletion"),
-            };
-            module_storage.add_module_bytes(addr, name.as_ident_str(), module_bytes.clone());
-        }
-
-        // For V1 loader flow, add modules to resource storage for now.
-        resource_storage.apply(genesis_state)?;
-    }
-
-    Ok((resource_storage, module_storage))
+    Ok(storage)
 }
 
 /// Print the updates to storage represented by `cs` in the context of the starting storage state
@@ -165,10 +143,10 @@ impl TestRunner {
             .map(|(filepath, _)| filepath.to_string())
             .collect();
         let modules = tests.module_info.values().map(|info| &info.module);
-
-        let (starting_resource_storage, starting_module_storage) =
-            setup_test_storage(modules, genesis_state)?;
-
+        let mut starting_storage_state = setup_test_storage(modules)?;
+        if let Some(genesis_state) = genesis_state {
+            starting_storage_state.apply(genesis_state)?;
+        }
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -181,8 +159,7 @@ impl TestRunner {
                 save_storage_state_on_failure,
                 report_stacktrace_on_abort,
                 vm,
-                starting_resource_storage,
-                starting_module_storage,
+                starting_storage_state,
                 execution_bound,
                 // TODO: our current implementation uses a unit cost table to prevent programs from
                 // running indefinitely. This should probably be done in a different way, like halting
@@ -291,19 +268,15 @@ impl SharedTestingConfig {
         TestRunInfo,
     ) {
         let extensions = extensions::new_extensions();
-        let mut session = self
-            .vm
-            .new_session_with_extensions(&self.starting_resource_storage, extensions);
-        let mut gas_meter = GasStatus::new(&self.cost_table, Gas::new(self.execution_bound));
-        // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
-
-        // Note: While Move unit tests run concurrently, there is no publishing involved.
-        //       For simplicity, locally unsync module storage is used.
         let module_storage = self
-            .starting_module_storage
+            .starting_storage_state
             .clone()
             .into_unsync_module_storage(self.vm.runtime_environment());
-
+        let mut session = self
+            .vm
+            .new_session_with_extensions(&self.starting_storage_state, extensions);
+        let mut gas_meter = GasStatus::new(&self.cost_table, Gas::new(self.execution_bound));
+        // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
         let now = Instant::now();
         let traversal_storage = TraversalStorage::new();
         let serialized_return_values_result = session.execute_function_bypass_visibility(
@@ -368,7 +341,7 @@ impl SharedTestingConfig {
                             print_resources_and_extensions(
                                 &changeset,
                                 extensions,
-                                &self.starting_resource_storage,
+                                &self.starting_storage_state,
                             )
                             .ok()
                         })

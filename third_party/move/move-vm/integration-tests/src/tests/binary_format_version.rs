@@ -9,7 +9,7 @@ use move_binary_format::{
 use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage,
-    IntoUnsyncModuleStorage, LocalModuleBytesStorage, TemporaryModuleStorage,
+    IntoUnsyncModuleStorage, TemporaryModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -31,11 +31,12 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let resource_storage = InMemoryStorage::new();
-        let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
+        let storage = InMemoryStorage::new();
+        let module_storage = storage
+            .clone()
+            .into_unsync_module_storage(vm.runtime_environment());
 
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
             let module_storage = TemporaryModuleStorage::new(
                 m.self_addr(),
@@ -86,11 +87,12 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             },
         );
 
-        let resource_storage = InMemoryStorage::new();
-        let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
+        let storage = InMemoryStorage::new();
+        let module_storage = storage
+            .clone()
+            .into_unsync_module_storage(vm.runtime_environment());
 
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
             let result = TemporaryModuleStorage::new(
                 m.self_addr(),
@@ -153,11 +155,12 @@ fn test_run_script_with_custom_max_binary_format_version() {
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let code_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
-        let resource_storage = InMemoryStorage::new();
+        let storage = InMemoryStorage::new();
+        let code_storage = storage
+            .clone()
+            .into_unsync_code_storage(vm.runtime_environment());
 
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         sess.execute_script(
             b_new.clone(),
             vec![],
@@ -195,11 +198,12 @@ fn test_run_script_with_custom_max_binary_format_version() {
             },
         );
 
-        let code_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
-        let resource_storage = InMemoryStorage::new();
+        let storage = InMemoryStorage::new();
+        let code_storage = storage
+            .clone()
+            .into_unsync_code_storage(vm.runtime_environment());
 
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         assert_eq!(
             sess.execute_script(
                 b_new.clone(),

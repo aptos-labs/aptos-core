@@ -12,9 +12,7 @@ use move_core_types::{
     value::{MoveStruct, MoveValue},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, IntoUnsyncModuleStorage, LocalModuleBytesStorage,
-};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, IntoUnsyncModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -59,12 +57,11 @@ fn run(
 
     let vm = MoveVM::new(vec![]);
 
-    let mut resource_storage = InMemoryStorage::new();
-    resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
-
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-    module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
-    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
+    let mut storage = InMemoryStorage::new();
+    storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+    let module_storage = storage
+        .clone()
+        .into_unsync_module_storage(vm.runtime_environment());
 
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
@@ -74,7 +71,7 @@ fn run(
         .map(|val| val.simple_serialize().unwrap())
         .collect();
 
-    let mut sess = vm.new_session(&resource_storage);
+    let mut sess = vm.new_session(&storage);
     sess.execute_function_bypass_visibility(
         &m.self_id(),
         &fun_name,

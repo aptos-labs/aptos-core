@@ -5,7 +5,7 @@
 use bytes::Bytes;
 use move_binary_format::{
     deserializer::DeserializerConfig,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{PartialVMError, PartialVMResult, VMResult},
     file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
     CompiledModule,
 };
@@ -13,7 +13,7 @@ use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChangeSet, ChangeSet, Op},
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     value::MoveTypeLayout,
@@ -21,7 +21,10 @@ use move_core_types::{
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
-use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
+use move_vm_types::{
+    resolver::{resource_size, ModuleResolver, ResourceResolver},
+    storage::ModuleBytesStorage,
+};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
@@ -67,6 +70,16 @@ impl TableResolver for BlankStorage {
         _key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<Option<Bytes>> {
+        Ok(None)
+    }
+}
+
+impl ModuleBytesStorage for BlankStorage {
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -233,13 +246,17 @@ impl InMemoryStorage {
         }
     }
 
-    pub fn publish_or_overwrite_module(&mut self, module_id: ModuleId, blob: Vec<u8>) {
-        let account = get_or_insert(&mut self.accounts, *module_id.address(), || {
+    /// Adds serialized module to this storage.
+    pub fn add_module_bytes(
+        &mut self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+        bytes: Bytes,
+    ) {
+        let account = get_or_insert(&mut self.accounts, *address, || {
             InMemoryAccountStorage::new()
         });
-        account
-            .modules
-            .insert(module_id.name().to_owned(), blob.into());
+        account.modules.insert(module_name.to_owned(), bytes);
     }
 
     pub fn publish_or_overwrite_resource(
@@ -292,5 +309,18 @@ impl TableResolver for InMemoryStorage {
         _maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<Option<Bytes>> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
+    }
+}
+
+impl ModuleBytesStorage for InMemoryStorage {
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
+        if let Some(account_storage) = self.accounts.get(address) {
+            return Ok(account_storage.modules.get(module_name).cloned());
+        }
+        Ok(None)
     }
 }

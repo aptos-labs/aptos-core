@@ -36,9 +36,7 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, IntoUnsyncModuleStorage, LocalModuleBytesStorage,
-};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, IntoUnsyncModuleStorage};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -57,9 +55,7 @@ fn run_verifier(module: CompiledModule) -> Result<CompiledModule, String> {
 }
 
 // Creates a storage with Move standard library as well as a few additional modules.
-fn storage_with_stdlib_and_modules(
-    additional_modules: Vec<CompiledModule>,
-) -> (InMemoryStorage, LocalModuleBytesStorage) {
+fn storage_with_stdlib_and_modules(additional_modules: Vec<CompiledModule>) -> InMemoryStorage {
     // First, compile and add standard library.
     let (_, compiled_units) = Compiler::from_files(
         move_stdlib::move_stdlib_files(),
@@ -80,16 +76,14 @@ fn storage_with_stdlib_and_modules(
         .collect::<Vec<_>>();
     compiled_modules.extend(additional_modules);
 
-    let mut resource_storage = InMemoryStorage::new();
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+    let mut storage = InMemoryStorage::new();
     for module in &compiled_modules {
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        resource_storage.publish_or_overwrite_module(module.self_id(), blob.clone());
-        module_bytes_storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
+        storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
     }
 
-    (resource_storage, module_bytes_storage)
+    storage
 }
 
 /// This function runs a verified module in the VM runtime
@@ -151,12 +145,12 @@ fn execute_function_in_module(
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let (resource_storage, module_bytes_storage) =
-            storage_with_stdlib_and_modules(vec![module]);
-        let module_storage =
-            module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
+        let storage = storage_with_stdlib_and_modules(vec![module]);
+        let module_storage = storage
+            .clone()
+            .into_unsync_module_storage(vm.runtime_environment());
 
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         let traversal_storage = TraversalStorage::new();
         sess.execute_function_bypass_visibility(
             &module_id,
