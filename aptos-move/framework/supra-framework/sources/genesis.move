@@ -265,6 +265,7 @@ module supra_framework::genesis {
             let account_addr = create_multisig_account_with_balance(supra_framework, owner, additional_owners,
                                 num_signatures_required,metadata_keys,metadata_values,timeout_duration,balance);
             vector::push_back(&mut result,account_addr);
+            account::increment_sequence_number(owner);
             counter = counter + 1;
         };
         result
@@ -274,9 +275,9 @@ module supra_framework::genesis {
                                 metadata_values: vector<vector<u8>>, timeout_duration: u64, balance:u64 ) : address {
 
         
-        let addr = multisig_account::get_next_multisig_account_address(owner);
         assert!(account::exists_at(owner),error::invalid_argument(EACCOUNT_DOES_NOT_EXIST));
         assert!(vector::all(&additional_owners,|ao_addr|{account::exists_at(*ao_addr)}),error::invalid_argument(EACCOUNT_DOES_NOT_EXIST));
+        let addr = multisig_account::get_next_multisig_account_address(owner);
         let owner_signer = create_signer(owner);
         multisig_account::create_with_owners(&owner_signer,additional_owners,num_signatures_required,metadata_keys,metadata_values,timeout_duration);
         supra_coin::mint(supra_framework,addr,balance);   
@@ -809,8 +810,6 @@ module supra_framework::genesis {
 
 	#[test_only]
 	use aptos_std::ed25519;
-    #[test_only]
-    use supra_framework::multisig_account;
 
     #[test_only]
     fun generate_multisig_account(owner: &signer, addition_owner: vector<address>): address {
@@ -1131,6 +1130,58 @@ module supra_framework::genesis {
         assert!(pbo_delegation_pool::delegation_pool_exists(pool_address1), 0);
         assert!(pbo_delegation_pool::delegation_pool_exists(pool_address2), 1);
     }
+    
+    #[test (supra_framework=@0x1, owner1=@0x1234, owner2=@0x2345, owner3=@0x3456)]
+    fun test_create_multisig_account_with_balance(supra_framework: &signer, owner1: address, owner2: address, owner3: address)
+    {
+        setup();
+        initialize_supra_coin(supra_framework);
+        let additional_owners = vector[owner2, owner3];
+        let timeout_duration=600;
+        let num_signatures_required = 2;
+        let metadata_keys: vector<String> =vector::empty();
+        let metadata_values: vector<vector<u8>> = vector::empty();
+        let balance = 10000000000;
+        create_account(supra_framework,owner1,0);
+        create_account(supra_framework,owner2,0);
+        create_account(supra_framework,owner3,0);
+        let addr = create_multisig_account_with_balance(supra_framework,owner1, additional_owners,
+                                num_signatures_required, metadata_keys, metadata_values, timeout_duration,balance);
+        //Ensure it is indeed on-chain multisig account with required threshold
+        assert!(multisig_account::num_signatures_required(addr)==2,1);
+        //Ensure the account is seeded with supplied balance
+        assert!(coin::balance<SupraCoin>(addr)==balance,2);
+        // Ensure that you can transfer out funds from multisig account
+        let multisig_signer = create_signer(addr);
+        coin::transfer<SupraCoin>(&multisig_signer,owner1,balance);
+        assert!(coin::balance<SupraCoin>(owner1)==balance,3);
+    }
+
+    #[test (supra_framework=@0x1, owner1=@0x1234, owner2=@0x2345, owner3=@0x3456)]
+    fun test_create_multisig_account_with_schema(supra_framework: &signer, owner1: address, owner2: address, owner3: address)
+    {
+        setup();
+        initialize_supra_coin(supra_framework);
+        let additional_owners = vector[owner2, owner3];
+        let timeout_duration=600;
+        let num_signatures_required = 2;
+        let metadata_keys: vector<String> =vector::empty();
+        let metadata_values: vector<vector<u8>> = vector::empty();
+        let balance = 10000000000;
+        let num_accounts = 3;
+        create_account(supra_framework,owner1,0);
+        create_account(supra_framework,owner2,0);
+        create_account(supra_framework,owner3,0);
+        let vec_addr = create_multiple_multisig_accounts_with_schema(supra_framework,owner1,
+                        additional_owners,num_signatures_required,metadata_keys,metadata_values,
+                        timeout_duration,balance,num_accounts);
+        //Ensure they are indeed on-chain multisig account with required threshold
+        assert!(vector::all(&vec_addr,|elem| {multisig_account::num_signatures_required(*elem)==2}),1);
+        //Ensure the accounts are seeded with supplied balance
+        assert!(vector::all(&vec_addr,|elem| {coin::balance<SupraCoin>(*elem)==balance}),2);
+        // Ensure that you can transfer out funds from multisig account
+    }
+
 
     #[test(supra_framework = @0x1)]
     fun test_create_vesting_without_staking_pools(supra_framework: &signer) {
