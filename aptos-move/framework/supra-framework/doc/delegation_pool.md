@@ -163,7 +163,6 @@ transferred to A
 -  [Function `get_add_stake_fee`](#0x1_delegation_pool_get_add_stake_fee)
 -  [Function `can_withdraw_pending_inactive`](#0x1_delegation_pool_can_withdraw_pending_inactive)
 -  [Function `calculate_and_update_voter_total_voting_power`](#0x1_delegation_pool_calculate_and_update_voter_total_voting_power)
--  [Function `calculate_and_update_remaining_voting_power`](#0x1_delegation_pool_calculate_and_update_remaining_voting_power)
 -  [Function `calculate_and_update_delegator_voter`](#0x1_delegation_pool_calculate_and_update_delegator_voter)
 -  [Function `calculate_and_update_voting_delegation`](#0x1_delegation_pool_calculate_and_update_voting_delegation)
 -  [Function `get_expected_stake_pool_address`](#0x1_delegation_pool_get_expected_stake_pool_address)
@@ -174,8 +173,6 @@ transferred to A
 -  [Function `initialize_delegation_pool`](#0x1_delegation_pool_initialize_delegation_pool)
 -  [Function `beneficiary_for_operator`](#0x1_delegation_pool_beneficiary_for_operator)
 -  [Function `enable_partial_governance_voting`](#0x1_delegation_pool_enable_partial_governance_voting)
--  [Function `vote`](#0x1_delegation_pool_vote)
--  [Function `create_proposal`](#0x1_delegation_pool_create_proposal)
 -  [Function `assert_owner_cap_exists`](#0x1_delegation_pool_assert_owner_cap_exists)
 -  [Function `assert_delegation_pool_exists`](#0x1_delegation_pool_assert_delegation_pool_exists)
 -  [Function `assert_min_active_balance`](#0x1_delegation_pool_assert_min_active_balance)
@@ -226,7 +223,6 @@ transferred to A
 -  [Function `redeem_inactive_shares`](#0x1_delegation_pool_redeem_inactive_shares)
 -  [Function `calculate_stake_pool_drift`](#0x1_delegation_pool_calculate_stake_pool_drift)
 -  [Function `synchronize_delegation_pool`](#0x1_delegation_pool_synchronize_delegation_pool)
--  [Function `assert_and_update_proposal_used_voting_power`](#0x1_delegation_pool_assert_and_update_proposal_used_voting_power)
 -  [Function `update_governance_records_for_buy_in_active_shares`](#0x1_delegation_pool_update_governance_records_for_buy_in_active_shares)
 -  [Function `update_governance_records_for_buy_in_pending_inactive_shares`](#0x1_delegation_pool_update_governance_records_for_buy_in_pending_inactive_shares)
 -  [Function `update_governanace_records_for_redeem_active_shares`](#0x1_delegation_pool_update_governanace_records_for_redeem_active_shares)
@@ -249,7 +245,6 @@ transferred to A
 <b>use</b> <a href="staking_config.md#0x1_staking_config">0x1::staking_config</a>;
 <b>use</b> <a href="supra_account.md#0x1_supra_account">0x1::supra_account</a>;
 <b>use</b> <a href="supra_coin.md#0x1_supra_coin">0x1::supra_coin</a>;
-<b>use</b> <a href="supra_governance.md#0x1_supra_governance">0x1::supra_governance</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -1678,26 +1673,6 @@ Delegation pool owner capability does not exist at the provided account.
 
 
 
-<a id="0x1_delegation_pool_EINSUFFICIENT_PROPOSER_STAKE"></a>
-
-The voter does not have sufficient stake to create a proposal.
-
-
-<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EINSUFFICIENT_PROPOSER_STAKE">EINSUFFICIENT_PROPOSER_STAKE</a>: u64 = 15;
-</code></pre>
-
-
-
-<a id="0x1_delegation_pool_ENO_VOTING_POWER"></a>
-
-The voter does not have any voting power on this proposal.
-
-
-<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ENO_VOTING_POWER">ENO_VOTING_POWER</a>: u64 = 16;
-</code></pre>
-
-
-
 <a id="0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING"></a>
 
 The stake pool has already voted on the proposal before enabling partial governance voting on this delegation pool.
@@ -1808,6 +1783,16 @@ Delegator's pending_inactive balance cannot be less than <code><a href="delegati
 
 
 
+<a id="0x1_delegation_pool_EINSUFFICIENT_PROPOSER_STAKE"></a>
+
+The voter does not have sufficient stake to create a proposal.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EINSUFFICIENT_PROPOSER_STAKE">EINSUFFICIENT_PROPOSER_STAKE</a>: u64 = 15;
+</code></pre>
+
+
+
 <a id="0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE"></a>
 
 Commission percentage has to be between 0 and <code><a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a></code> - 100%.
@@ -1824,6 +1809,16 @@ There is not enough <code>active</code> stake on the stake pool to <code>unlock<
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK">ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK</a>: u64 = 6;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_ENO_VOTING_POWER"></a>
+
+The voter does not have any voting power on this proposal.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ENO_VOTING_POWER">ENO_VOTING_POWER</a>: u64 = 16;
 </code></pre>
 
 
@@ -2498,46 +2493,6 @@ latest state.
 
 </details>
 
-<a id="0x1_delegation_pool_calculate_and_update_remaining_voting_power"></a>
-
-## Function `calculate_and_update_remaining_voting_power`
-
-Return the remaining voting power of a delegator in a delegation pool on a proposal. This function syncs DelegationPool to the
-latest state.
-
-
-<pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_remaining_voting_power">calculate_and_update_remaining_voting_power</a>(pool_address: <b>address</b>, voter_address: <b>address</b>, proposal_id: u64): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_remaining_voting_power">calculate_and_update_remaining_voting_power</a>(
-    pool_address: <b>address</b>,
-    voter_address: <b>address</b>,
-    proposal_id: u64
-): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
-    <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
-    // If the whole <a href="stake.md#0x1_stake">stake</a> pool <b>has</b> no <a href="voting.md#0x1_voting">voting</a> power(e.g. it <b>has</b> already voted before partial
-    // governance <a href="voting.md#0x1_voting">voting</a> flag is enabled), the delegator also <b>has</b> no <a href="voting.md#0x1_voting">voting</a> power.
-    <b>if</b> (<a href="supra_governance.md#0x1_supra_governance_get_remaining_voting_power">supra_governance::get_remaining_voting_power</a>(pool_address, proposal_id) == 0) {
-        <b>return</b> 0
-    };
-
-    <b>let</b> total_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_total_voting_power">calculate_and_update_voter_total_voting_power</a>(pool_address, voter_address);
-    <b>let</b> governance_records = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-    total_voting_power - <a href="delegation_pool.md#0x1_delegation_pool_get_used_voting_power">get_used_voting_power</a>(governance_records, voter_address, proposal_id)
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_delegation_pool_calculate_and_update_delegator_voter"></a>
 
 ## Function `calculate_and_update_delegator_voter`
@@ -2908,161 +2863,6 @@ The existing voter will be replaced. The function is permissionless.
         create_proposal_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a>&gt;(&stake_pool_signer),
         delegate_voting_power_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a>&gt;(&stake_pool_signer),
     });
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_delegation_pool_vote"></a>
-
-## Function `vote`
-
-Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
-1. The voting period of the proposal hasn't ended.
-2. The delegation pool's lockup period ends after the voting period of the proposal.
-3. The voter still has spare voting power on this proposal.
-4. The delegation pool never votes on the proposal before enabling partial governance voting.
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_vote">vote</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, proposal_id: u64, voting_power: u64, should_pass: bool)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_vote">vote</a>(
-    voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    pool_address: <b>address</b>,
-    proposal_id: u64,
-    voting_power: u64,
-    should_pass: bool
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
-    <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
-    // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation.
-    <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
-
-    <b>let</b> voter_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(voter);
-    <b>let</b> remaining_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_remaining_voting_power">calculate_and_update_remaining_voting_power</a>(
-        pool_address,
-        voter_address,
-        proposal_id
-    );
-    <b>if</b> (voting_power &gt; remaining_voting_power) {
-        voting_power = remaining_voting_power;
-    };
-    <b>assert</b>!(voting_power &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_ENO_VOTING_POWER">ENO_VOTING_POWER</a>));
-
-    <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-    // Check a edge case during the transient period of enabling partial governance <a href="voting.md#0x1_voting">voting</a>.
-    <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(governance_records, pool_address, proposal_id, voting_power);
-    <b>let</b> used_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_used_voting_power">borrow_mut_used_voting_power</a>(governance_records, voter_address, proposal_id);
-    *used_voting_power = *used_voting_power + voting_power;
-
-    <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
-    <a href="supra_governance.md#0x1_supra_governance_partial_vote">supra_governance::partial_vote</a>(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
-
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_Vote">Vote</a> {
-                voter: voter_address,
-                proposal_id,
-                <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-                num_votes: voting_power,
-                should_pass,
-            }
-        );
-    };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> governance_records.vote_events,
-        <a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a> {
-            voter: voter_address,
-            proposal_id,
-            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-            num_votes: voting_power,
-            should_pass,
-        }
-    );
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_delegation_pool_create_proposal"></a>
-
-## Function `create_proposal`
-
-A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
-voting power in THIS delegation pool must be not less than the minimum required voting power specified in
-<code><a href="supra_governance.md#0x1_supra_governance">supra_governance</a>.<b>move</b></code>.
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_create_proposal">create_proposal</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, is_multi_step_proposal: bool)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_create_proposal">create_proposal</a>(
-    voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    pool_address: <b>address</b>,
-    execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    is_multi_step_proposal: bool,
-) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
-    <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
-
-    // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
-    <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
-
-    <b>let</b> voter_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(voter);
-    <b>let</b> pool = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-    <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-    <b>let</b> total_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegated_votes">calculate_and_update_delegated_votes</a>(pool, governance_records, voter_addr);
-    <b>assert</b>!(
-        total_voting_power &gt;= <a href="supra_governance.md#0x1_supra_governance_get_required_proposer_stake">supra_governance::get_required_proposer_stake</a>(),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EINSUFFICIENT_PROPOSER_STAKE">EINSUFFICIENT_PROPOSER_STAKE</a>));
-    <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
-    <b>let</b> proposal_id = <a href="supra_governance.md#0x1_supra_governance_create_proposal_v2_impl">supra_governance::create_proposal_v2_impl</a>(
-        &pool_signer,
-        pool_address,
-        execution_hash,
-        metadata_location,
-        metadata_hash,
-        is_multi_step_proposal,
-    );
-
-    <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_CreateProposal">CreateProposal</a> {
-                proposal_id,
-                voter: voter_addr,
-                <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-            }
-        );
-    };
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> governance_records.create_proposal_events,
-        <a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a> {
-            proposal_id,
-            voter: voter_addr,
-            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-        }
-    );
 }
 </code></pre>
 
@@ -5126,50 +4926,6 @@ shares pools, assign commission to operator and eventually prepare delegation po
             pool_address
         ).commission_percentage_next_lockup_cycle;
     }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_delegation_pool_assert_and_update_proposal_used_voting_power"></a>
-
-## Function `assert_and_update_proposal_used_voting_power`
-
-
-
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, pool_address: <b>address</b>, proposal_id: u64, voting_power: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(
-    governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, pool_address: <b>address</b>, proposal_id: u64, voting_power: u64
-) {
-    <b>let</b> stake_pool_remaining_voting_power = <a href="supra_governance.md#0x1_supra_governance_get_remaining_voting_power">supra_governance::get_remaining_voting_power</a>(pool_address, proposal_id);
-    <b>let</b> stake_pool_used_voting_power = <a href="supra_governance.md#0x1_supra_governance_get_voting_power">supra_governance::get_voting_power</a>(
-        pool_address
-    ) - stake_pool_remaining_voting_power;
-    <b>let</b> proposal_used_voting_power = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut_with_default">smart_table::borrow_mut_with_default</a>(
-        &<b>mut</b> governance_records.votes_per_proposal,
-        proposal_id,
-        0
-    );
-    // A edge case: Before enabling partial governance <a href="voting.md#0x1_voting">voting</a> on a delegation pool, the delegation pool <b>has</b>
-    // a voter which can vote <b>with</b> all <a href="voting.md#0x1_voting">voting</a> power of this delegation pool. If the voter votes on a proposal after
-    // partial governance <a href="voting.md#0x1_voting">voting</a> flag is enabled, the delegation pool doesn't have enough <a href="voting.md#0x1_voting">voting</a> power on this
-    // proposal for all the delegators. To be fair, no one can vote on this proposal through this delegation pool.
-    // To detect this case, check <b>if</b> the <a href="stake.md#0x1_stake">stake</a> pool had used <a href="voting.md#0x1_voting">voting</a> power not through <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> <b>module</b>.
-    <b>assert</b>!(
-        stake_pool_used_voting_power == *proposal_used_voting_power,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING">EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING</a>)
-    );
-    *proposal_used_voting_power = *proposal_used_voting_power + voting_power;
 }
 </code></pre>
 

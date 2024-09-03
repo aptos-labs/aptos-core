@@ -270,17 +270,6 @@ pub enum EntryFunctionCall {
         delegator_address: AccountAddress,
     },
 
-    /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
-    /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
-    /// `supra_governance.move`.
-    DelegationPoolCreateProposal {
-        pool_address: AccountAddress,
-        execution_hash: Vec<u8>,
-        metadata_location: Vec<u8>,
-        metadata_hash: Vec<u8>,
-        is_multi_step_proposal: bool,
-    },
-
     /// Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
     /// this change won't take effects until the next lockup period.
     DelegationPoolDelegateVotingPower {
@@ -359,18 +348,6 @@ pub enum EntryFunctionCall {
     /// Allows an owner to update the commission percentage for the operator of the underlying stake pool.
     DelegationPoolUpdateCommissionPercentage {
         new_commission_percentage: u64,
-    },
-
-    /// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
-    /// 1. The voting period of the proposal hasn't ended.
-    /// 2. The delegation pool's lockup period ends after the voting period of the proposal.
-    /// 3. The voter still has spare voting power on this proposal.
-    /// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
-    DelegationPoolVote {
-        pool_address: AccountAddress,
-        proposal_id: u64,
-        voting_power: u64,
-        should_pass: bool,
     },
 
     /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
@@ -639,17 +616,6 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
-    /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
-    /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
-    /// `supra_governance.move`.
-    PboDelegationPoolCreateProposal {
-        pool_address: AccountAddress,
-        execution_hash: Vec<u8>,
-        metadata_location: Vec<u8>,
-        metadata_hash: Vec<u8>,
-        is_multi_step_proposal: bool,
-    },
-
     /// Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
     /// this change won't take effects until the next lockup period.
     PboDelegationPoolDelegateVotingPower {
@@ -713,18 +679,6 @@ pub enum EntryFunctionCall {
     /// Allows an owner to update the commission percentage for the operator of the underlying stake pool.
     PboDelegationPoolUpdateCommissionPercentage {
         new_commission_percentage: u64,
-    },
-
-    /// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
-    /// 1. The voting period of the proposal hasn't ended.
-    /// 2. The delegation pool's lockup period ends after the voting period of the proposal.
-    /// 3. The voter still has spare voting power on this proposal.
-    /// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
-    PboDelegationPoolVote {
-        pool_address: AccountAddress,
-        proposal_id: u64,
-        voting_power: u64,
-        should_pass: bool,
     },
 
     /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
@@ -1012,48 +966,8 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    SupraGovernanceAddApprovedScriptHashScript {
-        proposal_id: u64,
-    },
-
     SupraGovernanceAddSupraApprovedScriptHashScript {
         proposal_id: u64,
-    },
-
-    /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
-    SupraGovernanceBatchPartialVote {
-        stake_pools: Vec<AccountAddress>,
-        proposal_id: u64,
-        voting_power: u64,
-        should_pass: bool,
-    },
-
-    /// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
-    SupraGovernanceBatchVote {
-        stake_pools: Vec<AccountAddress>,
-        proposal_id: u64,
-        should_pass: bool,
-    },
-
-    /// Create a single-step proposal with the backing `stake_pool`.
-    /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-    /// only the exact script with matching hash can be successfully executed.
-    SupraGovernanceCreateProposal {
-        stake_pool: AccountAddress,
-        execution_hash: Vec<u8>,
-        metadata_location: Vec<u8>,
-        metadata_hash: Vec<u8>,
-    },
-
-    /// Create a single-step or multi-step proposal with the backing `stake_pool`.
-    /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-    /// only the exact script with matching hash can be successfully executed.
-    SupraGovernanceCreateProposalV2 {
-        stake_pool: AccountAddress,
-        execution_hash: Vec<u8>,
-        metadata_location: Vec<u8>,
-        metadata_hash: Vec<u8>,
-        is_multi_step_proposal: bool,
     },
 
     /// Change epoch immediately.
@@ -1067,14 +981,6 @@ pub enum EntryFunctionCall {
     /// `force_end_epoch()` equivalent but only called in testnet,
     /// where the core resources account exists and has been granted power to mint Aptos coins.
     SupraGovernanceForceEndEpochTestOnly {},
-
-    /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
-    SupraGovernancePartialVote {
-        stake_pool: AccountAddress,
-        proposal_id: u64,
-        voting_power: u64,
-        should_pass: bool,
-    },
 
     /// Manually reconfigure. Called at the end of a governance txn that alters on-chain configs.
     ///
@@ -1108,13 +1014,6 @@ pub enum EntryFunctionCall {
 
     /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
     SupraGovernanceSupraVote {
-        proposal_id: u64,
-        should_pass: bool,
-    },
-
-    /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
-    SupraGovernanceVote {
-        stake_pool: AccountAddress,
         proposal_id: u64,
         should_pass: bool,
     },
@@ -1475,19 +1374,6 @@ impl EntryFunctionCall {
             DelegationPoolAllowlistDelegator { delegator_address } => {
                 delegation_pool_allowlist_delegator(delegator_address)
             },
-            DelegationPoolCreateProposal {
-                pool_address,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-                is_multi_step_proposal,
-            } => delegation_pool_create_proposal(
-                pool_address,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-                is_multi_step_proposal,
-            ),
             DelegationPoolDelegateVotingPower {
                 pool_address,
                 new_voter,
@@ -1537,12 +1423,6 @@ impl EntryFunctionCall {
             DelegationPoolUpdateCommissionPercentage {
                 new_commission_percentage,
             } => delegation_pool_update_commission_percentage(new_commission_percentage),
-            DelegationPoolVote {
-                pool_address,
-                proposal_id,
-                voting_power,
-                should_pass,
-            } => delegation_pool_vote(pool_address, proposal_id, voting_power, should_pass),
             DelegationPoolWithdraw {
                 pool_address,
                 amount,
@@ -1733,19 +1613,6 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => object_code_deployment_publish(metadata_serialized, code),
-            PboDelegationPoolCreateProposal {
-                pool_address,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-                is_multi_step_proposal,
-            } => pbo_delegation_pool_create_proposal(
-                pool_address,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-                is_multi_step_proposal,
-            ),
             PboDelegationPoolDelegateVotingPower {
                 pool_address,
                 new_voter,
@@ -1781,12 +1648,6 @@ impl EntryFunctionCall {
             PboDelegationPoolUpdateCommissionPercentage {
                 new_commission_percentage,
             } => pbo_delegation_pool_update_commission_percentage(new_commission_percentage),
-            PboDelegationPoolVote {
-                pool_address,
-                proposal_id,
-                voting_power,
-                should_pass,
-            } => pbo_delegation_pool_vote(pool_address, proposal_id, voting_power, should_pass),
             PboDelegationPoolWithdraw {
                 pool_address,
                 amount,
@@ -1950,60 +1811,11 @@ impl EntryFunctionCall {
             SupraCoinClaimMintCapability {} => supra_coin_claim_mint_capability(),
             SupraCoinDelegateMintCapability { to } => supra_coin_delegate_mint_capability(to),
             SupraCoinMint { dst_addr, amount } => supra_coin_mint(dst_addr, amount),
-            SupraGovernanceAddApprovedScriptHashScript { proposal_id } => {
-                supra_governance_add_approved_script_hash_script(proposal_id)
-            },
             SupraGovernanceAddSupraApprovedScriptHashScript { proposal_id } => {
                 supra_governance_add_supra_approved_script_hash_script(proposal_id)
             },
-            SupraGovernanceBatchPartialVote {
-                stake_pools,
-                proposal_id,
-                voting_power,
-                should_pass,
-            } => supra_governance_batch_partial_vote(
-                stake_pools,
-                proposal_id,
-                voting_power,
-                should_pass,
-            ),
-            SupraGovernanceBatchVote {
-                stake_pools,
-                proposal_id,
-                should_pass,
-            } => supra_governance_batch_vote(stake_pools, proposal_id, should_pass),
-            SupraGovernanceCreateProposal {
-                stake_pool,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-            } => supra_governance_create_proposal(
-                stake_pool,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-            ),
-            SupraGovernanceCreateProposalV2 {
-                stake_pool,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-                is_multi_step_proposal,
-            } => supra_governance_create_proposal_v2(
-                stake_pool,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-                is_multi_step_proposal,
-            ),
             SupraGovernanceForceEndEpoch {} => supra_governance_force_end_epoch(),
             SupraGovernanceForceEndEpochTestOnly {} => supra_governance_force_end_epoch_test_only(),
-            SupraGovernancePartialVote {
-                stake_pool,
-                proposal_id,
-                voting_power,
-                should_pass,
-            } => supra_governance_partial_vote(stake_pool, proposal_id, voting_power, should_pass),
             SupraGovernanceReconfigure {} => supra_governance_reconfigure(),
             SupraGovernanceSupraCreateProposal {
                 execution_hash,
@@ -2029,11 +1841,6 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => supra_governance_supra_vote(proposal_id, should_pass),
-            SupraGovernanceVote {
-                stake_pool,
-                proposal_id,
-                should_pass,
-            } => supra_governance_vote(stake_pool, proposal_id, should_pass),
             TransactionFeeConvertToAptosFaBurnRef {} => {
                 transaction_fee_convert_to_aptos_fa_burn_ref()
             },
@@ -2781,36 +2588,6 @@ pub fn delegation_pool_allowlist_delegator(
     ))
 }
 
-/// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
-/// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
-/// `supra_governance.move`.
-pub fn delegation_pool_create_proposal(
-    pool_address: AccountAddress,
-    execution_hash: Vec<u8>,
-    metadata_location: Vec<u8>,
-    metadata_hash: Vec<u8>,
-    is_multi_step_proposal: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("delegation_pool").to_owned(),
-        ),
-        ident_str!("create_proposal").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&pool_address).unwrap(),
-            bcs::to_bytes(&execution_hash).unwrap(),
-            bcs::to_bytes(&metadata_location).unwrap(),
-            bcs::to_bytes(&metadata_hash).unwrap(),
-            bcs::to_bytes(&is_multi_step_proposal).unwrap(),
-        ],
-    ))
-}
-
 /// Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
 /// this change won't take effects until the next lockup period.
 pub fn delegation_pool_delegate_voting_power(
@@ -3073,36 +2850,6 @@ pub fn delegation_pool_update_commission_percentage(
         ident_str!("update_commission_percentage").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_commission_percentage).unwrap()],
-    ))
-}
-
-/// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
-/// 1. The voting period of the proposal hasn't ended.
-/// 2. The delegation pool's lockup period ends after the voting period of the proposal.
-/// 3. The voter still has spare voting power on this proposal.
-/// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
-pub fn delegation_pool_vote(
-    pool_address: AccountAddress,
-    proposal_id: u64,
-    voting_power: u64,
-    should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("delegation_pool").to_owned(),
-        ),
-        ident_str!("vote").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&pool_address).unwrap(),
-            bcs::to_bytes(&proposal_id).unwrap(),
-            bcs::to_bytes(&voting_power).unwrap(),
-            bcs::to_bytes(&should_pass).unwrap(),
-        ],
     ))
 }
 
@@ -3862,36 +3609,6 @@ pub fn object_code_deployment_publish(
     ))
 }
 
-/// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
-/// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
-/// `supra_governance.move`.
-pub fn pbo_delegation_pool_create_proposal(
-    pool_address: AccountAddress,
-    execution_hash: Vec<u8>,
-    metadata_location: Vec<u8>,
-    metadata_hash: Vec<u8>,
-    is_multi_step_proposal: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("pbo_delegation_pool").to_owned(),
-        ),
-        ident_str!("create_proposal").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&pool_address).unwrap(),
-            bcs::to_bytes(&execution_hash).unwrap(),
-            bcs::to_bytes(&metadata_location).unwrap(),
-            bcs::to_bytes(&metadata_hash).unwrap(),
-            bcs::to_bytes(&is_multi_step_proposal).unwrap(),
-        ],
-    ))
-}
-
 /// Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
 /// this change won't take effects until the next lockup period.
 pub fn pbo_delegation_pool_delegate_voting_power(
@@ -4090,36 +3807,6 @@ pub fn pbo_delegation_pool_update_commission_percentage(
         ident_str!("update_commission_percentage").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_commission_percentage).unwrap()],
-    ))
-}
-
-/// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
-/// 1. The voting period of the proposal hasn't ended.
-/// 2. The delegation pool's lockup period ends after the voting period of the proposal.
-/// 3. The voter still has spare voting power on this proposal.
-/// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
-pub fn pbo_delegation_pool_vote(
-    pool_address: AccountAddress,
-    proposal_id: u64,
-    voting_power: u64,
-    should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("pbo_delegation_pool").to_owned(),
-        ),
-        ident_str!("vote").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&pool_address).unwrap(),
-            bcs::to_bytes(&proposal_id).unwrap(),
-            bcs::to_bytes(&voting_power).unwrap(),
-            bcs::to_bytes(&should_pass).unwrap(),
-        ],
     ))
 }
 
@@ -5051,21 +4738,6 @@ pub fn supra_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayl
     ))
 }
 
-pub fn supra_governance_add_approved_script_hash_script(proposal_id: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("supra_governance").to_owned(),
-        ),
-        ident_str!("add_approved_script_hash_script").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&proposal_id).unwrap()],
-    ))
-}
-
 pub fn supra_governance_add_supra_approved_script_hash_script(
     proposal_id: u64,
 ) -> TransactionPayload {
@@ -5080,114 +4752,6 @@ pub fn supra_governance_add_supra_approved_script_hash_script(
         ident_str!("add_supra_approved_script_hash_script").to_owned(),
         vec![],
         vec![bcs::to_bytes(&proposal_id).unwrap()],
-    ))
-}
-
-/// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
-pub fn supra_governance_batch_partial_vote(
-    stake_pools: Vec<AccountAddress>,
-    proposal_id: u64,
-    voting_power: u64,
-    should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("supra_governance").to_owned(),
-        ),
-        ident_str!("batch_partial_vote").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&stake_pools).unwrap(),
-            bcs::to_bytes(&proposal_id).unwrap(),
-            bcs::to_bytes(&voting_power).unwrap(),
-            bcs::to_bytes(&should_pass).unwrap(),
-        ],
-    ))
-}
-
-/// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
-pub fn supra_governance_batch_vote(
-    stake_pools: Vec<AccountAddress>,
-    proposal_id: u64,
-    should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("supra_governance").to_owned(),
-        ),
-        ident_str!("batch_vote").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&stake_pools).unwrap(),
-            bcs::to_bytes(&proposal_id).unwrap(),
-            bcs::to_bytes(&should_pass).unwrap(),
-        ],
-    ))
-}
-
-/// Create a single-step proposal with the backing `stake_pool`.
-/// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-/// only the exact script with matching hash can be successfully executed.
-pub fn supra_governance_create_proposal(
-    stake_pool: AccountAddress,
-    execution_hash: Vec<u8>,
-    metadata_location: Vec<u8>,
-    metadata_hash: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("supra_governance").to_owned(),
-        ),
-        ident_str!("create_proposal").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&stake_pool).unwrap(),
-            bcs::to_bytes(&execution_hash).unwrap(),
-            bcs::to_bytes(&metadata_location).unwrap(),
-            bcs::to_bytes(&metadata_hash).unwrap(),
-        ],
-    ))
-}
-
-/// Create a single-step or multi-step proposal with the backing `stake_pool`.
-/// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-/// only the exact script with matching hash can be successfully executed.
-pub fn supra_governance_create_proposal_v2(
-    stake_pool: AccountAddress,
-    execution_hash: Vec<u8>,
-    metadata_location: Vec<u8>,
-    metadata_hash: Vec<u8>,
-    is_multi_step_proposal: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("supra_governance").to_owned(),
-        ),
-        ident_str!("create_proposal_v2").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&stake_pool).unwrap(),
-            bcs::to_bytes(&execution_hash).unwrap(),
-            bcs::to_bytes(&metadata_location).unwrap(),
-            bcs::to_bytes(&metadata_hash).unwrap(),
-            bcs::to_bytes(&is_multi_step_proposal).unwrap(),
-        ],
     ))
 }
 
@@ -5226,32 +4790,6 @@ pub fn supra_governance_force_end_epoch_test_only() -> TransactionPayload {
         ident_str!("force_end_epoch_test_only").to_owned(),
         vec![],
         vec![],
-    ))
-}
-
-/// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
-pub fn supra_governance_partial_vote(
-    stake_pool: AccountAddress,
-    proposal_id: u64,
-    voting_power: u64,
-    should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("supra_governance").to_owned(),
-        ),
-        ident_str!("partial_vote").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&stake_pool).unwrap(),
-            bcs::to_bytes(&proposal_id).unwrap(),
-            bcs::to_bytes(&voting_power).unwrap(),
-            bcs::to_bytes(&should_pass).unwrap(),
-        ],
     ))
 }
 
@@ -5346,30 +4884,6 @@ pub fn supra_governance_supra_vote(proposal_id: u64, should_pass: bool) -> Trans
         ident_str!("supra_vote").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&proposal_id).unwrap(),
-            bcs::to_bytes(&should_pass).unwrap(),
-        ],
-    ))
-}
-
-/// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
-pub fn supra_governance_vote(
-    stake_pool: AccountAddress,
-    proposal_id: u64,
-    should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("supra_governance").to_owned(),
-        ),
-        ident_str!("vote").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
         ],
@@ -6298,22 +5812,6 @@ mod decoder {
         }
     }
 
-    pub fn delegation_pool_create_proposal(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::DelegationPoolCreateProposal {
-                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
-                metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
-                metadata_hash: bcs::from_bytes(script.args().get(3)?).ok()?,
-                is_multi_step_proposal: bcs::from_bytes(script.args().get(4)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn delegation_pool_delegate_voting_power(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6479,19 +5977,6 @@ mod decoder {
                     new_commission_percentage: bcs::from_bytes(script.args().get(0)?).ok()?,
                 },
             )
-        } else {
-            None
-        }
-    }
-
-    pub fn delegation_pool_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::DelegationPoolVote {
-                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
-                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
-                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
         } else {
             None
         }
@@ -6932,22 +6417,6 @@ mod decoder {
         }
     }
 
-    pub fn pbo_delegation_pool_create_proposal(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::PboDelegationPoolCreateProposal {
-                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
-                metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
-                metadata_hash: bcs::from_bytes(script.args().get(3)?).ok()?,
-                is_multi_step_proposal: bcs::from_bytes(script.args().get(4)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn pbo_delegation_pool_delegate_voting_power(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7074,19 +6543,6 @@ mod decoder {
                     new_commission_percentage: bcs::from_bytes(script.args().get(0)?).ok()?,
                 },
             )
-        } else {
-            None
-        }
-    }
-
-    pub fn pbo_delegation_pool_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::PboDelegationPoolVote {
-                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
-                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
-                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
         } else {
             None
         }
@@ -7643,20 +7099,6 @@ mod decoder {
         }
     }
 
-    pub fn supra_governance_add_approved_script_hash_script(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::SupraGovernanceAddApprovedScriptHashScript {
-                    proposal_id: bcs::from_bytes(script.args().get(0)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
     pub fn supra_governance_add_supra_approved_script_hash_script(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7666,64 +7108,6 @@ mod decoder {
                     proposal_id: bcs::from_bytes(script.args().get(0)?).ok()?,
                 },
             )
-        } else {
-            None
-        }
-    }
-
-    pub fn supra_governance_batch_partial_vote(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::SupraGovernanceBatchPartialVote {
-                stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
-                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
-                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn supra_governance_batch_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::SupraGovernanceBatchVote {
-                stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
-                should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn supra_governance_create_proposal(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::SupraGovernanceCreateProposal {
-                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
-                execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
-                metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
-                metadata_hash: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn supra_governance_create_proposal_v2(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::SupraGovernanceCreateProposalV2 {
-                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
-                execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
-                metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
-                metadata_hash: bcs::from_bytes(script.args().get(3)?).ok()?,
-                is_multi_step_proposal: bcs::from_bytes(script.args().get(4)?).ok()?,
-            })
         } else {
             None
         }
@@ -7744,21 +7128,6 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::SupraGovernanceForceEndEpochTestOnly {})
-        } else {
-            None
-        }
-    }
-
-    pub fn supra_governance_partial_vote(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::SupraGovernancePartialVote {
-                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
-                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
-                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
         } else {
             None
         }
@@ -7806,18 +7175,6 @@ mod decoder {
             Some(EntryFunctionCall::SupraGovernanceSupraVote {
                 proposal_id: bcs::from_bytes(script.args().get(0)?).ok()?,
                 should_pass: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn supra_governance_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::SupraGovernanceVote {
-                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
-                should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None
@@ -8287,10 +7644,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::delegation_pool_allowlist_delegator),
         );
         map.insert(
-            "delegation_pool_create_proposal".to_string(),
-            Box::new(decoder::delegation_pool_create_proposal),
-        );
-        map.insert(
             "delegation_pool_delegate_voting_power".to_string(),
             Box::new(decoder::delegation_pool_delegate_voting_power),
         );
@@ -8345,10 +7698,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_update_commission_percentage".to_string(),
             Box::new(decoder::delegation_pool_update_commission_percentage),
-        );
-        map.insert(
-            "delegation_pool_vote".to_string(),
-            Box::new(decoder::delegation_pool_vote),
         );
         map.insert(
             "delegation_pool_withdraw".to_string(),
@@ -8479,10 +7828,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::object_code_deployment_publish),
         );
         map.insert(
-            "pbo_delegation_pool_create_proposal".to_string(),
-            Box::new(decoder::pbo_delegation_pool_create_proposal),
-        );
-        map.insert(
             "pbo_delegation_pool_delegate_voting_power".to_string(),
             Box::new(decoder::pbo_delegation_pool_delegate_voting_power),
         );
@@ -8521,10 +7866,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "pbo_delegation_pool_update_commission_percentage".to_string(),
             Box::new(decoder::pbo_delegation_pool_update_commission_percentage),
-        );
-        map.insert(
-            "pbo_delegation_pool_vote".to_string(),
-            Box::new(decoder::pbo_delegation_pool_vote),
         );
         map.insert(
             "pbo_delegation_pool_withdraw".to_string(),
@@ -8708,28 +8049,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::supra_coin_mint),
         );
         map.insert(
-            "supra_governance_add_approved_script_hash_script".to_string(),
-            Box::new(decoder::supra_governance_add_approved_script_hash_script),
-        );
-        map.insert(
             "supra_governance_add_supra_approved_script_hash_script".to_string(),
             Box::new(decoder::supra_governance_add_supra_approved_script_hash_script),
-        );
-        map.insert(
-            "supra_governance_batch_partial_vote".to_string(),
-            Box::new(decoder::supra_governance_batch_partial_vote),
-        );
-        map.insert(
-            "supra_governance_batch_vote".to_string(),
-            Box::new(decoder::supra_governance_batch_vote),
-        );
-        map.insert(
-            "supra_governance_create_proposal".to_string(),
-            Box::new(decoder::supra_governance_create_proposal),
-        );
-        map.insert(
-            "supra_governance_create_proposal_v2".to_string(),
-            Box::new(decoder::supra_governance_create_proposal_v2),
         );
         map.insert(
             "supra_governance_force_end_epoch".to_string(),
@@ -8738,10 +8059,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "supra_governance_force_end_epoch_test_only".to_string(),
             Box::new(decoder::supra_governance_force_end_epoch_test_only),
-        );
-        map.insert(
-            "supra_governance_partial_vote".to_string(),
-            Box::new(decoder::supra_governance_partial_vote),
         );
         map.insert(
             "supra_governance_reconfigure".to_string(),
@@ -8758,10 +8075,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "supra_governance_supra_vote".to_string(),
             Box::new(decoder::supra_governance_supra_vote),
-        );
-        map.insert(
-            "supra_governance_vote".to_string(),
-            Box::new(decoder::supra_governance_vote),
         );
         map.insert(
             "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),

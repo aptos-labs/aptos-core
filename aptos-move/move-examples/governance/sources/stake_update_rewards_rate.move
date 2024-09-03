@@ -4,7 +4,7 @@ script {
     use supra_framework::staking_config;
 
     fun main(proposal_id: u64) {
-        let framework_signer = supra_governance::resolve(proposal_id, @supra_framework);
+        let framework_signer = supra_governance::supra_resolve(proposal_id, @supra_framework);
         let num_seconds_in_a_year = 365 * 24 * 60 * 60;
         let epoch_duration_secs = block::get_epoch_interval_secs();
         let num_epochs_in_a_year = num_seconds_in_a_year / epoch_duration_secs;

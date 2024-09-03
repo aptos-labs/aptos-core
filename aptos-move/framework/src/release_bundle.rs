@@ -219,7 +219,7 @@ impl ReleasePackage {
             writer.indent();
             emitln!(
                 writer,
-                "let framework_signer = supra_governance::resolve(proposal_id, @{});",
+                "let framework_signer = supra_governance::supra_resolve(proposal_id, @{});",
                 for_address
             );
         } else {

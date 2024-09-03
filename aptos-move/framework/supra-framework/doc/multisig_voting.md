@@ -595,6 +595,16 @@ Cannot vote if the specified multi-step proposal is in execution.
 
 
 
+<a id="0x1_multisig_voting_ENOT_MULTISIG_OWNER"></a>
+
+Not a multisig owner authorized to vote.
+
+
+<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_ENOT_MULTISIG_OWNER">ENOT_MULTISIG_OWNER</a>: u64 = 16;
+</code></pre>
+
+
+
 <a id="0x1_multisig_voting_EPROPOSAL_ALREADY_RESOLVED"></a>
 
 Proposal cannot be resolved more than once
@@ -675,6 +685,46 @@ If we call <code><a href="multisig_voting.md#0x1_multisig_voting_resolve_proposa
 
 
 
+<a id="0x1_multisig_voting_ETHRESHOLD_EXCEEDS_VOTERS"></a>
+
+Threshold should not exceeds voters
+
+
+<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_ETHRESHOLD_EXCEEDS_VOTERS">ETHRESHOLD_EXCEEDS_VOTERS</a>: u64 = 15;
+</code></pre>
+
+
+
+<a id="0x1_multisig_voting_ETHRESHOLD_MUST_BE_GREATER_THAN_ONE"></a>
+
+Threshold value must be greater than 1
+
+
+<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_ETHRESHOLD_MUST_BE_GREATER_THAN_ONE">ETHRESHOLD_MUST_BE_GREATER_THAN_ONE</a>: u64 = 17;
+</code></pre>
+
+
+
+<a id="0x1_multisig_voting_EVOTE_DUPLICATE_VOTE"></a>
+
+Cannot vote duplicate
+
+
+<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_EVOTE_DUPLICATE_VOTE">EVOTE_DUPLICATE_VOTE</a>: u64 = 13;
+</code></pre>
+
+
+
+<a id="0x1_multisig_voting_EVOTE_OVERFLOW"></a>
+
+Vote is overflow
+
+
+<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_EVOTE_OVERFLOW">EVOTE_OVERFLOW</a>: u64 = 14;
+</code></pre>
+
+
+
 <a id="0x1_multisig_voting_EVOTING_FORUM_ALREADY_REGISTERED"></a>
 
 Voting forum has already been registered.
@@ -740,56 +790,6 @@ Key used to track the resolvable time in the proposal's metadata.
 
 
 <pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [82, 69, 83, 79, 76, 86, 65, 66, 76, 69, 95, 84, 73, 77, 69, 95, 77, 69, 84, 65, 68, 65, 84, 65, 95, 75, 69, 89];
-</code></pre>
-
-
-
-<a id="0x1_multisig_voting_ENOT_MULTISIG_OWNER"></a>
-
-Not a multisig owner authorized to vote.
-
-
-<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_ENOT_MULTISIG_OWNER">ENOT_MULTISIG_OWNER</a>: u64 = 16;
-</code></pre>
-
-
-
-<a id="0x1_multisig_voting_ETHRESHOLD_EXCEEDS_VOTERS"></a>
-
-Threshold should not exceeds voters
-
-
-<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_ETHRESHOLD_EXCEEDS_VOTERS">ETHRESHOLD_EXCEEDS_VOTERS</a>: u64 = 15;
-</code></pre>
-
-
-
-<a id="0x1_multisig_voting_ETHRESHOLD_MUST_BE_GREATER_THAN_ONE"></a>
-
-Threshold value must be greater than 1
-
-
-<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_ETHRESHOLD_MUST_BE_GREATER_THAN_ONE">ETHRESHOLD_MUST_BE_GREATER_THAN_ONE</a>: u64 = 17;
-</code></pre>
-
-
-
-<a id="0x1_multisig_voting_EVOTE_DUPLICATE_VOTE"></a>
-
-Cannot vote duplicate
-
-
-<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_EVOTE_DUPLICATE_VOTE">EVOTE_DUPLICATE_VOTE</a>: u64 = 13;
-</code></pre>
-
-
-
-<a id="0x1_multisig_voting_EVOTE_OVERFLOW"></a>
-
-Vote is overflow
-
-
-<pre><code><b>const</b> <a href="multisig_voting.md#0x1_multisig_voting_EVOTE_OVERFLOW">EVOTE_OVERFLOW</a>: u64 = 14;
 </code></pre>
 
 
