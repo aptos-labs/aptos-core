@@ -537,6 +537,8 @@ impl BufferManager {
             ResetSignal::TargetRound(round) => {
                 self.highest_committed_round = round;
                 self.latest_round = round;
+
+                let _ = self.drain_pending_commit_proof_till(round);
             },
         }
 
