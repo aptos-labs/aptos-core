@@ -326,7 +326,7 @@ pub fn sort_peers_by_subscription_optimality(
     sorted_peers
 }
 
-/// Returns true iff the peer metadata indicates support for the consensus observer
+/// Returns true iff the peer metadata indicates support for consensus observer
 fn supports_consensus_observer(peer_metadata: &PeerMetadata) -> bool {
     peer_metadata.supports_protocol(ProtocolId::ConsensusObserver)
         && peer_metadata.supports_protocol(ProtocolId::ConsensusObserverRpc)

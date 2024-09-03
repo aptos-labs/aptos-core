@@ -42,6 +42,7 @@ pub const STORAGE_SYNCHRONIZER_STATE_SNAPSHOT_RECEIVER: &str = "state_snapshot_r
 pub enum ExecutingComponent {
     Bootstrapper,
     Consensus,
+    ConsensusObserver,
     ContinuousSyncer,
 }
 
@@ -50,6 +51,7 @@ impl ExecutingComponent {
         match self {
             ExecutingComponent::Bootstrapper => "bootstrapper",
             ExecutingComponent::Consensus => "consensus",
+            ExecutingComponent::ConsensusObserver => "consensus_observer",
             ExecutingComponent::ContinuousSyncer => "continuous_syncer",
         }
     }
