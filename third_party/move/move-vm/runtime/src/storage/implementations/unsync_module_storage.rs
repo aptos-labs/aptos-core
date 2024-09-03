@@ -222,7 +222,7 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
         let partially_verified_module = self.runtime_environment.build_partially_verified_module(
             module,
             module_size,
-            module_hash,
+            &module_hash,
         )?;
 
         // Step 2: visit all dependencies and collect them for later verification.

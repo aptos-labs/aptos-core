@@ -14,7 +14,6 @@ better_any = { workspace = true }
 bytes = { workspace = true }
 itertools = { workspace = true }
 move-binary-format = { path = "../../../move-binary-format" }
-# move-command-line-common = { path = "../../../move-command-line-common" }
 move-compiler = { path = "../../../move-compiler" }
 move-core-types = { path = "../../../move-core/types" }
 move-vm-runtime = { path = "../../../move-vm/runtime", features = ["debugging"] }
