@@ -101,8 +101,8 @@ impl ModuleStorageEntry {
     }
 
     /// Returns the hash of the given module.
-    pub fn hash(&self) -> [u8; 32] {
-        self.hash
+    pub fn hash(&self) -> &[u8; 32] {
+        &self.hash
     }
 
     /// Returns the state value metadata of the given module.

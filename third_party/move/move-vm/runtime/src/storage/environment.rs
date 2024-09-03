@@ -5,11 +5,13 @@ use crate::{
     config::VMConfig,
     loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
-    storage::{struct_name_index_map::StructNameIndexMap, verifier::VerifierExtension},
+    storage::{
+        struct_name_index_map::StructNameIndexMap, verified_module_cache::VERIFIED_MODULES_V2,
+        verifier::VerifierExtension,
+    },
     Module, Script,
 };
 use bytes::Bytes;
-use lazy_static::lazy_static;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{Location, PartialVMError, VMResult},
@@ -22,7 +24,6 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use parking_lot::Mutex;
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
@@ -168,9 +169,9 @@ impl RuntimeEnvironment {
         &self,
         compiled_module: Arc<CompiledModule>,
         module_size: usize,
-        module_hash: [u8; 32],
+        module_hash: &[u8; 32],
     ) -> VMResult<PartiallyVerifiedModule> {
-        if !VERIFIED_MODULES_V2.contains(&module_hash) {
+        if !VERIFIED_MODULES_V2.contains(module_hash) {
             // For regular execution, we cache already verified modules. Note
             // that this even caches verification for the published modules.
             // This should be ok because as long as the hash is the same, the
@@ -186,7 +187,7 @@ impl RuntimeEnvironment {
                 verifier.verify_module(compiled_module.as_ref())?;
             }
 
-            VERIFIED_MODULES_V2.put(module_hash);
+            VERIFIED_MODULES_V2.put(*module_hash);
         }
 
         Ok(PartiallyVerifiedModule(compiled_module, module_size))
@@ -268,41 +269,4 @@ impl RuntimeEnvironment {
 /// Represents any type that contains a [RuntimeEnvironment].
 pub trait WithRuntimeEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment;
-}
-
-/// Cache for already verified modules. Since loader V1 uses such a cache
-/// to not perform repeated verifications, possibly even across blocks, for
-/// comparative performance we need to have it as well. For now, we keep it
-/// as a separate cache to make sure there is no interference between V1
-/// and V2 implementations.
-struct VerifiedModuleCache(Mutex<lru::LruCache<[u8; 32], ()>>);
-
-impl VerifiedModuleCache {
-    /// Maximum size of the cache. When modules are cached, they can skip
-    /// re-verification.
-    const VERIFIED_CACHE_SIZE: usize = 100_000;
-
-    fn new() -> Self {
-        Self(Mutex::new(lru::LruCache::new(Self::VERIFIED_CACHE_SIZE)))
-    }
-
-    fn contains(&self, module_hash: &[u8; 32]) -> bool {
-        // For tests, treat cache as empty at all times.
-        if cfg!(test) || cfg!(feature = "testing") {
-            false
-        } else {
-            self.0.lock().contains(module_hash)
-        }
-    }
-
-    fn put(&self, module_hash: [u8; 32]) {
-        // For tests, do not add entries to the cache.
-        if !cfg!(test) && !cfg!(feature = "testing") {
-            self.0.lock().put(module_hash, ());
-        }
-    }
-}
-
-lazy_static! {
-    static ref VERIFIED_MODULES_V2: VerifiedModuleCache = VerifiedModuleCache::new();
 }
