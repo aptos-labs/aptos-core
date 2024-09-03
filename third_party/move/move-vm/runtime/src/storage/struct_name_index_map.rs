@@ -49,9 +49,12 @@ impl StructNameIndexMap {
         // to the cache and return the corresponding index.
         let idx = index_map.backward_map.len();
         let prev_idx = index_map.forward_map.insert(struct_name.clone(), idx);
-        assert_none!(prev_idx, "Indexing map should never evict cached entries");
-
         index_map.backward_map.push(Arc::new(struct_name));
+
+        // Unlock the cache.
+        drop(index_map);
+
+        assert_none!(prev_idx, "Indexing map should never evict cached entries");
         StructNameIndex(idx)
     }
 
@@ -83,8 +86,10 @@ impl StructNameIndexMap {
         }
     }
 
+    /// Returns the number of cached entries. Asserts that the number of cached indices is
+    /// equal to the number of cached struct names.
     #[cfg(test)]
-    fn len(self) -> usize {
+    fn checked_len_for_tests(self) -> usize {
         let index_map = self.0.into_inner();
         let forward_map_len = index_map.forward_map.len();
         let backward_map_len = index_map.backward_map.len();
@@ -147,7 +152,7 @@ mod test {
         let bar_idx = struct_name_idx_map.struct_name_to_idx(bar);
         assert_eq!(bar_idx.0, 1);
 
-        assert_eq!(struct_name_idx_map.len(), 2);
+        assert_eq!(struct_name_idx_map.checked_len_for_tests(), 2);
     }
 
     fn struct_name_strategy() -> impl Strategy<Value = StructIdentifier> {
@@ -203,6 +208,6 @@ mod test {
 
         // Only a single struct name mast be cached!
         let struct_name_idx_map = Arc::into_inner(struct_name_idx_map).unwrap();
-        assert_eq!(struct_name_idx_map.len(), 1);
+        assert_eq!(struct_name_idx_map.checked_len_for_tests(), 1);
     }
 }
