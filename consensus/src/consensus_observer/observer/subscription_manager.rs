@@ -269,8 +269,7 @@ impl SubscriptionManager {
         }
     }
 
-    /// Produces a list of sorted peers to service our subscription request. Peers
-    /// are prioritized by validator distance and latency.
+    /// Produces a list of sorted peers to service our subscription request.
     /// Note: if `previous_subscription_peer` is provided, it will be excluded
     /// from the selection process. Likewise, all peers currently subscribed to us
     /// will be excluded from the selection process.
@@ -291,8 +290,9 @@ impl SubscriptionManager {
                 }
             }
 
-            // Sort the peers by validator distance and latency
-            let sorted_peers = subscription::sort_peers_by_distance_and_latency(peers_and_metadata);
+            // Sort the peers by subscription optimality
+            let sorted_peers =
+                subscription::sort_peers_by_subscription_optimality(&peers_and_metadata);
 
             // Return the sorted peers
             Some(sorted_peers)
@@ -414,12 +414,17 @@ impl SubscriptionManager {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_config::network_id::NetworkId;
-    use aptos_network::{application::storage::PeersAndMetadata, transport::ConnectionMetadata};
+    use aptos_config::{config::PeerRole, network_id::NetworkId};
+    use aptos_netcore::transport::ConnectionOrigin;
+    use aptos_network::{
+        application::storage::PeersAndMetadata,
+        protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
+        transport::{ConnectionId, ConnectionMetadata},
+    };
     use aptos_peer_monitoring_service_types::{
         response::NetworkInformationResponse, PeerMonitoringMetadata,
     };
-    use aptos_types::{transaction::Version, PeerId};
+    use aptos_types::{network_address::NetworkAddress, transaction::Version, PeerId};
     use claims::assert_matches;
     use maplit::hashmap;
     use mockall::mock;
@@ -469,7 +474,7 @@ mod test {
 
         // Add a new connected peer
         let connected_peer =
-            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None);
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
 
         // Create a subscription to the new peer
         create_observer_subscription(
@@ -512,7 +517,7 @@ mod test {
 
         // Add a new connected peer
         let connected_peer =
-            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None);
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
 
         // Create a subscription to the new peer
         create_observer_subscription(
@@ -558,7 +563,7 @@ mod test {
 
         // Add a new connected peer
         let connected_peer =
-            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None);
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
 
         // Create a subscription to the new peer
         create_observer_subscription(
@@ -609,11 +614,11 @@ mod test {
         );
 
         // Add an optimal validator peer
-        create_peer_and_connection(network_id, peers_and_metadata.clone(), 0, Some(0.1));
+        create_peer_and_connection(network_id, peers_and_metadata.clone(), 0, Some(0.1), true);
 
         // Add a suboptimal validator peer
         let suboptimal_peer =
-            create_peer_and_connection(network_id, peers_and_metadata.clone(), 0, None);
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 0, None, true);
 
         // Create a new subscription to the suboptimal peer
         create_observer_subscription(
@@ -674,6 +679,7 @@ mod test {
                 peers_and_metadata.clone(),
                 distance_from_validators,
                 None,
+                true,
             );
         }
 
@@ -708,6 +714,7 @@ mod test {
                 peers_and_metadata.clone(),
                 0,
                 Some(ping_latency_secs),
+                true,
             );
             validator_peers.push(validator_peer);
         }
@@ -810,10 +817,30 @@ mod test {
         peers_and_metadata: Arc<PeersAndMetadata>,
         distance_from_validators: u64,
         ping_latency_secs: Option<f64>,
+        support_consensus_observer: bool,
     ) -> PeerNetworkId {
-        // Create the peer and connection metadata
+        // Create the connection metadata
         let peer_network_id = PeerNetworkId::new(network_id, PeerId::random());
-        let connection_metadata = ConnectionMetadata::mock(peer_network_id.peer_id());
+        let connection_metadata = if support_consensus_observer {
+            // Create a protocol set that supports consensus observer
+            let protocol_set = ProtocolIdSet::from_iter(vec![
+                ProtocolId::ConsensusObserver,
+                ProtocolId::ConsensusObserverRpc,
+            ]);
+
+            // Create the connection metadata with the protocol set
+            ConnectionMetadata::new(
+                peer_network_id.peer_id(),
+                ConnectionId::default(),
+                NetworkAddress::mock(),
+                ConnectionOrigin::Inbound,
+                MessagingProtocolVersion::V1,
+                protocol_set,
+                PeerRole::PreferredUpstream,
+            )
+        } else {
+            ConnectionMetadata::mock(peer_network_id.peer_id())
+        };
 
         // Insert the connection into peers and metadata
         peers_and_metadata
