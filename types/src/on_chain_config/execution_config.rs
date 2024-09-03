@@ -162,8 +162,11 @@ pub enum TransactionShufflerType {
 
 impl TransactionShufflerType {
     pub fn default_for_genesis() -> Self {
-        // TODO: Change back to UseCaseAware once we have the iterator-based BlockSTM
-        TransactionShufflerType::SenderAwareV2(32)
+        TransactionShufflerType::UseCaseAware {
+            sender_spread_factor: 32,
+            platform_use_case_spread_factor: 0,
+            user_use_case_spread_factor: 4,
+        }
     }
 }
 
