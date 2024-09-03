@@ -759,9 +759,13 @@ impl BatchProofQueue {
                         }
                     }
                 }
-                item.proof = None;
-                item.proof_insertion_time = None;
-                item.txn_summaries = None;
+            } else {
+                self.items.insert(batch_key, QueueItem {
+                    info: batch.clone(),
+                    txn_summaries: None,
+                    proof: None,
+                    proof_insertion_time: None,
+                });
             }
         }
         counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
