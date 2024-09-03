@@ -310,24 +310,16 @@ impl Loader {
     // Internal helpers
     //
 
-    pub(crate) fn get_struct_name(&self, struct_idx: StructNameIndex) -> StructIdentifier {
-        match self {
-            Self::V1(loader) => loader
-                .struct_name_index_map()
-                .idx_to_struct_name(struct_idx),
-            Self::V2(loader) => loader
-                .struct_name_index_map()
-                .idx_to_struct_name(struct_idx),
-        }
-    }
-
     pub fn fetch_struct_ty_by_idx(
         &self,
         idx: StructNameIndex,
         module_store: &ModuleStorageAdapter,
         module_storage: &dyn ModuleStorageV2,
     ) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self.struct_name_index_map().idx_to_struct_name(idx);
+        // Ensure that the struct name index map is unlocked immediately by getting an arced
+        // struct name.
+        let struct_name = self.struct_name_index_map().idx_to_struct_name_ref(idx);
+
         match self {
             Loader::V1(_) => {
                 module_store.get_struct_type_by_identifier(&struct_name.name, &struct_name.module)
@@ -1727,16 +1719,9 @@ impl Loader {
             .iter()
             .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
-
-        let name = self
+        let struct_tag = self
             .struct_name_index_map()
-            .idx_to_struct_name(struct_name_idx);
-        let struct_tag = StructTag {
-            address: *name.module.address(),
-            module: name.module.name().to_owned(),
-            name: name.name.clone(),
-            type_args,
-        };
+            .idx_to_struct_tag(struct_name_idx, type_args);
 
         let size =
             (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
@@ -1823,8 +1808,8 @@ impl Loader {
                 // times. Right now these are Aggregator and AggregatorSnapshot.
                 let struct_name = self
                     .struct_name_index_map()
-                    .idx_to_struct_name(struct_name_idx);
-                let maybe_mapping = self.get_identifier_mapping_kind(&struct_name);
+                    .idx_to_struct_name_ref(struct_name_idx);
+                let maybe_mapping = self.get_identifier_mapping_kind(struct_name.as_ref());
 
                 let field_tys = fields
                     .iter()
@@ -2243,12 +2228,12 @@ impl Loader {
             //       behavior, e.g., make the cache available per thread.
             let struct_name = self
                 .struct_name_index_map()
-                .idx_to_struct_name(struct_name_idx);
+                .idx_to_struct_name_ref(struct_name_idx);
 
             // TODO(loader_v2): Revisit this, because now we do share the VM...
             println!(
                 "ERROR: Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached: {:?}",
-                &struct_name,
+                struct_name.as_ref(),
                 formula,
                 struct_type.as_ref(),
                 f
