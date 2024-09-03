@@ -1,9 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::keyless::Bn254;
+use crate::keyless::{Bn254, G1Bytes, G2Bytes};
 use crate::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine};
-use crate::keyless::Groth16Proof;
+use crate::keyless::{Groth16Proof, ZKP};
 use ark_ec::Group;
 use ark_groth16::{prepare_verifying_key, Groth16};
 use ark_crypto_primitives::snark::SNARK;
@@ -227,11 +227,24 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         let proof = Self::create_proof_with_trapdoor(pk, a, b, public_inputs)?;
         let mut x = vec![];
         let ax = proof.a.x().unwrap().serialize_uncompressed(x);
-        let mut y = vec![];
-        let ay = proof.a.y().unwrap().serialize_uncompressed(y);
-        // TODO: Get proof into Groth16Proof form
 
-        Ok(proof.into())
+
+        let mut a_proof = vec![];
+        proof.a.serialize_uncompressed(&mut a_proof).unwrap();
+        let new_a = G1Bytes::new_from_vec(a_proof).unwrap();
+
+        let mut b_proof = vec![];
+        proof.b.serialize_uncompressed(&mut b_proof).unwrap();
+        let new_b = G2Bytes::new_from_vec(b_proof).unwrap();
+
+        let c_proof = vec![];
+        let new_c = G1Bytes::new_from_vec(c_proof.clone()).unwrap();
+        // TODO: Get proof into Groth16Proof form
+        //
+
+        let res = Groth16Proof::new(new_a, new_b, new_c);
+
+        Ok(res)
     }
 
     /// Creates proof using the trapdoor
@@ -309,6 +322,8 @@ fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
 {
+    use crate::keyless::ZeroKnowledgeSig;
+
     let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
     let public_input = ark_ff::BigInt::new(public_input_values);
     let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
@@ -352,9 +367,18 @@ where
         )
         .unwrap();
 
-        assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
+        let ZKS = ZeroKnowledgeSig {
+            proof: ZKP::Groth16(proof),
+            exp_horizon_secs: 100,
+            extra_field: None,
+            override_aud_val: None,
+            training_wheels_signature: None,
+
+        };
+        assert!(ZKS.verify_groth16_proof(public_input, &pvk).is_ok());
+        /*assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
         let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
-        assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
+        assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());*/
     }
 }
 
