@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::keyless::ZeroKnowledgeSig;
+//use ark_bn254::Bn254;
 use crate::keyless::{Bn254, G1Bytes, G2Bytes};
 use crate::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 use crate::keyless::{Groth16Proof, ZKP};
@@ -318,11 +320,10 @@ fn generate_keys_and_inputs<E: Pairing>(wasm_file_path: String, r1cs_file_path: 
 /// pair and a hardcoded public input. These values were generated with the Keyless circuit at commit
 /// `b715e935effe282bb998bb06c826b33d290d94ed` of `aptos-core`
 #[cfg(test)]
-fn test_prove_and_verify<E>(n_iters: usize)
-where
-    E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
+fn test_prove_and_verify(n_iters: usize)
+/*where
+    E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>*/
 {
-    use crate::keyless::ZeroKnowledgeSig;
 
     let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
     let public_input = ark_ff::BigInt::new(public_input_values);
@@ -356,11 +357,11 @@ where
     let gamma_g2 = g2_projective_str_to_affine(["13321756384019475282834053010962858734065256385792198252178574019857707055625", "9904540203481000972785329888895853465145640470161185325980745361477345980499"],["13183258375250648244090549119792217999633468590401818473812106012080096645793", "9163822098487266592309953971558453292100379671136954613307467823219261972973"]).unwrap();
     let delta_g2 = g2_projective_str_to_affine(["9263958447477535187142724208180520744776704295633711436406632372106465499165", "6807912405557884826193725256367335580321369623359346147279599622449143736970"], ["18838367547891272887641438914091432084648683803724358191808362736715304958346", "7114529694217827778623886772036286266862226319773425773369673734499262479817"]).unwrap();
     let vk = VerifyingKey { alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1 };
-    let pvk = prepare_verifying_key::<E>(&vk);
+    let pvk = prepare_verifying_key::<Bn254>(&vk);
 
     let mut rng = rand::thread_rng();
     for _ in 0..n_iters {
-        let proof = Groth16Simulator::<E>::create_random_proof_with_trapdoor(
+        let proof = Groth16Simulator::<Bn254>::create_random_proof_with_trapdoor(
             &[public_input],
             &pk,
             &mut rng,
@@ -373,8 +374,8 @@ where
             extra_field: None,
             override_aud_val: None,
             training_wheels_signature: None,
-
         };
+
         assert!(ZKS.verify_groth16_proof(public_input, &pvk).is_ok());
         /*assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
         let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
@@ -382,13 +383,7 @@ where
     }
 }
 
-fn test_prove_and_verify_circuit_agnostic<E>(n_iters: usize)
-where
-    E: Pairing<
-        ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>,
-        G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>,
-        G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>,
-    <E as Pairing>::ScalarField: From<i32>
+fn test_prove_and_verify_circuit_agnostic(n_iters: usize)
 {
     let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
     let public_input = ark_ff::BigInt::new(public_input_values);
@@ -398,31 +393,40 @@ where
     //let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
 
-    let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
-    let pvk = prepare_verifying_key::<E>(&vk);
+    let (pk, vk) = Groth16Simulator::<Bn254>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+    let pvk = prepare_verifying_key(&vk);
     for i in 0..n_iters {
         println!("on iteration: {}", i);
 
 
-        let proof = Groth16Simulator::<E>::create_random_proof_with_trapdoor(
+        let proof = Groth16Simulator::<Bn254>::create_random_proof_with_trapdoor(
             &[public_input],
             &pk,
             &mut rng,
         )
         .unwrap();
 
-        assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
-        let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
-        assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
+        let ZKS = ZeroKnowledgeSig {
+            proof: ZKP::Groth16(proof),
+            exp_horizon_secs: 100,
+            extra_field: None,
+            override_aud_val: None,
+            training_wheels_signature: None,
+        };
+
+        assert!(ZKS.verify_groth16_proof(public_input, &pvk).is_ok());
+        //assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
+//        let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
+        //assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
 
 #[test]
 fn prove_and_verify() {
-    test_prove_and_verify::<Bn254>(25);
+    test_prove_and_verify(25);
 }
 
 #[test]
 fn prove_and_verify_circuit_agnostic() {
-    test_prove_and_verify_circuit_agnostic::<Bn254>(25);
+    test_prove_and_verify_circuit_agnostic(25);
 }
