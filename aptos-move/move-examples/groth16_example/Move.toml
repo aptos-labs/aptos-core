@@ -2,5 +2,8 @@
 name = "GenericGroth16"
 version = "0.0.0"
 
+[addresses]
+groth16_example = "0x42"
+
 [dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }
