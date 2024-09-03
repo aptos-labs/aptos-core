@@ -32,7 +32,7 @@ pub trait ModuleStorageEntryInterface: Sized + Debug {
     fn state_value_metadata(&self) -> &StateValueMetadata;
 
     /// Returns the hash of the given module.
-    fn hash(&self) -> [u8; 32];
+    fn hash(&self) -> &[u8; 32];
 
     /// Returns module's metadata.
     fn metadata(&self) -> &[Metadata];
@@ -150,8 +150,8 @@ impl ModuleStorageEntryInterface for ModuleStorageEntry {
         &self.state_value_metadata
     }
 
-    fn hash(&self) -> [u8; 32] {
-        self.hash
+    fn hash(&self) -> &[u8; 32] {
+        &self.hash
     }
 
     fn metadata(&self) -> &[Metadata] {
