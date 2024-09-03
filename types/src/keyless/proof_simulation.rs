@@ -232,14 +232,15 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
 
 
         let mut a_proof = vec![];
-        proof.a.serialize_uncompressed(&mut a_proof).unwrap();
+        proof.a.serialize_compressed(&mut a_proof).unwrap();
         let new_a = G1Bytes::new_from_vec(a_proof).unwrap();
 
         let mut b_proof = vec![];
-        proof.b.serialize_uncompressed(&mut b_proof).unwrap();
+        proof.b.serialize_compressed(&mut b_proof).unwrap();
         let new_b = G2Bytes::new_from_vec(b_proof).unwrap();
 
-        let c_proof = vec![];
+        let mut c_proof = vec![];
+        proof.c.serialize_compressed(&mut c_proof).unwrap();
         let new_c = G1Bytes::new_from_vec(c_proof.clone()).unwrap();
         // TODO: Get proof into Groth16Proof form
         //
