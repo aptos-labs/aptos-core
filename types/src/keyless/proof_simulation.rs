@@ -2,42 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::keyless::ZeroKnowledgeSig;
-//use ark_bn254::Bn254;
 use crate::keyless::{Bn254, G1Bytes, G2Bytes};
 use crate::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 use crate::keyless::{Groth16Proof, ZKP};
 use ark_ec::Group;
-use ark_groth16::{prepare_verifying_key, Groth16};
-use ark_crypto_primitives::snark::SNARK;
+use ark_groth16::prepare_verifying_key;
 use ark_ec::pairing::Pairing;
 use ark_ff::Field;
-use ark_relations::r1cs::{/*ConstraintSynthesizer,*/ SynthesisError};
+use ark_relations::r1cs::SynthesisError;
 use rand::{RngCore, Rng};
-use ark_std::{
-    //rand::SeedableRng,
-    //rand::{Rng, RngCore, SeedableRng},
-    //test_rng, UniformRand,
-};
 use ark_std::{marker::PhantomData, vec::Vec};
 use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP};
 use ark_groth16::data_structures::{VerifyingKey, Proof};
 use ark_serialize::*;
-//use ark_std::rand::Rng;
-//use ark_relations::r1cs::Result as R1CSResult;
 use ark_ec::{AffineRepr,CurveGroup};
 use ark_ff::PrimeField;
 use std::ops::AddAssign;
-//use ark_bn254::Bn254;
-//use ark_circom::CircomConfig;
-//use ark_circom::CircomBuilder;
-//use std::fs::File;
-//use std::collections::HashMap;
-//use std::str::FromStr;
-//use num_bigint_v4::BigInt;
 use ark_ff::MontBackend;
 use ark_bn254::FrConfig;
-//use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
-//use crate::keyless::Groth16VerificationKey;
 
 /// The SNARK of [[Groth16]](https://eprint.iacr.org/2016/260.pdf), where "proving" implements the
 /// simulation algorithm instead, using the trapdoor output by the modified setup algorithm also
@@ -65,7 +47,6 @@ pub struct Trapdoor<E: Pairing> {
     /// Generator for G2
     pub g2: E::G2Affine,
 }
-
 
 impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
 {
@@ -227,9 +208,6 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         let b = Self::generate_random_scalar(rng);
 
         let proof = Self::create_proof_with_trapdoor(pk, a, b, public_inputs)?;
-        let mut x = vec![];
-        let ax = proof.a.x().unwrap().serialize_uncompressed(x);
-
 
         let mut a_proof = vec![];
         proof.a.serialize_compressed(&mut a_proof).unwrap();
@@ -242,8 +220,6 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
         let mut c_proof = vec![];
         proof.c.serialize_compressed(&mut c_proof).unwrap();
         let new_c = G1Bytes::new_from_vec(c_proof.clone()).unwrap();
-        // TODO: Get proof into Groth16Proof form
-        //
 
         let res = Groth16Proof::new(new_a, new_b, new_c);
 
@@ -369,7 +345,7 @@ fn test_prove_and_verify(n_iters: usize)
         )
         .unwrap();
 
-        let ZKS = ZeroKnowledgeSig {
+        let zks = ZeroKnowledgeSig {
             proof: ZKP::Groth16(proof),
             exp_horizon_secs: 100,
             extra_field: None,
@@ -377,7 +353,7 @@ fn test_prove_and_verify(n_iters: usize)
             training_wheels_signature: None,
         };
 
-        assert!(ZKS.verify_groth16_proof(public_input, &pvk).is_ok());
+        assert!(zks.verify_groth16_proof(public_input, &pvk).is_ok());
         /*assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
         let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());*/
@@ -407,7 +383,7 @@ fn test_prove_and_verify_circuit_agnostic(n_iters: usize)
         )
         .unwrap();
 
-        let ZKS = ZeroKnowledgeSig {
+        let zks = ZeroKnowledgeSig {
             proof: ZKP::Groth16(proof),
             exp_horizon_secs: 100,
             extra_field: None,
@@ -415,7 +391,7 @@ fn test_prove_and_verify_circuit_agnostic(n_iters: usize)
             training_wheels_signature: None,
         };
 
-        assert!(ZKS.verify_groth16_proof(public_input, &pvk).is_ok());
+        assert!(zks.verify_groth16_proof(public_input, &pvk).is_ok());
         //assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
 //        let a = Groth16Simulator::<E>::generate_random_scalar(&mut rng);
         //assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
