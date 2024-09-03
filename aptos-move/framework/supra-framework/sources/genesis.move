@@ -1179,7 +1179,6 @@ module supra_framework::genesis {
         assert!(vector::all(&vec_addr,|elem| {multisig_account::num_signatures_required(*elem)==2}),1);
         //Ensure the accounts are seeded with supplied balance
         assert!(vector::all(&vec_addr,|elem| {coin::balance<SupraCoin>(*elem)==balance}),2);
-        // Ensure that you can transfer out funds from multisig account
     }
 
 
