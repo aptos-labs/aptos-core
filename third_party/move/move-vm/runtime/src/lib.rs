@@ -31,4 +31,25 @@ mod debug;
 
 mod access_control;
 
-pub use loader::LoadedFunction;
+pub use loader::{LoadedFunction, Module, Script};
+pub use storage::{
+    code_storage::{ambassador_impl_CodeStorage, deserialize_script, script_hash, CodeStorage},
+    environment::{
+        ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
+    },
+    implementations::{
+        unreachable_code_storage::UnreachableCodeStorage,
+        unsync_code_storage::{IntoUnsyncCodeStorage, UnsyncCodeStorage},
+        unsync_module_storage::{
+            IntoUnsyncModuleStorage, LocalModuleBytesStorage, UnsyncModuleStorage,
+        },
+    },
+    module_storage::{ambassador_impl_ModuleStorage, ModuleBytesStorage, ModuleStorage},
+    publishing::TemporaryModuleStorage,
+};
+
+// TODO(loader_v2): Temporary infra to still have loader V1 to test, run
+//                  and compare things e2e locally.
+pub fn use_loader_v1_based_on_env() -> bool {
+    std::env::var("USE_LOADER_V1").is_ok()
+}

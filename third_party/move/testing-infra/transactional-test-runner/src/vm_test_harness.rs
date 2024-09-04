@@ -42,6 +42,8 @@ use move_vm_runtime::{
     module_traversal::*,
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
+    IntoUnsyncCodeStorage, IntoUnsyncModuleStorage, LocalModuleBytesStorage,
+    TemporaryModuleStorage, UnreachableCodeStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -403,8 +405,9 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let res = f(&mut session, &mut gas_status)?;
 
         // save changeset
-        let changeset = session.finish()?;
-        self.storage.apply(changeset).unwrap();
+        // TODO(loader_v2): This is broken.
+        let changeset = session.finish(&UnreachableCodeStorage)?;
+        self.resource_storage.apply(changeset).unwrap();
         Ok(res)
     }
 }

@@ -212,7 +212,13 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
             )
-            .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
+            .and_then(|ret| {
+                Ok((
+                    ret,
+                    self.vm_session
+                        .finish_with_extensions(&UnreachableCodeStorage)?,
+                ))
+            });
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
 
         // Process the result, moving the return value of the initializer function into the
@@ -310,7 +316,13 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
             )
-            .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
+            .and_then(|ret| {
+                Ok((
+                    ret,
+                    self.vm_session
+                        .finish_with_extensions(&UnreachableCodeStorage)?,
+                ))
+            });
 
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
 

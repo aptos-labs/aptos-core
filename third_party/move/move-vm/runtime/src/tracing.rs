@@ -8,6 +8,7 @@ use crate::debug::DebugContext;
 use crate::{
     interpreter::Interpreter,
     loader::{LoadedFunction, Loader},
+    ModuleStorage,
 };
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use ::{
@@ -72,6 +73,7 @@ pub(crate) fn trace(
     pc: u16,
     instr: &Bytecode,
     loader: &Loader,
+    module_storage: &dyn ModuleStorage,
     interp: &Interpreter,
 ) {
     if *TRACING_ENABLED {
@@ -88,10 +90,15 @@ pub(crate) fn trace(
         }
     }
     if *DEBUGGING_ENABLED {
-        DEBUG_CONTEXT
-            .lock()
-            .unwrap()
-            .debug_loop(function, locals, pc, instr, loader, interp);
+        DEBUG_CONTEXT.lock().unwrap().debug_loop(
+            function,
+            locals,
+            pc,
+            instr,
+            loader,
+            module_storage,
+            interp,
+        );
     }
 }
 
@@ -106,6 +113,7 @@ macro_rules! trace {
             $pc,
             &$instr,
             $resolver.loader(),
+            $resolver.module_storage(),
             $interp,
         )
     };

@@ -35,9 +35,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
-};
+use move_vm_runtime::{ModuleStorage, move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session};
 use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use std::{
     collections::BTreeMap,
@@ -115,7 +113,20 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
+    pub fn convert_modules_into_write_ops(
+        &self,
+        module_storage: &impl AptosModuleStorage,
+        code_and_modules: impl IntoIterator<Item = (Bytes, CompiledModule)>,
+    ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
+        let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
+        woc.convert_modules_into_write_ops(module_storage, code_and_modules)
+    }
+
+    pub fn finish(
+        self,
+        configs: &ChangeSetConfigs,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
         let move_vm = self.inner.get_move_vm();
 
         let resource_converter = |value: Value,
@@ -143,7 +154,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let (change_set, mut extensions) = self
             .inner
-            .finish_with_extensions_with_custom_effects(&resource_converter)?;
+            .finish_with_extensions_with_custom_effects(&resource_converter, module_storage)?;
 
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.resolver, change_set)
@@ -259,6 +270,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         resolver: &dyn AptosMoveResolver,
+        module_storage: &impl ModuleStorage,
+        is_loader_v2_enabled: bool,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,

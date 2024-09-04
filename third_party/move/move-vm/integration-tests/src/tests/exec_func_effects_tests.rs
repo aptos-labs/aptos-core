@@ -108,7 +108,7 @@ fn run(
             &mut TraversalContext::new(&traversal_storage),
         )
         .and_then(|ret_values| {
-            let change_set = session.finish()?;
+            let change_set = session.finish(&module_storage)?;
             Ok((change_set, ret_values))
         })
 }

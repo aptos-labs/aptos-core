@@ -283,7 +283,7 @@ impl SharedTestingConfig {
         }
 
         let test_run_info = TestRunInfo::new(function_name.to_string(), now.elapsed());
-        match session.finish_with_extensions() {
+        match session.finish_with_extensions(&module_storage) {
             Ok((cs, mut extensions)) => {
                 let finalized_test_run_info = factory.lock().unwrap().finalize_test_run_info(
                     &cs,

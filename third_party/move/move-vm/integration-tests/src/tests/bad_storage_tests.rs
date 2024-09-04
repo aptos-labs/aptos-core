@@ -13,7 +13,10 @@ use move_core_types::{
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage, IntoUnsyncModuleStorage,
+    LocalModuleBytesStorage, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
     gas::UnmeteredGasMeter,
@@ -106,8 +109,8 @@ fn test_malformed_resource() {
     )
     .map(|_| ())
     .unwrap();
-    let changeset = sess.finish().unwrap();
-    storage.apply(changeset).unwrap();
+    let changeset = sess.finish(&code_storage).unwrap();
+    resource_storage.apply(changeset).unwrap();
 
     // Execute the second script and make sure it succeeds. This script simply checks
     // that the published resource is what we expect it to be. This inital run is to ensure
@@ -535,6 +538,62 @@ impl ModuleResolver for BogusModuleStorage {
 
     fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Err(PartialVMError::new(self.bad_status_code))
+    }
+}
+
+impl WithRuntimeEnvironment for BogusModuleStorage {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        todo!()
+    }
+}
+
+impl ModuleStorage for BogusModuleStorage {
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<bool> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Option<usize>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Vec<Metadata>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+
+    fn fetch_deserialized_module(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Arc<CompiledModule>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+
+    fn fetch_verified_module(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Arc<Module>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 }
 

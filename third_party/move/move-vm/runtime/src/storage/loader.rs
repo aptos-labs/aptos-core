@@ -38,20 +38,12 @@ use typed_arena::Arena;
 /// APIs by reference.
 pub(crate) struct LoaderV2 {
     runtime_environment: Arc<RuntimeEnvironment>,
-    // Local caches:
-    //   These caches are owned by this loader and are not affected by module
-    //   upgrades. When a new cache is added, the safety guarantees (i.e., why
-    //   it is safe for the loader to own this cache) MUST be documented.
-    // TODO(loader_v2): Revisit type cache implementation. For now re-use the existing
-    //                  one to unblock upgradable module and script storage first.
-    ty_cache: RwLock<TypeCache>,
 }
 
 impl LoaderV2 {
     pub(crate) fn new(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
         Self {
             runtime_environment,
-            ty_cache: RwLock::new(TypeCache::empty()),
         }
     }
 
@@ -68,7 +60,7 @@ impl LoaderV2 {
     }
 
     pub(crate) fn ty_cache(&self) -> &RwLock<TypeCache> {
-        &self.ty_cache
+        self.runtime_environment.ty_cache()
     }
 
     pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
@@ -220,7 +212,10 @@ impl LoaderV2 {
         module_name: &IdentStr,
         struct_name: &IdentStr,
     ) -> PartialVMResult<Arc<StructType>> {
-        if !module_storage.check_module_exists(address, module_name).map_err(|e| e.to_partial())? {
+        if !module_storage
+            .check_module_exists(address, module_name)
+            .map_err(|e| e.to_partial())?
+        {
             return Err(module_linker_error!(address, module_name).to_partial());
         }
 
@@ -270,7 +265,6 @@ impl Clone for LoaderV2 {
     fn clone(&self) -> Self {
         Self {
             runtime_environment: self.runtime_environment.clone(),
-            ty_cache: RwLock::new(self.ty_cache().read().clone()),
         }
     }
 }
