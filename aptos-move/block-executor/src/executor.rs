@@ -1081,7 +1081,7 @@ where
             if runtime_environment.vm_config().use_loader_v2 {
                 let entry =
                     ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
-                unsync_map.write_module_storage_entry(key, entry);
+                unsync_map.write_module_storage_entry(key, Arc::new(entry));
             } else {
                 unsync_map.write_module(key, write_op);
             }
