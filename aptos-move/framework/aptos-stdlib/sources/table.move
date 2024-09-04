@@ -23,73 +23,73 @@ module aptos_std::table {
     /// Add a new entry to the table. Aborts if an entry for this
     /// key already exists. The entry itself is not stored in the
     /// table, and cannot be discovered from it.
-    public fun add<K: copy + drop, V>(table: &mut Table<K, V>, key: K, val: V) {
-        add_box<K, V, Box<V>>(table, key, Box { val })
+    public fun add<K: copy + drop, V>(self: &mut Table<K, V>, key: K, val: V) {
+        add_box<K, V, Box<V>>(self, key, Box { val })
     }
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun borrow<K: copy + drop, V>(table: &Table<K, V>, key: K): &V {
-        &borrow_box<K, V, Box<V>>(table, key).val
+    public fun borrow<K: copy + drop, V>(self: &Table<K, V>, key: K): &V {
+        &borrow_box<K, V, Box<V>>(self, key).val
     }
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Returns specified default value if there is no entry for `key`.
-    public fun borrow_with_default<K: copy + drop, V>(table: &Table<K, V>, key: K, default: &V): &V {
-        if (!contains(table, copy key)) {
+    public fun borrow_with_default<K: copy + drop, V>(self: &Table<K, V>, key: K, default: &V): &V {
+        if (!contains(self, copy key)) {
             default
         } else {
-            borrow(table, copy key)
+            borrow(self, copy key)
         }
     }
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun borrow_mut<K: copy + drop, V>(table: &mut Table<K, V>, key: K): &mut V {
-        &mut borrow_box_mut<K, V, Box<V>>(table, key).val
+    public fun borrow_mut<K: copy + drop, V>(self: &mut Table<K, V>, key: K): &mut V {
+        &mut borrow_box_mut<K, V, Box<V>>(self, key).val
     }
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
-    public fun borrow_mut_with_default<K: copy + drop, V: drop>(table: &mut Table<K, V>, key: K, default: V): &mut V {
-        if (!contains(table, copy key)) {
-            add(table, copy key, default)
+    public fun borrow_mut_with_default<K: copy + drop, V: drop>(self: &mut Table<K, V>, key: K, default: V): &mut V {
+        if (!contains(self, copy key)) {
+            add(self, copy key, default)
         };
-        borrow_mut(table, key)
+        borrow_mut(self, key)
     }
 
     /// Insert the pair (`key`, `value`) if there is no entry for `key`.
     /// update the value of the entry for `key` to `value` otherwise
-    public fun upsert<K: copy + drop, V: drop>(table: &mut Table<K, V>, key: K, value: V) {
-        if (!contains(table, copy key)) {
-            add(table, copy key, value)
+    public fun upsert<K: copy + drop, V: drop>(self: &mut Table<K, V>, key: K, value: V) {
+        if (!contains(self, copy key)) {
+            add(self, copy key, value)
         } else {
-            let ref = borrow_mut(table, key);
+            let ref = borrow_mut(self, key);
             *ref = value;
         };
     }
 
-    /// Remove from `table` and return the value which `key` maps to.
+    /// Remove from `self` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun remove<K: copy + drop, V>(table: &mut Table<K, V>, key: K): V {
-        let Box { val } = remove_box<K, V, Box<V>>(table, key);
+    public fun remove<K: copy + drop, V>(self: &mut Table<K, V>, key: K): V {
+        let Box { val } = remove_box<K, V, Box<V>>(self, key);
         val
     }
 
-    /// Returns true iff `table` contains an entry for `key`.
-    public fun contains<K: copy + drop, V>(table: &Table<K, V>, key: K): bool {
-        contains_box<K, V, Box<V>>(table, key)
+    /// Returns true iff `self` contains an entry for `key`.
+    public fun contains<K: copy + drop, V>(self: &Table<K, V>, key: K): bool {
+        contains_box<K, V, Box<V>>(self, key)
     }
 
     #[test_only]
     /// Testing only: allows to drop a table even if it is not empty.
-    public fun drop_unchecked<K: copy + drop, V>(table: Table<K, V>) {
-        drop_unchecked_box<K, V, Box<V>>(table)
+    public fun drop_unchecked<K: copy + drop, V>(self: Table<K, V>) {
+        drop_unchecked_box<K, V, Box<V>>(self)
     }
 
-    public(friend) fun destroy<K: copy + drop, V>(table: Table<K, V>) {
-        destroy_empty_box<K, V, Box<V>>(&table);
-        drop_unchecked_box<K, V, Box<V>>(table)
+    public(friend) fun destroy<K: copy + drop, V>(self: Table<K, V>) {
+        destroy_empty_box<K, V, Box<V>>(&self);
+        drop_unchecked_box<K, V, Box<V>>(self)
     }
 
     #[test_only]

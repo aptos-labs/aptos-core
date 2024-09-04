@@ -59,26 +59,24 @@ fun <SELF>_0::main() {
      var $t10: u64
      var $t11: u64
   0: $t2 := true
-  1: if ($t2) goto 2 else goto 6
+  1: if ($t2) goto 2 else goto 15
   2: label L0
   3: $t5 := 5
   4: $t0 := move($t5)
-  5: goto 9
-  6: label L1
-  7: $t7 := 0
-  8: $t0 := move($t7)
-  9: label L2
- 10: $t9 := copy($t0)
- 11: $t10 := 5
- 12: $t8 := ==($t9, $t10)
- 13: if ($t8) goto 14 else goto 16
- 14: label L3
- 15: goto 19
- 16: label L4
- 17: $t11 := 42
- 18: abort($t11)
- 19: label L5
- 20: return ()
+  5: label L2
+  6: $t9 := copy($t0)
+  7: $t10 := 5
+  8: $t8 := ==($t9, $t10)
+  9: if ($t8) goto 10 else goto 12
+ 10: label L3
+ 11: return ()
+ 12: label L4
+ 13: $t11 := 42
+ 14: abort($t11)
+ 15: label L1
+ 16: $t7 := 0
+ 17: $t0 := move($t7)
+ 18: goto 5
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -102,7 +100,7 @@ fun <SELF>_0::main() {
   0: $t2 := true
      # live vars: $t2
      # events: e:$t2
-  1: if ($t2) goto 2 else goto 6
+  1: if ($t2) goto 2 else goto 15
      # live vars:
   2: label L0
      # live vars:
@@ -112,45 +110,42 @@ fun <SELF>_0::main() {
      # events: e:$t5, b:$t0
   4: $t0 := move($t5)
      # live vars: $t0
-  5: goto 9
-     # live vars:
-  6: label L1
-     # live vars:
-     # events: b:$t7
-  7: $t7 := 0
-     # live vars: $t7
-     # events: e:$t7
-  8: $t0 := move($t7)
+  5: label L2
      # live vars: $t0
-  9: label L2
-     # live vars: $t0
-     # events: e:$t0, b:$t9
- 10: $t9 := copy($t0)
+     # events: b:$t9
+  6: $t9 := copy($t0)
      # live vars: $t9
      # events: b:$t10
- 11: $t10 := 5
+  7: $t10 := 5
      # live vars: $t9, $t10
      # events: e:$t9, e:$t10, b:$t8
- 12: $t8 := ==($t9, $t10)
+  8: $t8 := ==($t9, $t10)
      # live vars: $t8
      # events: e:$t8
- 13: if ($t8) goto 14 else goto 16
+  9: if ($t8) goto 10 else goto 12
      # live vars:
- 14: label L3
+ 10: label L3
      # live vars:
- 15: goto 19
+ 11: return ()
      # live vars:
- 16: label L4
+ 12: label L4
      # live vars:
      # events: b:$t11
- 17: $t11 := 42
+ 13: $t11 := 42
      # live vars: $t11
      # events: e:$t11
- 18: abort($t11)
+ 14: abort($t11)
      # live vars:
- 19: label L5
+ 15: label L1
      # live vars:
- 20: return ()
+     # events: b:$t7
+ 16: $t7 := 0
+     # live vars: $t7
+     # events: e:$t7
+ 17: $t0 := move($t7)
+     # live vars: $t0
+     # events: e:$t0
+ 18: goto 5
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -164,32 +159,30 @@ fun <SELF>_0::main() {
      var $t4: u64 [unused]
      var $t5: u64
      var $t6: u64 [unused]
-     var $t7: u64
+     var $t7: u64 [unused]
      var $t8: bool [unused]
-     var $t9: u64 [unused]
-     var $t10: u64 [unused]
+     var $t9: u64
+     var $t10: u64
      var $t11: u64 [unused]
   0: $t2 := true
-  1: if ($t2) goto 2 else goto 6
+  1: if ($t2) goto 2 else goto 15
   2: label L0
   3: $t5 := 5
   4: $t5 := move($t5)
-  5: goto 9
-  6: label L1
-  7: $t7 := 0
-  8: $t5 := move($t7)
-  9: label L2
- 10: $t5 := copy($t5)
- 11: $t7 := 5
- 12: $t2 := ==($t5, $t7)
- 13: if ($t2) goto 14 else goto 16
- 14: label L3
- 15: goto 19
- 16: label L4
- 17: $t5 := 42
- 18: abort($t5)
- 19: label L5
- 20: return ()
+  5: label L2
+  6: $t9 := copy($t5)
+  7: $t10 := 5
+  8: $t2 := ==($t9, $t10)
+  9: if ($t2) goto 10 else goto 12
+ 10: label L3
+ 11: return ()
+ 12: label L4
+ 13: $t9 := 42
+ 14: abort($t9)
+ 15: label L1
+ 16: $t9 := 0
+ 17: $t5 := move($t9)
+ 18: goto 5
 }
 
 ============ after DeadStoreElimination: ================
@@ -203,30 +196,29 @@ fun <SELF>_0::main() {
      var $t4: u64 [unused]
      var $t5: u64
      var $t6: u64 [unused]
-     var $t7: u64
+     var $t7: u64 [unused]
      var $t8: bool [unused]
-     var $t9: u64 [unused]
-     var $t10: u64 [unused]
+     var $t9: u64
+     var $t10: u64
      var $t11: u64 [unused]
   0: $t2 := true
-  1: if ($t2) goto 2 else goto 5
+  1: if ($t2) goto 2 else goto 14
   2: label L0
   3: $t5 := 5
-  4: goto 8
-  5: label L1
-  6: $t7 := 0
-  7: $t5 := move($t7)
-  8: label L2
-  9: $t7 := 5
- 10: $t2 := ==($t5, $t7)
- 11: if ($t2) goto 12 else goto 14
- 12: label L3
- 13: goto 17
- 14: label L4
- 15: $t5 := 42
- 16: abort($t5)
- 17: label L5
- 18: return ()
+  4: label L2
+  5: $t9 := copy($t5)
+  6: $t10 := 5
+  7: $t2 := ==($t9, $t10)
+  8: if ($t2) goto 9 else goto 11
+  9: label L3
+ 10: return ()
+ 11: label L4
+ 12: $t9 := 42
+ 13: abort($t9)
+ 14: label L1
+ 15: $t9 := 0
+ 16: $t5 := move($t9)
+ 17: goto 4
 }
 
 
@@ -238,28 +230,24 @@ script {
 main() /* def_idx: 0 */ {
 L0:	loc0: u64
 L1:	loc1: u64
+L2:	loc2: u64
 B0:
-	0: LdTrue
-	1: BrFalse(5)
+	0: LdU64(5)
+	1: StLoc[0](loc0: u64)
 B1:
-	2: LdU64(5)
-	3: StLoc[0](loc0: u64)
-	4: Branch(7)
+	2: CopyLoc[0](loc0: u64)
+	3: LdU64(5)
+	4: Eq
+	5: BrFalse(7)
 B2:
-	5: LdU64(0)
-	6: StLoc[0](loc0: u64)
+	6: Ret
 B3:
-	7: MoveLoc[0](loc0: u64)
-	8: LdU64(5)
-	9: Eq
-	10: BrFalse(12)
+	7: LdU64(42)
+	8: Abort
 B4:
-	11: Branch(14)
-B5:
-	12: LdU64(42)
-	13: Abort
-B6:
-	14: Ret
+	9: LdU64(0)
+	10: StLoc[0](loc0: u64)
+	11: Branch(2)
 }
 }
 ============ bytecode verification succeeded ========

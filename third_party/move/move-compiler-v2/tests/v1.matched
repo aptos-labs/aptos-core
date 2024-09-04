@@ -22,14 +22,18 @@ move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/copy_loc_bo
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/copy_loc_borrowed_indirect.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/copy_loc_borrowed_indirect.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/copy_loc_borrowed_indirect_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/copy_loc_borrowed_indirect_invalid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/copy_loc_borrowed_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/copy_loc_borrowed_invalid.exp
+move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/eq_bad.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/eq_bad.exp
+move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/eq_ok.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/eq_ok.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/factor_invalid_1.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/factor_invalid_1.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/factor_invalid_2.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/factor_invalid_2.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/factor_valid_1.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/factor_valid_1.exp
+move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/factor_valid_2.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/factor_valid_2.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_global_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/imm_borrow_global_invalid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_global_requires_acquire.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/imm_borrow_global_requires_acquire.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_loc.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/imm_borrow_loc.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_loc_trivial.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/imm_borrow_loc_trivial.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_loc_trivial_valid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/imm_borrow_loc_trivial_valid.exp
+move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_loc_valid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/imm_borrow_loc_valid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_on_mut.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_on_mut_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut_invalid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/imm_borrow_on_mut_trivial.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut_trivial.exp
@@ -38,6 +42,7 @@ move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/join_borrow
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/move_one_branch.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/move_one_branch.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/mutable_borrow_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/mutable_borrow_invalid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/mutable_borrow_local_twice.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/mutable_borrow_local_twice.exp
+move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/mutable_borrow_local_twice_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/mutable_borrow_local_twice_invalid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/mutate_with_borrowed_loc.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/mutate_with_borrowed_loc.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/mutate_with_borrowed_loc_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/mutate_with_borrowed_loc_invalid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/mutate_with_borrowed_loc_struct_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/mutate_with_borrowed_loc_struct_invalid.exp
@@ -46,6 +51,7 @@ move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/release_cyc
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/return_with_borrowed_loc.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/return_with_borrowed_loc_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_invalid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/return_with_borrowed_loc_resource_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_resource_invalid.exp
+move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/writeref_borrow_invalid.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/writeref_borrow_invalid.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/writeref_borrow_valid1.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/writeref_borrow_valid1.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/writeref_borrow_valid2.exp   move-compiler-v2/tests/reference-safety/v1-borrow-tests/writeref_borrow_valid2.exp
 move-compiler/tests/move_check/borrows/assign_local_combo.exp   move-compiler-v2/tests/reference-safety/v1-tests/assign_local_combo.exp
@@ -182,6 +188,7 @@ move-compiler/tests/move_check/inlining/double_nesting.exp   move-compiler-v2/te
 move-compiler/tests/move_check/inlining/inline_accessing_constant.exp   move-compiler-v2/tests/checking/inlining/inline_accessing_constant.exp
 move-compiler/tests/move_check/inlining/lambda.exp   move-compiler-v2/tests/checking/inlining/lambda.exp
 move-compiler/tests/move_check/inlining/lambda_param.exp   move-compiler-v2/tests/checking/inlining/lambda_param.exp
+move-compiler/tests/move_check/inlining/lambda_param_mismatch.exp   move-compiler-v2/tests/checking/inlining/lambda_param_mismatch.exp
 move-compiler/tests/move_check/inlining/lambda_return.exp   move-compiler-v2/tests/checking/inlining/lambda_return.exp
 move-compiler/tests/move_check/inlining/multiple_nesting.exp   move-compiler-v2/tests/checking/inlining/multiple_nesting.exp
 move-compiler/tests/move_check/inlining/native_inline.exp   move-compiler-v2/tests/checking/inlining/native_inline.exp
@@ -266,6 +273,7 @@ move-compiler/tests/move_check/naming/unresolved_type_with_args.exp   move-compi
 move-compiler/tests/move_check/naming/vector_literal_type_arity.exp   move-compiler-v2/tests/checking/typing/v1-naming/vector_literal_type_arity.exp
 move-compiler/tests/move_check/translated_ir_tests/move/operators/boolean_not_non_boolean.exp   move-compiler-v2/tests/checking/typing/v1-operators/boolean_not_non_boolean.exp
 move-compiler/tests/move_check/translated_ir_tests/move/operators/casting_operators_types_mismatch.exp   move-compiler-v2/tests/checking/typing/v1-operators/casting_operators_types_mismatch.exp
+move-compiler/tests/move_check/parser/acquires_list_generic.exp   move-compiler-v2/tests/checking-lang-v1/acquires_list_generic.exp
 move-compiler/tests/move_check/parser/aptos_stdlib_attributes.exp   move-compiler-v2/tests/checking/attributes/aptos_stdlib_attributes.exp
 move-compiler/tests/move_check/parser/aptos_stdlib_attributes2.exp   move-compiler-v2/tests/checking/attributes/aptos_stdlib_attributes2.exp
 move-compiler/tests/move_check/parser/attribute_no_closing_bracket.exp   move-compiler-v2/tests/checking/attributes/attribute_no_closing_bracket.exp

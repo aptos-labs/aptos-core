@@ -88,6 +88,7 @@ pub struct ConsensusConfig {
     pub proof_cache_capacity: u64,
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
+    pub enable_pre_commit: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -155,6 +156,9 @@ pub struct ExecutionBackpressureConfig {
     pub percentile: f64,
     /// Recalibrating max block size, to target blocks taking this long.
     pub target_block_time_ms: usize,
+    /// A minimal number of transactions per block, even if calibration suggests otherwise
+    /// To make sure backpressure doesn't become too aggressive.
+    pub min_calibrated_txns_per_block: u64,
     // We compute re-calibrated block size, and use that for `max_txns_in_block`.
     // But after execution pool and cost of overpacking being minimal - we should
     // change so that backpressure sets `max_txns_to_execute` instead
@@ -228,6 +232,8 @@ impl Default for ConsensusConfig {
                 percentile: 0.5,
                 target_block_time_ms: 250,
                 min_block_time_ms_to_activate: 100,
+                // allow at least two spreading group from reordering in a single block, to utilize paralellism
+                min_calibrated_txns_per_block: 8,
             }),
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {
@@ -236,25 +242,25 @@ impl Default for ConsensusConfig {
                     // Block enters the pipeline after consensus orders it, and leaves the
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 800,
+                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    max_sending_block_txns_after_filtering_override:
+                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    backpressure_proposal_delay_ms: 50,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 1500,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    back_pressure_pipeline_latency_limit_ms: 1900,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1600,
-                    max_sending_block_txns_after_filtering_override:
-                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
                 },
                 // with execution backpressure, only later start reducing block size
                 PipelineBackpressureValues {
@@ -347,6 +353,7 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             num_bounded_executor_tasks: 16,
+            enable_pre_commit: true,
         }
     }
 }
@@ -384,12 +391,12 @@ impl ConsensusConfig {
             (
                 config.max_sending_block_txns,
                 config.max_receiving_block_txns,
-                "txns",
+                "send < recv for txns",
             ),
             (
                 config.max_sending_block_bytes,
                 config.max_receiving_block_bytes,
-                "bytes",
+                "send < recv for bytes",
             ),
         ];
         for (send, recv, label) in &send_recv_pairs {
@@ -412,22 +419,23 @@ impl ConsensusConfig {
             (
                 config.quorum_store.receiver_max_batch_txns as u64,
                 config.max_sending_block_txns,
-                "txns".to_string(),
+                "QS recv batch txns < max_sending_block_txns".to_string(),
             ),
             (
                 config.quorum_store.receiver_max_batch_txns as u64,
                 config.max_sending_block_txns_after_filtering,
-                "txns".to_string(),
+                "QS recv batch txns < max_sending_block_txns_after_filtering ".to_string(),
             ),
             (
                 config.quorum_store.receiver_max_batch_txns as u64,
                 config.min_max_txns_in_block_after_filtering_from_backpressure,
-                "txns".to_string(),
+                "QS recv batch txns < min_max_txns_in_block_after_filtering_from_backpressure"
+                    .to_string(),
             ),
             (
                 config.quorum_store.receiver_max_batch_bytes as u64,
                 config.max_sending_block_bytes,
-                "bytes".to_string(),
+                "QS recv batch bytes < max_sending_block_bytes".to_string(),
             ),
         ];
         for backpressure_values in &config.pipeline_backpressure {
@@ -435,7 +443,7 @@ impl ConsensusConfig {
                 config.quorum_store.receiver_max_batch_bytes as u64,
                 backpressure_values.max_sending_block_bytes_override,
                 format!(
-                    "backpressure {} ms: bytes",
+                    "backpressure {} ms: QS recv batch bytes < max_sending_block_bytes_override",
                     backpressure_values.back_pressure_pipeline_latency_limit_ms,
                 ),
             ));
@@ -445,7 +453,7 @@ impl ConsensusConfig {
                 config.quorum_store.receiver_max_batch_bytes as u64,
                 backoff_values.max_sending_block_bytes_override,
                 format!(
-                    "backoff {} %: bytes",
+                    "backoff {} %: bytes: QS recv batch bytes < max_sending_block_bytes_override",
                     backoff_values.backoff_if_below_participating_voting_power_percentage,
                 ),
             ));

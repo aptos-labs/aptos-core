@@ -9,6 +9,9 @@ use crate::{
     quorum_store,
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutorError;
+use aptos_logger::prelude::{error, warn};
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
     register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
@@ -27,6 +30,8 @@ pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
 pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
 /// Transaction commit failed (will not be retried) because of a duplicate
 pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
+/// Transaction commit failed (will not be retried) because it expired
+pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
@@ -176,6 +181,16 @@ pub static TXN_DEDUP_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
+});
+
+pub static BLOCK_PREPARER_LATENCY: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_execution_block_preparer_seconds",
+            "The time spent in block preparer",
+        )
+        .unwrap(),
+    )
 });
 
 /// Transaction dedup number of filtered
@@ -818,6 +833,60 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PIPELINE_INSERTION_TO_EXECUTED_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_pipeline_insertion_to_executed_time",
+            "Histogram for the time it takes for a block to be executed after being inserted into the pipeline"
+        ).unwrap()
+    )
+});
+
+pub static PIPELINE_ENTRY_TO_INSERTED_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_pipeline_entry_to_inserted_time",
+            "Histogram for the time it takes for a block to be inserted into the pipeline after being received"
+        ).unwrap()
+    )
+});
+
+pub static PREPARE_BLOCK_SIG_VERIFICATION_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_prepare_block_sig_verification_time",
+            "Histogram for the time it takes to verify the signatures of a block after it is prepared"
+        ).unwrap()
+    )
+});
+
+pub static PREPARE_BLOCK_WAIT_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_prepare_block_wait_time",
+            "Histogram for the time the block waits after it enters the pipeline before the block prepration starts"
+        ).unwrap()
+    )
+});
+
+pub static EXECUTE_BLOCK_WAIT_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_execute_block_wait_time",
+            "Histogram for the time the block waits after the block is prepared before the block execution starts"
+        ).unwrap()
+    )
+});
+
+pub static APPLY_LEDGER_WAIT_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_apply_ledger_wait_time",
+            "Histogram for the time the block waits after the block is executed before the ledger is applied"
+        ).unwrap()
+    )
+});
+
 const CONSENSUS_WAIT_DURATION_BUCKETS: [f64; 19] = [
     0.005, 0.01, 0.015, 0.02, 0.04, 0.06, 0.08, 0.10, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3,
     0.4, 0.6, 0.8, 2.0,
@@ -1002,6 +1071,56 @@ pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the buffer manager receiving executor error
+pub static BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_buffer_manager_received_executor_error_count",
+        "Count of the buffer manager receiving executor error",
+        &["error_type"],
+    )
+    .unwrap()
+});
+
+/// Count of the executor errors pipeline discarded
+pub static PIPELINE_DISCARDED_EXECUTOR_ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_pipeline_discarded_executor_error_count",
+        "Count of the executor errors pipeline discarded",
+        &["error_type"],
+    )
+    .unwrap()
+});
+
+pub fn log_executor_error_occurred(
+    e: ExecutorError,
+    counter: &Lazy<IntCounterVec>,
+    block_id: HashValue,
+) {
+    match e {
+        ExecutorError::CouldNotGetData => {
+            counter.with_label_values(&["CouldNotGetData"]).inc();
+            warn!(
+                block_id = block_id,
+                "Execution error - CouldNotGetData {}", block_id
+            );
+        },
+        ExecutorError::BlockNotFound(block_id) => {
+            counter.with_label_values(&["BlockNotFound"]).inc();
+            warn!(
+                block_id = block_id,
+                "Execution error BlockNotFound {}", block_id
+            );
+        },
+        e => {
+            counter.with_label_values(&["UnexpectedError"]).inc();
+            error!(
+                block_id = block_id,
+                "Execution error {:?} for {}", e, block_id
+            );
+        },
+    }
+}
+
 const PROPSER_ELECTION_DURATION_BUCKETS: [f64; 17] = [
     0.001, 0.002, 0.003, 0.004, 0.006, 0.008, 0.01, 0.012, 0.014, 0.0175, 0.02, 0.025, 0.05, 0.25,
     0.5, 1.0, 2.0,
@@ -1125,6 +1244,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
                         TXN_COMMIT_RETRY_LABEL
                     } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
                         TXN_COMMIT_FAILED_DUPLICATE_LABEL
+                    } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
+                        TXN_COMMIT_FAILED_EXPIRED_LABEL
                     } else {
                         TXN_COMMIT_FAILED_LABEL
                     }
@@ -1177,6 +1298,15 @@ pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::
     register_int_counter_vec!(
         "aptos_consensus_proposal_payload_availability_count",
         "The availability of proposal payload locally",
+        &["status"]
+    )
+    .unwrap()
+});
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_proposal_payload_fetch_duration",
+        "Time to fetch payload behind proposal with status",
         &["status"]
     )
     .unwrap()

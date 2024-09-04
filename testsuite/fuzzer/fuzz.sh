@@ -17,7 +17,8 @@ function error() {
 
 function cargo_fuzz() {
     # Nightly version control
-    NIGHTLY_VERSION="nightly-2024-04-01"
+    # Pin nightly-2024-02-12 because of https://github.com/google/oss-fuzz/issues/11626
+    NIGHTLY_VERSION="nightly-2024-02-12"
     rustup install $NIGHTLY_VERSION
     if [ -z "$1" ]; then
         error "error using cargo()"

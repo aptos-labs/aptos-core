@@ -81,6 +81,8 @@ pub enum CompilerVersion {
     /// The v2 compiler, starting with 2.0-unstable. Each new released version of the compiler
     /// should get an enum entry here.
     V2_0,
+    /// Upcoming Version 2.1 of the compiler
+    V2_1,
 }
 
 impl Default for CompilerVersion {
@@ -107,6 +109,7 @@ impl FromStr for CompilerVersion {
             // For legacy reasons, also support v1 and v2
             "1" | "v1" => Ok(Self::V1),
             "2" | "v2" | "2.0" => Ok(Self::V2_0),
+            "2.1" => Ok(Self::V2_1),
             _ => bail!(
                 "unrecognized compiler version `{}` (supported versions: `1`, `2`, `2.0`)",
                 s
@@ -123,6 +126,7 @@ impl Display for CompilerVersion {
             match self {
                 CompilerVersion::V1 => "1",
                 CompilerVersion::V2_0 => "2.0",
+                CompilerVersion::V2_1 => "2.1",
             },
             if self.unstable() { UNSTABLE_MARKER } else { "" }
         )
@@ -135,7 +139,8 @@ impl CompilerVersion {
     pub fn unstable(self) -> bool {
         match self {
             CompilerVersion::V1 => false,
-            CompilerVersion::V2_0 => true,
+            CompilerVersion::V2_0 => false,
+            CompilerVersion::V2_1 => true,
         }
     }
 
@@ -150,7 +155,7 @@ impl CompilerVersion {
                     Ok(())
                 }
             },
-            CompilerVersion::V2_0 => Ok(()),
+            CompilerVersion::V2_0 | CompilerVersion::V2_1 => Ok(()),
         }
     }
 }
@@ -172,12 +177,10 @@ pub enum LanguageVersion {
     /// functions with lambda parameters, as well as a simple form of `for`
     /// loops.
     V1,
-    /// The upcoming (currently unstable) 2.0 version of Move. The following
-    /// experimental language features are supported so far:
-    ///
-    /// - Access control specifiers as described in AIP-56.
-    /// - Receiver style (method) function calls with auto-referencing
+    /// The 2.0 version of Move.
     V2_0,
+    /// The currently unstable 2.1 version of Move
+    V2_1,
 }
 
 impl Default for LanguageVersion {
@@ -202,6 +205,7 @@ impl FromStr for LanguageVersion {
         match s1.as_str() {
             "1" => Ok(Self::V1),
             "2" | "2.0" => Ok(Self::V2_0),
+            "2.1" => Ok(Self::V2_1),
             _ => bail!(
                 "unrecognized language version `{}` (supported versions: `1`, `2`, `2.0`)",
                 s
@@ -216,7 +220,8 @@ impl LanguageVersion {
     pub fn unstable(self) -> bool {
         match self {
             LanguageVersion::V1 => false,
-            LanguageVersion::V2_0 => true,
+            LanguageVersion::V2_0 => false,
+            LanguageVersion::V2_1 => true,
         }
     }
 
@@ -231,6 +236,7 @@ impl LanguageVersion {
         env::get_bytecode_version_from_env(version).unwrap_or(match self {
             LanguageVersion::V1 => VERSION_DEFAULT,
             LanguageVersion::V2_0 => VERSION_DEFAULT_LANG_V2,
+            LanguageVersion::V2_1 => VERSION_DEFAULT_LANG_V2, // Update once we have v8 bytecode
         })
     }
 }
@@ -243,6 +249,7 @@ impl Display for LanguageVersion {
             match self {
                 LanguageVersion::V1 => "1",
                 LanguageVersion::V2_0 => "2.0",
+                LanguageVersion::V2_1 => "2.1",
             },
             if self.unstable() { UNSTABLE_MARKER } else { "" }
         )

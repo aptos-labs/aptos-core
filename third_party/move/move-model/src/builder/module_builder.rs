@@ -32,7 +32,7 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
-    LanguageVersion,
+    well_known, LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -763,6 +763,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             body: None,
             callees: Default::default(),
             is_recursive: Default::default(),
+            insts_using_generic_type_reflection: Default::default(),
         };
         self.spec_funs.push(fun_decl);
     }
@@ -1234,7 +1235,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 )
             },
             EA::StructLayout::Variants(variants) => {
-                let mut variant_maps = variants
+                let variant_maps = variants
                     .iter()
                     .map(|v| {
                         let variant_loc = et.to_loc(&v.loc);
@@ -1256,47 +1257,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         }
                     })
                     .collect_vec();
-                if !variant_maps.is_empty() {
-                    // Identify common fields and compute their offsets. Common fields
-                    // occupy the first N slots in a variant layout, where the order
-                    // is determined by the first variant which declares them.
-                    let mut common_fields: BTreeMap<Symbol, usize> = BTreeMap::new();
-                    let main = &variant_maps[0];
-                    for field in main.fields.values().sorted_by_key(|f| f.offset) {
-                        let mut common = true;
-                        for other in &variant_maps[1..variant_maps.len()] {
-                            if !other
-                                .fields
-                                .values()
-                                .any(|f| f.name == field.name && f.ty == field.ty)
-                            {
-                                common = false;
-                                break;
-                            }
-                        }
-                        if common {
-                            common_fields.insert(field.name, common_fields.len());
-                        }
-                    }
-                    // Now adjust the offsets of the fields over all variants.
-                    for variant_map in variant_maps.iter_mut() {
-                        let mut next_offset = common_fields.len();
-                        for field in variant_map
-                            .fields
-                            .values_mut()
-                            .sorted_by_key(|v| v.offset)
-                            .collect_vec()
-                        {
-                            if let Some(offset) = common_fields.get(&field.name) {
-                                field.common_for_variants = true;
-                                field.offset = *offset
-                            } else {
-                                field.offset = next_offset;
-                                next_offset += 1
-                            }
-                        }
-                    }
-                }
                 (StructLayout::Variants(variant_maps), false)
             },
             EA::StructLayout::Native(_) => (StructLayout::None, false),
@@ -1318,9 +1278,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         fields: &EA::Fields<EA::Type>,
     ) -> (BTreeMap<Symbol, FieldData>, bool) {
         let mut field_map = BTreeMap::new();
-        for (name_loc, field_name_, (idx, ty)) in fields {
+        for (name_loc, field_name, (idx, ty)) in fields {
             let field_loc = et.to_loc(&name_loc);
-            let field_sym = et.symbol_pool().make(field_name_);
+            let field_sym = et.symbol_pool().make(field_name);
             let field_ty = et.translate_type(ty);
             let field_ty_loc = et.to_loc(&ty.loc);
             for ctr in Constraint::for_field(struct_abilities, &field_ty) {
@@ -1337,7 +1297,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 loc: field_loc.clone(),
                 offset: *idx,
                 variant: for_variant,
-                common_for_variants: false,
                 ty: field_ty,
             });
         }
@@ -1353,7 +1312,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 loc: loc.clone(),
                 offset: 0,
                 variant: None,
-                common_for_variants: false,
                 ty: field_ty,
             });
             is_empty_struct = true;
@@ -1770,18 +1728,18 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let orig_sym = et.symbol_pool().make(orig_name);
                     let remapped_sym = et.symbol_pool().make(remapped_name);
                     let preset_arg_syms = preset_args
-                            .iter()
-                            .map(|v| {
-                                let sym = et.symbol_pool().make(v.value().as_str());
-                                if et.lookup_local(sym, false).is_none() {
-                                    et.error(
-                                        loc,
-                                        "[internal] error in finding used local variables in lambda calls",
-                                    );
-                                }
-                                sym
-                            })
-                            .collect();
+                        .iter()
+                        .map(|v| {
+                            let sym = et.symbol_pool().make(v.value().as_str());
+                            if et.lookup_local(sym, false).is_none() {
+                                et.error(
+                                    loc,
+                                    "[internal] error in finding used local variables in lambda calls",
+                                );
+                            }
+                            sym
+                        })
+                        .collect();
                     et.fun_ptrs_table
                         .insert(orig_sym, (remapped_sym, preset_arg_syms));
                 }
@@ -1818,7 +1776,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_params(loc, &entry.type_params, false);
                 if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
+                    let lang_ver_ge_2 =
+                        et.env().language_version.is_at_least(LanguageVersion::V2_0);
                     for f in fields.values() {
+                        // In Aptos Move 2.0 and above, field `self` is omitted from local bindings
+                        // so `self` can be used to refer to `self` parameter.
+                        if lang_ver_ge_2
+                            && f.name.display(et.symbol_pool()).to_string()
+                                == well_known::RECEIVER_PARAM_NAME
+                        {
+                            continue;
+                        }
                         et.define_local(
                             loc,
                             f.name,
@@ -1830,6 +1798,20 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             )),
                             None,
                         );
+                    }
+                    if lang_ver_ge_2 {
+                        let receiver_param_name =
+                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        et.define_local(loc, receiver_param_name, struct_type, None, None);
+                    }
+                } else if let StructLayout::Variants(_) = &entry.layout {
+                    et.enter_scope();
+                    if et.env().language_version.is_at_least(LanguageVersion::V2_0) {
+                        let receiver_param_name =
+                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        et.define_local(loc, receiver_param_name, struct_type, None, None);
                     }
                 }
 
@@ -2244,9 +2226,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             _ => {
                 if !additional_exps.is_empty() {
                     et.error(
-                          loc,
-                          "additional expressions only allowed with `aborts_if`, `aborts_with`, `modifies`, or `emits`",
-                      );
+                        loc,
+                        "additional expressions only allowed with `aborts_if`, `aborts_with`, `modifies`, or `emits`",
+                    );
                 }
                 (et.translate_exp(exp, &expected_type).into_exp(), vec![])
             },
@@ -3510,18 +3492,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             attributes: variant.attributes.clone(),
                         });
                         for field in variant.fields.values().sorted_by_key(|f| f.offset).cloned() {
-                            let variant_field_name = if !field.common_for_variants {
-                                // If the field is not common between variants, we need to qualify
-                                // the name with the variant for a unique id.
-                                let pool = self.parent.env.symbol_pool();
-                                pool.make(&FieldId::make_variant_field_id_str(
+                            let pool = self.parent.env.symbol_pool();
+                            let field_id =
+                                FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
                                     pool.string(variant.name).as_str(),
                                     pool.string(field.name).as_str(),
-                                ))
-                            } else {
-                                field.name
-                            };
-                            field_data.insert(FieldId::new(variant_field_name), field);
+                                )));
+                            field_data.insert(field_id, field);
                         }
                     }
                 },

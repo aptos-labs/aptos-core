@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/checking/variants/variants_test_parse_err1.move:10:19
+   │
+10 │         (c is Red|)
+   │                   ^
+   │                   │
+   │                   Unexpected ')'
+   │                   Expected a type name

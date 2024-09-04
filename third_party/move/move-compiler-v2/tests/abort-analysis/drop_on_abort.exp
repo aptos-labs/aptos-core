@@ -35,93 +35,69 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
      var $t6: u64
      # abort state: {returns,aborts}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
+     # refs: []
      #
   0: $t4 := borrow_local($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t4
-     # graph: {@0=local($t0)[borrow_imm -> @1],@1=derived[]}
-     # locals: {$t0=@0,$t4=@1}
-     # globals: {}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `vec`] at line 9
      #
   1: $t3 := vector::length<#0>($t4)
      # abort state: {returns,aborts}
      # live vars: $t0, $t3
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
   2: $t5 := 1
      # abort state: {returns,aborts}
      # live vars: $t0, $t3, $t5
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
   3: $t2 := >($t3, $t5)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
   4: if ($t2) goto 5 else goto 9
      # abort state: {aborts}
      # live vars: $t0
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
   5: label L0
      # abort state: {aborts}
      # live vars:
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
   6: $t6 := 1
      # abort state: {aborts}
      # live vars: $t6
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
   7: abort($t6)
      # abort state: {returns}
      # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
   8: goto 10
      # abort state: {returns}
      # live vars: $t0
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
   9: label L1
      # abort state: {returns}
      # live vars: $t0
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
  10: label L2
      # abort state: {returns}
      # live vars: $t0
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
  11: $t1 := pack m::Option<#0>($t0)
      # abort state: {returns}
      # live vars: $t1
-     # graph: {@0=local($t0)[]}
-     # locals: {$t0=@0}
-     # globals: {}
+     # refs: []
      #
  12: return $t1
 }

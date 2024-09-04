@@ -42,8 +42,11 @@ use std::{
     env, str,
     sync::{atomic::AtomicU32, Arc},
 };
-// use std::sync::Mutex;
-use tokio::{runtime::Runtime, time::Duration};
+use tokio::{
+    runtime::{Handle, Runtime},
+    task::block_in_place,
+    time::Duration,
+};
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
@@ -661,11 +664,15 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
 
 impl Drop for K8sSwarm {
     fn drop(&mut self) {
-        let runtime = Runtime::new().unwrap();
         if !self.keep {
-            runtime
-                .block_on(uninstall_testnet_resources(self.kube_namespace.clone()))
-                .unwrap();
+            let fut = uninstall_testnet_resources(self.kube_namespace.clone());
+            match Handle::try_current() {
+                Ok(handle) => block_in_place(move || handle.block_on(fut).unwrap()),
+                Err(_err) => {
+                    let runtime = Runtime::new().unwrap();
+                    runtime.block_on(fut).unwrap();
+                },
+            }
         } else {
             println!("Keeping kube_namespace {}", self.kube_namespace);
         }

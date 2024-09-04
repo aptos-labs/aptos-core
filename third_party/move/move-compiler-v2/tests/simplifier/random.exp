@@ -152,26 +152,4 @@ warning: Unused assignment to `q`. Consider removing or prefixing with an unders
    │                 ^
 
 
-Diagnostics:
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/simplifier/random.move:56:17
-   │
-55 │         let x = &v;
-   │                 -- previous local borrow
-56 │         let y = &mut v;
-   │                 ^^^^^^ mutable borrow attempted here
-57 │         *y;
-   │         -- requirement enforced here
-58 │         *x;
-   │         -- conflicting reference `x` used here
-
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/simplifier/random.move:56:17
-   │
-55 │         let x = &v;
-   │                 -- previous local borrow
-56 │         let y = &mut v;
-   │                 ^^^^^^ mutable borrow attempted here
-57 │         *y;
-58 │         *x;
-   │         -- requirement enforced here
+============ bytecode verification succeeded ========

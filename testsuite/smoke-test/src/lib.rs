@@ -13,6 +13,8 @@ mod client;
 #[cfg(test)]
 mod consensus;
 #[cfg(test)]
+mod consensus_key_rotation;
+#[cfg(test)]
 mod consensus_observer;
 #[cfg(test)]
 mod execution;

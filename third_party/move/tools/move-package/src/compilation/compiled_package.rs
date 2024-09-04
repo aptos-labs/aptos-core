@@ -516,15 +516,15 @@ impl CompiledPackage {
         // TODO: add more tests for the different caching cases
         !(package.has_source_changed_since_last_compile(resolved_package) // recompile if source has changed
             // Recompile if the flags are different
-                || package.are_build_flags_different(&resolution_graph.build_options)
-                // Force root package recompilation in test mode
-                || resolution_graph.build_options.test_mode && is_root_package
-                // Recompile if force recompilation is set
-                || resolution_graph.build_options.force_recompilation) &&
-                // Dive deeper to make sure that instantiations haven't changed since that
-                // can be changed by other packages above us in the dependency graph possibly
-                package.package.compiled_package_info.address_alias_instantiation
-                    == resolved_package.resolution_table
+            || package.are_build_flags_different(&resolution_graph.build_options)
+            // Force root package recompilation in test mode
+            || resolution_graph.build_options.test_mode && is_root_package
+            // Recompile if force recompilation is set
+            || resolution_graph.build_options.force_recompilation) &&
+            // Dive deeper to make sure that instantiations haven't changed since that
+            // can be changed by other packages above us in the dependency graph possibly
+            package.package.compiled_package_info.address_alias_instantiation
+                == resolved_package.resolution_table
     }
 
     pub(crate) fn build_all<W: Write>(
@@ -642,7 +642,7 @@ impl CompiledPackage {
                     Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
                 compiler_driver_v1(compiler)?
             },
-            CompilerVersion::V2_0 => {
+            version @ CompilerVersion::V2_0 | version @ CompilerVersion::V2_1 => {
                 let to_str_vec = |ps: &[Symbol]| {
                     ps.iter()
                         .map(move |s| s.as_str().to_owned())
@@ -688,12 +688,11 @@ impl CompiledPackage {
                     skip_attribute_checks,
                     known_attributes: known_attributes.clone(),
                     language_version: Some(effective_language_version),
+                    compiler_version: Some(version),
                     compile_test_code: flags.keep_testing_functions(),
+                    experiments: config.experiments.clone(),
                     ..Default::default()
                 };
-                for experiment in &config.experiments {
-                    options = options.set_experiment(experiment, true)
-                }
                 options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
                 compiler_driver_v2(options)?
             },
@@ -842,12 +841,12 @@ impl CompiledPackage {
                     let name_conflict_error_msg = occurence_infos
                         .into_iter()
                         .map(|(name, is_module, fpath)| {
-                                format!(
-                                    "\t{} '{}' at path '{}'",
-                                    if is_module { "Module" } else { "Script" },
-                                    name,
-                                    fpath
-                                )
+                            format!(
+                                "\t{} '{}' at path '{}'",
+                                if is_module { "Module" } else { "Script" },
+                                name,
+                                fpath
+                            )
                         })
                         .collect::<Vec<_>>()
                         .join("\n");
@@ -1059,7 +1058,8 @@ pub(crate) fn apply_named_address_renaming(
         .collect()
 }
 
-pub(crate) fn make_source_and_deps_for_compiler(
+/// Collects source and dependency files with their address mappings.
+pub fn make_source_and_deps_for_compiler(
     resolution_graph: &ResolvedGraph,
     root: &ResolvedPackage,
     deps: Vec<(

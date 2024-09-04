@@ -1,15 +1,18 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::DataStatus,
-    proof_of_store::{BatchInfo, ProofOfStore},
-};
+use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
+use futures::{
+    future::{BoxFuture, Shared},
+    FutureExt,
+};
 use serde::{Deserialize, Serialize};
 use std::{
+    fmt::Debug,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -24,11 +27,36 @@ pub trait TDataInfo {
     fn signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId>;
 }
 
+pub struct DataFetchFut {
+    pub iteration: u32,
+    pub fut: Shared<BoxFuture<'static, ExecutorResult<Vec<SignedTransaction>>>>,
+}
+
+impl fmt::Debug for DataFetchFut {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+impl DataFetchFut {
+    pub fn extend(&mut self, other: DataFetchFut) {
+        let self_fut = self.fut.clone();
+        self.fut = async move {
+            let result1 = self_fut.await?;
+            let result2 = other.fut.await?;
+            let result = [result1, result2].concat();
+            Ok(result)
+        }
+        .boxed()
+        .shared();
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct BatchPointer<T> {
     pub batch_summary: Vec<T>,
     #[serde(skip)]
-    pub status: Arc<Mutex<Option<DataStatus>>>,
+    pub data_fut: Arc<Mutex<Option<DataFetchFut>>>,
 }
 
 impl<T> BatchPointer<T>
@@ -38,14 +66,14 @@ where
     pub fn new(metadata: Vec<T>) -> Self {
         Self {
             batch_summary: metadata,
-            status: Arc::new(Mutex::new(None)),
+            data_fut: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn extend(&mut self, other: BatchPointer<T>) {
-        let other_data_status = other.status.lock().as_mut().unwrap().take();
+        let other_data_status = other.data_fut.lock().take().expect("must be initialized");
         self.batch_summary.extend(other.batch_summary);
-        let mut status = self.status.lock();
+        let mut status = self.data_fut.lock();
         *status = match &mut *status {
             None => Some(other_data_status),
             Some(status) => {
@@ -74,10 +102,22 @@ where
     }
 }
 
+impl<T> From<Vec<T>> for BatchPointer<T>
+where
+    T: TDataInfo,
+{
+    fn from(value: Vec<T>) -> Self {
+        Self {
+            batch_summary: value,
+            data_fut: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
 impl<T: PartialEq> PartialEq for BatchPointer<T> {
     fn eq(&self, other: &Self) -> bool {
         self.batch_summary == other.batch_summary
-            && Arc::as_ptr(&self.status) == Arc::as_ptr(&other.status)
+            && Arc::as_ptr(&self.data_fut) == Arc::as_ptr(&other.data_fut)
     }
 }
 
@@ -117,12 +157,27 @@ impl PayloadExecutionLimit {
             ) => PayloadExecutionLimit::MaxTransactionsToExecute(*limit1 + *limit2),
         };
     }
+
+    pub(crate) fn max_txns_to_execute(limit: Option<u64>) -> Self {
+        limit.map_or(PayloadExecutionLimit::None, |val| {
+            PayloadExecutionLimit::MaxTransactionsToExecute(val)
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct InlineBatch {
     batch_info: BatchInfo,
     transactions: Vec<SignedTransaction>,
+}
+
+impl InlineBatch {
+    pub fn new(batch_info: BatchInfo, transactions: Vec<SignedTransaction>) -> Self {
+        Self {
+            batch_info,
+            transactions,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -159,6 +214,22 @@ impl InlineBatches {
             .iter()
             .map(|inline_batch| inline_batch.batch_info.clone())
             .collect()
+    }
+}
+
+impl From<Vec<InlineBatch>> for InlineBatches {
+    fn from(value: Vec<InlineBatch>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Vec<(BatchInfo, Vec<SignedTransaction>)>> for InlineBatches {
+    fn from(value: Vec<(BatchInfo, Vec<SignedTransaction>)>) -> Self {
+        value
+            .into_iter()
+            .map(|(batch_info, transactions)| InlineBatch::new(batch_info, transactions))
+            .collect::<Vec<_>>()
+            .into()
     }
 }
 
@@ -215,6 +286,20 @@ pub enum OptQuorumStorePayload {
 }
 
 impl OptQuorumStorePayload {
+    pub fn new(
+        inline_batches: InlineBatches,
+        opt_batches: BatchPointer<BatchInfo>,
+        proofs: BatchPointer<ProofOfStore>,
+        execution_limits: PayloadExecutionLimit,
+    ) -> Self {
+        Self::V1(OptQuorumStorePayloadV1 {
+            inline_batches,
+            opt_batches,
+            proofs,
+            execution_limits,
+        })
+    }
+
     pub(crate) fn num_txns(&self) -> usize {
         self.opt_batches.num_txns() + self.proofs.num_txns() + self.inline_batches.num_txns()
     }
@@ -252,6 +337,10 @@ impl OptQuorumStorePayload {
 
     pub fn opt_batches(&self) -> &BatchPointer<BatchInfo> {
         &self.opt_batches
+    }
+
+    pub fn set_execution_limit(&mut self, execution_limits: PayloadExecutionLimit) {
+        self.execution_limits = execution_limits;
     }
 }
 
