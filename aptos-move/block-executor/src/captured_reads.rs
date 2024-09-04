@@ -12,19 +12,20 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::{
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, ShiftedTxnIndex,
-        StorageVersion, TxnIndex, ValueWithLayout, Version,
+        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
+        ValueWithLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
-    versioned_module_storage::{ModuleStorageReadResult, VersionedModuleStorage},
+    versioned_module_storage::{ModuleStorageRead, VersionedModuleStorage},
 };
 use aptos_types::{
     delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
+use claims::assert_none;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
 use std::{
@@ -287,32 +288,6 @@ impl DelayedFieldRead {
     }
 }
 
-/// Read captured from the module storage.
-// TODO(loader_v2): Just like for resource, optimize the representation here so we can resolve
-//                  based on it instead of going to the multi-version data structure.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub(crate) enum ModuleStorageRead {
-    /// Whether the read module existed or not. Modules that are pending to be
-    /// published and committed yield this as well.
-    Exists(bool),
-    /// A version in multi-version data structure at which a module was read. This
-    /// includes storage version (thanks to [ShiftedTxnIndex]) and allows us to treat
-    /// all reads uniformly. These reads can only come from committed modules, as
-    /// otherwise we read that the module does not exist.
-    Versioned(ShiftedTxnIndex),
-}
-
-impl ModuleStorageRead {
-    /// Returns  a new read based on the result returned from a module storage query.
-    pub(crate) fn new(result: &ModuleStorageReadResult) -> Self {
-        use ModuleStorageReadResult::*;
-        match result {
-            Versioned(idx, _) => Self::Versioned(*idx),
-            DoesNotExist => Self::Exists(false),
-        }
-    }
-}
-
 /// Serves as a "read-set" of a transaction execution, and provides APIs for capturing reads,
 /// resolving new reads based on already captured reads when possible, and for validation.
 ///
@@ -327,12 +302,8 @@ pub(crate) struct CapturedReads<T: Transaction> {
     group_reads: HashMap<T::Key, GroupRead<T>>,
     /// Captured module reads if V1 loader is used.
     pub(crate) module_reads: Vec<T::Key>,
-    /// Captured module reads if V2 loader is used. Here, using a vector is important for
-    /// the correctness of the current implementation which always resolves reads through
-    /// the multi-version data structure. If we were to use something like a hash map, it
-    /// would have been possible for a transaction to observe different read results for
-    /// the same module, but only log one, thus not failing the validation!
-    module_storage_reads: Vec<(T::Key, ModuleStorageRead)>,
+    /// Captured module reads if V2 loader is used.
+    module_storage_reads: HashMap<T::Key, ModuleStorageRead>,
 
     delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
 
@@ -507,14 +478,18 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
+    /// Returns the captured read of a module storage entry if it exists, and [None] otherwise.
+    pub(crate) fn get_captured_module_storage_read(
+        &self,
+        key: &T::Key,
+    ) -> Option<&ModuleStorageRead> {
+        self.module_storage_reads.get(key)
+    }
+
     /// Captures the read of a module storage entry.
-    pub(crate) fn capture_module_storage_read(
-        &mut self,
-        key: T::Key,
-        read_result: &ModuleStorageReadResult,
-    ) {
-        let read = ModuleStorageRead::new(read_result);
-        self.module_storage_reads.push((key.clone(), read));
+    pub(crate) fn capture_module_storage_read(&mut self, key: T::Key, read: ModuleStorageRead) {
+        let prev = self.module_storage_reads.insert(key, read);
+        assert_none!(prev);
     }
 
     pub(crate) fn capture_delayed_field_read(
@@ -625,6 +600,10 @@ impl<T: Transaction> CapturedReads<T> {
         })
     }
 
+    /// Re-reads the captured read keys, and checks if the reads are still the same:
+    ///   1. All modules that did not exist, still do not exist.
+    ///   2. For all captured reads of existing modules from version X, all new reads
+    ///      also have the same version X.
     pub(crate) fn validate_module_reads(
         &self,
         module_storage: &VersionedModuleStorage<T::Key>,
@@ -638,8 +617,7 @@ impl<T: Transaction> CapturedReads<T> {
         // and fetching it returned an error, the error is not recorded. Hence, it is safe here
         // to simply treat such errors as a non-existent value.
         self.module_storage_reads.iter().all(|(k, previous_read)| {
-            let result = module_storage.get(k, ShiftedTxnIndex::new(idx_to_validate));
-            let new_read = ModuleStorageRead::new(&result);
+            let new_read = module_storage.get(k, idx_to_validate);
             previous_read == &new_read
         })
     }
