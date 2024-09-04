@@ -22,7 +22,8 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
-    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
+    transaction::BlockExecutableTransaction as Transaction, vm::modules::ModuleStorageEntry,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
@@ -302,7 +303,7 @@ pub(crate) struct CapturedReads<T: Transaction> {
     /// Captured module reads if V1 loader is used.
     pub(crate) module_reads: Vec<T::Key>,
     /// Captured module reads if V2 loader is used.
-    module_storage_reads: HashMap<T::Key, ModuleStorageRead>,
+    module_storage_reads: HashMap<T::Key, ModuleStorageRead<ModuleStorageEntry>>,
 
     delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
 
@@ -481,14 +482,17 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn get_captured_module_storage_read(
         &self,
         key: &T::Key,
-    ) -> Option<&ModuleStorageRead> {
+    ) -> Option<&ModuleStorageRead<ModuleStorageEntry>> {
         self.module_storage_reads.get(key)
     }
 
     /// Captures the read of a module storage entry.
-    pub(crate) fn capture_module_storage_read(&mut self, key: T::Key, read: ModuleStorageRead) {
-        let _prev = self.module_storage_reads.insert(key, read);
-        // assert!(prev.is_none() || prev.is_some_and(|e| e.));
+    pub(crate) fn capture_module_storage_read(
+        &mut self,
+        key: T::Key,
+        read: ModuleStorageRead<ModuleStorageEntry>,
+    ) {
+        self.module_storage_reads.insert(key, read);
     }
 
     pub(crate) fn capture_delayed_field_read(
@@ -605,7 +609,7 @@ impl<T: Transaction> CapturedReads<T> {
     ///      also have the same version X.
     pub(crate) fn validate_module_reads(
         &self,
-        module_storage: &VersionedModuleStorage<T::Key>,
+        module_storage: &VersionedModuleStorage<T::Key, ModuleStorageEntry>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         if self.speculative_failure {

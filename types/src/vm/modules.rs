@@ -13,24 +13,50 @@ use move_binary_format::{
 };
 use move_core_types::{metadata::Metadata, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment};
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
-/// Different kinds of representation a module can be in. The code cache
-/// can implement different policies for promoting the representation from
-/// one to the other.
+/// An interface that any module storage entry in the code cache must implement.
+pub trait ModuleStorageEntryInterface: Sized + Debug {
+    /// Given a state value, constructs a new module storage entry from it.
+    fn from_state_value(
+        runtime_environment: &RuntimeEnvironment,
+        state_value: StateValue,
+    ) -> VMResult<Self>;
+
+    /// Returns the bytes of the given module.
+    fn bytes(&self) -> &Bytes;
+
+    /// Returns the size in bytes of the given module.
+    fn size_in_bytes(&self) -> usize {
+        self.bytes().len()
+    }
+
+    /// Returns the state value metadata of the given module.
+    fn state_value_metadata(&self) -> &StateValueMetadata;
+
+    /// Returns module's metadata.
+    fn metadata(&self) -> &[Metadata];
+
+    /// Returns true if the module representation is verified, and false otherwise.
+    // TODO[loader_v2]: revisit.
+    fn is_verified(&self) -> bool;
+}
+
+/// Different kinds of representation a module can be in. The code cache can implement different
+/// policies for promoting the representation from one to the other.
 #[derive(Debug)]
 enum Representation {
     /// A simple deserialized representation with a non-verified module.
     Deserialized(Arc<CompiledModule>),
-    /// A fully-verified module instance. Note that it is up to the code cache
-    /// to ensure that the module still passes verification in case any configs
-    /// are updated, or some feature flags are changed.
+    /// A fully-verified module instance. Note that it is up to the code cache to ensure that the
+    /// module still passes verification in case any configs are updated, or some feature flags
+    /// are changed.
     Verified(Arc<Module>),
 }
 
-/// An entry for Aptos code cache, capable of resolving different requests including
-/// bytes, metadata, etc. Note that it is the responsibility of the code cache to
-/// ensure the data is consistent with the latest on-chain configs.
+/// An entry for Aptos code cache, capable of resolving different requests including bytes, size,
+/// metadata, etc. Note that it is the responsibility of the code cache to ensure the data is
+/// consistent with the latest on-chain configs.
 #[derive(Debug)]
 pub struct ModuleStorageEntry {
     /// Serialized representation of the module.
@@ -43,11 +69,10 @@ pub struct ModuleStorageEntry {
 }
 
 impl ModuleStorageEntry {
-    /// Given a transaction write, constructs a new entry that can be used by the
-    /// module storage. Returns an error if:
-    ///   1. Module is being deleted. This is not allowed at the Move level, but
-    ///      transaction write can be a deletion, so returning an error is a good
-    ///      precaution.
+    /// Given a transaction write, constructs a new entry that can be used by the module storage.
+    /// Returns an error if:
+    ///   1. Module is being deleted. This is not allowed at the Move level, but transaction write
+    ///      can be a deletion, so returning an error is a good precaution.
     ///   2. If module entry cannot be constructed from a state value.
     pub fn from_transaction_write<V: TransactionWrite>(
         runtime_environment: &RuntimeEnvironment,
@@ -68,9 +93,38 @@ impl ModuleStorageEntry {
         })
     }
 
-    /// Given a state value, constructs a new module storage entry. Returns an error if the
-    /// module fails to be deserialized.
-    pub fn from_state_value(
+    /// Creates a new module storage entry which carries all additional metadata, but uses a
+    /// verified module representation.
+    pub fn make_verified(&self, module: Arc<Module>) -> Self {
+        Self {
+            serialized_module: self.serialized_module.clone(),
+            state_value_metadata: self.state_value_metadata.clone(),
+            representation: Representation::Verified(module),
+        }
+    }
+
+    /// Returns the deserialized (i.e., [CompiledModule]) representation of the
+    /// current storage entry.
+    pub fn as_compiled_module(&self) -> Arc<CompiledModule> {
+        use Representation::*;
+        match &self.representation {
+            Deserialized(m) => m.clone(),
+            Verified(m) => m.as_compiled_module(),
+        }
+    }
+
+    /// If the module representation is verified, returns it. Otherwise, returns [None].
+    pub fn try_as_verified_module(&self) -> Option<Arc<Module>> {
+        use Representation::*;
+        match &self.representation {
+            Deserialized(_) => None,
+            Verified(m) => Some(m.clone()),
+        }
+    }
+}
+
+impl ModuleStorageEntryInterface for ModuleStorageEntry {
+    fn from_state_value(
         runtime_environment: &RuntimeEnvironment,
         state_value: StateValue,
     ) -> VMResult<Self> {
@@ -93,28 +147,15 @@ impl ModuleStorageEntry {
         })
     }
 
-    /// Creates a new module storage entry which carries all additional metadata, but
-    /// uses a verified module representation.
-    pub fn make_verified(&self, module: Arc<Module>) -> Self {
-        Self {
-            serialized_module: self.serialized_module.clone(),
-            state_value_metadata: self.state_value_metadata.clone(),
-            representation: Representation::Verified(module),
-        }
-    }
-
-    /// Returns the bytes of the given module.
-    pub fn bytes(&self) -> &Bytes {
+    fn bytes(&self) -> &Bytes {
         &self.serialized_module
     }
 
-    /// Returns the state value metadata of the given module.
-    pub fn state_value_metadata(&self) -> &StateValueMetadata {
+    fn state_value_metadata(&self) -> &StateValueMetadata {
         &self.state_value_metadata
     }
 
-    /// Returns module's metadata.
-    pub fn metadata(&self) -> &[Metadata] {
+    fn metadata(&self) -> &[Metadata] {
         use Representation::*;
         match &self.representation {
             Deserialized(m) => &m.metadata,
@@ -122,27 +163,7 @@ impl ModuleStorageEntry {
         }
     }
 
-    /// Returns the deserialized (i.e., [CompiledModule]) representation of the
-    /// current storage entry.
-    pub fn as_compiled_module(&self) -> Arc<CompiledModule> {
-        use Representation::*;
-        match &self.representation {
-            Deserialized(m) => m.clone(),
-            Verified(m) => m.as_compiled_module(),
-        }
-    }
-
-    /// If the module representation is verified, returns it. Otherwise, returns [None].
-    pub fn try_as_verified_module(&self) -> Option<Arc<Module>> {
-        use Representation::*;
-        match &self.representation {
-            Deserialized(_) => None,
-            Verified(m) => Some(m.clone()),
-        }
-    }
-
-    /// Returns true if  the module representation is verified, and false otherwise.
-    pub fn is_verified(&self) -> bool {
+    fn is_verified(&self) -> bool {
         use Representation::*;
         match &self.representation {
             Deserialized(_) => false,
