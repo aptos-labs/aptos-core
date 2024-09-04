@@ -15,7 +15,7 @@ use aptos_logger::info;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use futures::{stream::FuturesOrdered, StreamExt};
-use std::{collections::HashSet, sync::Arc};
+use std::{cmp::Reverse, collections::HashSet, sync::Arc};
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
@@ -139,7 +139,7 @@ impl BlockPreparer {
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         tokio::task::spawn_blocking(move || {
             // stable sort to ensure batches with same gas are in the same order
-            batched_txns.sort_by(|(_, gas_a), (_, gas_b)| gas_b.cmp(gas_a));
+            batched_txns.sort_by_key(|(_, gas)| Reverse(*gas));
             info!("BlockPreparer: Batched transactions:");
             for (txns, gas_bucket_start) in &batched_txns {
                 info!(
