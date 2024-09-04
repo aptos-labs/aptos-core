@@ -162,16 +162,15 @@ pub enum UnsyncGroupError {
     TagNotFound,
 }
 
-/// In order to store base vales at the lowest index, i.e. at index 0, without conflicting
-/// with actual transaction index 0, the following struct wraps the index and internally
-/// increments it by 1.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
-pub struct ShiftedTxnIndex {
+// In order to store base vales at the lowest index, i.e. at index 0, without conflicting
+// with actual transaction index 0, the following struct wraps the index and internally
+// increments it by 1.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+pub(crate) struct ShiftedTxnIndex {
     idx: TxnIndex,
 }
 
 impl ShiftedTxnIndex {
-    /// Returns a new index corresponding to the specific transaction.
     pub fn new(real_idx: TxnIndex) -> Self {
         Self { idx: real_idx + 1 }
     }
@@ -184,20 +183,8 @@ impl ShiftedTxnIndex {
         }
     }
 
-    /// Returns a new index corresponding to the base storage version.
-    pub fn zero_idx() -> Self {
+    pub(crate) fn zero_idx() -> Self {
         Self { idx: 0 }
-    }
-
-    /// Returns a new index corresponding to the index before a specific transaction.
-    /// For transaction at index 0, the index corresponding to the base storage
-    /// version is returned.
-    pub fn previous_idx(next_idx: TxnIndex) -> Self {
-        if next_idx > 0 {
-            Self::new(next_idx - 1)
-        } else {
-            Self::zero_idx()
-        }
     }
 }
 

@@ -16,9 +16,8 @@ pub enum ExecutableDescriptor {
 
 pub trait ModulePath {
     // TODO(loader_v2):
-    //   Improve this in the future, right now all writes use state keys
-    //   and we need to use this trait to check if a generic state key is
-    //   for code or not.
+    //   Improve this in the future, right now all writes use state keys and we need to use this
+    //   trait to check if a generic state key is for code or not.
     fn is_module_path(&self) -> bool;
 
     // TODO(loader_v2): Make AptosModuleStorage generic?

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::view::{LatestView, ViewState};
-use aptos_mvhashmap::{types::ShiftedTxnIndex, versioned_module_storage::ModuleStorageReadResult};
+use aptos_mvhashmap::versioned_module_storage::{ModuleStorageRead, ModuleVersion};
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, TStateView},
@@ -38,9 +38,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
         Ok(self
-            .get_module_storage_entry(address, module_name)
+            .read_module_storage(address, module_name)
             .map_err(|e| e.to_partial())?
-            .into_module_module_storage_entry_at_idx()
+            .into_versioned()
             .map(|(_, entry)| entry.state_value_metadata().clone()))
     }
 
@@ -51,9 +51,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         // TODO(loader_v2): A very ugly way of converting state keys into generic types.
         let key = T::Key::from_state_key(state_key.clone());
         Ok(self
-            .get_module_storage_entry_by_key(&key)
+            .read_module_storage_by_key(&key)
             .map_err(|e| e.to_partial())?
-            .into_module_module_storage_entry_at_idx()
+            .into_versioned()
             .map(|(_, entry)| entry.bytes().len()))
     }
 }
@@ -84,8 +84,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<bool> {
         Ok(self
-            .get_module_storage_entry(address, module_name)?
-            .into_module_module_storage_entry_at_idx()
+            .read_module_storage(address, module_name)?
+            .into_versioned()
             .is_some())
     }
 
@@ -95,8 +95,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
         Ok(self
-            .get_module_storage_entry(address, module_name)?
-            .into_module_module_storage_entry_at_idx()
+            .read_module_storage(address, module_name)?
+            .into_versioned()
             .map(|(_, entry)| entry.bytes().clone()))
     }
 
@@ -106,8 +106,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
         Ok(self
-            .get_module_storage_entry(address, module_name)?
-            .into_module_module_storage_entry_at_idx()
+            .read_module_storage(address, module_name)?
+            .into_versioned()
             .map(|(_, entry)| entry.bytes().len()))
     }
 
@@ -117,7 +117,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Vec<Metadata>> {
         Ok(self
-            .get_existing_module_storage_entry_with_idx(address, module_name)?
+            .get_existing_module_storage_entry_with_version(address, module_name)?
             .1
             .metadata()
             .to_vec())
@@ -129,7 +129,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Arc<CompiledModule>> {
         Ok(self
-            .get_existing_module_storage_entry_with_idx(address, module_name)?
+            .get_existing_module_storage_entry_with_version(address, module_name)?
             .1
             .as_compiled_module())
     }
@@ -161,57 +161,68 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     /// Returns the module storage entry built from the current view. If it is not in
     /// multi-version or non-sync data structures, fetches it from the base view.
-    fn get_module_storage_entry_by_key(&self, key: &T::Key) -> VMResult<ModuleStorageReadResult> {
-        use ModuleStorageReadResult::*;
-
+    fn read_module_storage_by_key(&self, key: &T::Key) -> VMResult<ModuleStorageRead> {
         match &self.latest_view {
             ViewState::Sync(state) => {
-                let result = state.versioned_map.module_storage().get_or_else(
-                    key,
-                    ShiftedTxnIndex::new(self.txn_idx),
-                    || self.get_base_module_storage_entry(key),
-                )?;
+                // If the module read has been previously cached, return early.
+                if let Some(read) = state
+                    .captured_reads
+                    .borrow()
+                    .get_captured_module_storage_read(key)
+                {
+                    return Ok(read.clone());
+                }
+
+                // Otherwise, we need to go to the multi-version data structure to get it, and
+                // record under captured reads.
+                let read =
+                    state
+                        .versioned_map
+                        .module_storage()
+                        .get_or_else(key, self.txn_idx, || {
+                            self.get_base_module_storage_entry(key)
+                        })?;
                 state
                     .captured_reads
                     .borrow_mut()
-                    .capture_module_storage_read(key.clone(), &result);
-                Ok(result)
+                    .capture_module_storage_read(key.clone(), read.clone());
+                Ok(read)
             },
             ViewState::Unsync(state) => {
                 state.read_set.borrow_mut().module_reads.insert(key.clone());
                 Ok(match state.unsync_map.fetch_module(key) {
                     // For sequential execution, indices do not matter, but we still return
                     // them to have uniform interfaces.
-                    Some(entry) => Versioned(ShiftedTxnIndex::previous_idx(self.txn_idx), entry),
+                    Some(entry) => ModuleStorageRead::before_txn_idx(self.txn_idx, entry),
                     None => match self.get_base_module_storage_entry(key)? {
-                        Some(entry) => Versioned(ShiftedTxnIndex::zero_idx(), entry),
-                        None => DoesNotExist,
+                        Some(entry) => ModuleStorageRead::storage_version(entry),
+                        None => ModuleStorageRead::DoesNotExist,
                     },
                 })
             },
         }
     }
 
-    /// Similar to [LatestView::get_module_storage_entry_by_key], but allows to resolve module
+    /// Similar to [LatestView::read_module_storage_by_key], but allows to resolve module
     /// storage entries based on addresses and names.
-    fn get_module_storage_entry(
+    fn read_module_storage(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<ModuleStorageReadResult> {
+    ) -> VMResult<ModuleStorageRead> {
         let key = T::Key::from_address_and_module_name(address, module_name);
-        self.get_module_storage_entry_by_key(&key)
+        self.read_module_storage_by_key(&key)
     }
 
-    /// Similar to [LatestView::get_module_storage_entry], but in case the module does not exist,
+    /// Similar to [LatestView::read_module_storage], but in case the module does not exist,
     /// returns a linker VM error.
-    fn get_existing_module_storage_entry_with_idx(
+    fn get_existing_module_storage_entry_with_version(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<(ShiftedTxnIndex, Arc<ModuleStorageEntry>)> {
-        self.get_module_storage_entry(address, module_name)?
-            .into_module_module_storage_entry_at_idx()
+    ) -> VMResult<(ModuleVersion, Arc<ModuleStorageEntry>)> {
+        self.read_module_storage(address, module_name)?
+            .into_versioned()
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
@@ -225,8 +236,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         visited: &mut HashSet<T::Key>,
     ) -> VMResult<Arc<Module>> {
         // Get the module and check if is verified, if so, return it.
-        let (txn_idx, entry) =
-            self.get_existing_module_storage_entry_with_idx(address, module_name)?;
+        let (version, entry) =
+            self.get_existing_module_storage_entry_with_version(address, module_name)?;
         if let Some(module) = entry.try_as_verified_module() {
             return Ok(module);
         }
@@ -249,7 +260,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         let mut verified_dependencies = vec![];
         for (addr, name) in partially_verified_module.immediate_dependencies_iter() {
             // A verified dependency, continue early.
-            let (_, dep_entry) = self.get_existing_module_storage_entry_with_idx(addr, name)?;
+            let (_, dep_entry) = self.get_existing_module_storage_entry_with_version(addr, name)?;
             if let Some(module) = dep_entry.try_as_verified_module() {
                 verified_dependencies.push(module);
                 continue;
@@ -285,7 +296,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             ViewState::Sync(state) => {
                 state.versioned_map.module_storage().write_if_not_verified(
                     &key,
-                    txn_idx,
+                    version,
                     verified_entry,
                 );
             },
