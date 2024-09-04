@@ -7083,6 +7083,7 @@ dependencies = [
  "serde",
  "sha3 0.9.1",
  "test-case",
+ "tiny-keccak",
 ]
 
 [[package]]

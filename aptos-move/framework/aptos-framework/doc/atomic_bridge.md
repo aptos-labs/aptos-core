@@ -1296,7 +1296,6 @@ Generates a unique bridge transfer ID based on transfer details and nonce.
         nonce.inner = nonce.inner + 1;  // Safe <b>to</b> increment without overflow
     };
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&nonce.inner));
-
     keccak256(combined_bytes)
 }
 </code></pre>
@@ -2420,7 +2419,6 @@ Completes a bridge transfer by revealing the pre-image.
     pre_image: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) {
     <a href="atomic_bridge.md#0x1_bridge_configuration_assert_is_caller_operator">bridge_configuration::assert_is_caller_operator</a>(caller);
-
     <b>let</b> (recipient, amount) = <a href="atomic_bridge.md#0x1_bridge_store_complete_counterparty">bridge_store::complete_counterparty</a>(
         bridge_transfer_id,
         create_hashlock(pre_image)
@@ -2667,7 +2665,6 @@ The amount is transferred from the initiator to aptos_framework
 
     <b>let</b> bridge_transfer_id = bridge_transfer_id(&details);
     <a href="atomic_bridge.md#0x1_bridge_store_add_initiator">bridge_store::add_initiator</a>(bridge_transfer_id, details);
-
     <a href="atomic_bridge.md#0x1_atomic_bridge_burn">atomic_bridge::burn</a>(initiator_address, amount);
 
     <a href="event.md#0x1_event_emit">event::emit</a>(

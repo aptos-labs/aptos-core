@@ -53,3 +53,4 @@ mod type_too_large;
 mod vector_numeric_address;
 mod vm;
 mod vote;
+mod bridge;

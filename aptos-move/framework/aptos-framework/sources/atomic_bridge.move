@@ -186,7 +186,6 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_transfer_id = bridge_transfer_id(&details);
         bridge_store::add_initiator(bridge_transfer_id, details);
-
         atomic_bridge::burn(initiator_address, amount);
 
         event::emit(
@@ -999,6 +998,7 @@ module aptos_framework::atomic_bridge {
 
     friend aptos_framework::atomic_bridge_counterparty;
     friend aptos_framework::atomic_bridge_initiator;
+    friend aptos_framework::genesis;
 
     struct AptosCoinBurnCapability has key {
         burn_cap: BurnCapability<AptosCoin>,
