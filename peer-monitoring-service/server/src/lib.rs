@@ -321,7 +321,7 @@ fn get_distance_from_validators(
     // Otherwise, go through our peers, find the min, and return a distance relative to the min
     let mut min_peer_distance_from_validators = MAX_DISTANCE_FROM_VALIDATORS;
     for peer_metadata in connected_peers_and_metadata.values() {
-        if let Some(latest_network_info_response) = peer_metadata
+        if let Some(ref latest_network_info_response) = peer_metadata
             .get_peer_monitoring_metadata()
             .latest_network_info_response
         {

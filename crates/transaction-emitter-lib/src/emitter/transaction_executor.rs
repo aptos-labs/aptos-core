@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::RETRY_POLICY;
+use super::FETCH_ACCOUNT_RETRY_POLICY;
 use anyhow::{Context, Result};
-use aptos_logger::{debug, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress, types::transaction::SignedTransaction,
@@ -19,12 +19,25 @@ use std::{
 
 // Reliable/retrying transaction executor, used for initializing
 pub struct RestApiReliableTransactionSubmitter {
-    pub rest_clients: Vec<RestClient>,
-    pub max_retries: usize,
-    pub retry_after: Duration,
+    rest_clients: Vec<RestClient>,
+    max_retries: usize,
+    retry_after: Duration,
 }
 
 impl RestApiReliableTransactionSubmitter {
+    pub fn new(rest_clients: Vec<RestClient>, max_retries: usize, retry_after: Duration) -> Self {
+        info!(
+            "Using reliable/retriable init transaction executor with {} retries, every {}s",
+            max_retries,
+            retry_after.as_secs_f32()
+        );
+        Self {
+            rest_clients,
+            max_retries,
+            retry_after,
+        }
+    }
+
     fn random_rest_client(&self) -> &RestClient {
         let mut rng = thread_rng();
         self.rest_clients.choose(&mut rng).unwrap()
@@ -256,7 +269,7 @@ pub async fn query_sequence_number_with_client(
     rest_client: &RestClient,
     account_address: AccountAddress,
 ) -> Result<u64> {
-    let result = RETRY_POLICY
+    let result = FETCH_ACCOUNT_RETRY_POLICY
         .retry_if(
             move || rest_client.get_account_bcs(account_address),
             |error: &RestError| !is_account_not_found(error),
@@ -281,7 +294,7 @@ fn is_account_not_found(error: &RestError) -> bool {
 #[async_trait]
 impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64> {
-        Ok(RETRY_POLICY
+        Ok(FETCH_ACCOUNT_RETRY_POLICY
             .retry(move || {
                 self.random_rest_client()
                     .get_account_balance(account_address)

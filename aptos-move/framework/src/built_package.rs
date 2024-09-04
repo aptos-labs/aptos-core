@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    docgen::DocgenOptions,
+    docgen::{get_docgen_output_dir, DocgenOptions},
     extended_checks,
     natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
     zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
@@ -16,9 +16,10 @@ use codespan_reporting::{
     term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
-use move_binary_format::CompiledModule;
+use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use move_compiler_v2::{options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -26,7 +27,10 @@ use move_model::{
 };
 use move_package::{
     compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
-    source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+    source_package::{
+        manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+        std_lib::StdVersion,
+    },
     BuildConfig, CompilerConfig, ModelConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -73,15 +77,20 @@ pub struct BuildOptions {
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
+    /// Whether to override the standard library with the given version.
+    #[clap(long, value_parser)]
+    pub override_std: Option<StdVersion>,
     #[clap(skip)]
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
-    #[clap(long)]
+    #[clap(long, default_value_if("move_2", "true", "7"))]
     pub bytecode_version: Option<u32>,
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           default_value_if("move_2", "true", "2.0"))]
     pub compiler_version: Option<CompilerVersion>,
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           default_value_if("move_2", "true", "2.0"))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -89,6 +98,11 @@ pub struct BuildOptions {
     pub check_test_code: bool,
     #[clap(skip)]
     pub known_attributes: BTreeSet<String>,
+    #[clap(skip)]
+    pub experiments: Vec<String>,
+    /// Select bytecode, language, compiler for Move 2
+    #[clap(long)]
+    pub move_2: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -104,6 +118,7 @@ impl Default for BuildOptions {
             with_docs: false,
             install_dir: None,
             named_addresses: Default::default(),
+            override_std: None,
             docgen_options: None,
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
@@ -114,7 +129,31 @@ impl Default for BuildOptions {
             skip_attribute_checks: false,
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
+            experiments: vec![],
+            move_2: false,
         }
+    }
+}
+
+impl BuildOptions {
+    pub fn move_2() -> Self {
+        BuildOptions {
+            bytecode_version: Some(VERSION_7),
+            language_version: Some(LanguageVersion::V2_0),
+            compiler_version: Some(CompilerVersion::V2_0),
+            ..Self::default()
+        }
+    }
+
+    pub fn inferred_bytecode_version(&self) -> u32 {
+        self.language_version
+            .unwrap_or_default()
+            .infer_bytecode_version(self.bytecode_version)
+    }
+
+    pub fn with_experiment(mut self, exp: &str) -> Self {
+        self.experiments.push(exp.to_string());
+        self
     }
 }
 
@@ -136,7 +175,13 @@ pub fn build_model(
     language_version: Option<LanguageVersion>,
     skip_attribute_checks: bool,
     known_attributes: BTreeSet<String>,
+    experiments: Vec<String>,
 ) -> anyhow::Result<GlobalEnv> {
+    let bytecode_version = Some(
+        language_version
+            .unwrap_or_default()
+            .infer_bytecode_version(bytecode_version),
+    );
     let build_config = BuildConfig {
         dev_mode,
         additional_named_addresses,
@@ -147,6 +192,7 @@ pub fn build_model(
         full_model_generation: false,
         install_dir: None,
         test_mode: false,
+        override_std: None,
         force_recompilation: false,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
@@ -156,6 +202,7 @@ pub fn build_model(
             language_version,
             skip_attribute_checks,
             known_attributes,
+            experiments,
         },
     };
     let compiler_version = compiler_version.unwrap_or_default();
@@ -175,7 +222,7 @@ impl BuiltPackage {
     /// This function currently reports all Move compilation errors and warnings to stdout,
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
-        let bytecode_version = options.bytecode_version;
+        let bytecode_version = Some(options.inferred_bytecode_version());
         let compiler_version = options.compiler_version;
         let language_version = options.language_version;
         Self::check_versions(&compiler_version, &language_version)?;
@@ -190,6 +237,7 @@ impl BuiltPackage {
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
             test_mode: false,
+            override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
@@ -199,6 +247,7 @@ impl BuiltPackage {
                 language_version,
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
+                experiments: options.experiments.clone(),
             },
         };
 
@@ -208,12 +257,25 @@ impl BuiltPackage {
 
         // Run extended checks as well derive runtime metadata
         let model = &model_opt.expect("move model");
+
+        if let Some(model_options) = model.get_extension::<Options>() {
+            if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
+                std::process::exit(0)
+            }
+        }
+
         let runtime_metadata = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
             let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
             model.report_diag(&mut error_writer, Severity::Warning);
             if model.has_errors() {
                 bail!("extended checks failed")
+            }
+        }
+
+        if let Some(model_options) = model.get_extension::<Options>() {
+            if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
+                std::process::exit(0)
             }
         }
 
@@ -248,7 +310,7 @@ impl BuiltPackage {
                         .unwrap()
                         .parent()
                         .unwrap()
-                        .join("doc")
+                        .join(get_docgen_output_dir())
                         .display()
                         .to_string()
                 })
@@ -316,9 +378,8 @@ impl BuiltPackage {
         self.package
             .root_modules()
             .map(|unit_with_source| {
-                unit_with_source
-                    .unit
-                    .serialize(self.options.bytecode_version)
+                let bytecode_version = self.options.inferred_bytecode_version();
+                unit_with_source.unit.serialize(Some(bytecode_version))
             })
             .collect()
     }
@@ -365,7 +426,7 @@ impl BuiltPackage {
             .map(|unit_with_source| {
                 unit_with_source
                     .unit
-                    .serialize(self.options.bytecode_version)
+                    .serialize(Some(self.options.inferred_bytecode_version()))
             })
             .collect()
     }

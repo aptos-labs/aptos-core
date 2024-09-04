@@ -53,6 +53,7 @@ use futures::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
+    collections::HashMap,
     mem::{discriminant, Discriminant},
     sync::Arc,
     time::Duration,
@@ -169,16 +170,12 @@ pub struct NetworkReceivers {
 
 #[async_trait::async_trait]
 pub trait QuorumStoreSender: Send + Clone {
-    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>);
-
     async fn request_batch(
         &self,
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
     ) -> anyhow::Result<BatchResponse>;
-
-    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
     async fn send_signed_batch_info_msg(
         &self,
@@ -197,7 +194,7 @@ pub trait QuorumStoreSender: Send + Clone {
 #[derive(Clone)]
 pub struct NetworkSender {
     author: Author,
-    consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
+    pub(crate) consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
@@ -241,12 +238,7 @@ impl NetworkSender {
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
-        let response_msg = monitor!(
-            "block_retrieval",
-            self.consensus_network_client
-                .send_rpc(from, msg, timeout)
-                .await
-        )?;
+        let response_msg = monitor!("block_retrieval", self.send_rpc(from, msg, timeout).await)?;
         let response = match response_msg {
             ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
             _ => return Err(anyhow!("Invalid response to request")),
@@ -265,6 +257,24 @@ impl NetworkSender {
         Ok(response)
     }
 
+    pub async fn send_rpc_to_self(
+        &self,
+        msg: ConsensusMsg,
+        timeout_duration: Duration,
+    ) -> anyhow::Result<ConsensusMsg> {
+        let (tx, rx) = oneshot::channel();
+        let protocol = RPC[0];
+        let self_msg = Event::RpcRequest(self.author, msg.clone(), RPC[0], tx);
+        self.self_sender.clone().send(self_msg).await?;
+        if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
+            let response_msg =
+                tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
+            Ok(response_msg)
+        } else {
+            bail!("self rpc failed");
+        }
+    }
+
     pub async fn send_rpc(
         &self,
         receiver: Author,
@@ -278,15 +288,7 @@ impl NetworkSender {
             .with_label_values(&[msg.name()])
             .inc();
         if receiver == self.author() {
-            let (tx, rx) = oneshot::channel();
-            let protocol = RPC[0];
-            let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
-            self.self_sender.clone().send(self_msg).await?;
-            if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
-                Ok(protocol.from_bytes(&bytes)?)
-            } else {
-                bail!("self rpc failed");
-            }
+            self.send_rpc_to_self(msg, timeout_duration).await
         } else {
             Ok(monitor!(
                 "send_rpc",
@@ -311,34 +313,17 @@ impl NetworkSender {
             error!("Error broadcasting to self: {:?}", err);
         }
 
-        // Get the list of validators excluding our own account address. Note the
-        // ordering is not important in this case.
-        let self_author = self.author;
-        let other_validators: Vec<_> = self
-            .validators
-            .get_ordered_account_addresses_iter()
-            .filter(|author| author != &self_author)
-            .collect();
-
-        counters::CONSENSUS_SENT_MSGS
-            .with_label_values(&[msg.name()])
-            .inc_by(other_validators.len() as u64);
-        // Broadcast message over direct-send to all other validators.
-        if let Err(err) = self
-            .consensus_network_client
-            .send_to_many(other_validators.into_iter(), msg)
-        {
-            warn!(error = ?err, "Error broadcasting message");
-        }
+        self.broadcast_without_self(msg);
     }
 
     pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
         let self_author = self.author;
-        let other_validators: Vec<_> = self
+        let mut other_validators: Vec<_> = self
             .validators
             .get_ordered_account_addresses_iter()
             .filter(|author| author != &self_author)
             .collect();
+        self.sort_peers_by_latency(&mut other_validators);
 
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
@@ -346,7 +331,7 @@ impl NetworkSender {
         // Broadcast message over direct-send to all other validators.
         if let Err(err) = self
             .consensus_network_client
-            .send_to_many(other_validators.into_iter(), msg)
+            .send_to_many(other_validators, msg)
         {
             warn!(error = ?err, "Error broadcasting message");
         }
@@ -428,7 +413,11 @@ impl NetworkSender {
 
     pub async fn broadcast_fast_share(&self, share: FastShare<Share>) {
         fail_point!("consensus::send::broadcast_share", |_| ());
-        let msg = RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message();
+        let msg = tokio::task::spawn_blocking(|| {
+            RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message()
+        })
+        .await
+        .expect("task cannot fail to execute");
         self.broadcast(msg).await
     }
 
@@ -473,16 +462,14 @@ impl NetworkSender {
     pub fn author(&self) -> Author {
         self.author
     }
+
+    pub fn sort_peers_by_latency(&self, peers: &mut [Author]) {
+        self.consensus_network_client.sort_peers_by_latency(peers);
+    }
 }
 
 #[async_trait::async_trait]
 impl QuorumStoreSender for NetworkSender {
-    async fn send_batch_request(&self, request: BatchRequest, recipients: Vec<Author>) {
-        fail_point!("consensus::send::batch_request", |_| ());
-        let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
-        self.send(msg, recipients).await
-    }
-
     async fn request_batch(
         &self,
         request: BatchRequest,
@@ -491,10 +478,7 @@ impl QuorumStoreSender for NetworkSender {
     ) -> anyhow::Result<BatchResponse> {
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
-        let response = self
-            .consensus_network_client
-            .send_rpc(recipient, msg, timeout)
-            .await?;
+        let response = self.send_rpc(recipient, msg, timeout).await?;
         match response {
             // TODO: deprecated, remove after another release (likely v1.11)
             ConsensusMsg::BatchResponse(batch) => {
@@ -510,12 +494,6 @@ impl QuorumStoreSender for NetworkSender {
             },
             _ => Err(anyhow!("Invalid batch response")),
         }
-    }
-
-    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
-        fail_point!("consensus::send::batch", |_| ());
-        let msg = ConsensusMsg::BatchResponse(Box::new(batch));
-        self.send(msg, recipients).await
     }
 
     async fn send_signed_batch_info_msg(
@@ -590,16 +568,43 @@ impl TDAGNetworkSender for NetworkSender {
 impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 'static>
     RBNetworkSender<Req, Res> for NetworkSender
 {
+    async fn send_rb_rpc_raw(
+        &self,
+        receiver: Author,
+        raw_message: Bytes,
+        timeout: Duration,
+    ) -> anyhow::Result<Res> {
+        let response_msg = self
+            .consensus_network_client
+            .send_rpc_raw(receiver, raw_message, timeout)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))?;
+        tokio::task::spawn_blocking(|| TConsensusMsg::from_network_message(response_msg)).await?
+    }
+
     async fn send_rb_rpc(
         &self,
         receiver: Author,
         message: Req,
         timeout: Duration,
     ) -> anyhow::Result<Res> {
-        self.send_rpc(receiver, message.into_network_message(), timeout)
-            .await
-            .map_err(|e| anyhow!("invalid rpc response: {}", e))
-            .and_then(TConsensusMsg::from_network_message)
+        let consensus_msg = message.into_network_message();
+        let response_msg = self.send_rpc(receiver, consensus_msg, timeout).await?;
+        tokio::task::spawn_blocking(|| TConsensusMsg::from_network_message(response_msg)).await?
+    }
+
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<Author>,
+        message: Req,
+    ) -> anyhow::Result<HashMap<Author, Bytes>> {
+        let consensus_msg = message.into_network_message();
+        self.consensus_network_client
+            .to_bytes_by_protocol(peers, consensus_msg)
+    }
+
+    fn sort_peers_by_latency(&self, peers: &mut [Author]) {
+        self.sort_peers_by_latency(peers);
     }
 }
 
@@ -852,9 +857,6 @@ impl NetworkTask {
                     {
                         warn!(error = ?e, "aptos channel closed");
                     };
-                },
-                _ => {
-                    // Ignore `NewPeer` and `LostPeer` events
                 },
             });
         }

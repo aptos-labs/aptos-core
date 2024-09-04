@@ -14,6 +14,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_drop_helper::ArcAsyncDrop;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
 use std::cmp::Ordering;
@@ -24,7 +25,7 @@ type InMemSubTree<V> = super::node::SubTree<V>;
 type InMemInternal<V> = InternalNode<V>;
 
 #[derive(Clone)]
-enum InMemSubTreeInfo<V: Send + Sync + 'static> {
+enum InMemSubTreeInfo<V: ArcAsyncDrop> {
     Internal {
         subtree: InMemSubTree<V>,
         node: InMemInternal<V>,
@@ -105,7 +106,7 @@ enum PersistedSubTreeInfo<'a> {
 }
 
 #[derive(Clone)]
-enum SubTreeInfo<'a, V: Send + Sync + 'static> {
+enum SubTreeInfo<'a, V: ArcAsyncDrop> {
     InMem(InMemSubTreeInfo<V>),
     Persisted(PersistedSubTreeInfo<'a>),
 }
@@ -272,14 +273,14 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
     }
 }
 
-pub struct SubTreeUpdater<'a, V: Send + Sync + 'static> {
+pub struct SubTreeUpdater<'a, V: ArcAsyncDrop> {
     depth: usize,
     info: SubTreeInfo<'a, V>,
     updates: &'a [(HashValue, Option<&'a V>)],
     generation: u64,
 }
 
-impl<'a, V: Send + Sync + 'static + Clone + CryptoHash> SubTreeUpdater<'a, V> {
+impl<'a, V: ArcAsyncDrop + Clone + CryptoHash> SubTreeUpdater<'a, V> {
     pub(crate) fn update(
         root: InMemSubTree<V>,
         updates: &'a [(HashValue, Option<&'a V>)],

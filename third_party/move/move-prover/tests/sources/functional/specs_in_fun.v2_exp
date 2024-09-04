@@ -1,4 +1,28 @@
 Move prover returns: exiting with verification errors
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/sources/functional/specs_in_fun.move:18:9
+   │
+18 │         y = x + 1;
+   │         ^^^^^^^^^
+
+warning: Unused assignment to `z`. Consider removing or prefixing with an underscore: `_z`
+   ┌─ tests/sources/functional/specs_in_fun.move:33:9
+   │
+33 │         z = x + y;
+   │         ^^^^^^^^^
+
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/sources/functional/specs_in_fun.move:51:9
+   │
+51 │         y = x + 1;
+   │         ^^^^^^^^^
+
+warning: Unused assignment to `z`. Consider removing or prefixing with an underscore: `_z`
+   ┌─ tests/sources/functional/specs_in_fun.move:66:9
+   │
+66 │         z = x + y;
+   │         ^^^^^^^^^
+
 error: unknown assertion failed
    ┌─ tests/sources/functional/specs_in_fun.move:45:13
    │

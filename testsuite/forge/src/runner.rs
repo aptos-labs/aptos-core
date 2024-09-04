@@ -75,6 +75,9 @@ pub struct Options {
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     /// Show captured stdout of successful tests
     show_output: bool,
+    /// Retain debug logs and above for all nodes instead of just the first 5 nodes
+    #[clap(long, default_value = "false", env = "FORGE_RETAIN_DEBUG_LOGS")]
+    retain_debug_logs: bool,
 }
 
 impl Options {
@@ -124,6 +127,7 @@ pub type OverrideNodeConfigFn = Arc<dyn Fn(&mut NodeConfig, &mut NodeConfig) + S
 pub struct NodeResourceOverride {
     pub cpu_cores: Option<usize>,
     pub memory_gib: Option<usize>,
+    pub storage_gib: Option<usize>,
 }
 
 pub struct ForgeConfig {
@@ -166,6 +170,9 @@ pub struct ForgeConfig {
     validator_resource_override: NodeResourceOverride,
 
     fullnode_resource_override: NodeResourceOverride,
+
+    /// Retain debug logs and above for all nodes instead of just the first 5 nodes
+    retain_debug_logs: bool,
 }
 
 impl ForgeConfig {
@@ -256,7 +263,7 @@ impl ForgeConfig {
         OverrideNodeConfig::new(override_config, base_config)
     }
 
-    pub fn build_node_helm_config_fn(&self) -> Option<NodeConfigFn> {
+    pub fn build_node_helm_config_fn(&self, retain_debug_logs: bool) -> Option<NodeConfigFn> {
         let validator_override_node_config = self
             .validator_override_node_config_fn
             .clone()
@@ -270,6 +277,7 @@ impl ForgeConfig {
         let validator_resource_override = self.validator_resource_override;
         let fullnode_resource_override = self.fullnode_resource_override;
 
+        // Override specific helm values. See reference: terraform/helm/aptos-node/values.yaml
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
             if let Some(override_config) = &validator_override_node_config {
                 helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
@@ -304,6 +312,9 @@ impl ForgeConfig {
                 helm_values["validator"]["resources"]["limits"]["memory"] =
                     format!("{}Gi", memory_gib).into();
             }
+            if let Some(storage_gib) = validator_resource_override.storage_gib {
+                helm_values["validator"]["storage"]["size"] = format!("{}Gi", storage_gib).into();
+            }
             // fullnode resource overrides
             if let Some(cpu_cores) = fullnode_resource_override.cpu_cores {
                 helm_values["fullnode"]["resources"]["requests"]["cpu"] = cpu_cores.into();
@@ -315,6 +326,24 @@ impl ForgeConfig {
                 helm_values["fullnode"]["resources"]["limits"]["memory"] =
                     format!("{}Gi", memory_gib).into();
             }
+            if let Some(storage_gib) = fullnode_resource_override.storage_gib {
+                helm_values["fullnode"]["storage"]["size"] = format!("{}Gi", storage_gib).into();
+            }
+
+            if retain_debug_logs {
+                helm_values["validator"]["podAnnotations"]["aptos.dev/min-log-level-to-retain"] =
+                    serde_yaml::Value::String("debug".to_owned());
+                helm_values["fullnode"]["podAnnotations"]["aptos.dev/min-log-level-to-retain"] =
+                    serde_yaml::Value::String("debug".to_owned());
+                helm_values["validator"]["rust_log"] = "debug,hyper=off".into();
+                helm_values["fullnode"]["rust_log"] = "debug,hyper=off".into();
+            }
+
+            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
+                ["enable_storage_sharding"] = true.into();
+            helm_values["fullnode"]["config"]["storage"]["rocksdb_configs"]
+                ["enable_storage_sharding"] = true.into();
+            helm_values["fullnode"]["config"]["indexer_db_config"]["enable_event"] = true.into();
         }))
     }
 
@@ -476,6 +505,7 @@ impl Default for ForgeConfig {
             existing_db_tag: None,
             validator_resource_override: NodeResourceOverride::default(),
             fullnode_resource_override: NodeResourceOverride::default(),
+            retain_debug_logs: false,
         }
     }
 }
@@ -531,6 +561,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
     pub fn run(&self) -> Result<TestReport> {
         let test_count = self.filter_tests(&self.tests.all_tests()).count();
         let filtered_out = test_count.saturating_sub(self.tests.all_tests().len());
+        let retain_debug_logs = self.options.retain_debug_logs || self.tests.retain_debug_logs;
 
         let mut report = TestReport::new();
         let mut summary = TestSummary::new(test_count, filtered_out);
@@ -547,7 +578,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             let initial_version = self.initial_version();
             // The genesis version should always match the initial node version
             let genesis_version = initial_version.clone();
-            let runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap(); // TODO: new multithreaded?
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
             let mut swarm = runtime.block_on(self.factory.launch_swarm(
                 &mut rng,
@@ -558,7 +589,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.tests.genesis_config.as_ref(),
                 self.global_duration + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
                 self.tests.genesis_helm_config_fn.clone(),
-                self.tests.build_node_helm_config_fn(),
+                self.tests.build_node_helm_config_fn(retain_debug_logs),
                 self.tests.existing_db_tag.clone(),
             ))?;
 
@@ -586,16 +617,26 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
+            let logs_location = swarm.logs_location();
+            let swarm = Arc::new(tokio::sync::RwLock::new(swarm));
             for test in self.filter_tests(&self.tests.network_tests) {
-                let mut network_ctx = NetworkContext::new(
+                let network_ctx = NetworkContext::new(
                     CoreContext::from_rng(&mut rng),
-                    &mut *swarm,
+                    swarm.clone(),
                     &mut report,
                     self.global_duration,
                     self.tests.emit_job_request.clone(),
                     self.tests.success_criteria.clone(),
                 );
-                let result = run_test(|| test.run(&mut network_ctx));
+                let handle = network_ctx.runtime.handle().clone();
+                let _handle_context = handle.enter();
+                let network_ctx = NetworkContextSynchronizer::new(network_ctx, handle.clone());
+                let result = run_test(|| handle.block_on(test.run(network_ctx.clone())));
+                // explicitly keep network context in scope so that its created tokio Runtime drops after all the stuff has run.
+                let NetworkContextSynchronizer { ctx, handle } = network_ctx;
+                drop(handle);
+                let ctx = Arc::into_inner(ctx).unwrap().into_inner();
+                drop(ctx);
                 report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;
             }
@@ -606,7 +647,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             io::stderr().flush()?;
             if !summary.success() {
                 println!();
-                println!("Swarm logs can be found here: {}", swarm.logs_location());
+                println!("Swarm logs can be found here: {}", logs_location);
             }
         }
 

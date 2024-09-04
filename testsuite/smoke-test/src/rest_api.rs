@@ -30,7 +30,7 @@ use std::{convert::TryFrom, str::FromStr, sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_get_index() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let info = swarm.aptos_public_info();
 
     let resp = reqwest::get(info.url().to_owned()).await.unwrap();
@@ -39,7 +39,7 @@ async fn test_get_index() {
 
 #[tokio::test]
 async fn test_basic_client() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     info.client().get_ledger_information().await.unwrap();
@@ -123,6 +123,8 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
             TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool: false,
+                non_conflicting: false,
+                use_fa_transfer: false,
             },
             100,
         )]],
@@ -244,7 +246,7 @@ async fn test_gas_estimation_gas_used_limit() {
 
 #[tokio::test]
 async fn test_bcs() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
     // Create accounts
@@ -546,7 +548,7 @@ async fn test_bcs() {
 
 #[tokio::test]
 async fn test_view_function() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let info = swarm.aptos_public_info();
     let client: &Client = info.client();
 

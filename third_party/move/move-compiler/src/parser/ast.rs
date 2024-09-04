@@ -199,6 +199,7 @@ pub struct FriendDecl {
 
 new_name!(Field);
 new_name!(StructName);
+new_name!(VariantName);
 
 pub type ResourceLoc = Option<Loc>;
 
@@ -216,13 +217,24 @@ pub struct StructDefinition {
     pub abilities: Vec<Ability>,
     pub name: StructName,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub fields: StructFields,
+    pub layout: StructLayout,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum StructFields {
-    Defined(Vec<(Field, Type)>),
+pub enum StructLayout {
+    // the second field is true iff the struct has positional fields
+    Singleton(Vec<(Field, Type)>, bool),
+    Variants(Vec<StructVariant>),
     Native(Loc),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StructVariant {
+    pub attributes: Vec<Attributes>,
+    pub loc: Loc,
+    pub name: VariantName,
+    pub fields: Vec<(Field, Type)>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -275,6 +287,7 @@ pub enum Visibility {
     Public(Loc),
     Script(Loc),
     Friend(Loc),
+    Package(Loc),
     Internal,
 }
 
@@ -452,6 +465,8 @@ pub enum NameAccessChain_ {
     Two(LeadingNameAccess, Name),
     // (<Name>|<Num>)::<Name>::<Name>
     Three(Spanned<(LeadingNameAccess, Name)>, Name),
+    // (<Name>|<Num>)::<Name>::<Name>::<Name>
+    Four(Spanned<(LeadingNameAccess, Name)>, Name, Name),
 }
 pub type NameAccessChain = Spanned<NameAccessChain_>;
 
@@ -492,13 +507,39 @@ new_name!(Var);
 pub enum Bind_ {
     // x
     Var(Var),
-    // T { f1: b1, ... fn: bn }
-    // T<t1, ... , tn> { f1: b1, ... fn: bn }
-    Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<(Field, Bind)>),
+    // T { f1: b1, ... fn: bn, ".."? }
+    // T<t1, ... , tn> { f1: b1, ... fn: bn, ".."? }
+    Unpack(
+        Box<NameAccessChain>,
+        Option<Vec<Type>>,
+        Vec<BindFieldOrDotDot>,
+    ),
+    // T(e1, ..., en)
+    // T<t1, ... , tn>(e1, ..., en)
+    // where each e_i is an expression or a ".."
+    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotDot>),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
 pub type BindList = Spanned<Vec<Bind>>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindFieldOrDotDot_ {
+    // f : b
+    FieldBind(Field, Bind),
+    // ..
+    DotDot,
+}
+pub type BindFieldOrDotDot = Spanned<BindFieldOrDotDot_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindOrDotDot_ {
+    // a bind
+    Bind(Bind),
+    // ..
+    DotDot,
+}
+pub type BindOrDotDot = Spanned<BindOrDotDot_>;
 
 pub type BindWithRange = Spanned<(Bind, Exp)>;
 pub type BindWithRangeList = Spanned<Vec<BindWithRange>>;
@@ -634,6 +675,8 @@ pub enum Exp_ {
     While(Box<Exp>, Box<Exp>),
     // loop eloop
     Loop(Box<Exp>),
+    // match (e) { b1 [ if c_1] => e1, ... }
+    Match(Box<Exp>, Vec<Spanned<(BindList, Option<Exp>, Exp)>>),
 
     // { seq }
     Block(Sequence),
@@ -685,6 +728,9 @@ pub enum Exp_ {
     // (e: t)
     Annotate(Box<Exp>, Type),
 
+    // (e is t1 | .. | tn)
+    Test(Box<Exp>, Vec<Type>),
+
     // spec { ... }
     Spec(SpecBlock),
 
@@ -716,6 +762,16 @@ pub enum SequenceItem_ {
     Bind(BindList, Option<Type>, Box<Exp>),
 }
 pub type SequenceItem = Spanned<SequenceItem_>;
+
+pub type MatchArm = Spanned<MatchArm_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchArm_ {
+    bind: Bind,
+    variant_name: NameAccessChain,
+    type_args: Option<Vec<Type>>,
+    bindings: Vec<(Field, Bind)>,
+}
 
 //**************************************************************************************************
 // Traits
@@ -929,14 +985,16 @@ impl BinOp_ {
 impl Visibility {
     pub const FRIEND: &'static str = "public(friend)";
     pub const INTERNAL: &'static str = "";
+    pub const PACKAGE: &'static str = "public(package)";
     pub const PUBLIC: &'static str = "public";
     pub const SCRIPT: &'static str = "public(script)";
 
     pub fn loc(&self) -> Option<Loc> {
         match self {
-            Visibility::Public(loc) | Visibility::Script(loc) | Visibility::Friend(loc) => {
-                Some(*loc)
-            },
+            Visibility::Public(loc)
+            | Visibility::Script(loc)
+            | Visibility::Friend(loc)
+            | Visibility::Package(loc) => Some(*loc),
             Visibility::Internal => None,
         }
     }
@@ -967,6 +1025,9 @@ impl fmt::Display for NameAccessChain_ {
             NameAccessChain_::One(n) => write!(f, "{}", n),
             NameAccessChain_::Two(ln, n2) => write!(f, "{}::{}", ln, n2),
             NameAccessChain_::Three(sp!(_, (ln, n2)), n3) => write!(f, "{}::{}::{}", ln, n2, n3),
+            NameAccessChain_::Four(sp!(_, (ln, n2)), n3, n4) => {
+                write!(f, "{}::{}::{}::{}", ln, n2, n3, n4)
+            },
         }
     }
 }
@@ -989,6 +1050,7 @@ impl fmt::Display for Visibility {
             Visibility::Public(_) => Visibility::PUBLIC,
             Visibility::Script(_) => Visibility::SCRIPT,
             Visibility::Friend(_) => Visibility::FRIEND,
+            Visibility::Package(_) => Visibility::PACKAGE,
             Visibility::Internal => Visibility::INTERNAL,
         })
     }
@@ -1265,7 +1327,7 @@ impl AstDebug for StructDefinition {
             abilities,
             name,
             type_parameters,
-            fields,
+            layout,
         } = self;
         attributes.ast_debug(w);
 
@@ -1274,19 +1336,21 @@ impl AstDebug for StructDefinition {
             false
         });
 
-        if let StructFields::Native(_) = fields {
+        if let StructLayout::Native(_) = layout {
             w.write("native ");
         }
 
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
-        if let StructFields::Defined(fields) = fields {
-            w.block(|w| {
+        match layout {
+            StructLayout::Singleton(fields, _) => w.block(|w| {
                 w.semicolon(fields, |w, (f, st)| {
                     w.write(&format!("{}: ", f));
                     st.ast_debug(w);
                 });
-            })
+            }),
+            StructLayout::Variants(_) => w.writeln("variant printing NYI"),
+            StructLayout::Native(_) => {},
         }
     }
 }
@@ -1795,6 +1859,20 @@ impl AstDebug for Exp_ {
                     f.ast_debug(w);
                 }
             },
+            E::Match(e, arms) => {
+                w.write("match (");
+                e.ast_debug(w);
+                w.write(") {");
+                for arm in arms {
+                    arm.value.0.ast_debug(w);
+                    if let Some(cond) = &arm.value.1 {
+                        w.write(" if ");
+                        cond.ast_debug(w);
+                    }
+                    w.write(" => ");
+                    arm.value.2.ast_debug(w)
+                }
+            },
             E::While(b, e) => {
                 w.write("while (");
                 b.ast_debug(w);
@@ -1879,6 +1957,16 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
                 w.write(" as ");
                 ty.ast_debug(w);
+                w.write(")");
+            },
+            E::Test(e, tys) => {
+                w.write("(");
+                e.ast_debug(w);
+                w.write(" is ");
+                w.list(tys, "|", |w, item| {
+                    item.ast_debug(w);
+                    false
+                });
                 w.write(")");
             },
             E::Index(e, i) => {
@@ -1974,6 +2062,29 @@ impl AstDebug for Vec<Bind> {
     }
 }
 
+impl AstDebug for BindOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindOrDotDot_ as B;
+        match self {
+            B::Bind(b) => b.ast_debug(w),
+            B::DotDot => w.write(".."),
+        }
+    }
+}
+
+impl AstDebug for BindFieldOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindFieldOrDotDot_ as B;
+        match self {
+            B::FieldBind(f, b) => {
+                w.write(&format!("{}: ", f));
+                b.ast_debug(w);
+            },
+            B::DotDot => w.write(".."),
+        }
+    }
+}
+
 impl AstDebug for Vec<Vec<Exp>> {
     fn ast_debug(&self, w: &mut AstWriter) {
         for trigger in self {
@@ -1997,11 +2108,21 @@ impl AstDebug for Bind_ {
                     w.write(">");
                 }
                 w.write("{");
-                w.comma(fields, |w, (f, b)| {
-                    w.write(&format!("{}: ", f));
-                    b.ast_debug(w);
+                w.comma(fields, |w, field| {
+                    field.ast_debug(w);
                 });
                 w.write("}");
+            },
+            B::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(args, |w, b| b.ast_debug(w));
+                w.write(")");
             },
         }
     }

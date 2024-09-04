@@ -44,3 +44,22 @@ pub const TYPE_NAME_GET_SPEC: &str = "type_name::$get";
 
 /// The well-known name of the first parameter of a method.
 pub const RECEIVER_PARAM_NAME: &str = "self";
+
+/// The well-known abort codes used by the compiler. These conform
+/// to the error category standard as defined in
+/// `../move-stdlib/sources/error.move` in the standard library. The lowest
+/// three bytes represent the error category (one byte) and the reason (two bytes).
+/// All compiler generated abort codes use category
+/// `std::error::INTERNAL` (`0xB`). The upper five bytes
+/// are populated with the lowest bytes of the sha256
+/// of the string "Move 2 Abort Code".
+const fn make_abort_code(reason: u16) -> u64 {
+    let magic = 0xCA26CBD9BE; // sha256("Move 2 Abort code")
+    (magic << 24) | 0xB << 16 | (reason as u64)
+}
+
+// Used when user omits an abort code in an `assert!`.
+pub const UNSPECIFIED_ABORT_CODE: u64 = make_abort_code(0);
+
+// Used when a runtime value falls through a match.
+pub const INCOMPLETE_MATCH_ABORT_CODE: u64 = make_abort_code(1);

@@ -5,6 +5,7 @@ use crate::AptosDB;
 use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter, Result,
@@ -40,7 +41,10 @@ pub struct FastSyncStorageWrapper {
 impl FastSyncStorageWrapper {
     /// If the db is empty and configured to do fast sync, we return a FastSyncStorageWrapper
     /// Otherwise, we returns AptosDB directly and the FastSyncStorageWrapper is None
-    pub fn initialize_dbs(config: &NodeConfig) -> Result<Either<AptosDB, Self>> {
+    pub fn initialize_dbs(
+        config: &NodeConfig,
+        internal_indexer_db: Option<InternalIndexerDB>,
+    ) -> Result<Either<AptosDB, Self>> {
         let db_main = AptosDB::open(
             config.storage.get_dir_paths(),
             /*readonly=*/ false,
@@ -49,6 +53,7 @@ impl FastSyncStorageWrapper {
             config.storage.enable_indexer,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
+            internal_indexer_db,
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
 
@@ -62,7 +67,7 @@ impl FastSyncStorageWrapper {
             && (db_main
                 .ledger_db
                 .metadata_db()
-                .get_synced_version()
+                .get_synced_version()?
                 .map_or(0, |v| v)
                 == 0)
         {
@@ -75,6 +80,7 @@ impl FastSyncStorageWrapper {
                 config.storage.enable_indexer,
                 config.storage.buffered_state_target_items,
                 config.storage.max_num_nodes_per_lru_cache_shard,
+                None,
             )
             .map_err(|err| anyhow!("Secondary DB failed to open {}", err))?;
 
@@ -158,27 +164,35 @@ impl DbWriter for FastSyncStorageWrapper {
         Ok(())
     }
 
-    fn save_transactions(
+    fn pre_commit_ledger(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
         state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
         sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
-        self.get_aptos_db_write_ref().save_transactions(
+        self.get_aptos_db_write_ref().pre_commit_ledger(
             txns_to_commit,
             first_version,
             base_state_version,
-            ledger_info_with_sigs,
             sync_commit,
             latest_in_memory_state,
             state_updates_until_last_checkpoint,
             sharded_state_cache,
         )
+    }
+
+    fn commit_ledger(
+        &self,
+        version: Version,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        txns_to_commit: Option<&[TransactionToCommit]>,
+    ) -> Result<()> {
+        self.get_aptos_db_write_ref()
+            .commit_ledger(version, ledger_info_with_sigs, txns_to_commit)
     }
 }
 

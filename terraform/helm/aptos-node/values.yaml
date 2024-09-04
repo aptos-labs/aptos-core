@@ -34,31 +34,25 @@ haproxy:
     # -- Image repo to use for HAProxy images
     repo: haproxy
     # -- Image tag to use for HAProxy images
-    tag: 2.2.29@sha256:8019a233a37045a27970dbc990e9ea485799200c40f658e4620b7fdf55641a3c
+    tag: 3.0.2@sha256:3fa2e323a2f422239a39eff345b41ab20a7a91aa4ad8c3c82b9ae85dd241214b
     # -- Image pull policy to use for HAProxy images
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 3
-      memory: 6Gi
+      cpu: 7
+      memory: 16Gi
     requests:
-      cpu: 3
-      memory: 6Gi
+      cpu: 7
+      memory: 16Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
-  limits:
-    validator:
-      # -- Limit the number of connections per IP address per min
-      connectionsPerIPPerMin: 12
-      # Sustained 100mb/s for 10 sec.
-      maxBytesOutRate10sec: 134217728
-      rateLimitSession: 256
-      tcpBufSize: 524288
 
   config:
     # -- Whether to send Proxy Protocol v2
     send_proxy_protocol: &send_proxy_protocol false
+    # -- System user to run HA
+    user: nobody
   # -- Name of the Kubernetes TLS secret to use for HAProxy
   tls_secret:
 

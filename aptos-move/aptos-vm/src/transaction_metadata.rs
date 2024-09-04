@@ -28,7 +28,6 @@ pub struct TransactionMetadata {
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
-    pub required_deposit: Option<u64>,
     pub is_keyless: bool,
     pub entry_function_payload: Option<EntryFunction>,
     pub multisig_payload: Option<Multisig>,
@@ -38,20 +37,29 @@ impl TransactionMetadata {
     pub fn new(txn: &SignedTransaction) -> Self {
         Self {
             sender: txn.sender(),
-            authentication_key: txn.authenticator().sender().authentication_key().to_vec(),
+            authentication_key: txn
+                .authenticator()
+                .sender()
+                .authentication_key()
+                .map_or_else(Vec::new, |auth_key| auth_key.to_vec()),
             secondary_signers: txn.authenticator().secondary_signer_addresses(),
             secondary_authentication_keys: txn
                 .authenticator()
                 .secondary_signers()
                 .iter()
-                .map(|account_auth| account_auth.authentication_key().to_vec())
+                .map(|account_auth| {
+                    account_auth
+                        .authentication_key()
+                        .map_or_else(Vec::new, |auth_key| auth_key.to_vec())
+                })
                 .collect(),
             sequence_number: txn.sequence_number(),
             fee_payer: txn.authenticator_ref().fee_payer_address(),
-            fee_payer_authentication_key: txn
-                .authenticator()
-                .fee_payer_signer()
-                .map(|signer| signer.authentication_key().to_vec()),
+            fee_payer_authentication_key: txn.authenticator().fee_payer_signer().map(|signer| {
+                signer
+                    .authentication_key()
+                    .map_or_else(Vec::new, |auth_key| auth_key.to_vec())
+            }),
             max_gas_amount: txn.max_gas_amount().into(),
             gas_unit_price: txn.gas_unit_price().into(),
             transaction_size: (txn.raw_txn_bytes_len() as u64).into(),
@@ -70,7 +78,6 @@ impl TransactionMetadata {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),
                 _ => NumBytes::zero(),
             },
-            required_deposit: None,
             is_keyless: aptos_types::keyless::get_authenticators(txn)
                 .map(|res| !res.is_empty())
                 .unwrap_or(false),
@@ -137,10 +144,6 @@ impl TransactionMetadata {
 
     pub fn is_multi_agent(&self) -> bool {
         !self.secondary_signers.is_empty() || self.fee_payer.is_some()
-    }
-
-    pub fn set_required_deposit(&mut self, required_deposit: Option<u64>) {
-        self.required_deposit = required_deposit;
     }
 
     pub fn is_keyless(&self) -> bool {

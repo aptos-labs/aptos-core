@@ -1972,6 +1972,11 @@ fn check_unused_locals(
             DisplayVar::Tmp => panic!("ICE unused tmp"),
             DisplayVar::Orig(vstr) => vstr,
         };
+        if signature.is_first_parameter(&v) && vstr == "self" {
+            // Special treatment for `self` Move 2 parameter: do not warn if unused
+            // for the case v1 compiles v2 code
+            continue;
+        }
         let loc = v.loc();
         let msg = if signature.is_parameter(&v) {
             format!(

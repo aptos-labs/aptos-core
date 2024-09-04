@@ -10,10 +10,12 @@ use crate::{
     },
     file_format::{
         AbilitySet, Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, Constant,
-        FieldHandle, FieldInstantiation, FunctionDefinition, FunctionDefinitionIndex,
-        FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle, Signature, SignatureIndex,
-        SignatureToken, StructDefInstantiation, StructDefinition, StructFieldInformation,
-        StructHandle, TableIndex, TypeParameterIndex,
+        FieldDefinition, FieldHandle, FieldInstantiation, FunctionDefinition,
+        FunctionDefinitionIndex, FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle,
+        Signature, SignatureIndex, SignatureToken, StructDefInstantiation, StructDefinition,
+        StructFieldInformation, StructHandle, StructVariantHandle, StructVariantInstantiation,
+        TableIndex, TypeParameterIndex, VariantFieldHandle, VariantFieldInstantiation,
+        VariantIndex,
     },
     internals::ModuleIndex,
     IndexKind,
@@ -95,7 +97,38 @@ impl<'a> BoundsChecker<'a> {
         self.check_function_instantiations()?;
         self.check_field_instantiations()?;
         self.check_struct_defs()?;
-        self.check_function_defs()
+        self.check_function_defs()?;
+        // Since bytecode version 7
+        self.check_table(
+            self.view.variant_field_handles(),
+            Self::check_variant_field_handle,
+        )?;
+        self.check_table(
+            self.view.struct_variant_handles(),
+            Self::check_struct_variant_handle,
+        )?;
+        self.check_table(
+            self.view.variant_field_instantiations(),
+            Self::check_variant_field_instantiation,
+        )?;
+        self.check_table(
+            self.view.struct_variant_instantiations(),
+            Self::check_struct_variant_instantiation,
+        )?;
+        Ok(())
+    }
+
+    fn check_table<T>(
+        &self,
+        table: Option<&[T]>,
+        checker: impl Fn(&Self, &T) -> PartialVMResult<()>,
+    ) -> PartialVMResult<()> {
+        if let Some(table) = table {
+            for elem in table {
+                checker(self, elem)?
+            }
+        }
+        Ok(())
     }
 
     fn check_signatures(&self) -> PartialVMResult<()> {
@@ -169,8 +202,10 @@ impl<'a> BoundsChecker<'a> {
     }
 
     fn check_struct_defs(&self) -> PartialVMResult<()> {
-        for struct_def in self.view.struct_defs().into_iter().flatten() {
-            self.check_struct_def(struct_def)?
+        for (struct_def_idx, struct_def) in
+            self.view.struct_defs().into_iter().flatten().enumerate()
+        {
+            self.check_struct_def(struct_def, struct_def_idx)?
         }
         Ok(())
     }
@@ -222,10 +257,7 @@ impl<'a> BoundsChecker<'a> {
             .struct_defs()
             .and_then(|d| d.get(field_handle.owner.into_index()))
         {
-            let fields_count = match &struct_def.field_information {
-                StructFieldInformation::Native => 0,
-                StructFieldInformation::Declared(fields) => fields.len(),
-            };
+            let fields_count = struct_def.field_information.field_count(None);
             if field_handle.field as usize >= fields_count {
                 return Err(bounds_error(
                     StatusCode::INDEX_OUT_OF_BOUNDS,
@@ -236,6 +268,47 @@ impl<'a> BoundsChecker<'a> {
             }
         }
         Ok(())
+    }
+
+    fn check_variant_field_handle(&self, field_handle: &VariantFieldHandle) -> PartialVMResult<()> {
+        check_bounds_impl_opt(&self.view.struct_defs(), field_handle.struct_index)?;
+        let struct_def = self.view.struct_def_at(field_handle.struct_index)?;
+        for variant in &field_handle.variants {
+            Self::check_variant_index(struct_def, *variant)?;
+            let field_count = struct_def.field_information.field_count(Some(*variant));
+            if field_handle.field as usize >= field_count {
+                return Err(bounds_error(
+                    StatusCode::INDEX_OUT_OF_BOUNDS,
+                    IndexKind::MemberCount,
+                    field_handle.field,
+                    field_count,
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn check_struct_variant_handle(&self, handle: &StructVariantHandle) -> PartialVMResult<()> {
+        check_bounds_impl_opt(&self.view.struct_defs(), handle.struct_index)?;
+        let struct_def = self.view.struct_def_at(handle.struct_index)?;
+        Self::check_variant_index(struct_def, handle.variant)
+    }
+
+    fn check_variant_index(
+        struct_def: &StructDefinition,
+        variant_index: VariantIndex,
+    ) -> PartialVMResult<()> {
+        let count = struct_def.field_information.variant_count();
+        if (variant_index as usize) >= count {
+            Err(bounds_error(
+                StatusCode::INDEX_OUT_OF_BOUNDS,
+                IndexKind::MemberCount,
+                variant_index,
+                count,
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     fn check_struct_instantiation(
@@ -265,6 +338,22 @@ impl<'a> BoundsChecker<'a> {
         check_bounds_impl(self.view.signatures(), field_instantiation.type_parameters)
     }
 
+    fn check_variant_field_instantiation(
+        &self,
+        inst: &VariantFieldInstantiation,
+    ) -> PartialVMResult<()> {
+        check_bounds_impl_opt(&self.view.variant_field_handles(), inst.handle)?;
+        check_bounds_impl(self.view.signatures(), inst.type_parameters)
+    }
+
+    fn check_struct_variant_instantiation(
+        &self,
+        inst: &StructVariantInstantiation,
+    ) -> PartialVMResult<()> {
+        check_bounds_impl_opt(&self.view.struct_variant_handles(), inst.handle)?;
+        check_bounds_impl(self.view.signatures(), inst.type_parameters)
+    }
+
     fn check_signature(&self, signature: &Signature) -> PartialVMResult<()> {
         for ty in &signature.0 {
             self.check_type(ty)?
@@ -276,22 +365,51 @@ impl<'a> BoundsChecker<'a> {
         self.check_type(&constant.type_)
     }
 
-    fn check_struct_def(&self, struct_def: &StructDefinition) -> PartialVMResult<()> {
+    fn check_struct_def(
+        &self,
+        struct_def: &StructDefinition,
+        struct_def_idx: usize,
+    ) -> PartialVMResult<()> {
         check_bounds_impl(self.view.struct_handles(), struct_def.struct_handle)?;
-        // check signature (type) and type parameter for the field type
-        if let StructFieldInformation::Declared(fields) = &struct_def.field_information {
-            let type_param_count = self
-                .view
-                .struct_handles()
-                .get(struct_def.struct_handle.into_index())
-                .map_or(0, |sh| sh.type_parameters.len());
-            // field signatures are inlined
-            for field in fields {
-                check_bounds_impl(self.view.identifiers(), field.name)?;
-                self.check_type(&field.signature.0)?;
-                self.check_type_parameters_in_ty(&field.signature.0, type_param_count)?;
-            }
+        // check signature (type) and type parameter for the field types
+        let type_param_count = self
+            .view
+            .struct_handles()
+            .get(struct_def.struct_handle.into_index())
+            .map_or(0, |sh| sh.type_parameters.len());
+        match &struct_def.field_information {
+            StructFieldInformation::Declared(fields) => {
+                // field signatures are inlined
+                for field in fields {
+                    self.check_field_def(type_param_count, field)?;
+                }
+            },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                for field in variants.iter().flat_map(|v| v.fields.iter()) {
+                    self.check_field_def(type_param_count, field)?;
+                }
+                if variants.is_empty() {
+                    // Empty variants are not allowed
+                    return Err(verification_error(
+                        StatusCode::ZERO_VARIANTS_ERROR,
+                        IndexKind::StructDefinition,
+                        struct_def_idx as TableIndex,
+                    ));
+                }
+            },
+            StructFieldInformation::Native => {},
         }
+        Ok(())
+    }
+
+    fn check_field_def(
+        &self,
+        type_param_count: usize,
+        field: &FieldDefinition,
+    ) -> Result<(), PartialVMError> {
+        check_bounds_impl(self.view.identifiers(), field.name)?;
+        self.check_type(&field.signature.0)?;
+        self.check_type_parameters_in_ty(&field.signature.0, type_param_count)?;
         Ok(())
     }
 
@@ -379,16 +497,38 @@ impl<'a> BoundsChecker<'a> {
                     *idx,
                     bytecode_offset,
                 )?,
+                MutBorrowVariantField(idx) | ImmBorrowVariantField(idx) => self
+                    .check_code_unit_bounds_impl_opt(
+                        &self.view.variant_field_handles(),
+                        *idx,
+                        bytecode_offset,
+                    )?,
                 MutBorrowFieldGeneric(idx) | ImmBorrowFieldGeneric(idx) => {
                     self.check_code_unit_bounds_impl_opt(
                         &self.view.field_instantiations(),
                         *idx,
                         bytecode_offset,
                     )?;
-                    // check type parameters in borrow are bound to the function type parameters
                     if let Some(field_inst) = self
                         .view
                         .field_instantiations()
+                        .and_then(|f| f.get(idx.into_index()))
+                    {
+                        self.check_type_parameters_in_signature(
+                            field_inst.type_parameters,
+                            type_param_count,
+                        )?;
+                    }
+                },
+                MutBorrowVariantFieldGeneric(idx) | ImmBorrowVariantFieldGeneric(idx) => {
+                    self.check_code_unit_bounds_impl_opt(
+                        &self.view.variant_field_instantiations(),
+                        *idx,
+                        bytecode_offset,
+                    )?;
+                    if let Some(field_inst) = self
+                        .view
+                        .variant_field_instantiations()
                         .and_then(|f| f.get(idx.into_index()))
                     {
                         self.check_type_parameters_in_signature(
@@ -408,7 +548,6 @@ impl<'a> BoundsChecker<'a> {
                         *idx,
                         bytecode_offset,
                     )?;
-                    // check type parameters in call are bound to the function type parameters
                     if let Some(func_inst) =
                         self.view.function_instantiations().get(idx.into_index())
                     {
@@ -422,6 +561,12 @@ impl<'a> BoundsChecker<'a> {
                 | MutBorrowGlobal(idx) | MoveFrom(idx) | MoveTo(idx) => self
                     .check_code_unit_bounds_impl_opt(
                         &self.view.struct_defs(),
+                        *idx,
+                        bytecode_offset,
+                    )?,
+                PackVariant(idx) | UnpackVariant(idx) | TestVariant(idx) => self
+                    .check_code_unit_bounds_impl_opt(
+                        &self.view.struct_variant_handles(),
                         *idx,
                         bytecode_offset,
                     )?,
@@ -445,6 +590,24 @@ impl<'a> BoundsChecker<'a> {
                     {
                         self.check_type_parameters_in_signature(
                             struct_inst.type_parameters,
+                            type_param_count,
+                        )?;
+                    }
+                },
+                PackVariantGeneric(idx) | UnpackVariantGeneric(idx) | TestVariantGeneric(idx) => {
+                    self.check_code_unit_bounds_impl_opt(
+                        &self.view.struct_variant_instantiations(),
+                        *idx,
+                        bytecode_offset,
+                    )?;
+                    // check type parameters
+                    if let Some(struct_variant_inst) = self
+                        .view
+                        .struct_variant_instantiations()
+                        .and_then(|s| s.get(idx.into_index()))
+                    {
+                        self.check_type_parameters_in_signature(
+                            struct_variant_inst.type_parameters,
                             type_param_count,
                         )?;
                     }

@@ -27,7 +27,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt,
-    fmt::{Debug, Display, Error, Formatter},
+    fmt::{Debug, Error, Formatter},
     hash::Hash,
     iter,
     ops::Deref,
@@ -60,6 +60,8 @@ pub struct SpecFunDecl {
     pub body: Option<Exp>,
     pub callees: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub is_recursive: RefCell<Option<bool>>,
+    /// The instantiations for which this function is known to use generic type reflection.
+    pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
 }
 
 // =================================================================================================
@@ -182,7 +184,7 @@ impl ConditionKind {
     }
 }
 
-impl std::fmt::Display for ConditionKind {
+impl fmt::Display for ConditionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         fn display_ty_params(
             f: &mut Formatter<'_>,
@@ -251,7 +253,7 @@ impl QuantKind {
     }
 }
 
-impl std::fmt::Display for QuantKind {
+impl fmt::Display for QuantKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use QuantKind::*;
         match self {
@@ -537,6 +539,25 @@ impl ResourceSpecifier {
             },
         }
     }
+
+    /// Matches an unqualified struct name. This matches any resource pattern with that name,
+    /// regardless of type instantiation.
+    pub fn matches_modulo_type_instantiation(
+        &self,
+        env: &GlobalEnv,
+        struct_id: &QualifiedId<StructId>,
+    ) -> bool {
+        use ResourceSpecifier::*;
+        let struct_id = struct_id.instantiate(vec![]);
+        match self {
+            Resource(spec_struct_id) => Resource(
+                // Downgrade to a pattern without instantiation
+                spec_struct_id.to_qualified_id().instantiate(vec![]),
+            )
+            .matches(env, &[], &struct_id),
+            _ => self.matches(env, &[], &struct_id),
+        }
+    }
 }
 
 // =================================================================================================
@@ -596,6 +617,8 @@ pub enum ExpData {
     Block(NodeId, Pattern, Option<Exp>, Exp),
     /// Represents a conditional.
     IfElse(NodeId, Exp, Exp, Exp),
+    /// Represents a variant match
+    Match(NodeId, Exp, Vec<MatchArm>),
 
     // ---------------------------------------------------------
     // Subsequent expressions only appear in imperative context
@@ -616,6 +639,14 @@ pub enum ExpData {
     Mutate(NodeId, Exp, Exp),
     /// Represents a specification block, type is ().
     SpecBlock(NodeId, Spec),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MatchArm {
+    pub loc: Loc,
+    pub pattern: Pattern,
+    pub condition: Option<Exp>,
+    pub body: Exp,
 }
 
 /// An internalized expression. We do use a wrapper around the underlying internement implementation
@@ -680,13 +711,15 @@ pub enum RewriteResult {
 /// Visitor position
 #[derive(Clone)]
 pub enum VisitorPosition {
-    Pre,              // before visiting any subexpressions
-    MidMutate,        // after RHS and before LHS of Mutate expression.
-    BeforeBody,       // Before body of Block expression.
-    BeforeThen,       // Before then clause of IfElse expression.
-    BeforeElse,       // Before else clause of IfElse expression.
-    PreSequenceValue, // Before final expr in a Sequence (or before Post, if seq is empty)
-    Post,             // after visiting all subexpressions
+    Pre,                    // before visiting any subexpressions
+    MidMutate,              // after RHS and before LHS of Mutate expression.
+    BeforeBody,             // Before body of Block expression.
+    BeforeMatchBody(usize), // Before the ith body of a Match arm.
+    AfterMatchBody(usize),  // After the ith body of a Match arm.
+    BeforeThen,             // Before then clause of IfElse expression.
+    BeforeElse,             // Before else clause of IfElse expression.
+    PreSequenceValue,       // Before final expr in a Sequence (or before Post, if seq is empty)
+    Post,                   // after visiting all subexpressions
 }
 
 impl ExpData {
@@ -733,6 +766,7 @@ impl ExpData {
             | Quant(node_id, ..)
             | Block(node_id, ..)
             | IfElse(node_id, ..)
+            | Match(node_id, ..)
             | Sequence(node_id, ..)
             | Loop(node_id, ..)
             | LoopCont(node_id, ..)
@@ -847,6 +881,13 @@ impl ExpData {
                 (Lambda(_, pat, _), Post) | (Block(_, pat, _, _), Post) => {
                     // Remove declared variables from shadow
                     for_syms_in_pat_shadow_or_unshadow(pat, false, &mut shadow_map);
+                },
+                (Match(_, _, arms), BeforeMatchBody(idx)) => {
+                    // Add declared variables to shadow
+                    for_syms_in_pat_shadow_or_unshadow(&arms[idx].pattern, true, &mut shadow_map)
+                },
+                (Match(_, _, arms), AfterMatchBody(idx)) => {
+                    for_syms_in_pat_shadow_or_unshadow(&arms[idx].pattern, false, &mut shadow_map)
                 },
                 (Quant(_, _, ranges, ..), Pre) => {
                     for_syms_in_ranges_shadow_or_unshadow(ranges, true, &mut shadow_map);
@@ -1161,7 +1202,8 @@ impl ExpData {
             let should_continue = match x {
                 Pre => visitor(false, e),
                 Post => visitor(true, e),
-                MidMutate | BeforeBody | BeforeThen | BeforeElse | PreSequenceValue => true,
+                MidMutate | BeforeBody | BeforeThen | BeforeElse | BeforeMatchBody(_)
+                | AfterMatchBody(_) | PreSequenceValue => true,
             };
             if should_continue {
                 Some(())
@@ -1258,6 +1300,17 @@ impl ExpData {
                 t.visit_positions_impl(visitor)?;
                 visitor(VisitorPosition::BeforeElse, self)?;
                 e.visit_positions_impl(visitor)?;
+            },
+            Match(_, d, arms) => {
+                d.visit_positions_impl(visitor)?;
+                for (i, arm) in arms.iter().enumerate() {
+                    visitor(VisitorPosition::BeforeMatchBody(i), self)?;
+                    if let Some(c) = &arm.condition {
+                        c.visit_positions_impl(visitor)?;
+                    }
+                    arm.body.visit_positions_impl(visitor)?;
+                    visitor(VisitorPosition::AfterMatchBody(i), self)?;
+                }
             },
             Loop(_, e) => e.visit_positions_impl(visitor)?,
             Return(_, e) => e.visit_positions_impl(visitor)?,
@@ -1483,7 +1536,7 @@ impl ExpData {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
-                    Select(mid, sid, ..) | UpdateField(mid, sid, ..) | Pack(mid, sid) => {
+                    Select(mid, sid, ..) | UpdateField(mid, sid, ..) | Pack(mid, sid, _) => {
                         usage.insert(mid.qualified(*sid));
                     },
                     _ => {},
@@ -1564,13 +1617,19 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
-    Pack(ModuleId, StructId),
+    Pack(ModuleId, StructId, /*variant*/ Option<Symbol>),
     Tuple,
+    Select(ModuleId, StructId, FieldId),
+    SelectVariants(
+        ModuleId,
+        StructId,
+        /* fields from different variants */ Vec<FieldId>,
+    ),
+    TestVariants(ModuleId, StructId, /* variants */ Vec<Symbol>),
 
     // Specification specific
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     Closure(ModuleId, FunId),
-    Select(ModuleId, StructId, FieldId),
     UpdateField(ModuleId, StructId, FieldId),
     Result(usize),
     Index,
@@ -1674,7 +1733,13 @@ pub enum Pattern {
     Var(NodeId, Symbol),
     Wildcard(NodeId),
     Tuple(NodeId, Vec<Pattern>),
-    Struct(NodeId, QualifiedInstId<StructId>, Vec<Pattern>),
+    Struct(
+        // Struct(_, struct_id, optional_variant, patterns)
+        NodeId,
+        QualifiedInstId<StructId>,
+        Option<Symbol>,
+        Vec<Pattern>,
+    ),
     Error(NodeId),
 }
 
@@ -1685,7 +1750,7 @@ impl Pattern {
             Pattern::Var(id, _)
             | Pattern::Wildcard(id)
             | Pattern::Tuple(id, _)
-            | Pattern::Struct(id, _, _)
+            | Pattern::Struct(id, _, _, _)
             | Pattern::Error(id) => *id,
         }
     }
@@ -1729,7 +1794,7 @@ impl Pattern {
     fn collect_vars(r: &mut Vec<(NodeId, Symbol)>, p: &Pattern) {
         use Pattern::*;
         match p {
-            Struct(_, _, args) | Tuple(_, args) => {
+            Struct(_, _, _, args) | Tuple(_, args) => {
                 for arg in args {
                     Self::collect_vars(r, arg)
                 }
@@ -1764,9 +1829,10 @@ impl Pattern {
     ) -> bool {
         use Pattern::*;
         match p {
-            Struct(_nodeid, qsid, args) => {
+            Struct(_nodeid, qsid, _, args) => {
                 if let Some(exp) = opt_exp {
-                    if let ExpData::Call(_, Operation::Pack(modid, sid), actuals) = exp.as_ref() {
+                    if let ExpData::Call(_, Operation::Pack(modid, sid, _), actuals) = exp.as_ref()
+                    {
                         if *sid == qsid.id && *modid == qsid.module_id {
                             Self::collect_vars_exprs_from_vector_exprs(r, args, actuals)
                         } else {
@@ -1824,7 +1890,9 @@ impl Pattern {
     ) -> bool {
         use Pattern::*;
         match p {
-            Struct(_nodeid, _qsid, args) => Self::collect_vars_exprs_from_vector_none(r, args),
+            Struct(_nodeid, _qsid, _variant, args) => {
+                Self::collect_vars_exprs_from_vector_none(r, args)
+            },
             Tuple(_, args) => {
                 if let Some(value) = opt_v {
                     match value {
@@ -1942,9 +2010,10 @@ impl Pattern {
                     .map(|pat| pat.remove_vars(vars))
                     .collect(),
             ),
-            Pattern::Struct(id, qsid, patvec) => Pattern::Struct(
+            Pattern::Struct(id, qsid, variant, patvec) => Pattern::Struct(
                 id,
                 qsid,
+                variant,
                 patvec
                     .into_iter()
                     .map(|pat| pat.remove_vars(vars))
@@ -1976,7 +2045,7 @@ impl Pattern {
                     None
                 }
             },
-            Pattern::Tuple(_, patvec) | Pattern::Struct(_, _, patvec) => {
+            Pattern::Tuple(_, patvec) | Pattern::Struct(_, _, _, patvec) => {
                 let pat_out: Vec<_> = patvec.iter().map(|pat| pat.replace_vars(var_map)).collect();
                 if pat_out.iter().any(|opt_pat| opt_pat.is_some()) {
                     // Need to build a new vec.
@@ -1988,8 +2057,8 @@ impl Pattern {
                         .collect();
                     match self {
                         Pattern::Tuple(id, _) => Some(Pattern::Tuple(*id, new_vec)),
-                        Pattern::Struct(id, qsid, _) => {
-                            Some(Pattern::Struct(*id, qsid.clone(), new_vec))
+                        Pattern::Struct(id, qsid, variant, _) => {
+                            Some(Pattern::Struct(*id, qsid.clone(), *variant, new_vec))
                         },
                         _ => None,
                     }
@@ -2017,7 +2086,7 @@ impl Pattern {
                     pat.visit_pre_post(visitor);
                 }
             },
-            Struct(_, _, patvec) => {
+            Struct(_, _, _, patvec) => {
                 for pat in patvec {
                     pat.visit_pre_post(visitor);
                 }
@@ -2026,50 +2095,14 @@ impl Pattern {
         visitor(true, self);
     }
 
-    pub fn to_string<'a>(&self, env: &GlobalEnv, tctx: &'a TypeDisplayContext<'a>) -> String {
-        match self {
-            Pattern::Var(id, name) => {
-                let ty = env.get_node_type(*id);
-                format!("{}: {}", name.display(env.symbol_pool()), ty.display(tctx))
-            },
-            Pattern::Tuple(_, args) => format!(
-                "({})",
-                args.iter().map(|pat| pat.to_string(env, tctx)).join(", ")
-            ),
-            Pattern::Struct(_, struct_id, args) => {
-                let inst_str = if !struct_id.inst.is_empty() {
-                    format!(
-                        "<{}>",
-                        struct_id.inst.iter().map(|ty| ty.display(tctx)).join(", ")
-                    )
-                } else {
-                    "".to_string()
-                };
-                let struct_env = env.get_struct(struct_id.to_qualified_id());
-                let field_names = struct_env.get_fields().map(|f| f.get_name());
-                let args_str = args
-                    .iter()
-                    .zip(field_names)
-                    .map(|(pat, sym)| {
-                        let field_name = env.symbol_pool().string(sym);
-                        let pattern_str = pat.to_string(env, tctx);
-                        if &pattern_str != field_name.as_ref() {
-                            format!("{}: {}", field_name.as_ref(), pat.to_string(env, tctx))
-                        } else {
-                            pattern_str
-                        }
-                    })
-                    .join(", ");
-                format!(
-                    "{}{}{{ {} }}",
-                    struct_env.get_full_name_str(),
-                    inst_str,
-                    args_str
-                )
-            },
-            Pattern::Wildcard(_) => "_".to_string(),
-            Pattern::Error(_) => "<error>".to_string(),
+    pub fn to_string(&self, fun_env: &FunctionEnv) -> String {
+        PatDisplay {
+            env: fun_env.module_env.env,
+            pat: self,
+            fun_env: Some(fun_env.clone()),
+            show_type: false,
         }
+        .to_string()
     }
 
     pub fn display<'a>(&'a self, env: &'a GlobalEnv) -> PatDisplay<'a> {
@@ -2077,7 +2110,7 @@ impl Pattern {
             env,
             pat: self,
             fun_env: None,
-            verbose: true,
+            show_type: true,
         }
     }
 
@@ -2086,7 +2119,7 @@ impl Pattern {
             env: other.env,
             pat: self,
             fun_env: other.fun_env.clone(),
-            verbose: other.verbose,
+            show_type: other.show_type,
         }
     }
 
@@ -2095,19 +2128,24 @@ impl Pattern {
             env: other.env,
             pat: self,
             fun_env: other.fun_env.clone(),
-            verbose: other.verbose,
+            show_type: true,
         }
     }
 }
 
+#[derive(Clone)]
 pub struct PatDisplay<'a> {
     env: &'a GlobalEnv,
     pat: &'a Pattern,
     fun_env: Option<FunctionEnv<'a>>,
-    verbose: bool,
+    show_type: bool,
 }
 
 impl<'a> PatDisplay<'a> {
+    fn set_show_type(self, show_type: bool) -> Self {
+        Self { show_type, ..self }
+    }
+
     fn type_ctx(&self) -> TypeDisplayContext<'a> {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
@@ -2118,16 +2156,16 @@ impl<'a> PatDisplay<'a> {
 
     fn fmt_patterns(&self, f: &mut Formatter<'_>, patterns: &[Pattern]) -> Result<(), Error> {
         if let Some(first) = patterns.first() {
-            first.display_cont(self).fmt_pattern(f, false)?;
+            first.display_cont(self).fmt_pattern(f)?;
             for pat in patterns.iter().skip(1) {
                 write!(f, ", ")?;
-                pat.display_cont(self).fmt_pattern(f, false)?;
+                pat.display_cont(self).fmt_pattern(f)?;
             }
         }
         Ok(())
     }
 
-    fn fmt_pattern(&self, f: &mut Formatter<'_>, show_type: bool) -> Result<(), Error> {
+    fn fmt_pattern(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         use Pattern::*;
         let node_id = self.pat.node_id();
         let node_type = self.env.get_node_type(node_id);
@@ -2135,13 +2173,7 @@ impl<'a> PatDisplay<'a> {
         let mut showed_type = false;
         match self.pat {
             Var(_, sym) => {
-                write!(
-                    f,
-                    "{}: {}",
-                    sym.display(self.env.symbol_pool()),
-                    node_type.display(type_ctx)
-                )?;
-                showed_type = true;
+                write!(f, "{}", sym.display(self.env.symbol_pool()))?;
             },
             Wildcard(_) => write!(f, "_")?,
             Tuple(_, pattern_vec) => {
@@ -2149,7 +2181,7 @@ impl<'a> PatDisplay<'a> {
                 self.fmt_patterns(f, pattern_vec)?;
                 write!(f, ")")?
             },
-            Struct(_, struct_qfid, pattern_vec) => {
+            Struct(_, struct_qfid, variant, pattern_vec) => {
                 let inst_str = if !struct_qfid.inst.is_empty() {
                     format!(
                         "<{}>",
@@ -2163,35 +2195,44 @@ impl<'a> PatDisplay<'a> {
                     "".to_string()
                 };
                 let struct_env = self.env.get_struct(struct_qfid.to_qualified_id());
-                let field_names = struct_env.get_fields().map(|f| f.get_name());
-                let args_str = pattern_vec
-                    .iter()
-                    .zip(field_names)
-                    .map(|(pat, sym)| {
-                        let field_name = self.env.symbol_pool().string(sym);
-                        let pattern_str = pat.to_string(self.env, type_ctx);
-                        if &pattern_str != field_name.as_ref() {
-                            format!(
-                                "{}: {}",
-                                field_name.as_ref(),
-                                pat.to_string(self.env, type_ctx)
-                            )
-                        } else {
-                            pattern_str
-                        }
-                    })
-                    .join(", ");
+                let field_names = struct_env
+                    .get_fields_optional_variant(*variant)
+                    .map(|f| f.get_name());
+                let pool = self.env.symbol_pool();
+                let args_str = if variant.is_some() && pattern_vec.is_empty() {
+                    "".to_string()
+                } else {
+                    format!(
+                        "{{ {} }}",
+                        pattern_vec
+                            .iter()
+                            .zip(field_names)
+                            .map(|(pat, sym)| {
+                                let field_name = pool.string(sym);
+                                let pattern_str =
+                                    pat.display_cont(self).set_show_type(false).to_string();
+                                if &pattern_str != field_name.as_ref() {
+                                    format!("{}: {}", field_name.as_ref(), pattern_str)
+                                } else {
+                                    pattern_str
+                                }
+                            })
+                            .join(", ")
+                    )
+                };
                 write!(
                     f,
-                    "{}{}{{ {} }}",
+                    "{}{}{}{}",
                     struct_env.get_full_name_str(),
+                    optional_variant_suffix(pool, variant),
                     inst_str,
                     args_str
-                )?
+                )?;
+                showed_type = true
             },
             Error(_) => write!(f, "Pattern::Error")?,
         }
-        if show_type && !showed_type {
+        if self.show_type && !showed_type {
             write!(f, ": {}", node_type.display(type_ctx))
         } else {
             Ok(())
@@ -2199,9 +2240,9 @@ impl<'a> PatDisplay<'a> {
     }
 }
 
-impl<'a> Display for PatDisplay<'a> {
+impl<'a> fmt::Display for PatDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.fmt_pattern(f, true)
+        self.fmt_pattern(f)
     }
 }
 
@@ -2414,8 +2455,9 @@ impl Operation {
             Closure(..) => false,      // Spec
             Pack(..) => false,         // Could yield an undroppable value
             Tuple => true,
-            Select(..) => false,      // Move-related
-            UpdateField(..) => false, // Move-related
+            Select(..) => false,         // Move-related
+            SelectVariants(..) => false, // Move-related
+            UpdateField(..) => false,    // Move-related
 
             // Specification specific
             Result(..) => false, // Spec
@@ -2507,6 +2549,7 @@ impl Operation {
             EventStoreIncludedIn => false, // Spec
 
             // Operation with no effect
+            TestVariants(..) => true, // Cannot abort
             NoOp => true,
         }
     }
@@ -2644,7 +2687,7 @@ impl ExpData {
                     // Technically pure, but we don't want to eliminate it.
                     is_pure = false;
                 },
-                Block(..) | IfElse(..) => {}, // depends on contents
+                Block(..) | IfElse(..) | Match(..) => {}, // depends on contents
                 Return(..) => {
                     is_pure = false;
                 },
@@ -2689,6 +2732,10 @@ impl Address {
         } else {
             panic!("expected numerical address, found symbolic")
         }
+    }
+
+    pub fn is_one(&self) -> bool {
+        matches!(self, Address::Numerical(AccountAddress::ONE))
     }
 }
 
@@ -3022,6 +3069,19 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     indent(else_exp.display_cont(self))
                 )
             },
+            Match(_, discriminator, arms) => {
+                writeln!(f, "match ({}) {{", discriminator.display_cont(self))?;
+                for arm in arms {
+                    write!(f, "  {}", indent(arm.pattern.display_for_exp(self)))?;
+                    if let Some(c) = &arm.condition {
+                        write!(f, " if {}", c.display_cont(self))?
+                    }
+                    writeln!(f, " => {{")?;
+                    writeln!(f, "    {}", indent(indent(arm.body.display_cont(self))))?;
+                    writeln!(f, "  }}")?
+                }
+                writeln!(f, "}}")
+            },
             Sequence(_, es) => {
                 for (i, e) in es.iter().enumerate() {
                     if i > 0 {
@@ -3205,9 +3265,34 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                 }
                 Ok(())
             },
-            Pack(mid, sid) => write!(f, "pack {}", self.struct_str(mid, sid)),
+            Pack(mid, sid, variant) => write!(
+                f,
+                "pack {}{}",
+                self.struct_str(mid, sid),
+                optional_variant_suffix(self.env.symbol_pool(), variant)
+            ),
             Select(mid, sid, fid) => {
                 write!(f, "select {}", self.field_str(mid, sid, fid))
+            },
+            SelectVariants(mid, sid, fids) => {
+                write!(
+                    f,
+                    "select_variants {}",
+                    fids.iter()
+                        .map(|fid| self.field_str(mid, sid, fid))
+                        .join("|")
+                )
+            },
+            TestVariants(mid, sid, variants) => {
+                write!(
+                    f,
+                    "test_variants {}::{}",
+                    self.struct_str(mid, sid),
+                    variants
+                        .iter()
+                        .map(|v| v.display(self.env.symbol_pool()).to_string())
+                        .join("|")
+                )
             },
             UpdateField(mid, sid, fid) => {
                 write!(f, "update {}", self.field_str(mid, sid, fid))
@@ -3251,8 +3336,7 @@ impl<'a> OperationDisplay<'a> {
     }
 
     fn field_str(&self, mid: &ModuleId, sid: &StructId, fid: &FieldId) -> String {
-        let struct_env = self.env.get_module(*mid).into_struct(*sid);
-        let field_name = struct_env.get_field(*fid).get_name();
+        let field_name = fid.symbol();
         format!(
             "{}.{}",
             self.struct_str(mid, sid),
@@ -3318,6 +3402,14 @@ impl<'a> fmt::Display for EnvDisplay<'a, Spec> {
             writeln!(f, "{} -> {}", code_offset, self.env.display(spec))?
         }
         Ok(())
+    }
+}
+
+fn optional_variant_suffix(pool: &SymbolPool, variant: &Option<Symbol>) -> String {
+    if let Some(v) = variant {
+        format!("::{}", v.display(pool))
+    } else {
+        String::new()
     }
 }
 

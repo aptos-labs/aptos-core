@@ -108,11 +108,7 @@ fn dag_realistic_env_max_load_test(
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                    config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
-                        sender_conflict_window_size: 256,
-                        module_conflict_window_size: 2,
-                        entry_fun_conflict_window_size: 3,
-                    };
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::default_for_genesis();
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -134,8 +130,10 @@ fn dag_realistic_env_max_load_test(
                 )
                 .add_latency_threshold(4.0, LatencyType::P50)
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 15.0,
-                    max_round_gap: 8,
+                    max_non_epoch_no_progress_secs: 15.0,
+                    max_epoch_no_progress_secs: 15.0,
+                    max_non_epoch_round_gap: 8,
+                    max_epoch_round_gap: 8,
                 }),
         )
 }
@@ -211,11 +209,6 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                     }
                     OnChainExecutionConfig::V4(config_v4) => {
                         config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                        config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
-                            sender_conflict_window_size: 256,
-                            module_conflict_window_size: 2,
-                            entry_fun_conflict_window_size: 3,
-                        };
                     }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -226,8 +219,10 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 20.0,
-                    max_round_gap: 20,
+                    max_non_epoch_no_progress_secs: 20.0,
+                    max_epoch_no_progress_secs: 20.0,
+                    max_non_epoch_round_gap: 20,
+                    max_epoch_round_gap: 20,
                 }),
         )
 }

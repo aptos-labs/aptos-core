@@ -45,15 +45,16 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{info, warn};
 pub use move_binary_format::file_format::{AbilitySet, Visibility};
+#[allow(deprecated)]
+use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{
         AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
-        StructDefinitionIndex,
+        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken,
+        StructDefinitionIndex, VariantIndex,
     },
-    normalized::Type as MType,
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
 };
@@ -130,6 +131,11 @@ impl Loc {
                 Some(locbox) => (*locbox.clone()).inlined_from(inlined_from),
             })),
         }
+    }
+
+    /// Checks if `self` is an inlined location.
+    pub fn is_inlined(&self) -> bool {
+        self.inlined_from_loc.is_some()
     }
 
     // If `self` is an inlined `Loc`, then add the same
@@ -330,6 +336,16 @@ impl FieldId {
 
     pub fn symbol(self) -> Symbol {
         self.0
+    }
+
+    /// Makes a variant field name unique to a given struct.
+    /// TODO: Consider making FieldId containing two symbols, but this can be a breaking change
+    ///   to public APIs.
+    pub fn make_variant_field_id_str(
+        variant_name: impl AsRef<str>,
+        field_name: impl AsRef<str>,
+    ) -> String {
+        format!("{}.{}", variant_name.as_ref(), field_name.as_ref())
     }
 }
 
@@ -886,6 +902,11 @@ impl GlobalEnv {
         self.diag(Severity::Error, loc, msg)
     }
 
+    /// Adds a warning to this environment, without notes.
+    pub fn warning(&self, loc: &Loc, msg: &str) {
+        self.diag(Severity::Warning, loc, msg)
+    }
+
     /// Adds an error to this environment, with notes.
     pub fn error_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
@@ -912,6 +933,12 @@ impl GlobalEnv {
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
         self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], vec![])
+    }
+
+    /// Add a lint warning to this environment, with the `msg` and `notes`.
+    pub fn lint_diag_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
+        let lint_msg = format!("[lint] {}", msg);
+        self.diag_with_notes(Severity::Warning, loc, &lint_msg, notes)
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
@@ -1361,6 +1388,81 @@ impl GlobalEnv {
         }
     }
 
+    /// Determines whether the given spec fun uses type reflection over type parameters.
+    pub fn spec_fun_uses_generic_type_reflection(
+        &self,
+        fun_id: &QualifiedInstId<SpecFunId>,
+    ) -> bool {
+        fn uses_generic_type_reflection(
+            env: &GlobalEnv,
+            visited: &mut BTreeSet<QualifiedInstId<SpecFunId>>,
+            fun: &QualifiedInstId<SpecFunId>,
+        ) -> bool {
+            if !visited.insert(fun.clone()) {
+                return false;
+            }
+            let module = env.get_module(fun.module_id);
+            let decl = module.get_spec_fun(fun.id);
+            if let Some(def) = &decl.body {
+                // Check called spec funs
+                def.called_spec_funs(env).into_iter().any(|qid| {
+                    let qid_inst = qid.instantiate(&fun.inst);
+                    is_generic_type_reflection(env, &qid_inst)
+                        || uses_generic_type_reflection(env, visited, &qid_inst)
+                })
+            } else {
+                false
+            }
+        }
+        fn is_generic_type_reflection(
+            env: &GlobalEnv,
+            fun_id: &QualifiedInstId<SpecFunId>,
+        ) -> bool {
+            static REFLECTION_FUNS: Lazy<BTreeSet<String>> = Lazy::new(|| {
+                [
+                    well_known::TYPE_INFO_SPEC.to_owned(),
+                    well_known::TYPE_NAME_SPEC.to_owned(),
+                    well_known::TYPE_NAME_GET_SPEC.to_owned(),
+                ]
+                .into_iter()
+                .collect()
+            });
+            // The function must be at `extlib` or `stdlib`.
+            let module = env.get_module(fun_id.module_id);
+            let addr = module.get_name().addr();
+            if addr == &env.get_extlib_address() || addr == &env.get_stdlib_address() {
+                let fun = module.get_spec_fun(fun_id.id);
+                let name = format!(
+                    "{}::{}",
+                    module.get_name().name().display(module.symbol_pool()),
+                    fun.name.display(module.symbol_pool())
+                );
+                REFLECTION_FUNS.contains(&name)
+                    && fun_id.inst.iter().any(|ty| ty.is_type_parameter())
+            } else {
+                false
+            }
+        }
+        let module = self.get_module(fun_id.module_id);
+        let decl = module.get_spec_fun(fun_id.id);
+        let uses = decl
+            .insts_using_generic_type_reflection
+            .borrow()
+            .get(&fun_id.inst)
+            .cloned();
+        if let Some(b) = uses {
+            b
+        } else {
+            let b = uses_generic_type_reflection(self, &mut BTreeSet::new(), fun_id);
+            module
+                .get_spec_fun(fun_id.id)
+                .insts_using_generic_type_reflection
+                .borrow_mut()
+                .insert(fun_id.inst.clone(), b);
+            b
+        }
+    }
+
     /// Returns true if the type represents the well-known event handle type.
     pub fn is_wellknown_event_handle_type(&self, ty: &Type) -> bool {
         if let Type::Struct(mid, sid, _) = ty {
@@ -1616,6 +1718,7 @@ impl GlobalEnv {
             name: field_name,
             loc: loc.clone(),
             offset: 0,
+            variant: None,
             ty,
         });
         StructData {
@@ -1627,7 +1730,9 @@ impl GlobalEnv {
             abilities: AbilitySet::ALL,
             spec_var_opt: Some(var_id),
             field_data,
+            variants: None,
             spec: RefCell::new(Spec::default()),
+            is_native: false,
         }
     }
 
@@ -1755,6 +1860,7 @@ impl GlobalEnv {
         name: Symbol,
         loc: Loc,
         visibility: Visibility,
+        has_package_visibility: bool,
         type_params: Vec<TypeParameter>,
         params: Vec<Parameter>,
         result_type: Type,
@@ -1768,6 +1874,7 @@ impl GlobalEnv {
             def_idx: None,
             handle_idx: None,
             visibility,
+            has_package_visibility,
             is_native: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
@@ -1897,6 +2004,10 @@ impl GlobalEnv {
         }
     }
 
+    pub(crate) fn get_module_data_mut(&mut self, id: ModuleId) -> &mut ModuleData {
+        &mut self.module_data[id.0 as usize]
+    }
+
     /// Gets a struct by qualified id.
     pub fn get_struct_qid(&self, qid: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(qid.module_id).into_struct(qid.id)
@@ -1984,6 +2095,7 @@ impl GlobalEnv {
     }
 
     /// Attempt to compute a struct type for (`mid`, `sid`, `ts`).
+    #[allow(deprecated)]
     pub fn get_struct_type(&self, mid: ModuleId, sid: StructId, ts: &[Type]) -> Option<MType> {
         let menv = self.get_module(mid);
         Some(MType::Struct {
@@ -2310,15 +2422,30 @@ impl GlobalEnv {
                 emitln!(writer, "{}", self.display(&*module_spec));
             }
             for str in module.get_structs() {
-                emitln!(writer, "struct {} {{", str.get_name().display(spool));
-                writer.indent();
-                for fld in str.get_fields() {
-                    emitln!(
-                        writer,
-                        "{}: {},",
-                        fld.get_name().display(spool),
-                        fld.get_type().display(tctx)
-                    );
+                if str.has_variants() {
+                    emitln!(writer, "enum {} {{", str.get_name().display(spool));
+                    writer.indent();
+                    for variant in str.get_variants() {
+                        emit!(writer, "{}", variant.display(spool));
+                        let fields = str.get_fields_of_variant(variant).collect_vec();
+                        if !fields.is_empty() {
+                            emitln!(writer, " {");
+                            writer.indent();
+                            for fld in fields {
+                                emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                            }
+                            writer.unindent();
+                            emitln!(writer, "}")
+                        } else {
+                            emitln!(writer, ",")
+                        }
+                    }
+                } else {
+                    emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                    writer.indent();
+                    for fld in str.get_fields() {
+                        emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                    }
                 }
                 writer.unindent();
                 emitln!(writer, "}");
@@ -2354,6 +2481,14 @@ impl GlobalEnv {
             emitln!(writer, "}} // end {}", module.get_full_name_str())
         }
         writer.extract_result()
+    }
+
+    fn dump_field(&self, tctx: &TypeDisplayContext, fld: &FieldEnv) -> String {
+        format!(
+            "{}: {}",
+            fld.get_name().display(tctx.env.symbol_pool()),
+            fld.get_type().display(tctx)
+        )
     }
 
     pub fn dump_fun(&self, fun: &FunctionEnv) -> String {
@@ -2621,7 +2756,7 @@ impl<'env> ModuleEnv<'env> {
         self.data.name.is_script()
     }
 
-    /// Returns true of this module is target of compilation. A non-target module is
+    /// Returns true if this module is target of compilation. A non-target module is
     /// a dependency only but not explicitly requested to process.
     pub fn is_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
@@ -2700,6 +2835,43 @@ impl<'env> ModuleEnv<'env> {
     /// Returns the set of modules this one declares as friends.
     pub fn get_friend_modules(&self) -> BTreeSet<ModuleId> {
         self.data.friend_modules.clone()
+    }
+
+    /// Returns the set of modules in the current package,
+    /// whose public(package) functions are called in the current module.
+    /// Requires: `self` is a primary target.
+    pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
+        debug_assert!(self.is_primary_target());
+        let mut deps = BTreeSet::new();
+        if self.is_script_module() {
+            return deps;
+        }
+        for fun_env in self.get_functions() {
+            let called_funs = fun_env.get_called_functions().expect("called functions");
+            for fun in called_funs {
+                let mod_id = fun.module_id;
+                if self.get_id() == mod_id {
+                    // no need to friend self
+                    continue;
+                }
+                let mod_env = self.env.get_module(mod_id);
+                let fun_env = mod_env.get_function(fun.id);
+                if fun_env.has_package_visibility() && self.can_call_package_fun_in(&mod_env) {
+                    deps.insert(mod_id);
+                }
+            }
+        }
+        deps
+    }
+
+    /// Returns true if functions in the current module can call a public(package) function in the given module.
+    /// Requires: `self` is a primary target.
+    fn can_call_package_fun_in(&self, other: &Self) -> bool {
+        debug_assert!(self.is_primary_target());
+        !self.is_script_module()
+            && !other.is_script_module()
+            && other.is_primary_target()
+            && self.self_address() == other.self_address()
     }
 
     /// Returns true if the given module is a transitive dependency of this one. The
@@ -3118,6 +3290,7 @@ impl<'env> ModuleEnv<'env> {
             print_code: true,
             print_basic_blocks: true,
             print_locals: true,
+            print_bytecode_stats: false,
         });
         Some(
             disas
@@ -3213,8 +3386,23 @@ pub struct StructData {
     /// Field definitions.
     pub(crate) field_data: BTreeMap<FieldId, FieldData>,
 
+    /// If this structure has variants (i.e. is an `enum`), information about the
+    /// names of the variants and the location of their declaration. The fields
+    /// of variants can be identified via the variant name in `FieldData`.
+    pub(crate) variants: Option<BTreeMap<Symbol, StructVariant>>,
+
     /// Associated specification.
     pub(crate) spec: RefCell<Spec>,
+
+    /// Whether this struct is native
+    pub is_native: bool,
+}
+
+#[derive(Debug)]
+pub(crate) struct StructVariant {
+    pub(crate) loc: Loc,
+    pub(crate) attributes: Vec<Attribute>,
+    pub(crate) order: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -3364,11 +3552,76 @@ impl<'env> StructEnv<'env> {
         self.get_abilities().has_key()
     }
 
-    /// Get an iterator for the fields, ordered by offset.
+    /// Returns true if the struct has variants.
+    pub fn has_variants(&self) -> bool {
+        self.data.variants.is_some()
+    }
+
+    /// Returns an iteration of the variant names in the struct, in the order they
+    /// are declared.
+    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env {
+        self.data
+            .variants
+            .as_ref()
+            .expect("struct has variants")
+            .iter()
+            .sorted_by(|(_, v1), (_, v2)| v1.order.cmp(&v2.order))
+            .map(|(s, _)| *s)
+    }
+
+    /// Returns the location of the variant.
+    pub fn get_variant_loc(&self, variant: Symbol) -> &Loc {
+        self.data
+            .variants
+            .as_ref()
+            .and_then(|vars| vars.get(&variant).map(|v| &v.loc))
+            .expect("variant defined")
+    }
+
+    /// Get the index of the variant in the struct.
+    pub fn get_variant_idx(&self, variant: Symbol) -> Option<VariantIndex> {
+        self.get_variants()
+            .position(|n| variant == n)
+            .map(|p| p as VariantIndex)
+    }
+
+    /// Get the name of the variant in the struct by index.
+    pub fn get_variant_name_by_idx(&self, variant: VariantIndex) -> Option<Symbol> {
+        self.get_variants().nth(variant as usize)
+    }
+
+    /// Returns the attributes of the variant.
+    pub fn get_variant_attributes(&self, variant: Symbol) -> &[Attribute] {
+        self.data
+            .variants
+            .as_ref()
+            .and_then(|vars| vars.get(&variant).map(|v| v.attributes.as_slice()))
+            .expect("variant defined")
+    }
+
+    /// Get an iterator for the fields, ordered by offset. Notice if the struct has
+    /// variants, all fields of all variants are returned.
     pub fn get_fields(&'env self) -> impl Iterator<Item = FieldEnv<'env>> {
+        self.get_fields_optional_variant(None)
+    }
+
+    /// Get fields of a particular variant.
+    pub fn get_fields_of_variant(
+        &'env self,
+        variant: Symbol,
+    ) -> impl Iterator<Item = FieldEnv<'env>> {
+        self.get_fields_optional_variant(Some(variant))
+    }
+
+    /// Get fields of a particular variant.
+    pub fn get_fields_optional_variant(
+        &'env self,
+        variant: Option<Symbol>,
+    ) -> impl Iterator<Item = FieldEnv<'env>> {
         self.data
             .field_data
             .values()
+            .filter(|data| variant.is_none() || data.variant == variant)
             .sorted_by_key(|data| data.offset)
             .map(move |data| FieldEnv {
                 struct_env: self.clone(),
@@ -3376,7 +3629,13 @@ impl<'env> StructEnv<'env> {
             })
     }
 
-    /// Return the number of fields in the struct.
+    /// Return true if it is a native struct
+    pub fn is_native(&self) -> bool {
+        self.data.is_native
+    }
+
+    /// Return the number of fields in the struct. Notice of the struct has variants, this
+    /// includes the sum of all fields in all variants.
     pub fn get_field_count(&self) -> usize {
         self.data.field_data.len()
     }
@@ -3401,12 +3660,19 @@ impl<'env> StructEnv<'env> {
 
     /// Gets a field by its offset.
     pub fn get_field_by_offset(&'env self, offset: usize) -> FieldEnv<'env> {
-        for data in self.data.field_data.values() {
-            if data.offset == offset {
-                return FieldEnv {
-                    struct_env: self.clone(),
-                    data,
-                };
+        self.get_field_by_offset_optional_variant(None, offset)
+    }
+
+    /// Gets a field by its offset, in context of an optional variant.
+    pub fn get_field_by_offset_optional_variant(
+        &'env self,
+        variant: Option<Symbol>,
+        offset: usize,
+    ) -> FieldEnv<'env> {
+        // We may speed this up via a cache RefCell<BTreeMap<(variant, offset), FieldId>>
+        for field in self.get_fields_optional_variant(variant) {
+            if field.get_offset() == offset {
+                return field;
             }
         }
         unreachable!("invalid field lookup")
@@ -3464,7 +3730,7 @@ impl<'env> StructEnv<'env> {
 // =================================================================================================
 /// # Field Environment
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FieldData {
     /// The name of this field.
     pub name: Symbol,
@@ -3474,6 +3740,9 @@ pub struct FieldData {
 
     /// The offset of this field.
     pub offset: usize,
+
+    /// If the field is associated with a variant, the name of that variant.
+    pub variant: Option<Symbol>,
 
     /// The type of this field.
     pub ty: Type,
@@ -3510,13 +3779,18 @@ impl<'env> FieldEnv<'env> {
             self.struct_env.data.def_idx,
             &self.struct_env.module_env.data.source_map,
         ) {
-            if let Ok(smap) = mmap.get_struct_source_map(def_idx) {
-                let loc = self
-                    .struct_env
+            if let Some(loc) = mmap.get_struct_source_map(def_idx).ok().and_then(|smap| {
+                smap.get_field_location(
+                    self.data
+                        .variant
+                        .and_then(|v| self.struct_env.get_variant_idx(v)),
+                    self.data.offset as MemberCount,
+                )
+            }) {
+                self.struct_env
                     .module_env
                     .env
-                    .to_loc(&smap.fields[self.data.offset]);
-                self.struct_env.module_env.env.get_doc(&loc)
+                    .get_doc(&self.struct_env.module_env.env.to_loc(&loc))
             } else {
                 ""
             }
@@ -3533,6 +3807,11 @@ impl<'env> FieldEnv<'env> {
     /// Get field offset.
     pub fn get_offset(&self) -> usize {
         self.data.offset
+    }
+
+    /// Gets the variant this field is associated with
+    pub fn get_variant(&self) -> Option<Symbol> {
+        self.data.variant
     }
 }
 
@@ -3708,6 +3987,10 @@ pub struct FunctionData {
 
     /// Visibility of this function (private, friend, or public)
     pub(crate) visibility: Visibility,
+
+    /// Whether this function has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
+    pub(crate) has_package_visibility: bool,
 
     /// Whether this is a native function
     pub(crate) is_native: bool,
@@ -4074,6 +4357,11 @@ impl<'env> FunctionEnv<'env> {
     /// Return true if this function is a friend function
     pub fn is_friend(&self) -> bool {
         self.visibility() == Visibility::Friend
+    }
+
+    /// Return true iff this function is has package visibility
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 
     /// Returns true if invariants are declared disabled in body of function
@@ -4504,10 +4792,16 @@ impl ExpInfo {
 // =================================================================================================
 /// # Formatting
 
+enum Mode {
+    LineOnly,
+    FileAndLine,
+    Full,
+}
+
 pub struct LocDisplay<'env> {
     loc: &'env Loc,
     env: &'env GlobalEnv,
-    only_line: bool,
+    mode: Mode,
 }
 
 impl Loc {
@@ -4515,7 +4809,15 @@ impl Loc {
         LocDisplay {
             loc: self,
             env,
-            only_line: false,
+            mode: Mode::Full,
+        }
+    }
+
+    pub fn display_file_name_and_line<'env>(&'env self, env: &'env GlobalEnv) -> LocDisplay<'env> {
+        LocDisplay {
+            loc: self,
+            env,
+            mode: Mode::FileAndLine,
         }
     }
 
@@ -4523,7 +4825,7 @@ impl Loc {
         LocDisplay {
             loc: self,
             env,
-            only_line: true,
+            mode: Mode::LineOnly,
         }
     }
 }
@@ -4531,18 +4833,24 @@ impl Loc {
 impl<'env> fmt::Display for LocDisplay<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
-            if self.only_line {
-                write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
-            } else {
-                let offset = self.loc.span.end() - self.loc.span.start();
-                write!(
-                    f,
-                    "at {}:{}:{}+{}",
-                    fname,
-                    pos.line + LineOffset(1),
-                    pos.column + ColumnOffset(1),
-                    offset,
-                )
+            match &self.mode {
+                Mode::LineOnly => {
+                    write!(f, "at line {}", pos.line + LineOffset(1))
+                },
+                Mode::FileAndLine => {
+                    write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
+                },
+                Mode::Full => {
+                    let offset = self.loc.span.end() - self.loc.span.start();
+                    write!(
+                        f,
+                        "at {}:{}:{}+{}",
+                        fname,
+                        pos.line + LineOffset(1),
+                        pos.column + ColumnOffset(1),
+                        offset,
+                    )
+                },
             }
         } else {
             write!(f, "{:?}", self.loc)
@@ -4563,6 +4871,15 @@ impl GetNameString for QualifiedId<StructId> {
 impl GetNameString for QualifiedId<FunId> {
     fn get_name_for_display(&self, env: &GlobalEnv) -> String {
         env.get_function_qid(*self).get_full_name_str()
+    }
+}
+
+impl GetNameString for QualifiedId<SpecFunId> {
+    fn get_name_for_display(&self, env: &GlobalEnv) -> String {
+        env.get_spec_fun(*self)
+            .name
+            .display(env.symbol_pool())
+            .to_string()
     }
 }
 

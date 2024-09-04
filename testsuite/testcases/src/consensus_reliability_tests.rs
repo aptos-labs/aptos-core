@@ -7,12 +7,13 @@ use aptos_forge::{
     test_utils::consensus_utils::{
         test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
     },
-    NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test, TestReport,
+    NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, Swarm, SwarmExt, Test,
+    TestReport,
 };
 use aptos_logger::{info, warn};
+use async_trait::async_trait;
 use rand::Rng;
-use std::{collections::HashSet, time::Duration};
-use tokio::runtime::Runtime;
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 pub struct ChangingWorkingQuorumTest {
     pub min_tps: usize,
@@ -32,34 +33,37 @@ impl Test for ChangingWorkingQuorumTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for ChangingWorkingQuorumTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> Result<LoadDestination> {
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
         // because we are doing failure testing, we should be sending
         // traffic to nodes that are alive.
-        if ctx.swarm().full_nodes().count() > 0 {
+        let full_nodes_count = { ctx.swarm.read().await.full_nodes().count() };
+        if full_nodes_count > 0 {
             Ok(LoadDestination::AllFullnodes)
         } else if self.always_healthy_nodes > 0 {
-            Ok(LoadDestination::Peers(
-                ctx.swarm()
+            let validator_peer_ids = {
+                ctx.swarm
+                    .read()
+                    .await
                     .validators()
                     .take(self.always_healthy_nodes)
                     .map(|v| v.peer_id())
-                    .collect(),
-            ))
+                    .collect()
+            };
+            Ok(LoadDestination::Peers(validator_peer_ids))
         } else {
             Ok(LoadDestination::AllValidators)
         }
     }
 
-    fn test(
+    async fn test(
         &self,
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         _report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
-        let runtime = Runtime::new().unwrap();
-
-        let validators = swarm.get_validator_clients_with_names();
+        let validators = { swarm.read().await.get_validator_clients_with_names() };
 
         let num_validators = validators.len();
 
@@ -74,12 +78,22 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
         );
         // On every cycle, we will fail this many next nodes, and make this many previous nodes healthy again.
         let cycle_offset = max_fail_in_test / 4 + 1;
-        let num_destinations = if swarm.full_nodes().count() > 0 {
-            swarm.full_nodes().count()
-        } else if num_always_healthy > 0 {
-            num_always_healthy
-        } else {
-            swarm.validators().count()
+        let num_destinations = {
+            let swarm = swarm.read().await;
+            if swarm.full_nodes().count() > 0 {
+                swarm.full_nodes().count()
+            } else if num_always_healthy > 0 {
+                num_always_healthy
+            } else {
+                swarm.validators().count()
+            }
+        };
+        let (validator_clients, public_info) = {
+            let swarm = swarm.read().await;
+            (
+                swarm.get_validator_clients_with_names(),
+                swarm.aptos_public_info(),
+            )
         };
         // Function that returns set of down nodes in a given cycle.
         let down_indices_f = move |cycle: usize| -> HashSet<usize> {
@@ -107,34 +121,33 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
             num_always_healthy, max_fail_in_test, num_validators, cycle_offset, self.num_large_validators);
 
         let slow_allowed_lagging = if self.add_execution_delay {
-            runtime.block_on(async {
-                let mut rng = rand::thread_rng();
-                let mut slow_allowed_lagging = HashSet::new();
-                for (index, (name, validator)) in
-                    validators.iter().enumerate().skip(num_always_healthy)
-                {
-                    let sleep_time = rng.gen_range(20, 500);
-                    if sleep_time > 100 {
-                        slow_allowed_lagging.insert(index);
-                    }
-                    let name = name.clone();
-
-                    validator
-                        .set_failpoint(
-                            "aptos_vm::execution::block_metadata".to_string(),
-                            format!("sleep({})", sleep_time),
-                        )
-                        .await
-                        .map_err(|e| {
-                            anyhow!(
-                                "set_failpoint to remove execution delay on {} failed, {:?}",
-                                name,
-                                e
-                            )
-                        })?;
+            let mut slow_allowed_lagging = HashSet::new();
+            for (index, (name, validator)) in validators.iter().enumerate().skip(num_always_healthy)
+            {
+                let sleep_time = {
+                    let mut rng = rand::thread_rng();
+                    rng.gen_range(20, 500)
+                };
+                if sleep_time > 100 {
+                    slow_allowed_lagging.insert(index);
                 }
-                Ok::<HashSet<usize>, anyhow::Error>(slow_allowed_lagging)
-            })?
+                let name = name.clone();
+
+                validator
+                    .set_failpoint(
+                        "aptos_vm::execution::block_metadata".to_string(),
+                        format!("sleep({})", sleep_time),
+                    )
+                    .await
+                    .map_err(|e| {
+                        anyhow!(
+                            "set_failpoint to remove execution delay on {} failed, {:?}",
+                            name,
+                            e
+                        )
+                    })?;
+            }
+            slow_allowed_lagging
         } else {
             HashSet::new()
         };
@@ -142,32 +155,38 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
         let min_tps = self.min_tps;
         let check_period_s = self.check_period_s;
 
-        runtime.block_on(test_consensus_fault_tolerance(
-            swarm,
-            duration.as_secs() as usize / self.check_period_s,
-            self.check_period_s as f32,
-            1,
-            Box::new(FailPointFailureInjection::new(Box::new(move |cycle, part| {
+        let failure_injection = Box::new(FailPointFailureInjection::new(Box::new(
+            move |cycle, part| {
                 if part == 0 {
                     let down_indices = down_indices_f(cycle);
                     info!("For cycle {} down nodes: {:?}", cycle, down_indices);
                     // For all down nodes, we are going to drop all messages we receive.
                     (
-                        down_indices.iter().flat_map(|i| {
-                            [
-                                (
+                        down_indices
+                            .iter()
+                            .flat_map(|i| {
+                                [(
                                     *i,
                                     "consensus::process::any".to_string(),
                                     "return".to_string(),
-                                ),
-                            ]
-                        }).collect(),
+                                )]
+                            })
+                            .collect(),
                         true,
                     )
                 } else {
                     (vec![], false)
                 }
-            }))),
+            },
+        )));
+
+        test_consensus_fault_tolerance(
+            validator_clients,
+            public_info,
+            duration.as_secs() as usize / self.check_period_s,
+            self.check_period_s as f32,
+            1,
+            failure_injection,
             Box::new(move |cycle, _, _, _, cycle_end, cycle_start| {
                 // we group nodes into 3 groups:
                 // - active - nodes we expect to be making progress, and doing so together. we check wery strict rule of min(cycle_end) vs max(cycle_start)
@@ -266,37 +285,35 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
             }),
             false,
             true,
-        )).context("test_consensus_fault_tolerance failed")?;
+        ).await.context("test_consensus_fault_tolerance failed")?;
 
         // undo slowing down.
         if self.add_execution_delay {
-            runtime.block_on(async {
-                for (name, validator) in validators.iter().skip(num_always_healthy) {
-                    let name = name.clone();
+            for (name, validator) in validators.iter().skip(num_always_healthy) {
+                let name = name.clone();
 
-                    validator
-                        .set_failpoint(
-                            "aptos_vm::execution::block_metadata".to_string(),
-                            "off".to_string(),
+                validator
+                    .set_failpoint(
+                        "aptos_vm::execution::block_metadata".to_string(),
+                        "off".to_string(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        anyhow!(
+                            "set_failpoint to remove execution delay on {} failed, {:?}",
+                            name,
+                            e
                         )
-                        .await
-                        .map_err(|e| {
-                            anyhow!(
-                                "set_failpoint to remove execution delay on {} failed, {:?}",
-                                name,
-                                e
-                            )
-                        })?;
-                }
-                Ok::<(), anyhow::Error>(())
-            })?;
+                    })?;
+            }
         }
         Ok(())
     }
 }
 
+#[async_trait]
 impl NetworkTest for ChangingWorkingQuorumTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

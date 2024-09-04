@@ -45,7 +45,8 @@ const RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
     ["aptos-framework", "aptos-release-builder"];
 
 // The targeted unit test packages to ignore (these will be run separately, by other jobs)
-const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
+const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 3] =
+    ["aptos-testcases", "smoke-test", "aptos-keyless-circuit"];
 
 #[derive(Args, Clone, Debug)]
 #[command(disable_help_flag = true)]
@@ -70,6 +71,7 @@ pub enum AptosCargoCommand {
     AffectedPackages(CommonArgs),
     ChangedFiles(CommonArgs),
     Check(CommonArgs),
+    CheckMergeBase(CommonArgs),
     Xclippy(CommonArgs),
     Fmt(CommonArgs),
     Nextest(CommonArgs),
@@ -98,6 +100,7 @@ impl AptosCargoCommand {
             AptosCargoCommand::AffectedPackages(args) => args,
             AptosCargoCommand::ChangedFiles(args) => args,
             AptosCargoCommand::Check(args) => args,
+            AptosCargoCommand::CheckMergeBase(args) => args,
             AptosCargoCommand::Xclippy(args) => args,
             AptosCargoCommand::Fmt(args) => args,
             AptosCargoCommand::Nextest(args) => args,
@@ -161,6 +164,10 @@ impl AptosCargoCommand {
                 // Calculate and display the changed files
                 let (_, _, changed_files) = package_args.identify_changed_files()?;
                 output_changed_files(changed_files)
+            },
+            AptosCargoCommand::CheckMergeBase(_) => {
+                // Check the merge base
+                package_args.check_merge_base()
             },
             AptosCargoCommand::TargetedCLITests(_) => {
                 // Run the targeted CLI tests (if necessary).
@@ -474,7 +481,7 @@ fn output_affected_packages(packages: Vec<String>) -> anyhow::Result<()> {
     if packages.is_empty() {
         println!("No packages were affected!");
     } else {
-        println!("Affected packages detected:");
+        println!("Affected packages detected ({:?} total):", packages.len());
         for package in packages {
             println!("\t{:?}", package)
         }

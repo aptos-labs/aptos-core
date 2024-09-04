@@ -57,15 +57,11 @@ public fun m::test($t0: u64, $t1: u64): (u64, u64) {
   9: $t9 := 1
  10: $t8 := -($t4, $t9)
  11: $t4 := move($t8)
- 12: goto 15
+ 12: goto 1
  13: label L3
- 14: goto 17
- 15: label L4
- 16: goto 1
- 17: label L1
- 18: $t2 := move($t0)
- 19: $t3 := move($t1)
- 20: return ($t2, $t3)
+ 14: $t2 := move($t0)
+ 15: $t3 := move($t1)
+ 16: return ($t2, $t3)
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -114,27 +110,19 @@ public fun m::test($t0: u64, $t1: u64): (u64, u64) {
      # events: e:$t8
  11: $t4 := move($t8)
      # live vars: $t0, $t1, $t4
- 12: goto 15
-     # live vars: $t0, $t1, $t4
- 13: label L3
-     # live vars: $t0, $t1
- 14: goto 17
-     # live vars: $t0, $t1, $t4
- 15: label L4
+ 12: goto 1
      # live vars: $t0, $t1, $t4
      # events: e:$t4
- 16: goto 1
-     # live vars: $t0, $t1
- 17: label L1
+ 13: label L3
      # live vars: $t0, $t1
      # events: e:$t0, b:$t2
- 18: $t2 := move($t0)
+ 14: $t2 := move($t0)
      # live vars: $t1, $t2
      # events: e:$t1, b:$t3
- 19: $t3 := move($t1)
+ 15: $t3 := move($t1)
      # live vars: $t2, $t3
      # events: e:$t2, e:$t3
- 20: return ($t2, $t3)
+ 16: return ($t2, $t3)
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -161,15 +149,11 @@ public fun m::test($t0: u64, $t1: u64): (u64, u64) {
   9: $t7 := 1
  10: $t7 := -($t4, $t7)
  11: $t4 := move($t7)
- 12: goto 15
+ 12: goto 1
  13: label L3
- 14: goto 17
- 15: label L4
- 16: goto 1
- 17: label L1
- 18: $t0 := move($t0)
- 19: $t1 := move($t1)
- 20: return ($t0, $t1)
+ 14: $t0 := move($t0)
+ 15: $t1 := move($t1)
+ 16: return ($t0, $t1)
 }
 
 ============ after DeadStoreElimination: ================
@@ -196,13 +180,9 @@ public fun m::test($t0: u64, $t1: u64): (u64, u64) {
   9: $t7 := 1
  10: $t7 := -($t4, $t7)
  11: $t4 := move($t7)
- 12: goto 15
+ 12: goto 1
  13: label L3
- 14: goto 17
- 15: label L4
- 16: goto 1
- 17: label L1
- 18: return ($t0, $t1)
+ 14: return ($t0, $t1)
 }
 
 
@@ -218,34 +198,26 @@ B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: StLoc[2](loc0: u64)
 B1:
-	2: LdU64(0)
-	3: StLoc[3](loc1: u64)
-	4: CopyLoc[2](loc0: u64)
-	5: MoveLoc[3](loc1: u64)
-	6: Gt
-	7: BrFalse(21)
+	2: CopyLoc[2](loc0: u64)
+	3: LdU64(0)
+	4: Gt
+	5: BrFalse(17)
 B2:
-	8: MoveLoc[0](Arg0: u64)
-	9: StLoc[3](loc1: u64)
-	10: MoveLoc[1](Arg1: u64)
-	11: StLoc[0](Arg0: u64)
-	12: MoveLoc[3](loc1: u64)
-	13: StLoc[1](Arg1: u64)
-	14: LdU64(1)
-	15: StLoc[3](loc1: u64)
-	16: MoveLoc[2](loc0: u64)
-	17: MoveLoc[3](loc1: u64)
-	18: Sub
-	19: StLoc[2](loc0: u64)
-	20: Branch(22)
+	6: MoveLoc[0](Arg0: u64)
+	7: StLoc[3](loc1: u64)
+	8: MoveLoc[1](Arg1: u64)
+	9: StLoc[0](Arg0: u64)
+	10: MoveLoc[3](loc1: u64)
+	11: StLoc[1](Arg1: u64)
+	12: MoveLoc[2](loc0: u64)
+	13: LdU64(1)
+	14: Sub
+	15: StLoc[2](loc0: u64)
+	16: Branch(2)
 B3:
-	21: Branch(23)
-B4:
-	22: Branch(2)
-B5:
-	23: MoveLoc[0](Arg0: u64)
-	24: MoveLoc[1](Arg1: u64)
-	25: Ret
+	17: MoveLoc[0](Arg0: u64)
+	18: MoveLoc[1](Arg1: u64)
+	19: Ret
 }
 }
 ============ bytecode verification succeeded ========

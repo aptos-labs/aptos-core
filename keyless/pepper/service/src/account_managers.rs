@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Copyright © Aptos Foundation
-
 use aptos_logger::info;
 use once_cell::sync::Lazy;
 use regex::Regex;

@@ -198,8 +198,8 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         // Store result back
         for qid in scc {
             let decl_mut = env.get_spec_fun_mut(qid);
-            decl_mut.callees = transitive_callees.clone();
-            decl_mut.used_memory = transitive_usage.clone();
+            decl_mut.callees.clone_from(&transitive_callees);
+            decl_mut.used_memory.clone_from(&transitive_usage);
         }
     }
 
@@ -255,6 +255,7 @@ fn derive_spec_fun(env: &mut GlobalEnv, fun_id: QualifiedId<FunId>) -> Qualified
         body,
         callees: BTreeSet::new(),
         is_recursive: RefCell::new(None),
+        insts_using_generic_type_reflection: Default::default(),
     };
     env.add_spec_function_def(fun_id.module_id, decl)
 }

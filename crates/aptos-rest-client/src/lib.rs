@@ -1605,7 +1605,7 @@ impl Client {
         base: &str,
         limit_per_request: u64,
         ledger_version: Option<u64>,
-        cursor: Option<String>,
+        cursor: &Option<String>,
     ) -> AptosResult<Url> {
         let mut path = format!("{}?limit={}", base, limit_per_request);
         if let Some(ledger_version) = ledger_version {
@@ -1637,11 +1637,11 @@ impl Client {
                 base_path,
                 limit_per_request,
                 ledger_version,
-                cursor,
+                &cursor,
             )?;
             let raw_response = self.inner.get(url).send().await?;
             let response: Response<Vec<T>> = self.json(raw_response).await?;
-            cursor = response.state().cursor.clone();
+            cursor.clone_from(&response.state().cursor);
             if cursor.is_none() {
                 break Ok(response.map(|mut v| {
                     result.append(&mut v);
@@ -1670,13 +1670,13 @@ impl Client {
                 base_path,
                 limit_per_request,
                 ledger_version,
-                cursor,
+                &cursor,
             )?;
             let response: Response<BTreeMap<T, Vec<u8>>> = self
                 .get_bcs(url)
                 .await?
                 .and_then(|inner| bcs::from_bytes(&inner))?;
-            cursor = response.state().cursor.clone();
+            cursor.clone_from(&response.state().cursor);
             if cursor.is_none() {
                 break Ok(response.map(|mut v| {
                     result.append(&mut v);

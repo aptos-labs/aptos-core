@@ -4,7 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::MempoolSyncMsg,
+    network::{BroadcastPeerPriority, MempoolSyncMsg},
 };
 use anyhow::{format_err, Result};
 use aptos_compression::client::CompressionClient;
@@ -123,6 +123,8 @@ pub(crate) fn add_txns_to_mempool(
             transaction.account_seqno,
             TimelineState::NotReady,
             false,
+            None,
+            Some(BroadcastPeerPriority::Primary),
         );
         transactions.push(txn);
     }
@@ -151,6 +153,8 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
             0,
             TimelineState::NotReady,
             false,
+            None,
+            Some(BroadcastPeerPriority::Primary),
         )
         .code
     {

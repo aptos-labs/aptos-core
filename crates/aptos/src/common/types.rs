@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::fund_account;
+use super::utils::{explorer_transaction_link, fund_account};
 use crate::{
     common::{
         init::Network,
@@ -18,7 +18,7 @@ use crate::{
     genesis::git::from_yaml,
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
-use anyhow::Context;
+use anyhow::{bail, Context};
 use aptos_api_types::ViewFunction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
@@ -53,6 +53,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -231,6 +232,7 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
+    /// Name of network being used, if setup from aptos init
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
@@ -674,18 +676,17 @@ pub trait ParsePrivateKey {
 
 #[derive(Debug, Default, Parser)]
 pub struct HardwareWalletOptions {
-    /// Derivation Path of your account in hardware wallet
+    /// BIP44 derivation path of hardware wallet account, e.g. `m/44'/637'/0'/0'/0'`
     ///
-    /// e.g format - m/44\'/637\'/0\'/0\'/0\'
-    /// Make sure your wallet is unlocked and have Aptos opened
-    #[clap(long)]
+    /// Note you may need to escape single quotes in your shell, for example
+    /// `m/44'/637'/0'/0'/0'` would be `m/44\'/637\'/0\'/0\'/0\'`
+    #[clap(long, conflicts_with = "derivation_index")]
     pub derivation_path: Option<String>,
 
-    /// Index of your account in hardware wallet
+    /// BIP44 account index of hardware wallet account, e.g. `0`
     ///
-    /// This is the simpler version of derivation path e.g `format - [0]`
-    /// we will translate this index into `[m/44'/637'/0'/0'/0]`
-    #[clap(long)]
+    /// Given index `n` maps to BIP44 derivation path `m/44'/637'/n'/0'/0`
+    #[clap(long, conflicts_with = "derivation_path")]
     pub derivation_index: Option<String>,
 }
 
@@ -1021,25 +1022,53 @@ impl RestOptions {
     }
 }
 
+/// Options for optimization level
+#[derive(Debug, Clone, Parser)]
+pub enum OptimizationLevel {
+    /// No optimizations
+    None,
+    /// Default optimization level
+    Default,
+    /// Extra optimizations, that may take more time
+    Extra,
+}
+
+impl Default for OptimizationLevel {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+impl FromStr for OptimizationLevel {
+    type Err = anyhow::Error;
+
+    /// Parses an optimization level, or default.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "none" => Ok(Self::None),
+            "" | "default" => Ok(Self::Default),
+            "extra" => Ok(Self::Extra),
+            _ => bail!(
+                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `aggressive`)",
+                s
+            ),
+        }
+    }
+}
+
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
-    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
-    ///
-    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
-    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
-    ///
-    /// Currently, it also additionally pulls in all test compilation artifacts
-    #[clap(long)]
-    pub dev: bool,
-    /// Path to a move package (the folder with a Move.toml file)
+    /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
+
     /// Path to save the compiled move package
     ///
     /// Defaults to `<package_dir>/build`
     #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
+
     /// Named addresses for the move binary
     ///
     /// Example: alice=0x1234, bob=0x5678
@@ -1047,6 +1076,10 @@ pub struct MovePackageDir {
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, value_parser = crate::common::utils::parse_map::<String, AccountAddressWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
+
+    /// Override the standard library version by mainnet/testnet/devnet
+    #[clap(long, value_parser)]
+    pub override_std: Option<StdVersion>,
 
     /// Skip pulling the latest git dependencies
     ///
@@ -1056,44 +1089,95 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub(crate) skip_fetch_latest_git_deps: bool,
 
-    /// Specify the version of the bytecode the compiler is going to emit.
-    #[clap(long)]
-    pub bytecode_version: Option<u32>,
-
-    /// Specify the version of the compiler.
-    /// Currently, default to `v1`
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
-    pub compiler_version: Option<CompilerVersion>,
-
-    /// Specify the language version to be supported.
-    /// Currently, default to `v1`
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
-    pub language_version: Option<LanguageVersion>,
-
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
+
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
+    #[clap(long)]
+    pub dev: bool,
 
     /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
     /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
+
+    /// Select optimization level.  Choices are "none", "default", or "extra".
+    /// Level "extra" may spend more time on expensive optimizations in the future.
+    /// Level "none" does no optimizations, possibly leading to use of too many runtime resources.
+    /// Level "default" is the recommended level, and the default if not provided.
+    #[clap(long, alias = "optimization_level", value_parser = clap::value_parser!(OptimizationLevel))]
+    pub optimize: Option<OptimizationLevel>,
+
+    /// Experiments
+    #[clap(long, hide(true))]
+    pub experiments: Vec<String>,
+
+    /// ...or --bytecode BYTECODE_VERSION
+    /// Specify the version of the bytecode the compiler is going to emit.
+    /// Defaults to `6`, or `7` if language version 2 is selected
+    /// (through `--move-2` or `--language_version=2`), .
+    #[clap(
+        long,
+        default_value_if("move_2", "true", "7"),
+        alias = "bytecode",
+        verbatim_doc_comment
+    )]
+    pub bytecode_version: Option<u32>,
+
+    /// ...or --compiler COMPILER_VERSION
+    /// Specify the version of the compiler.
+    /// Defaults to `1`, or `2` if `--move-2` is selected.
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           alias = "compiler",
+           default_value_if("move_2", "true", "2.0"),
+           verbatim_doc_comment)]
+    pub compiler_version: Option<CompilerVersion>,
+
+    /// ...or --language LANGUAGE_VERSION
+    /// Specify the language version to be supported.
+    /// Currently, defaults to `1`, unless `--move-2` is selected.
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           alias = "language",
+           default_value_if("move_2", "true", "2.0"),
+           verbatim_doc_comment)]
+    pub language_version: Option<LanguageVersion>,
+
+    /// Select bytecode, language version, and compiler to support Move 2:
+    /// Same as `--bytecode_version=7 --language_version=2.0 --compiler_version=2.0`
+    #[clap(long, verbatim_doc_comment)]
+    pub move_2: bool,
+}
+
+impl Default for MovePackageDir {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MovePackageDir {
-    pub fn new(package_dir: PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {
             dev: false,
-            package_dir: Some(package_dir),
+            package_dir: None,
             output_dir: None,
             named_addresses: Default::default(),
+            override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
             language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
+            move_2: false,
+            optimize: None,
+            experiments: vec![],
         }
     }
 
@@ -1346,17 +1430,29 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
             },
-            Transaction::ValidatorTransaction(txn) => TransactionSummary {
+            Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
+            Transaction::ValidatorTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.transaction_info().hash,
                 gas_used: None,
                 gas_unit_price: None,
                 pending: None,
                 sender: None,
                 sequence_number: None,
-                success: Some(txn.info.success),
-                timestamp_us: Some(txn.timestamp.0),
-                version: Some(txn.info.version.0),
-                vm_status: Some(txn.info.vm_status.clone()),
+                success: Some(txn.transaction_info().success),
+                timestamp_us: Some(txn.timestamp().0),
+                version: Some(txn.transaction_info().version.0),
+                vm_status: Some(txn.transaction_info().vm_status.clone()),
             },
         }
     }
@@ -1698,25 +1794,19 @@ impl TransactionOptions {
             adjusted_max_gas
         };
 
-        // Sign and submit transaction
+        // Build a transaction
         let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
             .with_transaction_expiration_time(self.gas_options.expiration_secs);
 
-        match self.get_transaction_account_type() {
+        // Sign it with the appropriate signer
+        let transaction = match self.get_transaction_account_type() {
             Ok(AccountType::Local) => {
                 let (private_key, _) = self.get_key_and_address()?;
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
-                let transaction = sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload));
-                let response = client
-                    .submit_and_wait(&transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-                Ok(response.into_inner())
+                sender_account.sign_with_transaction_builder(transaction_factory.payload(payload))
             },
             Ok(AccountType::HardwareWallet) => {
                 let sender_account = &mut HardwareWalletAccount::new(
@@ -1729,17 +1819,33 @@ impl TransactionOptions {
                     HardwareWalletType::Ledger,
                     sequence_number,
                 );
-                let transaction = sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload))?;
-                let response = client
-                    .submit_and_wait(&transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-                Ok(response.into_inner())
+                sender_account
+                    .sign_with_transaction_builder(transaction_factory.payload(payload))?
             },
-            Err(err) => Err(err),
-        }
+            Err(err) => return Err(err),
+        };
+
+        // Submit the transaction, printing out a useful transaction link
+        client
+            .submit_bcs(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+        let transaction_hash = transaction.clone().committed_hash();
+        let network = self
+            .profile_options
+            .profile()
+            .ok()
+            .and_then(|profile| profile.network);
+        eprintln!(
+            "Transaction submitted: {}",
+            explorer_transaction_link(transaction_hash, network)
+        );
+        let response = client
+            .wait_for_signed_transaction(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+        Ok(response.into_inner())
     }
 
     /// Simulates a transaction locally, using the debugger to fetch required data from remote.

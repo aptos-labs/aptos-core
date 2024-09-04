@@ -142,7 +142,8 @@ async fn test_txn_emmitter_with_high_pending_latency() {
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
             conf.consensus.pipeline_backpressure.truncate(1);
-            conf.consensus.pipeline_backpressure[0].max_txns_from_block_to_execute = Some(2);
+            conf.consensus.pipeline_backpressure[0]
+                .max_sending_block_txns_after_filtering_override = 2;
             conf.consensus.pipeline_backpressure[0].back_pressure_pipeline_latency_limit_ms = 0;
         }))
         .build()
@@ -206,8 +207,9 @@ async fn test_txn_emmitter_low_funds() {
             mempool_backlog: 10,
         });
 
+    let account_1 = Arc::new(account_1);
     let txn_stat = emitter
-        .emit_txn_for_with_stats(&account_1, emit_job_request, Duration::from_secs(10), 3)
+        .emit_txn_for_with_stats(account_1, emit_job_request, Duration::from_secs(10), 3)
         .await
         .unwrap();
 

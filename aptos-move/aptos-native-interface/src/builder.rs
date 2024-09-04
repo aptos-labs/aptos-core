@@ -45,6 +45,7 @@ impl SafeNativeBuilder {
         misc_gas_params: MiscGasParameters,
         timed_features: TimedFeatures,
         features: Features,
+        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
     ) -> Self {
         Self {
             data: Arc::new(SharedData {
@@ -55,15 +56,8 @@ impl SafeNativeBuilder {
                 features,
             }),
             enable_incremental_gas_charging: true,
-            gas_hook: None,
+            gas_hook,
         }
-    }
-
-    pub fn set_gas_hook<F>(&mut self, action: F)
-    where
-        F: Fn(DynamicExpression) + Send + Sync + 'static,
-    {
-        self.gas_hook = Some(Arc::new(action));
     }
 
     /// Controls the default incremental gas charging behavior of the natives created from this builder.
