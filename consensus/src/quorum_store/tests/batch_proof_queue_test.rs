@@ -651,6 +651,9 @@ fn test_proof_pull_proofs_with_duplicates() {
     // txn_0, txn_1, txn_2 are expired.
     assert_eq!(result.0.len(), 2);
     assert_eq!(result.2, 0);
+
+    proof_queue.handle_updated_block_timestamp(now_in_usecs + 5_000_000);
+    assert!(proof_queue.is_empty());
 }
 
 #[test]
@@ -721,6 +724,10 @@ fn test_proof_queue_insert_after_commit() {
     let (remaining_txns, remaining_proofs) = proof_queue.remaining_txns_and_proofs();
     assert_eq!(remaining_txns, 0);
     assert_eq!(remaining_proofs, 0);
+
+    proof_queue.handle_updated_block_timestamp(10);
+
+    assert!(proof_queue.is_empty());
 }
 
 #[test]
@@ -775,4 +782,7 @@ fn test_proof_queue_pull_full_utilization() {
     assert_eq!(txns_with_proof_size.count(), 30);
     assert_eq!(cur_unique_txns, 30);
     assert!(proof_queue_fully_utilized);
+
+    proof_queue.handle_updated_block_timestamp(10);
+    assert!(proof_queue.is_empty());
 }
