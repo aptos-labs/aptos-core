@@ -3,7 +3,6 @@
 
 #[cfg(test)]
 mod proof_simulation {
-
     use crate::keyless::ZeroKnowledgeSig;
     use crate::keyless::{Bn254, G1Bytes, G2Bytes};
     use crate::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine};
@@ -23,6 +22,8 @@ mod proof_simulation {
     use std::ops::AddAssign;
     use ark_ff::MontBackend;
     use ark_bn254::FrConfig;
+
+    pub type Groth16SimulatorBn254 = Groth16Simulator<Bn254>;
 
     /// The SNARK of [[Groth16]](https://eprint.iacr.org/2016/260.pdf), where "proving" implements the
     /// simulation algorithm instead, using the trapdoor output by the modified setup algorithm also
@@ -234,7 +235,7 @@ mod proof_simulation {
         // TODO: Make this rng seedable
         let mut rng = rand::thread_rng();
         for _ in 0..n_iters {
-            let proof = Groth16Simulator::<Bn254>::create_random_proof_with_trapdoor(
+            let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(
                 &[public_input],
                 &pk,
                 &mut rng,
@@ -250,7 +251,7 @@ mod proof_simulation {
             };
 
             assert!(zks.verify_groth16_proof(public_input, &pvk).is_ok());
-            let a = Groth16Simulator::<Bn254>::generate_random_scalar(&mut rng);
+            let a = Groth16SimulatorBn254::generate_random_scalar(&mut rng);
             assert!(!zks.verify_groth16_proof(a, &pvk).is_ok());
         }
     }
@@ -263,13 +264,13 @@ mod proof_simulation {
         // TODO: Make this rng seedable
         let mut rng = rand::thread_rng();
 
-        let (pk, vk) = Groth16Simulator::<Bn254>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+        let (pk, vk) = Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
         let pvk = prepare_verifying_key(&vk);
         for i in 0..n_iters {
             println!("on iteration: {}", i);
 
 
-            let proof = Groth16Simulator::<Bn254>::create_random_proof_with_trapdoor(
+            let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(
                 &[public_input],
                 &pk,
                 &mut rng,
@@ -285,7 +286,7 @@ mod proof_simulation {
             };
 
             assert!(zks.verify_groth16_proof(public_input, &pvk).is_ok());
-            let a = Groth16Simulator::<Bn254>::generate_random_scalar(&mut rng);
+            let a = Groth16SimulatorBn254::generate_random_scalar(&mut rng);
             assert!(!zks.verify_groth16_proof(a, &pvk).is_ok());
         }
     }
