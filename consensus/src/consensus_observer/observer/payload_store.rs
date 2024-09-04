@@ -26,12 +26,12 @@ pub enum BlockPayloadStatus {
 }
 
 /// A simple struct to store the block payloads of ordered and committed blocks
-#[derive(Clone)]
 pub struct BlockPayloadStore {
     // The configuration of the consensus observer
     consensus_observer_config: ConsensusObserverConfig,
 
-    // Block transaction payloads (indexed by epoch and round)
+    // Block transaction payloads (indexed by epoch and round).
+    // This is directly accessed by the payload manager.
     block_payloads: Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
 }
 
@@ -299,16 +299,12 @@ mod test {
         };
 
         // Create a new block payload store
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some unverified blocks to the payload store
         let num_blocks_in_store = 100;
-        let unverified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
-            num_blocks_in_store,
-            1,
-            false,
-        );
+        let unverified_blocks =
+            create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 1, false);
 
         // Verify the payloads don't exist in the block payload store
         assert!(!block_payload_store.all_payloads_exist(&unverified_blocks));
@@ -320,12 +316,8 @@ mod test {
 
         // Add some verified blocks to the payload store
         let num_blocks_in_store = 100;
-        let verified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
-            num_blocks_in_store,
-            0,
-            true,
-        );
+        let verified_blocks =
+            create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 0, true);
 
         // Check that all the payloads exist in the block payload store
         assert!(block_payload_store.all_payloads_exist(&verified_blocks));
@@ -355,22 +347,18 @@ mod test {
     fn test_all_payloads_exist_unverified() {
         // Create a new block payload store
         let consensus_observer_config = ConsensusObserverConfig::default();
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add several verified blocks to the payload store
         let num_blocks_in_store = 10;
-        let verified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
-            num_blocks_in_store,
-            0,
-            true,
-        );
+        let verified_blocks =
+            create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 0, true);
 
         // Check that the payloads exists in the block payload store
         assert!(block_payload_store.all_payloads_exist(&verified_blocks));
 
         // Mark the payload of the first block as unverified
-        mark_payload_as_unverified(block_payload_store.clone(), &verified_blocks[0]);
+        mark_payload_as_unverified(&block_payload_store, &verified_blocks[0]);
 
         // Check that the payload no longer exists in the block payload store
         assert!(!block_payload_store.all_payloads_exist(&verified_blocks));
@@ -383,19 +371,15 @@ mod test {
     fn test_clear_all_payloads() {
         // Create a new block payload store
         let consensus_observer_config = ConsensusObserverConfig::default();
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some unverified blocks to the payload store
         let num_blocks_in_store = 30;
-        create_and_add_blocks_to_store(block_payload_store.clone(), num_blocks_in_store, 1, false);
+        create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 1, false);
 
         // Add some verified blocks to the payload store
-        let verified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
-            num_blocks_in_store,
-            0,
-            true,
-        );
+        let verified_blocks =
+            create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 0, true);
 
         // Check that the payloads exist in the block payload store
         assert!(block_payload_store.all_payloads_exist(&verified_blocks));
@@ -423,12 +407,8 @@ mod test {
 
         // Add some verified blocks to the payload store
         let num_blocks_in_store = 20;
-        let verified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
-            num_blocks_in_store,
-            0,
-            true,
-        );
+        let verified_blocks =
+            create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 0, true);
 
         // Check that the block payload store contains the new block payloads
         assert!(block_payload_store.all_payloads_exist(&verified_blocks));
@@ -438,7 +418,7 @@ mod test {
         check_num_verified_payloads(&block_payload_store, num_blocks_in_store);
 
         // Mark the payload of the first block as unverified
-        mark_payload_as_unverified(block_payload_store.clone(), &verified_blocks[0]);
+        mark_payload_as_unverified(&block_payload_store, &verified_blocks[0]);
 
         // Check that the payload no longer exists in the block payload store
         assert!(!block_payload_store.all_payloads_exist(&verified_blocks));
@@ -465,11 +445,11 @@ mod test {
         };
 
         // Create a new block payload store
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add the maximum number of verified blocks to the payload store
         let num_blocks_in_store = max_num_pending_blocks as usize;
-        create_and_add_blocks_to_store(block_payload_store.clone(), num_blocks_in_store, 0, true);
+        create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 0, true);
 
         // Verify the number of blocks in the block payload store
         check_num_verified_payloads(&block_payload_store, num_blocks_in_store);
@@ -477,7 +457,7 @@ mod test {
 
         // Add more blocks to the payload store
         let num_blocks_to_add = 5;
-        create_and_add_blocks_to_store(block_payload_store.clone(), num_blocks_to_add, 0, true);
+        create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_to_add, 0, true);
 
         // Verify the number of blocks in the block payload store
         check_num_verified_payloads(&block_payload_store, max_num_pending_blocks as usize);
@@ -485,7 +465,7 @@ mod test {
 
         // Add a large number of blocks to the payload store
         let num_blocks_to_add = 100;
-        create_and_add_blocks_to_store(block_payload_store.clone(), num_blocks_to_add, 0, true);
+        create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_to_add, 0, true);
 
         // Verify the number of blocks in the block payload store
         check_num_verified_payloads(&block_payload_store, max_num_pending_blocks as usize);
@@ -502,11 +482,11 @@ mod test {
         };
 
         // Create a new block payload store
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add the maximum number of unverified blocks to the payload store
         let num_blocks_in_store = max_num_pending_blocks as usize;
-        create_and_add_blocks_to_store(block_payload_store.clone(), num_blocks_in_store, 0, false);
+        create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_in_store, 0, false);
 
         // Verify the number of blocks in the block payload store
         check_num_unverified_payloads(&block_payload_store, num_blocks_in_store);
@@ -514,7 +494,7 @@ mod test {
 
         // Add more blocks to the payload store
         let num_blocks_to_add = 5;
-        create_and_add_blocks_to_store(block_payload_store.clone(), num_blocks_to_add, 0, false);
+        create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_to_add, 0, false);
 
         // Verify the number of blocks in the block payload store
         check_num_unverified_payloads(&block_payload_store, max_num_pending_blocks as usize);
@@ -522,7 +502,7 @@ mod test {
 
         // Add a large number of blocks to the payload store
         let num_blocks_to_add = 100;
-        create_and_add_blocks_to_store(block_payload_store.clone(), num_blocks_to_add, 0, false);
+        create_and_add_blocks_to_store(&mut block_payload_store, num_blocks_to_add, 0, false);
 
         // Verify the number of blocks in the block payload store
         check_num_unverified_payloads(&block_payload_store, max_num_pending_blocks as usize);
@@ -533,13 +513,13 @@ mod test {
     fn test_remove_blocks_for_epoch_round_verified() {
         // Create a new block payload store
         let consensus_observer_config = ConsensusObserverConfig::default();
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks to the payload store for the current epoch
         let current_epoch = 0;
         let num_blocks_in_store = 100;
         let verified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_blocks_in_store,
             current_epoch,
             true,
@@ -573,7 +553,7 @@ mod test {
         // Add some verified blocks to the payload store for the next epoch
         let next_epoch = current_epoch + 1;
         create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_blocks_in_store,
             next_epoch,
             true,
@@ -591,13 +571,13 @@ mod test {
     fn test_remove_blocks_for_epoch_round_unverified() {
         // Create a new block payload store
         let consensus_observer_config = ConsensusObserverConfig::default();
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some unverified blocks to the payload store for the current epoch
         let current_epoch = 10;
         let num_blocks_in_store = 100;
         let unverified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_blocks_in_store,
             current_epoch,
             false,
@@ -630,7 +610,7 @@ mod test {
         // Add some unverified blocks to the payload store for the next epoch
         let next_epoch = current_epoch + 1;
         create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_blocks_in_store,
             next_epoch,
             false,
@@ -648,13 +628,13 @@ mod test {
     fn test_remove_committed_blocks_verified() {
         // Create a new block payload store
         let consensus_observer_config = ConsensusObserverConfig::default();
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some blocks to the payload store for the current epoch
         let current_epoch = 0;
         let num_blocks_in_store = 100;
         let verified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_blocks_in_store,
             current_epoch,
             true,
@@ -700,7 +680,7 @@ mod test {
         // Add some blocks to the payload store for the next epoch
         let next_epoch = 1;
         let verified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_blocks_in_store,
             next_epoch,
             true,
@@ -717,13 +697,13 @@ mod test {
     fn test_remove_committed_blocks_unverified() {
         // Create a new block payload store
         let consensus_observer_config = ConsensusObserverConfig::default();
-        let block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some blocks to the payload store for the current epoch
         let current_epoch = 10;
         let num_blocks_in_store = 100;
         let unverified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_blocks_in_store,
             current_epoch,
             false,
@@ -768,7 +748,7 @@ mod test {
         // Add some blocks to the payload store for the next epoch
         let next_epoch = 11;
         let unverified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_blocks_in_store,
             next_epoch,
             false,
@@ -791,7 +771,7 @@ mod test {
         let current_epoch = 0;
         let num_verified_blocks = 10;
         create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_verified_blocks,
             current_epoch,
             true,
@@ -801,7 +781,7 @@ mod test {
         let next_epoch = current_epoch + 1;
         let num_unverified_blocks = 20;
         let unverified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_unverified_blocks,
             next_epoch,
             false,
@@ -811,7 +791,7 @@ mod test {
         let future_epoch = current_epoch + 30;
         let num_future_blocks = 30;
         let future_unverified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_future_blocks,
             future_epoch,
             false,
@@ -877,7 +857,7 @@ mod test {
         let current_epoch = 0;
         let num_verified_blocks = 10;
         let verified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_verified_blocks,
             current_epoch,
             true,
@@ -895,7 +875,7 @@ mod test {
             .unwrap();
 
         // Mark the first block payload as unverified
-        mark_payload_as_unverified(block_payload_store.clone(), &verified_blocks[0]);
+        mark_payload_as_unverified(&block_payload_store, &verified_blocks[0]);
 
         // Verify the ordered block and ensure it fails (since the payloads are unverified)
         let error = block_payload_store
@@ -923,7 +903,7 @@ mod test {
         let current_epoch = 10;
         let num_verified_blocks = 6;
         create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_verified_blocks,
             current_epoch,
             true,
@@ -933,7 +913,7 @@ mod test {
         let next_epoch = current_epoch + 1;
         let num_unverified_blocks = 15;
         let unverified_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_unverified_blocks,
             next_epoch,
             false,
@@ -943,7 +923,7 @@ mod test {
         let future_epoch = next_epoch + 1;
         let num_future_blocks = 10;
         let unverified_future_blocks = create_and_add_blocks_to_store(
-            block_payload_store.clone(),
+            &mut block_payload_store,
             num_future_blocks,
             future_epoch,
             false,
@@ -986,7 +966,7 @@ mod test {
 
     /// Creates and adds the given number of blocks to the block payload store
     fn create_and_add_blocks_to_store(
-        mut block_payload_store: BlockPayloadStore,
+        block_payload_store: &mut BlockPayloadStore,
         num_blocks: usize,
         epoch: u64,
         verified_payload_signatures: bool,
@@ -1110,7 +1090,7 @@ mod test {
 
     /// Marks the payload of the given block as unverified
     fn mark_payload_as_unverified(
-        block_payload_store: BlockPayloadStore,
+        block_payload_store: &BlockPayloadStore,
         block: &Arc<PipelinedBlock>,
     ) {
         // Get the payload entry for the given block
