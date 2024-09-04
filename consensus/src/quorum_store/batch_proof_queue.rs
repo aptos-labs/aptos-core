@@ -8,6 +8,7 @@ use super::{
 use crate::quorum_store::counters;
 use aptos_consensus_types::{
     common::TxnSummaryWithExpiration,
+    payload::TDataInfo,
     proof_of_store::{BatchInfo, ProofOfStore},
     utils::PayloadTxnsSize,
 };
@@ -733,8 +734,8 @@ impl BatchProofQueue {
     // Mark in the hashmap committed PoS, but keep them until they expire
     pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
         let start = Instant::now();
-        for batch in &batches {
-            let batch_key = BatchKey::from_info(batch);
+        for batch in batches.into_iter() {
+            let batch_key = BatchKey::from_info(&batch);
             if let Some(item) = self.items.get(&batch_key) {
                 if let Some(ref proof) = item.proof {
                     let insertion_time = item
@@ -767,8 +768,15 @@ impl BatchProofQueue {
                 }
                 item.mark_committed();
             } else {
+                let batch_sort_key = BatchSortKey::from_info(batch.info());
+                self.expirations
+                    .add_item(batch_sort_key.clone(), batch.expiration());
+                self.author_to_batches
+                    .entry(batch.author())
+                    .or_default()
+                    .insert(batch_sort_key, batch.clone());
                 self.items.insert(batch_key, QueueItem {
-                    info: batch.clone(),
+                    info: batch,
                     txn_summaries: None,
                     proof: None,
                     proof_insertion_time: None,
