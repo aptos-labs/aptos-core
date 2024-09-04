@@ -132,7 +132,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             .versioned_map
             .entry(tag.clone())
             .or_default()
-            .entry(zero_idx)
+            .entry(zero_idx.clone())
         {
             Occupied(mut o) => {
                 match &o.get().value {
@@ -176,7 +176,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
         // Remove any prior entries.
         let mut prev_tag_and_sizes: HashMap<T, Option<usize>> =
-            self.remove(shifted_idx).into_iter().collect();
+            self.remove(shifted_idx.clone()).into_iter().collect();
 
         // Changes the set of values, or the size of the entries (that might have been
         // used even when marked as an estimate, if self.size_changed was still false).
@@ -193,7 +193,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
                 // Update versioned_map.
                 self.versioned_map.entry(tag.clone()).or_default().insert(
-                    shifted_idx,
+                    shifted_idx.clone(),
                     CachePadded::new(GroupEntry::new(incarnation, v.clone())),
                 );
 
