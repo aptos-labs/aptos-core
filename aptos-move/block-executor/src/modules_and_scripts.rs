@@ -83,10 +83,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<bool> {
-        Ok(self
+        let exists = self
             .read_module_storage(address, module_name)?
             .into_versioned()
-            .is_some())
+            .is_some();
+        Ok(exists)
     }
 
     fn fetch_module_bytes(
@@ -182,6 +183,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         .get_or_else(key, self.txn_idx, || {
                             self.get_base_module_storage_entry(key)
                         })?;
+
                 state
                     .captured_reads
                     .borrow_mut()
@@ -272,7 +274,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             // there must be a cycle.
             // Note: here we treat "verified" modules as graph nodes that exited the recursion,
             //       which allows us to identify cycles.
+            assert!(!dep_entry.is_verified());
             let dep_key = T::Key::from_address_and_module_name(addr, name);
+
             if visited.insert(dep_key.clone()) {
                 let module = self.traversed_published_dependencies(addr, name, visited)?;
                 verified_dependencies.push(module);
@@ -287,13 +291,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             self.runtime_environment
                 .build_verified_module(partially_verified_module, &verified_dependencies)?,
         );
-        let verified_entry = entry.make_verified(module.clone());
+        let verified_entry = Arc::new(entry.make_verified(module.clone()));
 
         // Finally, change the entry in the module storage to the verified one, in order to
         // make sure that everyone sees the verified module.
         let key = T::Key::from_address_and_module_name(address, module_name);
         match &self.latest_view {
             ViewState::Sync(state) => {
+                state
+                    .captured_reads
+                    .borrow_mut()
+                    .capture_module_storage_read(
+                        key.clone(),
+                        ModuleStorageRead::Versioned(version.clone(), verified_entry.clone()),
+                    );
                 state.versioned_map.module_storage().write_if_not_verified(
                     &key,
                     version,
