@@ -107,6 +107,9 @@ spec:
         {{- if $.Values.metrics.destination }}
         aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
         {{- end}}
+        {{- with $.Values.validator.podAnnotations }}
+        {{- toYaml $.Values.validator.podAnnotations | nindent 8 }}
+        {{- end }}
     spec:
       securityContext:
         seccompProfile:
