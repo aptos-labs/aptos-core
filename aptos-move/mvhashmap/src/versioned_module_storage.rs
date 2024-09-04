@@ -1,31 +1,49 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{ShiftedTxnIndex, TxnIndex};
+use crate::types::{ShiftedTxnIndex, StorageVersion, TxnIndex};
 use aptos_types::{executable::ModulePath, vm::modules::ModuleStorageEntry};
 use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
+use derivative::Derivative;
 use move_binary_format::errors::VMResult;
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
 
+/// Represents a version of a module - either written by some transaction, or fetched from storage.
+pub type ModuleVersion = Result<TxnIndex, StorageVersion>;
+
 /// Result of a read query on the versioned module storage.
-#[derive(Debug)]
-pub enum ModuleStorageReadResult {
-    /// An existing module at certain index (either base storage or corresponding to
-    /// some committed transaction).
-    Versioned(ShiftedTxnIndex, Arc<ModuleStorageEntry>),
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Debug(bound = ""), PartialEq(bound = ""))]
+pub enum ModuleStorageRead {
+    /// An existing module at certain index of committed transaction or from the base storage.
+    Versioned(
+        ModuleVersion,
+        #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<ModuleStorageEntry>,
+    ),
     /// If module is not found in storage.
     DoesNotExist,
 }
 
-impl ModuleStorageReadResult {
+impl ModuleStorageRead {
+    pub fn storage_version(entry: Arc<ModuleStorageEntry>) -> Self {
+        Self::Versioned(Err(StorageVersion), entry)
+    }
+
+    pub fn before_txn_idx(txn_idx: TxnIndex, entry: Arc<ModuleStorageEntry>) -> Self {
+        let version = if txn_idx > 0 {
+            Ok(txn_idx - 1)
+        } else {
+            Err(StorageVersion)
+        };
+        Self::Versioned(version, entry)
+    }
+
     /// If the entry exists, returns it together with its index. Otherwise, returns [None].
-    pub fn into_module_module_storage_entry_at_idx(
-        self,
-    ) -> Option<(ShiftedTxnIndex, Arc<ModuleStorageEntry>)> {
+    pub fn into_versioned(self) -> Option<(ModuleVersion, Arc<ModuleStorageEntry>)> {
         match self {
-            Self::Versioned(idx, entry) => Some((idx, entry)),
+            Self::Versioned(version, entry) => Some((version, entry)),
             Self::DoesNotExist => None,
         }
     }
@@ -47,14 +65,14 @@ impl VersionedEntry {
 
     /// Returns the "latest" module entry under the specified index. If such an
     /// entry does nto exist, [None] is returned.
-    fn get(&self, txn_idx: ShiftedTxnIndex) -> Option<ModuleStorageReadResult> {
-        use ModuleStorageReadResult::*;
+    fn get(&self, txn_idx: ShiftedTxnIndex) -> Option<ModuleStorageRead> {
+        use ModuleStorageRead::*;
 
         self.versions
             .range(ShiftedTxnIndex::zero_idx()..txn_idx)
             .next_back()
             .map(|(idx, entry)| match entry.as_ref() {
-                Some(entry) => Versioned(*idx, entry.clone()),
+                Some(entry) => Versioned(idx.idx(), entry.clone()),
                 None => DoesNotExist,
             })
     }
@@ -75,51 +93,49 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
     }
 
     /// Returns the module entry from the module storage. If the entry does
-    /// not exist, [ModuleStorageReadResult::DoesNotExist] is returned. If
+    /// not exist, [ModuleStorageRead::DoesNotExist] is returned. If
     /// there is a pending code publish below the queried index, again the
-    /// same [ModuleStorageReadResult::DoesNotExist] is returned as all
+    /// same [ModuleStorageRead::DoesNotExist] is returned as all
     /// pending publishes are treated as non-existent modules.
-    pub fn get(&self, key: &K, txn_idx: ShiftedTxnIndex) -> ModuleStorageReadResult {
+    pub fn get(&self, key: &K, txn_idx: TxnIndex) -> ModuleStorageRead {
         let v = self
             .entries
             .entry(key.clone())
             .or_insert_with(VersionedEntry::empty);
-        v.get(txn_idx)
-            .unwrap_or(ModuleStorageReadResult::DoesNotExist)
+        v.get(ShiftedTxnIndex::new(txn_idx))
+            .unwrap_or(ModuleStorageRead::DoesNotExist)
     }
 
     /// Similar to [VersionedModuleStorage::get]. The difference is that if the module does not
     /// exist in module storage, the passed closure is used to initialize it. In contrast,
-    /// [VersionedModuleStorage::get] returns [ModuleStorageReadResult::DoesNotExist].
+    /// [VersionedModuleStorage::get] returns [ModuleStorageRead::DoesNotExist].
     pub fn get_or_else<F>(
         &self,
         key: &K,
-        txn_idx: ShiftedTxnIndex,
+        txn_idx: TxnIndex,
         init_func: F,
-    ) -> VMResult<ModuleStorageReadResult>
+    ) -> VMResult<ModuleStorageRead>
     where
         F: FnOnce() -> VMResult<Option<Arc<ModuleStorageEntry>>>,
     {
-        use ModuleStorageReadResult::*;
-
         let mut v = self
             .entries
             .entry(key.clone())
             .or_insert_with(VersionedEntry::empty);
 
         // Module entry exists in versioned entry, return it.
-        if let Some(result) = v.get(txn_idx) {
+        if let Some(result) = v.get(ShiftedTxnIndex::new(txn_idx)) {
             return Ok(result);
         }
 
         // Otherwise, use the passed closure to compute thw base storage value.
-        let zero = ShiftedTxnIndex::zero_idx();
         let maybe_entry = init_func()?;
         let result = Ok(match &maybe_entry {
-            Some(entry) => Versioned(zero, entry.clone()),
-            None => DoesNotExist,
+            Some(entry) => ModuleStorageRead::storage_version(entry.clone()),
+            None => ModuleStorageRead::DoesNotExist,
         });
-        v.versions.insert(zero, CachePadded::new(maybe_entry));
+        v.versions
+            .insert(ShiftedTxnIndex::zero_idx(), CachePadded::new(maybe_entry));
         result
     }
 
@@ -169,7 +185,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
     pub fn write_if_not_verified(
         &self,
         key: &K,
-        committed_idx: ShiftedTxnIndex,
+        version: ModuleVersion,
         entry: ModuleStorageEntry,
     ) {
         let mut versioned_entry = self
@@ -177,6 +193,9 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
             .get_mut(key)
             .expect("Versioned entry must always exist before it is set as verified");
 
+        let committed_idx = version
+            .map(ShiftedTxnIndex::new)
+            .unwrap_or(ShiftedTxnIndex::zero_idx());
         let prev_entry = versioned_entry
             .versions
             .get(&committed_idx)
