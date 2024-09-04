@@ -61,6 +61,10 @@ impl ProofManager {
         for proof in proofs.into_iter() {
             self.batch_proof_queue.insert_proof(proof);
         }
+        self.update_remaining_txns_and_proofs();
+    }
+
+    fn update_remaining_txns_and_proofs(&mut self) {
         sample!(
             SampleRate::Duration(Duration::from_millis(200)),
             (self.remaining_total_txn_num, self.remaining_total_proof_num) =
@@ -87,11 +91,7 @@ impl ProofManager {
         self.batch_proof_queue.mark_committed(batches);
         self.batch_proof_queue
             .handle_updated_block_timestamp(block_timestamp);
-        sample!(
-            SampleRate::Duration(Duration::from_millis(200)),
-            (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-                self.batch_proof_queue.remaining_txns_and_proofs();
-        );
+        self.update_remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
