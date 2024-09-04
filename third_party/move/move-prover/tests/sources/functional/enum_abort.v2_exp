@@ -99,7 +99,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/enum_abort.move:122: test_match_abort
     =         <redacted> = <redacted>
     =         _x = <redacted>
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/enum_abort.move:122: test_match_abort
     =         _z = <redacted>
     =         <redacted> = <redacted>
