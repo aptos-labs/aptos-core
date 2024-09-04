@@ -10,6 +10,7 @@ module aptos_framework::genesis {
     use aptos_framework::aptos_account;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
+    use aptos_framework::atomic_bridge;
     use aptos_framework::block;
     use aptos_framework::chain_id;
     use aptos_framework::chain_status;
@@ -131,6 +132,7 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
+        atomic_bridge::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -146,6 +148,10 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+        // Give atomic_bridge module MintCapability<AptosCoin> so it can mint on bridging.
+        atomic_bridge::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+        // Give atomic_bridge module BurnCapability<AptosCoin> so it can burn when bridging back.
+        atomic_bridge::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
     }
 
     /// Only called for testnets and e2e tests.
@@ -164,6 +170,10 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+        // Give atomic_bridge module MintCapability<AptosCoin> so it can mint on bridging.
+        atomic_bridge::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+        // Give atomic_bridge module BurnCapability<AptosCoin> so it can burn when bridging back.
+        atomic_bridge::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
 
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);

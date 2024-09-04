@@ -39,6 +39,7 @@
 <b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
 <b>use</b> <a href="aptos_governance.md#0x1_aptos_governance">0x1::aptos_governance</a>;
+<b>use</b> <a href="atomic_bridge.md#0x1_atomic_bridge">0x1::atomic_bridge</a>;
 <b>use</b> <a href="block.md#0x1_block">0x1::block</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
@@ -400,6 +401,10 @@ Genesis step 2: Initialize Aptos coin.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
     // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
+    // Give <a href="atomic_bridge.md#0x1_atomic_bridge">atomic_bridge</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint on bridging.
+    <a href="atomic_bridge.md#0x1_atomic_bridge_store_aptos_coin_mint_cap">atomic_bridge::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
+    // Give <a href="atomic_bridge.md#0x1_atomic_bridge">atomic_bridge</a> <b>module</b> BurnCapability&lt;AptosCoin&gt; so it can burn when bridging back.
+    <a href="atomic_bridge.md#0x1_atomic_bridge_store_aptos_coin_burn_cap">atomic_bridge::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
 }
 </code></pre>
 
@@ -438,6 +443,10 @@ Only called for testnets and e2e tests.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
     // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
+    // Give <a href="atomic_bridge.md#0x1_atomic_bridge">atomic_bridge</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint on bridging.
+    <a href="atomic_bridge.md#0x1_atomic_bridge_store_aptos_coin_mint_cap">atomic_bridge::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
+    // Give <a href="atomic_bridge.md#0x1_atomic_bridge">atomic_bridge</a> <b>module</b> BurnCapability&lt;AptosCoin&gt; so it can burn when bridging back.
+    <a href="atomic_bridge.md#0x1_atomic_bridge_store_aptos_coin_burn_cap">atomic_bridge::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
 
     <b>let</b> core_resources = <a href="account.md#0x1_account_create_account">account::create_account</a>(@core_resources);
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
