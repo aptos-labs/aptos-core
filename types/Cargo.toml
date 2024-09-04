@@ -21,14 +21,9 @@ aptos-dkg = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 ark-bn254 = { workspace = true }
-ark-circom = { workspace = true }
-ark-crypto-primitives = { workspace = true }
-ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
-ark-relations = { workspace = true }
 ark-serialize = { workspace = true }
-ark-std = { workspace = true }
 arr_macro = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
@@ -45,7 +40,7 @@ move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
-num-bigint-v4 = { workspace = true }
+num-bigint = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
@@ -70,6 +65,10 @@ strum_macros = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+ark-relations = { workspace = true }
+ark-std = { workspace = true }
+ark-crypto-primitives = { workspace = true }
+ark-ec = { workspace = true }
 ahash = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }
 aptos-proptest-helpers = { workspace = true }
