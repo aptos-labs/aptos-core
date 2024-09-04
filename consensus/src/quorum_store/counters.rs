@@ -850,6 +850,15 @@ pub static BATCH_SUCCESSFUL_CREATION: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+pub static QUORUM_STORE_MSG_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_msg_count",
+        "Count of messages received by various quoroum store components",
+        &["type"]
+    )
+    .unwrap()
+});
+
 /// Number of validators for which we received signed replies
 pub static BATCH_RECEIVED_REPLIES_COUNT: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
