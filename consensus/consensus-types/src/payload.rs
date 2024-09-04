@@ -183,10 +183,15 @@ impl InlineBatches {
         self.0.is_empty()
     }
 
-    pub fn transactions(&self) -> Vec<SignedTransaction> {
+    pub fn transactions(&self) -> Vec<(Vec<SignedTransaction>, u64)> {
         self.0
             .iter()
-            .flat_map(|inline_batch| inline_batch.transactions.clone())
+            .map(|inline_batch| {
+                (
+                    inline_batch.transactions.clone(),
+                    inline_batch.batch_info.gas_bucket_start(),
+                )
+            })
             .collect()
     }
 

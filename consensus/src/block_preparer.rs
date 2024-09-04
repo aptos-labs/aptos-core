@@ -43,7 +43,7 @@ impl BlockPreparer {
         &self,
         block: &Block,
         block_window: &OrderedBlockWindow,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<(Vec<SignedTransaction>, u64)>, Option<u64>)> {
         let mut txns = vec![];
         let mut futures = FuturesOrdered::new();
         for block in block_window
@@ -127,7 +127,7 @@ impl BlockPreparer {
         //     now.elapsed()
         // );
 
-        let (txns, max_txns_from_block_to_execute) = monitor!("get_transactions", {
+        let (mut batched_txns, max_txns_from_block_to_execute) = monitor!("get_transactions", {
             self.get_transactions(block, block_window).await?
         });
 
@@ -138,6 +138,21 @@ impl BlockPreparer {
         let block_timestamp_usecs = block.timestamp_usecs();
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         tokio::task::spawn_blocking(move || {
+            // stable sort to ensure batches with same gas are in the same order
+            batched_txns.sort_by(|(_, gas_a), (_, gas_b)| gas_b.cmp(gas_a));
+            info!("BlockPreparer: Batched transactions:");
+            for (txns, gas_bucket_start) in &batched_txns {
+                info!(
+                    "  BlockPreparer: Batched transactions: gas: {}, txns: {}",
+                    gas_bucket_start,
+                    txns.len()
+                );
+            }
+
+            let txns: Vec<_> = batched_txns
+                .into_iter()
+                .flat_map(|(txns, _)| txns.into_iter())
+                .collect();
             let txns_len = txns.len();
             let filtered_txns = txns
                 .into_iter()

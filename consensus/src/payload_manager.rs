@@ -55,7 +55,7 @@ pub trait TPayloadManager: Send + Sync {
     async fn get_transactions(
         &self,
         block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)>;
+    ) -> ExecutorResult<(Vec<(Vec<SignedTransaction>, u64)>, Option<u64>)>;
 }
 
 /// A payload manager that directly returns the transactions in a block's payload.
@@ -80,13 +80,13 @@ impl TPayloadManager for DirectMempoolPayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<(Vec<SignedTransaction>, u64)>, Option<u64>)> {
         let Some(payload) = block.payload() else {
             return Ok((Vec::new(), None));
         };
 
         match payload {
-            Payload::DirectMempool(txns) => Ok((txns.clone(), None)),
+            Payload::DirectMempool(txns) => Ok((vec![(txns.clone(), 0)], None)),
             _ => unreachable!(
                 "DirectMempoolPayloadManager: Unacceptable payload type {}. Epoch: {}, Round: {}, Block: {}",
                 payload,
@@ -127,6 +127,7 @@ impl QuorumStorePayloadManager {
         batch_reader: Arc<dyn BatchReader>,
     ) -> Vec<(
         HashValue,
+        u64,
         oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
     )> {
         let mut receivers = Vec::new();
@@ -139,6 +140,7 @@ impl QuorumStorePayloadManager {
             if block_timestamp <= batch_info.expiration() {
                 receivers.push((
                     *batch_info.digest(),
+                    batch_info.gas_bucket_start(),
                     batch_reader.get_batch(
                         *batch_info.digest(),
                         batch_info.expiration(),
@@ -347,7 +349,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<(Vec<SignedTransaction>, u64)>, Option<u64>)> {
         let Some(payload) = block.payload() else {
             return Ok((Vec::new(), None));
         };
@@ -397,7 +399,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                         &mut inline_batches
                             .iter()
                             // TODO: Can clone be avoided here?
-                            .flat_map(|(_batch_info, txns)| txns.clone())
+                            .map(|(batch_info, txns)| (txns.clone(), batch_info.gas_bucket_start()))
                             .collect(),
                     );
                     all_txns
@@ -470,7 +472,7 @@ async fn get_transactions_for_observer(
     block: &Block,
     block_payloads: &Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>>,
     consensus_publisher: &Option<Arc<ConsensusPublisher>>,
-) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+) -> ExecutorResult<(Vec<(Vec<SignedTransaction>, u64)>, Option<u64>)> {
     // The data should already be available (as consensus observer will only ever
     // forward a block to the executor once the data has been received and verified).
     let block_payload = match block_payloads.lock().entry((block.epoch(), block.round())) {
@@ -519,7 +521,7 @@ async fn process_payload_helper<T: TDataInfo>(
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
     ordered_authors: &[PeerId],
-) -> ExecutorResult<Vec<SignedTransaction>> {
+) -> ExecutorResult<Vec<(Vec<SignedTransaction>, u64)>> {
     let status = data_ptr.status.lock().take();
     match status.expect("Should have been updated before.") {
         DataStatus::Cached(data) => {
@@ -547,7 +549,7 @@ async fn process_payload_helper<T: TDataInfo>(
                 }
                 (proof.info(), signers)
             });
-            for (digest, rx) in receivers {
+            for (digest, gas_bucket_start, rx) in receivers {
                 match rx.await {
                     Err(e) => {
                         // We probably advanced epoch already.
@@ -568,7 +570,7 @@ async fn process_payload_helper<T: TDataInfo>(
                         return Err(DataNotFound(digest));
                     },
                     Ok(Ok(data)) => {
-                        vec_ret.push(data);
+                        vec_ret.push((data, gas_bucket_start));
                     },
                     Ok(Err(e)) => {
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
@@ -585,13 +587,12 @@ async fn process_payload_helper<T: TDataInfo>(
                     },
                 }
             }
-            let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
             // execution asks for the data twice, so data is cached here for the second time.
             data_ptr
                 .status
                 .lock()
-                .replace(DataStatus::Cached(ret.clone()));
-            Ok(ret)
+                .replace(DataStatus::Cached(vec_ret.clone()));
+            Ok(vec_ret)
         },
     }
 }
@@ -603,7 +604,8 @@ async fn process_payload(
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
     ordered_authors: &[PeerId],
-) -> ExecutorResult<Vec<SignedTransaction>> {
+    // TODO: replace this Vec<(Vec<>, u64>> with a struct BatchedTransactions
+) -> ExecutorResult<Vec<(Vec<SignedTransaction>, u64)>> {
     let status = proof_with_data.status.lock().take();
     match status.expect("Should have been updated before.") {
         DataStatus::Cached(data) => {
@@ -624,7 +626,7 @@ async fn process_payload(
                     block.round()
                 );
             }
-            for (digest, rx) in receivers {
+            for (digest, gas_bucket_start, rx) in receivers {
                 match rx.await {
                     Err(e) => {
                         // We probably advanced epoch already.
@@ -647,7 +649,7 @@ async fn process_payload(
                         return Err(DataNotFound(digest));
                     },
                     Ok(Ok(data)) => {
-                        vec_ret.push(data);
+                        vec_ret.push((data, gas_bucket_start));
                     },
                     Ok(Err(e)) => {
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
@@ -666,13 +668,12 @@ async fn process_payload(
                     },
                 }
             }
-            let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
             // execution asks for the data twice, so data is cached here for the second time.
             proof_with_data
                 .status
                 .lock()
-                .replace(DataStatus::Cached(ret.clone()));
-            Ok(ret)
+                .replace(DataStatus::Cached(vec_ret.clone()));
+            Ok(vec_ret)
         },
     }
 }
@@ -711,7 +712,7 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+    ) -> ExecutorResult<(Vec<(Vec<SignedTransaction>, u64)>, Option<u64>)> {
         return get_transactions_for_observer(block, &self.txns_pool, &self.consensus_publisher)
             .await;
     }
