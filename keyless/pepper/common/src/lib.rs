@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::authenticator::EphemeralPublicKey;
+use aptos_types::transaction::authenticator::{AnyPublicKey, AnySignature, EphemeralPublicKey};
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 pub mod account_recovery_db;
@@ -107,6 +107,69 @@ pub struct PepperResponse {
         deserialize_with = "deserialize_bytes_from_hex_with_0x"
     )]
     pub address: Vec<u8>,
+}
+
+fn serialize_anypk_to_hex<S>(pk: &AnyPublicKey, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let pk_bytes = pk.to_bytes();
+    serialize_bytes_to_hex(&pk_bytes, serializer)
+}
+
+fn deserialize_anypk_from_hex<'de, D>(deserializer: D) -> Result<AnyPublicKey, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let bytes = deserialize_bytes_from_hex(deserializer)?;
+    let pk = AnyPublicKey::try_from(bytes.as_slice()).map_err(D::Error::custom)?;
+    Ok(pk)
+}
+
+fn serialize_anysig_to_hex<S>(sig: &AnySignature, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let sig_bytes = sig.to_bytes();
+    serialize_bytes_to_hex(&sig_bytes, serializer)
+}
+
+fn deserialize_anysig_from_hex<'de, D>(deserializer: D) -> Result<AnySignature, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let bytes = deserialize_bytes_from_hex(deserializer)?;
+    let sig = AnySignature::try_from(bytes.as_slice()).map_err(D::Error::custom)?;
+    Ok(sig)
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VerifyRequest {
+    #[serde(
+        serialize_with = "serialize_anypk_to_hex",
+        deserialize_with = "deserialize_anypk_from_hex"
+    )]
+    pub public_key: AnyPublicKey,
+    #[serde(
+        serialize_with = "serialize_anysig_to_hex",
+        deserialize_with = "deserialize_anysig_from_hex"
+    )]
+    pub signature: AnySignature,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
+    )]
+    pub message: Vec<u8>,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex_with_0x",
+        deserialize_with = "deserialize_bytes_from_hex_with_0x"
+    )]
+    pub address: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VerifyResponse {
+    pub success: bool,
 }
 
 /// The response to /signature, which contains the VUF signature.

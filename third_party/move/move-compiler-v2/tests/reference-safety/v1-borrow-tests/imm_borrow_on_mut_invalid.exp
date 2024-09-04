@@ -1,46 +1,21 @@
 
 Diagnostics:
-error: cannot mutably borrow since mutable references exist
+error: cannot mutably borrow field `x` of value which is already borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut_invalid.move:25:29
    │
 24 │         let field_ref = set_and_pick(account, copy point_ref);
-   │                         ------------------------------------- previous mutable call result
+   │                         ------------------------------------- previously mutably borrowed here
 25 │         let x_val = *freeze(&mut point_ref.x);
-   │                     --------^^^^^^^^^^^^^^^^-
-   │                     │       │
-   │                     │       mutable borrow attempted here
-   │                     requirement enforced here
+   │                             ^^^^^^^^^^^^^^^^ borrow attempted here
 26 │         let returned_ref = bump_and_give(field_ref);
    │                            ------------------------ conflicting reference `field_ref` used here
 
-error: cannot freeze value  since multiple mutable references exist
-   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut_invalid.move:25:22
-   │
-24 │         let field_ref = set_and_pick(account, copy point_ref);
-   │                         ------------------------------------- conflicting mutable call result
-25 │         let x_val = *freeze(&mut point_ref.x);
-   │                      ^^^^^^^^^^^^^^^^^^^^^^^^
-   │                      │      │
-   │                      │      originating mutable field borrow
-   │                      frozen here
-
-error: cannot immutably borrow since mutable references exist
+error: cannot freeze value which is still mutably borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut_invalid.move:39:23
    │
 38 │         let field_ref = set_and_pick(account, copy point_ref);
-   │                         ------------------------------------- previous mutable call result
-39 │         let x_val = *&freeze(point_ref).x;
-   │                       ^^^^^^^^^^^^^^^^^--
-   │                       │
-   │                       requirement enforced here
-   │                       immutable borrow attempted here
-40 │         let returned_ref = bump_and_give(field_ref);
-   │                            ------------------------ conflicting reference `field_ref` used here
-
-error: cannot freeze local `point_ref` since other mutable usages for this reference exist
-   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_on_mut_invalid.move:39:23
-   │
+   │                         ------------------------------------- previously mutably borrowed here
 39 │         let x_val = *&freeze(point_ref).x;
    │                       ^^^^^^^^^^^^^^^^^ frozen here
 40 │         let returned_ref = bump_and_give(field_ref);
-   │                            ------------------------ used here
+   │                            ------------------------ conflicting reference `field_ref` used here

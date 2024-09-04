@@ -110,6 +110,43 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
         returned_edges
     }
 
+    /// Returns true if the given reference is borrowed via the given label.
+    pub fn is_borrowed_via(&self, id: RefID, label: &Lbl) -> bool {
+        self.has_ancestor_edge(id, |_, path, _| path.contains(label))
+    }
+
+    /// Returns true if the given reference is derived from the other one by
+    /// a sequence of borrow edges.
+    pub fn is_derived_from(&self, id: RefID, other_id: RefID) -> bool {
+        if id == other_id {
+            true
+        } else {
+            self.has_ancestor_edge(id, |parent, _, _| parent == other_id)
+        }
+    }
+
+    /// Returns true if there is a transitive parent (ancestor) edge satisfying the predicate.
+    pub fn has_ancestor_edge(
+        &self,
+        id: RefID,
+        pred: impl Fn(RefID, &[Lbl], RefID) -> bool,
+    ) -> bool {
+        let mut todo = vec![id];
+        let mut done = BTreeSet::new();
+        while let Some(next) = todo.pop() {
+            done.insert(next);
+            for (_loc, parent, path, _strong) in self.in_edges(next) {
+                if pred(parent, &path, next) {
+                    return true;
+                }
+                if !done.insert(parent) {
+                    todo.push(parent)
+                }
+            }
+        }
+        false
+    }
+
     //**********************************************************************************************
     // Edges/Borrows
     //**********************************************************************************************
@@ -421,6 +458,82 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
             r.borrowed_by.0.keys().all(|to_id| id != to_id)
                 && r.borrows_from.iter().all(|from_id| id != from_id)
         })
+    }
+
+    //**********************************************************************************************
+    // Common Predicates on Borrow Graphs
+    //**********************************************************************************************
+
+    /// Checks if `id` is borrowed, but ignores field borrows
+    pub fn has_full_borrows(&self, id: RefID) -> bool {
+        let borrowed_by = &self.0.get(&id).unwrap().borrowed_by;
+        borrowed_by
+            .0
+            .values()
+            .any(|edges| edges.iter().any(|edge| edge.path.first().is_none()))
+    }
+
+    /// Checks if `id` is borrowed
+    /// - All full/epsilon borrows are considered
+    /// - Only field borrows the specified label (or all if one isn't specified) are considered
+    pub fn has_consistent_borrows(&self, id: RefID, label_opt: Option<Lbl>) -> bool {
+        let (full_borrows, field_borrows) = self.borrowed_by(id);
+        !full_borrows.is_empty() || {
+            match label_opt {
+                None => field_borrows.values().any(|borrows| !borrows.is_empty()),
+                Some(label) => field_borrows
+                    .get(&label)
+                    .map(|borrows| !borrows.is_empty())
+                    .unwrap_or(false),
+            }
+        }
+    }
+
+    /// Checks if `id` is mutable borrowed
+    /// - All full/epsilon mutable borrows are considered
+    /// - Only field mutable borrows the specified label (or all if one isn't specified) are
+    ///   considered
+    pub fn has_consistent_mutable_borrows(&self, id: RefID, label_opt: Option<Lbl>) -> bool {
+        let (full_borrows, field_borrows) = self.borrowed_by(id);
+        !self.all_immutable(&full_borrows) || {
+            match label_opt {
+                None => field_borrows
+                    .values()
+                    .any(|borrows| !self.all_immutable(borrows)),
+                Some(label) => field_borrows
+                    .get(&label)
+                    .map(|borrows| !self.all_immutable(borrows))
+                    .unwrap_or(false),
+            }
+        }
+    }
+
+    /// Checks if `id` is writable
+    /// - Mutable references are writable if there are no consistent borrows
+    /// - Immutable references are not writable by the typing rules
+    pub fn is_writable(&self, id: RefID) -> bool {
+        assert!(self.is_mutable(id));
+        !self.has_consistent_borrows(id, None)
+    }
+
+    /// Checks if `id` is freezable
+    /// - Mutable references are freezable if there are no consistent mutable borrows
+    /// - Immutable references are not freezable by the typing rules
+    pub fn is_freezable(&self, id: RefID, at_field_opt: Option<Lbl>) -> bool {
+        assert!(self.is_mutable(id));
+        !self.has_consistent_mutable_borrows(id, at_field_opt)
+    }
+
+    /// Checks if `id` is readable
+    /// - Mutable references are readable if they are freezable
+    /// - Immutable references are always readable
+    pub fn is_readable(&self, id: RefID, at_field_opt: Option<Lbl>) -> bool {
+        let is_mutable = self.is_mutable(id);
+        !is_mutable || self.is_freezable(id, at_field_opt)
+    }
+
+    fn all_immutable(&self, borrows: &BTreeMap<RefID, Loc>) -> bool {
+        !borrows.keys().any(|x| self.is_mutable(*x))
     }
 
     //**********************************************************************************************

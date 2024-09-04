@@ -462,6 +462,8 @@ impl BlockStore {
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn set_back_pressure_for_test(&self, back_pressure: bool) {
+        use std::sync::atomic::Ordering;
+
         self.back_pressure_for_test
             .store(back_pressure, Ordering::Relaxed)
     }

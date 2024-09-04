@@ -2507,6 +2507,8 @@ pub enum ErrorMessageContext {
     Assignment,
     /// The error appears in the argument list of a function.
     Argument,
+    /// The error appears in the argument list of a positional constructor.
+    PositionalUnpackArgument,
     /// The error appears in a type argument.
     TypeArgument,
     /// The error appears in the argument of a receiver style function.
@@ -2558,6 +2560,10 @@ impl ErrorMessageContext {
             ),
             Argument | ReceiverArgument => format!(
                 "cannot pass `{}` to a function which expects argument of type `{}`",
+                actual, expected
+            ),
+            PositionalUnpackArgument => format!(
+                "cannot match {} to a struct field of type {}",
                 actual, expected
             ),
             OperatorArgument => format!(
@@ -2626,6 +2632,16 @@ impl ErrorMessageContext {
                 },
                 actual
             ),
+            PositionalUnpackArgument => format!(
+                "the struct/variant has {} {} but {} were provided",
+                expected,
+                if for_type_args {
+                    pluralize("type argument", expected)
+                } else {
+                    pluralize("field", expected)
+                },
+                actual
+            ),
             ReceiverArgument => {
                 if for_type_args {
                     format!(
@@ -2680,6 +2696,10 @@ impl ErrorMessageContext {
                 "the function takes {} but {} was provided",
                 expected, actual
             ),
+            PositionalUnpackArgument => format!(
+                "the struct/variant has {} but {} were provided",
+                expected, actual
+            ),
             Return => format!(
                 "the function returns {} but {} was provided",
                 expected, actual
@@ -2700,6 +2720,10 @@ impl ErrorMessageContext {
         match self {
             Argument | ReceiverArgument => format!(
                 "the function takes a reference but `{}` was provided",
+                actual
+            ),
+            PositionalUnpackArgument => format!(
+                "the struct/variant has a reference field but `{}` was provided",
                 actual
             ),
             OperatorArgument => {

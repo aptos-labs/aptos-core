@@ -1,9 +1,12 @@
 
-============ bytecode verification failed ========
-
 Diagnostics:
-error: reference safety check failed on bytecode level. This is a known issue, to be fixed later, resulting from differences between safety rules of the v1 and v2 compiler. Try to rewrite your code to workaround this problem.
+error: cannot read local `r2` since it is mutably borrowed
    ┌─ tests/reference-safety/bug_12817_order_dependency.move:14:9
    │
+12 │         let r1 = &mut x;
+   │                  ------ previously mutably borrowed here
+13 │         let r2 = &mut x;
 14 │         *r2 + *r1 // <- changed order here
-   │         ^^^
+   │         ^^^   --- conflicting reference `r1` used here
+   │         │
+   │         read attempted here

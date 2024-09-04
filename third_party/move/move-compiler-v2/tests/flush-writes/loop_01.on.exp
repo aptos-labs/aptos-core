@@ -1,0 +1,110 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::foo($t0: u64): (u64, u64) {
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := copy($t0)
+     # live vars: $t0, $t1
+  1: $t3 := 1
+     # live vars: $t0, $t1, $t3
+  2: $t0 := -($t0, $t3)
+     # live vars: $t0, $t1
+  3: return ($t1, $t0)
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     # live vars: $t0
+  0: label L0
+     # flush: $t0
+     # live vars: $t0
+  1: ($t1, $t0) := m::foo($t0)
+     # live vars: $t0, $t1
+  2: $t3 := 0
+     # live vars: $t0, $t1, $t3
+  3: $t2 := ==($t1, $t3)
+     # live vars: $t0, $t2
+  4: if ($t2) goto 5 else goto 0
+     # live vars: $t0
+  5: label L2
+     # live vars:
+  6: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64) {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     # live vars: $t0
+  0: label L0
+     # flush: $t0
+     # live vars: $t0
+  1: ($t0, $t1) := m::foo($t0)
+     # live vars: $t0, $t1
+  2: $t3 := 0
+     # live vars: $t0, $t1, $t3
+  3: $t2 := ==($t1, $t3)
+     # live vars: $t0, $t2
+  4: if ($t2) goto 5 else goto 0
+     # live vars: $t0
+  5: label L2
+     # live vars:
+  6: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+foo(Arg0: u64): u64 * u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+L2:	loc1: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: StLoc[1](loc0: u64)
+	2: MoveLoc[0](Arg0: u64)
+	3: LdU64(1)
+	4: Sub
+	5: StLoc[0](Arg0: u64)
+	6: MoveLoc[1](loc0: u64)
+	7: MoveLoc[0](Arg0: u64)
+	8: Ret
+}
+public test1(Arg0: u64) /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Call foo(u64): u64 * u64
+	2: StLoc[0](Arg0: u64)
+	3: LdU64(0)
+	4: Eq
+	5: BrFalse(0)
+B1:
+	6: Ret
+}
+public test2(Arg0: u64) /* def_idx: 2 */ {
+L1:	loc0: bool
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Call foo(u64): u64 * u64
+	2: LdU64(0)
+	3: Eq
+	4: StLoc[1](loc0: bool)
+	5: StLoc[0](Arg0: u64)
+	6: MoveLoc[1](loc0: bool)
+	7: BrFalse(0)
+B1:
+	8: Ret
+}
+}
+============ bytecode verification succeeded ========

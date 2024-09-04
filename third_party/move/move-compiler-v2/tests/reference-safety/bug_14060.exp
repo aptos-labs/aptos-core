@@ -1,9 +1,0 @@
-
-============ bytecode verification failed ========
-
-Diagnostics:
-bug: bytecode verification failed with unexpected status code `EQUALITY_OP_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
-  ┌─ tests/reference-safety/bug_14060.move:6:9
-  │
-6 │         x != copy y;
-  │         ^^^^^^^^^^^

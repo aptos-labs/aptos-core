@@ -87,7 +87,7 @@ public fun m::condition_requires_copy($t0: m::Outer): m::Outer {
  14: $t1 := infer($t7)
  15: goto 19
  16: label L4
- 17: $t8 := 15621340914461310977
+ 17: $t8 := 14566554180833181697
  18: abort($t8)
  19: label L0
  20: return $t1
@@ -116,7 +116,7 @@ fun m::consume($t0: m::Inner): bool {
  10: ($t5, $t6) := unpack_variant m::Inner::Inner2($t0)
  11: goto 15
  12: label L3
- 13: $t7 := 15621340914461310977
+ 13: $t7 := 14566554180833181697
  14: abort($t7)
  15: label L0
  16: $t1 := true
@@ -141,7 +141,7 @@ public fun m::matched_value_not_consumed($t0: m::Outer) {
   7: $t4 := infer($t0)
   8: goto 12
   9: label L3
- 10: $t5 := 15621340914461310977
+ 10: $t5 := 14566554180833181697
  11: abort($t5)
  12: label L0
  13: return ()

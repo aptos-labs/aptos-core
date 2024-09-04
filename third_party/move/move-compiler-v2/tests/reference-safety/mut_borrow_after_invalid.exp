@@ -1,25 +1,33 @@
 
 Diagnostics:
-error: mutable reference in local `f` requires exclusive access but is borrowed
-  ┌─ tests/reference-safety/mut_borrow_after_invalid.move:8:9
+error: cannot mutably borrow field `f` of local `f` which is already borrowed
+  ┌─ tests/reference-safety/mut_borrow_after_invalid.move:7:17
   │
+6 │         let s1 = s;
+  │                  - previously mutably borrowed here
+7 │         let f = &mut s.f;
+  │                 ^^^^^^^^ borrow attempted here
 8 │         *f;
-  │         ^^ requirement enforced here
 9 │         *s1;
   │         --- conflicting reference `s1` used here
 
-error: mutable reference in local `a` requires exclusive access but is borrowed
+error: cannot write local `a` since it is borrowed
    ┌─ tests/reference-safety/mut_borrow_after_invalid.move:16:9
    │
+15 │         let b = a;
+   │                 - previously mutably borrowed here
 16 │         *a = 0;
-   │         ^^^^^^ requirement enforced here
+   │         ^^^^^^ write attempted here
 17 │         *b
    │         -- conflicting reference `b` used here
 
-error: mutable reference in local `a` requires exclusive access but is borrowed
+error: cannot write local `a` since it is borrowed
    ┌─ tests/reference-safety/mut_borrow_after_invalid.move:25:9
    │
+23 │         let b = a;
+   │                 - previously mutably borrowed here
+24 │         let c = b;
 25 │         *a = 0;
-   │         ^^^^^^ requirement enforced here
+   │         ^^^^^^ write attempted here
 26 │         *c
    │         -- conflicting reference `c` used here

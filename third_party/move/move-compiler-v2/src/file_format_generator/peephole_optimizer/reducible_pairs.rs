@@ -27,8 +27,11 @@
 //!    target.
 //!    - stack is left unaffected (the first instruction pushes a constant, the second
 //!      takes it off).
+//! 6. [`LdTrue`, `BrFalse`] or [`LdFalse`, `BrTrue`]: Remove the pair.
+//!    - stack is left unaffected.
 //!    - locals are unaffected.
-//! 6. [`Not`, `BrFalse`] or [`Not`, `BrTrue`]: Replace with `BrTrue` or `BrFalse`.
+//!    - basic blocks are merged.
+//! 7. [`Not`, `BrFalse`] or [`Not`, `BrTrue`]: Replace with `BrTrue` or `BrFalse`.
 //!    - stack is left unaffected (first instruction negates the top, second takes it
 //!      off, vs. just take off the top).
 //!    - locals are unaffected.
@@ -57,6 +60,7 @@ impl FixedWindowOptimizer for ReduciblePairs {
             },
             (CopyLoc(_), Pop) => Some(vec![]),
             (LdTrue, BrTrue(target)) | (LdFalse, BrFalse(target)) => Some(vec![Branch(*target)]),
+            (LdTrue, BrFalse(_)) | (LdFalse, BrTrue(_)) => Some(vec![]),
             (Not, BrFalse(target)) => Some(vec![BrTrue(*target)]),
             (Not, BrTrue(target)) => Some(vec![BrFalse(*target)]),
             _ => None,

@@ -1,0 +1,35 @@
+// -- Model dump before bytecode pipeline
+module 0x815::m {
+    enum Color {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    enum Generic {
+        Foo {
+            0: #0,
+        }
+        Bar {
+            0: u64,
+        }
+    }
+    private fun test(c: m::Color): bool {
+        test_variants m::Color::Red|RGB(c)
+    }
+    private fun test_fully_qualified(c: m::Color): bool {
+        test_variants m::Color::Red(c)
+    }
+    private fun test_generic<T>(x: &m::Generic<#0>): bool {
+        test_variants m::Generic::Foo<T>(x)
+    }
+    private fun test_generic_qualified<T>(x: &m::Generic<#0>): bool {
+        test_variants m::Generic::Foo<T>(x)
+    }
+    private fun test_qualified(c: m::Color): bool {
+        test_variants m::Color::Red|RGB(c)
+    }
+} // end 0x815::m

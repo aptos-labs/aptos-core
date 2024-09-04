@@ -27,11 +27,15 @@ impl HexyOverlay {
     pub fn view(&self, base: &Arc<HexyBase>, base_overlay: &HexyOverlay) -> HexyView {
         HexyView::new(
             base.clone(),
-            self.overlay.view_layers_since(&base_overlay.overlay),
+            self.overlay.view_layers_after(&base_overlay.overlay),
         )
     }
 
     pub fn root_hash(&self) -> HashValue {
         self.root_hash
+    }
+
+    pub fn is_the_same(&self, other: &Self) -> bool {
+        self.overlay.is_the_same(&other.overlay)
     }
 }

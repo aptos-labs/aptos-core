@@ -1,9 +1,12 @@
 
-============ bytecode verification failed ========
-
 Diagnostics:
-bug: bytecode verification failed with unexpected status code `WRITEREF_EXISTS_BORROW_ERROR`. This is a compiler bug, consider reporting it.
+error: cannot write local `r2` since it is borrowed
   ┌─ tests/reference-safety/bug_13149.move:7:9
   │
+5 │         let r1 = &mut a;
+  │                  ------ previously mutably borrowed here
+6 │         let r2 = &mut a;
 7 │         *r2 = 2;
-  │         ^^^^^^^
+  │         ^^^^^^^ write attempted here
+8 │         *r1 = 1;
+  │         ------- conflicting reference `r1` used here

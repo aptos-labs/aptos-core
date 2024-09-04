@@ -23,9 +23,9 @@ class Flow(Flag):
     # Tests that are run manually when using a smaller representative mode.
     # (i.e. for measuring speed of the machine)
     REPRESENTATIVE = auto()
-    # Tests used for previewnet evaluation
+    # Tests used for mainnet hardware evaluation
     MAINNET = auto()
-    # Tests used for previewnet evaluation
+    # Tests used for mainnet hardware evaluation
     MAINNET_LARGE_DB = auto()
     # Tests for Agg V2 performance
     AGG_V2 = auto()
@@ -147,98 +147,46 @@ CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	min_ratio	max_ratio	median
 CALIBRATION = """
-no-op	1	VM	0.896	1.057	41218.8
-no-op	1000	VM	0.902	1.030	22359.4
-apt-fa-transfer	1	VM	0.891	1.056	28721.7
-apt-fa-transfer	1	native	0.848	1.157	40469.1
-account-generation	1	VM	0.888	1.030	22359.4
-account-generation	1	native	0.717	1.153	33440.0
-account-resource32-b	1	VM	0.934	1.074	36855.5
-modify-global-resource	1	VM	0.940	1.033	3082.9
-modify-global-resource	10	VM	0.918	1.017	17905.3
-publish-package	1	VM	0.950	1.040	143.9
-mix_publish_transfer	1	VM	0.967	1.163	2173.8
-batch100-transfer	1	VM	0.859	1.021	667.8
-batch100-transfer	1	native	0.784	1.222	1862.1
-vector-picture30k	1	VM	0.935	1.023	110.0
-vector-picture30k	20	VM	0.819	1.038	1347.9
-smart-table-picture30-k-with200-change	1	VM	0.959	1.054	21.4
-smart-table-picture30-k-with200-change	20	VM	0.923	1.057	182.6
-modify-global-resource-agg-v2	1	VM	0.893	1.030	39728.8
-modify-global-flag-agg-v2	1	VM	0.972	1.022	6111.4
-modify-global-bounded-agg-v2	1	VM	0.926	1.103	10494.1
-modify-global-milestone-agg-v2	1	VM	0.912	1.030	29251.9
-resource-groups-global-write-tag1-kb	1	VM	0.886	1.061	9389.9
-resource-groups-global-write-and-read-tag1-kb	1	VM	0.882	1.018	6446.3
-resource-groups-sender-write-tag1-kb	1	VM	0.841	1.163	22359.4
-resource-groups-sender-multi-change1-kb	1	VM	0.826	1.107	17562.1
-token-v1ft-mint-and-transfer	1	VM	0.892	1.027	1347.9
-token-v1ft-mint-and-transfer	20	VM	0.889	1.021	12114.8
-token-v1nft-mint-and-transfer-sequential	1	VM	0.899	1.027	812.9
-token-v1nft-mint-and-transfer-sequential	20	VM	0.888	1.015	7881.5
-coin-init-and-mint	1	VM	0.870	1.024	30932.7
-coin-init-and-mint	20	VM	0.866	1.055	25786.3
-fungible-asset-mint	1	VM	0.873	1.033	25331.5
-fungible-asset-mint	20	VM	0.887	1.055	22763.8
-no-op5-signers	1	VM	0.904	1.038	41978.3
-token-v2-ambassador-mint	1	VM	0.869	1.025	17905.3
-token-v2-ambassador-mint	20	VM	0.878	1.024	17562.1
-liquidity-pool-swap	1	VM	0.931	1.032	975.7
-liquidity-pool-swap	20	VM	0.918	1.009	8359.6
-liquidity-pool-swap-stable	1	VM	0.901	1.016	957.5
-liquidity-pool-swap-stable	20	VM	0.925	1.022	8035.3
-deserialize-u256	1	VM	0.899	1.036	39728.8
-no-op-fee-payer	1	VM	0.922	1.022	2392.0
-no-op-fee-payer	50	VM	0.898	1.028	27699.5
-"""
-
-
-# temporary table, until recalibration can be done.
-CALIBRATION_SEPARATOR = " "
-
-# transaction_type                                 module_working_set  executor      block_size    expected t/s    t/s
-CALIBRATION = """
-warmup                                                            1  VM                 10000             0    20373
-no-op                                                             1  VM                 10000         41218.8  33211
-no-op                                                          1000  VM                 10000         22359.4  20593
-apt-fa-transfer                                                   1  VM                 10000         28721.7  25699
-account-generation                                                1  VM                 10000         22359.4  20728
-account-resource32-b                                              1  VM                 10000         36855.5  30215
-modify-global-resource                                            1  VM                  3082          3082.9   2853
-modify-global-resource                                           10  VM                 10000         17905.3  16934
-publish-package                                                   1  VM                   143           143.9    149
-mix_publish_transfer                                              1  VM                  2173          2173.8   2272
-batch100-transfer                                                 1  VM                   667           667.8    768
-vector-picture30k                                                 1  VM                   110           110      110
-vector-picture30k                                                20  VM                  1347          1347.9   1124
-smart-table-picture30-k-with200-change                            1  VM                    21            21.4     22
-smart-table-picture30-k-with200-change                           20  VM                   182           182.6    191
-modify-global-resource-agg-v2                                     1  VM                 10000         39728.8  30580
-modify-global-flag-agg-v2                                         1  VM                  6111          6111.4   5288
-modify-global-bounded-agg-v2                                      1  VM                 10000         10494.1   9035
-modify-global-milestone-agg-v2                                    1  VM                 10000         29251.9  24582
-resource-groups-global-write-tag1-kb                              1  VM                  9389          9389.9   9271
-resource-groups-global-write-and-read-tag1-kb                     1  VM                  6446          6446.3   6276
-resource-groups-sender-write-tag1-kb                              1  VM                 10000         22359.4  21517
-resource-groups-sender-multi-change1-kb                           1  VM                 10000         17562.1  15941
-token-v1ft-mint-and-transfer                                      1  VM                  1347          1347.9   1271
-token-v1ft-mint-and-transfer                                     20  VM                 10000         12114.8  11409
-token-v1nft-mint-and-transfer-sequential                          1  VM                   812           812.9    815
-token-v1nft-mint-and-transfer-sequential                         20  VM                  7881          7881.5   7583
-coin-init-and-mint                                                1  VM                 10000         30932.7  27459
-coin-init-and-mint                                               20  VM                 10000         25786.3  23818
-fungible-asset-mint                                               1  VM                 10000         25331.5  21542
-fungible-asset-mint                                              20  VM                 10000         22763.8  19915
-no-op5-signers                                                    1  VM                 10000         41978.3  34432
-token-v2-ambassador-mint                                          1  VM                 10000         17905.3  15378
-token-v2-ambassador-mint                                         20  VM                 10000         17562.1  15351
-liquidity-pool-swap                                               1  VM                   975           975.7    973
-liquidity-pool-swap                                              20  VM                  8359          8359.6   8213
-liquidity-pool-swap-stable                                        1  VM                   957           957.5    952
-liquidity-pool-swap-stable                                       20  VM                  8035          8035.3   7993
-deserialize-u256                                                  1  VM                 10000         39728.8  32416
-no-op-fee-payer                                                   1  VM                  2392          2392     2193
-no-op-fee-payer                                                  50  VM                 10000         27699.5  25762
+no-op	1	VM	0.900	1.031	33440.0
+no-op	1000	VM	0.926	1.020	20420.9
+apt-fa-transfer	1	VM	0.860	1.030	25331.5
+account-generation	1	VM	0.892	1.036	20798.2
+account-resource32-b	1	VM	0.896	1.046	29796.4
+modify-global-resource	1	VM	0.932	1.009	2870.9
+modify-global-resource	10	VM	0.931	1.016	16886.3
+publish-package	1	VM	0.932	1.031	149.5
+mix_publish_transfer	1	VM	0.956	1.099	2259.6
+batch100-transfer	1	VM	0.859	1.023	784.5
+vector-picture30k	1	VM	0.954	1.021	112.2
+vector-picture30k	20	VM	0.879	1.036	1119.0
+smart-table-picture30-k-with200-change	1	VM	0.950	1.044	21.8
+smart-table-picture30-k-with200-change	20	VM	0.946	1.056	185.9
+modify-global-resource-agg-v2	1	VM	0.877	1.050	29796.4
+modify-global-flag-agg-v2	1	VM	0.964	1.022	5294.9
+modify-global-bounded-agg-v2	1	VM	0.938	1.076	8866.4
+modify-global-milestone-agg-v2	1	VM	0.907	1.026	24885.0
+resource-groups-global-write-tag1-kb	1	VM	0.941	1.043	9039.0
+resource-groups-global-write-and-read-tag1-kb	1	VM	0.936	1.020	6221.0
+resource-groups-sender-write-tag1-kb	1	VM	0.893	1.047	20798.2
+resource-groups-sender-multi-change1-kb	1	VM	0.906	1.054	16553.6
+token-v1ft-mint-and-transfer	1	VM	0.899	1.041	1276.2
+token-v1ft-mint-and-transfer	20	VM	0.879	1.011	11483.9
+token-v1nft-mint-and-transfer-sequential	1	VM	0.899	1.024	812.9
+token-v1nft-mint-and-transfer-sequential	20	VM	0.883	1.012	7732.8
+coin-init-and-mint	1	VM	0.845	1.026	27205.9
+coin-init-and-mint	20	VM	0.815	1.033	23591.6
+fungible-asset-mint	1	VM	0.848	1.018	21180.4
+fungible-asset-mint	20	VM	0.874	1.043	19680.6
+no-op5-signers	1	VM	0.884	1.041	33440.0
+token-v2-ambassador-mint	1	VM	0.840	1.028	15320.8
+token-v2-ambassador-mint	20	VM	0.866	1.016	15320.8
+liquidity-pool-swap	1	VM	0.909	1.028	975.7
+liquidity-pool-swap	20	VM	0.895	1.010	8194.6
+liquidity-pool-swap-stable	1	VM	0.899	1.016	957.5
+liquidity-pool-swap-stable	20	VM	0.917	1.022	7881.5
+deserialize-u256	1	VM	0.850	1.039	33440.0
+no-op-fee-payer	1	VM	0.907	1.018	2216.5
+no-op-fee-payer	50	VM	0.837	1.011	25786.3
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
@@ -325,12 +273,12 @@ TESTS = [
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
 
     # setting separately for previewnet, as we run on a different number of cores.
-    RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer"), key_extra=RunGroupKeyExtra(smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=23000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=130 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
-    RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
+    RunGroupConfig(expected_tps=26000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("apt-fa-transfer"), key_extra=RunGroupKeyExtra(smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=20000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=140 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=15400 if NUM_ACCOUNTS < 5000000 else 6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    # RunGroupConfig(expected_tps=17000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
+    # RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
 ]
 # fmt: on
 
@@ -621,12 +569,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         if SKIP_NATIVE and test.key.executor_type == "native":
             continue
 
-        if test.key in calibrated_expected_tps:
-            expected_tps = calibrated_expected_tps[test.key]
-        else:
-            print(f"WARNING: Couldn't find {test.key} in calibration results")
-            assert test.expected_tps is not None, test
+        if test.expected_tps is not None:
+            print(f"WARNING: using uncalibrated TPS for {test.key}")
             expected_tps = test.expected_tps
+        else:
+            assert test.key in calibrated_expected_tps, test
+            expected_tps = calibrated_expected_tps[test.key]
         cur_block_size = int(min([expected_tps, MAX_BLOCK_SIZE]))
 
         print(f"Testing {test.key}")

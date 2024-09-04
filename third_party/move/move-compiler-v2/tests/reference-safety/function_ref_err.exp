@@ -1,13 +1,12 @@
 
 Diagnostics:
-error: cannot immutably borrow since mutable references exist
+error: cannot transfer mutable value since it is borrowed
    ┌─ tests/reference-safety/function_ref_err.move:15:18
    │
 14 │         let au = g_mut(&mut 3, &mut addr);
-   │                  ------------------------ previous mutable call result
+   │                  ------------------------ previously mutably borrowed here
 15 │         let du = f_mut(&h, &mut addr);
-   │                  ^^^^^^^^^^^^^^^^^^^^ immutable borrow attempted here
+   │                  ^^^^^^^^^^^^^^^^^^^^ transfer attempted here
 16 │         *du > 0;
-   │         --- requirement enforced here
 17 │         *au > 1;
    │         --- conflicting reference `au` used here

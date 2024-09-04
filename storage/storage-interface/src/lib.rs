@@ -282,7 +282,12 @@ pub trait DbReader: Send + Sync {
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
         /// Returns the latest "synced" transaction version, potentially not "committed" yet.
-        fn get_synced_version(&self) -> Result<Version>;
+        fn get_synced_version(&self) -> Result<Option<Version>>;
+
+        /// Returns the latest "pre-committed" transaction version, which includes those written to
+        /// the DB but yet to be certified by consensus or a verified LedgerInfo from a state sync
+        /// peer.
+        fn get_pre_committed_version(&self) -> Result<Option<Version>>;
 
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
@@ -487,6 +492,21 @@ pub trait DbReader: Send + Sync {
         self.get_state_value_with_proof_by_version_ext(state_key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
+
+    fn ensure_synced_version(&self) -> Result<Version> {
+        self.get_synced_version()?
+            .ok_or_else(|| AptosDbError::NotFound("Synced version not found.".to_string()))
+    }
+
+    fn expect_synced_version(&self) -> Version {
+        self.ensure_synced_version()
+            .expect("Failed to get synced version.")
+    }
+
+    fn ensure_pre_committed_version(&self) -> Result<Version> {
+        self.get_pre_committed_version()?
+            .ok_or_else(|| AptosDbError::NotFound("Pre-committed version not found.".to_string()))
+    }
 }
 
 /// Trait that is implemented by a DB that supports certain public (to client) write APIs
@@ -519,11 +539,7 @@ pub trait DbWriter: Send + Sync {
         unimplemented!()
     }
 
-    /// Persist transactions. Called by the executor module when either syncing nodes or committing
-    /// blocks during normal operation.
-    /// See [`AptosDB::save_transactions`].
-    ///
-    /// [`AptosDB::save_transactions`]: ../aptosdb/struct.AptosDB.html#method.save_transactions
+    /// Persist transactions. Called by state sync to save verified transactions to the DB.
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],
@@ -534,6 +550,67 @@ pub trait DbWriter: Send + Sync {
         latest_in_memory_state: StateDelta,
         state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
         sharded_state_cache: Option<&ShardedStateCache>,
+    ) -> Result<()> {
+        // For reconfig suffix.
+        if ledger_info_with_sigs.is_none() && txns_to_commit.is_empty() {
+            return Ok(());
+        }
+
+        if !txns_to_commit.is_empty() {
+            self.pre_commit_ledger(
+                txns_to_commit,
+                first_version,
+                base_state_version,
+                sync_commit,
+                latest_in_memory_state,
+                state_updates_until_last_checkpoint,
+                sharded_state_cache,
+            )?;
+        }
+        let version_to_commit = if let Some(ledger_info_with_sigs) = ledger_info_with_sigs {
+            ledger_info_with_sigs.ledger_info().version()
+        } else {
+            // here txns_to_commit is known to be non-empty
+            first_version + txns_to_commit.len() as u64 - 1
+        };
+        self.commit_ledger(
+            version_to_commit,
+            ledger_info_with_sigs,
+            Some(txns_to_commit),
+        )
+    }
+
+    /// Optimistically persist transactions to the ledger.
+    ///
+    /// Called by consensus to pre-commit blocks before execution result is agreed on by the
+    /// validators.
+    ///
+    ///   If these blocks are later confirmed to be included in the ledger, commit_ledger should be
+    ///       called with a `LedgerInfoWithSignatures`.
+    ///   If not, the consensus needs to panic, resulting in a reboot of the node where the DB will
+    ///       truncate the unconfirmed data.
+    fn pre_commit_ledger(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        sync_commit: bool,
+        latest_in_memory_state: StateDelta,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        sharded_state_cache: Option<&ShardedStateCache>,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    /// Commit pre-committed transactions to the ledger.
+    ///
+    /// If a LedgerInfoWithSigs is provided, both the "synced version" and "committed version" will
+    /// advance, otherwise only the synced version will advance.
+    fn commit_ledger(
+        &self,
+        version: Version,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        txns_to_commit: Option<&[TransactionToCommit]>,
     ) -> Result<()> {
         unimplemented!()
     }

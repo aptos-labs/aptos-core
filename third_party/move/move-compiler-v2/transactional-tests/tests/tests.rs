@@ -41,6 +41,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("optimize")),
         experiments: &[
             (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
             (Experiment::ACQUIRES_CHECK, false),
         ],
         language_version: LanguageVersion::V2_0,
@@ -63,6 +64,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("optimize-no-simplify")),
         experiments: &[
             (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
             (Experiment::AST_SIMPLIFY, false),
             (Experiment::ACQUIRES_CHECK, false),
         ],
@@ -99,9 +101,12 @@ const SEPARATE_BASELINE: &[&str] = &[
     "bug_14243_stack_size.move",
     // The output of the tests could be different depending on the language version
     "/operator_eval/",
-    // Creates different code if optimized
+    // Creates different code if optimized or not
     "no-v1-comparison/enum/enum_field_select.move",
     "no-v1-comparison/enum/enum_field_select_different_offsets.move",
+    "no-v1-comparison/assert_one.move",
+    // Flaky redundant unused assignment error
+    "no-v1-comparison/enum/enum_scoping.move",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

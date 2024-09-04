@@ -539,6 +539,25 @@ impl ResourceSpecifier {
             },
         }
     }
+
+    /// Matches an unqualified struct name. This matches any resource pattern with that name,
+    /// regardless of type instantiation.
+    pub fn matches_modulo_type_instantiation(
+        &self,
+        env: &GlobalEnv,
+        struct_id: &QualifiedId<StructId>,
+    ) -> bool {
+        use ResourceSpecifier::*;
+        let struct_id = struct_id.instantiate(vec![]);
+        match self {
+            Resource(spec_struct_id) => Resource(
+                // Downgrade to a pattern without instantiation
+                spec_struct_id.to_qualified_id().instantiate(vec![]),
+            )
+            .matches(env, &[], &struct_id),
+            _ => self.matches(env, &[], &struct_id),
+        }
+    }
 }
 
 // =================================================================================================
