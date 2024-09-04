@@ -14,8 +14,8 @@ use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
 pub type ModuleVersion = Result<TxnIndex, StorageVersion>;
 
 /// Result of a read query on the versioned module storage.
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""), PartialEq(bound = ""))]
+#[derive(Clone, Derivative)]
+#[derivative(Debug, PartialEq)]
 pub enum ModuleStorageRead {
     /// An existing module at certain index of committed transaction or from the base storage.
     Versioned(
@@ -128,7 +128,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
             return Ok(result);
         }
 
-        // Otherwise, use the passed closure to compute thw base storage value.
+        // Otherwise, use the passed closure to compute the base storage value.
         let maybe_entry = init_func()?;
         let result = Ok(match &maybe_entry {
             Some(entry) => ModuleStorageRead::storage_version(entry.clone()),
@@ -158,7 +158,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
     pub fn write_pending(&self, key: K, txn_idx: TxnIndex) {
         let mut v = self
             .entries
-            .entry(key)
+            .entry(key.clone())
             .or_insert_with(VersionedEntry::empty);
         v.versions
             .insert(ShiftedTxnIndex::new(txn_idx), CachePadded::new(None));
@@ -186,7 +186,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
         &self,
         key: &K,
         version: ModuleVersion,
-        entry: ModuleStorageEntry,
+        entry: Arc<ModuleStorageEntry>,
     ) {
         let mut versioned_entry = self
             .entries
@@ -205,7 +205,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
         if !prev_entry.is_verified() {
             versioned_entry
                 .versions
-                .insert(committed_idx, CachePadded::new(Some(Arc::new(entry))));
+                .insert(committed_idx, CachePadded::new(Some(entry)));
         }
     }
 }

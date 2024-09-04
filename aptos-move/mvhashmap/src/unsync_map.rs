@@ -265,10 +265,8 @@ impl<
             .insert(key, (Arc::new(value), None));
     }
 
-    pub fn write_module_storage_entry(&self, key: K, entry: ModuleStorageEntry) {
-        self.module_storage
-            .borrow_mut()
-            .insert(key, Arc::new(entry));
+    pub fn write_module_storage_entry(&self, key: K, entry: Arc<ModuleStorageEntry>) {
+        self.module_storage.borrow_mut().insert(key, entry);
     }
 
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
