@@ -21,6 +21,9 @@ pub struct OrderedBlockStore {
     // The configuration of the consensus observer
     consensus_observer_config: ConsensusObserverConfig,
 
+    // The highest committed block (epoch and round)
+    highest_committed_epoch_round: Option<(u64, Round)>,
+
     // Ordered blocks. The key is the epoch and round of the last block in the
     // ordered block. Each entry contains the block and the commit decision (if any).
     ordered_blocks: Arc<Mutex<BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)>>>,
@@ -30,6 +33,7 @@ impl OrderedBlockStore {
     pub fn new(consensus_observer_config: ConsensusObserverConfig) -> Self {
         Self {
             consensus_observer_config,
+            highest_committed_epoch_round: None,
             ordered_blocks: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
@@ -44,6 +48,11 @@ impl OrderedBlockStore {
         &self,
     ) -> BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)> {
         self.ordered_blocks.lock().clone()
+    }
+
+    /// Returns the highest committed epoch and round (if any)
+    pub fn get_highest_committed_epoch_round(&self) -> Option<(u64, Round)> {
+        self.highest_committed_epoch_round
     }
 
     /// Returns the last ordered block (if any)
@@ -100,10 +109,13 @@ impl OrderedBlockStore {
 
     /// Removes the ordered blocks for the given commit ledger info. This will
     /// remove all blocks up to (and including) the epoch and round of the commit.
-    pub fn remove_blocks_for_commit(&self, commit_ledger_info: &LedgerInfoWithSignatures) {
+    pub fn remove_blocks_for_commit(&mut self, commit_ledger_info: &LedgerInfoWithSignatures) {
         // Determine the epoch and round to split off
         let split_off_epoch = commit_ledger_info.ledger_info().epoch();
         let split_off_round = commit_ledger_info.commit_info().round().saturating_add(1);
+
+        // Update the highest committed epoch and round
+        self.update_highest_committed_epoch_round(commit_ledger_info);
 
         // Remove the blocks from the ordered blocks
         let mut ordered_blocks = self.ordered_blocks.lock();
@@ -111,17 +123,44 @@ impl OrderedBlockStore {
     }
 
     /// Updates the commit decision of the ordered block (if found)
-    pub fn update_commit_decision(&self, commit_decision: &CommitDecision) {
+    pub fn update_commit_decision(&mut self, commit_decision: &CommitDecision) {
         // Get the epoch and round of the commit decision
         let commit_decision_epoch = commit_decision.epoch();
         let commit_decision_round = commit_decision.round();
 
+        // Update the highest committed epoch and round
+        self.update_highest_committed_epoch_round(commit_decision.commit_proof());
+
         // Update the commit decision for the ordered blocks
-        let mut ordered_blocks = self.ordered_blocks.lock();
-        if let Some((_, existing_commit_decision)) =
-            ordered_blocks.get_mut(&(commit_decision_epoch, commit_decision_round))
+        if let Some((_, existing_commit_decision)) = self
+            .ordered_blocks
+            .lock()
+            .get_mut(&(commit_decision_epoch, commit_decision_round))
         {
+            // Update the commit decision
             *existing_commit_decision = Some(commit_decision.clone());
+        }
+    }
+
+    /// Updates the highest committed epoch and round based on the commit ledger info
+    fn update_highest_committed_epoch_round(
+        &mut self,
+        commit_ledger_info: &LedgerInfoWithSignatures,
+    ) {
+        // Get the epoch and round of the commit ledger info
+        let commit_epoch = commit_ledger_info.ledger_info().epoch();
+        let commit_round = commit_ledger_info.commit_info().round();
+
+        // Update the highest committed epoch and round (if appropriate)
+        match self.highest_committed_epoch_round {
+            Some((highest_epoch, highest_round)) => {
+                if (commit_epoch, commit_round) > (highest_epoch, highest_round) {
+                    self.highest_committed_epoch_round = Some((commit_epoch, commit_round));
+                }
+            },
+            None => {
+                self.highest_committed_epoch_round = Some((commit_epoch, commit_round));
+            },
         }
     }
 
@@ -156,6 +195,17 @@ impl OrderedBlockStore {
             &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
             metrics::ORDERED_BLOCKS_LABEL,
             highest_ordered_round,
+        );
+
+        // Update the highest round for the committed blocks
+        let highest_committed_round = self
+            .highest_committed_epoch_round
+            .map(|(_, round)| round)
+            .unwrap_or(0);
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
+            metrics::COMMITTED_BLOCKS_LABEL,
+            highest_committed_round,
         );
     }
 }
@@ -305,7 +355,7 @@ mod test {
     #[test]
     fn test_remove_blocks_for_commit() {
         // Create a new ordered block store
-        let ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
+        let mut ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
 
         // Insert several ordered blocks for the current epoch
         let current_epoch = 10;
@@ -399,7 +449,7 @@ mod test {
     #[test]
     fn test_update_commit_decision() {
         // Create a new ordered block store
-        let ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
+        let mut ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
 
         // Insert several ordered blocks for the current epoch
         let current_epoch = 0;

@@ -282,7 +282,7 @@ async fn extract_on_chain_configs(
 /// A simple helper function that handles the committed blocks
 /// (as part of the commit callback).
 fn handle_committed_blocks(
-    pending_ordered_blocks: OrderedBlockStore,
+    mut pending_ordered_blocks: OrderedBlockStore,
     block_payload_store: BlockPayloadStore,
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
     blocks: &[Arc<PipelinedBlock>],
