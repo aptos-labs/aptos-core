@@ -568,19 +568,6 @@ impl Scheduler {
         Ok(())
     }
 
-    /// If transaction at `txn_idx` is committed and publishes modules, we must re-validate all
-    /// transactions above. Since commit itself can re-execute and trigger re-validations, we only
-    /// need to take care of the case when commit was successful.
-    pub(crate) fn finish_module_publishing_after_commit(
-        &self,
-        txn_idx: TxnIndex,
-        executed_at_commit: bool,
-    ) {
-        if !executed_at_commit {
-            self.decrease_validation_idx(txn_idx + 1);
-        }
-    }
-
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
     /// may return a re-execution task back to the caller (otherwise, Retry).
     pub fn finish_abort(
