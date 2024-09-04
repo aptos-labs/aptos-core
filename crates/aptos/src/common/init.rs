@@ -114,7 +114,7 @@ impl CliCommand<()> for InitTool {
             network
         } else {
             eprintln!(
-                "Choose network from [devnet, testnet, local, custom | defaults to devnet]"
+                "Choose network from [devnet, testnet, local, custom | defaults to devnet]. For testnet, start over and run movement init --skip-faucet"
             );
             let input = read_line("network")?;
             let input = input.trim();
@@ -469,11 +469,7 @@ impl FromStr for Network {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.to_lowercase().trim() {
             // "mainnet" => Self::Mainnet,
-            "testnet" => {
-                return Err(CliError::CommandArgumentError(format!(
-                    "To use testnet, run `movement init --skip-faucet`, follow the prompts to create an account address, then visit the faucet UI  at https://faucet.movementlabs.xyz to fund the account."
-                )));
-            },
+            "testnet" => Self::Testnet,
             "devnet" => Self::Devnet,
             "local" => Self::Local,
             "custom" => Self::Custom,
