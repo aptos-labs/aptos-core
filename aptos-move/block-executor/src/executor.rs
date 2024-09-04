@@ -552,7 +552,6 @@ where
             let mut executed_at_commit = false;
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
-                executed_at_commit = true;
 
                 Self::update_transaction_on_abort(
                     txn_idx,
@@ -581,6 +580,21 @@ where
                     ),
                 )?;
 
+                // Make sure we publish modules here before we wake up subsequent dependent
+                // transactions and decrease the validation index.
+                if runtime_environment.vm_config().use_loader_v2 {
+                    if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
+                        executed_at_commit = true;
+                        for (key, v) in module_write_set.into_iter() {
+                            let entry =
+                                ModuleStorageEntry::from_transaction_write(runtime_environment, v)?;
+                            versioned_cache
+                                .module_storage()
+                                .write_published(&key, txn_idx, entry);
+                        }
+                    }
+                }
+
                 scheduler.finish_execution_during_commit(txn_idx)?;
 
                 let validation_result = Self::validate(txn_idx, last_input_output, versioned_cache);
@@ -596,7 +610,10 @@ where
                 }
             }
 
-            if runtime_environment.vm_config().use_loader_v2 {
+            // If transaction was committed without delayed fields failing, i.e., without
+            // re-execution, we make the published modules visible here. As a result, we need to
+            // decrease the validation index.
+            if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
                 if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
                     for (key, v) in module_write_set.into_iter() {
                         let entry =
@@ -605,7 +622,7 @@ where
                             .module_storage()
                             .write_published(&key, txn_idx, entry);
                     }
-                    scheduler.finish_module_publishing_after_commit(txn_idx, executed_at_commit);
+                    scheduler.finish_execution_during_commit(txn_idx)?;
                 }
             }
 
@@ -937,7 +954,6 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    // println!("Executing txn {}", txn_idx);
                     let needs_suffix_validation = Self::execute(
                         txn_idx,
                         incarnation,
