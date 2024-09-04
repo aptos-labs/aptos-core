@@ -26,3 +26,4 @@ pub mod constants;
 pub mod pvss;
 pub mod utils;
 pub mod weighted_vuf;
+pub mod range_proof;
