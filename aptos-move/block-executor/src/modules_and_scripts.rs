@@ -7,7 +7,7 @@ use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::modules::ModuleStorageEntry,
+    vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
 };
 use aptos_vm_types::module_and_script_storage::{
     code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
@@ -162,7 +162,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     /// Returns the module storage entry built from the current view. If it is not in
     /// multi-version or non-sync data structures, fetches it from the base view.
-    fn read_module_storage_by_key(&self, key: &T::Key) -> VMResult<ModuleStorageRead> {
+    fn read_module_storage_by_key(
+        &self,
+        key: &T::Key,
+    ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // If the module read has been previously cached, return early.
@@ -211,7 +214,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<ModuleStorageRead> {
+    ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
         let key = T::Key::from_address_and_module_name(address, module_name);
         self.read_module_storage_by_key(&key)
     }
@@ -251,7 +254,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         //  2. Entry exists at this index.
 
         // Otherwise, run the local verification first.
-        let size = entry.bytes().len();
+        let size = entry.size_in_bytes();
         let cm = entry.as_compiled_module();
         let partially_verified_module = self
             .runtime_environment
