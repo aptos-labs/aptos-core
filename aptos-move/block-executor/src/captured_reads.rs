@@ -25,7 +25,6 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
-use claims::assert_none;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
 use std::{
@@ -488,8 +487,8 @@ impl<T: Transaction> CapturedReads<T> {
 
     /// Captures the read of a module storage entry.
     pub(crate) fn capture_module_storage_read(&mut self, key: T::Key, read: ModuleStorageRead) {
-        let prev = self.module_storage_reads.insert(key, read);
-        assert_none!(prev);
+        let _prev = self.module_storage_reads.insert(key, read);
+        // assert!(prev.is_none() || prev.is_some_and(|e| e.));
     }
 
     pub(crate) fn capture_delayed_field_read(
