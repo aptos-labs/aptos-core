@@ -1582,7 +1582,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                     .insert(state_key.clone());
                 state
                     .unsync_map
-                    .fetch_module_for_loader_v2(state_key)
+                    .fetch_module_for_loader_v1(state_key)
                     .map_or_else(
                         || self.get_raw_base_value(state_key),
                         |v| Ok(v.as_state_value()),
