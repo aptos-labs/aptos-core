@@ -2919,6 +2919,7 @@ dependencies = [
  "crossbeam",
  "dashmap",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "proptest",
  "proptest-derive",
