@@ -503,7 +503,7 @@ async fn backup_the_snapshot_and_cleanup(
             return;
         }
     }
-
+    // TODO: add checks to handle concurrent backup jobs.
     backup_restore_operator
         .backup_db_snapshot_and_update_metadata(ledger_chain_id as u64, epoch, snapshot_dir.clone())
         .await
