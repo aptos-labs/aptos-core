@@ -28,9 +28,9 @@ enum Representation {
     Verified(Arc<Module>),
 }
 
-/// An entry for Aptos code cache, capable of resolving different request including
-/// its bytes, metadata, etc. Note that it is the responsibility of the code cache
-/// to ensure the data is consistent with the latest on-chain configs.
+/// An entry for Aptos code cache, capable of resolving different requests including
+/// bytes, metadata, etc. Note that it is the responsibility of the code cache to
+/// ensure the data is consistent with the latest on-chain configs.
 #[derive(Debug)]
 pub struct ModuleStorageEntry {
     /// Serialized representation of the module.
