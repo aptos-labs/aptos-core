@@ -52,6 +52,9 @@ impl Environment {
         let mut features = Features::fetch_config(state_view).unwrap_or_default();
         if use_loader_v1_based_on_env() {
             features.disable(FeatureFlag::ENABLE_LOADER_V2);
+        } else {
+            // Forcefully enable V2 loader.
+            features.enable(FeatureFlag::ENABLE_LOADER_V2);
         }
 
         // If no chain ID is in storage, we assume we are in a testing environment.
