@@ -193,6 +193,12 @@ impl Default for Features {
             features.enable(feature);
         }
 
+        if use_loader_v1_based_on_env() {
+            features.disable(FeatureFlag::ENABLE_LOADER_V2);
+        } else {
+            features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        }
+
         features
     }
 }
