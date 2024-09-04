@@ -275,7 +275,7 @@ impl<
         })
     }
 
-    pub fn fetch_module_for_loader_v2(&self, key: &K) -> Option<Arc<V>> {
+    pub fn fetch_module_for_loader_v1(&self, key: &K) -> Option<Arc<V>> {
         self.module_map
             .borrow()
             .get(key)
