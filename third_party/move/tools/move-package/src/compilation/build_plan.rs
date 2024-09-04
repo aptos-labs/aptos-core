@@ -12,7 +12,7 @@ use crate::{
     source_package::parsed_manifest::PackageName,
     CompilerConfig,
 };
-use anyhow::{Error, Result};
+use anyhow::{Context, Result};
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
     diagnostics::{report_diagnostics_to_color_buffer, report_warnings, FilesSourceText},
@@ -456,16 +456,12 @@ impl BuildPlan {
             let path = dir?.path();
             if !keep_paths.iter().any(|name| path.ends_with(name.as_str())) {
                 if path.is_dir() {
-                    std::fs::remove_dir_all(&path).map_err(|e| {
-                        Error::new(e).context(format!(
-                            "When deleting directory {}",
-                            path.to_string_lossy()
-                        ))
+                    std::fs::remove_dir_all(&path).with_context(|| {
+                        format!("When deleting directory {}", path.to_string_lossy())
                     })?;
                 } else {
-                    std::fs::remove_file(&path).map_err(|e| {
-                        Error::new(e)
-                            .context(format!("When deleting file {}", path.to_string_lossy()))
+                    std::fs::remove_file(&path).with_context(|| {
+                        format!("When deleting file {}", path.to_string_lossy())
                     })?;
                 }
             }
