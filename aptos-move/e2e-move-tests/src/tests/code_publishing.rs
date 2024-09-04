@@ -442,7 +442,7 @@ fn test_module_publishing_does_not_fallback() {
         MemberId::from_str(&format!("{}::{}::{}", addr, module_name, function_name)).unwrap();
 
     let mut txns = vec![];
-    let mut expected_abort_codes = vec![];
+    let mut expected_abort_codes: Vec<Option<u64>> = vec![];
 
     // Generate a simple test workload.
     for abort_code in [1, 2, 3, 4, 5, 1] {
