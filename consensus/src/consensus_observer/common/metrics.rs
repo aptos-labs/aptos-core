@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 // Useful metric labels
 pub const BLOCK_PAYLOAD_LABEL: &str = "block_payload";
 pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
+pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
 pub const ORDERED_BLOCKS_LABEL: &str = "ordered_blocks";
@@ -26,6 +27,16 @@ pub static OBSERVER_CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
         "consensus_observer_created_subscriptions",
         "Counters for created subscriptions for consensus observer",
         &["creation_label", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking dropped (direct send) messages by the consensus observer
+pub static OBSERVER_DROPPED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_dropped_messages",
+        "Counters related to dropped (direct send) messages by the consensus observer",
+        &["message_type", "network_id"]
     )
     .unwrap()
 });
