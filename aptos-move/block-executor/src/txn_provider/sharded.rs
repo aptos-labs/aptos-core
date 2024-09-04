@@ -352,9 +352,6 @@ where
         mv: &MVHashMap<TX::Key, TX::Tag, TX::Value, X, TX::Identifier>,
         scheduler: &Scheduler<Self>,
     ) {
-        if self.remote_dependencies.is_empty() {
-            return;
-        }
         while let CrossShardMessage::Commit(CrossShardTxnResult {
             global_txn_idx,
             result,
