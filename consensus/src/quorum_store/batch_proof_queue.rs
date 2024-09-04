@@ -123,6 +123,14 @@ impl BatchProofQueue {
             .count()
     }
 
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.items.is_empty()
+            && self.author_to_batches.is_empty()
+            && self.expirations.is_empty()
+            && self.txn_summary_num_occurrences.is_empty()
+    }
+
     fn remaining_txns_without_duplicates(&self) -> u64 {
         // txn_summary_num_occurrences counts all the unexpired and uncommitted proofs that have txn summaries
         // in batch_summaries.
