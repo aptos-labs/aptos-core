@@ -1765,7 +1765,9 @@ impl<'env> SpecTranslator<'env> {
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let oper_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
+        let binding = self.env.get_node_type(args[0].node_id());
+        let common_type = binding.skip_reference();
+        let oper_base = match common_type {
             Type::Primitive(PrimitiveType::U8) => "Bv8",
             Type::Primitive(PrimitiveType::U16) => "Bv16",
             Type::Primitive(PrimitiveType::U32) => "Bv32",
@@ -1780,7 +1782,18 @@ impl<'env> SpecTranslator<'env> {
             let num_oper_e = global_state.get_node_num_oper(e.node_id());
             let ty_e = self.env.get_node_type(e.node_id());
             if num_oper_e != Bitwise {
-                emit!(self.writer, "$int2bv.{}(", boogie_num_type_base(&ty_e));
+                if matches!(ty_e, Type::Primitive(PrimitiveType::Num)) || ty_e == *common_type {
+                    emit!(
+                        self.writer,
+                        "$int2bv.{}(",
+                        boogie_num_type_base(common_type)
+                    );
+                } else {
+                    self.env.error(
+                        &self.env.get_node_loc(e.node_id()),
+                        "arguments of bit operations must have the same data type",
+                    );
+                }
             }
             self.translate_exp(e);
             if num_oper_e != Bitwise {
