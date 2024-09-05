@@ -195,6 +195,7 @@ impl ProofCoordinator {
             signed_batch_info.batch_info().clone(),
             IncrementalProofState::new(signed_batch_info.batch_info().clone()),
         );
+        #[allow(deprecated)]
         self.batch_info_to_time
             .entry(signed_batch_info.batch_info().clone())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
@@ -228,11 +229,15 @@ impl ProofCoordinator {
                 self.proof_cache
                     .insert(proof.info().clone(), proof.multi_signature().clone());
                 // quorum store measurements
+                #[allow(deprecated)]
                 let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
                     - self
                         .batch_info_to_time
                         .remove(signed_batch_info.batch_info())
-                        .expect("Batch created without recording the time!");
+                        .ok_or(
+                            // Batch created without recording the time!
+                            SignedBatchInfoError::NoTimeStamps,
+                        )?;
                 counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
                 return Ok(Some(proof));
             }
@@ -304,12 +309,14 @@ impl ProofCoordinator {
                 Some(command) = rx.recv() => monitor!("proof_coordinator_handle_command", {
                     match command {
                         ProofCoordinatorCommand::Shutdown(ack_tx) => {
+                            counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofCoordinator::shutdown"]).inc();
                             ack_tx
                                 .send(())
                                 .expect("Failed to send shutdown ack to QuorumStore");
                             break;
                         },
                         ProofCoordinatorCommand::CommitNotification(batches) => {
+                            counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofCoordinator::commit_notification"]).inc();
                             for batch in batches {
                                 let digest = batch.digest();
                                 if let Entry::Occupied(existing_proof) = self.batch_info_to_proof.entry(batch.clone()) {

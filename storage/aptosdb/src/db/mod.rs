@@ -20,6 +20,7 @@ use crate::{
     schema::{
         block_info::BlockInfoSchema,
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
@@ -31,7 +32,7 @@ use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
-use aptos_db_indexer::Indexer;
+use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
@@ -96,7 +97,8 @@ pub struct AptosDB {
     pub(crate) transaction_store: Arc<TransactionStore>,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
-    ledger_commit_lock: std::sync::Mutex<()>,
+    pre_commit_lock: std::sync::Mutex<()>,
+    commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,
 }
@@ -123,6 +125,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -133,6 +136,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             false,
+            internal_indexer_db,
         )
     }
 
@@ -144,6 +148,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
         Self::open_internal(
             &db_paths,
@@ -154,6 +159,7 @@ impl AptosDB {
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             true,
+            internal_indexer_db,
         )
     }
 

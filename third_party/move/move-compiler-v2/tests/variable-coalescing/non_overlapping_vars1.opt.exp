@@ -19,6 +19,20 @@ fun m::test() {
   8: return ()
 }
 
+
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/variable-coalescing/non_overlapping_vars1.move:4:9
+  │
+4 │         x = x + 1;
+  │         ^^^^^^^^^
+
+warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/variable-coalescing/non_overlapping_vars1.move:6:9
+  │
+6 │         y = y + 1;
+  │         ^^^^^^^^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]
@@ -119,10 +133,10 @@ B0:
 	0: LdU64(1)
 	1: LdU64(1)
 	2: Add
-	3: LdU64(2)
-	4: LdU64(1)
-	5: Add
-	6: Pop
+	3: Pop
+	4: LdU64(2)
+	5: LdU64(1)
+	6: Add
 	7: Pop
 	8: Ret
 }

@@ -835,10 +835,11 @@ pub fn make_function_type(
         Visibility::Internal if in_current_module => (),
         Visibility::Internal => {
             let internal_msg = format!(
-                "This function is internal to its module. Only '{}' and '{}' functions can \
+                "This function is internal to its module. Only '{}', '{}', and '{}' functions can \
                  be called outside of their module",
                 Visibility::PUBLIC,
-                Visibility::FRIEND
+                Visibility::PACKAGE,
+                Visibility::FRIEND,
             );
             context.env.add_diag(diag!(
                 TypeSafety::Visibility,
@@ -859,6 +860,7 @@ pub fn make_function_type(
                 (vis_loc, internal_msg),
             ));
         },
+        Visibility::Package(_) => panic!("unexpected visibility"),
         Visibility::Public(_) => (),
     };
     (defined_loc, ty_args, params, acquires, return_ty)

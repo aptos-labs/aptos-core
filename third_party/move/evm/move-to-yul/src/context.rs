@@ -225,7 +225,7 @@ impl<'a> Context<'a> {
         pipeline.add_processor(ReachingDefProcessor::new());
         pipeline.add_processor(LiveVarAnalysisProcessor::new());
         if options.dump_bytecode {
-            pipeline.run_with_dump(env, &mut targets, &options.output, false, &|_| {})
+            pipeline.run_with_dump(env, &mut targets, &options.output, false, &|_| {}, || true)
         } else {
             pipeline.run(env, &mut targets);
         }

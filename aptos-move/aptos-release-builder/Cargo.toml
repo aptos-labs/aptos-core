@@ -24,18 +24,28 @@ aptos-gas-schedule-updator = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-keygen = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
+aptos-move-debugger = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+aptos-vm-logging = { workspace = true }
+aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 git2 = { workspace = true }
 handlebars = { workspace = true }
 hex = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
 once_cell = { workspace = true }
+parking_lot = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -45,6 +55,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+walkdir = { workspace = true }
 
 [[bin]]
 name = "aptos-release-builder"

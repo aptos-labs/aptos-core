@@ -17,7 +17,7 @@ anyhow = { workspace = true }
 aptos = { workspace = true, features = ["fuzzing"] }
 aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-cached-packages = { workspace = true }
-aptos-config = { workspace = true }
+aptos-config = { workspace = true, features = ["smoke-test"] }
 aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
@@ -65,6 +65,7 @@ walkdir = { workspace = true }
 
 [dev-dependencies]
 aptos-backup-cli = { workspace = true }
+aptos-db-indexer = { workspace = true, features = ["fuzzing"] }
 aptos-genesis = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }

@@ -6,12 +6,13 @@ use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
-    consensus_observer::publisher::ConsensusPublisher, network_interface::ConsensusMsg,
-    persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
+    network_interface::ConsensusMsg, persistent_liveness_storage::StorageWriteProxy,
+    quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
-use aptos_db_indexer::indexer_reader::IndexerReaders;
+use aptos_db_indexer::{db_indexer::InternalIndexerDB, indexer_reader::IndexerReaders};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_indexer_grpc_table_info::runtime::{
@@ -27,7 +28,6 @@ use aptos_peer_monitoring_service_server::{
     PeerMonitoringServiceServer,
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
-use aptos_schemadb::DB;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
@@ -45,7 +45,7 @@ pub fn bootstrap_api_and_indexer(
     node_config: &NodeConfig,
     db_rw: DbReaderWriter,
     chain_id: ChainId,
-    internal_indexer_db: Option<Arc<DB>>,
+    internal_indexer_db: Option<InternalIndexerDB>,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
     Option<Runtime>,

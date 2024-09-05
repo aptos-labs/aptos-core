@@ -543,7 +543,7 @@ function install_dotnet {
     # Below we need to (a) set TERM variable because the .net installer expects it and it is not set
     # in some environments (b) use bash not sh because the installer uses bash features.
     # NOTE: use wget to better follow the redirect
-    wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+    wget --tries 10 --retry-connrefused --waitretry=5 https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
     chmod +x dotnet-install.sh
     ./dotnet-install.sh --channel $DOTNET_VERSION --install-dir "${DOTNET_INSTALL_DIR}" --version latest
     rm dotnet-install.sh
@@ -1099,11 +1099,12 @@ if [[ "$INSTALL_JSTS" == "true" ]]; then
   install_solidity
 fi
 
+install_libudev-dev
+
 install_python3
 if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
   if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
     pip3 install pre-commit
-    install_libudev-dev
   else
     install_pkg python-pre-commit "$PACKAGE_MANAGER"
   fi

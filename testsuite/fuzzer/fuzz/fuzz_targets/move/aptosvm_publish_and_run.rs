@@ -3,10 +3,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
-use aptos_framework::natives::code::{
-    ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
-};
 use aptos_language_e2e_tests::{
     account::Account, data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor,
 };
@@ -19,112 +15,26 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::AptosVM;
-use arbitrary::Arbitrary;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
     deserializer::DeserializerConfig,
     errors::VMError,
-    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex, SignatureToken},
+    file_format::{CompiledModule, CompiledScript, SignatureToken},
 };
 use move_bytecode_verifier::VerifierConfig;
-use move_core_types::{
-    language_storage::{ModuleId, TypeTag},
-    value::MoveValue,
-    vm_status::{StatusCode, StatusType, VMStatus},
-};
+use move_core_types::vm_status::{StatusCode, StatusType};
 use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
-    convert::TryInto,
+    collections::{BTreeMap, HashSet},
     sync::Arc,
+    time::Instant,
 };
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Copy)]
-pub enum FundAmount {
-    Zero,
-    Poor,
-    Rich,
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Copy)]
-pub struct UserAccount {
-    is_inited_and_funded: bool,
-    fund: FundAmount,
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub enum Authenticator {
-    Ed25519 {
-        sender: UserAccount,
-    },
-    MultiAgent {
-        sender: UserAccount,
-        secondary_signers: Vec<UserAccount>,
-    },
-    FeePayer {
-        sender: UserAccount,
-        secondary_signers: Vec<UserAccount>,
-        fee_payer: UserAccount,
-    },
-}
-
-impl UserAccount {
-    fn fund_amount(&self) -> u64 {
-        match self.fund {
-            FundAmount::Zero => 0,
-            FundAmount::Poor => 1_000,
-            FundAmount::Rich => 1_000_000_000_000_000,
-        }
-    }
-
-    fn convert_account(&self, vm: &mut FakeExecutor) -> Account {
-        if self.is_inited_and_funded {
-            vm.create_accounts(1, self.fund_amount(), 0).remove(0)
-        } else {
-            Account::new()
-        }
-    }
-}
-
-impl Authenticator {
-    fn sender(&self) -> UserAccount {
-        match self {
-            Authenticator::Ed25519 { sender } => *sender,
-            Authenticator::MultiAgent {
-                sender,
-                secondary_signers: _,
-            } => *sender,
-            Authenticator::FeePayer {
-                sender,
-                secondary_signers: _,
-                fee_payer: _,
-            } => *sender,
-        }
-    }
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub enum ExecVariant {
-    Script {
-        script: CompiledScript,
-        type_args: Vec<TypeTag>,
-        args: Vec<MoveValue>,
-    },
-    CallFunction {
-        module: ModuleId,
-        function: FunctionDefinitionIndex,
-        type_args: Vec<TypeTag>,
-        args: Vec<Vec<u8>>,
-    },
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub struct RunnableState {
-    pub dep_modules: Vec<CompiledModule>,
-    pub exec_variant: ExecVariant,
-    pub tx_auth_type: Authenticator,
-}
+mod utils;
+use utils::{
+    check_for_invariant_violation, publish_group, sort_by_deps, Authenticator, ExecVariant,
+    RunnableState,
+};
 
 // genesis write set generated once for each fuzzing session
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
@@ -139,66 +49,9 @@ static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     )
 });
 
-// small debug macro which can be enabled or disabled
-const DEBUG: bool = false;
-macro_rules! tdbg {
-    () => {
-        ()
-    };
-    ($val:expr $(,)?) => {
-        if DEBUG {
-            dbg!($val)
-        } else {
-            ($val)
-        }
-    };
-    ($($val:expr),+ $(,)?) => {
-        if DEBUG {
-            dbg!($(($val)),+,)
-        } else {
-            ($(($val)),+,)
-        }
-    };
-}
-
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
 
-// used for ordering modules topologically
-fn sort_by_deps(
-    map: &BTreeMap<ModuleId, CompiledModule>,
-    order: &mut Vec<ModuleId>,
-    id: ModuleId,
-    visited: &mut HashSet<ModuleId>,
-) -> Result<(), Corpus> {
-    if visited.contains(&id) {
-        return Err(Corpus::Keep);
-    }
-    visited.insert(id.clone());
-    if order.contains(&id) {
-        return Ok(());
-    }
-    let compiled = &map.get(&id).unwrap();
-    for dep in compiled.immediate_dependencies() {
-        // Only consider deps which are actually in this package. Deps for outside
-        // packages are considered fine because of package deployment order. Note
-        // that because of this detail, we can't use existing topsort from Move utils.
-        if map.contains_key(&dep) {
-            sort_by_deps(map, order, dep, visited)?;
-        }
-    }
-    order.push(id);
-    Ok(())
-}
-
-// panic to catch invariant violations
-fn check_for_invariant_violation(e: VMStatus) {
-    if e.status_type() == StatusType::InvariantViolation {
-        // known false positive
-        if e.message() != Some(&"moving container with dangling references".to_string()) {
-            panic!("invariant violation {:?}", e);
-        }
-    }
-}
+const EXECUTION_TIME_GAS_RATIO: u8 = 35;
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
     if e.status_type() == StatusType::InvariantViolation
@@ -232,51 +85,6 @@ fn filter_modules(input: &RunnableState) -> Result<(), Corpus> {
         }
     }
     Ok(())
-}
-
-fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload {
-    let modules_metadatas: Vec<_> = modules
-        .iter()
-        .map(|cm| ModuleMetadata {
-            name: cm.name().to_string(),
-            source: vec![],
-            source_map: vec![],
-            extension: MoveOption::default(),
-        })
-        .collect();
-
-    let all_immediate_deps: Vec<_> = modules
-        .iter()
-        .flat_map(|cm| cm.immediate_dependencies())
-        .map(|mi| PackageDep {
-            account: mi.address,
-            package_name: mi.name.to_string(),
-        })
-        .collect::<BTreeSet<_>>() // leave only uniques
-        .into_iter()
-        .filter(|c| &c.account != modules[0].address()) // filter out package itself
-        .collect::<Vec<_>>();
-
-    let metadata = PackageMetadata {
-        name: "fuzz_package".to_string(),
-        upgrade_policy: UpgradePolicy::compat(), // TODO: currently does not matter. Maybe fuzz compat checks specifically at some point.
-        upgrade_number: 1,
-        source_digest: "".to_string(),
-        manifest: vec![],
-        modules: modules_metadatas,
-        deps: all_immediate_deps,
-        extension: MoveOption::default(),
-    };
-    let pkg_metadata = bcs::to_bytes(&metadata).expect("PackageMetadata must serialize");
-    let mut pkg_code: Vec<Vec<u8>> = vec![];
-    for module in modules {
-        let mut module_code: Vec<u8> = vec![];
-        module
-            .serialize(&mut module_code)
-            .expect("Module must serialize");
-        pkg_code.push(module_code);
-    }
-    code_publish_package_txn(pkg_metadata, pkg_code)
 }
 
 fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
@@ -370,51 +178,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     for group in packages {
         let sender = *group[0].address();
         let acc = vm.new_account_at(sender);
-        let tx = acc
-            .transaction()
-            .gas_unit_price(100)
-            .sequence_number(0)
-            .payload(publish_transaction_payload(&group))
-            .sign();
-
-        tdbg!("publishing");
-        let res = vm
-            .execute_block(vec![tx])
-            .map_err(|e| {
-                check_for_invariant_violation(e);
-                Corpus::Keep
-            })?
-            .pop()
-            .expect("expected 1 output");
-        // if error exit gracefully
-        tdbg!(&res);
-        let status = match tdbg!(res.status()) {
-            TransactionStatus::Keep(status) => status,
-            TransactionStatus::Discard(e) => {
-                if e.status_type() == StatusType::InvariantViolation {
-                    panic!("invariant violation {:?}", e);
-                }
-                return Err(Corpus::Keep);
-            },
-            _ => return Err(Corpus::Keep),
-        };
-        tdbg!(&status);
-        // apply write set to commit published packages
-        vm.apply_write_set(res.write_set());
-        match tdbg!(status) {
-            ExecutionStatus::Success => (),
-            ExecutionStatus::MiscellaneousError(e) => {
-                if let Some(e) = e {
-                    if e.status_type() == StatusType::InvariantViolation {
-                        panic!("invariant violation {:?}", e);
-                    }
-                }
-                return Err(Corpus::Keep);
-            },
-            _ => return Err(Corpus::Keep),
-        };
-
-        tdbg!("published");
+        publish_group(&mut vm, &acc, &group, 0)?;
     }
 
     let sender_acc = if true {
@@ -425,6 +189,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         // only create sender pub/priv key. do not initialize
         Account::new()
     };
+
     // build tx
     let tx = match input.exec_variant.clone() {
         ExecVariant::Script {
@@ -491,7 +256,6 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 )))
         },
     };
-
     let raw_tx = tx.raw();
     let tx = match input.tx_auth_type {
         Authenticator::Ed25519 { sender: _ } => raw_tx
@@ -563,7 +327,11 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         }
         old_res = Some(res);
     }
-    let res = vm.execute_block(vec![tx]);
+
+    let now = Instant::now();
+    let res = vm.execute_block(vec![tx.clone()]);
+    let elapsed = now.elapsed();
+
     // check main execution as well
     if let Some(old_res) = old_res {
         assert!(old_res == res);
@@ -603,6 +371,30 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         },
         _ => return Err(Corpus::Keep),
     };
+
+    let fee = res.try_extract_fee_statement().unwrap().unwrap();
+
+    // EXECUTION_TIME_GAS_RATIO is a ratio between execution time and gas used. If the ratio is higher than EXECUTION_TIME_GAS_ratio, we consider the gas usage as unexpected.
+    // EXPERIMENTAL: This very sensible to excution enviroment, e.g. local run, OSS-Fuzz. It may cause false positive. Real data from production does not apply to this ratio.
+    // We only want to catch big unexpected gas usage.
+    if (elapsed.as_millis() / (fee.execution_gas_used() + fee.io_gas_used()) as u128)
+        > EXECUTION_TIME_GAS_RATIO as u128
+    {
+        if std::env::var("DEBUG").is_ok() {
+            tdbg!(
+                "Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}",
+                elapsed,
+                fee.execution_gas_used() + fee.io_gas_used()
+            );
+            tdbg!("Transaction: {:?}", tx);
+        } else {
+            panic!(
+                "Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}",
+                elapsed,
+                fee.execution_gas_used() + fee.io_gas_used()
+            );
+        }
+    }
 
     Ok(())
 }

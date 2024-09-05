@@ -23,6 +23,14 @@ fun m::test($t0: u64): u64 {
   5: return $t1
 }
 
+
+Diagnostics:
+warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+  ┌─ tests/copy-propagation/immut_refs_2.move:4:17
+  │
+4 │         let a = &p;
+  │                 ^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]

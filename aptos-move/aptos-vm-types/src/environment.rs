@@ -17,28 +17,23 @@ use std::sync::Arc;
 
 // TODO(George): move configs here from types crate.
 pub fn aptos_prod_ty_builder(
-    features: &Features,
     gas_feature_version: u64,
     gas_params: &AptosGasParameters,
 ) -> TypeBuilder {
-    if features.is_limit_type_size_enabled() && gas_feature_version >= RELEASE_V1_15 {
+    if gas_feature_version >= RELEASE_V1_15 {
         let max_ty_size = gas_params.vm.txn.max_ty_size;
         let max_ty_depth = gas_params.vm.txn.max_ty_depth;
         TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
     } else {
-        aptos_default_ty_builder(features)
+        aptos_default_ty_builder()
     }
 }
 
-pub fn aptos_default_ty_builder(features: &Features) -> TypeBuilder {
-    if features.is_limit_type_size_enabled() {
-        // Type builder to use when:
-        //   1. Type size gas parameters are not yet in gas schedule (before V14).
-        //   2. No gas parameters are found on-chain.
-        TypeBuilder::with_limits(128, 20)
-    } else {
-        TypeBuilder::Legacy
-    }
+pub fn aptos_default_ty_builder() -> TypeBuilder {
+    // Type builder to use when:
+    //   1. Type size gas parameters are not yet in gas schedule (before 1.15).
+    //   2. No gas parameters are found on-chain.
+    TypeBuilder::with_limits(128, 20)
 }
 
 /// A runtime environment which can be used for VM initialization and more.
@@ -68,7 +63,7 @@ impl Environment {
         }
         let timed_features = timed_features_builder.build();
 
-        let ty_builder = aptos_default_ty_builder(&features);
+        let ty_builder = aptos_default_ty_builder();
         Self::initialize(features, timed_features, chain_id, ty_builder)
     }
 
@@ -80,21 +75,11 @@ impl Environment {
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
 
-        let ty_builder = aptos_default_ty_builder(&features);
+        let ty_builder = aptos_default_ty_builder();
         Arc::new(Self::initialize(
             features,
             timed_features,
             chain_id,
-            ty_builder,
-        ))
-    }
-
-    pub fn with_features_for_testing(self, features: Features) -> Arc<Self> {
-        let ty_builder = aptos_default_ty_builder(&features);
-        Arc::new(Self::initialize(
-            features,
-            self.timed_features,
-            self.chain_id,
             ty_builder,
         ))
     }
@@ -132,16 +117,7 @@ impl Environment {
         chain_id: ChainId,
         ty_builder: TypeBuilder,
     ) -> Self {
-        // By default, do not use delayed field optimization. Instead, clients should enable it
-        // manually where applicable.
-        let delayed_field_optimization_enabled = false;
-
-        let vm_config = aptos_prod_vm_config(
-            &features,
-            &timed_features,
-            delayed_field_optimization_enabled,
-            ty_builder,
-        );
+        let vm_config = aptos_prod_vm_config(&features, &timed_features, ty_builder);
 
         Self {
             chain_id,

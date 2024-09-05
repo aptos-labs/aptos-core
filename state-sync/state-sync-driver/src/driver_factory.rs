@@ -20,7 +20,6 @@ use aptos_event_notifications::{EventNotificationSender, EventSubscriptionServic
 use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_mempool_notifications::MempoolNotificationSender;
-use aptos_schemadb::DB;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::TimeService;
@@ -59,7 +58,6 @@ impl DriverFactory {
         aptos_data_client: AptosDataClient,
         streaming_service_client: StreamingServiceClient,
         time_service: TimeService,
-        internal_indexer_db: Option<Arc<DB>>,
     ) -> Self {
         let (driver_factory, _) = Self::create_and_spawn_driver_internal(
             create_runtime,
@@ -75,7 +73,6 @@ impl DriverFactory {
             aptos_data_client,
             streaming_service_client,
             time_service,
-            internal_indexer_db,
         );
         driver_factory
     }
@@ -102,7 +99,6 @@ impl DriverFactory {
         aptos_data_client: AptosDataClient,
         streaming_service_client: StreamingServiceClient,
         time_service: TimeService,
-        internal_indexer_db: Option<Arc<DB>>,
     ) -> (Self, UnboundedSender<CommitNotification>) {
         // Notify subscribers of the initial on-chain config values
         match storage.reader.get_latest_state_checkpoint_version() {
@@ -183,7 +179,6 @@ impl DriverFactory {
             streaming_service_client,
             storage.reader,
             time_service,
-            internal_indexer_db,
         );
 
         // Spawn the driver

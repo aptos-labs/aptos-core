@@ -16,12 +16,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
+use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
@@ -38,27 +38,23 @@ impl BlankStorage {
 }
 
 impl ModuleResolver for BlankStorage {
-    type Error = PartialVMError;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Ok(None)
     }
 }
 
 impl ResourceResolver for BlankStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Ok((None, 0))
     }
 }
@@ -70,79 +66,8 @@ impl TableResolver for BlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
+    ) -> PartialVMResult<Option<Bytes>> {
         Ok(None)
-    }
-}
-
-/// A storage adapter created by stacking a change set on top of an existing storage backend.
-/// This can be used for additional computations without modifying the base.
-#[derive(Debug, Clone)]
-pub struct DeltaStorage<'a, 'b, S> {
-    base: &'a S,
-    change_set: &'b ChangeSet,
-}
-
-impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
-    type Error = S::Error;
-
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
-        if let Some(account_storage) = self.change_set.accounts().get(module_id.address()) {
-            if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
-                return Ok(blob_opt.clone().ok());
-            }
-        }
-
-        self.base.get_module(module_id)
-    }
-}
-
-impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
-    type Error = S::Error;
-
-    fn get_resource_bytes_with_metadata_and_layout(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-        metadata: &[Metadata],
-        layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
-        if let Some(account_storage) = self.change_set.accounts().get(address) {
-            if let Some(blob_opt) = account_storage.resources().get(tag) {
-                let buf = blob_opt.clone().ok();
-                let buf_size = resource_size(&buf);
-                return Ok((buf, buf_size));
-            }
-        }
-        self.base
-            .get_resource_bytes_with_metadata_and_layout(address, tag, metadata, layout)
-    }
-}
-
-#[cfg(feature = "table-extension")]
-impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
-    fn resolve_table_entry_bytes_with_layout(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-        maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
-        // TODO: In addition to `change_set`, cache table outputs.
-        self.base
-            .resolve_table_entry_bytes_with_layout(handle, key, maybe_layout)
-    }
-}
-
-impl<'a, 'b, S: MoveResolver<PartialVMError>> DeltaStorage<'a, 'b, S> {
-    pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
-        Self {
-            base,
-            change_set: delta,
-        }
     }
 }
 
@@ -329,13 +254,11 @@ impl InMemoryStorage {
 }
 
 impl ModuleResolver for InMemoryStorage {
-    type Error = PartialVMError;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
             return Ok(account_storage.modules.get(module_id.name()).cloned());
         }
@@ -344,15 +267,13 @@ impl ModuleResolver for InMemoryStorage {
 }
 
 impl ResourceResolver for InMemoryStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         if let Some(account_storage) = self.accounts.get(address) {
             let buf = account_storage.resources.get(tag).cloned();
             let buf_size = resource_size(&buf);
@@ -369,7 +290,7 @@ impl TableResolver for InMemoryStorage {
         handle: &TableHandle,
         key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
+    ) -> PartialVMResult<Option<Bytes>> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
     }
 }

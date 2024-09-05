@@ -49,6 +49,7 @@ mod module;
 mod multisig;
 mod script;
 pub mod signature_verified_transaction;
+pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
@@ -2029,6 +2030,17 @@ impl Transaction {
             | Transaction::GenesisTransaction(_)
             | Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
+            | Transaction::ValidatorTransaction(_) => false,
+        }
+    }
+
+    pub fn is_block_start(&self) -> bool {
+        match self {
+            Transaction::BlockMetadata(_) | Transaction::BlockMetadataExt(_) => true,
+            Transaction::StateCheckpoint(_)
+            | Transaction::BlockEpilogue(_)
+            | Transaction::UserTransaction(_)
+            | Transaction::GenesisTransaction(_)
             | Transaction::ValidatorTransaction(_) => false,
         }
     }

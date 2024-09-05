@@ -464,6 +464,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
+        num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
@@ -592,6 +593,7 @@ where
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
                         scheduler.num_txns(),
+                        num_workers,
                     );
 
                     // failpoint triggering error at the last committed transaction,
@@ -756,6 +758,7 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -795,6 +798,7 @@ where
                     shared_counter,
                     &executor,
                     block,
+                    num_workers,
                 )?;
                 scheduler.queueing_commits_mark_done();
             }
@@ -883,7 +887,7 @@ where
         }
 
         let num_txns = signature_verified_block.len();
-        let concurrency_level = self.config.local.concurrency_level.min(num_txns / 2).max(2);
+        let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -906,7 +910,7 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..concurrency_level {
+            for _ in 0..num_workers {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         env,
@@ -919,6 +923,7 @@ where
                         &shared_counter,
                         &shared_commit_state,
                         &final_results,
+                        num_workers,
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,

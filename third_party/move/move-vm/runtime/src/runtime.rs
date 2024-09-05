@@ -124,11 +124,21 @@ impl VMRuntime {
                     self.loader
                         .load_module(&module_id, data_store, module_store)?;
                 let old_module = old_module_ref.module();
-                let old_m = normalized::Module::new(old_module);
-                let new_m = normalized::Module::new(module);
-                compat
-                    .check(&old_m, &new_m)
-                    .map_err(|e| e.finish(Location::Undefined))?;
+                if self.loader.vm_config().use_compatibility_checker_v2 {
+                    compat
+                        .check(old_module, module)
+                        .map_err(|e| e.finish(Location::Undefined))?
+                } else {
+                    #[allow(deprecated)]
+                    let old_m = normalized::Module::new(old_module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    #[allow(deprecated)]
+                    let new_m = normalized::Module::new(module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    compat
+                        .legacy_check(&old_m, &new_m)
+                        .map_err(|e| e.finish(Location::Undefined))?
+                }
             }
             if !bundle_unverified.insert(module_id) {
                 return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)
@@ -355,7 +365,7 @@ impl VMRuntime {
 
     fn execute_function_impl(
         &self,
-        func: LoadedFunction,
+        function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
@@ -363,13 +373,13 @@ impl VMRuntime {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
-        let LoadedFunction { ty_args, function } = func;
         let ty_builder = self.loader().ty_builder();
+        let ty_args = function.ty_args();
 
         let param_tys = function
             .param_tys()
             .iter()
-            .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let mut_ref_args = param_tys
@@ -386,13 +396,12 @@ impl VMRuntime {
         let return_tys = function
             .return_tys()
             .iter()
-            .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 
         let return_values = Interpreter::entrypoint(
             function,
-            ty_args,
             deserialized_args,
             data_store,
             module_store,

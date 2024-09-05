@@ -32,6 +32,7 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
+    well_known, LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -67,6 +68,12 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub use_decls: Vec<UseDecl>,
     /// Translated friend declarations.
     pub friend_decls: Vec<FriendDecl>,
+    /// Location of a friend visibility modifier in the current module
+    pub friend_fun_loc: Option<move_ir_types::location::Loc>,
+    /// Location of a package visibility modifier in the current module
+    pub package_fun_loc: Option<move_ir_types::location::Loc>,
+    /// Set of functions with package visibility in the current module
+    pub package_funs: BTreeSet<FunId>,
     /// Translated specification functions.
     pub spec_funs: Vec<SpecFunDecl>,
     /// During the definition analysis, the index into `spec_funs` we are currently
@@ -144,6 +151,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             module_id,
             module_name,
             use_decls: vec![],
+            friend_fun_loc: None,
+            package_fun_loc: None,
+            package_funs: BTreeSet::new(),
             friend_decls: vec![],
             spec_funs: vec![],
             inline_spec_builder: Spec::default(),
@@ -245,10 +255,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         qsym
     }
 
+    pub fn is_variant(maccess: &EA::ModuleAccess) -> bool {
+        matches!(
+            maccess.value,
+            EA::ModuleAccess_::ModuleAccess(_, _, Some(_))
+        )
+    }
+
     pub fn check_no_variant(&self, maccess: &EA::ModuleAccess) -> bool {
-        if let EA::ModuleAccess_::ModuleAccess(_, _, Some(n)) = &maccess.value {
+        if Self::is_variant(maccess) {
             self.parent.env.error(
-                &self.parent.to_loc(&n.loc),
+                &self.parent.to_loc(&maccess.loc),
                 "variants not allowed in this context",
             );
             false
@@ -441,8 +458,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.decl_ana_use_decl(use_decl)
         }
         for (friend_mod_id, friend) in module_def.friends.key_cloned_iter() {
-            self.decl_ana_friend_decl(&friend_mod_id, friend);
+            self.decl_ana_friend_decl(&friend_mod_id, &friend.loc);
         }
+        // we have collected all package and friend visibilities in the current module
+        // and friend declarations in the current module, before we can check their compatibility
+        self.check_visibility_compatibility();
     }
 
     fn decl_ana_const(&mut self, name: &PA::ConstantName, def: &EA::Constant) {
@@ -491,7 +511,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             struct_id,
             abilities,
             type_params,
-            StructLayout::None, // will be filled in during definition analysis
+            StructLayout::None, // will be filled in during definition analysis,
+            matches!(def.layout, EA::StructLayout::Native(_)),
         );
     }
 
@@ -504,6 +525,23 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             )
         }
         let fun_id = FunId::new(qsym.symbol);
+        let visibility = match def.visibility {
+            EA::Visibility::Public(_) => Visibility::Public,
+            EA::Visibility::Friend(loc) => {
+                if self.friend_fun_loc.is_none() {
+                    self.friend_fun_loc = Some(loc);
+                }
+                Visibility::Friend
+            },
+            EA::Visibility::Internal => Visibility::Private,
+            EA::Visibility::Package(loc) => {
+                if self.package_fun_loc.is_none() {
+                    self.package_fun_loc = Some(loc);
+                }
+                self.package_funs.insert(fun_id);
+                Visibility::Friend
+            },
+        };
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
@@ -518,16 +556,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
         let kind = if def.entry.is_some() {
+            if et.env().language_version.is_at_least(LanguageVersion::V2_0) && def.inline {
+                et.error(&et.to_loc(&def.loc), "An entry function cannot be inlined.");
+            }
             FunctionKind::Entry
         } else if def.inline {
             FunctionKind::Inline
         } else {
             FunctionKind::Regular
-        };
-        let visibility = match def.visibility {
-            EA::Visibility::Public(_) => Visibility::Public,
-            EA::Visibility::Friend(_) => Visibility::Friend,
-            EA::Visibility::Internal => Visibility::Private,
         };
         let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
         let def_loc = et.to_loc(&def.loc);
@@ -615,7 +651,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         });
     }
 
-    fn decl_ana_friend_decl(&mut self, friend_mod_id: &EA::ModuleIdent, friend: &EA::Friend) {
+    fn decl_ana_friend_decl(
+        &mut self,
+        friend_mod_id: &EA::ModuleIdent,
+        friend_loc: &move_ir_types::location::Loc,
+    ) {
         // Get various information about the declared friend module.
         let addr = self.parent.resolve_address(
             &self.parent.to_loc(&friend_mod_id.loc),
@@ -625,7 +665,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .symbol_pool()
             .make(friend_mod_id.value.module.0.value.as_str());
         let module_name = ModuleName::from_address_bytes_and_name(addr, name);
-        let loc = self.parent.to_loc(&friend.loc);
+        let loc = self.parent.to_loc(friend_loc);
         // Add a corresponding friend declaration.
         self.friend_decls.push(FriendDecl {
             loc,
@@ -723,6 +763,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             body: None,
             callees: Default::default(),
             is_recursive: Default::default(),
+            insts_using_generic_type_reflection: Default::default(),
         };
         self.spec_funs.push(fun_decl);
     }
@@ -1185,13 +1226,16 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // Notice: duplicate field and variant declarations are currently checked in
         // the expansion phase, so don't need to do here again.
         let (layout, is_empty_struct) = match &def.layout {
-            EA::StructLayout::Singleton(fields) => {
+            EA::StructLayout::Singleton(fields, is_positional) => {
                 let (map, is_struct_empty) =
                     Self::build_field_map(&mut et, None, struct_abilities, &loc, fields);
-                (StructLayout::Singleton(map), is_struct_empty)
+                (
+                    StructLayout::Singleton(map, *is_positional),
+                    is_struct_empty,
+                )
             },
             EA::StructLayout::Variants(variants) => {
-                let mut variant_maps = variants
+                let variant_maps = variants
                     .iter()
                     .map(|v| {
                         let variant_loc = et.to_loc(&v.loc);
@@ -1209,35 +1253,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             name: variant_name,
                             attributes,
                             fields: variant_fields,
+                            is_positional: v.is_positional,
                         }
                     })
                     .collect_vec();
-                // Identify common fields
-                if !variant_maps.is_empty() {
-                    let mut common_fields = BTreeSet::new();
-                    let main = &variant_maps[0];
-                    for field in main.fields.values() {
-                        let mut common = true;
-                        for other in &variant_maps[1..variant_maps.len()] {
-                            if !other
-                                .fields
-                                .values()
-                                .any(|f| f.name == field.name && f.ty == field.ty)
-                            {
-                                common = false;
-                                break;
-                            }
-                        }
-                        if common {
-                            common_fields.insert(field.name);
-                        }
-                    }
-                    for variant_map in variant_maps.iter_mut() {
-                        for field in variant_map.fields.values_mut() {
-                            field.common_for_variants = common_fields.contains(&field.name)
-                        }
-                    }
-                }
                 (StructLayout::Variants(variant_maps), false)
             },
             EA::StructLayout::Native(_) => (StructLayout::None, false),
@@ -1259,9 +1278,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         fields: &EA::Fields<EA::Type>,
     ) -> (BTreeMap<Symbol, FieldData>, bool) {
         let mut field_map = BTreeMap::new();
-        for (name_loc, field_name_, (idx, ty)) in fields {
+        for (name_loc, field_name, (idx, ty)) in fields {
             let field_loc = et.to_loc(&name_loc);
-            let field_sym = et.symbol_pool().make(field_name_);
+            let field_sym = et.symbol_pool().make(field_name);
             let field_ty = et.translate_type(ty);
             let field_ty_loc = et.to_loc(&ty.loc);
             for ctr in Constraint::for_field(struct_abilities, &field_ty) {
@@ -1278,7 +1297,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 loc: field_loc.clone(),
                 offset: *idx,
                 variant: for_variant,
-                common_for_variants: false,
                 ty: field_ty,
             });
         }
@@ -1294,7 +1312,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 loc: loc.clone(),
                 offset: 0,
                 variant: None,
-                common_for_variants: false,
                 ty: field_ty,
             });
             is_empty_struct = true;
@@ -1711,18 +1728,18 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let orig_sym = et.symbol_pool().make(orig_name);
                     let remapped_sym = et.symbol_pool().make(remapped_name);
                     let preset_arg_syms = preset_args
-                            .iter()
-                            .map(|v| {
-                                let sym = et.symbol_pool().make(v.value().as_str());
-                                if et.lookup_local(sym, false).is_none() {
-                                    et.error(
-                                        loc,
-                                        "[internal] error in finding used local variables in lambda calls",
-                                    );
-                                }
-                                sym
-                            })
-                            .collect();
+                        .iter()
+                        .map(|v| {
+                            let sym = et.symbol_pool().make(v.value().as_str());
+                            if et.lookup_local(sym, false).is_none() {
+                                et.error(
+                                    loc,
+                                    "[internal] error in finding used local variables in lambda calls",
+                                );
+                            }
+                            sym
+                        })
+                        .collect();
                     et.fun_ptrs_table
                         .insert(orig_sym, (remapped_sym, preset_arg_syms));
                 }
@@ -1757,9 +1774,19 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 et.define_type_params(loc, &entry.type_params, false);
-                if let StructLayout::Singleton(fields) = &entry.layout {
+                if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
+                    let lang_ver_ge_2 =
+                        et.env().language_version.is_at_least(LanguageVersion::V2_0);
                     for f in fields.values() {
+                        // In Aptos Move 2.0 and above, field `self` is omitted from local bindings
+                        // so `self` can be used to refer to `self` parameter.
+                        if lang_ver_ge_2
+                            && f.name.display(et.symbol_pool()).to_string()
+                                == well_known::RECEIVER_PARAM_NAME
+                        {
+                            continue;
+                        }
                         et.define_local(
                             loc,
                             f.name,
@@ -1771,6 +1798,20 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             )),
                             None,
                         );
+                    }
+                    if lang_ver_ge_2 {
+                        let receiver_param_name =
+                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        et.define_local(loc, receiver_param_name, struct_type, None, None);
+                    }
+                } else if let StructLayout::Variants(_) = &entry.layout {
+                    et.enter_scope();
+                    if et.env().language_version.is_at_least(LanguageVersion::V2_0) {
+                        let receiver_param_name =
+                            et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
+                        let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                        et.define_local(loc, receiver_param_name, struct_type, None, None);
                     }
                 }
 
@@ -1830,6 +1871,37 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
 
         et
+    }
+
+    /// Checks if both package and friend visibility/declaration are used in the same module
+    fn check_visibility_compatibility(&self) {
+        if let Some(package_vis_loc) = &self.package_fun_loc {
+            let package_vis_loc = self.parent.to_loc(package_vis_loc);
+            let friend_vis_loc = if let Some(friend_vis_loc) = &self.friend_fun_loc {
+                Some(self.parent.to_loc(friend_vis_loc))
+            } else {
+                self.friend_decls
+                    .first()
+                    .map(|friend_decl| friend_decl.loc.clone())
+            };
+            if let Some(friend_vis_loc) = friend_vis_loc {
+                self.parent.env.diag_with_labels(
+                    Severity::Error,
+                    &friend_vis_loc,
+                    "Cannot use both package and friend visibility in the same module",
+                    vec![
+                        (
+                            package_vis_loc,
+                            "package visibility declared here".to_string(),
+                        ),
+                        (
+                            friend_vis_loc.clone(),
+                            "friend visibility declared here".to_string(),
+                        ),
+                    ],
+                );
+            }
+        }
     }
 }
 
@@ -2154,9 +2226,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             _ => {
                 if !additional_exps.is_empty() {
                     et.error(
-                          loc,
-                          "additional expressions only allowed with `aborts_if`, `aborts_with`, `modifies`, or `emits`",
-                      );
+                        loc,
+                        "additional expressions only allowed with `aborts_if`, `aborts_with`, `modifies`, or `emits`",
+                    );
                 }
                 (et.translate_exp(exp, &expected_type).into_exp(), vec![])
             },
@@ -3225,6 +3297,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     // TODO: model friend visibility properly
                     unimplemented!("Friend visibility not supported yet")
                 },
+                PA::Visibility::Package(..) => {
+                    // TODO: model package visibility properly
+                    unimplemented!("Package visibility not supported yet")
+                },
             }
         }
         let rex = Regex::new(&format!(
@@ -3405,29 +3481,25 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let mut field_data: BTreeMap<FieldId, FieldData> = BTreeMap::new();
             let mut variants: BTreeMap<Symbol, model::StructVariant> = BTreeMap::new();
             match &entry.layout {
-                StructLayout::Singleton(fields) => {
+                StructLayout::Singleton(fields, _) => {
                     field_data.extend(fields.values().map(|f| (FieldId::new(f.name), f.clone())));
                 },
                 StructLayout::Variants(entry_variants) => {
-                    for variant in entry_variants {
+                    for (order, variant) in entry_variants.iter().enumerate() {
                         variants.insert(variant.name, model::StructVariant {
                             loc: variant.loc.clone(),
+                            order,
                             attributes: variant.attributes.clone(),
                         });
-                        let pool = self.parent.env.symbol_pool();
-                        field_data.extend(variant.fields.values().map(|f| {
-                            let variant_field_name = if !f.common_for_variants {
-                                // If the field is not common between variants, we need to qualify
-                                // the name with the variant for a unique id.
-                                pool.make(&FieldId::make_variant_field_id_str(
+                        for field in variant.fields.values().sorted_by_key(|f| f.offset).cloned() {
+                            let pool = self.parent.env.symbol_pool();
+                            let field_id =
+                                FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
                                     pool.string(variant.name).as_str(),
-                                    pool.string(f.name).as_str(),
-                                ))
-                            } else {
-                                f.name
-                            };
-                            (FieldId::new(variant_field_name), f.clone())
-                        }))
+                                    pool.string(field.name).as_str(),
+                                )));
+                            field_data.insert(field_id, field);
+                        }
                     }
                 },
                 StructLayout::None => {},
@@ -3447,6 +3519,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     Some(variants)
                 },
                 spec: RefCell::new(spec),
+                is_native: entry.is_native,
             };
             struct_data.insert(StructId::new(name.symbol), data);
         }
@@ -3467,6 +3540,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let def = self.fun_defs.remove(&name.symbol);
             let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
+            let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
@@ -3474,6 +3548,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 def_idx: None,
                 handle_idx: None,
                 visibility: entry.visibility,
+                has_package_visibility: self.package_funs.contains(&fun_id),
                 is_native: entry.is_native,
                 kind: entry.kind,
                 attributes: entry.attributes.clone(),
@@ -3487,7 +3562,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),
             };
-            function_data.insert(FunId::new(name.symbol), data);
+            function_data.insert(fun_id, data);
         }
 
         let mut named_constants: BTreeMap<NamedConstantId, NamedConstantData> = Default::default();

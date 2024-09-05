@@ -6,22 +6,23 @@ use crate::{
     config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
     utils,
 };
-use anyhow::{ensure, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_logger::warn;
 use aptos_types::chain_id::ChainId;
 use arr_macro::arr;
-use number_range::NumberRangeOptions;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 // Lru cache will consume about 2G RAM based on this default value.
 pub const DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD: usize = 1 << 13;
 
 pub const BUFFERED_STATE_TARGET_ITEMS: usize = 100_000;
+pub const BUFFERED_STATE_TARGET_ITEMS_FOR_TEST: usize = 10;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -49,11 +50,7 @@ impl ShardedDbPathConfig {
     pub fn get_shard_paths(&self) -> Result<HashMap<u8, PathBuf>> {
         let mut result = HashMap::new();
         for shard_path in &self.shard_paths {
-            let shard_ids = NumberRangeOptions::<u8>::new()
-                .with_list_sep(',')
-                .with_range_sep('-')
-                .parse(shard_path.shards.as_str())?
-                .collect::<Vec<u8>>();
+            let shard_ids = Self::parse(shard_path.shards.as_str())?;
             let path = &shard_path.path;
             ensure!(
                 path.is_absolute(),
@@ -73,6 +70,31 @@ impl ShardedDbPathConfig {
         }
 
         Ok(result)
+    }
+
+    fn parse(path: &str) -> Result<Vec<u8>> {
+        let mut shard_ids = vec![];
+        for p in path.split(',') {
+            let num_or_range: Vec<&str> = p.split('-').collect();
+            match num_or_range.len() {
+                1 => {
+                    let num = u8::from_str(num_or_range[0])?;
+                    ensure!(num < 16);
+                    shard_ids.push(num);
+                },
+                2 => {
+                    let range_start = u8::from_str(num_or_range[0])?;
+                    let range_end = u8::from_str(num_or_range[1])?;
+                    ensure!(range_start <= range_end && range_end < 16);
+                    for num in range_start..=range_end {
+                        shard_ids.push(num);
+                    }
+                },
+                _ => bail!("Invalid path: {path}."),
+            }
+        }
+
+        Ok(shard_ids)
     }
 }
 

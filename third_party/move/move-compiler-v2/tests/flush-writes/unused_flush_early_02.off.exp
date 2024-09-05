@@ -1,0 +1,43 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+bar() /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+one(): u64 /* def_idx: 1 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+public test(): u64 * u64 /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+L3:	loc3: bool
+L4:	loc4: u64
+B0:
+	0: Call one(): u64
+	1: Call one(): u64
+	2: Call one(): u64
+	3: LdU64(0)
+	4: StLoc[0](loc0: u64)
+	5: StLoc[1](loc1: u64)
+	6: MoveLoc[0](loc0: u64)
+	7: Eq
+	8: StLoc[3](loc3: bool)
+	9: StLoc[4](loc4: u64)
+	10: MoveLoc[3](loc3: bool)
+	11: BrFalse(13)
+B1:
+	12: Call bar()
+B2:
+	13: MoveLoc[4](loc4: u64)
+	14: MoveLoc[1](loc1: u64)
+	15: Ret
+}
+}
+============ bytecode verification succeeded ========

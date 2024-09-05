@@ -1,0 +1,14 @@
+// -- Model dump before bytecode pipeline
+module 0x123::a {
+    friend entry fun a() {
+        Tuple()
+    }
+} // end 0x123::a
+module 0x123::b {
+    private entry fun a() {
+        Tuple()
+    }
+    private fun b() {
+        b::a()
+    }
+} // end 0x123::b

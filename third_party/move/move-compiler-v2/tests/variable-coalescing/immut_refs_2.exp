@@ -23,6 +23,14 @@ fun m::test($t0: u64): u64 {
   5: return $t1
 }
 
+
+Diagnostics:
+warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+  ┌─ tests/variable-coalescing/immut_refs_2.move:4:17
+  │
+4 │         let a = &p;
+  │                 ^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]
@@ -117,13 +125,9 @@ L1:	loc0: &u64
 L2:	loc1: u64
 B0:
 	0: ImmBorrowLoc[0](Arg0: u64)
-	1: StLoc[1](loc0: &u64)
-	2: MoveLoc[1](loc0: &u64)
-	3: Pop
-	4: MoveLoc[0](Arg0: u64)
-	5: StLoc[2](loc1: u64)
-	6: MoveLoc[2](loc1: u64)
-	7: Ret
+	1: Pop
+	2: MoveLoc[0](Arg0: u64)
+	3: Ret
 }
 }
 ============ bytecode verification succeeded ========

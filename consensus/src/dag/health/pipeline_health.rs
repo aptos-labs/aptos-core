@@ -68,7 +68,7 @@ impl TPipelineHealth for PipelineLatencyBasedBackpressure {
         let latency = self.adapter.pipeline_pending_latency();
         self.pipeline_config.get_backoff(latency).map(|config| {
             (
-                config.max_sending_block_txns_override,
+                config.max_sending_block_txns_after_filtering_override,
                 config.max_sending_block_bytes_override,
             )
         })

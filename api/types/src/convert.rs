@@ -45,6 +45,7 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    transaction_argument::convert_txn_args,
     value::{MoveStructLayout, MoveTypeLayout},
 };
 use serde_json::Value;
@@ -154,7 +155,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         &self,
         typ: &StructTag,
         bytes: &'_ [u8],
-    ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>> {
+    ) -> Result<(
+        Option<Identifier>,
+        Vec<(Identifier, move_core_types::value::MoveValue)>,
+    )> {
         self.inner.view_struct_fields(typ, bytes)
     }
 
@@ -272,7 +276,26 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     ) -> Result<TransactionPayload> {
         use aptos_types::transaction::TransactionPayload::*;
         let ret = match payload {
-            Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
+            Script(s) => {
+                let (code, ty_args, args) = s.into_inner();
+                let script_args = self.inner.view_script_arguments(&code, &args, &ty_args);
+
+                let json_args = match script_args {
+                    Ok(values) => values
+                        .into_iter()
+                        .map(|v| MoveValue::try_from(v)?.json())
+                        .collect::<Result<_>>()?,
+                    Err(_e) => convert_txn_args(&args)
+                        .into_iter()
+                        .map(|arg| HexEncodedBytes::from(arg).json())
+                        .collect::<Result<_>>()?,
+                };
+                TransactionPayload::ScriptPayload(ScriptPayload {
+                    code: MoveScriptBytecode::new(code).try_parse_abi(),
+                    type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
+                    arguments: json_args,
+                })
+            },
             EntryFunction(fun) => {
                 let (module, function, ty_args, args) = fun.into_inner();
                 let func_args = self

@@ -5,7 +5,9 @@ use crate::{
     account::{
         create::{CreateAccount, DEFAULT_FUNDED_COINS},
         fund::FundWithFaucet,
-        key_rotation::{LookupAddress, RotateKey, RotateSummary},
+        key_rotation::{
+            LookupAddress, NewAuthKeyOptions, NewProfileOptions, RotateKey, RotateSummary,
+        },
         list::{ListAccount, ListQuery},
         transfer::{TransferCoins, TransferSummary},
     },
@@ -264,10 +266,16 @@ impl CliTestFramework {
                 prompt_options: PromptOptions::yes(),
                 ..Default::default()
             },
-            new_private_key: Some(new_private_key),
-            save_to_profile: None,
-            new_private_key_file: None,
-            skip_saving_profile: true,
+            new_auth_key_options: NewAuthKeyOptions {
+                new_private_key: Some(new_private_key),
+                new_private_key_file: None,
+                new_derivation_path: None,
+                new_derivation_index: None,
+            },
+            new_profile_options: NewProfileOptions {
+                skip_saving_profile: true,
+                save_to_profile: None,
+            },
         }
         .execute()
         .await?;
@@ -528,9 +536,10 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         consensus_public_key: bls12381::PublicKey,
         proof_of_possession: bls12381::ProofOfPossession,
+        gas_options: Option<GasOptions>,
     ) -> CliTypedResult<TransactionSummary> {
         UpdateConsensusKey {
-            txn_options: self.transaction_options(operator_index, None),
+            txn_options: self.transaction_options(operator_index, gas_options),
             operator_args: self.operator_args(pool_index),
             operator_config_file_args: OperatorConfigFileArgs {
                 operator_config_file: None,
@@ -828,6 +837,7 @@ impl CliTestFramework {
                 framework_local_dir: framework_dir,
                 skip_fetch_latest_git_deps: false,
             },
+            template: None,
         }
         .execute()
         .await
@@ -1034,7 +1044,7 @@ impl CliTestFramework {
                 script_path: Some(source_path),
                 compiled_script_path: None,
                 framework_package_args,
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args: vec![] },
@@ -1057,13 +1067,12 @@ impl CliTestFramework {
             txn_options: self.transaction_options(index, None),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
-                compiled_script_path: None,
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args },
@@ -1087,16 +1096,9 @@ impl CliTestFramework {
     pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
         MovePackageDir {
             dev: true,
-            package_dir: Some(self.move_dir()),
-            output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
-            override_std: None,
-            skip_fetch_latest_git_deps: true,
-            bytecode_version: None,
-            compiler_version: None,
-            language_version: None,
-            skip_attribute_checks: false,
-            check_test_code: false,
+            package_dir: Some(self.move_dir()),
+            ..MovePackageDir::new()
         }
     }
 
@@ -1195,13 +1197,12 @@ impl CliTestFramework {
                 is_multi_step,
                 compile_proposal_args: CompileScriptFunction {
                     script_path: Some(script_path),
-                    compiled_script_path: None,
                     framework_package_args: FrameworkPackageArgs {
                         framework_git_rev: None,
                         framework_local_dir: Some(Self::aptos_framework_dir()),
                         skip_fetch_latest_git_deps: false,
                     },
-                    bytecode_version: None,
+                    ..CompileScriptFunction::default()
                 },
             },
         }
@@ -1241,13 +1242,12 @@ impl CliTestFramework {
             proposal_id,
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
-                compiled_script_path: None,
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             rest_options: self.rest_options(),
             profile: Default::default(),

@@ -6,7 +6,7 @@ use crate::{
     pipeline::pipeline_phase::StatelessPipeline,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
-use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_executor_types::ExecutorResult;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use async_trait::async_trait;
@@ -42,7 +42,7 @@ impl Display for PersistingRequest {
     }
 }
 
-pub type PersistingResponse = ExecutorResult<()>;
+pub type PersistingResponse = ExecutorResult<Round>;
 
 pub struct PersistingPhase {
     persisting_handle: Arc<dyn StateComputer>,
@@ -67,9 +67,11 @@ impl StatelessPipeline for PersistingPhase {
             commit_ledger_info,
             callback,
         } = req;
+        let round = commit_ledger_info.ledger_info().round();
 
         self.persisting_handle
             .commit(&blocks, commit_ledger_info, callback)
             .await
+            .map(|_| round)
     }
 }

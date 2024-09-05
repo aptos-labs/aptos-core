@@ -837,6 +837,10 @@ pub fn stack_struct_borrow_field(
         StructFieldInformation::Native => {
             return Err(VMError::new("Borrow field on a native struct".to_string()));
         },
+        StructFieldInformation::DeclaredVariants(..) => {
+            // TODO(#13806): consider implementing for struct variants
+            return Err(VMError::new("Enum types not yet supported".to_string()));
+        },
         StructFieldInformation::Declared(fields) => {
             let field_def = &fields[field_handle.field as usize];
             &field_def.signature.0

@@ -164,6 +164,7 @@ def fake_context(
         forge_test_suite="banana",
         forge_username="banana-eater",
         forge_blocking=True,
+        forge_retain_debug_logs="true",
         github_actions="false",
         github_job_url="https://banana",
     )

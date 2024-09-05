@@ -20,7 +20,10 @@ use move_package::{
     compilation::{build_plan::BuildPlan, compiled_package::build_and_report_v2_driver},
     BuildConfig,
 };
-use move_unit_test::UnitTestingConfig;
+use move_unit_test::{
+    test_reporter::{UnitTestFactory, UnitTestFactoryWithCostTable},
+    UnitTestingConfig,
+};
 use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
 use move_vm_test_utils::gas_schedule::CostTable;
 // if unix
@@ -117,7 +120,6 @@ impl Test {
             evm,
         } = self;
         let unit_test_config = UnitTestingConfig {
-            gas_limit,
             filter,
             list,
             num_threads,
@@ -129,7 +131,7 @@ impl Test {
             #[cfg(feature = "evm-backend")]
             evm,
 
-            ..UnitTestingConfig::default_with_bound(None)
+            ..UnitTestingConfig::default()
         };
         let result = run_move_unit_tests(
             &rerooted_path,
@@ -137,6 +139,7 @@ impl Test {
             unit_test_config,
             natives,
             genesis,
+            gas_limit,
             cost_table,
             compute_coverage,
             &mut std::io::stdout(),
@@ -159,13 +162,36 @@ pub enum UnitTestResult {
 
 pub fn run_move_unit_tests<W: Write + Send>(
     pkg_path: &Path,
+    build_config: move_package::BuildConfig,
+    unit_test_config: UnitTestingConfig,
+    natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
+    gas_limit: Option<u64>,
+    cost_table: Option<CostTable>,
+    compute_coverage: bool,
+    writer: &mut W,
+) -> Result<UnitTestResult> {
+    run_move_unit_tests_with_factory(
+        pkg_path,
+        build_config,
+        unit_test_config,
+        natives,
+        genesis,
+        compute_coverage,
+        writer,
+        UnitTestFactoryWithCostTable::new(cost_table, gas_limit),
+    )
+}
+
+pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Send>(
+    pkg_path: &Path,
     mut build_config: move_package::BuildConfig,
     mut unit_test_config: UnitTestingConfig,
     natives: Vec<NativeFunctionRecord>,
     genesis: ChangeSet,
-    cost_table: Option<CostTable>,
     compute_coverage: bool,
     writer: &mut W,
+    factory: F,
 ) -> Result<UnitTestResult> {
     let mut test_plan = None;
     let mut test_plan_v2 = None;
@@ -302,7 +328,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
     if !unit_test_config
-        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), cost_table, writer)
+        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), writer, factory)
         .unwrap()
         .1
     {

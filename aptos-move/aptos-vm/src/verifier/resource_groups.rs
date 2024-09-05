@@ -6,7 +6,6 @@ use aptos_framework::{ResourceGroupScope, RuntimeModuleMetadataV1};
 use move_binary_format::{
     access::ModuleAccess,
     errors::{Location, PartialVMError, VMError, VMResult},
-    normalized::Struct,
     CompiledModule,
 };
 use move_core_types::{
@@ -172,7 +171,11 @@ pub(crate) fn extract_resource_group_metadata_from_module(
         let structs = module
             .struct_defs()
             .iter()
-            .map(|d| Struct::new(&module, d).0.into_string())
+            .map(|struct_def| {
+                let struct_handle = module.struct_handle_at(struct_def.struct_handle);
+                let name = module.identifier_at(struct_handle.name).to_string();
+                name
+            })
             .collect::<BTreeSet<_>>();
         Ok((groups, members, structs))
     } else {
