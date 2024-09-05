@@ -21,7 +21,7 @@ use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
     block::Block,
     common::Round,
-    pipelined_block::{ExecutionSummary, OrderedBlockWindow, PipelinedBlock},
+    pipelined_block::{ExecutionSummary, PipelinedBlock},
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
@@ -31,7 +31,9 @@ use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{
+    account_config::NewBlockEvent, ledger_info::LedgerInfoWithSignatures, transaction::Version,
+};
 use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
@@ -410,9 +412,59 @@ impl BlockStore {
                 block.round(),
                 block.epoch(),
             );
+            let aptos_db = self.storage.aptos_db();
+            let latest_block_event = aptos_db
+                .get_latest_block_events(1)
+                .expect("at least one block");
+            let latest_block_event_with_version =
+                latest_block_event.first().expect("at least one block");
+            let latest_new_block_event = latest_block_event_with_version
+                .event
+                .expect_new_block_event()
+                .expect("new block event");
+            let mut height = latest_new_block_event.height();
+            let committed_transactions;
+            loop {
+                let (start_version, end_version, new_block_event): (
+                    Version,
+                    Version,
+                    NewBlockEvent,
+                ) = self
+                    .storage
+                    .aptos_db()
+                    .get_block_info_by_height(height)
+                    .expect("block id by height");
+                if new_block_event.epoch() < block.epoch() {
+                    panic!(
+                        "the epoch of the latest block event {} is less than the block epoch {}",
+                        new_block_event.epoch(),
+                        block.epoch(),
+                    );
+                }
+                if new_block_event.round() < block.round() {
+                    panic!(
+                        "the round of the latest block event {} is less than the block round {}",
+                        new_block_event.round(),
+                        block.round(),
+                    );
+                }
+                if new_block_event.epoch() == block.epoch()
+                    && new_block_event.round() == block.round()
+                {
+                    let iter = aptos_db
+                        .get_transaction_info_iterator(start_version, end_version - start_version)
+                        .expect("iterator");
+                    committed_transactions = iter
+                        .map(|info| info.expect("info").transaction_hash())
+                        .collect();
+                    break;
+                }
+                height -= 1;
+            }
+
             // TODO: assert that this is an older block than commit root
             let pipelined_block =
-                PipelinedBlock::new_ordered(block.clone(), OrderedBlockWindow::empty());
+                PipelinedBlock::new_recovered(block.clone(), committed_transactions);
             block_tree.insert_block(pipelined_block)
         }
     }

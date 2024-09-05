@@ -292,6 +292,27 @@ impl PipelinedBlock {
         }
     }
 
+    pub fn new_recovered(block: Block, committed_transactions: Vec<HashValue>) -> Self {
+        info!(
+            "New Recovered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block.payload().map_or(0, |p| p.len())
+        );
+        Self {
+            block,
+            block_window: OrderedBlockWindow::empty(),
+            input_transactions: vec![],
+            state_compute_result: StateComputeResult::new_dummy(),
+            randomness: OnceCell::new(),
+            pipeline_insertion_time: OnceCell::new(),
+            execution_summary: Arc::new(OnceCell::new()),
+            committed_transactions: Arc::new(OnceCell::with_value(committed_transactions)),
+        }
+    }
+
     pub fn block(&self) -> &Block {
         &self.block
     }
