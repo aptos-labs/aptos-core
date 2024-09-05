@@ -515,7 +515,7 @@ impl ControlFlowGraphCodeGenerator {
         // check invariant 6
         for (block, preds) in self.predecessors.iter() {
             if *block == self.exit_block || *block == self.get_the_non_trivial_successor(self.entry_block) || preds.is_empty() {
-                continue;;
+                continue;
             }
             assert!(matches!(self.code_blocks.get(block).expect("code block").first().expect("first instruction"), Bytecode::Label(..)));
         }
@@ -654,7 +654,7 @@ impl RedundantJumpRemover {
         for suc in self.0.successors.get(&block).expect("successors").clone() {
             if !self.0.is_trivial_block(suc) && self.remove_jump_if_possible(block, suc) {
                 // we may have removed block
-                if self.0.successors.get(&block).is_none() {
+                if !self.0.successors.contains_key(&block) {
                     break;
                 }
                 // successors of `block` changes
