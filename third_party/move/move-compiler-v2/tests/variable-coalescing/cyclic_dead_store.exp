@@ -68,13 +68,9 @@ public fun m::test1($t0: u64, $t1: u64, $t2: u64) {
   7: $t6 := 1
   8: $t5 := +($t3, $t6)
   9: $t3 := move($t5)
- 10: goto 13
+ 10: goto 1
  11: label L3
- 12: goto 15
- 13: label L4
- 14: goto 1
- 15: label L1
- 16: return ()
+ 12: return ()
 }
 
 
@@ -92,13 +88,9 @@ public fun m::test2($t0: u64, $t1: u64) {
   5: $t5 := 1
   6: $t4 := +($t2, $t5)
   7: $t2 := move($t4)
-  8: goto 11
+  8: goto 1
   9: label L3
- 10: goto 13
- 11: label L4
- 12: goto 1
- 13: label L1
- 14: return ()
+ 10: return ()
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -137,20 +129,12 @@ public fun m::test1($t0: u64, $t1: u64, $t2: u64) {
      # events: e:$t5
   9: $t3 := move($t5)
      # live vars: $t0, $t2, $t3
- 10: goto 13
-     # live vars: $t0, $t2, $t3
- 11: label L3
-     # live vars:
- 12: goto 15
-     # live vars: $t0, $t2, $t3
- 13: label L4
+ 10: goto 1
      # live vars: $t0, $t2, $t3
      # events: e:$t0, e:$t2, e:$t3
- 14: goto 1
+ 11: label L3
      # live vars:
- 15: label L1
-     # live vars:
- 16: return ()
+ 12: return ()
 }
 
 
@@ -183,20 +167,12 @@ public fun m::test2($t0: u64, $t1: u64) {
      # events: e:$t4
   7: $t2 := move($t4)
      # live vars: $t0, $t2
-  8: goto 11
-     # live vars: $t0, $t2
-  9: label L3
-     # live vars:
- 10: goto 13
-     # live vars: $t0, $t2
- 11: label L4
+  8: goto 1
      # live vars: $t0, $t2
      # events: e:$t0, e:$t2
- 12: goto 1
+  9: label L3
      # live vars:
- 13: label L1
-     # live vars:
- 14: return ()
+ 10: return ()
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -217,13 +193,9 @@ public fun m::test1($t0: u64, $t1: u64, $t2: u64) {
   7: $t1 := 1
   8: $t1 := +($t3, $t1)
   9: $t3 := move($t1)
- 10: goto 13
+ 10: goto 1
  11: label L3
- 12: goto 15
- 13: label L4
- 14: goto 1
- 15: label L1
- 16: return ()
+ 12: return ()
 }
 
 
@@ -241,13 +213,9 @@ public fun m::test2($t0: u64, $t1: u64) {
   5: $t5 := 1
   6: $t5 := +($t1, $t5)
   7: $t1 := move($t5)
-  8: goto 11
+  8: goto 1
   9: label L3
- 10: goto 13
- 11: label L4
- 12: goto 1
- 13: label L1
- 14: return ()
+ 10: return ()
 }
 
 ============ after DeadStoreElimination: ================
@@ -268,13 +236,9 @@ public fun m::test1($t0: u64, $t1: u64, $t2: u64) {
   7: $t1 := 1
   8: $t1 := +($t3, $t1)
   9: $t3 := move($t1)
- 10: goto 13
+ 10: goto 1
  11: label L3
- 12: goto 15
- 13: label L4
- 14: goto 1
- 15: label L1
- 16: return ()
+ 12: return ()
 }
 
 
@@ -292,13 +256,9 @@ public fun m::test2($t0: u64, $t1: u64) {
   5: $t5 := 1
   6: $t5 := +($t1, $t5)
   7: $t1 := move($t5)
-  8: goto 11
+  8: goto 1
   9: label L3
- 10: goto 13
- 11: label L4
- 12: goto 1
- 13: label L1
- 14: return ()
+ 10: return ()
 }
 
 
@@ -322,13 +282,9 @@ B2:
 	7: LdU64(1)
 	8: Add
 	9: StLoc[3](loc0: u64)
-	10: Branch(12)
+	10: Branch(2)
 B3:
-	11: Branch(13)
-B4:
-	12: Branch(2)
-B5:
-	13: Ret
+	11: Ret
 }
 public test2(Arg0: u64, Arg1: u64) /* def_idx: 1 */ {
 L2:	loc0: u64
@@ -345,13 +301,9 @@ B2:
 	7: LdU64(1)
 	8: Add
 	9: StLoc[1](Arg1: u64)
-	10: Branch(12)
+	10: Branch(2)
 B3:
-	11: Branch(13)
-B4:
-	12: Branch(2)
-B5:
-	13: Ret
+	11: Ret
 }
 }
 ============ bytecode verification succeeded ========

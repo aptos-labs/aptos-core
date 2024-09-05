@@ -14,7 +14,7 @@ use move_compiler::{
         warn_of_deprecation_use_in_aptos_libs_env_var,
     },
 };
-use move_model::metadata::LanguageVersion;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
@@ -46,6 +46,10 @@ pub struct Options {
     /// The language version to use.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
+
+    /// The compiler version to use.
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
+    pub compiler_version: Option<CompilerVersion>,
 
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]

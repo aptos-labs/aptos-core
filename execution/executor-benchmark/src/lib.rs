@@ -166,7 +166,7 @@ pub fn run_benchmark<V>(
         ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
     });
 
-    let version = db.reader.get_synced_version().unwrap();
+    let version = db.reader.expect_synced_version();
 
     let (pipeline, block_sender) =
         Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
@@ -236,8 +236,7 @@ pub fn run_benchmark<V>(
     );
 
     if !pipeline_config.skip_commit {
-        let num_txns =
-            db.reader.get_synced_version().unwrap() - version - num_blocks_created as u64;
+        let num_txns = db.reader.expect_synced_version() - version - num_blocks_created as u64;
         overall_measuring.print_end("Overall", num_txns);
 
         if verify_sequence_numbers {
@@ -261,7 +260,7 @@ fn init_workload<V>(
 where
     V: TransactionBlockExecutor + 'static,
 {
-    let version = db.reader.get_synced_version().unwrap();
+    let version = db.reader.expect_synced_version();
     let (pipeline, block_sender) = Pipeline::<V>::new(
         BlockExecutor::new(db.clone()),
         version,

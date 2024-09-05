@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::{
-    logging::{LogEntry, LogSchema},
-    metrics,
-    network_message::{CommitDecision, OrderedBlock},
+    common::{
+        logging::{LogEntry, LogSchema},
+        metrics,
+    },
+    network::observer_message::{CommitDecision, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::common::Round;

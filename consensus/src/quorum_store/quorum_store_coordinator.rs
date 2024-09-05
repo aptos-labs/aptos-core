@@ -5,7 +5,7 @@ use crate::{
     monitor,
     quorum_store::{
         batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGeneratorCommand,
-        proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
+        counters, proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
     },
     round_manager::VerifiedEvent,
 };
@@ -54,6 +54,9 @@ impl QuorumStoreCoordinator {
             monitor!("quorum_store_coordinator_loop", {
                 match cmd {
                     CoordinatorCommand::CommitNotification(block_timestamp, batches) => {
+                        counters::QUORUM_STORE_MSG_COUNT
+                            .with_label_values(&["QSCoordinator::commit_notification"])
+                            .inc();
                         // TODO: need a callback or not?
                         self.proof_coordinator_cmd_tx
                             .send(ProofCoordinatorCommand::CommitNotification(batches.clone()))
@@ -77,6 +80,9 @@ impl QuorumStoreCoordinator {
                             .expect("Failed to send to BatchGenerator");
                     },
                     CoordinatorCommand::Shutdown(ack_tx) => {
+                        counters::QUORUM_STORE_MSG_COUNT
+                            .with_label_values(&["QSCoordinator::shutdown"])
+                            .inc();
                         // Note: Shutdown is done from the back of the quorum store pipeline to the
                         // front, so senders are always shutdown before receivers. This avoids sending
                         // messages through closed channels during shutdown.

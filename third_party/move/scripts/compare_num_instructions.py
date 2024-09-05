@@ -84,7 +84,7 @@ def count_instructions(file_name):
     """
     result = subprocess.run(
         [
-            "../../../target/debug/move-disassembler",
+            "../../../target/release/move-disassembler",
             "--skip-code",
             "--skip-locals",
             "--print-bytecode-stats",

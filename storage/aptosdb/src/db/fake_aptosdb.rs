@@ -236,7 +236,7 @@ impl FakeAptosDB {
             .current_version
             .map(|version| version + 1)
             .unwrap_or(0);
-        let num_transactions_in_db = self.get_synced_version().map_or(0, |v| v + 1);
+        let num_transactions_in_db = self.get_synced_version()?.map_or(0, |v| v + 1);
         ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
             "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
             first_version,
@@ -667,7 +667,7 @@ impl DbReader for FakeAptosDB {
     fn get_block_timestamp(&self, version: Version) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             ensure!(
-                version <= self.get_synced_version()?,
+                version <= self.ensure_synced_version()?,
                 "version older than latest version"
             );
 
@@ -835,7 +835,7 @@ impl DbReader for FakeAptosDB {
         // This is because when we call save_transactions for the genesis block, we call [AptosDB::save_transactions]
         // where there is an expectation that the root of the SMTs are the same pointers. Here,
         // we get from the inner AptosDB which ensures that the pointers match when save_transactions is called.
-        if self.get_synced_version().unwrap_or_default() == 0 {
+        if self.ensure_synced_version().unwrap_or_default() == 0 {
             return self.inner.get_latest_executed_trees();
         }
 

@@ -16,7 +16,7 @@ use codespan_reporting::{
     term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
-use move_binary_format::CompiledModule;
+use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_compiler_v2::{options::Options, Experiment};
@@ -138,7 +138,7 @@ impl Default for BuildOptions {
 impl BuildOptions {
     pub fn move_2() -> Self {
         BuildOptions {
-            bytecode_version: Some(7),
+            bytecode_version: Some(VERSION_7),
             language_version: Some(LanguageVersion::V2_0),
             compiler_version: Some(CompilerVersion::V2_0),
             ..Self::default()

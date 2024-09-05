@@ -23,6 +23,7 @@ use crate::{
     pipeline::{
         ability_processor::AbilityProcessor,
         avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        control_flow_graph_simplifier::ControlFlowGraphSimplifier,
         copy_propagation::CopyPropagation,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
@@ -123,9 +124,10 @@ where
             &dump_base_name,
             false,
             &pipeline::register_formatters,
+            || !env.has_errors(),
         )
     } else {
-        pipeline.run(&env, &mut targets)
+        pipeline.run_with_hook(&env, &mut targets, |_| {}, |_, _, _| !env.has_errors())
     }
     check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
 
@@ -449,6 +451,10 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // While this section of the pipeline is optional, some code that used to previously compile
     // may no longer compile without this section because of using too many local (temp) variables.
 
+    if options.experiment_on(Experiment::CFG_SIMPLIFICATION) {
+        pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
+    }
+
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
         pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
         pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
@@ -478,7 +484,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
     // There should be no "transforming" processors run after this point.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
 
     if options.experiment_on(Experiment::FLUSH_WRITES_OPTIMIZATION) {
         // This processor only adds annotations, does not transform the bytecode.

@@ -138,6 +138,16 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string(),
+            description: "Turns on optimizations waiting for comparison testing".to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::CFG_SIMPLIFICATION.to_string(),
+            description: "Whether to do the control flow graph simplification".to_string(),
+            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+        },
+        Experiment {
             name: Experiment::COPY_PROPAGATION.to_string(),
             description: "Whether copy propagation is run".to_string(),
             default: Given(false),
@@ -212,7 +222,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::FLUSH_WRITES_OPTIMIZATION.to_string(),
             description: "Whether to run flush writes processor and optimization".to_string(),
-            default: Inherited(Experiment::OPTIMIZE.to_string()),
+            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
         },
         Experiment {
             name: Experiment::STOP_BEFORE_STACKLESS_BYTECODE.to_string(),
@@ -255,6 +265,7 @@ impl Experiment {
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
+    pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
@@ -268,6 +279,8 @@ impl Experiment {
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";
+    pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =
+        "optimize-waiting-for-compare-tests";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";

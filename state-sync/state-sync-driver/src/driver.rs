@@ -97,7 +97,7 @@ pub struct StateSyncDriver<
     // The listener for commit notifications
     commit_notification_listener: CommitNotificationListener,
 
-    // The handler for notifications from consensus
+    // The handler for notifications from consensus or consensus observer
     consensus_notification_handler: ConsensusNotificationHandler,
 
     // The component that manages the continuous syncing of the node
@@ -223,12 +223,10 @@ impl<
                     self.handle_client_notification(notification).await;
                 },
                 notification = self.commit_notification_listener.select_next_some() => {
-                    // TODO(joshlind): we should probably just remove this path
-                    // now that we aren't reusing it.
-                    self.handle_commit_notification(notification).await;
+                    self.handle_snapshot_commit_notification(notification).await;
                 }
                 notification = self.consensus_notification_handler.select_next_some() => {
-                    self.handle_consensus_notification(notification).await;
+                    self.handle_consensus_or_observer_notification(notification).await;
                 }
                 notification = self.error_notification_listener.select_next_some() => {
                     self.handle_error_notification(notification).await;
@@ -240,11 +238,13 @@ impl<
         }
     }
 
-    /// Handles a notification sent by consensus
-    async fn handle_consensus_notification(&mut self, notification: ConsensusNotification) {
-        // Verify the notification: full nodes shouldn't receive notifications
-        // and consensus should only send notifications after bootstrapping!
-        let result = if !self.is_consensus_enabled() {
+    /// Handles a notification sent by consensus or consensus observer
+    async fn handle_consensus_or_observer_notification(
+        &mut self,
+        notification: ConsensusNotification,
+    ) {
+        // Verify the notification before processing it
+        let result = if !self.is_consensus_or_observer_enabled() {
             Err(Error::FullNodeConsensusNotification(format!(
                 "Received consensus notification: {:?}",
                 notification
@@ -258,7 +258,7 @@ impl<
             Ok(())
         };
 
-        // Respond to consensus with any verification errors and then return
+        // Handle any verification errors
         if let Err(error) = result {
             match notification {
                 ConsensusNotification::NotifyCommit(commit_notification) => {
@@ -300,7 +300,7 @@ impl<
         }
     }
 
-    /// Handles a commit notification sent by consensus
+    /// Handles a commit notification sent by consensus or consensus observer
     async fn handle_consensus_commit_notification(
         &mut self,
         consensus_commit_notification: ConsensusCommitNotification,
@@ -328,7 +328,7 @@ impl<
         )
         .await;
 
-        // Respond to consensus successfully
+        // Respond successfully
         self.consensus_notification_handler
             .respond_to_commit_notification(consensus_commit_notification, Ok(()))
             .await?;
@@ -373,12 +373,12 @@ impl<
         }
     }
 
-    /// Handles a consensus notification to sync to a specified target
+    /// Handles a consensus or consensus observer request to sync to a specified target
     async fn handle_consensus_sync_notification(
         &mut self,
         sync_notification: ConsensusSyncNotification,
     ) -> Result<(), Error> {
-        let latest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
+        let latest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
         info!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
             "Received a consensus sync notification! Target version: {:?}. Latest synced version: {:?}",
@@ -423,9 +423,11 @@ impl<
         }
     }
 
-    /// Handles a commit notification sent by the storage synchronizer for a
-    /// new state snapshot.
-    async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
+    /// Handles a notification from the storage synchronizer for a new state snapshot
+    async fn handle_snapshot_commit_notification(
+        &mut self,
+        commit_notification: CommitNotification,
+    ) {
         let CommitNotification::CommittedStateSnapshot(committed_snapshot) = commit_notification;
         info!(
             LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
@@ -533,18 +535,18 @@ impl<
         // so that in the event another sync request occurs, we have fresh state.
         if !self.active_sync_request() {
             self.continuous_syncer.reset_active_stream(None).await?;
-            self.storage_synchronizer.finish_chunk_executor(); // Consensus is now in control
+            self.storage_synchronizer.finish_chunk_executor(); // Consensus or consensus observer is now in control
         }
         Ok(())
     }
 
-    /// Returns true iff there's an active sync request from consensus
+    /// Returns true iff there's an active sync request from consensus or consensus observer
     fn active_sync_request(&self) -> bool {
         self.consensus_notification_handler.active_sync_request()
     }
 
-    /// Returns true iff this node enables consensus
-    fn is_consensus_enabled(&self) -> bool {
+    /// Returns true iff this node enables consensus or consensus observer
+    fn is_consensus_or_observer_enabled(&self) -> bool {
         self.driver_configuration.role == RoleType::Validator
             || self
                 .driver_configuration
@@ -552,9 +554,9 @@ impl<
                 .observer_enabled
     }
 
-    /// Returns true iff consensus is currently executing
-    fn check_if_consensus_executing(&self) -> bool {
-        self.is_consensus_enabled()
+    /// Returns true iff consensus or consensus observer is currently executing
+    fn check_if_consensus_or_observer_executing(&self) -> bool {
+        self.is_consensus_or_observer_enabled()
             && self.bootstrapper.is_bootstrapped()
             && !self.active_sync_request()
     }
@@ -565,7 +567,7 @@ impl<
     /// and state sync is trivial.
     async fn check_auto_bootstrapping(&mut self) {
         if !self.bootstrapper.is_bootstrapped()
-            && self.is_consensus_enabled()
+            && self.is_consensus_or_observer_enabled()
             && self.driver_configuration.config.enable_auto_bootstrapping
             && self.driver_configuration.waypoint.version() == 0
         {
@@ -611,13 +613,16 @@ impl<
                 .message("Error found when checking the sync request progress!"));
         }
 
-        // If consensus is executing, there's nothing to do
-        if self.check_if_consensus_executing() {
-            trace!(LogSchema::new(LogEntry::Driver)
-                .message("Consensus is executing. There's nothing to do."));
+        // If consensus or consensus observer is executing, there's nothing to do
+        if self.check_if_consensus_or_observer_executing() {
+            let executing_component = if self.driver_configuration.role.is_validator() {
+                ExecutingComponent::Consensus
+            } else {
+                ExecutingComponent::ConsensusObserver
+            };
             metrics::increment_counter(
                 &metrics::EXECUTING_COMPONENT,
-                ExecutingComponent::Consensus.get_label(),
+                executing_component.get_label(),
             );
             return;
         }

@@ -506,7 +506,7 @@ pub struct TestPackage {
     pub dump_state: bool,
 }
 
-fn fix_bytecode_version(
+pub(crate) fn fix_bytecode_version(
     bytecode_version_in: Option<u32>,
     language_version: Option<LanguageVersion>,
 ) -> Option<u32> {
@@ -570,7 +570,7 @@ impl CliCommand<&'static str> for TestPackage {
                         )
                     })
                     .collect(),
-                ..UnitTestingConfig::default_with_bound(None)
+                ..UnitTestingConfig::default()
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
             aptos_debug_natives::aptos_debug_natives(
@@ -578,6 +578,7 @@ impl CliCommand<&'static str> for TestPackage {
                 MiscGasParameters::zeros(),
             ),
             aptos_test_feature_flags_genesis(),
+            None,
             None,
             self.compute_coverage,
             &mut std::io::stdout(),
@@ -814,7 +815,7 @@ impl FromStr for IncludedArtifacts {
     }
 }
 
-fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
+pub(crate) fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
     match optlevel {
         None | Some(OptimizationLevel::Default) => {
             vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]

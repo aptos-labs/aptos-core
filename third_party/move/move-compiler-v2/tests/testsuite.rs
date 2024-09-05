@@ -105,6 +105,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         .set_experiment(Experiment::SPEC_REWRITE, true)
         // Turn optimization on by default. Some configs below may turn it off.
         .set_experiment(Experiment::OPTIMIZE, true)
+        .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true)
         .set_language_version(LanguageVersion::V2_0);
     opts.testing = true;
     let configs = vec![
@@ -744,7 +745,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         }
     }
 
-    if options.compile_test_code {
+    if ok && options.compile_test_code {
         // Build the test plan here to parse and validate any test-related attributes in the AST.
         // In real use, this is run outside of the compilation process, but the needed info is
         // available in `env` once we finish the AST.
@@ -809,6 +810,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                         out.push_str(dump);
                         debug!("{}", dump);
                     }
+                    *ok.borrow()
                 },
             );
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {
