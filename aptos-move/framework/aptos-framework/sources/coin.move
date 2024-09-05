@@ -144,6 +144,7 @@ module aptos_framework::coin {
     /// Maximum possible coin supply.
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
+    #[deprecated]
     /// Configuration that controls the behavior of total coin supply. If the field
     /// is set, coin creators are allowed to upgrade to parallelizable implementations.
     struct SupplyConfig has key {
@@ -541,18 +542,10 @@ module aptos_framework::coin {
     // Total supply config
     //
 
-    /// Publishes supply configuration. Initially, upgrading is not allowed.
-    public(friend) fun initialize_supply_config(aptos_framework: &signer) {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(aptos_framework, SupplyConfig { allow_upgrades: false });
-    }
-
     /// This should be called by on-chain governance to update the config and allow
     /// or disallow upgradability of total supply.
-    public fun allow_supply_upgrades(aptos_framework: &signer, allowed: bool) acquires SupplyConfig {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        let allow_upgrades = &mut borrow_global_mut<SupplyConfig>(@aptos_framework).allow_upgrades;
-        *allow_upgrades = allowed;
+    public fun allow_supply_upgrades(_aptos_framework: &signer, _allowed: bool) {
+        abort error::invalid_state(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
     }
 
     inline fun calculate_amount_to_withdraw<CoinType>(
@@ -927,30 +920,8 @@ module aptos_framework::coin {
 
     /// Upgrade total supply to use a parallelizable implementation if it is
     /// available.
-    public entry fun upgrade_supply<CoinType>(account: &signer) acquires CoinInfo, SupplyConfig {
-        let account_addr = signer::address_of(account);
-
-        // Only coin creators can upgrade total supply.
-        assert!(
-            coin_address<CoinType>() == account_addr,
-            error::invalid_argument(ECOIN_INFO_ADDRESS_MISMATCH),
-        );
-
-        // Can only succeed once on-chain governance agreed on the upgrade.
-        assert!(
-            borrow_global<SupplyConfig>(@aptos_framework).allow_upgrades,
-            error::permission_denied(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
-        );
-
-        let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(account_addr).supply;
-        if (option::is_some(maybe_supply)) {
-            let supply = option::borrow_mut(maybe_supply);
-
-            // If supply is tracked and the current implementation uses an integer - upgrade.
-            if (!optional_aggregator::is_parallelizable(supply)) {
-                optional_aggregator::switch(supply);
-            }
-        }
+    public entry fun upgrade_supply<CoinType>(_account: &signer) {
+        abort error::invalid_state(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
     }
 
     /// Creates a new Coin with given `CoinType` and returns minting/freezing/burning capabilities.
@@ -1706,50 +1677,6 @@ module aptos_framework::coin {
         optional_aggregator::add(supply, MAX_U128);
         optional_aggregator::add(supply, 1);
         optional_aggregator::sub(supply, 1);
-    }
-
-    #[test(framework = @aptos_framework)]
-    #[expected_failure(abort_code = 0x5000B, location = aptos_framework::coin)]
-    fun test_supply_upgrade_fails(framework: signer) acquires CoinInfo, SupplyConfig {
-        initialize_supply_config(&framework);
-        aggregator_factory::initialize_aggregator_factory_for_test(&framework);
-        initialize_with_integer(&framework);
-
-        let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
-        let supply = option::borrow_mut(maybe_supply);
-
-        // Supply should be non-parallelizable.
-        assert!(!optional_aggregator::is_parallelizable(supply), 0);
-
-        optional_aggregator::add(supply, 100);
-        optional_aggregator::sub(supply, 50);
-        optional_aggregator::add(supply, 950);
-        assert!(optional_aggregator::read(supply) == 1000, 0);
-
-        upgrade_supply<FakeMoney>(&framework);
-    }
-
-    #[test(framework = @aptos_framework)]
-    fun test_supply_upgrade(framework: signer) acquires CoinInfo, SupplyConfig {
-        initialize_supply_config(&framework);
-        aggregator_factory::initialize_aggregator_factory_for_test(&framework);
-        initialize_with_integer(&framework);
-
-        // Ensure we have a non-parellelizable non-zero supply.
-        let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
-        let supply = option::borrow_mut(maybe_supply);
-        assert!(!optional_aggregator::is_parallelizable(supply), 0);
-        optional_aggregator::add(supply, 100);
-
-        // Upgrade.
-        allow_supply_upgrades(&framework, true);
-        upgrade_supply<FakeMoney>(&framework);
-
-        // Check supply again.
-        let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
-        let supply = option::borrow_mut(maybe_supply);
-        assert!(optional_aggregator::is_parallelizable(supply), 0);
-        assert!(optional_aggregator::read(supply) == 100, 0);
     }
 
     #[test_only]
