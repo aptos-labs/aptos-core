@@ -3,6 +3,7 @@
 
 use crate::{aptos_core_path, components::get_execution_hash};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
@@ -21,8 +22,14 @@ pub struct FrameworkReleaseConfig {
 pub fn generate_upgrade_proposals(
     config: &FrameworkReleaseConfig,
     is_testnet: bool,
-    next_execution_hash: Vec<u8>,
+    next_execution_hash: Option<HashValue>,
+    is_multi_step: bool,
 ) -> Result<Vec<(String, String)>> {
+    assert!(
+        is_multi_step || next_execution_hash.is_none(),
+        "only multi-step proposals can have a next execution hash"
+    );
+
     const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
 
     let mut package_path_list = [
@@ -54,7 +61,7 @@ pub fn generate_upgrade_proposals(
     // For generating multi-step proposal files, we need to generate them in the reverse order since
     // we need the hash of the next script.
     // We will reverse the order back when writing the files into a directory.
-    if !next_execution_hash.is_empty() {
+    if next_execution_hash.is_some() {
         package_path_list.reverse();
     }
 
@@ -102,16 +109,10 @@ pub fn generate_upgrade_proposals(
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
 
-        // If we're generating a single-step proposal on testnet
-        if is_testnet && next_execution_hash.is_empty() {
-            release.generate_script_proposal_testnet(account, move_script_path.clone())?;
-            // If we're generating a single-step proposal on mainnet
-        } else if next_execution_hash.is_empty() {
-            release.generate_script_proposal(account, move_script_path.clone())?;
+        if is_multi_step {
             // If we're generating a multi-step proposal
-        } else {
             let next_execution_hash_bytes = if result.is_empty() {
-                next_execution_hash.clone()
+                next_execution_hash
             } else {
                 get_execution_hash(&result)
             };
@@ -120,7 +121,13 @@ pub fn generate_upgrade_proposals(
                 move_script_path.clone(),
                 next_execution_hash_bytes,
             )?;
-        };
+        } else if is_testnet {
+            // If we're generating a single-step proposal on testnet
+            release.generate_script_proposal_testnet(account, move_script_path.clone())?;
+        } else {
+            // If we're generating a single-step proposal on mainnet
+            release.generate_script_proposal(account, move_script_path.clone())?;
+        }
 
         let mut script = format!(
             "// Framework commit hash: {}\n// Builder commit hash: {}\n",
