@@ -50,9 +50,12 @@ use futures::{
     FutureExt, SinkExt, StreamExt,
 };
 use once_cell::sync::OnceCell;
-use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
-    Arc,
+use std::{
+    collections::BTreeMap,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
 };
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
@@ -160,6 +163,8 @@ pub struct BufferManager {
     // Consensus publisher for downstream observers.
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+
+    pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
 }
 
 impl BufferManager {
@@ -252,6 +257,8 @@ impl BufferManager {
             optimistic_sig_verification_for_commit_votes,
             consensus_observer_config,
             consensus_publisher,
+
+            pending_commit_proofs: BTreeMap::new(),
         }
     }
 
@@ -292,6 +299,57 @@ impl BufferManager {
                 .await
                 .expect("Failed to send retry request");
         });
+    }
+
+    fn try_add_pending_commit_proof(&mut self, commit_proof: LedgerInfoWithSignatures) -> bool {
+        const MAX_PENDING_COMMIT_PROOFS: usize = 100;
+
+        let round = commit_proof.commit_info().round();
+        let block_id = commit_proof.commit_info().id();
+        if self.highest_committed_round < round {
+            if self.pending_commit_proofs.len() < MAX_PENDING_COMMIT_PROOFS {
+                self.pending_commit_proofs.insert(round, commit_proof);
+
+                info!(
+                    round = round,
+                    block_id = block_id,
+                    "Added pending commit proof."
+                );
+                true
+            } else {
+                warn!(
+                    round = round,
+                    block_id = block_id,
+                    "Too many pending commit proofs, ignored."
+                );
+                false
+            }
+        } else {
+            debug!(
+                round = round,
+                highest_committed_round = self.highest_committed_round,
+                block_id = block_id,
+                "Commit proof too old, ignored."
+            );
+            false
+        }
+    }
+
+    fn drain_pending_commit_proof_till(
+        &mut self,
+        round: Round,
+    ) -> Option<LedgerInfoWithSignatures> {
+        // split at `round`
+        let mut remainder = self.pending_commit_proofs.split_off(&(round + 1));
+
+        // keep the second part after split
+        std::mem::swap(&mut self.pending_commit_proofs, &mut remainder);
+        let mut to_remove = remainder;
+
+        // return the last of the first part
+        to_remove
+            .pop_last()
+            .map(|(_round, commit_proof)| commit_proof)
     }
 
     /// process incoming ordered blocks
@@ -481,6 +539,8 @@ impl BufferManager {
             ResetSignal::TargetRound(round) => {
                 self.highest_committed_round = round;
                 self.latest_round = round;
+
+                let _ = self.drain_pending_commit_proof_till(round);
             },
         }
 
@@ -574,12 +634,21 @@ impl BufferManager {
         }
 
         let item = self.buffer.take(&current_cursor);
-        let new_item = item.advance_to_executed_or_aggregated(
+        let round = item.round();
+        let mut new_item = item.advance_to_executed_or_aggregated(
             executed_blocks,
             &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
             self.order_vote_enabled,
         );
+        if let Some(commit_proof) = self.drain_pending_commit_proof_till(round) {
+            if !new_item.is_aggregated()
+                && commit_proof.ledger_info().commit_info().id() == block_id
+            {
+                new_item = new_item.try_advance_to_aggregated_with_ledger_info(commit_proof)
+            }
+        }
+
         let aggregated = new_item.is_aggregated();
         self.buffer.set(&current_cursor, new_item);
         if aggregated {
@@ -697,16 +766,16 @@ impl BufferManager {
                     );
                     let aggregated = new_item.is_aggregated();
                     self.buffer.set(&cursor, new_item);
+
+                    reply_ack(protocol, response_sender);
                     if aggregated {
-                        let response =
-                            ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
-                        if let Ok(bytes) = protocol.to_bytes(&response) {
-                            let _ = response_sender.send(Ok(bytes.into()));
-                        }
                         return Some(target_block_id);
                     }
+                } else if self.try_add_pending_commit_proof(commit_proof.into_inner()) {
+                    reply_ack(protocol, response_sender);
+                } else {
+                    reply_nack(protocol, response_sender); // TODO: send_commit_proof() doesn't care about the response and this should be direct send not RPC
                 }
-                reply_nack(protocol, response_sender); // TODO: send_commit_proof() doesn't care about the response and this should be direct send not RPC
             },
             CommitMessage::Ack(_) => {
                 // It should be filtered out by verify, so we log errors here
@@ -916,8 +985,20 @@ impl BufferManager {
     }
 }
 
+fn reply_ack(protocol: ProtocolId, response_sender: oneshot::Sender<Result<Bytes, RpcError>>) {
+    reply_commit_msg(protocol, response_sender, CommitMessage::Ack(()))
+}
+
 fn reply_nack(protocol: ProtocolId, response_sender: oneshot::Sender<Result<Bytes, RpcError>>) {
-    let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Nack));
+    reply_commit_msg(protocol, response_sender, CommitMessage::Nack)
+}
+
+fn reply_commit_msg(
+    protocol: ProtocolId,
+    response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+    msg: CommitMessage,
+) {
+    let response = ConsensusMsg::CommitMessage(Box::new(msg));
     if let Ok(bytes) = protocol.to_bytes(&response) {
         let _ = response_sender.send(Ok(bytes.into()));
     }

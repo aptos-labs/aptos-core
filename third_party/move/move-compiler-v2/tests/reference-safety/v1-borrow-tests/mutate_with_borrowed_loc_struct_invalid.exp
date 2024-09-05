@@ -19,11 +19,3 @@ error: cannot drop local `s` which is still borrowed
    │         ^^^^^^^^^^^^^^ dropped here
 17 │         z;
    │         - conflicting reference `z` used here
-
-
-Diagnostics:
-error: local `x` of type `M::X` does not have the `drop` ability
-  ┌─ tests/reference-safety/v1-borrow-tests/mutate_with_borrowed_loc_struct_invalid.move:6:17
-  │
-6 │         let y = &x;
-  │                 ^^ still borrowed but will be implicitly dropped later since it is no longer used

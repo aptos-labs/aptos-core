@@ -147,6 +147,13 @@ pub fn convert_prologue_error(
             };
             VMStatus::error(new_major_status, None)
         },
+        // Speculative errors are returned for caller to handle.
+        e @ VMStatus::Error {
+            status_code:
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                | StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+            ..
+        } => e,
         status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error { .. } => {
             speculative_error!(
                 log_context,
@@ -196,6 +203,13 @@ pub fn convert_epilogue_error(
                 )
             },
         },
+        // Speculative errors are returned for caller to handle.
+        e @ VMStatus::Error {
+            status_code:
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+                | StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+            ..
+        } => e,
         status => {
             let err_msg = format!("[aptos_vm] Unexpected success epilogue error: {:?}", status);
             speculative_error!(log_context, err_msg.clone());
