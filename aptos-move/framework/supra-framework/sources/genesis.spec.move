@@ -151,14 +151,6 @@ spec supra_framework::genesis {
         ensures global<chain_status::GenesisEndMarker>(@supra_framework) == chain_status::GenesisEndMarker {};
     }
 
-    spec create_delegation_pools {
-        pragma verify = false;
-    }
-
-    spec create_delegation_pool {
-        pragma verify = false;
-    }
-
     spec create_pbo_delegation_pools {
         pragma verify = false;
     }
