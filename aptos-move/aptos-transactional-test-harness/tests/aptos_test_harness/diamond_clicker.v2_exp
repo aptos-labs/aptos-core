@@ -33,26 +33,26 @@ B0:
 	9: MutBorrowField[0](OuterStruct.any_field: vector<InnerStruct>)
 	10: StLoc[2](loc1: &mut vector<InnerStruct>)
 	11: LdU64(0)
-	12: StLoc[3](loc2: u64)
-	13: CopyLoc[2](loc1: &mut vector<InnerStruct>)
-	14: FreezeRef
-	15: VecLen(3)
+	12: CopyLoc[2](loc1: &mut vector<InnerStruct>)
+	13: FreezeRef
+	14: VecLen(3)
+	15: StLoc[3](loc2: u64)
 	16: StLoc[4](loc3: u64)
 B1:
-	17: CopyLoc[3](loc2: u64)
-	18: CopyLoc[4](loc3: u64)
+	17: CopyLoc[4](loc3: u64)
+	18: CopyLoc[3](loc2: u64)
 	19: Lt
 	20: BrFalse(31)
 B2:
 	21: CopyLoc[2](loc1: &mut vector<InnerStruct>)
-	22: CopyLoc[3](loc2: u64)
+	22: CopyLoc[4](loc3: u64)
 	23: VecMutBorrow(3)
 	24: FreezeRef
 	25: Call debug::print<InnerStruct>(&InnerStruct)
-	26: MoveLoc[3](loc2: u64)
+	26: MoveLoc[4](loc3: u64)
 	27: LdU64(1)
 	28: Add
-	29: StLoc[3](loc2: u64)
+	29: StLoc[4](loc3: u64)
 	30: Branch(34)
 B3:
 	31: MoveLoc[2](loc1: &mut vector<InnerStruct>)
