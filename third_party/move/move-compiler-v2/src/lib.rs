@@ -124,9 +124,10 @@ where
             &dump_base_name,
             false,
             &pipeline::register_formatters,
+            || !env.has_errors(),
         )
     } else {
-        pipeline.run(&env, &mut targets)
+        pipeline.run_with_hook(&env, &mut targets, |_| {}, |_, _, _| !env.has_errors())
     }
     check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
 
