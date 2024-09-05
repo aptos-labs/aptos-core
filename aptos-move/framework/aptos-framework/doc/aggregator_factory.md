@@ -68,12 +68,31 @@ account can.
 ## Constants
 
 
+<a id="0x1_aggregator_factory_MAX_U128"></a>
+
+
+
+<pre><code><b>const</b> <a href="aggregator_factory.md#0x1_aggregator_factory_MAX_U128">MAX_U128</a>: u128 = 340282366920938463463374607431768211455;
+</code></pre>
+
+
+
 <a id="0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND"></a>
 
 Aggregator factory is not published yet.
 
 
 <pre><code><b>const</b> <a href="aggregator_factory.md#0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND">EAGGREGATOR_FACTORY_NOT_FOUND</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x1_aggregator_factory_EAGG_V1_LIMIT_DEPRECATED"></a>
+
+Aggregator V1 only supports limit == MAX_U128
+
+
+<pre><code><b>const</b> <a href="aggregator_factory.md#0x1_aggregator_factory_EAGG_V1_LIMIT_DEPRECATED">EAGG_V1_LIMIT_DEPRECATED</a>: u64 = 2;
 </code></pre>
 
 
@@ -124,6 +143,11 @@ Creates a new aggregator instance which overflows on exceeding a <code>limit</co
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">create_aggregator_internal</a>(limit: u128): Aggregator <b>acquires</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a> {
+    <b>assert</b>!(
+        limit == <a href="aggregator_factory.md#0x1_aggregator_factory_MAX_U128">MAX_U128</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aggregator_factory.md#0x1_aggregator_factory_EAGG_V1_LIMIT_DEPRECATED">EAGG_V1_LIMIT_DEPRECATED</a>)
+    );
+
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(@aptos_framework),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="aggregator_factory.md#0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND">EAGGREGATOR_FACTORY_NOT_FOUND</a>)
