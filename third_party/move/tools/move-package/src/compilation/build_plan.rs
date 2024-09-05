@@ -459,10 +459,6 @@ impl BuildPlan {
                     std::fs::remove_dir_all(&path).with_context(|| {
                         format!("When deleting directory {}", path.to_string_lossy())
                     })?;
-                } else {
-                    std::fs::remove_file(&path).with_context(|| {
-                        format!("When deleting file {}", path.to_string_lossy())
-                    })?;
                 }
             }
         }
