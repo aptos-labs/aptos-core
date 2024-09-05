@@ -61,6 +61,16 @@ impl BlockPayloadStore {
         self.block_payloads.lock().clear();
     }
 
+    /// Returns true iff we already have a payload entry for the given block
+    pub fn existing_payload_entry(&self, block_payload: &BlockPayload) -> bool {
+        // Get the epoch and round of the payload
+        let block_info = &block_payload.block;
+        let epoch_and_round = (block_info.epoch(), block_info.round());
+
+        // Check if a payload already exists in the store
+        self.block_payloads.lock().contains_key(&epoch_and_round)
+    }
+
     /// Returns a reference to the block payloads
     pub fn get_block_payloads(&self) -> Arc<Mutex<BTreeMap<(u64, Round), BlockPayloadStatus>>> {
         self.block_payloads.clone()
@@ -397,6 +407,41 @@ mod test {
         // Check that the block payload store is empty
         check_num_unverified_payloads(&block_payload_store, 0);
         check_num_verified_payloads(&block_payload_store, 0);
+    }
+
+    #[test]
+    fn test_existing_payload_entry() {
+        // Create a new block payload store
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
+
+        // Create a new block payload
+        let epoch = 10;
+        let round = 100;
+        let block_payload = create_block_payload(epoch, round);
+
+        // Check that the payload doesn't exist in the block payload store
+        assert!(!block_payload_store.existing_payload_entry(&block_payload));
+
+        // Insert the verified block payload into the block payload store
+        block_payload_store.insert_block_payload(block_payload.clone(), true);
+
+        // Check that the payload now exists in the block payload store
+        assert!(block_payload_store.existing_payload_entry(&block_payload));
+
+        // Create another block payload
+        let epoch = 5;
+        let round = 101;
+        let block_payload = create_block_payload(epoch, round);
+
+        // Check that the payload doesn't exist in the block payload store
+        assert!(!block_payload_store.existing_payload_entry(&block_payload));
+
+        // Insert the unverified block payload into the block payload store
+        block_payload_store.insert_block_payload(block_payload.clone(), false);
+
+        // Check that the payload now exists in the block payload store
+        assert!(block_payload_store.existing_payload_entry(&block_payload));
     }
 
     #[test]
@@ -1038,6 +1083,12 @@ mod test {
         }
 
         pipelined_blocks
+    }
+
+    /// Creates a new block payload with the given epoch and round
+    fn create_block_payload(epoch: u64, round: Round) -> BlockPayload {
+        let block_info = BlockInfo::random_with_epoch(epoch, round);
+        BlockPayload::new(block_info, BlockTransactionPayload::empty())
     }
 
     /// Checks the number of unverified payloads in the block payload store
