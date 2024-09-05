@@ -11409,6 +11409,7 @@ dependencies = [
  "move-to-yul",
  "move-vm-runtime",
  "move-vm-test-utils",
+ "move-vm-types",
  "once_cell",
  "primitive-types 0.10.1",
  "rayon",

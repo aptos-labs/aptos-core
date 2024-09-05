@@ -570,7 +570,7 @@ impl CliCommand<&'static str> for TestPackage {
                         )
                     })
                     .collect(),
-                ..UnitTestingConfig::default_with_bound(None)
+                ..UnitTestingConfig::default()
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future
             aptos_debug_natives::aptos_debug_natives(
@@ -578,6 +578,7 @@ impl CliCommand<&'static str> for TestPackage {
                 MiscGasParameters::zeros(),
             ),
             aptos_test_feature_flags_genesis(),
+            None,
             None,
             self.compute_coverage,
             &mut std::io::stdout(),
