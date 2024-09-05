@@ -16,7 +16,12 @@ The <code><a href="function_info.md#0x1_function_info">function_info</a></code> 
 -  [Function `is_identifier`](#0x1_function_info_is_identifier)
 -  [Function `load_function_impl`](#0x1_function_info_load_function_impl)
 -  [Specification](#@Specification_1)
+    -  [Function `new_function_info`](#@Specification_1_new_function_info)
+    -  [Function `new_function_info_from_address`](#@Specification_1_new_function_info_from_address)
+    -  [Function `check_dispatch_type_compatibility`](#@Specification_1_check_dispatch_type_compatibility)
+    -  [Function `load_module_from_function`](#@Specification_1_load_module_from_function)
     -  [Function `check_dispatch_type_compatibility_impl`](#@Specification_1_check_dispatch_type_compatibility_impl)
+    -  [Function `is_identifier`](#@Specification_1_is_identifier)
     -  [Function `load_function_impl`](#@Specification_1_load_function_impl)
 
 
@@ -328,12 +333,92 @@ if such module isn't accessed previously in the transaction.
 
 
 
+<a id="@Specification_1_new_function_info"></a>
+
+### Function `new_function_info`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="function_info.md#0x1_function_info_new_function_info">new_function_info</a>(module_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_new_function_info_from_address"></a>
+
+### Function `new_function_info_from_address`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_new_function_info_from_address">new_function_info_from_address</a>(module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_check_dispatch_type_compatibility"></a>
+
+### Function `check_dispatch_type_compatibility`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(framework_function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, dispatch_target: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_load_module_from_function"></a>
+
+### Function `load_module_from_function`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_load_module_from_function">load_module_from_function</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
 <a id="@Specification_1_check_dispatch_type_compatibility_impl"></a>
 
 ### Function `check_dispatch_type_compatibility_impl`
 
 
 <pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(lhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, r: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_identifier"></a>
+
+### Function `is_identifier`
+
+
+<pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 </code></pre>
 
 
