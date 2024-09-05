@@ -321,6 +321,20 @@ mod test {
 
         // Verify the highest committed epoch and round is the last ordered block (in the next epoch)
         verify_highest_committed_epoch_round(&ordered_block_store, &last_ordered_block_info);
+
+        // Create a commit decision for an out-of-date ordered block
+        let out_of_date_ordered_block = ordered_blocks.first().unwrap();
+        let out_of_date_ordered_block_info = out_of_date_ordered_block.last_block().block_info();
+        let commit_decision = CommitDecision::new(LedgerInfoWithSignatures::new(
+            LedgerInfo::new(out_of_date_ordered_block_info.clone(), HashValue::random()),
+            AggregateSignature::empty(),
+        ));
+
+        // Update the commit decision for the out-of-date ordered block
+        ordered_block_store.update_commit_decision(&commit_decision);
+
+        // Verify the highest committed epoch and round is still the last ordered block (in the next epoch)
+        verify_highest_committed_epoch_round(&ordered_block_store, &last_ordered_block_info);
     }
 
     #[test]
