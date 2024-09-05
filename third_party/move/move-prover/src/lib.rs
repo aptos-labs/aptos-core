@@ -319,6 +319,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             &dump_file_base,
             options.prover.dump_cfg,
             &|_| {},
+            || true,
         )
     } else {
         pipeline.run(env, &mut targets);
