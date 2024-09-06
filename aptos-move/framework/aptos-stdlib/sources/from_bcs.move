@@ -59,6 +59,8 @@ module aptos_std::from_bcs {
         s
     }
 
+    public native fun from_bytes_public<T>(bytes: vector<u8>): T;
+
     /// Package private native function to deserialize a type T.
     ///
     /// Note that this function does not put any constraint on `T`. If code uses this function to
