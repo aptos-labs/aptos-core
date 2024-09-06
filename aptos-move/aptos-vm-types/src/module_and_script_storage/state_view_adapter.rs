@@ -15,9 +15,10 @@ use move_binary_format::{
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage, module_storage_error,
-    move_vm::MoveVM, CodeStorage, IntoUnsyncCodeStorage, Module, ModuleBytesStorage, ModuleStorage,
-    Script, UnsyncCodeStorage, UnsyncModuleStorage,
+    move_vm::MoveVM, AsUnsyncCodeStorage, CodeStorage, Module, ModuleStorage, Script,
+    UnsyncCodeStorage, UnsyncModuleStorage,
 };
+use move_vm_types::code_storage::ModuleBytesStorage;
 use std::sync::Arc;
 
 /// Same as [module_storage_error], but works with state keys and is kept

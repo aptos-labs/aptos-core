@@ -42,8 +42,7 @@ use move_vm_runtime::{
     module_traversal::*,
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
-    IntoUnsyncCodeStorage, IntoUnsyncModuleStorage, LocalModuleBytesStorage,
-    TemporaryModuleStorage,
+    AsUnsyncCodeStorage, AsUnsyncModuleStorage, TemporaryModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -65,11 +64,7 @@ struct SimpleVMTestAdapter<'a> {
 
     // VM to be shared by all tasks. If we use V1 loader, we store None here.
     vm: Option<Rc<MoveVM>>,
-
-    // Different storages for a task: resources, modules, and scripts. Module
-    // and script storages are only used if loader V2 implementation is enabled.
-    resource_storage: InMemoryStorage,
-    module_bytes_storage: LocalModuleBytesStorage,
+    storage: InMemoryStorage,
 
     default_syntax: SyntaxChoice,
     comparison_mode: bool,
@@ -168,8 +163,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             comparison_mode,
             run_config,
             vm,
-            resource_storage: InMemoryStorage::new(),
-            module_bytes_storage: LocalModuleBytesStorage::empty(),
+            storage: InMemoryStorage::new(),
         };
 
         if vm_config.use_loader_v2 {
@@ -197,7 +191,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
             let vm = adapter.vm();
             let module_storage = adapter
-                .module_bytes_storage
+                .storage
                 .clone()
                 .into_unsync_module_storage(vm.runtime_environment());
 
@@ -210,11 +204,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .expect("All modules should publish")
             .release_verified_module_bundle()
             .for_each(|(bytes, module)| {
-                adapter.module_bytes_storage.add_module_bytes(
-                    module.self_addr(),
-                    module.self_name(),
-                    bytes,
-                );
+                adapter
+                    .storage
+                    .add_module_bytes(module.self_addr(), module.self_name(), bytes);
             });
         } else {
             adapter
@@ -270,7 +262,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     ) -> Result<(Option<String>, CompiledModule)> {
         let vm = self.vm();
         let module_storage = self
-            .module_bytes_storage
+            .storage
             .clone()
             .into_unsync_module_storage(vm.runtime_environment());
 
@@ -314,11 +306,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         match result {
             Ok(modules_to_publish) => {
                 for (bytes, module) in modules_to_publish {
-                    self.module_bytes_storage.add_module_bytes(
-                        module.address(),
-                        module.name(),
-                        bytes,
-                    );
+                    self.storage
+                        .add_module_bytes(module.address(), module.name(), bytes);
                 }
                 Ok((None, module))
             },
@@ -344,7 +333,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     ) -> Result<Option<String>> {
         let vm = self.vm();
         let code_storage = self
-            .module_bytes_storage
+            .storage
             .clone()
             .into_unsync_code_storage(vm.runtime_environment());
 
@@ -402,7 +391,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     ) -> Result<(Option<String>, SerializedReturnValues)> {
         let vm = self.vm();
         let module_storage = self
-            .module_bytes_storage
+            .storage
             .clone()
             .into_unsync_module_storage(vm.runtime_environment());
 
@@ -461,25 +450,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             type_args,
         };
         match self
-            .resource_storage
+            .storage
             .get_resource_bytes_with_metadata_and_layout(&address, &tag, &[], None)
             .unwrap()
             .0
         {
             None => Ok("[No Resource Exists]".to_owned()),
             Some(data) => {
-                let vm = self.vm();
-                let annotated = if vm.vm_config().use_loader_v2 {
-                    MoveValueAnnotator::new(
-                        self.module_bytes_storage
-                            .clone()
-                            .into_unsync_module_storage(vm.runtime_environment()),
-                    )
-                    .view_resource(&tag, &data)?
-                } else {
-                    MoveValueAnnotator::new(self.resource_storage.clone())
-                        .view_resource(&tag, &data)?
-                };
+                let annotated =
+                    MoveValueAnnotator::new(self.storage.clone()).view_resource(&tag, &data)?;
                 Ok(format!("{}", annotated))
             },
         }
@@ -510,7 +489,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
                 gas_budget,
             )
             .unwrap();
-            let session = vm.new_session(&self.resource_storage);
+            let session = vm.new_session(&self.storage);
             (session, gas_status)
         };
 
@@ -519,7 +498,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
 
         // save changeset
         let changeset = session.finish()?;
-        self.resource_storage.apply(changeset).unwrap();
+        self.storage.apply(changeset).unwrap();
         Ok(res)
     }
 }
