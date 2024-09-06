@@ -620,8 +620,8 @@ impl<T: Transaction> CapturedReads<T> {
         // and fetching it returned an error, the error is not recorded. Hence, it is safe here
         // to simply treat such errors as a non-existent value.
         self.module_storage_reads.iter().all(|(k, previous_read)| {
-            let new_read = module_storage.get(k, idx_to_validate);
-            previous_read == &new_read
+            let current_read = module_storage.get(k, idx_to_validate);
+            previous_read == &current_read
         })
     }
 
@@ -733,8 +733,11 @@ impl<T: Transaction> CapturedReads<T> {
             }
         }
 
-        // TODO(loader_v2): We have a new set of reads now. We probably need to feature gate here as well?
+        // TODO(loader_v2): Test summaries are the same.
         for key in &self.module_reads {
+            ret.insert(InputOutputKey::Resource(key.clone()));
+        }
+        for key in self.module_storage_reads.keys() {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
 
@@ -785,7 +788,7 @@ impl<T: Transaction> UnsyncReadSet<T> {
             }
         }
 
-        // TODO(loader_v2): Should we be using a feature flag here?
+        // TODO(loader_v2): Test summaries are the same if we switch.
         for key in &self.module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
