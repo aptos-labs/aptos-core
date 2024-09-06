@@ -620,12 +620,11 @@ pub async fn simulate_multistep_proposal(
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let module_and_script_storage = vm.as_aptos_code_storage(&state_view);
+        let code_storage = vm.as_aptos_code_storage(&state_view);
 
         let (_vm_status, vm_output) = vm.execute_user_transaction(
             &resolver,
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
             &account
                 .account()
                 .transaction()

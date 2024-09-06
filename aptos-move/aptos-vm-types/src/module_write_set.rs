@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::WriteOpInfo, resolver::ExecutorView};
+use crate::{
+    change_set::WriteOpInfo, module_and_script_storage::module_storage::AptosModuleStorage,
+    resolver::ExecutorView,
+};
 use aptos_types::{
     state_store::state_key::StateKey,
     write_set::{TransactionWrite, WriteOp, WriteOpSize},
@@ -57,12 +60,21 @@ impl ModuleWriteSet {
     pub fn write_op_info_iter_mut<'a>(
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
+        module_storage: &'a impl AptosModuleStorage,
+        is_loader_v2_enabled: bool,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        self.write_ops.iter_mut().map(|(key, op)| {
+        self.write_ops.iter_mut().map(move |(key, op)| {
+            let prev_size = if is_loader_v2_enabled {
+                module_storage
+                    .fetch_module_size_by_state_key(key)?
+                    .unwrap_or(0) as u64
+            } else {
+                executor_view.get_module_state_value_size(key)?.unwrap_or(0)
+            };
             Ok(WriteOpInfo {
                 key,
                 op_size: op.write_op_size(),
-                prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
+                prev_size,
                 metadata_mut: op.get_metadata_mut(),
             })
         })

@@ -5,7 +5,7 @@
 use crate::compiler::{as_module, as_script, compile_units};
 use bytes::Bytes;
 use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -100,8 +100,7 @@ fn test_malformed_resource() {
     let mut module_bytes_storage = LocalModuleBytesStorage::empty();
     module_bytes_storage.add_module_bytes(ms.self_addr(), ms.self_name(), ms_blob.into());
     module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), m_blob.into());
-    let module_and_script_storage =
-        module_bytes_storage.into_unsync_code_storage(vm.runtime_environment());
+    let code_storage = module_bytes_storage.into_unsync_code_storage(vm.runtime_environment());
 
     // Execute the first script to publish a resource Foo.
     let mut script_blob = vec![];
@@ -114,8 +113,7 @@ fn test_malformed_resource() {
         vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
-        &module_and_script_storage,
-        &module_and_script_storage,
+        &code_storage,
     )
     .map(|_| ())
     .unwrap();
@@ -135,8 +133,7 @@ fn test_malformed_resource() {
             vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .map(|_| ())
         .unwrap();
@@ -165,8 +162,7 @@ fn test_malformed_resource() {
                 vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_and_script_storage,
-                &module_and_script_storage,
+                &code_storage,
             )
             .map(|_| ())
             .unwrap_err();
@@ -627,8 +623,16 @@ impl ModuleStorage for BogusModuleStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<bool> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_module_bytes(
@@ -643,32 +647,32 @@ impl ModuleStorage for BogusModuleStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<Option<usize>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_module_metadata(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<Vec<Metadata>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_deserialized_module(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<Arc<CompiledModule>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
     fn fetch_verified_module(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
-        Err(PartialVMError::new(self.bad_status_code))
+    ) -> VMResult<Arc<Module>> {
+        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 }
 

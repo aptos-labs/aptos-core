@@ -200,18 +200,6 @@ fn runtime_reentrancy_check() {
 
     // Call stack look like following:
     // A::foo3 -> B::foo3 -> B::dispatch_d -> D::foo3, D doesn't exist, thus an error.
-
-    // Note(loader_v2):
-    //   1) V1 loader gets the function and its parent module, and if the module does
-    //      not exist it returns FUNCTION_RESOLUTION_FAILURE.
-    //   2) V2 loader checks the module first, and if it does not exist, returns the
-    //      linker error.
-    let expected_error_code = if vm.vm_config().use_loader_v2 {
-        StatusCode::LINKER_ERROR
-    } else {
-        StatusCode::FUNCTION_RESOLUTION_FAILURE
-    };
-
     let fun_name = Identifier::new("foo3").unwrap();
     assert_eq!(
         sess.execute_function_bypass_visibility(
@@ -225,6 +213,6 @@ fn runtime_reentrancy_check() {
         )
         .unwrap_err()
         .major_status(),
-        expected_error_code,
+        StatusCode::FUNCTION_RESOLUTION_FAILURE,
     );
 }

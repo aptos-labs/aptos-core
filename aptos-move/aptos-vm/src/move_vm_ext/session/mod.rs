@@ -67,7 +67,7 @@ pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
     resolver: &'r dyn AptosMoveResolver,
     is_storage_slot_metadata_enabled: bool,
-    use_loader_v2: bool,
+    is_loader_v2_enabled: bool,
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
@@ -112,12 +112,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         move_vm.flush_loader_cache_if_invalidated();
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
-        let use_loader_v2 = features.use_loader_v2();
+        let is_loader_v2_enabled = features.is_loader_v2_enabled();
         Self {
             inner: move_vm.new_session_with_extensions(resolver, extensions),
             resolver,
             is_storage_slot_metadata_enabled,
-            use_loader_v2,
+            is_loader_v2_enabled,
         }
     }
 
@@ -168,7 +168,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             move_vm,
             self.resolver,
             module_storage,
-            self.use_loader_v2,
+            self.is_loader_v2_enabled,
             change_set,
         )
         .map_err(|e| e.finish(Location::Undefined))?;
@@ -191,7 +191,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let (change_set, module_write_set) = Self::convert_change_set(
             &woc,
             change_set,
-            self.use_loader_v2,
+            self.is_loader_v2_enabled,
             resource_group_change_set,
             events,
             table_change_set,
@@ -285,7 +285,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         vm: &MoveVM,
         resolver: &dyn AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
-        use_loader_v2: bool,
+        is_loader_v2_enabled: bool,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -315,7 +315,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group_tag = if use_loader_v2 {
+                let resource_group_tag = if is_loader_v2_enabled {
                     module_storage
                         .fetch_module_metadata(&struct_tag.address, &struct_tag.module)
                         .ok()
@@ -388,7 +388,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn convert_change_set(
         woc: &WriteOpConverter,
         change_set: ChangeSet,
-        use_loader_v2: bool,
+        is_loader_v2_enabled: bool,
         resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         table_change_set: TableChangeSet,
@@ -492,7 +492,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         )?;
 
         // Modules must not be published through the V1 flow if we are using V2.
-        if use_loader_v2 && !module_write_ops.is_empty() {
+        if is_loader_v2_enabled && !module_write_ops.is_empty() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("Non-empty V1 module write set in V2 flow".to_string()),
