@@ -243,7 +243,7 @@ async fn extract_on_chain_configs(
     let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
         on_chain_configs.get();
     if let Err(error) = &onchain_randomness_config_seq_num {
-        error!(
+        warn!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                 "Failed to read on-chain randomness config seq num! Error: {:?}",
                 error
