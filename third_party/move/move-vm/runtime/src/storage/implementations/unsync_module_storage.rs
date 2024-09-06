@@ -5,7 +5,7 @@ use crate::{
     module_cyclic_dependency_error, module_linker_error,
     storage::{
         environment::{RuntimeEnvironment, WithRuntimeEnvironment},
-        module_storage::{ModuleBytesStorage, ModuleStorage},
+        module_storage::ModuleStorage,
     },
     Module,
 };
@@ -19,50 +19,14 @@ use move_core_types::{
     language_storage::ModuleId,
     metadata::Metadata,
 };
+use move_vm_types::code_storage::ModuleBytesStorage;
 use std::{
+    borrow::Borrow,
     cell::RefCell,
     collections::{btree_map, BTreeMap, BTreeSet},
+    ops::Deref,
     sync::Arc,
 };
-
-/// Represents an in-memory storage that contains modules' bytes.
-#[derive(Clone)]
-pub struct LocalModuleBytesStorage(BTreeMap<AccountAddress, BTreeMap<Identifier, Bytes>>);
-
-impl LocalModuleBytesStorage {
-    /// Create an empty storage for module bytes.
-    pub fn empty() -> Self {
-        Self(BTreeMap::new())
-    }
-
-    /// Adds serialized module to this module byte storage.
-    pub fn add_module_bytes(
-        &mut self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        bytes: Bytes,
-    ) {
-        use btree_map::Entry::*;
-        let account_module_storage = match self.0.entry(*address) {
-            Occupied(entry) => entry.into_mut(),
-            Vacant(entry) => entry.insert(BTreeMap::new()),
-        };
-        account_module_storage.insert(module_name.to_owned(), bytes);
-    }
-}
-
-impl ModuleBytesStorage for LocalModuleBytesStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.0.get(address) {
-            return Ok(account_storage.get(module_name).cloned());
-        }
-        Ok(None)
-    }
-}
 
 /// An entry in [UnsyncModuleStorage]. As modules are accessed, entries can be
 /// "promoted", e.g., a deserialized representation can be converted into the
@@ -91,32 +55,55 @@ impl ModuleStorageEntry {
 
 /// Implementation of (not thread-safe) module storage used for Move unit tests,
 /// and externally.
-pub struct UnsyncModuleStorage<'e, B> {
+pub struct UnsyncModuleStorage<'a, S> {
     /// Environment where this module storage is defined in.
-    runtime_environment: &'e RuntimeEnvironment,
+    runtime_environment: &'a RuntimeEnvironment,
     /// Storage with deserialized modules, i.e., module cache.
     module_storage: RefCell<BTreeMap<AccountAddress, BTreeMap<Identifier, ModuleStorageEntry>>>,
-    /// Immutable baseline byte storage from which one can fetch raw module bytes.
-    byte_storage: B,
+
+    /// Immutable baseline storage from which one can fetch raw module bytes.
+    base_storage: BorrowedOrOwned<'a, S>,
 }
 
-pub trait IntoUnsyncModuleStorage<'e, B> {
-    fn into_unsync_module_storage(self, env: &'e RuntimeEnvironment) -> UnsyncModuleStorage<'e, B>;
+pub trait AsUnsyncModuleStorage<'a, S> {
+    fn as_unsync_module_storage(
+        &'a self,
+        env: &'a RuntimeEnvironment,
+    ) -> UnsyncModuleStorage<'a, S>;
+
+    fn into_unsync_module_storage(self, env: &'a RuntimeEnvironment) -> UnsyncModuleStorage<'a, S>;
 }
 
-impl<'e, B: ModuleBytesStorage> IntoUnsyncModuleStorage<'e, B> for B {
-    fn into_unsync_module_storage(self, env: &'e RuntimeEnvironment) -> UnsyncModuleStorage<'e, B> {
-        UnsyncModuleStorage::new(env, self)
+impl<'a, S: ModuleBytesStorage> AsUnsyncModuleStorage<'a, S> for S {
+    fn as_unsync_module_storage(
+        &'a self,
+        env: &'a RuntimeEnvironment,
+    ) -> UnsyncModuleStorage<'a, S> {
+        UnsyncModuleStorage::from_borrowed(env, self)
+    }
+
+    fn into_unsync_module_storage(self, env: &'a RuntimeEnvironment) -> UnsyncModuleStorage<'a, S> {
+        UnsyncModuleStorage::from_owned(env, self)
     }
 }
 
-impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
-    /// Creates a new storage with empty module cache, but no constraints on the byte storage.
-    fn new(runtime_environment: &'e RuntimeEnvironment, byte_storage: B) -> Self {
+impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
+    /// Private constructor from borrowed byte storage. Creates empty module storage cache.
+    fn from_borrowed(runtime_environment: &'a RuntimeEnvironment, storage: &'a S) -> Self {
         Self {
             runtime_environment,
             module_storage: RefCell::new(BTreeMap::new()),
-            byte_storage,
+            base_storage: BorrowedOrOwned::Borrowed(storage),
+        }
+    }
+
+    /// Private constructor that captures provided byte storage by value. Creates empty module
+    /// storage cache.
+    fn from_owned(runtime_environment: &'a RuntimeEnvironment, storage: S) -> Self {
+        Self {
+            runtime_environment,
+            module_storage: RefCell::new(BTreeMap::new()),
+            base_storage: BorrowedOrOwned::Owned(storage),
         }
     }
 
@@ -265,13 +252,18 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     }
 
     /// The baseline byte storage used by this module storage.
-    pub fn byte_storage(&self) -> &B {
-        &self.byte_storage
+    pub fn byte_storage(&self) -> &S {
+        &self.base_storage
     }
 
     /// Returns the byte storage used by this module storage.
-    pub(crate) fn release_byte_storage(self) -> B {
-        self.byte_storage
+    pub(crate) fn release_byte_storage(self) -> S {
+        use BorrowedOrOwned::*;
+        match self.base_storage {
+            // TODO(loader_v2): Revisit publishing APIs to not capture byte storage.
+            Borrowed(_) => unreachable!(),
+            Owned(storage) => storage,
+        }
     }
 }
 
@@ -290,7 +282,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         // Cached modules in module storage are a subset of modules in byte
         // storage, so it is sufficient to check existence based on it.
         Ok(self
-            .byte_storage
+            .base_storage
             .fetch_module_bytes(address, module_name)?
             .is_some())
     }
@@ -300,7 +292,7 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        self.byte_storage.fetch_module_bytes(address, module_name)
+        self.base_storage.fetch_module_bytes(address, module_name)
     }
 
     fn fetch_module_size_in_bytes(
@@ -382,6 +374,25 @@ fn get_module_entry_mut_or_panic<'a>(
         .unwrap()
 }
 
+/// Represents owned or borrowed types, similar to [std::borrow::Cow] but without enforcing
+/// [ToOwned] trait bound on types it stores. We use it to be able to construct different storages
+/// that capture or borrow underlying byte storage.
+enum BorrowedOrOwned<'a, T> {
+    Borrowed(&'a T),
+    Owned(T),
+}
+
+impl<'a, T> Deref for BorrowedOrOwned<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match *self {
+            Self::Borrowed(x) => x,
+            Self::Owned(ref x) => x.borrow(),
+        }
+    }
+}
+
 #[cfg(test)]
 impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     pub(crate) fn does_not_have_cached_modules(&self) -> bool {
@@ -415,6 +426,7 @@ pub(crate) mod test {
         file_format_common::VERSION_DEFAULT,
     };
     use move_core_types::{ident_str, vm_status::StatusCode};
+    use move_vm_test_utils::InMemoryStorage;
 
     fn module<'a>(
         module_name: &'a str,
@@ -432,7 +444,7 @@ pub(crate) mod test {
     }
 
     pub(crate) fn add_module_bytes<'a>(
-        module_bytes_storage: &mut LocalModuleBytesStorage,
+        module_bytes_storage: &mut InMemoryStorage,
         module_name: &'a str,
         dependencies: impl IntoIterator<Item = &'a str>,
         friends: impl IntoIterator<Item = &'a str>,
@@ -444,7 +456,7 @@ pub(crate) mod test {
     #[test]
     fn test_module_does_not_exist() {
         let env = RuntimeEnvironment::test();
-        let module_storage = LocalModuleBytesStorage::empty().into_unsync_module_storage(&env);
+        let module_storage = InMemoryStorage::new().into_unsync_module_storage(&env);
 
         let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
         assert!(!assert_ok!(result));
@@ -467,7 +479,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_module_exists() {
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec![], vec![]);
 
         let env = RuntimeEnvironment::test();
@@ -482,7 +494,7 @@ pub(crate) mod test {
     fn test_deserialized_caching() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "b", vec![], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec!["d", "e"], vec![]);
@@ -516,7 +528,7 @@ pub(crate) mod test {
     fn test_dependency_tree_traversal() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "b", vec![], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec!["d", "e"], vec![]);
@@ -545,7 +557,7 @@ pub(crate) mod test {
     fn test_dependency_dag_traversal() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b", "c"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "b", vec!["d"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec!["d"], vec![]);
@@ -582,7 +594,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_cyclic_dependencies_traversal_fails() {
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "b", vec!["c"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec!["a"], vec![]);
@@ -601,7 +613,7 @@ pub(crate) mod test {
     fn test_cyclic_friends_are_allowed() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec![], vec!["b"]);
         add_module_bytes(&mut module_bytes_storage, "b", vec![], vec!["c"]);
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec!["a"]);
@@ -621,7 +633,7 @@ pub(crate) mod test {
     fn test_transitive_friends_are_allowed_to_be_transitive_dependencies() {
         use ModuleStorageEntry::*;
 
-        let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+        let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec!["b"], vec!["d"]);
         add_module_bytes(&mut module_bytes_storage, "b", vec!["c"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec![]);

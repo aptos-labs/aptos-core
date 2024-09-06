@@ -22,8 +22,7 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage, IntoUnsyncModuleStorage,
-    LocalModuleBytesStorage,
+    module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, AsUnsyncModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -255,14 +254,12 @@ fn call_script_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let move_vm = MoveVM::new(vec![]);
-
-    let code_storage =
-        LocalModuleBytesStorage::empty().into_unsync_code_storage(move_vm.runtime_environment());
-    let resource_storage = InMemoryStorage::new();
+    let storage = InMemoryStorage::new();
+    let code_storage = storage.as_unsync_code_storage(move_vm.runtime_environment());
+    let mut session = move_vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
 
-    let mut session = move_vm.new_session(&resource_storage);
     session
         .execute_script(
             script,
@@ -286,26 +283,18 @@ fn call_function_with_args_ty_args_signers(
     ty_args: Vec<TypeTag>,
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
+    let move_vm = MoveVM::new(vec![]);
+    let mut storage = InMemoryStorage::new();
+
     let module_id = module.self_id();
     let mut module_blob = vec![];
     module.serialize(&mut module_blob).unwrap();
 
-    let mut resource_storage = InMemoryStorage::new();
-    resource_storage.publish_or_overwrite_module(module_id.clone(), module_blob.clone());
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-    module_bytes_storage.add_module_bytes(
-        module_id.address(),
-        module_id.name(),
-        module_blob.into(),
-    );
-
-    let move_vm = MoveVM::new(vec![]);
-    let module_storage =
-        module_bytes_storage.into_unsync_module_storage(move_vm.runtime_environment());
+    storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
+    let module_storage = storage.as_unsync_module_storage(move_vm.runtime_environment());
+    let mut session = move_vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
-
-    let mut session = move_vm.new_session(&resource_storage);
     session.execute_function_bypass_visibility(
         &module_id,
         function_name.as_ident_str(),
@@ -784,18 +773,16 @@ fn call_missing_item() {
     let module_id = module.self_id();
     let mut module_blob = vec![];
     module.serialize(&mut module_blob).unwrap();
+
+    // missing module
     let function_name = ident_str!("foo");
 
     let move_vm = MoveVM::new(vec![]);
-
-    let module_storage =
-        LocalModuleBytesStorage::empty().into_unsync_module_storage(move_vm.runtime_environment());
-    let mut resource_storage = InMemoryStorage::new();
+    let mut storage = InMemoryStorage::new();
+    let module_storage = storage.as_unsync_module_storage(move_vm.runtime_environment());
+    let mut session = move_vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
-
-    // A module is missing.
-    let mut session = move_vm.new_session(&resource_storage);
     let error = session
         .execute_function_bypass_visibility(
             &module_id,
@@ -817,20 +804,13 @@ fn call_missing_item() {
     assert_eq!(error.status_type(), StatusType::Verification);
     drop(session);
 
-    resource_storage.publish_or_overwrite_module(module_id.clone(), module_blob.clone());
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-    module_bytes_storage.add_module_bytes(
-        module_id.address(),
-        module_id.name(),
-        module_blob.into(),
-    );
-    let module_storage =
-        module_bytes_storage.into_unsync_module_storage(move_vm.runtime_environment());
+    // missing function
+
+    storage.add_module_bytes(module_id.address(), module_id.name(), module_blob.into());
+    let module_storage = storage.as_unsync_module_storage(move_vm.runtime_environment());
+    let mut session = move_vm.new_session(&storage);
 
     let traversal_storage = TraversalStorage::new();
-
-    // A function is missing.
-    let mut session = move_vm.new_session(&resource_storage);
     let error = session
         .execute_function_bypass_visibility(
             &module_id,

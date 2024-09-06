@@ -37,6 +37,7 @@ hex = { workspace = true }
 move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
 move-compiler = { path = "../../move-compiler" }
 move-ir-compiler = { path = "../../move-ir-compiler" }
+move-vm-test-utils = { path = "../test-utils" }
 proptest = { workspace = true }
 
 [features]
