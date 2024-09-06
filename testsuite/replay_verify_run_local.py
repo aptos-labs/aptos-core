@@ -18,7 +18,7 @@ def local_setup():
     # Take these from the expected replay verify run
     envs = {
         "TIMEOUT_MINUTES": "5",
-        "BUCKET": "aptos-testnet-backup-b7b1ad7a",
+        "BUCKET": "aptos-testnet-backup",
         "SUB_DIR": "e1",
         "HISTORY_START": "350000000",
         "TXNS_TO_SKIP": "0",  # 46874937 151020059 should be excluded

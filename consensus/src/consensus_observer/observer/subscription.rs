@@ -6,13 +6,13 @@ use crate::consensus_observer::common::{
     logging::{LogEntry, LogSchema},
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_logger::warn;
-use aptos_network::application::metadata::PeerMetadata;
+use aptos_logger::{info, warn};
+use aptos_network::{application::metadata::PeerMetadata, ProtocolId};
 use aptos_storage_interface::DbReader;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use ordered_float::OrderedFloat;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -34,8 +34,8 @@ pub struct ConsensusObserverSubscription {
     // The timestamp of the last message received from the peer
     last_message_receive_time: Instant,
 
-    // The timestamp of the last peer optimality check
-    last_peer_optimality_check: Instant,
+    // The timestamp and connected peers for the last optimality check
+    last_optimality_check_time_and_peers: (Instant, HashSet<PeerNetworkId>),
 
     // The highest synced version we've seen from storage, along with the time at which it was seen
     highest_synced_version_and_time: (u64, Instant),
@@ -51,43 +51,65 @@ impl ConsensusObserverSubscription {
         peer_network_id: PeerNetworkId,
         time_service: TimeService,
     ) -> Self {
+        // Get the current time
         let time_now = time_service.now();
 
+        // Create a new subscription
         Self {
             consensus_observer_config,
             db_reader,
             peer_network_id,
             last_message_receive_time: time_now,
-            last_peer_optimality_check: time_now,
+            last_optimality_check_time_and_peers: (time_now, HashSet::new()),
             highest_synced_version_and_time: (0, time_now),
             time_service,
         }
     }
 
-    /// Verifies that the peer selected for the subscription is optimal
-    /// based on the set of currently available peers. This is done
-    /// periodically to avoid excessive subscription terminations.
+    /// Verifies that the peer currently selected for the subscription is
+    /// optimal. This is only done if: (i) the peers have changed since the
+    /// last check; or (ii) enough time has elapsed to force a refresh.
     pub fn check_subscription_peer_optimality(
         &mut self,
         peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
     ) -> Result<(), Error> {
-        // Check if we need to perform the peer optimality check
+        // Get the last optimality check time and connected peers
+        let (last_optimality_check_time, last_optimality_check_peers) =
+            self.last_optimality_check_time_and_peers.clone();
+
+        // Determine if enough time has elapsed to force a refresh
         let time_now = self.time_service.now();
-        let duration_since_last_check = time_now.duration_since(self.last_peer_optimality_check);
-        if duration_since_last_check
-            < Duration::from_millis(
-                self.consensus_observer_config
-                    .peer_optimality_check_interval_ms,
-            )
-        {
-            return Ok(()); // We don't need to check the peer optimality yet
+        let duration_since_last_check = time_now.duration_since(last_optimality_check_time);
+        let refresh_interval = Duration::from_millis(
+            self.consensus_observer_config
+                .subscription_refresh_interval_ms,
+        );
+        let force_refresh = duration_since_last_check >= refresh_interval;
+
+        // Determine if the peers have changed since the last check.
+        // Note: we only check for peer changes periodically to avoid
+        // excessive subscription churn due to peer connects/disconnects.
+        let current_connected_peers = peers_and_metadata.keys().cloned().collect();
+        let peer_check_interval = Duration::from_millis(
+            self.consensus_observer_config
+                .subscription_peer_change_interval_ms,
+        );
+        let peers_changed = duration_since_last_check >= peer_check_interval
+            && current_connected_peers != last_optimality_check_peers;
+
+        // Determine if we should perform the optimality check
+        if !force_refresh && !peers_changed {
+            return Ok(()); // We don't need to check optimality yet
         }
 
-        // Update the last peer optimality check time
-        self.last_peer_optimality_check = time_now;
+        // Otherwise, update the last peer optimality check time and peers
+        self.last_optimality_check_time_and_peers = (time_now, current_connected_peers);
+
+        // Sort the peers by subscription optimality
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
 
         // Verify that we're subscribed to the most optimal peer
-        if let Some(optimal_peer) = sort_peers_by_distance_and_latency(peers_and_metadata).first() {
+        if let Some(optimal_peer) = sorted_peers.first() {
             if *optimal_peer != self.peer_network_id {
                 return Err(Error::SubscriptionSuboptimal(format!(
                     "Subscription to peer: {} is no longer optimal! New optimal peer: {}",
@@ -227,19 +249,30 @@ fn get_latency_for_peer(
     latency
 }
 
-/// Sorts the peers by distance from the validator set and latency.
-/// We prioritize distance over latency as we want to avoid close
+/// Sorts the peers by subscription optimality (in descending order of
+/// optimality). This requires: (i) sorting the peers by distance from the
+/// validator set and ping latency (lower values are more optimal); and (ii)
+/// filtering out peers that don't support consensus observer.
+///
+/// Note: we prioritize distance over latency as we want to avoid close
 /// but not up-to-date peers. If peers don't have sufficient metadata
 /// for sorting, they are given a lower priority.
-pub fn sort_peers_by_distance_and_latency(
-    peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
+pub fn sort_peers_by_subscription_optimality(
+    peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
 ) -> Vec<PeerNetworkId> {
     // Group peers and latencies by validator distance, i.e., distance -> [(peer, latency)]
+    let mut unsupported_peers = Vec::new();
     let mut peers_and_latencies_by_distance = BTreeMap::new();
     for (peer_network_id, peer_metadata) in peers_and_metadata {
+        // Verify that the peer supports consensus observer
+        if !supports_consensus_observer(peer_metadata) {
+            unsupported_peers.push(*peer_network_id);
+            continue; // Skip the peer
+        }
+
         // Get the distance and latency for the peer
-        let distance = get_distance_for_peer(&peer_network_id, &peer_metadata);
-        let latency = get_latency_for_peer(&peer_network_id, &peer_metadata);
+        let distance = get_distance_for_peer(peer_network_id, peer_metadata);
+        let latency = get_latency_for_peer(peer_network_id, peer_metadata);
 
         // If the distance is not found, use the maximum distance
         let distance =
@@ -252,7 +285,18 @@ pub fn sort_peers_by_distance_and_latency(
         peers_and_latencies_by_distance
             .entry(distance)
             .or_insert_with(Vec::new)
-            .push((peer_network_id, OrderedFloat(latency)));
+            .push((*peer_network_id, OrderedFloat(latency)));
+    }
+
+    // If there are peers that don't support consensus observer, log them
+    if !unsupported_peers.is_empty() {
+        info!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Found {} peers that don't support consensus observer! Peers: {:?}",
+                unsupported_peers.len(),
+                unsupported_peers
+            ))
+        );
     }
 
     // Sort the peers by distance and latency. Note: BTreeMaps are
@@ -270,18 +314,38 @@ pub fn sort_peers_by_distance_and_latency(
         );
     }
 
+    // Log the sorted peers
+    info!(
+        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+            "Sorted {} peers by subscription optimality! Peers: {:?}",
+            sorted_peers.len(),
+            sorted_peers
+        ))
+    );
+
     sorted_peers
+}
+
+/// Returns true iff the peer metadata indicates support for consensus observer
+fn supports_consensus_observer(peer_metadata: &PeerMetadata) -> bool {
+    peer_metadata.supports_protocol(ProtocolId::ConsensusObserver)
+        && peer_metadata.supports_protocol(ProtocolId::ConsensusObserverRpc)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_network::transport::ConnectionMetadata;
+    use aptos_config::config::PeerRole;
+    use aptos_netcore::transport::ConnectionOrigin;
+    use aptos_network::{
+        protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
+        transport::{ConnectionId, ConnectionMetadata},
+    };
     use aptos_peer_monitoring_service_types::{
         response::NetworkInformationResponse, PeerMonitoringMetadata,
     };
     use aptos_storage_interface::Result;
-    use aptos_types::transaction::Version;
+    use aptos_types::{network_address::NetworkAddress, transaction::Version};
     use mockall::mock;
 
     // This is a simple mock of the DbReader (it generates a MockDatabaseReader)
@@ -294,10 +358,12 @@ mod test {
 
     #[test]
     fn check_subscription_peer_optimality() {
-        // Create a new observer subscription
+        // Create a consensus observer config and time service
         let consensus_observer_config = ConsensusObserverConfig::default();
-        let peer_network_id = PeerNetworkId::random();
         let time_service = TimeService::mock();
+
+        // Create a new observer subscription
+        let peer_network_id = PeerNetworkId::random();
         let mut subscription = ConsensusObserverSubscription::new(
             consensus_observer_config,
             Arc::new(MockDatabaseReader::new()),
@@ -305,62 +371,255 @@ mod test {
             time_service.clone(),
         );
 
-        // Verify the time of the last peer optimality check
-        let current_time = time_service.now();
-        assert_eq!(subscription.last_peer_optimality_check, current_time);
+        // Verify the time and peers for the last optimality check
+        let (last_check_time, last_check_peers) =
+            subscription.last_optimality_check_time_and_peers.clone();
+        assert_eq!(last_check_time, time_service.now());
+        assert!(last_check_peers.is_empty());
+
+        // Create a peers and metadata map for the subscription
+        let mut peers_and_metadata = HashMap::new();
+        peers_and_metadata.insert(
+            peer_network_id,
+            PeerMetadata::new_for_test(
+                create_connection_metadata(peer_network_id, true),
+                PeerMonitoringMetadata::new(None, None, None, None, None),
+            ),
+        );
+
+        // Add a more optimal peer to the set of peers
+        let new_optimal_peer = PeerNetworkId::random();
+        peers_and_metadata.insert(
+            new_optimal_peer,
+            PeerMetadata::new_for_test(
+                create_connection_metadata(new_optimal_peer, true),
+                PeerMonitoringMetadata::new(Some(0.1), None, None, None, None),
+            ),
+        );
 
         // Verify that the peer is optimal (not enough time has elapsed to check)
         assert!(subscription
-            .check_subscription_peer_optimality(HashMap::new())
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
             .is_ok());
 
         // Elapse some amount of time (but not enough to check optimality)
         let mock_time_service = time_service.into_mock();
         mock_time_service.advance(Duration::from_millis(
-            consensus_observer_config.peer_optimality_check_interval_ms / 2,
+            consensus_observer_config.subscription_peer_change_interval_ms / 2,
         ));
 
-        // Verify that the original peer is still optimal even though it is missing metadata
-        let new_optimal_peer = PeerNetworkId::random();
-        let mut peers_and_metadata = HashMap::new();
-        peers_and_metadata.insert(
-            new_optimal_peer,
-            PeerMetadata::new_for_test(
-                ConnectionMetadata::mock(new_optimal_peer.peer_id()),
-                PeerMonitoringMetadata::new(None, None, None, None, None),
-            ),
-        );
+        // Verify that the peer is still optimal (not enough time has elapsed to check)
         assert!(subscription
             .check_subscription_peer_optimality(peers_and_metadata.clone())
             .is_ok());
 
-        // Elapse enough time to check optimality
+        // Elapse enough time to check the peer optimality
         mock_time_service.advance(Duration::from_millis(
-            consensus_observer_config.peer_optimality_check_interval_ms + 1,
+            consensus_observer_config.subscription_peer_change_interval_ms + 1,
         ));
 
-        // Verify that the original peer is no longer optimal
+        // Verify that the peer is no longer optimal (a more optimal peer has been added)
         assert!(subscription
             .check_subscription_peer_optimality(peers_and_metadata.clone())
             .is_err());
 
-        // Add the original peer to the list of peers (with optimal metadata)
+        // Verify the time of the last peer optimality check
+        let (last_check_time, last_check_peers) =
+            subscription.last_optimality_check_time_and_peers.clone();
+        assert_eq!(last_check_time, mock_time_service.now());
+        assert_eq!(
+            last_check_peers,
+            peers_and_metadata.keys().cloned().collect()
+        );
+
+        // Elapse enough time to check the peer optimality
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_peer_change_interval_ms + 1,
+        ));
+
+        // Verify that the peer is now optimal (the peers haven't changed)
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_ok());
+
+        // Remove the current peer from the list of peers
+        peers_and_metadata.remove(&peer_network_id);
+
+        // Verify that the peer is not optimal (the peers have changed)
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_err());
+
+        // Verify the time of the last peer optimality check
+        let (last_check_time, last_check_peers) =
+            subscription.last_optimality_check_time_and_peers.clone();
+        assert_eq!(last_check_time, mock_time_service.now());
+        assert_eq!(
+            last_check_peers,
+            peers_and_metadata.keys().cloned().collect()
+        );
+    }
+
+    #[test]
+    fn check_subscription_peer_refresh() {
+        // Create a consensus observer config and time service
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let time_service = TimeService::mock();
+
+        // Create a new observer subscription
+        let peer_network_id = PeerNetworkId::random();
+        let mut subscription = ConsensusObserverSubscription::new(
+            consensus_observer_config,
+            Arc::new(MockDatabaseReader::new()),
+            peer_network_id,
+            time_service.clone(),
+        );
+
+        // Create a peers and metadata map for the subscription
+        let mut peers_and_metadata = HashMap::new();
         peers_and_metadata.insert(
             peer_network_id,
             PeerMetadata::new_for_test(
-                ConnectionMetadata::mock(peer_network_id.peer_id()),
+                create_connection_metadata(peer_network_id, true),
+                PeerMonitoringMetadata::new(None, None, None, None, None),
+            ),
+        );
+
+        // Verify that the peer is optimal (not enough time has elapsed to refresh)
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_ok());
+
+        // Add a more optimal peer to the set of peers
+        let new_optimal_peer = PeerNetworkId::random();
+        peers_and_metadata.insert(
+            new_optimal_peer,
+            PeerMetadata::new_for_test(
+                create_connection_metadata(new_optimal_peer, true),
                 PeerMonitoringMetadata::new(Some(0.1), None, None, None, None),
             ),
         );
 
-        // Verify that the peer is still optimal
+        // Verify that the peer is still optimal (not enough time has elapsed to refresh)
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_ok());
+
+        // Elapse enough time to refresh optimality
+        let mock_time_service = time_service.into_mock();
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_refresh_interval_ms + 1,
+        ));
+
+        // Verify that the peer is no longer optimal
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_err());
+
+        // Elapse some amount of time (but not enough to refresh)
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_refresh_interval_ms / 2,
+        ));
+
+        // Verify that the peer is now optimal (not enough time has elapsed to refresh)
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_ok());
+
+        // Remove the more optimal peer from the list of peers
+        peers_and_metadata.remove(&new_optimal_peer);
+
+        // Elapse enough time to refresh optimality
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_refresh_interval_ms + 1,
+        ));
+
+        // Verify that the peer is optimal
         assert!(subscription
             .check_subscription_peer_optimality(peers_and_metadata)
             .is_ok());
 
         // Verify the time of the last peer optimality check
         let current_time = mock_time_service.now();
-        assert_eq!(subscription.last_peer_optimality_check, current_time);
+        let (last_check_time, _) = subscription.last_optimality_check_time_and_peers;
+        assert_eq!(last_check_time, current_time);
+    }
+
+    #[test]
+    fn check_subscription_peer_optimality_supported() {
+        // Create a consensus observer config and time service
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let time_service = TimeService::mock();
+
+        // Create a new observer subscription
+        let peer_network_id = PeerNetworkId::random();
+        let mut subscription = ConsensusObserverSubscription::new(
+            consensus_observer_config,
+            Arc::new(MockDatabaseReader::new()),
+            peer_network_id,
+            time_service.clone(),
+        );
+
+        // Insert empty metadata for the subscription peer
+        let mut peers_and_metadata = HashMap::new();
+        peers_and_metadata.insert(
+            peer_network_id,
+            PeerMetadata::new_for_test(
+                create_connection_metadata(peer_network_id, true),
+                PeerMonitoringMetadata::new(None, None, None, None, None),
+            ),
+        );
+
+        // Elapse enough time to check optimality
+        let mock_time_service = time_service.into_mock();
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_peer_change_interval_ms + 1,
+        ));
+
+        // Verify that the peer is still optimal (there are no other peers)
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_ok());
+
+        // Add a more optimal peer without consensus observer support
+        let unsupported_peer = PeerNetworkId::random();
+        peers_and_metadata.insert(
+            unsupported_peer,
+            PeerMetadata::new_for_test(
+                create_connection_metadata(unsupported_peer, false),
+                PeerMonitoringMetadata::new(Some(0.1), None, None, None, None),
+            ),
+        );
+
+        // Elapse enough time to check optimality
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_peer_change_interval_ms + 1,
+        ));
+
+        // Verify that the peer is still optimal (the unsupported peer is ignored)
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_ok());
+
+        // Add another more optimal peer with consensus observer support
+        let supported_peer = PeerNetworkId::random();
+        peers_and_metadata.insert(
+            supported_peer,
+            PeerMetadata::new_for_test(
+                create_connection_metadata(supported_peer, true),
+                PeerMonitoringMetadata::new(Some(0.01), None, None, None, None),
+            ),
+        );
+
+        // Elapse enough time to check optimality
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_peer_change_interval_ms + 1,
+        ));
+
+        // Verify that the peer is no longer optimal
+        assert!(subscription
+            .check_subscription_peer_optimality(peers_and_metadata.clone())
+            .is_err());
     }
 
     #[test]
@@ -520,33 +779,33 @@ mod test {
     fn test_sort_peers_by_distance_and_latency() {
         // Sort an empty list of peers
         let peers_and_metadata = HashMap::new();
-        assert!(sort_peers_by_distance_and_latency(peers_and_metadata).is_empty());
+        assert!(sort_peers_by_subscription_optimality(&peers_and_metadata).is_empty());
 
         // Create a list of peers with empty metadata
-        let peers_and_metadata = create_peers_and_metadata(true, true, 10);
+        let peers_and_metadata = create_peers_and_metadata(true, true, true, 10);
 
         // Sort the peers and verify the results
-        let sorted_peers = sort_peers_by_distance_and_latency(peers_and_metadata);
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
         assert_eq!(sorted_peers.len(), 10);
 
         // Create a list of peers with valid metadata
-        let peers_and_metadata = create_peers_and_metadata(false, false, 10);
+        let peers_and_metadata = create_peers_and_metadata(false, false, true, 10);
 
         // Sort the peers
-        let sorted_peers = sort_peers_by_distance_and_latency(peers_and_metadata.clone());
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
 
         // Verify the order of the peers
         verify_increasing_distance_latencies(&peers_and_metadata, &sorted_peers);
         assert_eq!(sorted_peers.len(), 10);
 
         // Create a list of peers with and without metadata
-        let mut peers_and_metadata = create_peers_and_metadata(false, false, 10);
-        peers_and_metadata.extend(create_peers_and_metadata(true, false, 10));
-        peers_and_metadata.extend(create_peers_and_metadata(false, true, 10));
-        peers_and_metadata.extend(create_peers_and_metadata(true, true, 10));
+        let mut peers_and_metadata = create_peers_and_metadata(false, false, true, 10);
+        peers_and_metadata.extend(create_peers_and_metadata(true, false, true, 10));
+        peers_and_metadata.extend(create_peers_and_metadata(false, true, true, 10));
+        peers_and_metadata.extend(create_peers_and_metadata(true, true, true, 10));
 
         // Sort the peers
-        let sorted_peers = sort_peers_by_distance_and_latency(peers_and_metadata.clone());
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
         assert_eq!(sorted_peers.len(), 40);
 
         // Verify the order of the first 20 peers
@@ -571,16 +830,101 @@ mod test {
         assert!(remaining_peers.is_empty());
     }
 
+    #[test]
+    fn test_sort_peers_by_distance_and_latency_filter() {
+        // Sort an empty list of peers
+        let peers_and_metadata = HashMap::new();
+        assert!(sort_peers_by_subscription_optimality(&peers_and_metadata).is_empty());
+
+        // Create a list of peers with empty metadata (with consensus observer support)
+        let peers_and_metadata = create_peers_and_metadata(true, true, true, 10);
+
+        // Sort the peers and verify the results
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
+        assert_eq!(sorted_peers.len(), 10);
+
+        // Create a list of peers with empty metadata (without consensus observer support)
+        let peers_and_metadata = create_peers_and_metadata(true, true, false, 10);
+
+        // Sort the peers and verify the results
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
+        assert!(sorted_peers.is_empty());
+
+        // Create a list of peers with valid metadata (without consensus observer support)
+        let peers_and_metadata = create_peers_and_metadata(false, false, false, 10);
+
+        // Sort the peers and verify the results
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
+        assert!(sorted_peers.is_empty());
+
+        // Create a list of peers with empty metadata (with and without consensus observer support)
+        let mut peers_and_metadata = create_peers_and_metadata(true, true, true, 5);
+        peers_and_metadata.extend(create_peers_and_metadata(true, true, false, 50));
+
+        // Sort the peers and verify the results (only the supported peers are sorted)
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
+        assert_eq!(sorted_peers.len(), 5);
+
+        // Create a list of peers with valid metadata (with and without consensus observer support)
+        let mut peers_and_metadata = create_peers_and_metadata(false, false, true, 50);
+        peers_and_metadata.extend(create_peers_and_metadata(false, false, false, 10));
+
+        // Sort the peers and verify the results (only the supported peers are sorted)
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
+        assert_eq!(sorted_peers.len(), 50);
+
+        // Create a list of peers with valid metadata (with and without consensus observer support)
+        let supported_peer_and_metadata = create_peers_and_metadata(false, false, true, 1);
+        let unsupported_peer_and_metadata = create_peers_and_metadata(false, false, false, 1);
+        let mut peers_and_metadata = HashMap::new();
+        peers_and_metadata.extend(supported_peer_and_metadata.clone());
+        peers_and_metadata.extend(unsupported_peer_and_metadata);
+
+        // Sort the peers and verify the results (only the supported peer is sorted)
+        let supported_peer = supported_peer_and_metadata.keys().next().unwrap();
+        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
+        assert_eq!(sorted_peers, vec![*supported_peer]);
+    }
+
+    /// Creates a new connection metadata for testing
+    fn create_connection_metadata(
+        peer_network_id: PeerNetworkId,
+        support_consensus_observer: bool,
+    ) -> ConnectionMetadata {
+        if support_consensus_observer {
+            // Create a protocol set that supports consensus observer
+            let protocol_set = ProtocolIdSet::from_iter(vec![
+                ProtocolId::ConsensusObserver,
+                ProtocolId::ConsensusObserverRpc,
+            ]);
+
+            // Create the connection metadata with the protocol set
+            ConnectionMetadata::new(
+                peer_network_id.peer_id(),
+                ConnectionId::default(),
+                NetworkAddress::mock(),
+                ConnectionOrigin::Inbound,
+                MessagingProtocolVersion::V1,
+                protocol_set,
+                PeerRole::PreferredUpstream,
+            )
+        } else {
+            ConnectionMetadata::mock(peer_network_id.peer_id())
+        }
+    }
+
     /// Creates a new peer and metadata for testing
     fn create_peer_and_metadata(
         latency: Option<f64>,
         distance_from_validators: Option<u64>,
+        support_consensus_observer: bool,
     ) -> (PeerNetworkId, PeerMetadata) {
         // Create a random peer
         let peer_network_id = PeerNetworkId::random();
 
         // Create a new peer metadata with the given latency and distance
-        let connection_metadata = ConnectionMetadata::mock(peer_network_id.peer_id());
+        let connection_metadata =
+            create_connection_metadata(peer_network_id, support_consensus_observer);
         let network_information_response =
             distance_from_validators.map(|distance| NetworkInformationResponse {
                 connected_peers: BTreeMap::new(),
@@ -598,6 +942,7 @@ mod test {
     fn create_peers_and_metadata(
         empty_latency: bool,
         empty_distance: bool,
+        support_consensus_observer: bool,
         num_peers: u64,
     ) -> HashMap<PeerNetworkId, PeerMetadata> {
         let mut peers_and_metadata = HashMap::new();
@@ -609,7 +954,8 @@ mod test {
             let latency = if empty_latency { None } else { Some(i as f64) };
 
             // Create a new peer and metadata
-            let (peer_network_id, peer_metadata) = create_peer_and_metadata(latency, distance);
+            let (peer_network_id, peer_metadata) =
+                create_peer_and_metadata(latency, distance, support_consensus_observer);
             peers_and_metadata.insert(peer_network_id, peer_metadata);
         }
         peers_and_metadata

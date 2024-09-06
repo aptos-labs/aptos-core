@@ -26,11 +26,3 @@ error: use of unassigned local `x`
   │
 4 │     let y = x;
   │             ^
-
-
-Diagnostics:
-warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
-  ┌─ tests/simplifier-elimination/use_before_assign.move:4:13
-  │
-4 │     let y = x;
-  │             ^

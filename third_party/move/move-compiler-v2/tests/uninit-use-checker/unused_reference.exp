@@ -1,0 +1,29 @@
+============ initial bytecode ================
+
+[variant baseline]
+public fun Module0::function0() {
+     var $t0: &Module0::S
+     var $t1: Module0::S
+  0: $t1 := read_ref($t0)
+  1: return ()
+}
+
+
+Diagnostics:
+error: use of unassigned local `y`
+  ┌─ tests/uninit-use-checker/unused_reference.move:6:9
+  │
+6 │         *y;
+  │         ^^
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+public fun Module0::function0() {
+     var $t0: &Module0::S
+     var $t1: Module0::S
+     # before: { no: $t0, $t1 }, after: { no: $t0 }
+  0: $t1 := read_ref($t0)
+     # before: { no: $t0 }, after: { no: $t0 }
+  1: return ()
+}

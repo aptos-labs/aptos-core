@@ -7,11 +7,3 @@ error: cannot return a reference derived from value since it is not based on a p
    │                 -- value previously borrowed here
 13 │         r
    │         ^ return attempted here
-
-
-Diagnostics:
-error: local `x` of type `M::X` does not have the `drop` ability
-  ┌─ tests/ability-check/v1-borrow-tests/return_type_mismatch_and_unused_resource.move:6:9
-  │
-6 │         &x;
-  │         ^^ implicitly dropped here since it is no longer used
