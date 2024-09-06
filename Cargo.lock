@@ -13470,7 +13470,6 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "move-compiler",
- "move-compiler-v2",
  "move-model",
  "move-prover",
  "move-prover-boogie-backend",
