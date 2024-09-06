@@ -519,6 +519,12 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    /// Add `amount` of coins to the delegation pool `pool_address`.
+    PboDelegationPoolAddStake {
+        pool_address: AccountAddress,
+        amount: u64,
+    },
+
     /// Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
     /// this change won't take effects until the next lockup period.
     PboDelegationPoolDelegateVotingPower {
@@ -1456,6 +1462,10 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => object_code_deployment_publish(metadata_serialized, code),
+            PboDelegationPoolAddStake {
+                pool_address,
+                amount,
+            } => pbo_delegation_pool_add_stake(pool_address, amount),
             PboDelegationPoolDelegateVotingPower {
                 pool_address,
                 new_voter,
@@ -3127,6 +3137,28 @@ pub fn object_code_deployment_publish(
         vec![
             bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
+        ],
+    ))
+}
+
+/// Add `amount` of coins to the delegation pool `pool_address`.
+pub fn pbo_delegation_pool_add_stake(
+    pool_address: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("pbo_delegation_pool").to_owned(),
+        ),
+        ident_str!("add_stake").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -5735,6 +5767,19 @@ mod decoder {
         }
     }
 
+    pub fn pbo_delegation_pool_add_stake(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::PboDelegationPoolAddStake {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn pbo_delegation_pool_delegate_voting_power(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7076,6 +7121,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "object_code_deployment_publish".to_string(),
             Box::new(decoder::object_code_deployment_publish),
+        );
+        map.insert(
+            "pbo_delegation_pool_add_stake".to_string(),
+            Box::new(decoder::pbo_delegation_pool_add_stake),
         );
         map.insert(
             "pbo_delegation_pool_delegate_voting_power".to_string(),

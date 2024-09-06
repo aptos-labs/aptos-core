@@ -48,7 +48,7 @@ pub struct Layout {
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
     /// Minimum number of votes to consider a proposal valid.
-    pub min_voting_threshold: u128,
+    pub min_voting_threshold: u64,
     /// Maximum stake to be in the validator set
     pub max_stake: u64,
     /// Minimum number of seconds to lockup staked coins
@@ -59,6 +59,8 @@ pub struct Layout {
     pub rewards_apy_percentage: u64,
     /// Voting duration for a proposal in seconds.
     pub voting_duration_secs: u64,
+    /// List of voters
+    pub voters: Vec<AccountAddress>,
     /// % of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
     /// Timestamp for Genesis in microseconds
@@ -111,6 +113,7 @@ impl Default for Layout {
             required_proposer_stake: 100_000_000_000_000,
             rewards_apy_percentage: 10,
             voting_duration_secs: 43_200,
+            voters: vec![],
             voting_power_increase_limit: 20,
             genesis_timestamp_in_microseconds: 0,
             total_supply: None,

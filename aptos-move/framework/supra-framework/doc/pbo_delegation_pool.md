@@ -3426,7 +3426,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 Add <code>amount</code> of coins to the delegation pool <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -3435,7 +3435,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     // short-circuit <b>if</b> amount <b>to</b> add is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation

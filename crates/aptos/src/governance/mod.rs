@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod delegation_pool;
 pub mod utils;
 
 #[cfg(feature = "no-upload-proposal")]
@@ -67,8 +66,6 @@ pub enum GovernanceTool {
     ExecuteProposal(ExecuteProposal),
     GenerateUpgradeProposal(GenerateUpgradeProposal),
     ApproveExecutionHash(ApproveExecutionHash),
-    #[clap(subcommand)]
-    DelegationPool(delegation_pool::DelegationPoolTool),
 }
 
 impl GovernanceTool {
@@ -83,7 +80,6 @@ impl GovernanceTool {
             ListProposals(tool) => tool.execute_serialized().await,
             VerifyProposal(tool) => tool.execute_serialized().await,
             ApproveExecutionHash(tool) => tool.execute_serialized().await,
-            DelegationPool(tool) => tool.execute().await,
         }
     }
 }
@@ -285,8 +281,6 @@ async fn get_proposal(
 #[derive(Parser)]
 pub struct SubmitProposal {
     #[clap(flatten)]
-    pub(crate) pool_address_args: PoolAddressArgs,
-    #[clap(flatten)]
     pub(crate) args: SubmitProposalArgs,
 }
 
@@ -384,8 +378,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
         let txn: Transaction = if self.args.is_multi_step {
             self.args
                 .txn_options
-                .submit_transaction(aptos_stdlib::supra_governance_create_proposal_v2(
-                    self.pool_address_args.pool_address,
+                .submit_transaction(aptos_stdlib::supra_governance_supra_create_proposal_v2(
                     script_hash.to_vec(),
                     self.args.metadata_url.to_string().as_bytes().to_vec(),
                     metadata_hash.to_hex().as_bytes().to_vec(),
@@ -395,8 +388,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
         } else {
             self.args
                 .txn_options
-                .submit_transaction(aptos_stdlib::supra_governance_create_proposal(
-                    self.pool_address_args.pool_address,
+                .submit_transaction(aptos_stdlib::supra_governance_supra_create_proposal(
                     script_hash.to_vec(),
                     self.args.metadata_url.to_string().as_bytes().to_vec(),
                     metadata_hash.to_hex().as_bytes().to_vec(),
@@ -581,8 +573,7 @@ impl SubmitVote {
             summaries.push(
                 self.args
                     .txn_options
-                    .submit_transaction(aptos_stdlib::supra_governance_vote(
-                        *pool_address,
+                    .submit_transaction(aptos_stdlib::supra_governance_supra_vote(
                         proposal_id,
                         vote,
                     ))
@@ -672,19 +663,6 @@ impl SubmitVote {
                 ),
                 self.args.txn_options.prompt_options,
             )?;
-
-            summaries.push(
-                self.args
-                    .txn_options
-                    .submit_transaction(aptos_stdlib::supra_governance_partial_vote(
-                        *pool_address,
-                        proposal_id,
-                        voting_power,
-                        vote,
-                    ))
-                    .await
-                    .map(TransactionSummary::from)?,
-            );
         }
         Ok(summaries)
     }
@@ -738,7 +716,7 @@ impl CliCommand<TransactionSummary> for ApproveExecutionHash {
         Ok(self
             .txn_options
             .submit_transaction(
-                aptos_stdlib::supra_governance_add_approved_script_hash_script(self.proposal_id),
+                aptos_stdlib::supra_governance_add_supra_approved_script_hash_script(self.proposal_id),
             )
             .await
             .map(TransactionSummary::from)?)
@@ -1050,7 +1028,7 @@ impl GenerateExecutionHash {
                 path.pop();
                 path.join("aptos-move")
                     .join("framework")
-                    .join("aptos-framework")
+                    .join("supra-framework")
                     .canonicalize()
                     .map_err(|err| {
                         CliError::IO(
