@@ -635,6 +635,14 @@ impl ModuleStorage for BogusModuleStorage {
         Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
     }
 
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        Err(PartialVMError::new(self.bad_status_code))
+    }
+
     fn fetch_module_size_in_bytes(
         &self,
         _address: &AccountAddress,

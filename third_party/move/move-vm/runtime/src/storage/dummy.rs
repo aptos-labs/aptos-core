@@ -64,6 +64,14 @@ impl ModuleStorage for DummyCodeStorage {
         unexpected_unimplemented_error!()
     }
 
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Option<Bytes>> {
+        unexpected_unimplemented_error!()
+    }
+
     fn fetch_module_metadata(
         &self,
         _address: &AccountAddress,
