@@ -35,4 +35,4 @@ jobs:
     - name: Run tests
       run: |
         ${{ env.CARGO_BIN }} test --release -p aptos-framework -- --skip prover
-        RUST_MIN_STACK=104857600 ${{ env.CARGO_BIN }} nextest run -p e2e-move-tests
+        RUST_MIN_STACK=104857600 ${{ env.CARGO_BIN }} nextest run -p e2e-move-tests --no-fail-fast

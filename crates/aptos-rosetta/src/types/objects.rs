@@ -2260,21 +2260,21 @@ impl InternalOperation {
                 distribute_staking_rewards.sender,
             ),
             InternalOperation::AddDelegatedStake(add_delegated_stake) => (
-                aptos_stdlib::delegation_pool_add_stake(
+                aptos_stdlib::pbo_delegation_pool_add_stake(
                     add_delegated_stake.pool_address,
                     add_delegated_stake.amount,
                 ),
                 add_delegated_stake.delegator,
             ),
             InternalOperation::UnlockDelegatedStake(unlock_delegated_stake) => (
-                aptos_stdlib::delegation_pool_unlock(
+                aptos_stdlib::pbo_delegation_pool_unlock(
                     unlock_delegated_stake.pool_address,
                     unlock_delegated_stake.amount,
                 ),
                 unlock_delegated_stake.delegator,
             ),
             InternalOperation::WithdrawUndelegated(withdraw_undelegated) => (
-                aptos_stdlib::delegation_pool_withdraw(
+                aptos_stdlib::pbo_delegation_pool_withdraw(
                     withdraw_undelegated.pool_address,
                     withdraw_undelegated.amount_withdrawn,
                 ),

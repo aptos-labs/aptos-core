@@ -1271,7 +1271,7 @@ module supra_framework::pbo_delegation_pool {
     }
 
     /// Add `amount` of coins to the delegation pool `pool_address`.
-    public fun add_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+    public entry fun add_stake(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         // short-circuit if amount to add is 0 so no event is emitted
         if (amount == 0) { return };
         // synchronize delegation and stake pools before any user operation

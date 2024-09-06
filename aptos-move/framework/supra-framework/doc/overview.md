@@ -25,7 +25,6 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::config_buffer`](config_buffer.md#0x1_config_buffer)
 -  [`0x1::consensus_config`](consensus_config.md#0x1_consensus_config)
 -  [`0x1::create_signer`](create_signer.md#0x1_create_signer)
--  [`0x1::delegation_pool`](delegation_pool.md#0x1_delegation_pool)
 -  [`0x1::dispatchable_fungible_asset`](dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset)
 -  [`0x1::dkg`](dkg.md#0x1_dkg)
 -  [`0x1::event`](event.md#0x1_event)

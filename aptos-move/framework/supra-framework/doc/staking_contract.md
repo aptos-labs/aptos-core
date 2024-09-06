@@ -1267,26 +1267,6 @@ pool.
 ## Constants
 
 
-<a id="0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE"></a>
-
-Commission percentage has to be between 0 and 100.
-
-
-<pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
-
-Chaning beneficiaries for operators is not supported.
-
-
-<pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 9;
-</code></pre>
-
-
-
 <a id="0x1_staking_contract_ECANT_MERGE_STAKING_CONTRACTS"></a>
 
 Staking contracts can't be merged.
@@ -1317,6 +1297,16 @@ Store amount must be at least the min stake required for a stake pool to join th
 
 
 
+<a id="0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE"></a>
+
+Commission percentage has to be between 0 and 100.
+
+
+<pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>: u64 = 2;
+</code></pre>
+
+
+
 <a id="0x1_staking_contract_ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY"></a>
 
 Caller must be either the staker, operator, or beneficiary.
@@ -1343,6 +1333,16 @@ Staker has no staking contracts.
 
 
 <pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_STAKER">ENO_STAKING_CONTRACT_FOUND_FOR_STAKER</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
+
+Chaning beneficiaries for operators is not supported.
+
+
+<pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 9;
 </code></pre>
 
 

@@ -25,6 +25,7 @@ use aptos_framework::ReleaseBundle;
 use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
 use aptos_types::{
+    account_address::AccountAddress,
     chain_id::ChainId,
     on_chain_config::{
         Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
@@ -419,12 +420,13 @@ pub struct GenesisConfiguration {
     pub is_test: bool,
     pub min_stake: u64,
     pub max_stake: u64,
-    pub min_voting_threshold: u128,
+    pub min_voting_threshold: u64,
     pub recurring_lockup_duration_secs: u64,
     pub required_proposer_stake: u64,
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
     pub voting_power_increase_limit: u64,
+    pub voters: Vec<AccountAddress>,
     pub genesis_timestamp_in_microseconds: u64,
     pub employee_vesting_start: Option<u64>,
     pub employee_vesting_period_duration: Option<u64>,
@@ -647,6 +649,7 @@ impl Builder {
             rewards_apy_percentage: 10,
             voting_duration_secs: ONE_DAY / 24,
             voting_power_increase_limit: 50,
+            voters: vec![],
             genesis_timestamp_in_microseconds: 0,
             employee_vesting_start: None,
             employee_vesting_period_duration: None,

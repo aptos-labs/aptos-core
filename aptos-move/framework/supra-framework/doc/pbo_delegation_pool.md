@@ -1030,7 +1030,7 @@ This struct should be stored in the delegation pool resource account.
 
 </dd>
 <dt>
-<code><a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: <b>address</b></code>
+<code>delegation_pool: <b>address</b></code>
 </dt>
 <dd>
 
@@ -1081,7 +1081,7 @@ This struct should be stored in the delegation pool resource account.
 
 </dd>
 <dt>
-<code><a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: <b>address</b></code>
+<code>delegation_pool: <b>address</b></code>
 </dt>
 <dd>
 
@@ -1292,12 +1292,81 @@ Delegation pool owner capability does not exist at the provided account.
 
 
 
+<a id="0x1_pbo_delegation_pool_EINVALID_COMMISSION_PERCENTAGE"></a>
+
+Commission percentage has to be between 0 and <code><a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_MAX_FEE">MAX_FEE</a></code> - 100%.
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>: u64 = 5;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
+
+Chaning beneficiaries for operators is not supported.
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 19;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL"></a>
+
+Active share is not the same in stake pool and delegation pool
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL">EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL</a>: u64 = 26;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_EADMIN_ADDRESS_CANNOT_BE_ZERO"></a>
+
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EADMIN_ADDRESS_CANNOT_BE_ZERO">EADMIN_ADDRESS_CANNOT_BE_ZERO</a>: u64 = 35;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_EADMIN_NOT_MULTISIG"></a>
+
+Provided admin address is not a multisig account
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EADMIN_NOT_MULTISIG">EADMIN_NOT_MULTISIG</a>: u64 = 27;
+</code></pre>
+
+
+
 <a id="0x1_pbo_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING"></a>
 
 The stake pool has already voted on the proposal before enabling partial governance voting on this delegation pool.
 
 
 <pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING">EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING</a>: u64 = 17;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_EAMOUNT_REQUESTED_NOT_UNLOCKABLE"></a>
+
+Requested amount too high, the balance would fall below principle stake after unlock
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EAMOUNT_REQUESTED_NOT_UNLOCKABLE">EAMOUNT_REQUESTED_NOT_UNLOCKABLE</a>: u64 = 25;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_ECOIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE"></a>
+
+Coin value is not the same with principle stake.
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ECOIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE">ECOIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE</a>: u64 = 24;
 </code></pre>
 
 
@@ -1342,12 +1411,40 @@ Delegator's active balance cannot be less than <code><a href="pbo_delegation_poo
 
 
 
+<a id="0x1_pbo_delegation_pool_EDELEGATOR_DOES_NOT_EXIST"></a>
+
+Delegator address does not exist in pool tables
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EDELEGATOR_DOES_NOT_EXIST">EDELEGATOR_DOES_NOT_EXIST</a>: u64 = 28;
+</code></pre>
+
+
+
 <a id="0x1_pbo_delegation_pool_EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW"></a>
 
 Delegator's pending_inactive balance cannot be less than <code><a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_MIN_COINS_ON_SHARES_POOL">MIN_COINS_ON_SHARES_POOL</a></code>.
 
 
 <pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW">EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW</a>: u64 = 9;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_EDENOMINATOR_IS_ZERO"></a>
+
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EDENOMINATOR_IS_ZERO">EDENOMINATOR_IS_ZERO</a>: u64 = 33;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_EEMPTY_UNLOCK_SCHEDULE"></a>
+
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EEMPTY_UNLOCK_SCHEDULE">EEMPTY_UNLOCK_SCHEDULE</a>: u64 = 30;
 </code></pre>
 
 
@@ -1362,12 +1459,11 @@ The voter does not have sufficient stake to create a proposal.
 
 
 
-<a id="0x1_pbo_delegation_pool_EINVALID_COMMISSION_PERCENTAGE"></a>
-
-Commission percentage has to be between 0 and <code><a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_MAX_FEE">MAX_FEE</a></code> - 100%.
+<a id="0x1_pbo_delegation_pool_ENEW_IS_SAME_AS_OLD_DELEGATOR"></a>
 
 
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>: u64 = 5;
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ENEW_IS_SAME_AS_OLD_DELEGATOR">ENEW_IS_SAME_AS_OLD_DELEGATOR</a>: u64 = 37;
 </code></pre>
 
 
@@ -1392,12 +1488,11 @@ The voter does not have any voting power on this proposal.
 
 
 
-<a id="0x1_pbo_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
-
-Chaning beneficiaries for operators is not supported.
+<a id="0x1_pbo_delegation_pool_ENUMERATORS_GRATER_THAN_DENOMINATOR"></a>
 
 
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 19;
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ENUMERATORS_GRATER_THAN_DENOMINATOR">ENUMERATORS_GRATER_THAN_DENOMINATOR</a>: u64 = 34;
 </code></pre>
 
 
@@ -1422,6 +1517,24 @@ There is a pending withdrawal to be executed before <code>unlock</code>ing any n
 
 
 
+<a id="0x1_pbo_delegation_pool_EPERIOD_DURATION_IS_ZERO"></a>
+
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EPERIOD_DURATION_IS_ZERO">EPERIOD_DURATION_IS_ZERO</a>: u64 = 32;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_ESCHEDULE_WITH_ZERO_FRACTION"></a>
+
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ESCHEDULE_WITH_ZERO_FRACTION">ESCHEDULE_WITH_ZERO_FRACTION</a>: u64 = 31;
+</code></pre>
+
+
+
 <a id="0x1_pbo_delegation_pool_ESLASHED_INACTIVE_STAKE_ON_PAST_OLC"></a>
 
 Slashing (if implemented) should not be applied to already <code>inactive</code> stake.
@@ -1431,6 +1544,16 @@ Additionally, the inactive stake does not count on the voting power of validator
 
 
 <pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ESLASHED_INACTIVE_STAKE_ON_PAST_OLC">ESLASHED_INACTIVE_STAKE_ON_PAST_OLC</a>: u64 = 7;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_ESTARTUP_TIME_IN_PAST"></a>
+
+Pool unlock time in past
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ESTARTUP_TIME_IN_PAST">ESTARTUP_TIME_IN_PAST</a>: u64 = 29;
 </code></pre>
 
 
@@ -1451,6 +1574,16 @@ Commission percentage change is too late in this lockup period, and should be do
 
 
 <pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ETOO_LATE_COMMISSION_CHANGE">ETOO_LATE_COMMISSION_CHANGE</a>: u64 = 21;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_EVECTOR_LENGTH_NOT_SAME"></a>
+
+Vector length is not the same.
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EVECTOR_LENGTH_NOT_SAME">EVECTOR_LENGTH_NOT_SAME</a>: u64 = 23;
 </code></pre>
 
 
@@ -1528,139 +1661,6 @@ Scaling factor of shares pools used within the delegation pool
 
 
 <pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_SHARES_SCALING_FACTOR">SHARES_SCALING_FACTOR</a>: u64 = 10000000000000000;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL"></a>
-
-Active share is not the same in stake pool and delegation pool
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL">EACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL</a>: u64 = 26;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EADMIN_ADDRESS_CANNOT_BE_ZERO"></a>
-
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EADMIN_ADDRESS_CANNOT_BE_ZERO">EADMIN_ADDRESS_CANNOT_BE_ZERO</a>: u64 = 35;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EADMIN_NOT_MULTISIG"></a>
-
-Provided admin address is not a multisig account
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EADMIN_NOT_MULTISIG">EADMIN_NOT_MULTISIG</a>: u64 = 27;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EAMOUNT_REQUESTED_NOT_UNLOCKABLE"></a>
-
-Requested amount too high, the balance would fall below principle stake after unlock
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EAMOUNT_REQUESTED_NOT_UNLOCKABLE">EAMOUNT_REQUESTED_NOT_UNLOCKABLE</a>: u64 = 25;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_ECOIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE"></a>
-
-Coin value is not the same with principle stake.
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ECOIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE">ECOIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE</a>: u64 = 24;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EDELEGATOR_DOES_NOT_EXIST"></a>
-
-Delegator address does not exist in pool tables
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EDELEGATOR_DOES_NOT_EXIST">EDELEGATOR_DOES_NOT_EXIST</a>: u64 = 28;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EDENOMINATOR_IS_ZERO"></a>
-
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EDENOMINATOR_IS_ZERO">EDENOMINATOR_IS_ZERO</a>: u64 = 33;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EEMPTY_UNLOCK_SCHEDULE"></a>
-
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EEMPTY_UNLOCK_SCHEDULE">EEMPTY_UNLOCK_SCHEDULE</a>: u64 = 30;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_ENEW_IS_SAME_AS_OLD_DELEGATOR"></a>
-
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ENEW_IS_SAME_AS_OLD_DELEGATOR">ENEW_IS_SAME_AS_OLD_DELEGATOR</a>: u64 = 37;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_ENUMERATORS_GRATER_THAN_DENOMINATOR"></a>
-
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ENUMERATORS_GRATER_THAN_DENOMINATOR">ENUMERATORS_GRATER_THAN_DENOMINATOR</a>: u64 = 34;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EPERIOD_DURATION_IS_ZERO"></a>
-
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EPERIOD_DURATION_IS_ZERO">EPERIOD_DURATION_IS_ZERO</a>: u64 = 32;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_ESCHEDULE_WITH_ZERO_FRACTION"></a>
-
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ESCHEDULE_WITH_ZERO_FRACTION">ESCHEDULE_WITH_ZERO_FRACTION</a>: u64 = 31;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_ESTARTUP_TIME_IN_PAST"></a>
-
-Pool unlock time in past
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ESTARTUP_TIME_IN_PAST">ESTARTUP_TIME_IN_PAST</a>: u64 = 29;
-</code></pre>
-
-
-
-<a id="0x1_pbo_delegation_pool_EVECTOR_LENGTH_NOT_SAME"></a>
-
-Vector length is not the same.
-
-
-<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EVECTOR_LENGTH_NOT_SAME">EVECTOR_LENGTH_NOT_SAME</a>: u64 = 23;
 </code></pre>
 
 
@@ -2513,8 +2513,8 @@ THe existing voter will be replaced. The function is permissionless.
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation.
     <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
 
-    <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-    <b>let</b> stake_pool_signer = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>);
+    <b>let</b> delegation_pool = <b>borrow_global</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+    <b>let</b> stake_pool_signer = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(delegation_pool);
     // delegated_voter is managed by the <a href="stake.md#0x1_stake">stake</a> pool itself, which <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> is managed by <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>.
     // So <a href="voting.md#0x1_voting">voting</a> power of this <a href="stake.md#0x1_stake">stake</a> pool can only be used through this <b>module</b>.
     <a href="stake.md#0x1_stake_set_delegated_voter">stake::set_delegated_voter</a>(&stake_pool_signer,
@@ -3063,7 +3063,7 @@ Given the amounts of shares in <code>active_shares</code> pool and <code>inactiv
 power, which equals to the sum of the coin amounts.
 
 
-<pre><code><b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: &<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">pbo_delegation_pool::DelegationPool</a>, latest_delegated_votes: &<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegatedVotes">pbo_delegation_pool::DelegatedVotes</a>): u64
+<pre><code><b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(delegation_pool: &<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">pbo_delegation_pool::DelegationPool</a>, latest_delegated_votes: &<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegatedVotes">pbo_delegation_pool::DelegatedVotes</a>): u64
 </code></pre>
 
 
@@ -3073,12 +3073,12 @@ power, which equals to the sum of the coin amounts.
 
 
 <pre><code><b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(
-    <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: &<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>, latest_delegated_votes: &<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegatedVotes">DelegatedVotes</a>
+    delegation_pool: &<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>, latest_delegated_votes: &<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegatedVotes">DelegatedVotes</a>
 ): u64 {
-    <b>let</b> active_amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount">pool_u64::shares_to_amount</a>(&<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>.active_shares,
+    <b>let</b> active_amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount">pool_u64::shares_to_amount</a>(&delegation_pool.active_shares,
         latest_delegated_votes.active_shares);
     <b>let</b> pending_inactive_amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount">pool_u64::shares_to_amount</a>(
-        <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>),
+        <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(delegation_pool),
         latest_delegated_votes.pending_inactive_shares);
     active_amount + pending_inactive_amount
 }
@@ -3266,8 +3266,8 @@ Allows an owner to update the commission percentage for the operator of the unde
             pool_address
         );
     } <b>else</b> {
-        <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-        <b>let</b> pool_signer = <a href="account.md#0x1_account_create_signer_with_capability">account::create_signer_with_capability</a>(&<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>.stake_pool_signer_cap);
+        <b>let</b> delegation_pool = <b>borrow_global</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+        <b>let</b> pool_signer = <a href="account.md#0x1_account_create_signer_with_capability">account::create_signer_with_capability</a>(&delegation_pool.stake_pool_signer_cap);
         <b>move_to</b>(&pool_signer,
             <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
                 commission_percentage_next_lockup_cycle: new_commission_percentage,
@@ -3346,27 +3346,27 @@ this change won't take effects until the next lockup period.
     <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
 
     <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
-    <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+    <b>let</b> delegation_pool = <b>borrow_global</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
     <b>let</b> delegator_vote_delegation = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(
-        <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, governance_records, delegator_address
+        delegation_pool, governance_records, delegator_address
     );
     <b>let</b> pending_voter: <b>address</b> = delegator_vote_delegation.pending_voter;
 
     // No need <b>to</b> <b>update</b> <b>if</b> the voter doesn't really change.
     <b>if</b> (pending_voter != new_voter) {
         delegator_vote_delegation.pending_voter = new_voter;
-        <b>let</b> active_shares = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
+        <b>let</b> active_shares = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(delegation_pool,
             delegator_address);
         // &lt;active shares&gt; of &lt;pending voter of shareholder&gt; -= &lt;active_shares&gt;
         // &lt;active shares&gt; of &lt;new voter of shareholder&gt; += &lt;active_shares&gt;
         <b>let</b> pending_delegated_votes = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, governance_records, pending_voter
+            delegation_pool, governance_records, pending_voter
         );
         pending_delegated_votes.active_shares_next_lockup = pending_delegated_votes.active_shares_next_lockup
             - active_shares;
 
-        <b>let</b> new_delegated_votes = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
+        <b>let</b> new_delegated_votes = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(delegation_pool,
             governance_records, new_voter);
         new_delegated_votes.active_shares_next_lockup = new_delegated_votes.active_shares_next_lockup
             + active_shares;
@@ -3426,7 +3426,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 Add <code>amount</code> of coins to the delegation pool <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -3435,7 +3435,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     // short-circuit <b>if</b> amount <b>to</b> add is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation

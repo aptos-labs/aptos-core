@@ -1,6 +1,7 @@
 #[test_only]
 module supra_framework::delegation_pool_integration_tests {
     use std::features;
+    use std::option;
     use std::signer;
 
     use aptos_std::bls12381;
@@ -11,7 +12,7 @@ module supra_framework::delegation_pool_integration_tests {
     use supra_framework::supra_coin::SupraCoin;
     use supra_framework::coin;
     use supra_framework::reconfiguration;
-    use supra_framework::delegation_pool as dp;
+    use supra_framework::pbo_delegation_pool as dp;
     use supra_framework::timestamp;
 
     #[test_only]
@@ -92,6 +93,14 @@ module supra_framework::delegation_pool_integration_tests {
     }
 
     #[test_only]
+    fun generate_multisig_account(owner: &signer, addition_owner: vector<address>, threshold: u64): address {
+        let owner_addr = aptos_std::signer::address_of(owner);
+        let multisig_addr = supra_framework::multisig_account::get_next_multisig_account_address(owner_addr);
+        supra_framework::multisig_account::create_with_owners(owner, addition_owner, threshold, vector[], vector[], 300);
+        multisig_addr
+    }
+
+    #[test_only]
     public fun initialize_test_validator(
         public_key: &bls12381::PublicKey,
         proof_of_possession: &bls12381::ProofOfPossession,
@@ -105,7 +114,24 @@ module supra_framework::delegation_pool_integration_tests {
             account::create_account_for_test(validator_address);
         };
 
-        dp::initialize_delegation_pool(validator, 0, vector::empty<u8>());
+        let delegator_address = vector[@0x010, @0x020];
+        let principle_stake = vector[0, 0];
+        let coin = stake::mint_coins(0);
+        let principle_lockup_time = 60;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+        dp::initialize_delegation_pool(
+            validator,
+            option::some(multisig),
+            0,
+            vector::empty<u8>(),
+            delegator_address,
+            principle_stake,
+            coin,
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
         validator_address = dp::get_owned_pool_address(validator_address);
 
         stake::rotate_consensus_key(validator, validator_address, CONSENSUS_KEY_1);
@@ -525,7 +551,7 @@ module supra_framework::delegation_pool_integration_tests {
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10006, location = supra_framework::delegation_pool)]
+    #[expected_failure(abort_code = 0x10006, location = supra_framework::pbo_delegation_pool)]
     public entry fun test_active_validator_unlocking_more_than_available_stake_should_cap(
         supra_framework: &signer,
         validator: &signer,
@@ -1016,7 +1042,25 @@ module supra_framework::delegation_pool_integration_tests {
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(validator);
         account::create_account_for_test(validator_address);
-        dp::initialize_delegation_pool(validator, 0, vector::empty<u8>());
+        let delegator_address = vector[@0x010, @0x020];
+        let principle_stake = vector[100 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(300 * ONE_APT);
+        let principle_lockup_time = 0;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+        dp::initialize_delegation_pool(
+            validator,
+            option::some(multisig),
+            0,
+            vector::empty<u8>(),
+            delegator_address,
+            principle_stake,
+            coin,
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
+
         validator_address = dp::get_owned_pool_address(validator_address);
         mint_and_add_stake(validator, 100 * ONE_APT);
 
@@ -1044,7 +1088,25 @@ module supra_framework::delegation_pool_integration_tests {
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
         let validator_address = signer::address_of(validator);
         account::create_account_for_test(validator_address);
-        dp::initialize_delegation_pool(validator, 0, vector::empty<u8>());
+        let delegator_address = vector[@0x010, @0x020];
+        let principle_stake = vector[100 * ONE_APT, 200 * ONE_APT];
+        let coin = stake::mint_coins(300 * ONE_APT);
+        let principle_lockup_time = 0;
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+        dp::initialize_delegation_pool(
+            validator,
+            option::some(multisig),
+            0,
+            vector::empty<u8>(),
+            delegator_address,
+            principle_stake,
+            coin,
+            vector[2, 2, 3],
+            10,
+            principle_lockup_time,
+            12
+        );
+
         validator_address = dp::get_owned_pool_address(validator_address);
         mint_and_add_stake(validator, 100 * ONE_APT);
 
