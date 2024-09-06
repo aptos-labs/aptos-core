@@ -64,13 +64,3 @@ pub trait ModuleStorage {
         module_name: &IdentStr,
     ) -> VMResult<Arc<Module>>;
 }
-
-/// Storage that contains serialized modules. Clients can implement this trait
-/// for their own backends, so that [ModuleStorage] can be built on top of it.
-pub trait ModuleBytesStorage {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>>;
-}

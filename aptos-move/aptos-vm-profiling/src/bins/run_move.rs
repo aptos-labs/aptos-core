@@ -14,7 +14,7 @@ use move_core_types::{
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction, IntoUnsyncCodeStorage, LocalModuleBytesStorage,
+    native_functions::NativeFunction, AsUnsyncCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -160,15 +160,13 @@ fn main() -> Result<()> {
     ));
 
     let vm = MoveVM::new(natives);
+    let mut storage = InMemoryStorage::new();
 
-    let mut resource_storage = InMemoryStorage::new();
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
     let test_modules = compile_test_modules();
     for module in &test_modules {
         let mut blob = vec![];
         module.serialize(&mut blob).unwrap();
-        resource_storage.publish_or_overwrite_module(module.self_id(), blob.clone());
-        module_bytes_storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into())
+        storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into())
     }
 
     let src = fs::read_to_string(&args[1])?;
@@ -180,22 +178,16 @@ fn main() -> Result<()> {
         let module = Compiler::new(test_modules.iter().collect()).into_compiled_module(&src)?;
         let mut module_blob = vec![];
         module.serialize(&mut module_blob)?;
-        resource_storage.publish_or_overwrite_module(module.self_id(), module_blob.clone());
-        module_bytes_storage.add_module_bytes(
-            module.self_addr(),
-            module.self_name(),
-            module_blob.into(),
-        );
+        storage.add_module_bytes(module.self_addr(), module.self_name(), module_blob.into());
         Entrypoint::Module(module.self_id())
     };
-    let module_and_script_storage =
-        module_bytes_storage.into_unsync_code_storage(vm.runtime_environment());
 
     let mut extensions = NativeContextExtensions::default();
-    extensions.add(NativeTableContext::new([0; 32], &resource_storage));
-    let mut sess = vm.new_session_with_extensions(&resource_storage, extensions);
+    extensions.add(NativeTableContext::new([0; 32], &storage));
+    let mut sess = vm.new_session_with_extensions(&storage, extensions);
 
     let traversal_storage = TraversalStorage::new();
+    let code_storage = storage.as_unsync_code_storage(vm.runtime_environment());
 
     let args: Vec<Vec<u8>> = vec![];
     match entrypoint {
@@ -206,7 +198,7 @@ fn main() -> Result<()> {
                 args,
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_and_script_storage,
+                &code_storage,
             )?;
         },
         Entrypoint::Module(module_id) => {
@@ -217,7 +209,7 @@ fn main() -> Result<()> {
                 args,
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_and_script_storage,
+                &code_storage,
             )?;
             println!("{:?}", res);
         },

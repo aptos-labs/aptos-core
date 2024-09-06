@@ -8,8 +8,8 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage,
-    IntoUnsyncModuleStorage, LocalModuleBytesStorage, TemporaryModuleStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
+    AsUnsyncModuleStorage, TemporaryModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -26,18 +26,16 @@ fn test_publish_module_with_custom_max_binary_format_version() {
 
     // Should accept both modules with the default settings
     {
+        let storage = InMemoryStorage::new();
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
         ));
+        let mut sess = vm.new_session(&storage);
 
-        let resource_storage = InMemoryStorage::new();
-        let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
-
-        let mut sess = vm.new_session(&resource_storage);
         if vm.vm_config().use_loader_v2 {
-            let module_storage = TemporaryModuleStorage::new(
+            let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
+            let new_module_storage = TemporaryModuleStorage::new(
                 m.self_addr(),
                 vm.runtime_environment(),
                 &module_storage,
@@ -47,7 +45,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             TemporaryModuleStorage::new(
                 m.self_addr(),
                 vm.runtime_environment(),
-                &module_storage,
+                &new_module_storage,
                 vec![b_old.clone().into()],
             )
             .expect("Old module should be publishable");
@@ -72,6 +70,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
 
     // Should reject the module with newer version with max binary format version being set to VERSION_MAX - 1
     {
+        let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -85,13 +84,10 @@ fn test_publish_module_with_custom_max_binary_format_version() {
                 ..Default::default()
             },
         );
+        let mut sess = vm.new_session(&storage);
 
-        let resource_storage = InMemoryStorage::new();
-        let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
-
-        let mut sess = vm.new_session(&resource_storage);
         if vm.vm_config().use_loader_v2 {
+            let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
             let result = TemporaryModuleStorage::new(
                 m.self_addr(),
                 vm.runtime_environment(),
@@ -142,22 +138,19 @@ fn test_run_script_with_custom_max_binary_format_version() {
         .unwrap();
     s.serialize_for_version(Some(VERSION_MAX.checked_sub(1).unwrap()), &mut b_old)
         .unwrap();
-    let args: Vec<Vec<u8>> = vec![];
-
     let traversal_storage = TraversalStorage::new();
 
     // Should accept both modules with the default settings
     {
+        let storage = InMemoryStorage::new();
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
         ));
+        let mut sess = vm.new_session(&storage);
+        let code_storage = storage.as_unsync_code_storage(vm.runtime_environment());
 
-        let code_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
-        let resource_storage = InMemoryStorage::new();
-
-        let mut sess = vm.new_session(&resource_storage);
+        let args: Vec<Vec<u8>> = vec![];
         sess.execute_script(
             b_new.clone(),
             vec![],
@@ -171,7 +164,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
         sess.execute_script(
             b_old.clone(),
             vec![],
-            args.clone(),
+            args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
             &code_storage,
@@ -181,6 +174,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
 
     // Should reject the module with newer version with max binary format version being set to VERSION_MAX - 1
     {
+        let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -194,12 +188,10 @@ fn test_run_script_with_custom_max_binary_format_version() {
                 ..Default::default()
             },
         );
+        let mut sess = vm.new_session(&storage);
+        let code_storage = storage.as_unsync_code_storage(vm.runtime_environment());
 
-        let code_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
-        let resource_storage = InMemoryStorage::new();
-
-        let mut sess = vm.new_session(&resource_storage);
+        let args: Vec<Vec<u8>> = vec![];
         assert_eq!(
             sess.execute_script(
                 b_new.clone(),

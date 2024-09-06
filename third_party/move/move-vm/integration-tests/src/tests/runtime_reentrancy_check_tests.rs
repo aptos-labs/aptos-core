@@ -9,8 +9,7 @@ use move_core_types::{
     language_storage::ModuleId, vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
-    IntoUnsyncModuleStorage, LocalModuleBytesStorage,
+    module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction, AsUnsyncModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -63,24 +62,70 @@ fn make_dispatch_d_native() -> NativeFunction {
     })
 }
 
-fn set_up_storage(modules: Vec<String>) -> (InMemoryStorage, LocalModuleBytesStorage) {
-    let mut resource_storage = InMemoryStorage::new();
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
-
-    for module in modules {
-        let mut units = compile_units(&module).unwrap();
-        let m = as_module(units.pop().unwrap());
-        let mut blob = vec![];
-        m.serialize(&mut blob).unwrap();
-
-        resource_storage.publish_or_overwrite_module(m.self_id(), blob.clone());
-        module_bytes_storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
-    }
-    (resource_storage, module_bytes_storage)
+fn compile_and_publish(storage: &mut InMemoryStorage, code: String) {
+    let mut units = compile_units(&code).unwrap();
+    let m = as_module(units.pop().unwrap());
+    let mut blob = vec![];
+    m.serialize(&mut blob).unwrap();
+    storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 }
 
 #[test]
 fn runtime_reentrancy_check() {
+    let mut storage = InMemoryStorage::new();
+
+    let code_1 = format!(
+        r#"
+        module 0x{0}::B {{
+            public fun foo1() {{ Self::dispatch(0); return }}
+            public fun foo2() {{ Self::load_c(); Self::dispatch_c(0); return }}
+            public fun foo3() {{ Self::dispatch_d(0); return }}
+            native fun dispatch(_f: u64);
+            native fun dispatch_c(_f: u64);
+            native fun dispatch_d(_f: u64);
+            native fun load_c();
+        }}
+"#,
+        TEST_ADDR.to_hex(),
+    );
+
+    compile_and_publish(&mut storage, code_1);
+
+    let code_2 = format!(
+        r#"
+    module 0x{0}::A {{
+        use 0x{0}::B;
+        public fun foo1() {{ B::foo1(); return }}
+        public fun foo2() {{ B::foo2(); return }}
+        public fun foo3() {{ B::foo3(); return }}
+        public fun foo() {{ return }}
+    }}
+    module 0x{0}::B {{
+        public fun foo1() {{ Self::dispatch(0); return }}
+        public fun foo2() {{ Self::load_c(); Self::dispatch_c(0); return }}
+        public fun foo3() {{ Self::dispatch_d(0); return }}
+        native fun dispatch(_f: u64);
+        native fun dispatch_c(_f: u64);
+        native fun dispatch_d(_f: u64);
+        native fun load_c();
+    }}
+"#,
+        TEST_ADDR.to_hex(),
+    );
+
+    compile_and_publish(&mut storage, code_2);
+
+    let code_3 = format!(
+        r#"
+        module 0x{0}::C {{
+            public fun foo() {{ return }}
+        }}
+"#,
+        TEST_ADDR.to_hex(),
+    );
+
+    compile_and_publish(&mut storage, code_3);
+
     let natives = vec![
         (
             TEST_ADDR,
@@ -107,62 +152,14 @@ fn runtime_reentrancy_check() {
             make_load_c(),
         ),
     ];
-    let vm = MoveVM::new(natives);
 
-    let code_1 = format!(
-        r#"
-        module 0x{0}::B {{
-            public fun foo1() {{ Self::dispatch(0); return }}
-            public fun foo2() {{ Self::load_c(); Self::dispatch_c(0); return }}
-            public fun foo3() {{ Self::dispatch_d(0); return }}
-
-            native fun dispatch(_f: u64);
-            native fun dispatch_c(_f: u64);
-            native fun dispatch_d(_f: u64);
-            native fun load_c();
-        }}
-        "#,
-        TEST_ADDR.to_hex(),
-    );
-    let code_2 = format!(
-        r#"
-        module 0x{0}::A {{
-            use 0x{0}::B;
-            public fun foo1() {{ B::foo1(); return }}
-            public fun foo2() {{ B::foo2(); return }}
-            public fun foo3() {{ B::foo3(); return }}
-
-            public fun foo() {{ return }}
-        }}
-        module 0x{0}::B {{
-            public fun foo1() {{ Self::dispatch(0); return }}
-            public fun foo2() {{ Self::load_c(); Self::dispatch_c(0); return }}
-            public fun foo3() {{ Self::dispatch_d(0); return }}
-
-            native fun dispatch(_f: u64);
-            native fun dispatch_c(_f: u64);
-            native fun dispatch_d(_f: u64);
-            native fun load_c();
-        }}
-        "#,
-        TEST_ADDR.to_hex(),
-    );
-    let code_3 = format!(
-        r#"
-        module 0x{0}::C {{
-            public fun foo() {{ return }}
-        }}
-        "#,
-        TEST_ADDR.to_hex(),
-    );
-    let (resource_storage, module_bytes_storage) = set_up_storage(vec![code_1, code_2, code_3]);
-    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
-
-    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
     let fun_name = Identifier::new("foo1").unwrap();
     let args: Vec<Vec<u8>> = vec![];
+    let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
 
-    let mut sess = vm.new_session(&resource_storage);
+    let vm = MoveVM::new(natives);
+    let mut sess = vm.new_session(&storage);
+    let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
     let traversal_storage = TraversalStorage::new();
 
     // Call stack look like following:
@@ -213,6 +210,6 @@ fn runtime_reentrancy_check() {
         )
         .unwrap_err()
         .major_status(),
-        StatusCode::FUNCTION_RESOLUTION_FAILURE,
+        StatusCode::FUNCTION_RESOLUTION_FAILURE
     );
 }
