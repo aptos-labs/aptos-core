@@ -14,8 +14,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, IntoUnsyncModuleStorage,
-    LocalModuleBytesStorage,
+    module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -95,15 +94,13 @@ fn run(
 ) -> VMResult<(ChangeSet, SerializedReturnValues)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
-    let (resource_storage, module_bytes_storage) = setup(&modules);
-
-    let vm = MoveVM::new(vec![]);
-    let module_storage = module_bytes_storage.into_unsync_module_storage(vm.runtime_environment());
+    let (vm, storage) = setup_vm(&modules);
+    let mut session = vm.new_session(&storage);
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
+    let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
 
-    let mut session = vm.new_session(&resource_storage);
     session
         .execute_function_bypass_visibility(
             module_id,
@@ -123,21 +120,24 @@ fn run(
 type ModuleCode = (ModuleId, String);
 
 // TODO - move some utility functions to where test infra lives, see about unifying with similar code
-fn setup(modules: &[ModuleCode]) -> (InMemoryStorage, LocalModuleBytesStorage) {
-    let mut resource_storage = InMemoryStorage::new();
-    let mut module_bytes_storage = LocalModuleBytesStorage::empty();
+fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage) {
+    let mut storage = InMemoryStorage::new();
+    compile_modules(&mut storage, modules);
+    (MoveVM::new(vec![]), storage)
+}
 
-    for (id, code) in modules.iter() {
-        let mut units = compile_units(code).unwrap();
-        let module = as_module(units.pop().unwrap());
-        let mut blob = vec![];
-        module.serialize(&mut blob).unwrap();
+fn compile_modules(storage: &mut InMemoryStorage, modules: &[ModuleCode]) {
+    modules.iter().for_each(|(id, code)| {
+        compile_module(storage, id, code);
+    });
+}
 
-        resource_storage.publish_or_overwrite_module(id.clone(), blob.clone());
-        module_bytes_storage.add_module_bytes(id.address(), id.name(), blob.into());
-    }
-
-    (resource_storage, module_bytes_storage)
+fn compile_module(storage: &mut InMemoryStorage, mod_id: &ModuleId, code: &str) {
+    let mut units = compile_units(code).unwrap();
+    let module = as_module(units.pop().unwrap());
+    let mut blob = vec![];
+    module.serialize(&mut blob).unwrap();
+    storage.add_module_bytes(mod_id.address(), mod_id.name(), blob.into());
 }
 
 fn parse_u64_arg(arg: &[u8]) -> u64 {

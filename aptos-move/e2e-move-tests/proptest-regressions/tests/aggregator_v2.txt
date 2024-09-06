@@ -5,6 +5,3 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc a8f570394fd4cd6dccbec4f0f8a866f365ac76eac32cb0e8a1665f3d09f06c80 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: DisabledOnly, block_split: Whole }
-cc 52c6a6cf4201fef72829b12dfab727e8389745340f7d7410ced095d95e5cea5f # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: BothComparison, block_split: Whole }
-cc 36cb9749e2e8783398784f7e25601afa6a9d28f0baa7694bf15cf6691af06ca6 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: BothComparison, block_split: SplitIntoThree { first_len: 1, second_len: 2 } }
-cc 1671612f29bd7b2a1ca5e2a486557a1c338409a9b2f378adf554719d7d0da4cf # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: BothComparison, block_split: SplitIntoThree { first_len: 1, second_len: 3 } }, element_type = U128, use_type = UseResourceGroupType

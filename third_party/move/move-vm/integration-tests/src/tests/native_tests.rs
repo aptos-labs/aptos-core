@@ -10,7 +10,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
-    IntoUnsyncCodeStorage, LocalModuleBytesStorage, ModuleStorage, TemporaryModuleStorage,
+    session::Session, AsUnsyncCodeStorage, ModuleStorage, TemporaryModuleStorage,
     UnreachableCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -56,6 +56,8 @@ fn test_publish_module_with_nested_loops() {
     let traversal_storage = TraversalStorage::new();
 
     {
+        let storage = InMemoryStorage::new();
+
         let natives = vec![(
             TEST_ADDR,
             Identifier::new("M").unwrap(),
@@ -70,13 +72,10 @@ fn test_publish_module_with_nested_loops() {
             ..Default::default()
         });
 
-        let resource_storage = InMemoryStorage::new();
-        let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
-
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
-            let module_storage = TemporaryModuleStorage::new(
+            let module_storage = storage.as_unsync_code_storage(vm.runtime_environment());
+            let new_module_storage = TemporaryModuleStorage::new(
                 &TEST_ADDR,
                 vm.runtime_environment(),
                 &module_storage,
@@ -84,9 +83,8 @@ fn test_publish_module_with_nested_loops() {
             )
             .expect("Module should be publishable");
             load_and_run_functions(
-                &vm,
-                &resource_storage,
-                &module_storage,
+                &mut sess,
+                &new_module_storage,
                 &traversal_storage,
                 &m.self_id(),
             );
@@ -95,8 +93,7 @@ fn test_publish_module_with_nested_loops() {
             sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
                 .unwrap();
             load_and_run_functions(
-                &vm,
-                &resource_storage,
+                &mut sess,
                 &UnreachableCodeStorage,
                 &traversal_storage,
                 &m.self_id(),
@@ -106,14 +103,12 @@ fn test_publish_module_with_nested_loops() {
 }
 
 fn load_and_run_functions(
-    vm: &MoveVM,
-    resource_storage: &InMemoryStorage,
+    session: &mut Session,
     module_storage: &impl ModuleStorage,
     traversal_storage: &TraversalStorage,
     module_id: &ModuleId,
 ) {
-    let mut sess = vm.new_session(resource_storage);
-    let func = sess
+    let func = session
         .load_function(
             module_storage,
             module_id,
@@ -121,7 +116,7 @@ fn load_and_run_functions(
             &[],
         )
         .unwrap();
-    let err1 = sess
+    let err1 = session
         .execute_entry_function(
             func,
             Vec::<Vec<u8>>::new(),
@@ -133,7 +128,7 @@ fn load_and_run_functions(
 
     assert!(err1.exec_state().unwrap().stack_trace().is_empty());
 
-    let func = sess
+    let func = session
         .load_function(
             module_storage,
             module_id,
@@ -141,7 +136,7 @@ fn load_and_run_functions(
             &[],
         )
         .unwrap();
-    let err2 = sess
+    let err2 = session
         .execute_entry_function(
             func,
             Vec::<Vec<u8>>::new(),
