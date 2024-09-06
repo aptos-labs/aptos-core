@@ -114,7 +114,7 @@ impl CliCommand<()> for InitTool {
             network
         } else {
             eprintln!(
-                "Choose network from [devnet, testnet, local, custom | defaults to devnet]"
+                "Choose network from [devnet, testnet, local, custom | defaults to devnet]. For testnet, start over and run movement init --skip-faucet"
             );
             let input = read_line("network")?;
             let input = input.trim();
@@ -125,6 +125,10 @@ impl CliCommand<()> for InitTool {
                 Network::from_str(input)?
             }
         };
+
+        if network == Network::Testnet && !self.skip_faucet {
+            return Err("For testnet, start over and run movement init --skip-faucet");
+        }
 
         // Ensure the config contains the network used
         profile_config.network = Some(network);
@@ -349,7 +353,9 @@ impl CliCommand<()> for InitTool {
             .profile_name()
             .unwrap_or(DEFAULT_PROFILE);
         eprintln!(
-            "\n---\nMovement CLI is now set up for account {} as profile {}!\n See the account here: {}\n Run `movement --help` for more information about commands",
+            "\n---\nMovement CLI is now set up for account {} as profile {}!\n See the account here: {}\n 
+            Run `movement --help` for more information about commands. \n 
+            Visit https://faucet.movementlabs.xyz to use the testnet faucet.",
             address,
             profile_name,
             explorer_account_link(address, Some(network))
