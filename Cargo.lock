@@ -10872,7 +10872,6 @@ dependencies = [
  "anyhow",
  "move-binary-format",
  "move-core-types",
- "move-vm-runtime",
  "petgraph 0.6.5",
  "serde-reflection",
 ]
@@ -11630,6 +11629,7 @@ dependencies = [
  "move-compiler",
  "move-core-types",
  "move-ir-compiler",
+ "move-vm-test-utils",
  "move-vm-types",
  "once_cell",
  "parking_lot 0.12.1",

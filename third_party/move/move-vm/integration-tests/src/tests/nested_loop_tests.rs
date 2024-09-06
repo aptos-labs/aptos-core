@@ -5,8 +5,8 @@ use crate::compiler::{as_module, as_script, compile_units};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, IntoUnsyncCodeStorage,
-    IntoUnsyncModuleStorage, LocalModuleBytesStorage, TemporaryModuleStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
+    AsUnsyncModuleStorage, TemporaryModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -38,6 +38,7 @@ fn test_publish_module_with_nested_loops() {
 
     // Should succeed with max_loop_depth = 2
     {
+        let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -52,12 +53,9 @@ fn test_publish_module_with_nested_loops() {
             },
         );
 
-        let resource_storage = InMemoryStorage::new();
-        let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
-
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
+            let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
             let result = TemporaryModuleStorage::new(
                 &TEST_ADDR,
                 vm.runtime_environment(),
@@ -74,6 +72,7 @@ fn test_publish_module_with_nested_loops() {
 
     // Should fail with max_loop_depth = 1
     {
+        let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -88,12 +87,9 @@ fn test_publish_module_with_nested_loops() {
             },
         );
 
-        let resource_storage = InMemoryStorage::new();
-        let module_storage =
-            LocalModuleBytesStorage::empty().into_unsync_module_storage(vm.runtime_environment());
-
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
+            let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
             let result = TemporaryModuleStorage::new(
                 &TEST_ADDR,
                 vm.runtime_environment(),
@@ -135,6 +131,7 @@ fn test_run_script_with_nested_loops() {
 
     // Should succeed with max_loop_depth = 2
     {
+        let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -148,12 +145,9 @@ fn test_run_script_with_nested_loops() {
                 ..Default::default()
             },
         );
+        let code_storage = storage.as_unsync_code_storage(vm.runtime_environment());
 
-        let code_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
-        let resource_storage = InMemoryStorage::new();
-
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
         sess.execute_script(
             s_blob.clone(),
@@ -168,6 +162,7 @@ fn test_run_script_with_nested_loops() {
 
     // Should fail with max_loop_depth = 1
     {
+        let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
@@ -181,12 +176,9 @@ fn test_run_script_with_nested_loops() {
                 ..Default::default()
             },
         );
+        let code_storage = storage.as_unsync_code_storage(vm.runtime_environment());
 
-        let code_storage =
-            LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
-        let resource_storage = InMemoryStorage::new();
-
-        let mut sess = vm.new_session(&resource_storage);
+        let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
         sess.execute_script(
             s_blob,
