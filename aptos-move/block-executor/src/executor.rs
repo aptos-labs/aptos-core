@@ -580,6 +580,7 @@ where
                     ),
                 )?;
 
+                // TODO(loader_v2): Remove duplication here.
                 // Make sure we publish modules here before we wake up subsequent dependent
                 // transactions and decrease the validation index.
                 if runtime_environment.vm_config().use_loader_v2 {

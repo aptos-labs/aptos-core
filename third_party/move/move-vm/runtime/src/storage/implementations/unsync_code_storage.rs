@@ -173,7 +173,6 @@ impl<M: ModuleStorage + WithRuntimeEnvironment> CodeStorage for UnsyncCodeStorag
     }
 }
 
-
 #[cfg(test)]
 impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
     fn matches<P: Fn(&ScriptStorageEntry) -> bool>(
