@@ -121,12 +121,14 @@ impl CliCommand<()> for InitTool {
             if input.is_empty() {
                 eprintln!("No network given, using devnet...");
                 Network::Devnet
-            } else if input.eq_ignore_ascii_case("testnet") && self.skip_faucet {
-                Network::Testnet
             } else {
                 Network::from_str(input)?
             }
         };
+
+        if network == Network::Testnet && !self.skip_faucet {
+            return Err("For testnet, start over and run movement init --skip-faucet");
+        }
 
         // Ensure the config contains the network used
         profile_config.network = Some(network);
