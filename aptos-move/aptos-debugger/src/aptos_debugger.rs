@@ -120,12 +120,11 @@ impl AptosDebugger {
 
         let vm = AptosVM::new(&state_view);
         let resolver = state_view.as_move_resolver();
-        let module_and_script_storage = vm.as_aptos_code_storage(&state_view);
+        let code_storage = vm.as_aptos_code_storage(&state_view);
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
             &txn,
             &log_context,
             |gas_meter| {

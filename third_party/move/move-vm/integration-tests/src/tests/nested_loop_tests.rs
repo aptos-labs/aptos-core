@@ -149,7 +149,7 @@ fn test_run_script_with_nested_loops() {
             },
         );
 
-        let module_and_script_storage =
+        let code_storage =
             LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
         let resource_storage = InMemoryStorage::new();
 
@@ -161,8 +161,7 @@ fn test_run_script_with_nested_loops() {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .unwrap();
     }
@@ -183,7 +182,7 @@ fn test_run_script_with_nested_loops() {
             },
         );
 
-        let module_and_script_storage =
+        let code_storage =
             LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
         let resource_storage = InMemoryStorage::new();
 
@@ -195,8 +194,7 @@ fn test_run_script_with_nested_loops() {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .unwrap_err();
     }
