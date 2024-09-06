@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::loader::Module;
+use ambassador::delegatable_trait;
 use bytes::Bytes;
-use move_binary_format::{errors::PartialVMResult, CompiledModule};
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use std::sync::Arc;
 
 /// Represents module storage backend, abstracting away any caching behaviour. The
 /// clients can implement their own module storage to pass to the VM to resolve code.
+#[delegatable_trait]
 pub trait ModuleStorage {
     /// Returns true if the module exists, and false otherwise. An error is returned
     /// if there is a storage error.
@@ -16,7 +18,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<bool>;
+    ) -> VMResult<bool>;
 
     /// Returns module bytes. An error is returned if there is a storage error. If
     /// the module does not exist, returns [None].
@@ -24,15 +26,15 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>>;
+    ) -> VMResult<Option<Bytes>>;
 
-    /// Returns the size of a module in bytes. An error is returned if the module does
-    /// not exist, or there is a storage error.
+    /// Returns the size of a module in bytes. An error is returned if the there is
+    /// a storage error. If module does not exist, [None] is returned.
     fn fetch_module_size_in_bytes(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<usize>;
+    ) -> VMResult<Option<usize>>;
 
     /// Returns the metadata in the module. An error is returned if the module does
     /// not exist, or there is a storage error.
@@ -40,7 +42,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>>;
+    ) -> VMResult<Vec<Metadata>>;
 
     /// Returns the deserialized module. There is no guarantees that the module has been
     /// previously verified. An error is returned if:
@@ -51,7 +53,7 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>>;
+    ) -> VMResult<Arc<CompiledModule>>;
 
     /// Returns the verified module. The module can be either in a cached state (it is
     /// then returned) or newly constructed. The error is returned if the storage fails
@@ -60,7 +62,17 @@ pub trait ModuleStorage {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>>;
+    ) -> VMResult<Arc<Module>>;
+}
+
+/// Storage that contains serialized modules. Clients can implement this trait
+/// for their own backends, so that [ModuleStorage] can be built on top of it.
+pub trait ModuleBytesStorage {
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>>;
 }
 
 /// Storage that contains serialized modules. Clients can implement this trait

@@ -90,7 +90,9 @@ impl<'r> WriteOpConverter<'r> {
             let addr = compiled_module.self_addr();
             let name = compiled_module.self_name();
 
-            let module_exists = module_storage.check_module_exists(addr, name)?;
+            let module_exists = module_storage
+                .check_module_exists(addr, name)
+                .map_err(|e| e.to_partial())?;
             let op = if module_exists {
                 Op::Modify(bytes)
             } else {

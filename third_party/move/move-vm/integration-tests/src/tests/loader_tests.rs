@@ -221,7 +221,7 @@ fn load() {
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage = LocalModuleBytesStorage::empty()
             .into_unsync_module_storage(adapter.vm.runtime_environment());
-        adapter.publish_modules_using_loader_v2(&module_storage, modules);
+        let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.call_functions(&module_storage);
     } else {
         adapter.publish_modules(modules);
@@ -448,14 +448,21 @@ fn deep_dependency_list_ok_0() {
     // create a chain of dependencies
     let max = 100u64;
     dependency_chain(1, max, &mut modules);
-    adapter.publish_modules(modules);
-
-    let mut adapter = adapter.fresh();
     let name = format!("A{}", max);
     let dep_name = format!("A{}", max - 1);
     let deps = vec![dep_name];
     let module = empty_module_with_dependencies(name, deps);
-    adapter.publish_modules(vec![module]);
+
+    if adapter.vm.vm_config().use_loader_v2 {
+        let module_storage = LocalModuleBytesStorage::empty()
+            .into_unsync_module_storage(adapter.vm.runtime_environment());
+        let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
+        adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
+    } else {
+        adapter.publish_modules(modules);
+        let mut adapter = adapter.fresh();
+        adapter.publish_modules(vec![module]);
+    }
 }
 
 #[test]
@@ -468,14 +475,21 @@ fn deep_dependency_list_ok_1() {
     // create a chain of dependencies
     let max = 30u64;
     dependency_chain(1, max, &mut modules);
-    adapter.publish_modules(modules);
-
-    let mut adapter = adapter.fresh();
     let name = format!("A{}", max);
     let dep_name = format!("A{}", max - 1);
     let deps = vec![dep_name];
     let module = empty_module_with_dependencies(name, deps);
-    adapter.publish_modules(vec![module]);
+
+    if adapter.vm.vm_config().use_loader_v2 {
+        let module_storage = LocalModuleBytesStorage::empty()
+            .into_unsync_module_storage(adapter.vm.runtime_environment());
+        let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
+        adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
+    } else {
+        adapter.publish_modules(modules);
+        let mut adapter = adapter.fresh();
+        adapter.publish_modules(vec![module]);
+    }
 }
 
 #[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
@@ -619,17 +633,24 @@ fn deep_friend_list_ok_0() {
 
     let mut modules = vec![];
 
-    // create a chain of dependencies
+    // create a chain of friends
     let max = 100u64;
     friend_chain(1, max, &mut modules);
-    adapter.publish_modules(modules);
-
-    let mut adapter = adapter.fresh();
     let name = format!("A{}", max);
     let dep_name = format!("A{}", max - 1);
     let deps = vec![dep_name];
     let module = empty_module_with_friends(name, deps);
-    adapter.publish_modules(vec![module]);
+
+    if adapter.vm.vm_config().use_loader_v2 {
+        let module_storage = LocalModuleBytesStorage::empty()
+            .into_unsync_module_storage(adapter.vm.runtime_environment());
+        let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
+        adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
+    } else {
+        adapter.publish_modules(modules);
+        let mut adapter = adapter.fresh();
+        adapter.publish_modules(vec![module]);
+    }
 }
 
 #[test]
@@ -639,17 +660,24 @@ fn deep_friend_list_ok_1() {
 
     let mut modules = vec![];
 
-    // create a chain of dependencies
+    // create a chain of friends
     let max = 30u64;
     friend_chain(1, max, &mut modules);
-    adapter.publish_modules(modules);
-
-    let mut adapter = adapter.fresh();
     let name = format!("A{}", max);
     let dep_name = format!("A{}", max - 1);
     let deps = vec![dep_name];
     let module = empty_module_with_friends(name, deps);
-    adapter.publish_modules(vec![module]);
+
+    if adapter.vm.vm_config().use_loader_v2 {
+        let module_storage = LocalModuleBytesStorage::empty()
+            .into_unsync_module_storage(adapter.vm.runtime_environment());
+        let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
+        adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
+    } else {
+        adapter.publish_modules(modules);
+        let mut adapter = adapter.fresh();
+        adapter.publish_modules(vec![module]);
+    }
 }
 
 fn leaf_module(name: &str) -> CompiledModule {

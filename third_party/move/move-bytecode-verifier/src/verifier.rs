@@ -101,6 +101,8 @@ pub fn verify_module_with_config_for_test_with_version(
 }
 
 pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
+    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
+
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         // Always needs to run bound checker first as subsequent passes depend on it
@@ -160,7 +162,7 @@ pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
 }
 
 pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
-    fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
+    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
 
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
