@@ -1,0 +1,14 @@
+---
+remote_endpoint: ~
+name: transaction_simulation_enhancement
+proposals:
+  - name: enable_transaction_simulation_enhancement
+    metadata:
+      title: "Enable the transaction simulation enhancement"
+      description: "Enables the transaction simulation enhancement described in AIP-92 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-92.md)"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/493"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - transaction_simulation_enhancement
