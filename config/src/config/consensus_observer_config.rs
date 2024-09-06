@@ -30,6 +30,8 @@ pub struct ConsensusObserverConfig {
 
     /// Interval (in milliseconds) to garbage collect peer state
     pub garbage_collection_interval_ms: u64,
+    /// The maximum number of concurrent subscriptions
+    pub max_concurrent_subscriptions: u64,
     /// Maximum number of blocks to keep in memory (e.g., pending blocks, ordered blocks, etc.)
     pub max_num_pending_blocks: u64,
     /// Maximum timeout (in milliseconds) for active subscriptions
@@ -52,14 +54,15 @@ impl Default for ConsensusObserverConfig {
             publisher_enabled: false,
             max_network_channel_size: 1000,
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
-            network_request_timeout_ms: 10_000,                // 10 seconds
+            network_request_timeout_ms: 5_000,                 // 5 seconds
             garbage_collection_interval_ms: 60_000,            // 60 seconds
-            max_num_pending_blocks: 100,                       // 100 blocks
-            max_subscription_timeout_ms: 30_000,               // 30 seconds
-            max_synced_version_timeout_ms: 60_000,             // 60 seconds
-            progress_check_interval_ms: 5_000,                 // 5 seconds
-            subscription_peer_change_interval_ms: 60_000,      // 1 minute
-            subscription_refresh_interval_ms: 300_000,         // 5 minutes
+            max_concurrent_subscriptions: 2,
+            max_num_pending_blocks: 100,
+            max_subscription_timeout_ms: 30_000,   // 30 seconds
+            max_synced_version_timeout_ms: 60_000, // 60 seconds
+            progress_check_interval_ms: 5_000,     // 5 seconds
+            subscription_peer_change_interval_ms: 120_000, // 2 minutes
+            subscription_refresh_interval_ms: 300_000, // 5 minutes
         }
     }
 }

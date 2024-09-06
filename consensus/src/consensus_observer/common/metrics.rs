@@ -16,7 +16,7 @@ pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
-pub const ORDERED_BLOCKS_LABEL: &str = "ordered_blocks";
+pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
@@ -36,6 +36,16 @@ pub static OBSERVER_DROPPED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "consensus_observer_dropped_messages",
         "Counters related to dropped (direct send) messages by the consensus observer",
+        &["message_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking rejected (direct send) messages by the consensus observer
+pub static OBSERVER_REJECTED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_rejected_messages",
+        "Counters related to rejected (direct send) messages by the consensus observer",
         &["message_type", "network_id"]
     )
     .unwrap()
@@ -191,8 +201,8 @@ pub static PUBLISHER_SENT_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Increments the given request counter with the provided values
-pub fn increment_request_counter(
+/// Increments the given counter with the provided values
+pub fn increment_counter(
     counter: &Lazy<IntCounterVec>,
     label: &str,
     peer_network_id: &PeerNetworkId,

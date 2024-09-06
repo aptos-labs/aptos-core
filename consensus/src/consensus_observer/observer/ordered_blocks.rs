@@ -177,7 +177,7 @@ impl OrderedBlockStore {
             .sum();
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
-            metrics::ORDERED_BLOCKS_LABEL,
+            metrics::ORDERED_BLOCK_LABEL,
             num_ordered_blocks,
         );
 
@@ -189,7 +189,7 @@ impl OrderedBlockStore {
             .unwrap_or(0);
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
-            metrics::ORDERED_BLOCKS_LABEL,
+            metrics::ORDERED_BLOCK_LABEL,
             highest_ordered_round,
         );
 
