@@ -11,7 +11,8 @@ use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use aptos_vm_types::{
-    change_set::ChangeSetInterface, resolver::ExecutorView, storage::space_pricing::ChargeAndRefund,
+    change_set::ChangeSetInterface, module_and_script_storage::module_storage::AptosModuleStorage,
+    resolver::ExecutorView, storage::space_pricing::ChargeAndRefund,
 };
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
@@ -572,6 +573,8 @@ where
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
         executor_view: &dyn ExecutorView,
+        module_storage: &impl AptosModuleStorage,
+        is_loader_v2_enabled: bool,
     ) -> VMResult<Fee> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
@@ -592,7 +595,9 @@ where
         let mut write_fee = Fee::new(0);
         let mut write_set_storage = vec![];
         let mut total_refund = Fee::new(0);
-        for res in change_set.write_op_info_iter_mut(executor_view) {
+        for res in
+            change_set.write_op_info_iter_mut(executor_view, module_storage, is_loader_v2_enabled)
+        {
             let write_op_info = res.map_err(|err| err.finish(Location::Undefined))?;
             let key = write_op_info.key.clone();
             let op_type = write_op_type(&write_op_info.op_size);

@@ -159,6 +159,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0942ffc6dcaadf03badf6e6a2d0228460359d5e34b57ccdc720b7382dfbd5ec5"
 
 [[package]]
+name = "ambassador"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b27ba24e4d8a188489d5a03c7fabc167a60809a383cdb4d15feb37479cd2a48"
+dependencies = [
+ "itertools 0.10.5",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4539,6 +4551,7 @@ dependencies = [
 name = "aptos-vm-types"
 version = "0.0.1"
 dependencies = [
+ "ambassador",
  "anyhow",
  "aptos-aggregator",
  "aptos-gas-algebra",
@@ -10914,6 +10927,7 @@ dependencies = [
  "anyhow",
  "move-binary-format",
  "move-core-types",
+ "move-vm-runtime",
  "petgraph 0.6.5",
  "serde-reflection",
 ]
@@ -11656,6 +11670,7 @@ dependencies = [
 name = "move-vm-runtime"
 version = "0.1.0"
 dependencies = [
+ "ambassador",
  "anyhow",
  "better_any",
  "bytes",
