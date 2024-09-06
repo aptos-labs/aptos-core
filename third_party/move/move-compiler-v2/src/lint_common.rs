@@ -20,6 +20,7 @@ pub enum LintChecker {
     AvoidCopyOnIdentityComparison,
     BlocksInConditions,
     NeedlessBool,
+    NeedlessRefInFieldAccess,
     SimplerNumericExpression,
     UnnecessaryBooleanIdentityComparison,
     UnnecessaryNumericalExtremeComparison,
