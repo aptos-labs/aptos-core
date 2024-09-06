@@ -151,7 +151,7 @@ impl MoveVmExt {
             .features()
             .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES);
 
-        let vm = if env.features().use_loader_v2() {
+        let vm = if env.features().is_loader_v2_enabled() {
             // TODO(loader_v2): For now re-create the VM every time. Later we can have a
             //                  single VM created once.
             MoveVM::new_with_config(

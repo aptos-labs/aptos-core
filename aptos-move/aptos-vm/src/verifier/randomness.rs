@@ -5,7 +5,7 @@ use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
 use aptos_framework::{KnownAttribute, RandomnessAnnotation};
 use aptos_types::transaction::EntryFunction;
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
-use move_binary_format::errors::{Location, VMResult};
+use move_binary_format::errors::VMResult;
 
 pub(crate) fn get_randomness_annotation(
     resolver: &impl AptosMoveResolver,
@@ -17,8 +17,7 @@ pub(crate) fn get_randomness_annotation(
     let module = if use_loader_v2 {
         // TODO(loader_v2): Enhance this further by querying RuntimeModuleMetadataV1 directly.
         module_storage
-            .fetch_deserialized_module(entry_fn.module().address(), entry_fn.module().name())
-            .map_err(|e| e.finish(Location::Undefined))?
+            .fetch_deserialized_module(entry_fn.module().address(), entry_fn.module().name())?
     } else {
         #[allow(deprecated)]
         session

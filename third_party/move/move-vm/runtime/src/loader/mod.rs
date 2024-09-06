@@ -5,7 +5,7 @@
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     module_traversal::TraversalContext, script_hash,
-    storage::module_storage::ModuleStorage as ModuleStorageV2, RuntimeEnvironment,
+    storage::module_storage::ModuleStorage as ModuleStorageV2, CodeStorage, RuntimeEnvironment,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -52,9 +52,7 @@ mod type_loader;
 
 use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
-    storage::{
-        loader::LoaderV2, script_storage::ScriptStorage, struct_name_index_map::StructNameIndexMap,
-    },
+    storage::{loader::LoaderV2, struct_name_index_map::StructNameIndexMap},
 };
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
@@ -197,8 +195,7 @@ impl Loader {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         script_blob: &[u8],
-        module_storage: &impl ModuleStorageV2,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
         match self {
             Self::V1(loader) => loader.check_script_dependencies_and_check_gas(
@@ -208,15 +205,12 @@ impl Loader {
                 traversal_context,
                 script_blob,
             ),
-            Self::V2(loader) => loader
-                .check_script_dependencies_and_check_gas(
-                    module_storage,
-                    script_storage,
-                    gas_meter,
-                    traversal_context,
-                    script_blob,
-                )
-                .map_err(|e| e.finish(Location::Undefined)),
+            Self::V2(loader) => loader.check_script_dependencies_and_check_gas(
+                code_storage,
+                gas_meter,
+                traversal_context,
+                script_blob,
+            ),
         }
     }
 
@@ -243,15 +237,13 @@ impl Loader {
                 referenced_modules,
                 ids,
             ),
-            Self::V2(loader) => loader
-                .check_dependencies_and_charge_gas(
-                    module_storage,
-                    gas_meter,
-                    visited,
-                    referenced_modules,
-                    ids,
-                )
-                .map_err(|e| e.finish(Location::Undefined)),
+            Self::V2(loader) => loader.check_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                visited,
+                referenced_modules,
+                ids,
+            ),
         }
     }
 
@@ -261,14 +253,11 @@ impl Loader {
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-        module_storage: &impl ModuleStorageV2,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<LoadedFunction> {
         match self {
             Self::V1(loader) => loader.load_script(script_blob, ty_args, data_store, module_store),
-            Self::V2(loader) => {
-                loader.load_script(module_storage, script_storage, script_blob, ty_args)
-            },
+            Self::V2(loader) => loader.load_script(code_storage, script_blob, ty_args),
         }
     }
 
@@ -288,18 +277,12 @@ impl Loader {
                     .resolve_module_and_function_by_name(module_id, function_name)
                     .map_err(|err| err.finish(Location::Undefined))
             },
-            Loader::V2(loader) => loader
-                .load_function_without_ty_args(
-                    module_storage,
-                    module_id.address(),
-                    module_id.name(),
-                    function_name,
-                )
-                .map_err(|e| {
-                    // TODO(loader_v2): Revisit errors...
-                    let e = e.finish(Location::Undefined);
-                    expect_no_verification_errors(e)
-                }),
+            Loader::V2(loader) => loader.load_function_without_ty_args(
+                module_storage,
+                module_id.address(),
+                module_id.name(),
+                function_name,
+            ),
         }
     }
 
@@ -670,8 +653,6 @@ impl LoaderV1 {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<()> {
-        fail::fail_point!("verifier-failpoint-1", |_| { Ok(()) });
-
         let mut bundle_unverified: BTreeSet<_> = modules.iter().map(|m| m.self_id()).collect();
         let mut bundle_verified = BTreeMap::new();
         for module in modules {
@@ -967,8 +948,6 @@ impl LoaderV1 {
         let (module, size, hash_value) =
             data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
 
-        fail::fail_point!("verifier-failpoint-2", |_| { Ok((module.clone(), size)) });
-
         if self.vm_config().paranoid_type_checks && &module.self_id() != id {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1082,9 +1061,6 @@ impl LoaderV1 {
         let all_imm_deps = bundle_deps
             .into_iter()
             .chain(cached_deps.iter().map(|m| m.module()));
-
-        fail::fail_point!("verifier-failpoint-4", |_| { Ok(()) });
-
         let result = dependencies::verify_module(module, all_imm_deps);
 
         // if dependencies loading is not allowed to fail, the linking should not fail as well
@@ -1320,12 +1296,24 @@ impl<'a> Resolver<'a> {
             Loader::V1(_) => self
                 .module_store
                 .resolve_module_and_function_by_name(module_id, function_name)?,
-            Loader::V2(loader) => loader.load_function_without_ty_args(
-                self.module_storage,
-                module_id.address(),
-                module_id.name(),
-                function_name,
-            )?,
+            Loader::V2(loader) => loader
+                .load_function_without_ty_args(
+                    self.module_storage,
+                    module_id.address(),
+                    module_id.name(),
+                    function_name,
+                )
+                .map_err(|_| {
+                    // Note: Loader V1 implementation uses this error.
+                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
+                        format!(
+                            "Module or function do not exist for {}::{}::{}",
+                            module_id.address(),
+                            module_id.name(),
+                            function_name
+                        ),
+                    )
+                })?,
         };
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),

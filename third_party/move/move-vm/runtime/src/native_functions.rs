@@ -220,12 +220,18 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
                     .module_store()
                     .resolve_module_and_function_by_name(module_id, function_name)?
             },
-            Loader::V2(loader) => loader.load_function_without_ty_args(
-                self.resolver.module_storage(),
-                module_id.address(),
-                module_id.name(),
-                function_name,
-            )?,
+            Loader::V2(loader) => loader
+                .load_function_without_ty_args(
+                    self.resolver.module_storage(),
+                    module_id.address(),
+                    module_id.name(),
+                    function_name,
+                )
+                // Note: Keeping this consistent with Loader V1 implementation.
+                .map_err(|_| {
+                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                        .with_message(format!("Module {} doesn't exist", module_id))
+                })?,
         };
         Ok(function)
     }
