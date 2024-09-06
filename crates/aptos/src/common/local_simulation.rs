@@ -23,15 +23,10 @@ pub fn run_transaction_using_debugger(
     let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
     let resolver = state_view.as_move_resolver();
-    let module_and_script_storage = vm.as_aptos_code_storage(&state_view);
+    let code_storage = vm.as_aptos_code_storage(&state_view);
 
-    let (vm_status, vm_output) = vm.execute_user_transaction(
-        &resolver,
-        &module_and_script_storage,
-        &module_and_script_storage,
-        &transaction,
-        &log_context,
-    );
+    let (vm_status, vm_output) =
+        vm.execute_user_transaction(&resolver, &code_storage, &transaction, &log_context);
 
     Ok((vm_status, vm_output))
 }
@@ -47,14 +42,9 @@ pub fn benchmark_transaction_using_debugger(
     let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
     let resolver = state_view.as_move_resolver();
-    let module_and_script_storage = vm.as_aptos_code_storage(&state_view);
-    let (vm_status, vm_output) = vm.execute_user_transaction(
-        &resolver,
-        &module_and_script_storage,
-        &module_and_script_storage,
-        &transaction,
-        &log_context,
-    );
+    let code_storage = vm.as_aptos_code_storage(&state_view);
+    let (vm_status, vm_output) =
+        vm.execute_user_transaction(&resolver, &code_storage, &transaction, &log_context);
 
     let time_cold = {
         let n = 15;
@@ -64,13 +54,13 @@ pub fn benchmark_transaction_using_debugger(
             // Create a new VM each time so to include code loading as part of the
             // total running time.
             let vm = AptosVM::new(&state_view);
+            let code_storage = vm.as_aptos_code_storage(&state_view);
             let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
             let t1 = Instant::now();
             std::hint::black_box(vm.execute_user_transaction(
                 &resolver,
-                &module_and_script_storage,
-                &module_and_script_storage,
+                &code_storage,
                 &transaction,
                 &log_context,
             ));
@@ -93,8 +83,7 @@ pub fn benchmark_transaction_using_debugger(
             let t1 = Instant::now();
             std::hint::black_box(vm.execute_user_transaction(
                 &resolver,
-                &module_and_script_storage,
-                &module_and_script_storage,
+                &code_storage,
                 &transaction,
                 &log_context,
             ));

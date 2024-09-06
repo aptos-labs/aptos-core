@@ -256,7 +256,7 @@ fn call_script_with_args_ty_args_signers(
 ) -> VMResult<()> {
     let move_vm = MoveVM::new(vec![]);
 
-    let module_and_script_storage =
+    let code_storage =
         LocalModuleBytesStorage::empty().into_unsync_code_storage(move_vm.runtime_environment());
     let resource_storage = InMemoryStorage::new();
 
@@ -270,8 +270,7 @@ fn call_script_with_args_ty_args_signers(
             combine_signers_and_args(signers, non_signer_args),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .map(|_| ())
 }

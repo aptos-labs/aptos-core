@@ -6,14 +6,15 @@ use crate::{
     storage::{
         environment::WithEnvironment,
         implementations::unsync_module_storage::IntoUnsyncModuleStorage,
-        module_storage::ModuleBytesStorage,
+        module_storage::{ambassador_impl_ModuleStorage, ModuleBytesStorage},
     },
-    Module, ModuleStorage, RuntimeEnvironment, Script, ScriptStorage, UnsyncModuleStorage,
+    CodeStorage, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncModuleStorage,
 };
+use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
     access::ScriptAccess,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, VMResult},
     file_format::CompiledScript,
     CompiledModule,
 };
@@ -37,6 +38,8 @@ enum ScriptStorageEntry {
 }
 
 /// Code storage that stores both modules and scripts (not thread-safe).
+#[derive(Delegate)]
+#[delegate(ModuleStorage, target = "module_storage")]
 pub struct UnsyncCodeStorage<M> {
     script_storage: RefCell<HashMap<[u8; 32], ScriptStorageEntry>>,
     module_storage: M,
@@ -75,7 +78,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
 
     /// Deserializes the script into its compiled representation. The deserialization
     /// is based on the current environment configurations.
-    fn deserialize_script(&self, serialized_script: &[u8]) -> PartialVMResult<Arc<CompiledScript>> {
+    fn deserialize_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
         let deserializer_config = &self
             .module_storage
             .runtime_environment()
@@ -86,7 +89,9 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
                 .map_err(|err| {
                     // Note: we remap the error to be consistent with loader V1 implementation!
                     let msg = format!("[VM] deserializer for script returned error: {:?}", err);
-                    PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR).with_message(msg)
+                    PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                        .with_message(msg)
+                        .finish(Location::Script)
                 })?;
         Ok(Arc::new(compiled_script))
     }
@@ -101,7 +106,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
     fn verify_deserialized_script(
         &self,
         compiled_script: Arc<CompiledScript>,
-    ) -> PartialVMResult<Arc<Script>> {
+    ) -> VMResult<Arc<Script>> {
         let partially_compiled_script = self
             .module_storage
             .runtime_environment()
@@ -109,7 +114,7 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
         let immediate_dependencies = compiled_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| self.module_storage.fetch_verified_module(addr, name))
-            .collect::<PartialVMResult<Vec<_>>>()?;
+            .collect::<VMResult<Vec<_>>>()?;
         Ok(Arc::new(
             self.module_storage
                 .runtime_environment()
@@ -118,11 +123,11 @@ impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
     }
 }
 
-impl<M: ModuleStorage + WithEnvironment> ScriptStorage for UnsyncCodeStorage<M> {
-    fn fetch_deserialized_script(
+impl<M: ModuleStorage + WithEnvironment> CodeStorage for UnsyncCodeStorage<M> {
+    fn deserialize_and_cache_script(
         &self,
         serialized_script: &[u8],
-    ) -> PartialVMResult<Arc<CompiledScript>> {
+    ) -> VMResult<Arc<CompiledScript>> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;
 
@@ -142,7 +147,7 @@ impl<M: ModuleStorage + WithEnvironment> ScriptStorage for UnsyncCodeStorage<M> 
         })
     }
 
-    fn fetch_verified_script(&self, serialized_script: &[u8]) -> PartialVMResult<Arc<Script>> {
+    fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
         use hash_map::Entry::*;
         use ScriptStorageEntry::*;
 
@@ -168,60 +173,6 @@ impl<M: ModuleStorage + WithEnvironment> ScriptStorage for UnsyncCodeStorage<M> 
     }
 }
 
-impl<M: ModuleStorage + WithEnvironment> ModuleStorage for UnsyncCodeStorage<M> {
-    fn check_module_exists(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<bool> {
-        self.module_storage
-            .check_module_exists(address, module_name)
-    }
-
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<Option<Bytes>> {
-        self.module_storage.fetch_module_bytes(address, module_name)
-    }
-
-    fn fetch_module_size_in_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<usize> {
-        self.module_storage
-            .fetch_module_size_in_bytes(address, module_name)
-    }
-
-    fn fetch_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<Vec<Metadata>> {
-        self.module_storage
-            .fetch_module_metadata(address, module_name)
-    }
-
-    fn fetch_deserialized_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<CompiledModule>> {
-        self.module_storage
-            .fetch_deserialized_module(address, module_name)
-    }
-
-    fn fetch_verified_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Module>> {
-        self.module_storage
-            .fetch_verified_module(address, module_name)
-    }
-}
 
 #[cfg(test)]
 impl<M: ModuleStorage + WithEnvironment> UnsyncCodeStorage<M> {
@@ -279,14 +230,14 @@ mod test {
         let serialized_script = script(vec!["a"]);
         let hash_1 = script_hash(&serialized_script);
 
-        assert_ok!(code_storage.fetch_deserialized_script(&serialized_script));
+        assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.matches(vec![hash_1], |e| matches!(e, Deserialized(..))));
         assert!(code_storage.matches(vec![], |e| matches!(e, Verified(..))));
 
         let serialized_script = script(vec!["b"]);
         let hash_2 = script_hash(&serialized_script);
 
-        assert_ok!(code_storage.fetch_deserialized_script(&serialized_script));
+        assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.module_storage().does_not_have_cached_modules());
         assert!(code_storage.matches(vec![hash_1, hash_2], |e| matches!(e, Deserialized(..))));
         assert!(code_storage.matches(vec![], |e| matches!(e, Verified(..))));
@@ -307,12 +258,12 @@ mod test {
 
         let serialized_script = script(vec!["a"]);
         let hash = script_hash(&serialized_script);
-        assert_ok!(code_storage.fetch_deserialized_script(&serialized_script));
+        assert_ok!(code_storage.deserialize_and_cache_script(&serialized_script));
         assert!(code_storage.module_storage().does_not_have_cached_modules());
         assert!(code_storage.matches(vec![hash], |e| matches!(e, S::Deserialized(..))));
         assert!(code_storage.matches(vec![], |e| matches!(e, S::Verified(..))));
 
-        assert_ok!(code_storage.fetch_verified_script(&serialized_script));
+        assert_ok!(code_storage.verify_and_cache_script(&serialized_script));
 
         assert!(code_storage.matches(vec![], |e| matches!(e, S::Deserialized(..))));
         assert!(code_storage.matches(vec![hash], |e| matches!(e, S::Verified(..))));

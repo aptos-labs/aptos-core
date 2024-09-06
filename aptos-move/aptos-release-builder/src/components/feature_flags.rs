@@ -132,7 +132,7 @@ pub enum FeatureFlag {
     TransactionSimulationEnhancement,
     CollectionOwner,
     TransactionContextHashFunctionUpdate,
-    UseLoaderV2,
+    EnableLoaderV2,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -352,7 +352,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::TransactionContextHashFunctionUpdate => {
                 AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE
             },
-            FeatureFlag::UseLoaderV2 => AptosFeatureFlag::USE_LOADER_V2,
+            FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
         }
     }
 }
@@ -499,7 +499,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE => {
                 FeatureFlag::TransactionContextHashFunctionUpdate
             },
-            AptosFeatureFlag::USE_LOADER_V2 => FeatureFlag::UseLoaderV2,
+            AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
         }
     }
 }

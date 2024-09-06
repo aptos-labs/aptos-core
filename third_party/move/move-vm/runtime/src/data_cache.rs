@@ -247,7 +247,8 @@ impl<'r> TransactionDataCache<'r> {
                 },
                 Loader::V2(_) => {
                     let metadata = module_storage
-                        .fetch_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())?;
+                        .fetch_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())
+                        .map_err(|e| e.to_partial())?;
                     // If we need to process aggregator lifting, we pass type layout to remote.
                     // Remote, in turn ensures that all aggregator values are lifted if the resolved
                     // resource comes from storage.

@@ -6,6 +6,7 @@ use crate::{
         AbstractResourceWriteOp, GroupWrite, InPlaceDelayedFieldChangeOp,
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
+    module_and_script_storage::module_storage::AptosModuleStorage,
     module_write_set::ModuleWriteSet,
     resolver::ExecutorView,
 };
@@ -847,6 +848,8 @@ pub trait ChangeSetInterface {
     fn write_op_info_iter_mut<'a>(
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
+        module_storage: &'a impl AptosModuleStorage,
+        is_loader_v2_enabled: bool,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>>;
 }
 
@@ -871,6 +874,8 @@ impl ChangeSetInterface for VMChangeSet {
     fn write_op_info_iter_mut<'a>(
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
+        _module_storage: &'a impl AptosModuleStorage,
+        _is_loader_v2_enabled: bool,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
             Ok(WriteOpInfo {

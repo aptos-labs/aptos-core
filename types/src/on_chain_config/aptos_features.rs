@@ -98,7 +98,7 @@ pub enum FeatureFlag {
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
     TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE = 80,
-    USE_LOADER_V2 = 81,
+    ENABLE_LOADER_V2 = 81,
 }
 
 impl FeatureFlag {
@@ -202,7 +202,7 @@ impl Default for Features {
         }
 
         if use_loader_v2_based_on_env() {
-            features.enable(FeatureFlag::USE_LOADER_V2);
+            features.enable(FeatureFlag::ENABLE_LOADER_V2);
         }
 
         features
@@ -329,8 +329,8 @@ impl Features {
         self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
     }
 
-    pub fn use_loader_v2(&self) -> bool {
-        self.is_enabled(FeatureFlag::USE_LOADER_V2)
+    pub fn is_loader_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
