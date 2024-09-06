@@ -6,11 +6,12 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     loader::{LoadedFunction, ModuleStorageAdapter},
+    module_linker_error,
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     storage::module_storage::ModuleStorage,
-    ScriptStorage,
+    CodeStorage,
 };
 use bytes::Bytes;
 use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
@@ -91,7 +92,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// Execute a Move function ignoring its visibility and whether it is entry or not.
     pub fn execute_function_bypass_visibility(
         &mut self,
-        module: &ModuleId,
+        module_id: &ModuleId,
         function_name: &IdentStr,
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
@@ -99,8 +100,16 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
+        if self.move_vm.vm_config().use_loader_v2 {
+            let addr = module_id.address();
+            let name = module_id.name();
+            if !module_storage.check_module_exists(addr, name)? {
+                return Err(module_linker_error!(addr, name));
+            }
+        }
+
         let func = self.move_vm.runtime.loader().load_function(
-            module,
+            module_id,
             function_name,
             &ty_args,
             &mut self.data_cache,
@@ -163,8 +172,7 @@ impl<'r, 'l> Session<'r, 'l> {
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
     ) -> VMResult<()> {
         self.move_vm.runtime.execute_script(
             script,
@@ -175,8 +183,7 @@ impl<'r, 'l> Session<'r, 'l> {
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
-            module_storage,
-            script_storage,
+            code_storage,
         )
     }
 
@@ -365,8 +372,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// Load a script and all of its types into cache
     pub fn load_script(
         &mut self,
-        module_storage: &impl ModuleStorage,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
         script: impl Borrow<[u8]>,
         ty_args: &[TypeTag],
     ) -> VMResult<LoadedFunction> {
@@ -375,8 +381,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ty_args,
             &mut self.data_cache,
             &self.module_store,
-            module_storage,
-            script_storage,
+            code_storage,
         )
     }
 
@@ -525,8 +530,7 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn check_script_dependencies_and_check_gas(
         &mut self,
-        module_storage: &impl ModuleStorage,
-        script_storage: &impl ScriptStorage,
+        code_storage: &impl CodeStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         script: impl Borrow<[u8]>,
@@ -540,8 +544,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 gas_meter,
                 traversal_context,
                 script.borrow(),
-                module_storage,
-                script_storage,
+                code_storage,
             )
     }
 }

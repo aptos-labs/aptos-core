@@ -207,7 +207,6 @@ fn main() -> Result<()> {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_and_script_storage,
-                &module_and_script_storage,
             )?;
         },
         Entrypoint::Module(module_id) => {

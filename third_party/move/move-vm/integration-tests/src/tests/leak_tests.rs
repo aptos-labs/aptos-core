@@ -52,7 +52,7 @@ fn leak_with_abort() {
 
     let vm = MoveVM::new(vec![]);
 
-    let module_and_script_storage =
+    let code_storage =
         LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
     let resource_storage = InMemoryStorage::new();
 
@@ -66,8 +66,7 @@ fn leak_with_abort() {
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         );
     }
 

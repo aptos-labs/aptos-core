@@ -153,7 +153,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let module_and_script_storage =
+        let code_storage =
             LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
         let resource_storage = InMemoryStorage::new();
 
@@ -164,8 +164,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             args.clone(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .unwrap();
 
@@ -175,8 +174,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             args.clone(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .unwrap();
     }
@@ -197,7 +195,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             },
         );
 
-        let module_and_script_storage =
+        let code_storage =
             LocalModuleBytesStorage::empty().into_unsync_code_storage(vm.runtime_environment());
         let resource_storage = InMemoryStorage::new();
 
@@ -209,8 +207,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
                 args.clone(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
-                &module_and_script_storage,
-                &module_and_script_storage,
+                &code_storage,
             )
             .unwrap_err()
             .major_status(),
@@ -223,8 +220,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             args,
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            &module_and_script_storage,
-            &module_and_script_storage,
+            &code_storage,
         )
         .unwrap();
     }

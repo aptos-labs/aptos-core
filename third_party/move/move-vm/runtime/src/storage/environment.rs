@@ -8,7 +8,10 @@ use crate::{
     Module, Script,
 };
 use move_binary_format::{
-    access::ModuleAccess, errors::PartialVMResult, file_format::CompiledScript, CompiledModule,
+    access::ModuleAccess,
+    errors::{Location, VMResult},
+    file_format::CompiledScript,
+    CompiledModule,
 };
 use move_bytecode_verifier::dependencies;
 use move_core_types::{
@@ -108,9 +111,11 @@ impl RuntimeEnvironment {
     pub fn build_partially_verified_script(
         &self,
         compiled_script: Arc<CompiledScript>,
-    ) -> PartialVMResult<PartiallyVerifiedScript> {
-        move_bytecode_verifier::verify_script(compiled_script.as_ref())
-            .map_err(|e| e.to_partial())?;
+    ) -> VMResult<PartiallyVerifiedScript> {
+        move_bytecode_verifier::verify_script_with_config(
+            &self.vm_config().verifier_config,
+            compiled_script.as_ref(),
+        )?;
         if let Some(verifier) = &self.verifier_extension {
             verifier.verify_script(compiled_script.as_ref())?;
         }
@@ -123,13 +128,13 @@ impl RuntimeEnvironment {
         &self,
         partially_verified_script: PartiallyVerifiedScript,
         immediate_dependencies: &[Arc<Module>],
-    ) -> PartialVMResult<Script> {
+    ) -> VMResult<Script> {
         dependencies::verify_script(
             partially_verified_script.0.as_ref(),
             immediate_dependencies.iter().map(|m| m.module()),
-        )
-        .map_err(|e| e.to_partial())?;
+        )?;
         Script::new(partially_verified_script.0, self.struct_name_index_map())
+            .map_err(|e| e.finish(Location::Script))
     }
 
     /// Creates a partially verified compiled module by running:
@@ -139,9 +144,12 @@ impl RuntimeEnvironment {
         &self,
         compiled_module: Arc<CompiledModule>,
         module_size: usize,
-    ) -> PartialVMResult<PartiallyVerifiedModule> {
-        move_bytecode_verifier::verify_module(compiled_module.as_ref())
-            .map_err(|e| e.to_partial())?;
+    ) -> VMResult<PartiallyVerifiedModule> {
+        // TODO(loader_v2): In loader V1, we also have a paranoid check, and a call to check_natives.
+        move_bytecode_verifier::verify_module_with_config(
+            &self.vm_config().verifier_config,
+            compiled_module.as_ref(),
+        )?;
         if let Some(verifier) = &self.verifier_extension {
             verifier.verify_module(compiled_module.as_ref())?;
         }
@@ -154,18 +162,20 @@ impl RuntimeEnvironment {
         &self,
         partially_verified_module: PartiallyVerifiedModule,
         immediate_dependencies: &[Arc<Module>],
-    ) -> PartialVMResult<Module> {
+    ) -> VMResult<Module> {
         dependencies::verify_module(
             partially_verified_module.0.as_ref(),
             immediate_dependencies.iter().map(|m| m.module()),
-        )
-        .map_err(|e| e.to_partial())?;
-        Module::new(
+        )?;
+        let result = Module::new(
             &self.natives,
             partially_verified_module.1,
             partially_verified_module.0,
             self.struct_name_index_map(),
-        )
+        );
+
+        // Note: loader V1 implementation does not set locations for this error.
+        result.map_err(|e| e.finish(Location::Undefined))
     }
 }
 

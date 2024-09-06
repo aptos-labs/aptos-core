@@ -164,6 +164,7 @@ pub fn verify_module<'a>(
     module: &CompiledModule,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> VMResult<()> {
+    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
     verify_module_impl(module, dependencies)
         .map_err(|e| e.finish(Location::Module(module.self_id())))
 }
@@ -184,6 +185,7 @@ pub fn verify_script<'a>(
     script: &CompiledScript,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> VMResult<()> {
+    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
     verify_script_impl(script, dependencies).map_err(|e| e.finish(Location::Script))
 }
 
