@@ -20,7 +20,7 @@ use aptos_infallible::Mutex;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
-    delayed_fields::PanicError,
+    error::PanicError,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
@@ -436,7 +436,7 @@ impl BlockAptosVM {
             Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
                 err_msg,
             ))) => Err(VMStatus::Error {
-                status_code: StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                status_code: StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
                 sub_status: None,
                 message: Some(err_msg),
             }),

@@ -4,9 +4,9 @@
 use crate::types::{AtomicTxnIndex, MVDelayedFieldsError, TxnIndex};
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedApplyEntry, DelayedEntry},
-    types::{code_invariant_error, DelayedFieldValue, PanicOr, ReadPosition},
+    types::{DelayedFieldValue, ReadPosition},
 };
-use aptos_types::delayed_fields::PanicError;
+use aptos_types::error::{code_invariant_error, PanicError, PanicOr};
 use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -1285,8 +1285,6 @@ mod test {
             DelayedFieldValue::Aggregator(5)
         );
     }
-
-    // TODO: test for latest predicted with the first entry (nothing committed).
 
     #[test]
     fn read_delta_chain() {

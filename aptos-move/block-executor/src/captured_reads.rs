@@ -5,10 +5,7 @@ use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
-    types::{
-        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_mvhashmap::{
     types::{
@@ -20,8 +17,10 @@ use aptos_mvhashmap::{
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
-    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
+    error::{code_invariant_error, PanicError, PanicOr},
+    state_store::state_value::StateValueMetadata,
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;

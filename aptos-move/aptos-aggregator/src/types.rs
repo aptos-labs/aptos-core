@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::bounded_math::SignedU128;
-use aptos_logger::error;
-use aptos_types::delayed_fields::PanicError;
+use aptos_types::error::{code_invariant_error, NonPanic, PanicError, PanicOr};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
@@ -20,81 +19,9 @@ use move_vm_types::{
     values::{Struct, Value},
 };
 
-// Wrapping another error, to add a variant that represents
-// something that should never happen - i.e. a code invariant error,
-// which we would generally just panic, but since we are inside of the VM,
-// we cannot do that.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PanicOr<T: std::fmt::Debug> {
-    CodeInvariantError(String),
-    Or(T),
-}
-
-impl<T: std::fmt::Debug> PanicOr<T> {
-    pub fn map_non_panic<E: std::fmt::Debug>(self, f: impl FnOnce(T) -> E) -> PanicOr<E> {
-        match self {
-            PanicOr::CodeInvariantError(msg) => PanicOr::CodeInvariantError(msg),
-            PanicOr::Or(value) => PanicOr::Or(f(value)),
-        }
-    }
-}
-
-pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
-    let msg = format!(
-        "Code invariant broken (there is a bug in the code), {:?}",
-        message
-    );
-    error!("{}", msg);
-    PanicError::CodeInvariantError(msg)
-}
-
-pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {
-    value.map_err(|e| code_invariant_error(format!("Expected Ok, got Err({:?})", e)))
-}
-
-impl<T: std::fmt::Debug> From<PanicError> for PanicOr<T> {
-    fn from(err: PanicError) -> Self {
-        match err {
-            PanicError::CodeInvariantError(e) => PanicOr::CodeInvariantError(e),
-        }
-    }
-}
-
-pub trait NonPanic {}
-
-impl<T: std::fmt::Debug + NonPanic> From<T> for PanicOr<T> {
-    fn from(err: T) -> Self {
-        PanicOr::Or(err)
-    }
-}
-
 impl From<DelayedFieldsSpeculativeError> for PartialVMError {
     fn from(err: DelayedFieldsSpeculativeError) -> Self {
         PartialVMError::from(PanicOr::from(err))
-    }
-}
-
-impl<T: std::fmt::Debug> From<&PanicOr<T>> for StatusCode {
-    fn from(err: &PanicOr<T>) -> Self {
-        match err {
-            PanicOr::CodeInvariantError(_) => {
-                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
-            },
-            PanicOr::Or(_) => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-        }
-    }
-}
-
-impl<T: std::fmt::Debug> From<PanicOr<T>> for PartialVMError {
-    fn from(err: PanicOr<T>) -> Self {
-        match err {
-            PanicOr::CodeInvariantError(msg) => {
-                PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
-                    .with_message(msg)
-            },
-            PanicOr::Or(err) => PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-                .with_message(format!("{:?}", err)),
-        }
     }
 }
 

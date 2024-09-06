@@ -8,13 +8,14 @@ use crate::{
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
-use aptos_aggregator::types::code_invariant_error;
 use aptos_logger::error;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
-    delayed_fields::PanicError, fee_statement::FeeStatement,
+    error::{code_invariant_error, PanicError},
+    fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
-    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
@@ -453,14 +454,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Result<ExecutionStatus<O, E>, PanicError> {
-        let owning_ptr = self.outputs[txn_idx as usize]
-            .swap(None)
-            .ok_or(code_invariant_error(
-                "[BlockSTM]: Output must be recorded after execution",
-            ))?;
+        let owning_ptr = self.outputs[txn_idx as usize].swap(None).ok_or_else(|| {
+            code_invariant_error("[BlockSTM]: Output must be recorded after execution")
+        })?;
 
         Arc::try_unwrap(owning_ptr).map_err(|_| {
-            code_invariant_error("[BlockSTM]: Output must be recorded after execution")
+            code_invariant_error("[BlockSTM]: Output must be uniquely owned after execution")
         })
     }
 }
