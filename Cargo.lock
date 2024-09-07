@@ -15161,6 +15161,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-types",
+ "async-trait",
  "reqwest",
 ]
 

@@ -4,6 +4,7 @@
 // Copyright © Entropy Foundation
 
 use anyhow::Result;
+use async_trait::async_trait;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::TransactionPayload;
 
@@ -77,8 +78,9 @@ pub struct SupraCommandArguments {
 }
 
 /// Trait required by supra cli for its operation.
+#[async_trait]
 pub trait SupraCommand {
 
     /// consume self and returns [SupraCommandArguments]
-    fn supra_command_arguments(self) -> Result<SupraCommandArguments>;
+    async fn supra_command_arguments(self) -> Result<SupraCommandArguments>;
 }
