@@ -38,9 +38,9 @@ jobs:
     #     RUST_MIN_STACK=104857600 ${{ env.CARGO_BIN }} nextest run -p e2e-move-tests --no-fail-fast
 
     - name: Slack Notification
-      if: failure()
+      if: always()
       uses: rtCamp/action-slack-notify@v2
       env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         SLACK_CHANNEL: aptos-core-notifications # Specify your channel
         SLACK_MESSAGE: 'Job ${{ job.status }}: ${{ github.event.head_commit.message }}'
