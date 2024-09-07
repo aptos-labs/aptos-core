@@ -127,7 +127,7 @@ impl CliCommand<()> for InitTool {
         };
 
         if network == Network::Testnet && !self.skip_faucet {
-            return Err(CliError::UnexpectedError(format!(
+            return Err(CliError::CommandArgumentError(format!(
                 "For testnet, start over and run movement init --skip-faucet"
             )));
         }
