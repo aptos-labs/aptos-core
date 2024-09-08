@@ -19,6 +19,9 @@ pub struct OrderedBlockStore {
     // The configuration of the consensus observer
     consensus_observer_config: ConsensusObserverConfig,
 
+    // The highest committed block (epoch and round)
+    highest_committed_epoch_round: Option<(u64, Round)>,
+
     // Ordered blocks. The key is the epoch and round of the last block in the
     // ordered block. Each entry contains the block and the commit decision (if any).
     ordered_blocks: BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)>,
@@ -28,6 +31,7 @@ impl OrderedBlockStore {
     pub fn new(consensus_observer_config: ConsensusObserverConfig) -> Self {
         Self {
             consensus_observer_config,
+            highest_committed_epoch_round: None,
             ordered_blocks: BTreeMap::new(),
         }
     }
@@ -42,6 +46,11 @@ impl OrderedBlockStore {
         &self,
     ) -> BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)> {
         self.ordered_blocks.clone()
+    }
+
+    /// Returns the highest committed epoch and round (if any)
+    pub fn get_highest_committed_epoch_round(&self) -> Option<(u64, Round)> {
+        self.highest_committed_epoch_round
     }
 
     /// Returns the last ordered block (if any)
@@ -104,6 +113,9 @@ impl OrderedBlockStore {
         self.ordered_blocks = self
             .ordered_blocks
             .split_off(&(split_off_epoch, split_off_round));
+
+        // Update the highest committed epoch and round
+        self.update_highest_committed_epoch_round(commit_ledger_info);
     }
 
     /// Updates the commit decision of the ordered block (if found)
@@ -118,6 +130,32 @@ impl OrderedBlockStore {
             .get_mut(&(commit_decision_epoch, commit_decision_round))
         {
             *existing_commit_decision = Some(commit_decision.clone());
+        }
+
+        // Update the highest committed epoch and round
+        self.update_highest_committed_epoch_round(commit_decision.commit_proof());
+    }
+
+    /// Updates the highest committed epoch and round based on the commit ledger info
+    fn update_highest_committed_epoch_round(
+        &mut self,
+        commit_ledger_info: &LedgerInfoWithSignatures,
+    ) {
+        // Get the epoch and round of the commit ledger info
+        let commit_epoch = commit_ledger_info.ledger_info().epoch();
+        let commit_round = commit_ledger_info.commit_info().round();
+        let commit_epoch_round = (commit_epoch, commit_round);
+
+        // Update the highest committed epoch and round (if appropriate)
+        match self.highest_committed_epoch_round {
+            Some(highest_committed_epoch_round) => {
+                if commit_epoch_round > highest_committed_epoch_round {
+                    self.highest_committed_epoch_round = Some(commit_epoch_round);
+                }
+            },
+            None => {
+                self.highest_committed_epoch_round = Some(commit_epoch_round);
+            },
         }
     }
 
@@ -154,6 +192,17 @@ impl OrderedBlockStore {
             metrics::ORDERED_BLOCKS_LABEL,
             highest_ordered_round,
         );
+
+        // Update the highest round for the committed blocks
+        let highest_committed_round = self
+            .highest_committed_epoch_round
+            .map(|(_, round)| round)
+            .unwrap_or(0);
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
+            metrics::COMMITTED_BLOCKS_LABEL,
+            highest_committed_round,
+        );
     }
 }
 
@@ -187,6 +236,91 @@ mod test {
 
         // Check that all the ordered blocks were removed
         assert!(ordered_block_store.ordered_blocks.is_empty());
+    }
+
+    #[test]
+    fn test_get_highest_committed_epoch_round() {
+        // Create a new ordered block store
+        let mut ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
+
+        // Verify that we have no highest committed epoch and round
+        assert!(ordered_block_store
+            .get_highest_committed_epoch_round()
+            .is_none());
+
+        // Insert several ordered blocks for the current epoch
+        let current_epoch = 10;
+        let num_ordered_blocks = 50;
+        let ordered_blocks = create_and_add_ordered_blocks(
+            &mut ordered_block_store,
+            num_ordered_blocks,
+            current_epoch,
+        );
+
+        // Create a commit decision for the first ordered block
+        let first_ordered_block = ordered_blocks.first().unwrap();
+        let first_ordered_block_info = first_ordered_block.last_block().block_info();
+        let commit_decision = CommitDecision::new(LedgerInfoWithSignatures::new(
+            LedgerInfo::new(first_ordered_block_info.clone(), HashValue::random()),
+            AggregateSignature::empty(),
+        ));
+
+        // Update the commit decision for the first ordered block
+        ordered_block_store.update_commit_decision(&commit_decision);
+
+        // Verify the highest committed epoch and round is the first ordered block
+        verify_highest_committed_epoch_round(&ordered_block_store, &first_ordered_block_info);
+
+        // Create a commit decision for the last ordered block
+        let last_ordered_block = ordered_blocks.last().unwrap();
+        let last_ordered_block_info = last_ordered_block.last_block().block_info();
+        let commit_decision = CommitDecision::new(LedgerInfoWithSignatures::new(
+            LedgerInfo::new(last_ordered_block_info.clone(), HashValue::random()),
+            AggregateSignature::empty(),
+        ));
+
+        // Update the commit decision for the last ordered block
+        ordered_block_store.update_commit_decision(&commit_decision);
+
+        // Verify the highest committed epoch and round is the last ordered block
+        verify_highest_committed_epoch_round(&ordered_block_store, &last_ordered_block_info);
+
+        // Insert several ordered blocks for the next epoch
+        let next_epoch = current_epoch + 1;
+        let num_ordered_blocks = 10;
+        let ordered_blocks =
+            create_and_add_ordered_blocks(&mut ordered_block_store, num_ordered_blocks, next_epoch);
+
+        // Verify the highest committed epoch and round is still the last ordered block
+        verify_highest_committed_epoch_round(&ordered_block_store, &last_ordered_block_info);
+
+        // Create a commit decision for the first ordered block (in the next epoch)
+        let first_ordered_block = ordered_blocks.first().unwrap();
+        let first_ordered_block_info = first_ordered_block.last_block().block_info();
+        let commit_decision = CommitDecision::new(LedgerInfoWithSignatures::new(
+            LedgerInfo::new(first_ordered_block_info.clone(), HashValue::random()),
+            AggregateSignature::empty(),
+        ));
+
+        // Update the commit decision for the first ordered block
+        ordered_block_store.update_commit_decision(&commit_decision);
+
+        // Verify the highest committed epoch and round is the first ordered block (in the next epoch)
+        verify_highest_committed_epoch_round(&ordered_block_store, &first_ordered_block_info);
+
+        // Create a commit decision for the last ordered block (in the next epoch)
+        let last_ordered_block = ordered_blocks.last().unwrap();
+        let last_ordered_block_info = last_ordered_block.last_block().block_info();
+        let commit_decision = CommitDecision::new(LedgerInfoWithSignatures::new(
+            LedgerInfo::new(last_ordered_block_info.clone(), HashValue::random()),
+            AggregateSignature::empty(),
+        ));
+
+        // Remove the ordered blocks for the commit decision
+        ordered_block_store.remove_blocks_for_commit(commit_decision.commit_proof());
+
+        // Verify the highest committed epoch and round is the last ordered block (in the next epoch)
+        verify_highest_committed_epoch_round(&ordered_block_store, &last_ordered_block_info);
     }
 
     #[test]
@@ -579,6 +713,21 @@ mod test {
         assert_eq!(
             commit_decision,
             updated_commit_decision.as_ref().unwrap().clone()
+        );
+    }
+
+    /// Verifies the highest committed epoch and round matches the given block info
+    fn verify_highest_committed_epoch_round(
+        ordered_block_store: &OrderedBlockStore,
+        block_info: &BlockInfo,
+    ) {
+        // Verify the highest committed epoch and round is the block info
+        let highest_committed_epoch_round = ordered_block_store
+            .get_highest_committed_epoch_round()
+            .unwrap();
+        assert_eq!(
+            highest_committed_epoch_round,
+            (block_info.epoch(), block_info.round())
         );
     }
 }
