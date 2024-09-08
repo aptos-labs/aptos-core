@@ -64,8 +64,7 @@ impl BlockPayloadStore {
     /// Returns true iff we already have a payload entry for the given block
     pub fn existing_payload_entry(&self, block_payload: &BlockPayload) -> bool {
         // Get the epoch and round of the payload
-        let block_info = &block_payload.block;
-        let epoch_and_round = (block_info.epoch(), block_info.round());
+        let epoch_and_round = (block_payload.epoch(), block_payload.round());
 
         // Check if a payload already exists in the store
         self.block_payloads.lock().contains_key(&epoch_and_round)
@@ -88,14 +87,15 @@ impl BlockPayloadStore {
             warn!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Exceeded the maximum number of payloads: {:?}. Dropping block: {:?}!",
-                    max_num_pending_blocks, block_payload.block,
+                    max_num_pending_blocks,
+                    block_payload.block(),
                 ))
             );
             return; // Drop the block if we've exceeded the maximum
         }
 
         // Create the new payload status
-        let epoch_and_round = (block_payload.block.epoch(), block_payload.block.round());
+        let epoch_and_round = (block_payload.epoch(), block_payload.round());
         let payload_status = if verified_payload_signatures {
             BlockPayloadStatus::AvailableAndVerified(block_payload)
         } else {
@@ -171,7 +171,7 @@ impl BlockPayloadStore {
                     // Get the block transaction payload
                     let transaction_payload = match entry.get() {
                         BlockPayloadStatus::AvailableAndVerified(block_payload) => {
-                            &block_payload.transaction_payload
+                            block_payload.transaction_payload()
                         },
                         BlockPayloadStatus::AvailableAndUnverified(_) => {
                             // The payload should have already been verified
@@ -261,7 +261,7 @@ impl BlockPayloadStore {
         // Collect the rounds of all newly verified blocks
         let verified_payload_rounds: Vec<Round> = verified_payloads_to_update
             .iter()
-            .map(|block_payload| block_payload.block.round())
+            .map(|block_payload| block_payload.round())
             .collect();
 
         // Update the verified block payloads. Note: this will cause

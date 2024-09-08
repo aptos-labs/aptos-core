@@ -360,7 +360,7 @@ impl SubscriptionManager {
         );
 
         // Update the number of created subscriptions
-        metrics::increment_request_counter(
+        metrics::increment_counter(
             &metrics::OBSERVER_CREATED_SUBSCRIPTIONS,
             metrics::CREATED_SUBSCRIPTION_LABEL,
             &peer_network_id,
@@ -381,7 +381,7 @@ impl SubscriptionManager {
         );
 
         // Update the number of terminated subscriptions
-        metrics::increment_request_counter(
+        metrics::increment_counter(
             &metrics::OBSERVER_TERMINATED_SUBSCRIPTIONS,
             error.get_label(),
             &peer_network_id,

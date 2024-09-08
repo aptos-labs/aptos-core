@@ -150,7 +150,7 @@ impl ConsensusPublisher {
         let (peer_network_id, message, response_sender) = network_message.into_parts();
 
         // Update the RPC request counter
-        metrics::increment_request_counter(
+        metrics::increment_counter(
             &metrics::PUBLISHER_RECEIVED_REQUESTS,
             message.get_label(),
             &peer_network_id,
