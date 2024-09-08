@@ -321,12 +321,28 @@ impl ConsensusObserver {
         peer_network_id: PeerNetworkId,
         block_payload: BlockPayload,
     ) {
-        // Update the metrics for the received block payload
-        update_metrics_for_block_payload_message(peer_network_id, &block_payload);
-
         // Get the epoch and round for the block
         let block_epoch = block_payload.block.epoch();
         let block_round = block_payload.block.round();
+
+        // Determine if the payload is behind the last ordered block, or it already exists
+        let last_ordered_block = self.get_last_ordered_block();
+        let payload_out_of_date =
+            (block_epoch, block_round) <= (last_ordered_block.epoch(), last_ordered_block.round());
+        let payload_exists = self
+            .block_payload_store
+            .lock()
+            .existing_payload_entry(&block_payload);
+
+        // If the payload already exists, or is behind the last ordered block, we should ignore it
+        if payload_exists || payload_out_of_date {
+            // Update the metrics for the dropped block payload
+            update_metrics_for_dropped_block_payload_message(peer_network_id, &block_payload);
+            return;
+        }
+
+        // Update the metrics for the received block payload
+        update_metrics_for_block_payload_message(peer_network_id, &block_payload);
 
         // Verify the block payload digests
         if let Err(error) = block_payload.verify_payload_digests() {
@@ -896,6 +912,29 @@ fn update_metrics_for_commit_decision_message(
         &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
         metrics::COMMIT_DECISION_LABEL,
         commit_decision.round(),
+    );
+}
+
+/// Updates the metrics for the dropped block payload message
+fn update_metrics_for_dropped_block_payload_message(
+    peer_network_id: PeerNetworkId,
+    block_payload: &BlockPayload,
+) {
+    // Increment the dropped message counter
+    metrics::increment_request_counter(
+        &metrics::OBSERVER_DROPPED_MESSAGES,
+        metrics::BLOCK_PAYLOAD_LABEL,
+        &peer_network_id,
+    );
+
+    // Log the dropped block payload message
+    debug!(
+        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+            "Ignoring block payload message from peer: {:?}! Block epoch and round: ({}, {})",
+            peer_network_id,
+            block_payload.block.epoch(),
+            block_payload.block.round()
+        ))
     );
 }
 
