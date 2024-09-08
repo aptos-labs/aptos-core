@@ -486,9 +486,7 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
     let (mut change_set, empty_module_write_set) =
         sess.finish(&change_set_configs, &module_storage)?;
     assert!(
-        empty_module_write_set
-            .is_empty_or_invariant_violation()
-            .is_ok(),
+        empty_module_write_set.is_empty(),
         "Modules cannot be published by 'force_end_epoch'"
     );
 
