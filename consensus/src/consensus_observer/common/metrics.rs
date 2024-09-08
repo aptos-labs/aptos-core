@@ -16,7 +16,7 @@ pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
-pub const ORDERED_BLOCKS_LABEL: &str = "ordered_blocks";
+pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
@@ -191,8 +191,8 @@ pub static PUBLISHER_SENT_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Increments the given request counter with the provided values
-pub fn increment_request_counter(
+/// Increments the given counter with the provided values
+pub fn increment_counter(
     counter: &Lazy<IntCounterVec>,
     label: &str,
     peer_network_id: &PeerNetworkId,

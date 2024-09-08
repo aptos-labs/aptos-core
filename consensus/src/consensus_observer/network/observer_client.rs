@@ -46,7 +46,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         message_label: &str,
     ) -> Result<(), Error> {
         // Increment the message counter
-        metrics::increment_request_counter(
+        metrics::increment_counter(
             &metrics::PUBLISHER_SENT_MESSAGES,
             message_label,
             peer_network_id,
@@ -74,7 +74,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
                 .message(&format!("Failed to send message: {:?}", error)));
 
             // Update the direct send error metrics
-            metrics::increment_request_counter(
+            metrics::increment_counter(
                 &metrics::PUBLISHER_SENT_MESSAGE_ERRORS,
                 error.get_label(),
                 peer_network_id,
@@ -125,7 +125,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
                     .message(&format!("Failed to serialize message: {:?}", error)));
 
                 // Update the direct send error metrics
-                metrics::increment_request_counter(
+                metrics::increment_counter(
                     &metrics::PUBLISHER_SENT_MESSAGE_ERRORS,
                     error.get_label(),
                     peer_network_id,
@@ -147,7 +147,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         let request_id = rand::thread_rng().gen();
 
         // Increment the request counter
-        metrics::increment_request_counter(
+        metrics::increment_counter(
             &metrics::OBSERVER_SENT_REQUESTS,
             request.get_label(),
             peer_network_id,
@@ -174,7 +174,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         match result {
             Ok(consensus_observer_response) => {
                 // Update the RPC success metrics
-                metrics::increment_request_counter(
+                metrics::increment_counter(
                     &metrics::OBSERVER_RECEIVED_MESSAGE_RESPONSES,
                     request_label,
                     peer_network_id,
@@ -192,7 +192,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
                     .error(&error));
 
                 // Update the RPC error metrics
-                metrics::increment_request_counter(
+                metrics::increment_counter(
                     &metrics::OBSERVER_SENT_MESSAGE_ERRORS,
                     error.get_label(),
                     peer_network_id,

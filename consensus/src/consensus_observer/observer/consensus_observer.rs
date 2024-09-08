@@ -322,8 +322,8 @@ impl ConsensusObserver {
         block_payload: BlockPayload,
     ) {
         // Get the epoch and round for the block
-        let block_epoch = block_payload.block.epoch();
-        let block_round = block_payload.block.round();
+        let block_epoch = block_payload.epoch();
+        let block_round = block_payload.round();
 
         // Determine if the payload is behind the last ordered block, or if it already exists
         let last_ordered_block = self.get_last_ordered_block();
@@ -349,7 +349,8 @@ impl ConsensusObserver {
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Failed to verify block payload digests! Ignoring block: {:?}. Error: {:?}",
-                    block_payload.block, error
+                    block_payload.block(),
+                    error
                 ))
             );
             return;
@@ -363,7 +364,7 @@ impl ConsensusObserver {
                 error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Failed to verify block payload signatures! Ignoring block: {:?}. Error: {:?}",
-                        block_payload.block, error
+                        block_payload.block(), error
                     ))
                 );
                 return;
@@ -543,7 +544,7 @@ impl ConsensusObserver {
         }
 
         // Increment the received message counter
-        metrics::increment_request_counter(
+        metrics::increment_counter(
             &metrics::OBSERVER_RECEIVED_MESSAGES,
             message.get_label(),
             &peer_network_id,
@@ -902,7 +903,8 @@ fn update_metrics_for_block_payload_message(
     // Log the received block payload message
     let log_message = format!(
         "Received block payload: {}, from peer: {}!",
-        block_payload.block, peer_network_id
+        block_payload.block(),
+        peer_network_id
     );
     log_received_message(log_message);
 
@@ -910,7 +912,7 @@ fn update_metrics_for_block_payload_message(
     metrics::set_gauge_with_label(
         &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
         metrics::BLOCK_PAYLOAD_LABEL,
-        block_payload.block.round(),
+        block_payload.round(),
     );
 }
 
@@ -941,7 +943,7 @@ fn update_metrics_for_dropped_block_payload_message(
     block_payload: &BlockPayload,
 ) {
     // Increment the dropped message counter
-    metrics::increment_request_counter(
+    metrics::increment_counter(
         &metrics::OBSERVER_DROPPED_MESSAGES,
         metrics::BLOCK_PAYLOAD_LABEL,
         &peer_network_id,
@@ -952,8 +954,8 @@ fn update_metrics_for_dropped_block_payload_message(
         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
             "Ignoring block payload message from peer: {:?}! Block epoch and round: ({}, {})",
             peer_network_id,
-            block_payload.block.epoch(),
-            block_payload.block.round()
+            block_payload.epoch(),
+            block_payload.round()
         ))
     );
 }
@@ -964,7 +966,7 @@ fn update_metrics_for_dropped_commit_decision_message(
     commit_decision: &CommitDecision,
 ) {
     // Increment the dropped message counter
-    metrics::increment_request_counter(
+    metrics::increment_counter(
         &metrics::OBSERVER_DROPPED_MESSAGES,
         metrics::COMMITTED_BLOCKS_LABEL,
         &peer_network_id,
@@ -987,9 +989,9 @@ fn update_metrics_for_dropped_ordered_block_message(
     ordered_block: &OrderedBlock,
 ) {
     // Increment the dropped message counter
-    metrics::increment_request_counter(
+    metrics::increment_counter(
         &metrics::OBSERVER_DROPPED_MESSAGES,
-        metrics::ORDERED_BLOCKS_LABEL,
+        metrics::ORDERED_BLOCK_LABEL,
         &peer_network_id,
     );
 
@@ -1020,7 +1022,7 @@ fn update_metrics_for_ordered_block_message(
     // Update the metrics for the received ordered block
     metrics::set_gauge_with_label(
         &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
-        metrics::ORDERED_BLOCKS_LABEL,
+        metrics::ORDERED_BLOCK_LABEL,
         ordered_block.proof_block_info().round(),
     );
 }
