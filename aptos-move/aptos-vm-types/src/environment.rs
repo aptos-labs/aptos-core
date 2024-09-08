@@ -50,8 +50,12 @@ pub struct Environment {
 impl Environment {
     pub fn new(state_view: &impl StateView) -> Self {
         let mut features = Features::fetch_config(state_view).unwrap_or_default();
+
+        // TODO(loader_v2): Remove before rolling out. This allows us to replay with V2.
         if use_loader_v1_based_on_env() {
             features.disable(FeatureFlag::ENABLE_LOADER_V2);
+        } else {
+            features.enable(FeatureFlag::ENABLE_LOADER_V2);
         }
 
         // If no chain ID is in storage, we assume we are in a testing environment.
