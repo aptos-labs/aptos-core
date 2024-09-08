@@ -325,7 +325,7 @@ impl ConsensusObserver {
         let block_epoch = block_payload.block.epoch();
         let block_round = block_payload.block.round();
 
-        // Determine if the payload is behind the last ordered block, or it already exists
+        // Determine if the payload is behind the last ordered block, or if it already exists
         let last_ordered_block = self.get_last_ordered_block();
         let payload_out_of_date =
             (block_epoch, block_round) <= (last_ordered_block.epoch(), last_ordered_block.round());
@@ -334,8 +334,8 @@ impl ConsensusObserver {
             .lock()
             .existing_payload_entry(&block_payload);
 
-        // If the payload already exists, or is behind the last ordered block, we should ignore it
-        if payload_exists || payload_out_of_date {
+        // If the payload is out of date or already exists, ignore it
+        if payload_out_of_date || payload_exists {
             // Update the metrics for the dropped block payload
             update_metrics_for_dropped_block_payload_message(peer_network_id, &block_payload);
             return;
@@ -574,9 +574,6 @@ impl ConsensusObserver {
         peer_network_id: PeerNetworkId,
         ordered_block: OrderedBlock,
     ) {
-        // Update the metrics for the received ordered block
-        update_metrics_for_ordered_block_message(peer_network_id, &ordered_block);
-
         // Verify the ordered blocks before processing
         if let Err(error) = ordered_block.verify_ordered_blocks() {
             error!(
@@ -588,6 +585,29 @@ impl ConsensusObserver {
             );
             return;
         };
+
+        // Get the epoch and round of the first block
+        let first_block = ordered_block.first_block();
+        let first_block_epoch_round = (first_block.epoch(), first_block.round());
+
+        // Determine if the block is behind the last ordered block, or if it is already pending
+        let last_ordered_block = self.get_last_ordered_block();
+        let block_out_of_date =
+            first_block_epoch_round <= (last_ordered_block.epoch(), last_ordered_block.round());
+        let block_pending = self
+            .pending_block_store
+            .lock()
+            .existing_pending_block(&ordered_block);
+
+        // If the block is out of date or already pending, ignore it
+        if block_out_of_date || block_pending {
+            // Update the metrics for the dropped ordered block
+            update_metrics_for_dropped_ordered_block_message(peer_network_id, &ordered_block);
+            return;
+        }
+
+        // Update the metrics for the received ordered block
+        update_metrics_for_ordered_block_message(peer_network_id, &ordered_block);
 
         // If all payloads exist, process the block. Otherwise, store it
         // in the pending block store and wait for the payloads to arrive.
@@ -957,6 +977,29 @@ fn update_metrics_for_dropped_commit_decision_message(
             peer_network_id,
             commit_decision.epoch(),
             commit_decision.round()
+        ))
+    );
+}
+
+/// Updates the metrics for the dropped ordered block message
+fn update_metrics_for_dropped_ordered_block_message(
+    peer_network_id: PeerNetworkId,
+    ordered_block: &OrderedBlock,
+) {
+    // Increment the dropped message counter
+    metrics::increment_request_counter(
+        &metrics::OBSERVER_DROPPED_MESSAGES,
+        metrics::ORDERED_BLOCKS_LABEL,
+        &peer_network_id,
+    );
+
+    // Log the dropped ordered block message
+    debug!(
+        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+            "Ignoring ordered block message from peer: {:?}! Block epoch and round: ({}, {})",
+            peer_network_id,
+            ordered_block.proof_block_info().epoch(),
+            ordered_block.proof_block_info().round()
         ))
     );
 }
