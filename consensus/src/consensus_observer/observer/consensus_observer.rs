@@ -85,7 +85,7 @@ pub struct ConsensusObserver {
     // The flag indicates if we're waiting to transition to a new epoch.
     sync_handle: Option<(DropGuard, bool)>,
 
-    // The subscription manager
+    // The consensus observer subscription manager
     subscription_manager: SubscriptionManager,
 }
 
@@ -165,13 +165,15 @@ impl ConsensusObserver {
             return;
         }
 
-        // Otherwise, check the health of the active subscription
-        let new_subscription_created = self
+        // Otherwise, check the health of the active subscriptions
+        if let Err(error) = self
             .subscription_manager
             .check_and_manage_subscriptions()
-            .await;
-        if new_subscription_created {
-            // Clear the pending block state (a new subscription was created)
+            .await
+        {
+            // Log the failure and clear the pending block state
+            warn!(LogSchema::new(LogEntry::ConsensusObserver)
+                .message(&format!("Subscription checks failed! Error: {:?}", error)));
             self.clear_pending_block_state().await;
         }
     }
@@ -198,6 +200,9 @@ impl ConsensusObserver {
                 ))
             );
         }
+
+        // Increment the cleared block state counter
+        metrics::increment_counter_without_labels(&metrics::OBSERVER_CLEARED_BLOCK_STATE);
     }
 
     /// Finalizes the ordered block by sending it to the execution pipeline
@@ -528,18 +533,25 @@ impl ConsensusObserver {
         // Unpack the network message
         let (peer_network_id, message) = network_message.into_parts();
 
-        // Verify the message is from the peer we've subscribed to
+        // Verify the message is from the peers we've subscribed to
         if let Err(error) = self
             .subscription_manager
-            .verify_message_sender(peer_network_id)
+            .verify_message_for_subscription(peer_network_id)
         {
+            // Increment the rejected message counter
+            metrics::increment_counter(
+                &metrics::OBSERVER_REJECTED_MESSAGES,
+                message.get_label(),
+                &peer_network_id,
+            );
+
+            // Log the error and return
             warn!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Message failed subscription sender verification! Error: {:?}",
+                    "Received message that was not from an active subscription! Error: {:?}",
                     error,
                 ))
             );
-
             return;
         }
 
