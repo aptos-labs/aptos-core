@@ -41,6 +41,17 @@ impl PendingBlockStore {
         self.blocks_without_payloads.clear();
     }
 
+    /// Returns true iff the store contains an entry for the given ordered block
+    pub fn existing_pending_block(&self, ordered_block: &OrderedBlock) -> bool {
+        // Get the epoch and round of the first block
+        let first_block = ordered_block.first_block();
+        let first_block_epoch_round = (first_block.epoch(), first_block.round());
+
+        // Check if the block is already in the store
+        self.blocks_without_payloads
+            .contains_key(&first_block_epoch_round)
+    }
+
     /// Inserts a block (without payloads) into the store
     pub fn insert_pending_block(&mut self, ordered_block: OrderedBlock) {
         // Get the epoch and round of the first block
@@ -236,6 +247,67 @@ mod test {
             .lock()
             .blocks_without_payloads
             .is_empty());
+    }
+
+    #[test]
+    fn test_existing_pending_block() {
+        // Create a new pending block store
+        let max_num_pending_blocks = 10;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks: max_num_pending_blocks as u64,
+            ..ConsensusObserverConfig::default()
+        };
+        let pending_block_store = Arc::new(Mutex::new(PendingBlockStore::new(
+            ConsensusObserverConfig::default(),
+        )));
+
+        // Insert the maximum number of blocks into the store
+        let current_epoch = 10;
+        let starting_round = 100;
+        let pending_blocks = create_and_add_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks,
+            current_epoch,
+            starting_round,
+            5,
+        );
+
+        // Verify that all blocks were inserted correctly
+        for pending_block in &pending_blocks {
+            assert!(pending_block_store
+                .lock()
+                .existing_pending_block(pending_block));
+        }
+
+        // Create a new block payload store and insert payloads for the second block
+        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
+            consensus_observer_config,
+        )));
+        let second_block = pending_blocks[1].clone();
+        insert_payloads_for_ordered_block(block_payload_store.clone(), &second_block);
+
+        // Remove the second block (which is now ready)
+        let payload_round = second_block.first_block().round();
+        let ready_block = pending_block_store.lock().remove_ready_block(
+            current_epoch,
+            payload_round,
+            block_payload_store.clone(),
+        );
+        assert_eq!(ready_block, Some(second_block));
+
+        // Verify that the first and second blocks were removed
+        verify_pending_blocks(
+            pending_block_store.clone(),
+            max_num_pending_blocks - 2,
+            &pending_blocks[2..].to_vec(),
+        );
+
+        // Verify that the first and second blocks are no longer in the store
+        for pending_block in &pending_blocks[..2] {
+            assert!(!pending_block_store
+                .lock()
+                .existing_pending_block(pending_block));
+        }
     }
 
     #[test]
