@@ -106,8 +106,15 @@ spec aptos_framework::account {
 
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
     }
+
+    // spec schema AbortsIfPermissionedSigner {
+    //     use aptos_framework::permissioned_signer;
+    //     s: signer;
+    //     let perm = AccountPermission:: {};
+    //     aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
+    // }
 
     /// Only the address `@aptos_framework` can call.
     /// OriginatingAddress does not exist under `@aptos_framework` before the call.
@@ -331,6 +338,7 @@ spec aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) {
+        aborts_if permissioned_signer::spec_is_permissioned_signer(delegate_signer);
         aborts_if !exists<Account>(rotation_cap_offerer_address);
         let delegate_address = signer::address_of(delegate_signer);
         let offerer_account_resource = global<Account>(rotation_cap_offerer_address);
@@ -390,7 +398,6 @@ spec aptos_framework::account {
             source_address,
             recipient_address,
         };
-
         aborts_if !exists<chain_id::ChainId>(@aptos_framework);
         aborts_if !exists<Account>(recipient_address);
         aborts_if !exists<Account>(source_address);
@@ -581,8 +588,11 @@ spec aptos_framework::account {
     spec fun spec_create_resource_address(source: address, seed: vector<u8>): address;
 
     spec create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
+        use aptos_framework::create_signer;
         let source_addr = signer::address_of(source);
         let resource_addr = spec_create_resource_address(source_addr, seed);
+
+        let resource = create_signer::spec_create_signer(resource_addr);
 
         aborts_if len(ZERO_AUTH_KEY) != 32;
         include exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
