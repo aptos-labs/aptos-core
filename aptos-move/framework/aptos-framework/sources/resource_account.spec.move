@@ -60,7 +60,7 @@ spec aptos_framework::resource_account {
     ///
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
     }
 
     spec create_resource_account(
@@ -116,6 +116,8 @@ spec aptos_framework::resource_account {
         resource_signer_cap: account::SignerCapability,
         optional_auth_key: vector<u8>,
     ) {
+        pragma aborts_if_is_partial;
+
         let resource_addr = signer::address_of(resource);
         /// [high-level-req-1]
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIf;
@@ -172,6 +174,8 @@ spec aptos_framework::resource_account {
         resource: &signer,
         source_addr: address,
     ) : account::SignerCapability  {
+        pragma aborts_if_is_partial;
+
         /// [high-level-req-6]
         aborts_if !exists<Container>(source_addr);
         let resource_addr = signer::address_of(resource);
