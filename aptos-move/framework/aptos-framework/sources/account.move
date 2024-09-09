@@ -9,6 +9,7 @@ module aptos_framework::account {
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
+    use aptos_framework::permissioned_signer;
     use aptos_framework::system_addresses;
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
@@ -302,6 +303,7 @@ module aptos_framework::account {
             vector::length(&new_auth_key) == 32,
             error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
         );
+        permissioned_signer::assert_master_signer(account);
         let account_resource = borrow_global_mut<Account>(addr);
         account_resource.authentication_key = new_auth_key;
     }
@@ -357,6 +359,7 @@ module aptos_framework::account {
     ) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        permissioned_signer::assert_master_signer(account);
         let account_resource = borrow_global_mut<Account>(addr);
 
         // Verify the given `from_public_key_bytes` matches this account's current authentication key.
@@ -412,6 +415,7 @@ module aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) acquires Account, OriginatingAddress {
+        permissioned_signer::assert_master_signer(delegate_signer);
         assert!(exists_at(rotation_cap_offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
 
         // Check that there exists a rotation capability offer at the offerer's account resource for the delegate.
@@ -471,6 +475,7 @@ module aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
     ) acquires Account {
+        permissioned_signer::assert_master_signer(account);
         let addr = signer::address_of(account);
         assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
@@ -569,6 +574,7 @@ module aptos_framework::account {
     /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
     public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
         assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        permissioned_signer::assert_master_signer(account);
         let addr = signer::address_of(account);
         let account_resource = borrow_global<Account>(addr);
         assert!(
@@ -580,6 +586,7 @@ module aptos_framework::account {
 
     /// Revoke any rotation capability offer in the specified account.
     public entry fun revoke_any_rotation_capability(account: &signer) acquires Account {
+        permissioned_signer::assert_master_signer(account);
         let account_resource = borrow_global_mut<Account>(signer::address_of(account));
         option::extract(&mut account_resource.rotation_capability_offer.for);
     }
@@ -600,6 +607,7 @@ module aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) acquires Account {
+        permissioned_signer::assert_master_signer(account);
         let source_address = signer::address_of(account);
         assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
@@ -639,6 +647,7 @@ module aptos_framework::account {
     /// has a signer capability offer from `account` but will be revoked in this function).
     public entry fun revoke_signer_capability(account: &signer, to_be_revoked_address: address) acquires Account {
         assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        permissioned_signer::assert_master_signer(account);
         let addr = signer::address_of(account);
         let account_resource = borrow_global<Account>(addr);
         assert!(
@@ -650,6 +659,7 @@ module aptos_framework::account {
 
     /// Revoke any signer capability offer in the specified account.
     public entry fun revoke_any_signer_capability(account: &signer) acquires Account {
+        permissioned_signer::assert_master_signer(account);
         let account_resource = borrow_global_mut<Account>(signer::address_of(account));
         option::extract(&mut account_resource.signer_capability_offer.for);
     }
@@ -657,6 +667,7 @@ module aptos_framework::account {
     /// Return an authorized signer of the offerer, if there's an existing signer capability offer for `account`
     /// at the offerer's address.
     public fun create_authorized_signer(account: &signer, offerer_address: address): signer acquires Account {
+        permissioned_signer::assert_master_signer(account);
         assert!(exists_at(offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
 
         // Check if there's an existing signer capability offer from the offerer.
