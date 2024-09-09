@@ -988,12 +988,6 @@ impl RoundManager {
         self.broadcast_fast_shares(vote.ledger_info().commit_info())
             .await;
 
-        let consensus_data_hash = if self.onchain_config.order_vote_enabled() {
-            HashValue::zero()
-        } else {
-            vote.vote_data_hash()
-        };
-
         if self.randomness_config.skip_non_rand_blocks() {
             if !require_randomness {
                 self.block_store
@@ -1001,8 +995,6 @@ impl RoundManager {
                     .pre_execute(&pipelined_block)
                     .await;
             }
-
-            // self.broadcast_precommit_vote(vote.ledger_info().commit_info().clone(), consensus_data_hash).await;
         }
 
         if self.local_config.broadcast_vote {
@@ -1192,43 +1184,6 @@ impl RoundManager {
             }
             dashmap::mapref::entry::Entry::Vacant(_) => {}
         }
-
-        // if let Some((_, fut)) = execution_futures.remove(&block_id) {
-        //     info!("[PreExecution] removed execution_future for block of epoch {} round {} id {}", block_info.epoch(), block_info.round(), block_id);
-
-        //     match fut.await {
-        //         Ok(execution_result) => {
-        //             let commit_info = BlockInfo::new(
-        //                 block_info.epoch(),
-        //                 block_info.round(),
-        //                 block_id,
-        //                 execution_result.result.root_hash(),
-        //                 execution_result.result.version(),
-        //                 block_info.timestamp_usecs(),
-        //                 execution_result.result.epoch_state().clone(),
-        //             );
-        //             let execution_future = async move { Ok(execution_result) }.boxed().shared();
-        //             execution_futures.insert(block_id, execution_future);
-
-        //             info!("[PreExecution] broadcast commit vote for block of epoch {} round {} id {}", block_info.epoch(), block_info.round(), block_id);
-
-        //             let commit_ledger_info = LedgerInfo::new(commit_info, consensus_data_hash);
-        //             let signature = safety_rules.lock().sign_pre_commit_vote(commit_ledger_info.clone());
-        //             match signature{
-        //                 Ok(signature) => {
-        //                     let commit_vote = CommitVote::new_with_signature(author, commit_ledger_info, signature);
-        //                     network.broadcast_commit_vote(commit_vote).await;
-        //                 },
-        //                 Err(e) => {
-        //                     warn!("[PreExecution] Failed to sign commit vote: {:?}", e);
-        //                 }
-        //             }
-        //         },
-        //         Err(e) => {
-        //             warn!("[PreExecution] Failed to execute block: {:?}", e);
-        //         }
-        //     }
-        // };
     }
 
     /// Upon new vote:

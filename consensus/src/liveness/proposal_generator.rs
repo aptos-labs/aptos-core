@@ -504,17 +504,15 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        // // daniel todo: deal with max_txns_from_block_to_execute in check_randomness
-        // // Check if the block contains any randomness transaction
-        // let maybe_require_randomness = skip_non_rand_blocks.then(|| {
-        //     ref_txns.par_iter().any(|txns| {
-        //         self.validator.read().check_randomness_in_batch(txns.as_ref())
-        //     })
-        //     |
-        //     inline_txns.par_iter().any(|txn| self.validator.read().check_randomness(txn))
-        // });
-
-        let maybe_require_randomness = Some(false);
+        // daniel todo: deal with max_txns_from_block_to_execute in check_randomness
+        // Check if the block contains any randomness transaction
+        let maybe_require_randomness = skip_non_rand_blocks.then(|| {
+            ref_txns.par_iter().any(|txns| {
+                self.validator.read().check_randomness_in_batch(txns.as_ref())
+            })
+            |
+            inline_txns.par_iter().any(|txn| self.validator.read().check_randomness(txn))
+        });
 
         observe_block(timestamp, BlockStage::CHECKED_RAND);
 
