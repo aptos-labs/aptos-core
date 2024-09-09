@@ -501,7 +501,7 @@ impl ControlFlowGraphCodeGenerator {
         }
         // check invariant 3
         for (block, code) in self.code_blocks.iter() {
-            if block == &self.entry_block || block == &self.exit_block {
+            if self.is_trivial_block(*block) {
                 assert!(code.is_empty())
             } else {
                 assert!(!code.is_empty(), "block {} is empty", block);
