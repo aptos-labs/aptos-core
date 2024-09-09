@@ -8,3 +8,4 @@ AptosToken = { local = "../../../framework/aptos-token" }
 
 [addresses]
 aptos_framework = "0x1"
+mint_nft = "0x42"
