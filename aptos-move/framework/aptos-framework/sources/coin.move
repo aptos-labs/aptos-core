@@ -13,6 +13,7 @@ module aptos_framework::coin {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
+    use aptos_framework::permissioned_signer;
     use aptos_framework::system_addresses;
 
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, MintRef, TransferRef, BurnRef};
@@ -611,6 +612,7 @@ module aptos_framework::coin {
     public entry fun migrate_to_fungible_store<CoinType>(
         account: &signer
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
+        permissioned_signer::assert_master_signer(account);
         maybe_convert_to_fungible_store<CoinType>(signer::address_of(account));
     }
 
@@ -954,6 +956,7 @@ module aptos_framework::coin {
         monitor_supply: bool,
         parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+        permissioned_signer::assert_master_signer(account);
         let account_addr = signer::address_of(account);
 
         assert!(
@@ -1011,6 +1014,7 @@ module aptos_framework::coin {
     }
 
     public fun register<CoinType>(account: &signer) acquires CoinConversionMap {
+        permissioned_signer::assert_master_signer(account);
         let account_addr = signer::address_of(account);
         // Short-circuit and do nothing if account is already registered for CoinType.
         if (is_account_registered<CoinType>(account_addr)) {
@@ -1054,6 +1058,17 @@ module aptos_framework::coin {
             amount
         );
         let withdrawn_coin = if (coin_amount_to_withdraw > 0) {
+            let metadata = paired_metadata<CoinType>();
+            if(option::is_some(&metadata)) {
+                fungible_asset::withdraw_permission_check_by_address(
+                    account,
+                    object::object_address(&option::destroy_some(metadata)),
+                    coin_amount_to_withdraw
+                );
+            } else {
+                permissioned_signer::assert_master_signer(account);
+            };
+
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             assert!(
                 !coin_store.frozen,
