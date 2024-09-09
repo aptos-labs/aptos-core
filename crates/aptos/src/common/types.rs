@@ -109,7 +109,7 @@ pub enum CliError {
     #[error(
         "The package is larger than {1} bytes ({0} bytes)! \
         To lower the size you may want to include less artifacts via `--included-artifacts`. \
-        You can also override this check with `--override-size-check. \
+        You can also override this check with `--override-size-check`. \
         Alternatively, you can use the `--chunked-publish` to enable chunked publish mode, \
         which chunks down the package and deploys it in several stages."
     )]

@@ -1095,7 +1095,7 @@ impl CliCommand<String> for BuildPublishPayload {
     }
 }
 
-/// Publishes the modules in a Move package to the Aptos blockchain, under an object.
+/// Publishes the modules in a Move package to the Aptos blockchain, under an object (legacy version of `deploy-object`)
 #[derive(Parser)]
 pub struct CreateObjectAndPublishPackage {
     /// The named address for compiling and using in the contract
@@ -1201,7 +1201,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
     }
 }
 
-/// Upgrades the modules in a Move package deployed under an object.
+/// Upgrades the modules in a Move package deployed under an object (legacy version of `upgrade-object`)
 #[derive(Parser)]
 pub struct UpgradeObjectPackage {
     /// Address of the object the package was deployed to
@@ -1405,7 +1405,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
 
         if result.is_ok() {
             println!(
-                "Code was successfully deployed to object address {}.",
+                "Code was successfully deployed to object address {}",
                 object_address
             );
         }
@@ -1413,6 +1413,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
     }
 }
 
+/// Upgrades the modules in a Move package deployed under an object.
 #[derive(Parser)]
 pub struct UpgradeCodeObject {
     /// The named address for compiling and using in the contract
@@ -1516,7 +1517,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
 
         if result.is_ok() {
             println!(
-                "Code was successfully deployed to object address {}.",
+                "Code was successfully upgraded at object address {}",
                 self.object_address
             );
         }
@@ -1568,16 +1569,23 @@ async fn submit_chunked_publish_transactions(
         match result {
             Ok(tx_summary) => {
                 let tx_hash = tx_summary.transaction_hash.to_string();
-                println!("Submitted Successfully ({})\n", &tx_hash);
+                let status = tx_summary.success.map_or("".to_string(), |success| {
+                    if success {
+                        "Success".to_string()
+                    } else {
+                        "Failed".to_string()
+                    }
+                });
+                println!("Transaction executed: {} ({})\n", status, &tx_hash);
                 tx_hashes.push(tx_hash);
                 publishing_result = Ok(tx_summary);
             },
 
             Err(e) => {
-                println!("Caution: An error occurred while submitting chunked publish transactions. \
+                println!("{}", "Caution: An error occurred while submitting chunked publish transactions. \
                 \nDue to this error, there may be incomplete data left in the `StagingArea` resource. \
                 \nThis could cause further errors if you attempt to run the chunked publish command again. \
-                \nTo avoid this, use the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under your account before retrying.");
+                \nTo avoid this, use the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under your account before retrying.".bold());
                 return Err(e);
             },
         }
@@ -1627,7 +1635,7 @@ async fn is_staging_area_empty(txn_options: &TransactionOptions) -> CliTypedResu
     }
 }
 
-/// Cleans up the `StagingArea` resource under an account, which is used for chunked publish mode.
+/// Cleans up the `StagingArea` resource under an account, which is used for chunked publish operations
 #[derive(Parser)]
 pub struct ClearStagingArea {
     #[clap(flatten)]
