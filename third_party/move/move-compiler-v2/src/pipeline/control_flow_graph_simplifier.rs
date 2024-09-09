@@ -200,7 +200,7 @@ impl ControlFlowGraphSimplifierTransformation {
 ///
 /// Invariants:
 /// 1. Fields `code_blocks`, `successors`, and `predecessors` have the same set of keys.
-/// 2. Block `A` has sucessor block `B` iff block `B` has predecessor block `A`, according
+/// 2. Block `A` has successor block `B` iff block `B` has predecessor block `A`, according
 /// to fields `successors` and `predecessors` respectively.
 /// 3. In `code_blocks`, entry and exit blocks cannot have code (mapped to empty vectors in `code_blocks`),
 /// and all other blocks must have code.
@@ -350,14 +350,14 @@ impl ControlFlowGraphCodeGenerator {
         !last_instr.is_always_branching()
     }
 
-    /// Gets the only successor of `block`; panics if there is no successors.
+    /// Gets the only successor of `block`; panics if there is no successor.
     fn get_the_successor(&self, block: BlockId) -> BlockId {
         let successors = self.successors.get(&block).expect("successors");
         debug_assert!(successors.len() == 1);
         *successors.first().expect("successor block")
     }
 
-    /// Gets the only predecessor of `block`; panics if there is no predecessors.
+    /// Gets the only predecessor of `block`; panics if there is no predecessor.
     fn get_the_predecessor(&self, block: BlockId) -> BlockId {
         let predecessors = self.predecessors.get(&block).expect("predecessors");
         debug_assert!(predecessors.len() == 1);
