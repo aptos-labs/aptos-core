@@ -209,7 +209,9 @@ impl ControlFlowGraphSimplifierTransformation {
 /// 6. All blocks with predecessors must start with a label, unless it's the first block (the successor of the entry block), or the exit block.
 /// 7. The entry and exit blocks are distinct.
 /// 8. The `successors` doesn't contain repeated successors for a block.
-/// 9. Code blocks are consistent with the successors and predecessors map.
+/// 9. Code blocks are consistent with the successors and predecessors map：
+///   - if a block explicitly branch or jump to label L1 (and L2), then the successors of that block should contain extacly L1 (and L2).
+///   - otherwise, the block should have exactly one successor except the exit block.
 #[derive(Debug)]
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
@@ -457,12 +459,14 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Replaces `old` by `new` in `blocks`
-    fn replace_blocks(blocks: &mut [BlockId], old: BlockId, new: BlockId) {
-        for block in blocks {
+    fn replace_blocks(blocks: &mut Vec<BlockId>, old: BlockId, new: BlockId) {
+        for block in blocks.iter_mut() {
             if *block == old {
                 *block = new;
             }
         }
+        let blocks_dedup = blocks.to_vec().into_iter().unique().collect();
+        *blocks = blocks_dedup;
     }
 
     /// Checks if the control flow graph is consistent
@@ -517,10 +521,20 @@ impl ControlFlowGraphCodeGenerator {
         }
         // check invariant 6
         for (block, preds) in self.predecessors.iter() {
-            if *block == self.exit_block || *block == self.get_the_non_trivial_successor(self.entry_block) || preds.is_empty() {
+            if *block == self.exit_block
+                || *block == self.get_the_non_trivial_successor(self.entry_block)
+                || preds.is_empty()
+            {
                 continue;
             }
-            assert!(matches!(self.code_blocks.get(block).expect("code block").first().expect("first instruction"), Bytecode::Label(..)));
+            assert!(matches!(
+                self.code_blocks
+                    .get(block)
+                    .expect("code block")
+                    .first()
+                    .expect("first instruction"),
+                Bytecode::Label(..)
+            ));
         }
         // check invariant 7
         assert!(self.entry_block != self.exit_block);
@@ -528,7 +542,41 @@ impl ControlFlowGraphCodeGenerator {
         for (_, succs) in self.successors.iter() {
             succs.iter().all_unique();
         }
-        // TODO: check other invariants
+        // check invariant 9
+        for (block, code) in self.code_blocks.iter() {
+            if self.is_trivial_block(*block) {
+                continue;
+            }
+            let last_instr = code.last().expect("last instruction");
+            match last_instr {
+                Bytecode::Branch(_, l0, l1, _) => {
+                    let succs_labels: BTreeSet<Label> = self
+                        .succs(*block)
+                        .iter()
+                        .map(|block| self.get_block_label(*block).expect("label"))
+                        .collect();
+                    assert!(
+                        succs_labels.len() == {
+                            if l0 == l1 {
+                                1
+                            } else {
+                                2
+                            }
+                        }
+                    );
+                    assert!(succs_labels.contains(&l0));
+                    assert!(succs_labels.contains(&l1));
+                },
+                Bytecode::Jump(_, l) => {
+                    let suc_block = self.get_the_non_trivial_successor(*block);
+                    let suc_label = self.get_block_label(suc_block).expect("label");
+                    assert!(l == &suc_label);
+                },
+                _ => {
+                    assert!(self.successors.get(block).expect("successors").len() == 1);
+                },
+            }
+        }
         true
     }
 }
