@@ -47,7 +47,7 @@ spec aptos_framework::managed_coin {
     ///
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
     }
 
     spec burn<CoinType>(
