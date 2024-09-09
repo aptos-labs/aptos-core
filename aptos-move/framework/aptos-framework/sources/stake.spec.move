@@ -521,6 +521,7 @@ spec aptos_framework::stake {
     }
 
     spec distribute_rewards {
+        pragma aborts_if_is_partial;
         include ResourceRequirement;
         requires rewards_rate <= MAX_REWARDS_RATE;
         requires rewards_rate_denominator > 0;
