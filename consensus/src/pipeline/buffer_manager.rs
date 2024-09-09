@@ -28,6 +28,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{
     common::{Author, Round},
+    pipeline::commit_vote::CommitVote,
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
@@ -37,8 +38,8 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress, aggregate_signature::PartialSignatures,
+    epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
 use futures::{
@@ -49,6 +50,7 @@ use futures::{
     future::{AbortHandle, Abortable},
     FutureExt, SinkExt, StreamExt,
 };
+use lru::LruCache;
 use once_cell::sync::OnceCell;
 use std::{
     collections::BTreeMap,
@@ -164,6 +166,10 @@ pub struct BufferManager {
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 
     pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
+
+    // If the buffer manager receives a commit vote for a block that is not in buffer items, then
+    // the vote will be cached. We can cache upto 30 blocks, and upto 150 commit votes per block.
+    pending_commit_votes: LruCache<HashValue, Vec<CommitVote>>,
 }
 
 impl BufferManager {
@@ -257,6 +263,7 @@ impl BufferManager {
             consensus_publisher,
 
             pending_commit_proofs: BTreeMap::new(),
+            pending_commit_votes: LruCache::new(30),
         }
     }
 
@@ -333,6 +340,43 @@ impl BufferManager {
         }
     }
 
+    fn try_add_pending_commit_vote(&mut self, vote: CommitVote) -> bool {
+        let block_id = vote.commit_info().id();
+        let round = vote.commit_info().round();
+        let epoch = vote.commit_info().epoch();
+
+        // Store the commit vote only if it is for a future round.
+        if (epoch > self.epoch_state.epoch)
+            || (epoch == self.epoch_state.epoch && round > self.highest_committed_round)
+        {
+            if let Some(votes) = self.pending_commit_votes.get_mut(&block_id) {
+                if votes.len() < 150 {
+                    votes.push(vote);
+                    true
+                } else {
+                    warn!(
+                        round = round,
+                        block_id = block_id,
+                        "Too many pending commit votes, ignored caching commit vote."
+                    );
+                    false
+                }
+            } else {
+                self.pending_commit_votes.put(block_id, vec![vote]);
+                true
+            }
+        } else {
+            debug!(
+                round = round,
+                highest_committed_round = self.highest_committed_round,
+                block_id = block_id,
+                epoch = epoch,
+                "Commit vote too old, ignored."
+            );
+            false
+        }
+    }
+
     fn drain_pending_commit_proof_till(
         &mut self,
         round: Round,
@@ -381,7 +425,22 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
+        let mut unverified_signatures = PartialSignatures::empty();
+        if let Some(block) = ordered_blocks.last() {
+            if let Some(votes) = self.pending_commit_votes.pop(&block.id()) {
+                for vote in votes {
+                    let author = vote.author();
+                    let signature = vote.signature().clone();
+                    unverified_signatures.add_signature(author, signature);
+                }
+            }
+        }
+        let item = BufferItem::new_ordered(
+            ordered_blocks,
+            ordered_proof,
+            callback,
+            unverified_signatures,
+        );
         self.buffer.push_back(item);
     }
 
@@ -741,6 +800,8 @@ impl BufferManager {
                     } else {
                         return None;
                     }
+                } else if self.try_add_pending_commit_vote(vote) {
+                    reply_ack(protocol, response_sender);
                 } else {
                     reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
