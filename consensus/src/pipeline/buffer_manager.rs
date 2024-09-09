@@ -158,6 +158,9 @@ pub struct BufferManager {
     back_pressure_enabled: bool,
     highest_committed_round: Round,
     latest_round: Round,
+    back_pressure_enabled: bool,
+    highest_committed_round: Round,
+    latest_round: Round,
 
     // Consensus publisher for downstream observers.
     consensus_observer_config: ConsensusObserverConfig,
