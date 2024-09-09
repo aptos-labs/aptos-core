@@ -210,6 +210,7 @@ module aptos_framework::aptos_account {
         // as APT cannot be frozen or have dispatch, and PFS cannot be transfered
         // (PFS could potentially be burned. regular transfer would permanently unburn the store.
         // Ignoring the check here has the equivalent of unburning, transfers, and then burning again)
+        fungible_asset::withdraw_permission_check_by_address(source, @aptos_fungible_asset, amount);
         fungible_asset::deposit_internal(recipient_store, fungible_asset::withdraw_internal(sender_store, amount));
     }
 

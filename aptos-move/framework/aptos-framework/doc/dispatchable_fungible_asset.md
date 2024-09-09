@@ -220,6 +220,7 @@ The semantics of deposit will be governed by the function specified in DispatchF
     amount: u64,
 ): FungibleAsset <b>acquires</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_withdraw_sanity_check">fungible_asset::withdraw_sanity_check</a>(owner, store, <b>false</b>);
+    <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check">fungible_asset::withdraw_permission_check</a>(owner, store, amount);
     <b>let</b> func_opt = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_dispatch_function">fungible_asset::withdraw_dispatch_function</a>(store);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&func_opt)) {
         <b>assert</b>!(
