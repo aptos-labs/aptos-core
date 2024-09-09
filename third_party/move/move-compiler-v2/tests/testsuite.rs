@@ -678,7 +678,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/control-flow-simplification/"],
             exclude: vec![],
             exp_suffix: Some("on.exp"),
-            options: opts.clone().set_experiment(Experiment::CFG_SIMPLIFICATION, true),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::CFG_SIMPLIFICATION, true),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
@@ -690,12 +692,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/control-flow-simplification/"],
             exclude: vec![],
             exp_suffix: Some("off.exp"),
-            options: opts.clone().set_experiment(Experiment::CFG_SIMPLIFICATION, false),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::CFG_SIMPLIFICATION, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
-        }
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
