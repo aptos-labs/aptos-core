@@ -28,28 +28,25 @@ B0:
 	4: StLoc[2](loc2: u64)
 	5: MoveLoc[0](loc0: u64)
 	6: Eq
-	7: BrFalse(10)
+	7: BrFalse(9)
 B1:
 	8: Call bar()
-	9: Branch(10)
 B2:
-	10: MoveLoc[2](loc2: u64)
-	11: LdU64(0)
-	12: Eq
-	13: BrFalse(16)
+	9: MoveLoc[2](loc2: u64)
+	10: LdU64(0)
+	11: Eq
+	12: BrFalse(14)
 B3:
-	14: Call bar()
-	15: Branch(16)
+	13: Call bar()
 B4:
-	16: MoveLoc[1](loc1: u64)
-	17: LdU64(0)
-	18: Eq
-	19: BrFalse(22)
+	14: MoveLoc[1](loc1: u64)
+	15: LdU64(0)
+	16: Eq
+	17: BrFalse(19)
 B5:
-	20: Call bar()
-	21: Branch(22)
+	18: Call bar()
 B6:
-	22: Ret
+	19: Ret
 }
 }
 ============ bytecode verification succeeded ========

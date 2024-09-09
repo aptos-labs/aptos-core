@@ -129,8 +129,23 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         },
         Experiment {
             name: Experiment::OPTIMIZE.to_string(),
-            description: "Turns on or off a group of optimizations".to_string(),
+            description: "Turns on standard group of optimizations".to_string(),
             default: Given(true),
+        },
+        Experiment {
+            name: Experiment::OPTIMIZE_EXTRA.to_string(),
+            description: "Use extra optimizations".to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string(),
+            description: "Turns on optimizations waiting for comparison testing".to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::CFG_SIMPLIFICATION.to_string(),
+            description: "Whether to do the control flow graph simplification".to_string(),
+            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
         },
         Experiment {
             name: Experiment::COPY_PROPAGATION.to_string(),
@@ -185,7 +200,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             name: Experiment::AST_SIMPLIFY_FULL.to_string(),
             description: "Whether to run the ast simplifier, including code elimination"
                 .to_string(),
-            default: Given(false),
+            default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
         },
         Experiment {
             name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
@@ -207,7 +222,33 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::FLUSH_WRITES_OPTIMIZATION.to_string(),
             description: "Whether to run flush writes processor and optimization".to_string(),
-            default: Inherited(Experiment::OPTIMIZE.to_string()),
+            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+        },
+        Experiment {
+            name: Experiment::STOP_BEFORE_STACKLESS_BYTECODE.to_string(),
+            description:
+                "Exit quietly just before converting to stackless bytecode (after AST passes)"
+                    .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::STOP_BEFORE_FILE_FORMAT.to_string(),
+            description:
+                "Exit quietly just before generating file format (after stackless bytecode  passes)"
+                    .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::STOP_BEFORE_EXTENDED_CHECKS.to_string(),
+            description: "Exit quietly just before extended checks (after file format generation)"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::STOP_AFTER_EXTENDED_CHECKS.to_string(),
+            description: "Exit quietly just after extended checks (after file format generation)"
+                .to_string(),
+            default: Given(false),
         },
     ];
     experiments
@@ -224,6 +265,7 @@ impl Experiment {
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
+    pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
@@ -236,6 +278,9 @@ impl Experiment {
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";
+    pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";
+    pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =
+        "optimize-waiting-for-compare-tests";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
@@ -244,6 +289,10 @@ impl Experiment {
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
+    pub const STOP_AFTER_EXTENDED_CHECKS: &'static str = "stop-after-extended-checks";
+    pub const STOP_BEFORE_EXTENDED_CHECKS: &'static str = "stop-before-extended-checks";
+    pub const STOP_BEFORE_FILE_FORMAT: &'static str = "stop-before-file-format";
+    pub const STOP_BEFORE_STACKLESS_BYTECODE: &'static str = "stop-before-stackless-bytecode";
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
     pub const UNUSED_ASSIGNMENT_CHECK: &'static str = "unused-assignment-check";
     pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";

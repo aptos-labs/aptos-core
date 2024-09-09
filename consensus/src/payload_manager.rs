@@ -3,9 +3,9 @@
 
 use crate::{
     consensus_observer::{
-        network_message::{BlockTransactionPayload, ConsensusObserverMessage},
-        payload_store::BlockPayloadStatus,
-        publisher::ConsensusPublisher,
+        network::observer_message::{BlockTransactionPayload, ConsensusObserverMessage},
+        observer::payload_store::BlockPayloadStatus,
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
@@ -428,7 +428,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 block.gen_block_info(HashValue::zero(), 0, None),
                 transaction_payload.clone(),
             );
-            consensus_publisher.publish_message(message).await;
+            consensus_publisher.publish_message(message);
         }
 
         Ok((
@@ -477,7 +477,7 @@ async fn get_transactions_for_observer(
             block.gen_block_info(HashValue::zero(), 0, None),
             transaction_payload.clone(),
         );
-        consensus_publisher.publish_message(message).await;
+        consensus_publisher.publish_message(message);
     }
 
     // Return the transactions and the transaction limit

@@ -89,6 +89,11 @@ impl<I: Ord + Hash> TimeExpirations<I> {
         }
         ret
     }
+
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.expiries.is_empty()
+    }
 }
 
 pub struct MempoolProxy {

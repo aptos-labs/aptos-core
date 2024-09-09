@@ -71,3 +71,6 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+
+============ bytecode verification succeeded ========

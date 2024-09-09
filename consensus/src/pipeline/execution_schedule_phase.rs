@@ -5,7 +5,7 @@ use crate::{
     counters::{NUM_NON_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS}, pipeline::{
         execution_wait_phase::ExecutionWaitRequest,
         pipeline_phase::{CountedRequest, StatelessPipeline},
-    }, state_computer::{PipelineExecutionResult, StateComputeResultFut, SyncStateComputeResultFut}, state_replication::StateComputer
+    }, state_computer::{StateComputeResultFut, SyncStateComputeResultFut}, state_replication::StateComputer
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
@@ -24,8 +24,8 @@ use std::{
 
 pub struct ExecutionRequest {
     pub ordered_blocks: Vec<PipelinedBlock>,
-    // Hold a CountedRequest to guarantee the executor doesn't get reset with pending tasks
-    // stuck in the ExecutinoPipeline.
+    // Pass down a CountedRequest to the ExecutionPipeline stages in order to guarantee the executor
+    // doesn't get reset with pending tasks stuck in the pipeline.
     pub lifetime_guard: CountedRequest<()>,
 }
 
@@ -90,7 +90,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                     info!("[PreExecution] block was not pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                     let fut = self
                         .execution_proxy
-                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned())
+                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
                         .await;
                     entry.insert(fut);
                     NUM_NON_PREEXECUTED_BLOCKS.inc();
@@ -101,8 +101,6 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         let execution_futures = self.execution_futures.clone();
 
         // In the future being returned, wait for the compute results in order.
-        // n.b. Must `spawn()` here to make sure lifetime_guard will be released even if
-        //      ExecutionWait phase is never kicked off.
         let fut = tokio::task::spawn(async move {
             let mut results = vec![];
             // wait for all futs so that lifetime_guard is guaranteed to be dropped only
@@ -124,12 +122,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             }
             let results = itertools::zip_eq(ordered_blocks, results)
                 .map(|(block, res)| {
-                    let PipelineExecutionResult {
-                        input_txns,
-                        result,
-                        execution_time,
-                    } = res?;
-                    Ok(block.set_execution_result(input_txns, result, execution_time))
+                    Ok(block.set_execution_result(res?))
                 })
                 .collect::<ExecutorResult<Vec<_>>>()?;
             drop(lifetime_guard);

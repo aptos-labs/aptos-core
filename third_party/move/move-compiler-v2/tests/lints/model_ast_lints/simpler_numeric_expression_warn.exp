@@ -1,0 +1,156 @@
+
+Diagnostics:
+warning: [lint] This expression can be simplified to just `0`
+  ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:3:9
+  │
+3 │         (x & 0) + 1
+  │         ^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This expression can be simplified to just `0`
+  ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:7:9
+  │
+7 │         (0 & x) * 0
+  │         ^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This expression can be simplified to just `0`
+  ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:7:9
+  │
+7 │         (0 & x) * 0
+  │         ^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This expression can be simplified to just `0`
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:11:10
+   │
+11 │         ((0 * x) % 1) | 0
+   │          ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This expression can be simplified to just `0`
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:11:9
+   │
+11 │         ((0 * x) % 1) | 0
+   │         ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:11:9
+   │
+11 │         ((0 * x) % 1) | 0
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:15:9
+   │
+15 │         (x ^ 0) - 0 + (x >> 0) + (x << 0) + 0
+   │         ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:15:9
+   │
+15 │         (x ^ 0) - 0 + (x >> 0) + (x << 0) + 0
+   │         ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:15:23
+   │
+15 │         (x ^ 0) - 0 + (x >> 0) + (x << 0) + 0
+   │                       ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:15:34
+   │
+15 │         (x ^ 0) - 0 + (x >> 0) + (x << 0) + 0
+   │                                  ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:15:9
+   │
+15 │         (x ^ 0) - 0 + (x >> 0) + (x << 0) + 0
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:19:9
+   │
+19 │         (x / 1) * 1
+   │         ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:19:9
+   │
+19 │         (x / 1) * 1
+   │         ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the right-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:23:13
+   │
+23 │         0 + (0 | x) + (0 ^ x)
+   │             ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the right-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:23:9
+   │
+23 │         0 + (0 | x) + (0 ^ x)
+   │         ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the right-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:23:23
+   │
+23 │         0 + (0 | x) + (0 ^ x)
+   │                       ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the right-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:27:9
+   │
+27 │         1 * x
+   │         ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This binary operation can be simplified to just the left-hand side
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:31:14
+   │
+31 │         0 >> x + 0 << x
+   │              ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+warning: [lint] This expression can be simplified to just `0`
+   ┌─ tests/lints/model_ast_lints/simpler_numeric_expression_warn.move:31:9
+   │
+31 │         0 >> x + 0 << x
+   │         ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
+
+
+============ bytecode verification succeeded ========

@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::StateSyncError, payload_manager::TPayloadManager, state_computer::{StateComputeResultFut, SyncStateComputeResultFut},
+    error::StateSyncError, payload_manager::TPayloadManager,
+    pipeline::pipeline_phase::CountedRequest, state_computer::{StateComputeResultFut, SyncStateComputeResultFut},
     transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
@@ -32,8 +33,9 @@ pub trait StateComputer: Send + Sync {
         // The parent block root hash.
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
+        _lifetime_guard: CountedRequest<()>,
     ) -> SyncStateComputeResultFut {
-        unimplemented!("This state computer does not support scheduling");
+        unimplemented!();
     }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.
