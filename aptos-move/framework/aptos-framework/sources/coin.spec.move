@@ -60,6 +60,7 @@ spec aptos_framework::coin {
     ///
     spec module {
         pragma verify = true;
+        pragma aborts_if_is_partial;
         global supply<CoinType>: num;
         global aggregate_supply<CoinType>: num;
         apply TotalSupplyTracked<CoinType> to *<CoinType> except
