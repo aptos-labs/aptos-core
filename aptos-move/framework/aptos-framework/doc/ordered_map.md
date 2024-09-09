@@ -221,6 +221,15 @@ TODO: Once fields can be (mutable) references, this class will be deprecated.
 ## Constants
 
 
+<a id="0x1_ordered_map_EITER_OUT_OF_BOUNDS"></a>
+
+
+
+<pre><code><b>const</b> <a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>: u64 = 3;
+</code></pre>
+
+
+
 <a id="0x1_ordered_map_EKEY_ALREADY_EXISTS"></a>
 
 Map key already exists
@@ -237,15 +246,6 @@ Map key is not found
 
 
 <pre><code><b>const</b> <a href="ordered_map.md#0x1_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x1_ordered_map_EITER_OUT_OF_BOUNDS"></a>
-
-
-
-<pre><code><b>const</b> <a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>: u64 = 3;
 </code></pre>
 
 

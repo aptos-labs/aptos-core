@@ -99,6 +99,7 @@ pool.
     -  [Function `pending_distribution_counts`](#@Specification_1_pending_distribution_counts)
     -  [Function `staking_contract_exists`](#@Specification_1_staking_contract_exists)
     -  [Function `beneficiary_for_operator`](#@Specification_1_beneficiary_for_operator)
+    -  [Function `get_expected_stake_pool_address`](#@Specification_1_get_expected_stake_pool_address)
     -  [Function `create_staking_contract`](#@Specification_1_create_staking_contract)
     -  [Function `create_staking_contract_with_coins`](#@Specification_1_create_staking_contract_with_coins)
     -  [Function `add_stake`](#@Specification_1_add_stake)
@@ -2958,22 +2959,6 @@ Staking_contract exists the stacker/operator pair.
 
 
 
-
-<a id="0x1_staking_contract_spec_staking_contract_exists"></a>
-
-
-<pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_spec_staking_contract_exists">spec_staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>): bool {
-   <b>if</b> (!<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker)) {
-       <b>false</b>
-   } <b>else</b> {
-       <b>let</b> store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker);
-       <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(store.staking_contracts, operator)
-   }
-}
-</code></pre>
-
-
-
 <a id="@Specification_1_beneficiary_for_operator"></a>
 
 ### Function `beneficiary_for_operator`
@@ -2987,6 +2972,39 @@ Staking_contract exists the stacker/operator pair.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_expected_stake_pool_address"></a>
+
+### Function `get_expected_stake_pool_address`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_get_expected_stake_pool_address">get_expected_stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>, contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+</code></pre>
+
+
+
+
+<a id="0x1_staking_contract_spec_staking_contract_exists"></a>
+
+
+<pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_spec_staking_contract_exists">spec_staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>): bool {
+   <b>if</b> (!<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker)) {
+       <b>false</b>
+   } <b>else</b> {
+       <b>let</b> store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker);
+       <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(store.staking_contracts, operator)
+   }
+}
 </code></pre>
 
 
