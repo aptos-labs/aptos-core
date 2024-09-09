@@ -41,6 +41,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("optimize")),
         experiments: &[
             (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
             (Experiment::ACQUIRES_CHECK, false),
         ],
         language_version: LanguageVersion::V2_0,
@@ -63,6 +64,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("optimize-no-simplify")),
         experiments: &[
             (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
             (Experiment::AST_SIMPLIFY, false),
             (Experiment::ACQUIRES_CHECK, false),
         ],

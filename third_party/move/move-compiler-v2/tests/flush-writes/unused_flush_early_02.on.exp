@@ -39,19 +39,15 @@ public fun m::test(): (u64, u64) {
      # live vars: $t2, $t3, $t4, $t6
   4: $t5 := ==($t3, $t6)
      # live vars: $t2, $t4, $t5
-  5: if ($t5) goto 6 else goto 9
+  5: if ($t5) goto 6 else goto 8
      # live vars: $t2, $t4
   6: label L0
      # live vars: $t2, $t4
   7: m::bar()
      # live vars: $t2, $t4
-  8: goto 10
+  8: label L2
      # live vars: $t2, $t4
-  9: label L1
-     # live vars: $t2, $t4
- 10: label L2
-     # live vars: $t2, $t4
- 11: return ($t2, $t4)
+  9: return ($t2, $t4)
 }
 
 
@@ -80,14 +76,13 @@ B0:
 	4: StLoc[1](loc1: u64)
 	5: LdU64(0)
 	6: Eq
-	7: BrFalse(10)
+	7: BrFalse(9)
 B1:
 	8: Call bar()
-	9: Branch(10)
 B2:
-	10: MoveLoc[0](loc0: u64)
-	11: MoveLoc[1](loc1: u64)
-	12: Ret
+	9: MoveLoc[0](loc0: u64)
+	10: MoveLoc[1](loc1: u64)
+	11: Ret
 }
 }
 ============ bytecode verification succeeded ========

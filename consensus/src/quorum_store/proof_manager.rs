@@ -61,8 +61,15 @@ impl ProofManager {
         for proof in proofs.into_iter() {
             self.batch_proof_queue.insert_proof(proof);
         }
-        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.batch_proof_queue.remaining_txns_and_proofs();
+        self.update_remaining_txns_and_proofs();
+    }
+
+    fn update_remaining_txns_and_proofs(&mut self) {
+        sample!(
+            SampleRate::Duration(Duration::from_millis(200)),
+            (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+                self.batch_proof_queue.remaining_txns_and_proofs();
+        );
     }
 
     pub(crate) fn receive_batches(
@@ -70,6 +77,8 @@ impl ProofManager {
         batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
         self.batch_proof_queue.insert_batches(batch_summaries);
+        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
+            self.batch_proof_queue.remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_commit_notification(
@@ -84,8 +93,7 @@ impl ProofManager {
         self.batch_proof_queue.mark_committed(batches);
         self.batch_proof_queue
             .handle_updated_block_timestamp(block_timestamp);
-        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.batch_proof_queue.remaining_txns_and_proofs();
+        self.update_remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
@@ -173,8 +181,8 @@ impl ProofManager {
                     } else {
                         (Vec::new(), PayloadTxnsSize::zero())
                     };
-                counters::NUM_INLINE_BATCHES.observe(inline_block_size.count() as f64);
-                counters::NUM_INLINE_TXNS.observe(inline_block_size.size_in_bytes() as f64);
+                counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
+                counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
                 let response = if self.enable_opt_quorum_store {
                     let inline_batches = inline_block.into();
@@ -262,18 +270,22 @@ impl ProofManager {
                         monitor!("proof_manager_handle_command", {
                         match msg {
                             ProofManagerCommand::Shutdown(ack_tx) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::shutdown"]).inc();
                                 ack_tx
                                     .send(())
                                     .expect("Failed to send shutdown ack to QuorumStore");
                                 break;
                             },
                             ProofManagerCommand::ReceiveProofs(proofs) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::receive_proofs"]).inc();
                                 self.receive_proofs(proofs.take());
                             },
                             ProofManagerCommand::ReceiveBatches(batches) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::receive_batches"]).inc();
                                 self.receive_batches(batches);
                             }
                             ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::commit_notification"]).inc();
                                 self.handle_commit_notification(
                                     block_timestamp,
                                     batches,

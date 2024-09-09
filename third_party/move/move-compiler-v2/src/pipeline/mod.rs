@@ -13,10 +13,12 @@ use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub mod ability_processor;
 pub mod avail_copies_analysis;
+pub mod control_flow_graph_simplifier;
 pub mod copy_propagation;
 pub mod dead_store_elimination;
 pub mod exit_state_analysis;
 pub mod flush_writes_processor;
+pub mod lint_processor;
 pub mod livevar_analysis_processor;
 pub mod reference_safety;
 pub mod split_critical_edges_processor;

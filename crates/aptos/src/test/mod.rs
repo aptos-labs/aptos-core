@@ -15,11 +15,12 @@ use crate::{
         init::{InitTool, Network},
         types::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
-            AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
-            EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, OverrideSizeCheckOption, PoolAddressArgs,
-            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
+            AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
+            EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
+            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
+            OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+            PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
+            TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -892,6 +893,9 @@ impl CliTestFramework {
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
+            chunked_publish_option: ChunkedPublishOption {
+                chunked_publish: false,
+            },
         }
         .execute()
         .await
@@ -1097,7 +1101,8 @@ impl CliTestFramework {
         MovePackageDir {
             dev: true,
             named_addresses: Self::named_addresses(account_strs),
-            ..MovePackageDir::new(self.move_dir())
+            package_dir: Some(self.move_dir()),
+            ..MovePackageDir::new()
         }
     }
 

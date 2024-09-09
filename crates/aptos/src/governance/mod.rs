@@ -1020,17 +1020,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             next_execution_hash,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = included_artifacts.build_options(
-            move_options.dev,
-            move_options.skip_fetch_latest_git_deps,
-            move_options.named_addresses(),
-            move_options.override_std,
-            move_options.bytecode_version,
-            move_options.compiler_version,
-            move_options.language_version,
-            move_options.skip_attribute_checks,
-            move_options.check_test_code,
-        );
+        let options = included_artifacts.build_options(&move_options)?;
         let package = BuiltPackage::build(package_path, options)?;
         let release = ReleasePackage::new(package)?;
 
@@ -1043,10 +1033,14 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             // If we're generating a multi-step proposal
         } else {
             let next_execution_hash_bytes = hex::decode(next_execution_hash)?;
+            let next_execution_hash =
+                HashValue::from_slice(next_execution_hash_bytes).map_err(|_err| {
+                    CliError::CommandArgumentError("Invalid next execution hash".to_string())
+                })?;
             release.generate_script_proposal_multi_step(
                 account,
                 output,
-                next_execution_hash_bytes,
+                Some(next_execution_hash),
             )?;
         };
         Ok(())

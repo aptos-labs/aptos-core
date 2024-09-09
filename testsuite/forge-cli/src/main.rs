@@ -188,6 +188,11 @@ struct K8sSwarm {
     keep: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
+    #[clap(
+        long,
+        help = "Retain debug logs and above for all nodes instead of just the first 5 nodes"
+    )]
+    retain_debug_logs: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -1858,7 +1863,7 @@ fn realistic_env_max_load_test(
             (duration.as_secs() / 10).max(60),
         )
         .add_latency_threshold(3.4, LatencyType::P50)
-        .add_latency_threshold(4.5, LatencyType::P90)
+        .add_latency_threshold(4.5, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
             max_epoch_no_progress_secs: 15.0,

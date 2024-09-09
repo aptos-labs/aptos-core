@@ -1,0 +1,26 @@
+// -- Model dump before bytecode pipeline
+module 0x1::m {
+    struct R {
+        value: bool,
+    }
+    private fun f1()
+        acquires m::R(*)
+     {
+        {
+          let x: &mut m::R = BorrowGlobal(Mutable)<m::R>(0x1);
+          select m::R.value<&mut m::R>(x) = false;
+          if Eq<bool>(select m::R.value<m::R>(BorrowGlobal(Immutable)<m::R>(0x1)), false) {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          select m::R.value<m::R>(BorrowGlobal(Mutable)<m::R>(0x1)) = true;
+          if Eq<bool>(select m::R.value<m::R>(BorrowGlobal(Immutable)<m::R>(0x1)), true) {
+            Tuple()
+          } else {
+            Abort(2)
+          };
+          Tuple()
+        }
+    }
+} // end 0x1::m

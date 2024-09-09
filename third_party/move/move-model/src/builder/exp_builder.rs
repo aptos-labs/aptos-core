@@ -31,7 +31,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, Ability, AbilitySet};
 use move_compiler::{
-    expansion::ast::{self as EA, wild_card},
+    expansion::ast::{self as EA},
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
@@ -1500,8 +1500,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     )
                 }
             },
-            EA::Exp_::Pack(maccess, generics, fields) => {
-                if let Some(exp) = self.translate_pack(
+            EA::Exp_::Pack(maccess, generics, fields) => self
+                .translate_pack(
                     &loc,
                     maccess,
                     generics,
@@ -1509,12 +1509,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     expected_type,
                     context,
                     false,
-                ) {
-                    exp
-                } else {
-                    self.new_error_exp()
-                }
-            },
+                )
+                .unwrap_or_else(|| self.new_error_exp()),
             EA::Exp_::IfElse(cond, then, else_) => {
                 let try_freeze_if_else = |et: &mut ExpTranslator,
                                           expected_ty: &Type,
@@ -2048,7 +2044,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         receiver_arg_ty: &Type,
         inst: ReceiverFunctionInstance,
     ) -> RewriteResult {
-        let receiver_param_type = inst.arg_types.first().expect("argument").clone();
+        let mut receiver_param_type = inst.arg_types.first().expect("argument").clone();
         // Determine whether an automatic borrow needs to be inserted
         // and it's kind.
         let borrow_kind_opt = inst.receiver_needs_borrow(receiver_arg_ty);
@@ -2103,6 +2099,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             // to avoid follow-up errors, only do if unification
             // succeeded
             if ok {
+                receiver_param_type = subs.specialize(&receiver_param_type);
                 self.subs = subs;
                 let inst = inst
                     .type_inst
@@ -2422,6 +2419,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             },
             EA::LValue_::PositionalUnpack(maccess, generics, args) => {
+                let expected_type = &self.subs.specialize(expected_type);
                 let Some((struct_id, variant)) = self.translate_constructor_name(
                     expected_type,
                     expected_order,
@@ -2493,7 +2491,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 );
                                 let field_name = Field(field_name);
                                 fields
-                                    .add(field_name, (field_offset, wild_card(*arg_loc)))
+                                    .add(field_name, (field_offset, EA::wild_card(*arg_loc)))
                                     .expect("duplicate keys");
                                 remaining -= 1;
                                 field_offset += 1;
@@ -2529,31 +2527,27 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> Option<Pattern> {
         // Translate constructor name
         let expected_type = self.subs.specialize(expected_type);
-        let Some((
+        let (
             QualifiedInstId {
                 module_id,
                 id,
                 inst,
             },
             variant,
-        )) = self.translate_constructor_name(
+        ) = self.translate_constructor_name(
             &expected_type,
             expected_order,
             context,
             loc,
             maccess,
             generics,
-        )
-        else {
-            // error reported by `translate_constructor_name`
-            return None;
-        };
+        )?;
+        let struct_name_loc = self.to_loc(&maccess.loc);
         let struct_name = self
             .parent
             .parent
             .get_struct_name(module_id.qualified(id))
             .clone();
-        let struct_name_loc = self.to_loc(&maccess.loc);
         let ref_expected = expected_type.try_reference_kind();
 
         // Process argument list
@@ -2575,7 +2569,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         } else {
                             field_ty.clone()
                         };
-                        let lvalue = wild_card(dotdot.loc);
+                        let lvalue = EA::wild_card(dotdot.loc);
                         let translated = self.translate_lvalue(
                             &lvalue,
                             &expected_field_ty,
@@ -2609,14 +2603,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     args.insert(field_data.offset, translated);
                 }
             }
-        } else if !field_decls.is_empty() {
-            self.error(
-                loc,
-                &format!(
-                    "no arguments provided for unpack, expected {}",
-                    field_decls.len()
-                ),
-            )
+        } else {
+            let expected_args = if variant.is_some() {
+                field_decls.len()
+            } else {
+                // For structs need to account for the dummy field added by v1 compiler
+                field_decls
+                    .iter()
+                    .filter(|d| d.0 != &self.parent.dummy_field_name())
+                    .count()
+            };
+            if expected_args != 0 {
+                self.error(
+                    loc,
+                    &format!("no arguments provided for pack, expected {}", expected_args),
+                )
+            }
         }
 
         let mut args = args
@@ -2654,10 +2656,45 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         generics: &Option<Vec<EA::Type>>,
     ) -> Option<(QualifiedInstId<StructId>, Option<Symbol>)> {
         let expected_type = self.subs.specialize(expected_type).drop_reference();
+
+        let (struct_name, variant, struct_entry) =
+            self.resolve_struct_access(&expected_type, maccess, true)?;
+
+        // Resolve type instantiation.
+        let name_loc = self.to_loc(&maccess.loc);
+        let instantiation = self.make_instantiation_or_report(
+            &name_loc,
+            true,
+            struct_name.symbol,
+            &struct_entry.type_params,
+            generics,
+        )?;
+
+        // Verify type derived from reference with expected type.
+        let struct_id = struct_entry
+            .module_id
+            .qualified_inst(struct_entry.struct_id, instantiation);
+        let ty = struct_id.to_type();
+        let ty = self.check_type_with_order(expected_order, loc, &ty, &expected_type, context);
+        // Convert the unified type back to struct id
+        let mut struct_id = struct_id;
+        if let Type::Struct(_, _, types) = ty {
+            struct_id.inst = types;
+        }
+
+        Some((struct_id, variant))
+    }
+
+    fn resolve_struct_access(
+        &mut self,
+        expected_type: &Type,
+        maccess: &EA::ModuleAccess,
+        report_error: bool,
+    ) -> Option<(QualifiedSymbol, Option<Symbol>, StructEntry)> {
         // Determine whether expected type is known to have variants (at this
         // point during inference). If so, they are used for name resolution.
         let variant_struct_info = if let Type::Struct(mid, sid, _) = expected_type {
-            let entry = self.parent.parent.lookup_struct_entry(mid.qualified(sid));
+            let entry = self.parent.parent.lookup_struct_entry(mid.qualified(*sid));
             if let StructLayout::Variants(variants) = &entry.layout {
                 Some((
                     entry,
@@ -2687,41 +2724,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let (struct_name, variant) =
                     self.parent.module_access_to_qualified_with_variant(maccess);
                 let struct_name_loc = self.to_loc(&maccess.loc);
-                let struct_entry =
-                    self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
+                let struct_entry = if report_error {
+                    self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?
+                } else {
+                    self.parent.parent.struct_table.get(&struct_name).cloned()?
+                };
+
                 (struct_name, variant, struct_entry)
             },
         };
-
-        // Resolve type instantiation.
-        let instantiation = self.make_instantiation_or_report(
-            loc,
-            true,
-            struct_name.symbol,
-            &struct_entry.type_params,
-            generics,
-        )?;
-
-        // If this is a struct variant, check whether it exists.
-        if let Some(v) = variant {
-            if !self.check_variant_declared(&struct_name, &struct_entry, &struct_name_loc, v) {
+        if let Some(variant) = variant.filter(|_| report_error) {
+            if !self.check_variant_declared(&struct_name, &struct_entry, &struct_name_loc, variant)
+            {
                 return None;
             }
         }
-
-        // Verify type derived from reference with expected type.
-        let struct_id = struct_entry
-            .module_id
-            .qualified_inst(struct_entry.struct_id, instantiation);
-        let ty = struct_id.to_type();
-        let ty = self.check_type_with_order(expected_order, loc, &ty, &expected_type, context);
-        // Convert the unified type back to struct id
-        let mut struct_id = struct_id;
-        if let Type::Struct(_, _, types) = ty {
-            struct_id.inst = types;
-        }
-
-        Some((struct_id, variant))
+        Some((struct_name, variant, struct_entry))
     }
 
     fn new_error_pat(&mut self, loc: &Loc) -> Pattern {
@@ -2939,10 +2957,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         result
     }
 
-    /// Checks whether the given name can be resolve to a struct.
-    fn can_resolve_to_struct(&self, maccess: &EA::ModuleAccess) -> bool {
-        let (struct_name, _variant) = self.parent.module_access_to_qualified_with_variant(maccess);
-        self.parent.parent.struct_table.contains_key(&struct_name)
+    /// Checks whether the given name can be resolved to a struct or struct variant
+    fn can_resolve_to_struct(&mut self, expected_type: &Type, maccess: &EA::ModuleAccess) -> bool {
+        (maccess.value.is_valid_struct_constant_or_schema_name()
+            || ModuleBuilder::is_variant(maccess))
+            && self
+                .resolve_struct_access(expected_type, maccess, false)
+                .is_some()
     }
 
     fn translate_fun_call_special_cases(
@@ -2964,10 +2985,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         // handles call of struct/variant with positional fields
-        if maccess.value.is_valid_struct_constant_or_schema_name()
-            && self.can_resolve_to_struct(maccess)
-            || ModuleBuilder::is_variant(maccess)
-        {
+        let expected_type = &self.subs.specialize(expected_type);
+        if self.can_resolve_to_struct(expected_type, maccess) {
             self.check_language_version(loc, "positional fields", LanguageVersion::V2_0);
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =
@@ -3282,6 +3301,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
+        let expected_type = &self.subs.specialize(expected_type);
+        // Try to resolve as argument-less construction of struct variant
+        if self.can_resolve_to_struct(expected_type, maccess) {
+            return self
+                .translate_pack(loc, maccess, type_args, None, expected_type, context, false)
+                .unwrap_or_else(|| self.new_error_exp());
+        }
+
         let global_var_sym = match &maccess.value {
             EA::ModuleAccess_::ModuleAccess(..) => self.parent.module_access_to_qualified(maccess),
             EA::ModuleAccess_::Name(name) => {
@@ -3874,16 +3901,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         let (exp_ty, exp) = self.translate_exp_free(exp);
+        let exp_ty = self.subs.specialize(&exp_ty);
         let mut variants = vec![];
         let mut struct_id = None;
         for ty in tys {
-            let loc = self.to_loc(&ty.loc);
+            let ty_loc = self.to_loc(&ty.loc);
             if let EA::Type_::Apply(maccess, generics) = &ty.value {
                 if let Some((inferred_struct_id, variant)) = self.translate_constructor_name(
                     &exp_ty,
                     WideningOrder::LeftToRight,
                     context,
-                    &loc,
+                    &ty_loc,
                     maccess,
                     &Some(generics.clone()),
                 ) {
@@ -3894,7 +3922,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         variants.push(variant);
                     } else {
                         self.error(
-                            &loc,
+                            &ty_loc,
                             &format!(
                                 "expected variant of enum type but found type `{}`",
                                 self.env().display(&inferred_struct_id)
@@ -4518,25 +4546,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_positional_constructor: bool,
     ) -> Option<ExpData> {
         // Resolve reference to struct
-        let (struct_name, variant) = self.parent.module_access_to_qualified_with_variant(maccess);
-        let struct_name_loc = self.to_loc(&maccess.loc);
-        let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
-
-        // Resolve type instantiation
-        let instantiation = self.make_instantiation_or_report(
-            &self.to_loc(&maccess.loc),
-            true,
-            struct_name.symbol,
-            &struct_entry.type_params,
+        // Translate constructor name
+        let expected_type = self.subs.specialize(expected_type);
+        let (struct_inst_id, variant) = self.translate_constructor_name(
+            &expected_type,
+            WideningOrder::LeftToRight,
+            context,
+            loc,
+            maccess,
             generics,
         )?;
-
-        // If this is a struct variant, check whether it exists.
-        if let Some(v) = variant {
-            if !self.check_variant_declared(&struct_name, &struct_entry, &struct_name_loc, v) {
-                return None;
-            }
-        }
+        let struct_name = self
+            .parent
+            .parent
+            .get_struct_name(struct_inst_id.to_qualified_id())
+            .clone();
 
         // Process argument list.
         // given pack<S>{ f_p(1): e_1, ... }, where p is a permutation of the fields
@@ -4549,10 +4573,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // is equivalent.
         let mut bindings = BTreeMap::new();
         let mut args = BTreeMap::new();
+        let struct_name_loc = self.to_loc(&maccess.loc);
         let (field_decls, is_positional_constructor) =
             self.get_field_decls_for_pack_unpack(&struct_name, &struct_name_loc, variant)?;
         let field_decls = field_decls.clone();
-        if is_positional_constructor != expected_positional_constructor {
+        if fields.is_some() && is_positional_constructor != expected_positional_constructor {
             let struct_name_display = struct_name.display(self.env());
             let variant_name_display = variant
                 .map(|v| format!("::{}", v.display(self.symbol_pool())))
@@ -4589,7 +4614,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let in_order_fields = self.in_order_fields(&field_decls, fields);
             for (_, name, (exp_idx, field_exp)) in fields.iter() {
                 let (def_idx, field_name, translated_field_exp) =
-                    self.translate_exp_field(&field_decls, name, &instantiation, field_exp);
+                    self.translate_exp_field(&field_decls, name, &struct_inst_id.inst, field_exp);
                 if in_order_fields.contains(&def_idx) {
                     args.insert(def_idx, translated_field_exp);
                 } else {
@@ -4605,18 +4630,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     bindings.insert(*exp_idx, (var, translated_field_exp));
                 }
             }
-        } else if !field_decls.is_empty() {
-            self.error(
-                loc,
-                &format!(
-                    "no arguments provided for pack, expected {}",
-                    field_decls.len()
-                ),
-            )
+        } else {
+            let expected_args = if variant.is_some() {
+                field_decls.len()
+            } else {
+                // For structs need to account for the dummy field added by v1 compiler
+                field_decls
+                    .iter()
+                    .filter(|d| d.0 != &self.parent.dummy_field_name())
+                    .count()
+            };
+            if expected_args != 0 {
+                self.error(
+                    loc,
+                    &format!("no arguments provided for pack, expected {}", expected_args),
+                )
+            }
         }
-        let struct_id = struct_entry
-            .module_id
-            .qualified_inst(struct_entry.struct_id, instantiation);
         let bindings = bindings
             .into_iter()
             .sorted_by_key(|(i, _)| *i)
@@ -4628,8 +4658,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|(_, value)| value)
             .collect_vec();
 
-        let struct_ty = struct_id.to_type();
-        let struct_ty = self.check_type(loc, &struct_ty, expected_type, context);
+        let struct_ty = struct_inst_id.to_type();
+        let struct_ty = self.check_type(loc, &struct_ty, &expected_type, context);
         let mut field_args = args.into_iter().map(|e| e.into_exp()).collect_vec();
         if variant.is_none() && field_args.is_empty() {
             // The move compiler inserts a dummy field with the value of false
@@ -4642,10 +4672,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             field_args.push(ExpData::Value(id, Value::Bool(false)).into_exp());
         }
         let id = self.new_node_id_with_type_loc(&struct_ty, loc);
-        self.set_node_instantiation(id, struct_id.inst);
+        self.set_node_instantiation(id, struct_inst_id.inst);
         let body = ExpData::Call(
             id,
-            Operation::Pack(struct_id.module_id, struct_id.id, variant),
+            Operation::Pack(struct_inst_id.module_id, struct_inst_id.id, variant),
             field_args,
         );
         // Fold the bindings and the body into result exp
@@ -4730,7 +4760,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.error(
                         struct_name_loc,
                         &format!(
-                            "struct `{}` has no variant named `{}`",
+                            "enum `{}` has no variant named `{}`",
                             struct_name.display(self.env()),
                             name.display(self.symbol_pool())
                         ),
@@ -4738,8 +4768,34 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     None
                 }
             },
-            _ => {
-                self.bug(struct_name_loc, "inconsistent struct definition");
+            (StructLayout::Singleton(..), Some(_)) => {
+                self.error(
+                    struct_name_loc,
+                    &format!(
+                        "struct `{}` does not have variants",
+                        struct_name.display(self.env())
+                    ),
+                );
+                None
+            },
+            (StructLayout::Variants(..), None) => {
+                self.error(
+                    struct_name_loc,
+                    &format!(
+                        "enum `{}` must be used with one of its variants",
+                        struct_name.display(self.env())
+                    ),
+                );
+                None
+            },
+            (StructLayout::None, _) => {
+                self.error(
+                    struct_name_loc,
+                    &format!(
+                        "native struct `{}` has no fields",
+                        struct_name.display(self.env())
+                    ),
+                );
                 None
             },
         }

@@ -61,6 +61,10 @@ on:
         required: false
         type: string
         description: Whether to use performance images
+      FORGE_RETAIN_DEBUG_LOGS:
+        required: false
+        type: boolean
+        description: Retain debug logs for all nodes
       COMMENT_HEADER:
         required: false
         type: string
@@ -104,6 +108,7 @@ env:
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
   FORGE_ENABLE_FAILPOINTS: ${{ inputs.FORGE_ENABLE_FAILPOINTS }}
   FORGE_ENABLE_PERFORMANCE: ${{ inputs.FORGE_ENABLE_PERFORMANCE }}
+  FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
   COMMENT_HEADER: ${{ inputs.COMMENT_HEADER }}
   VERBOSE: true
   COMMENT_ON_PR: ${{ inputs.COMMENT_ON_PR }}
