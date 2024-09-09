@@ -1212,7 +1212,11 @@ impl<'env> Docgen<'env> {
         // depends on the `is_resource()` predicate to add additional functions to structs declared
         // with the `key` ability.
         let resource_or_enum = if struct_env.has_variants() {
-            "Enum"
+            if struct_env.has_memory() {
+                "Enum Resource"
+            } else {
+                "Enum"
+            }
         } else if struct_env.has_memory() {
             "Resource"
         } else {
