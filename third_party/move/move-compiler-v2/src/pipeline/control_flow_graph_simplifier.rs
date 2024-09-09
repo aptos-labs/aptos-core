@@ -302,7 +302,7 @@ impl ControlFlowGraphCodeGenerator {
             if self.is_trivial_block(block) {
                 continue;
             }
-            // TODO:
+            // TODO: avoid cloning the code of `block`
             // can't use `.remove` instead to avoid copying,
             // because the following may look at visited block
             // `code_block` is non-empty since `block` is non-trivial
