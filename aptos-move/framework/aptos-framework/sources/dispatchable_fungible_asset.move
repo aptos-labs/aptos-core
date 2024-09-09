@@ -77,6 +77,7 @@ module aptos_framework::dispatchable_fungible_asset {
         amount: u64,
     ): FungibleAsset acquires TransferRefStore {
         fungible_asset::withdraw_sanity_check(owner, store, false);
+        fungible_asset::withdraw_permission_check(owner, store, amount);
         let func_opt = fungible_asset::withdraw_dispatch_function(store);
         if (option::is_some(&func_opt)) {
             assert!(
