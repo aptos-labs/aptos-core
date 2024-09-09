@@ -53,7 +53,7 @@ use futures::{
 use lru::LruCache;
 use once_cell::sync::OnceCell;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
@@ -169,7 +169,7 @@ pub struct BufferManager {
 
     // If the buffer manager receives a commit vote for a block that is not in buffer items, then
     // the vote will be cached. We can cache upto 30 blocks, and upto 150 commit votes per block.
-    pending_commit_votes: LruCache<HashValue, Vec<CommitVote>>,
+    pending_commit_votes: LruCache<HashValue, HashMap<AccountAddress, CommitVote>>,
 }
 
 impl BufferManager {
@@ -350,8 +350,14 @@ impl BufferManager {
             || (epoch == self.epoch_state.epoch && round > self.highest_committed_round)
         {
             if let Some(votes) = self.pending_commit_votes.get_mut(&block_id) {
-                if votes.len() < 150 {
-                    votes.push(vote);
+                if votes.len() < 150
+                    && self
+                        .epoch_state
+                        .verifier
+                        .get_voting_power(&vote.author())
+                        .is_some()
+                {
+                    votes.insert(vote.author(), vote);
                     true
                 } else {
                     warn!(
@@ -362,7 +368,9 @@ impl BufferManager {
                     false
                 }
             } else {
-                self.pending_commit_votes.put(block_id, vec![vote]);
+                let mut votes = HashMap::new();
+                votes.insert(vote.author(), vote);
+                self.pending_commit_votes.put(block_id, votes);
                 true
             }
         } else {
@@ -428,10 +436,8 @@ impl BufferManager {
         let mut unverified_signatures = PartialSignatures::empty();
         if let Some(block) = ordered_blocks.last() {
             if let Some(votes) = self.pending_commit_votes.pop(&block.id()) {
-                for vote in votes {
-                    let author = vote.author();
-                    let signature = vote.signature().clone();
-                    unverified_signatures.add_signature(author, signature);
+                for vote in votes.values() {
+                    unverified_signatures.add_signature(vote.author(), vote.signature().clone());
                 }
             }
         }
