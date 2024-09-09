@@ -83,7 +83,9 @@ impl BlockPreparer {
             Err(ExecutorError::CouldNotGetData)
         });
         info!(
-            "BlockPreparer: Preparing for block {} and window {:?}",
+            "BlockPreparer: Preparing for block ({}, {}) {} and window {:?}",
+            block.epoch(),
+            block.round(),
             block.id(),
             block_window
                 .blocks()

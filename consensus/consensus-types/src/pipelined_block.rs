@@ -271,7 +271,7 @@ impl PipelinedBlock {
         }
     }
 
-    pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
+    pub fn new_with_window(block: Block, window: OrderedBlockWindow) -> Self {
         info!(
             "New Ordered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
             block.id(),
@@ -294,12 +294,13 @@ impl PipelinedBlock {
 
     pub fn new_recovered(block: Block, committed_transactions: Vec<HashValue>) -> Self {
         info!(
-            "New Recovered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
+            "New Recovered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}, committed_txns: {:?}",
             block.id(),
             block.parent_id(),
             block.round(),
             block.epoch(),
-            block.payload().map_or(0, |p| p.len())
+            block.payload().map_or(0, |p| p.len()),
+            committed_transactions,
         );
         Self {
             block,

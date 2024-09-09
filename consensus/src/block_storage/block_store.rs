@@ -402,7 +402,7 @@ impl BlockStore {
                 block_window.blocks().iter().map(|b| format!("{}", b.id())).collect::<Vec<_>>(),
                 now.elapsed().as_millis()
             );
-            let pipelined_block = PipelinedBlock::new_ordered(block.clone(), block_window);
+            let pipelined_block = PipelinedBlock::new_with_window(block.clone(), block_window);
             block_tree.insert_block(pipelined_block)
         } else {
             info!(
@@ -442,11 +442,13 @@ impl BlockStore {
                     );
                 }
                 if new_block_event.round() < block.round() {
-                    panic!(
+                    info!(
                         "the round of the latest block event {} is less than the block round {}",
                         new_block_event.round(),
                         block.round(),
                     );
+                    committed_transactions = vec![];
+                    break;
                 }
                 if new_block_event.epoch() == block.epoch()
                     && new_block_event.round() == block.round()
