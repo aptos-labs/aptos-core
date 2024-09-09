@@ -321,6 +321,7 @@ impl ControlFlowGraphCodeGenerator {
         block: BlockId,
         next_block_to_visit: Option<&BlockId>,
     ) -> Vec<Bytecode> {
+        debug_assert!(!code_block.is_empty());
         // since we may generate the blocks in a different order, we may need to add explicit jump or eliminate unnecessary jump.
         if Self::falls_to_next_block(&code_block) {
             // if we have block 0 followed by block 1 without jump/branch
