@@ -164,20 +164,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
 
-      - name: Check if dev_setup.sh has changed
-        id: check_changes
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.sha }}
-          if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -q 'scripts/dev_setup.sh'; then
-            echo "scripts/dev_setup.sh has changed"
-            echo "dev_setup_changed=true" >> $GITHUB_ENV
-          else
-            echo "scripts/dev_setup.sh has not changed"
-            echo "dev_setup_changed=false" >> $GITHUB_ENV
-          fi
-
       - name: Run dev_setup.sh
-        if: env.dev_setup_changed == 'true'
         run: |
           scripts/dev_setup.sh -b -p -r -y -P -t
 

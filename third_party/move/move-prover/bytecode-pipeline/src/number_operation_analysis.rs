@@ -16,7 +16,7 @@ use crate::{
 use itertools::Either;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{Exp, ExpData, TempIndex},
+    ast::{Exp, ExpData, Operation as ASTOperation, TempIndex},
     model::{FieldId, FunId, GlobalEnv, ModuleId, Parameter, StructId},
     ty::{PrimitiveType, Type},
 };
@@ -460,16 +460,42 @@ impl<'a> NumberOperationAnalysis<'a> {
 
                                 for (arg, arg_oper) in args.iter().zip(arg_oper.iter()) {
                                     if merged != *arg_oper {
-                                        // propagate to arg if necessary
-                                        global_state.update_node_oper(
-                                            arg.node_id(),
-                                            merged,
-                                            allow_merge,
-                                        );
-                                        update_temporary(arg, &merged, global_state, state);
+                                        // need to update the num_oper type to avoid insertion of int2bv conversion
+                                        // which is inefficient during SMT solving
+                                        let update_flag = match arg.clone().into() {
+                                            ExpData::Temporary(..)
+                                            | ExpData::LocalVar(..)
+                                            | ExpData::Value(..)
+                                            | ExpData::Call(_, ASTOperation::Cast, _) => true,
+                                            ExpData::Call(
+                                                _,
+                                                ASTOperation::SpecFunction(mid, sid, _),
+                                                _,
+                                            ) => {
+                                                // if the current argument is a call to a recursive spec function
+                                                // we need to update num_oper type, otherwise the boogie generator
+                                                // will incorrectly insert inv2bv conversion
+                                                let module_env =
+                                                    &self.func_target.global_env().get_module(mid);
+                                                let spec_f = module_env.get_spec_fun(sid);
+                                                !spec_f.is_move_fun
+                                                    && self
+                                                        .func_target
+                                                        .global_env()
+                                                        .is_spec_fun_recursive(mid.qualified(sid))
+                                            },
+                                            _ => false,
+                                        };
+                                        if update_flag {
+                                            global_state.update_node_oper(
+                                                arg.node_id(),
+                                                merged,
+                                                allow_merge,
+                                            );
+                                            update_temporary(arg, &merged, global_state, state);
+                                        }
                                     }
                                 }
-
                                 global_state.update_node_oper(*id, merged, allow_merge);
                             }
                         },
