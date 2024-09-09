@@ -247,6 +247,7 @@ module aptos_framework::aptos_account {
         // as APT cannot be frozen or have dispatch, and PFS cannot be transfered
         // (PFS could potentially be burned. regular transfer would permanently unburn the store.
         // Ignoring the check here has the equivalent of unburning, transfers, and then burning again)
+        fungible_asset::withdraw_permission_check_by_address(source, @aptos_fungible_asset, amount);
         fungible_asset::deposit_internal(recipient_store, fungible_asset::withdraw_internal(sender_store, amount));
     }
 
@@ -313,6 +314,28 @@ module aptos_framework::aptos_account {
 
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
+    }
+
+    #[test(alice = @0xa11ce, core = @0x1)]
+    public fun test_transfer_permission(alice: &signer, core: &signer) {
+        use aptos_framework::permissioned_signer;
+
+        let bob = from_bcs::to_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
+        let carol = from_bcs::to_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
+
+        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
+        create_account(signer::address_of(alice));
+        coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
+
+        let perm_handle = permissioned_signer::create_permissioned_handle(alice);
+        let alice_perm_signer = permissioned_signer::signer_from_permissioned(&perm_handle);
+        fungible_asset::grant_apt_permission(alice, &alice_perm_signer, 500);
+
+        transfer(&alice_perm_signer, bob, 500);
+
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+        permissioned_signer::destroy_permissioned_handle(perm_handle);
     }
 
     #[test(alice = @0xa11ce, core = @0x1)]
