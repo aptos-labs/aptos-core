@@ -2,7 +2,7 @@ module 0x42::test {
     use std::option::{Self, Option};
     use std::vector;
 
-    public fun check_and_get_threshold(bytes: vector<u8>): Option<u8> {
+    public fun test(bytes: vector<u8>): Option<u8> {
         let len = vector::length(&bytes);
         if (len == 0) {
             return option::none<u8>()
