@@ -207,7 +207,9 @@ impl ControlFlowGraphSimplifierTransformation {
 /// 4. Entry block has exactly one successor.
 /// 5. All blocks except for the exit block must have at least one successor.
 /// 6. All blocks with predecessors must start with a label, unless it's the first block, or the exit block.
-/// 7. Code blocks are consistent with the successors and predecessors map.
+/// 7. The entry and exit blocks are distinct.
+/// 8. There is at least one block other than the entry and exit blocks.
+/// 9. Code blocks are consistent with the successors and predecessors map.
 #[derive(Debug)]
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
@@ -519,6 +521,10 @@ impl ControlFlowGraphCodeGenerator {
             }
             assert!(matches!(self.code_blocks.get(block).expect("code block").first().expect("first instruction"), Bytecode::Label(..)));
         }
+        // check invariant 7
+        assert!(self.entry_block != self.exit_block);
+        // check invariant 8
+        assert!(self.blocks().len() > 2);
         // TODO: check other invariants
         true
     }
