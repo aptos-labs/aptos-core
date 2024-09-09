@@ -208,7 +208,8 @@ impl ControlFlowGraphSimplifierTransformation {
 /// 5. All blocks except for the exit block must have at least one successor.
 /// 6. All blocks with predecessors must start with a label, unless it's the first block (the successor of the entry block), or the exit block.
 /// 7. The entry and exit blocks are distinct.
-/// 8. Code blocks are consistent with the successors and predecessors map.
+/// 8. The `successors` doesn't contain repeated successors for a block.
+/// 9. Code blocks are consistent with the successors and predecessors map.
 #[derive(Debug)]
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
@@ -523,6 +524,10 @@ impl ControlFlowGraphCodeGenerator {
         }
         // check invariant 7
         assert!(self.entry_block != self.exit_block);
+        // check invariant 8
+        for (_, succs) in self.successors.iter() {
+            succs.iter().all_unique();
+        }
         // TODO: check other invariants
         true
     }
