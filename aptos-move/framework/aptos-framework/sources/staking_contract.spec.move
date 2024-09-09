@@ -135,6 +135,10 @@ spec aptos_framework::staking_contract {
         ensures result == spec_staking_contract_exists(staker, operator);
     }
 
+    spec get_expected_stake_pool_address {
+        pragma aborts_if_is_partial;
+    }
+
     spec fun spec_staking_contract_exists(staker: address, operator: address): bool {
         if (!exists<Store>(staker)) {
             false
