@@ -204,12 +204,11 @@ impl ControlFlowGraphSimplifierTransformation {
 /// to fields `successors` and `predecessors` respectively.
 /// 3. In `code_blocks`, entry and exit blocks cannot have code (mapped to empty vectors in `code_blocks`),
 /// and all other blocks must have code.
-/// 4. Entry block has exactly one successor.
+/// 4. Entry block has exactly one successor, which is not the exit block.
 /// 5. All blocks except for the exit block must have at least one successor.
 /// 6. All blocks with predecessors must start with a label, unless it's the first block, or the exit block.
 /// 7. The entry and exit blocks are distinct.
-/// 8. There is at least one block other than the entry and exit blocks.
-/// 9. Code blocks are consistent with the successors and predecessors map.
+/// 8. Code blocks are consistent with the successors and predecessors map.
 #[derive(Debug)]
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
@@ -507,7 +506,7 @@ impl ControlFlowGraphCodeGenerator {
             }
         }
         // check invariant 4
-        assert!(self.succs(self.entry_block).len() == 1);
+        assert!(self.get_the_successor(self.entry_block) != self.exit_block);
         // check invariant 5
         for (block, succs) in self.successors.iter() {
             if block != &self.exit_block {
@@ -523,8 +522,6 @@ impl ControlFlowGraphCodeGenerator {
         }
         // check invariant 7
         assert!(self.entry_block != self.exit_block);
-        // check invariant 8
-        assert!(self.blocks().len() > 2);
         // TODO: check other invariants
         true
     }
