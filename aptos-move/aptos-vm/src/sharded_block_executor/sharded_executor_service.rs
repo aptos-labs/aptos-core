@@ -16,6 +16,7 @@ use crate::{
         ExecutorShardCommand,
     },
 };
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::{
@@ -135,9 +136,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
+                let txn_provider = DefaultTxnProvider::new(signature_verified_transactions);
                 let ret = BlockAptosVM::execute_block_on_thread_pool(
                     executor_thread_pool,
-                    &signature_verified_transactions,
+                    &txn_provider,
                     aggr_overridden_state_view.as_ref(),
                     config,
                     cross_shard_commit_sender,
@@ -163,7 +165,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 callback.send(ret).unwrap();
                 executor_thread_pool_clone.spawn(move || {
                     // Explicit async drop
-                    drop(signature_verified_transactions);
+                    drop(txn_provider);
                 });
             });
         });

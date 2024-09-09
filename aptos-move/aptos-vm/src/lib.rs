@@ -126,6 +126,7 @@ pub mod verifier;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
@@ -159,7 +160,7 @@ pub trait VMExecutor: Send + Sync {
 
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
@@ -167,11 +168,11 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them,
     /// Without applying any block limit
     fn execute_block_no_limit(
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Self::execute_block(
-            transactions,
+            txn_provider,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )
