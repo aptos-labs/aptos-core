@@ -36,7 +36,8 @@ spec aptos_framework::aptos_coin {
 
     spec initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         use aptos_framework::aggregator_factory;
-
+        use aptos_framework::permissioned_signer;
+        aborts_if permissioned_signer::spec_is_permissioned_signer(aptos_framework);
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if !string::spec_internal_check_utf8(b"Aptos Coin");
