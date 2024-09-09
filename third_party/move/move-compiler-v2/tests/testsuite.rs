@@ -673,16 +673,28 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode_filter: None,
         },
         TestConfig {
-            name: "control-flow-simplification",
-            runner: |p| run_test(p, get_config_by_name("control-flow-simplification")),
+            name: "control-flow-simplification-on",
+            runner: |p| run_test(p, get_config_by_name("control-flow-simplification-on")),
             include: vec!["/control-flow-simplification/"],
             exclude: vec![],
-            exp_suffix: None,
-            options: opts.clone(),
+            exp_suffix: Some("on.exp"),
+            options: opts.clone().set_experiment(Experiment::CFG_SIMPLIFICATION, true),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter: Some(vec!["ControlFlowGraphSimplifier", FILE_FORMAT_STAGE]),
+        },
+        TestConfig {
+            name: "control-flow-simplification-off",
+            runner: |p| run_test(p, get_config_by_name("control-flow-simplification-off")),
+            include: vec!["/control-flow-simplification/"],
+            exclude: vec![],
+            exp_suffix: Some("off.exp"),
+            options: opts.clone().set_experiment(Experiment::CFG_SIMPLIFICATION, false),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
         }
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
