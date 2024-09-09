@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_language_e2e_tests::{
     account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
@@ -137,8 +138,9 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
             .into_iter()
             .map(|t| t.into_txn())
             .collect();
+    let txn_provider = DefaultTxnProvider::new(txns);
     let unsharded_txn_output = AptosVMBlockExecutor::new()
-        .execute_block_no_limit(&txns, executor.data_store())
+        .execute_block_no_limit(&txn_provider, executor.data_store())
         .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     sharded_block_executor.shutdown();
@@ -192,8 +194,9 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
         )
         .unwrap();
 
+    let txn_provider = DefaultTxnProvider::new(execution_ordered_txns);
     let unsharded_txn_output = AptosVMBlockExecutor::new()
-        .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+        .execute_block_no_limit(&txn_provider, executor.data_store())
         .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     sharded_block_executor.shutdown();

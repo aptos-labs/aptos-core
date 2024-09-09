@@ -4,6 +4,7 @@
 
 use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
     StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
@@ -291,12 +292,13 @@ impl Verifier {
         if cur_txns.is_empty() {
             return Ok(Vec::new());
         }
+        let txns = cur_txns
+            .iter()
+            .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
+            .collect::<Vec<_>>();
+        let txns_provider = DefaultTxnProvider::new(txns);
         let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
-            cur_txns
-                .iter()
-                .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
-                .collect::<Vec<_>>()
-                .as_slice(),
+            &txns_provider,
             &self
                 .arc_db
                 .state_view_at_version(start_version.checked_sub(1))?,

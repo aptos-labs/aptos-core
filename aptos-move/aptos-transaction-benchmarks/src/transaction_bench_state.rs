@@ -4,7 +4,9 @@
 use crate::transactions;
 use aptos_bitvec::BitVec;
 use aptos_block_executor::{
-    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+    code_cache_global_manager::AptosModuleCacheManager,
+    txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
@@ -192,16 +194,16 @@ where
     pub(crate) fn execute_sequential(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        let txns = self.gen_transaction();
-        self.execute_benchmark_sequential(&txns, None);
+        let txn_provider = DefaultTxnProvider::new(self.gen_transaction());
+        self.execute_benchmark_sequential(&txn_provider, None);
     }
 
     /// Executes this state in a single block.
     pub(crate) fn execute_parallel(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        let txns = self.gen_transaction();
-        self.execute_benchmark_parallel(&txns, num_cpus::get(), None);
+        let txn_provider = DefaultTxnProvider::new(self.gen_transaction());
+        self.execute_benchmark_parallel(&txn_provider, num_cpus::get(), None);
     }
 
     fn is_shareded(&self) -> bool {
@@ -210,16 +212,17 @@ where
 
     fn execute_benchmark_sequential(
         &self,
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
-        let block_size = transactions.len();
+        let block_size = txn_provider.num_txns();
         let timer = Instant::now();
         let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            DefaultTxnProvider<SignatureVerifiedTransaction>,
         >(
-            transactions,
+            txn_provider,
             self.state_view.as_ref(),
             &AptosModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
@@ -259,17 +262,18 @@ where
 
     fn execute_benchmark_parallel(
         &self,
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
-        let block_size = transactions.len();
+        let block_size = txn_provider.num_txns();
         let timer = Instant::now();
         let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            DefaultTxnProvider<SignatureVerifiedTransaction>,
         >(
-            transactions,
+            txn_provider,
             self.state_view.as_ref(),
             &AptosModuleCacheManager::new(),
             BlockExecutorConfig::new_maybe_block_limit(
@@ -295,6 +299,7 @@ where
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
+        let txn_provider = DefaultTxnProvider::new(transactions);
         let (output, par_tps) = if run_par {
             println!("Parallel execution starts...");
             let (output, tps) = if self.is_shareded() {
@@ -305,7 +310,7 @@ where
                 )
             } else {
                 self.execute_benchmark_parallel(
-                    &transactions,
+                    &txn_provider,
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 )
@@ -324,7 +329,7 @@ where
         let (output, seq_tps) = if run_seq {
             println!("Sequential execution starts...");
             let (output, tps) =
-                self.execute_benchmark_sequential(&transactions, maybe_block_gas_limit);
+                self.execute_benchmark_sequential(&txn_provider, maybe_block_gas_limit);
             println!("Sequential execution finishes, TPS = {}", tps);
             (output, tps)
         } else {

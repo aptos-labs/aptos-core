@@ -6,6 +6,7 @@
 mod mock_vm_test;
 
 use anyhow::Result;
+use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
@@ -65,7 +66,7 @@ impl VMBlockExecutor for MockVM {
 
     fn execute_block(
         &self,
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
@@ -75,8 +76,9 @@ impl VMBlockExecutor for MockVM {
         let mut output_cache = HashMap::new();
         let mut outputs = vec![];
 
-        for txn in transactions {
-            let txn = txn.expect_valid();
+        for idx in 0..txn_provider.num_txns() {
+            let txn_arc = txn_provider.get_txn(idx as u32);
+            let txn = txn_arc.expect_valid();
             if matches!(txn, Transaction::StateCheckpoint(_)) {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),

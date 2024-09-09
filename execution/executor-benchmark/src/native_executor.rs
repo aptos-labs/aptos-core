@@ -6,6 +6,7 @@ use crate::{
     metrics::TIMER,
 };
 use anyhow::Result;
+use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{DepositEvent, WithdrawEvent},
@@ -357,75 +358,83 @@ impl VMBlockExecutor for NativeExecutor {
 
     fn execute_block(
         &self,
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        let num_txns = txn_provider.num_txns();
         let transaction_outputs = NATIVE_EXECUTOR_POOL
             .install(|| {
-                transactions
-                    .par_iter()
-                    .map(|txn| match &txn.expect_valid() {
-                        Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
-                        Transaction::UserTransaction(user_txn) => match user_txn.payload() {
-                            aptos_types::transaction::TransactionPayload::EntryFunction(f) => {
-                                match (
-                                    *f.module().address(),
-                                    f.module().name().as_str(),
-                                    f.function().as_str(),
-                                ) {
-                                    (AccountAddress::ONE, "coin", "transfer") => {
-                                        Self::handle_account_creation_and_transfer(
-                                            user_txn.sender(),
-                                            bcs::from_bytes(&f.args()[0]).unwrap(),
-                                            bcs::from_bytes(&f.args()[1]).unwrap(),
-                                            &state_view,
-                                            false,
-                                            true,
-                                        )
-                                    },
-                                    (AccountAddress::ONE, "aptos_account", "transfer") => {
-                                        Self::handle_account_creation_and_transfer(
-                                            user_txn.sender(),
-                                            bcs::from_bytes(&f.args()[0]).unwrap(),
-                                            bcs::from_bytes(&f.args()[1]).unwrap(),
-                                            &state_view,
-                                            false,
-                                            false,
-                                        )
-                                    },
-                                    (AccountAddress::ONE, "aptos_account", "create_account") => {
-                                        Self::handle_account_creation_and_transfer(
+                (0..num_txns)
+                    .into_par_iter()
+                    .map(|idx| {
+                        let txn = txn_provider.get_txn(idx as u32);
+                        match &txn.expect_valid() {
+                            Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
+                            Transaction::UserTransaction(user_txn) => match user_txn.payload() {
+                                aptos_types::transaction::TransactionPayload::EntryFunction(f) => {
+                                    match (
+                                        *f.module().address(),
+                                        f.module().name().as_str(),
+                                        f.function().as_str(),
+                                    ) {
+                                        (AccountAddress::ONE, "coin", "transfer") => {
+                                            Self::handle_account_creation_and_transfer(
+                                                user_txn.sender(),
+                                                bcs::from_bytes(&f.args()[0]).unwrap(),
+                                                bcs::from_bytes(&f.args()[1]).unwrap(),
+                                                &state_view,
+                                                false,
+                                                true,
+                                            )
+                                        },
+                                        (AccountAddress::ONE, "aptos_account", "transfer") => {
+                                            Self::handle_account_creation_and_transfer(
+                                                user_txn.sender(),
+                                                bcs::from_bytes(&f.args()[0]).unwrap(),
+                                                bcs::from_bytes(&f.args()[1]).unwrap(),
+                                                &state_view,
+                                                false,
+                                                false,
+                                            )
+                                        },
+                                        (
+                                            AccountAddress::ONE,
+                                            "aptos_account",
+                                            "create_account",
+                                        ) => Self::handle_account_creation_and_transfer(
                                             user_txn.sender(),
                                             bcs::from_bytes(&f.args()[0]).unwrap(),
                                             0,
                                             &state_view,
                                             true,
                                             false,
-                                        )
-                                    },
-                                    (AccountAddress::ONE, "aptos_account", "batch_transfer") => {
-                                        Self::handle_batch_account_creation_and_transfer(
+                                        ),
+                                        (
+                                            AccountAddress::ONE,
+                                            "aptos_account",
+                                            "batch_transfer",
+                                        ) => Self::handle_batch_account_creation_and_transfer(
                                             user_txn.sender(),
                                             bcs::from_bytes(&f.args()[0]).unwrap(),
                                             bcs::from_bytes(&f.args()[1]).unwrap(),
                                             &state_view,
                                             false,
                                             true,
-                                        )
-                                    },
-                                    _ => unimplemented!(
-                                        "{} {}::{}",
-                                        *f.module().address(),
-                                        f.module().name().as_str(),
-                                        f.function().as_str()
-                                    ),
-                                }
+                                        ),
+                                        _ => unimplemented!(
+                                            "{} {}::{}",
+                                            *f.module().address(),
+                                            f.module().name().as_str(),
+                                            f.function().as_str()
+                                        ),
+                                    }
+                                },
+                                _ => unimplemented!(),
                             },
                             _ => unimplemented!(),
-                        },
-                        _ => unimplemented!(),
+                        }
                     })
                     .collect::<Result<Vec<_>>>()
             })
