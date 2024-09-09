@@ -11,6 +11,7 @@ use std::{
 use url::Url;
 
 const IMPORTED_TRANSACTIONS_FOLDER: &str = "imported_transactions";
+const SCRIPTED_TRANSACTIONS_FOLDER: &str = "scripted_transactions";
 
 #[derive(Parser)]
 pub struct IndexerCliArgs {
@@ -42,7 +43,10 @@ impl IndexerCliArgs {
 /// Overall configuration for the transaction generator.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransactionGeneratorConfig {
-    pub import_config: TransactionImporterConfig, // TODO: Add scripted transaction generation configuration.
+    // Configuration for importing transactions from multiple networks.
+    pub import_config: TransactionImporterConfig,
+    // Configuration for generating transactions from scripts.
+    pub script_transaction_generator_config: ScriptTransactionGeneratorConfig,
 }
 
 impl TransactionGeneratorConfig {
@@ -52,7 +56,20 @@ impl TransactionGeneratorConfig {
         if !import_config_path.exists() {
             tokio::fs::create_dir_all(&import_config_path).await?;
         }
-        self.import_config.run(&import_config_path).await
+        self.import_config
+            .run(&import_config_path)
+            .await
+            .context("Importing transactions failed.")?;
+
+        let script_config_path = output_path.join(SCRIPTED_TRANSACTIONS_FOLDER);
+        // Check if the output folder exists.
+        if !script_config_path.exists() {
+            tokio::fs::create_dir_all(&script_config_path).await?;
+        }
+        self.script_transaction_generator_config
+            .run(&script_config_path)
+            .await
+            .context("Generating transactions from scripts failed.")
     }
 }
 
@@ -65,7 +82,7 @@ pub struct TransactionImporterConfig {
 }
 
 impl TransactionImporterConfig {
-    pub async fn run(&self, output_path: &Path) -> anyhow::Result<()> {
+    fn validate(&self) -> anyhow::Result<()> {
         // Validate the configuration. This is to make sure that no output file shares the same name.
         let mut output_files = HashSet::new();
         for (_, network_config) in self.configs.iter() {
@@ -78,6 +95,13 @@ impl TransactionImporterConfig {
                 }
             }
         }
+        Ok(())
+    }
+
+    pub async fn run(&self, output_path: &Path) -> anyhow::Result<()> {
+        // Validate the configuration.
+        self.validate()?;
+
         // Run the transaction importer for each network.
         for (network_name, network_config) in self.configs.iter() {
             network_config.run(output_path).await.context(format!(
@@ -99,6 +123,30 @@ pub struct TransactionImporterPerNetworkConfig {
     pub api_key: Option<String>,
     /// The version of the transaction to fetch and their output file names.
     pub versions_to_import: HashMap<u64, String>,
+}
+
+/// Configuration for generating transactions from scripts.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScriptTransactionGeneratorConfig {
+    /// List of scripts to run to generate transactions.
+    pub scripted_transactions: Vec<ScriptTransactions>,
+}
+
+/// Configuration for generating transactions from a script.
+/// `ScriptTransactions` will generate a list of transactions and output if specified.
+/// A managed-node will be used to execute the scripts in sequence.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScriptTransactions {
+    pub steps: Vec<ScriptStep>,
+}
+
+/// A step that can optionally output one transaction.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScriptStep {
+    pub script_path: PathBuf,
+    pub output_name: Option<String>,
+    // Optional address to fund the account; if not provided, the default profile address will be used.
+    pub fund_address: Option<String>,
 }
 
 #[cfg(test)]
@@ -124,6 +172,9 @@ mod tests {
                             1: "mainnet_v1.json"
                         }
                     }
+                },
+                "script_transaction_generator_config": {
+                    "scripted_transactions": []
                 }
             }
         "#;

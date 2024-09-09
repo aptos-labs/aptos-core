@@ -9,6 +9,7 @@ This tool is to generate transactions for testing purpose.
 ### Config
 
 ```YAML
+# Config to import transactions onchain.
 import_config:
   testnet:
     # Transaction Stream endpoint addresss.
@@ -18,4 +19,11 @@ import_config:
     # A map from versions to dump and their output names.
     versions_to_import:
       123: testnet_v1.json
+# Config to generate the transactions via localnode.
+script_transaction_generator_config:
+  scripted_transactions:
+    # Steps can be shared between runs.
+    - steps:
+        - script_path: /path/to/your_move_script
+          output_name: random_script.json
 ```
