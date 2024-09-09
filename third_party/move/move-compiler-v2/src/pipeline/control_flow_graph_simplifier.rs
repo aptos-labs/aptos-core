@@ -469,8 +469,8 @@ impl ControlFlowGraphCodeGenerator {
     /// - TODO: check if the code blocks are consistent with the successors and predecessors map
     fn check_consistency(&self) -> bool {
         // check invariant 1
-        assert!(self.code_blocks.keys().collect_vec() == self.successors.keys().collect_vec());
-        assert!(self.code_blocks.keys().collect_vec() == self.predecessors.keys().collect_vec());
+        assert!(self.code_blocks.keys().eq(self.successors.keys()));
+        assert!(self.code_blocks.keys().eq(self.predecessors.keys()));
         let pred_map_reversed = self.predecessors.iter().fold(
             BTreeMap::new(),
             |mut acc: BTreeMap<BlockId, Vec<BlockId>>, (block, preds)| {
@@ -482,7 +482,7 @@ impl ControlFlowGraphCodeGenerator {
             },
         );
         // check invariant 2
-        assert!(self.successors.keys().collect_vec() == pred_map_reversed.keys().collect_vec());
+        assert!(self.successors.keys().eq(pred_map_reversed.keys()));
         for block in self.successors.keys() {
             assert!(
                 self.successors
