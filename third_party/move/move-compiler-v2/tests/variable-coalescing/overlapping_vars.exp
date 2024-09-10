@@ -103,8 +103,6 @@ module c0ffee.m {
 
 test(): u64 /* def_idx: 0 */ {
 L0:	loc0: u64
-L1:	loc1: u64
-L2:	loc2: u64
 B0:
 	0: LdU64(1)
 	1: LdU64(2)

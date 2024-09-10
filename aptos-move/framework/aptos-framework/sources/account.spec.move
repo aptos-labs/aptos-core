@@ -575,6 +575,7 @@ spec aptos_framework::account {
         // This function should not abort assuming the result of `sha3_256` is deserializable into an address.
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_resource_address(source, seed);
+        ensures [abstract] source != result; // We can assume that the derived resource account does not equal to `source`
     }
 
     spec fun spec_create_resource_address(source: address, seed: vector<u8>): address;

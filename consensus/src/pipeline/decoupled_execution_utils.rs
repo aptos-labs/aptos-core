@@ -27,6 +27,7 @@ use std::sync::{
 };
 
 /// build channels and return phases and buffer manager
+#[allow(clippy::too_many_arguments)]
 pub fn prepare_phases_and_buffer_manager(
     author: Author,
     execution_proxy: Arc<dyn StateComputer>,
@@ -39,6 +40,7 @@ pub fn prepare_phases_and_buffer_manager(
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
+    back_pressure_enabled: bool,
     highest_committed_round: u64,
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
@@ -128,6 +130,7 @@ pub fn prepare_phases_and_buffer_manager(
             reset_flag.clone(),
             bounded_executor,
             order_vote_enabled,
+            back_pressure_enabled,
             highest_committed_round,
             consensus_observer_config,
             consensus_publisher,

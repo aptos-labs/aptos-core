@@ -55,6 +55,7 @@ public fun m::test3(): (u64, u64) {
      var $t2: u64
      var $t3: u64
      var $t4: u64
+     # flush: $t2
      # live vars:
   0: $t2 := m::one()
      # flush: $t3
@@ -98,14 +99,12 @@ L0:	loc0: u64
 L1:	loc1: u64
 B0:
 	0: Call one(): u64
-	1: Call one(): u64
-	2: Pop
-	3: Call one(): u64
-	4: StLoc[0](loc0: u64)
-	5: StLoc[1](loc1: u64)
-	6: MoveLoc[0](loc0: u64)
-	7: MoveLoc[1](loc1: u64)
-	8: Ret
+	1: StLoc[0](loc0: u64)
+	2: Call one(): u64
+	3: Pop
+	4: Call one(): u64
+	5: MoveLoc[0](loc0: u64)
+	6: Ret
 }
 }
 ============ bytecode verification succeeded ========

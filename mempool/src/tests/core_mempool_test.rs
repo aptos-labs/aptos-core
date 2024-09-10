@@ -14,7 +14,8 @@ use aptos_config::config::{MempoolConfig, NodeConfig};
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    mempool_status::MempoolStatusCode, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+    account_address::AccountAddress, mempool_status::MempoolStatusCode,
+    transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
 use itertools::Itertools;
 use maplit::btreemap;
@@ -756,7 +757,9 @@ fn test_capacity_bytes() {
     let mut txns = vec![];
     let last_txn;
     loop {
-        let txn = new_test_mempool_transaction(address, seq_no);
+        let txn = signed_txn_to_mempool_transaction(
+            TestTransaction::new(address, seq_no, 1).make_signed_transaction(),
+        );
         let txn_bytes = txn.get_estimated_bytes();
 
         if size_bytes <= capacity_bytes {
@@ -811,10 +814,9 @@ fn test_capacity_bytes() {
     }
 }
 
-fn new_test_mempool_transaction(address: usize, sequence_number: u64) -> MempoolTransaction {
-    let signed_txn = TestTransaction::new(address, sequence_number, 1).make_signed_transaction();
+fn signed_txn_to_mempool_transaction(txn: SignedTransaction) -> MempoolTransaction {
     MempoolTransaction::new(
-        signed_txn,
+        txn,
         Duration::from_secs(1),
         1,
         TimelineState::NotReady,
@@ -849,6 +851,98 @@ fn test_parking_lot_eviction() {
 
     // Make sure we can't insert any new transactions, cause parking lot supposed to be empty by now.
     assert!(add_txn(&mut pool, TestTransaction::new(0, 2, 1)).is_err());
+}
+
+#[test]
+fn test_parking_lot_eviction_bytes() {
+    // Get the small transaction size
+    let small_txn_size =
+        signed_txn_to_mempool_transaction(TestTransaction::new(1, 1, 1).make_signed_transaction())
+            .get_estimated_bytes();
+
+    let mut config = NodeConfig::generate_random_config();
+    config.mempool.capacity = 100;
+    // Fit 2 small transactions + one additional transaction (by overflowing the capacity bytes)
+    config.mempool.capacity_bytes = 3 * small_txn_size + 1;
+    let mut pool = CoreMempool::new(&config);
+    // Add 2 small transactions to parking lot
+    for address in 0..2 {
+        add_txn(&mut pool, TestTransaction::new(address, 1, 1)).unwrap();
+    }
+    // Add one large transaction that will top off the capacity bytes
+    add_txn(&mut pool, TestTransaction::new_with_large_script(2, 1, 1)).unwrap();
+    // Mempool is full. Insert a small txn for other account.
+    add_txn(&mut pool, TestTransaction::new(3, 0, 1)).unwrap();
+}
+
+#[test]
+fn test_parking_lot_eviction_benchmark() {
+    // Get the small transaction size
+    let small_txn_size =
+        signed_txn_to_mempool_transaction(TestTransaction::new(1, 1, 1).make_signed_transaction())
+            .get_estimated_bytes();
+    let huge_txn_size = signed_txn_to_mempool_transaction(
+        TestTransaction::new_with_huge_script(1, 1, 1).make_signed_transaction(),
+    )
+    .get_estimated_bytes();
+    let num_small_txns = (huge_txn_size / small_txn_size) * 2;
+
+    let mut config = NodeConfig::generate_random_config();
+    config.mempool.capacity_per_user = 200;
+    config.mempool.capacity = 4_000_000;
+    // ~5 MB
+    config.mempool.capacity_bytes = num_small_txns * small_txn_size + 1;
+    let mut pool = CoreMempool::new(&config);
+
+    // // Add one huge transaction that will evict all transactions from parking lot
+    // let huge_signed_txn = TestTransaction::new_with_huge_script(0, 1, 1).make_signed_transaction();
+    // // Pre-compute these values, as shared mempool would do
+    // huge_signed_txn.committed_hash();
+    // huge_signed_txn.txn_bytes_len();
+    //
+    // let now = Instant::now();
+    // add_signed_txn(&mut pool, huge_signed_txn.clone()).unwrap();
+    // // Flush the huge transaction
+    // add_txn(&mut pool, TestTransaction::new(1, 0, 1)).unwrap();
+
+    let accounts: Vec<_> = (0..num_small_txns)
+        .map(|_| AccountAddress::random())
+        .collect();
+    // Fill up parking lot to capacity
+    for account in accounts {
+        for seq_num in 1..2 {
+            add_txn(
+                &mut pool,
+                TestTransaction::new_with_address(account, seq_num, 1),
+            )
+            .unwrap();
+        }
+    }
+    // Add one huge transaction that will cause mempool to be (beyond) full
+    let huge_signed_txn = TestTransaction::new_with_huge_script(0, 0, 1).make_signed_transaction();
+    add_signed_txn(&mut pool, huge_signed_txn).unwrap();
+    assert_eq!(pool.get_parking_lot_size(), num_small_txns);
+
+    // Add one huge transaction that will evict many transactions from parking lot
+    let huge_signed_txn = TestTransaction::new_with_huge_script(1, 0, 1).make_signed_transaction();
+    // Pre-compute these values, as shared mempool would do
+    huge_signed_txn.committed_hash();
+    huge_signed_txn.txn_bytes_len();
+    let now = Instant::now();
+    add_signed_txn(&mut pool, huge_signed_txn).unwrap();
+    let time_to_evict_ms = now.elapsed().as_millis();
+
+    let has_remainder = huge_txn_size % small_txn_size != 0;
+    let num_expected_evicted = num_small_txns / 2 + has_remainder as usize;
+    assert_eq!(
+        pool.get_parking_lot_size(),
+        num_small_txns - num_expected_evicted
+    );
+    assert!(
+        time_to_evict_ms < 300,
+        "Parking lot eviction of {} should take less than 300 ms on a reasonable machine",
+        num_expected_evicted
+    );
 }
 
 #[test]

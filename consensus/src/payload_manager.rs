@@ -428,7 +428,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 block.gen_block_info(HashValue::zero(), 0, None),
                 transaction_payload.clone(),
             );
-            consensus_publisher.publish_message(message).await;
+            consensus_publisher.publish_message(message);
         }
 
         Ok((
@@ -477,7 +477,7 @@ async fn get_transactions_for_observer(
             block.gen_block_info(HashValue::zero(), 0, None),
             transaction_payload.clone(),
         );
-        consensus_publisher.publish_message(message).await;
+        consensus_publisher.publish_message(message);
     }
 
     // Return the transactions and the transaction limit
