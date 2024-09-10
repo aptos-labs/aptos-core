@@ -163,6 +163,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
+
+      - name: Run dev_setup.sh
+        run: |
+          scripts/dev_setup.sh -b -p -r -y -P -t
+
       - name: Run targeted rust unit tests
         uses: ./.github/actions/rust-targeted-unit-tests
         with:

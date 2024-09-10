@@ -2044,7 +2044,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         receiver_arg_ty: &Type,
         inst: ReceiverFunctionInstance,
     ) -> RewriteResult {
-        let receiver_param_type = inst.arg_types.first().expect("argument").clone();
+        let mut receiver_param_type = inst.arg_types.first().expect("argument").clone();
         // Determine whether an automatic borrow needs to be inserted
         // and it's kind.
         let borrow_kind_opt = inst.receiver_needs_borrow(receiver_arg_ty);
@@ -2099,6 +2099,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             // to avoid follow-up errors, only do if unification
             // succeeded
             if ok {
+                receiver_param_type = subs.specialize(&receiver_param_type);
                 self.subs = subs;
                 let inst = inst
                     .type_inst

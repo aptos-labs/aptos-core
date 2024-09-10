@@ -122,10 +122,10 @@ impl ModuleGenerator {
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let options = module_env.env.get_extension::<Options>().expect("options");
         let language_version = options.language_version.unwrap_or_default();
+        let compiler_version = options.compiler_version.unwrap_or(CompilerVersion::V2_0);
         let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
-        let compilation_metadata =
-            CompilationMetadata::new(CompilerVersion::V2_0, language_version);
+        let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {
             key: COMPILATION_METADATA_KEY.to_vec(),
             value: bcs::to_bytes(&compilation_metadata)
@@ -1101,8 +1101,8 @@ impl<'env> ModuleContext<'env> {
                 if *mid == fun.module_env.get_id() =>
                     {
                         result.insert(*sid);
-                    },
-                _ => {},
+                    }
+                _ => {}
             }
         }
         result
