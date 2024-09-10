@@ -2537,7 +2537,7 @@ impl AptosVM {
         &self,
         signed_transaction: &SignedTransaction,
         resolver: &impl AptosMoveResolver,
-        session: &mut SessionExt
+        session: & SessionExt
     ) -> (bool, Option<EntryFunction>) {
         let entry_fn = match signed_transaction.payload() {
             TransactionPayload::EntryFunction(entry) => entry,
@@ -2559,7 +2559,7 @@ impl AptosVM {
         let mut res = vec![];
         let mut entry_funs = vec![];
         for txn in signed_transactions {
-            let (result, entry_opt) = self.check_randomness(txn, resolver, &mut session);
+            let (result, entry_opt) = self.check_randomness(txn, resolver, & session);
             res.push(result);
             entry_funs.push(entry_opt);
         }

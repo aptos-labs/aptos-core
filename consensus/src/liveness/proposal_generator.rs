@@ -39,6 +39,7 @@ use std::{
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::time::Instant;
 use aptos_types::transaction::{EntryFunction, SignedTransaction, TransactionPayload};
 use move_core_types::language_storage::ModuleId;
 
@@ -512,6 +513,7 @@ impl ProposalGenerator {
             proposer_election,
         );
 
+        let now = Instant::now();
         // daniel todo: deal with max_txns_from_block_to_execute in check_randomness
         // Check if the block contains any randomness transaction
         let maybe_require_randomness = skip_non_rand_blocks.then(|| {
@@ -575,6 +577,8 @@ impl ProposalGenerator {
                     }
                 }
         });
+        let elapsed = now.elapsed();
+        info!("Check randomness: {:.3?}", elapsed);
 
         observe_block(timestamp, BlockStage::CHECKED_RAND);
 
