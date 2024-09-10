@@ -276,7 +276,7 @@ pub struct ProposalGenerator {
     validator: Arc<RwLock<PooledVMValidator>>,
 
     // randomness info
-    randomness_info: Arc<Mutex<HashMap<EntryFunction, bool>>>,
+    randomness_info: Arc<Mutex<HashSet<EntryFunction>>>,
 }
 
 impl ProposalGenerator {
@@ -319,7 +319,7 @@ impl ProposalGenerator {
             onchain_randomness_config,
             allow_batches_without_pos_in_proposal,
             validator,
-            randomness_info: Arc::new(Mutex::new(HashMap::new())),
+            randomness_info: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -518,63 +518,102 @@ impl ProposalGenerator {
         // Check if the block contains any randomness transaction
         let maybe_require_randomness = skip_non_rand_blocks.then(|| {
             ref_txns.par_iter().any(|txns| {
-                let b = <std::option::Option<Vec<SignedTransaction>> as Clone>::clone(&txns.as_ref()).map(|t| t.iter().any(|txn| {
-                    let entry_fn = match txn.payload() {
-                        TransactionPayload::EntryFunction(entry) => Some(entry),
-                        TransactionPayload::Multisig(_) => None,
-                        _ => None,
-                    };
-                    if let Some(entry) = entry_fn {
-                        if self.randomness_info.lock().contains_key(entry) {
-                            *self.randomness_info.lock().get(entry).unwrap()
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }));
-                if !b.is_some_and(|b| b) {
-                    let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
-                    for (entry, val) in entry_map {
-                        if !self.randomness_info.lock().contains_key(&entry) {
-                            self.randomness_info.lock().insert(entry, val);
-                        }
-                    }
-                    result
-                } else {
-                    true
-                }
-            })
-            |
-                {
-                    let b = inline_txns.iter().any(|txn| {
+                if let Some(txns) = txns.as_ref() {
+                    for txn in txns {
                         let entry_fn = match txn.payload() {
                             TransactionPayload::EntryFunction(entry) => Some(entry),
                             TransactionPayload::Multisig(_) => None,
                             _ => None,
                         };
                         if let Some(entry) = entry_fn {
-                            if self.randomness_info.lock().contains_key(entry) {
-                                *self.randomness_info.lock().get(entry).unwrap()
-                            } else {
-                                false
+                            if self.randomness_info.lock().contains(entry) {
+                                return true;
+                                // if *self.randomness_info.lock().get(entry).unwrap() {
+                                //     return true;
+                                // }
                             }
-                        } else {
-                            false
                         }
-                    });
-                    if !b {
+                    }
+                } else {
+                    return false;
+                }
+                // let b = <std::option::Option<Vec<SignedTransaction>> as Clone>::clone(&txns.as_ref()).map(|t| t.iter().any(|txn| {
+                //     let entry_fn = match txn.payload() {
+                //         TransactionPayload::EntryFunction(entry) => Some(entry),
+                //         TransactionPayload::Multisig(_) => None,
+                //         _ => None,
+                //     };
+                //     if let Some(entry) = entry_fn {
+                //         if self.randomness_info.lock().contains_key(entry) {
+                //             *self.randomness_info.lock().get(entry).unwrap()
+                //         } else {
+                //             false
+                //         }
+                //     } else {
+                //         false
+                //     }
+                // }));
+                let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
+                for entry in entry_map {
+                    if !self.randomness_info.lock().contains(&entry) {
+                        self.randomness_info.lock().insert(entry);
+                    }
+                }
+                result
+                // if !b.is_some_and(|b| b) {
+                //     let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
+                //     for (entry, val) in entry_map {
+                //         if !self.randomness_info.lock().contains_key(&entry) {
+                //             self.randomness_info.lock().insert(entry, val);
+                //         }
+                //     }
+                //     result
+                // } else {
+                //     true
+                // }
+            })
+            |
+                {
+                    for txn in &inline_txns {
+                        let entry_fn = match txn.payload() {
+                            TransactionPayload::EntryFunction(entry) => Some(entry),
+                            TransactionPayload::Multisig(_) => None,
+                            _ => None,
+                        };
+                        if let Some(entry) = entry_fn {
+                            if self.randomness_info.lock().contains(entry) {
+                                return true;
+                            }
+                        }
+                    }
+
+                    // let b = inline_txns.iter().any(|txn| {
+                    //     let entry_fn = match txn.payload() {
+                    //         TransactionPayload::EntryFunction(entry) => Some(entry),
+                    //         TransactionPayload::Multisig(_) => None,
+                    //         _ => None,
+                    //     };
+                    //     if let Some(entry) = entry_fn {
+                    //         if self.randomness_info.lock().contains_key(entry) {
+                    //             *self.randomness_info.lock().get(entry).unwrap()
+                    //         } else {
+                    //             false
+                    //         }
+                    //     } else {
+                    //         false
+                    //     }
+                    // });
+                    //if !b {
                         let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns));
-                        for (entry, val) in entry_map {
-                            if !self.randomness_info.lock().contains_key(&entry) {
-                                self.randomness_info.lock().insert(entry, val);
+                        for entry in entry_map {
+                            if !self.randomness_info.lock().contains(&entry) {
+                                self.randomness_info.lock().insert(entry);
                             }
                         }
                         result
-                    } else {
-                        true
-                    }
+                    // } else {
+                    //     true
+                    // }
                 }
         });
         let elapsed = now.elapsed();

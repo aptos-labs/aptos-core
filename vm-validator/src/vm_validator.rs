@@ -81,7 +81,7 @@ impl VMValidator {
         self.vm.check_randomness(txn, &resolver, &mut session).0
     }
 
-    pub fn check_randomness_in_batch(&self, txn: &Vec<SignedTransaction>) -> (Vec<bool>, Vec<Option<EntryFunction>>) {
+    pub fn check_randomness_in_batch(&self, txn: &Vec<SignedTransaction>) -> (bool, Option<EntryFunction>) {
         let resolver = self.vm.as_move_resolver(&self.state_view);
         self.vm.check_randomness_in_batch(txn, &resolver)
     }
@@ -161,25 +161,23 @@ impl PooledVMValidator {
         self.get_next_vm().lock().unwrap().check_randomness(txn)
     }
 
-    pub fn check_randomness_for_batch_txns(&self, txn: &Vec<SignedTransaction>) -> (Vec<bool>, Vec<Option<EntryFunction>>) {
+    pub fn check_randomness_for_batch_txns(&self, txn: &Vec<SignedTransaction>) -> (bool, Option<EntryFunction>) {
         self.get_next_vm().lock().unwrap().check_randomness_in_batch(txn)
     }
 
-    pub fn check_randomness_in_batch(&self, txns: &Option<Vec<SignedTransaction>>) -> (bool, Vec<(EntryFunction, bool)>) {
+    pub fn check_randomness_in_batch(&self, txns: &Option<Vec<SignedTransaction>>) -> (bool, HashSet<EntryFunction>) {
         txns.as_ref()
-            .map_or((false, vec![]), |txns| {
-                let (res, entries) = self.check_randomness_for_batch_txns(txns);
-                let mut entry_result = vec![];
+            .map_or((false, HashSet::new()), |txns| {
+                let (res, entry_opt) = self.check_randomness_for_batch_txns(txns);
                 let mut entry_set = HashSet::new();
-                for (re, entry_opt) in res.iter().zip(entries.iter()) {
+                //for entry_opt in entries.iter() {
                     if let Some(entry) = entry_opt {
-                        if !entry_set.contains(entry) {
-                            entry_result.push((entry.clone(), *re));
+                        if !entry_set.contains(&entry) {
                             entry_set.insert(entry.clone());
                         }
                     }
-                }
-                (res.iter().any(|&x| x), entry_result)
+                //}
+                (res, entry_set)
             })
     }
 
