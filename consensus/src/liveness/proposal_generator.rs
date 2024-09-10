@@ -511,7 +511,7 @@ impl ProposalGenerator {
                 self.validator.read().check_randomness_in_batch(txns.as_ref())
             })
             |
-            inline_txns.par_iter().any(|txn| self.validator.read().check_randomness(txn))
+                self.validator.read().check_randomness_in_batch(&Some(inline_txns))
         });
 
         observe_block(timestamp, BlockStage::CHECKED_RAND);

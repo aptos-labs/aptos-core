@@ -2537,18 +2537,32 @@ impl AptosVM {
         &self,
         signed_transaction: &SignedTransaction,
         resolver: &impl AptosMoveResolver,
+        session: &mut SessionExt
     ) -> bool {
         let entry_fn = match signed_transaction.payload() {
             TransactionPayload::EntryFunction(entry) => entry,
             TransactionPayload::Multisig(_) => return false, // daniel todo fix
             _ => return false,
         };
-        let mut session = self.new_session(resolver, SessionId::Void, None);
-        match get_randomness_annotation(resolver, &mut session, entry_fn) {
+        match get_randomness_annotation(resolver, session, entry_fn) {
             Ok(annotation) => annotation.is_some(),
             Err(_) => false,
         }
     }
+
+    pub fn check_randomness_in_batch(
+        &self,
+        signed_transactions: &Vec<SignedTransaction>,
+        resolver: &impl AptosMoveResolver,
+    ) -> Vec<bool> {
+        let mut session = self.new_session(resolver, SessionId::Void, None);
+        let mut res = vec![];
+        for txn in signed_transactions {
+            res.push(self.check_randomness(txn, resolver, &mut session));
+        }
+        res
+    }
+
 }
 
 // Executor external API

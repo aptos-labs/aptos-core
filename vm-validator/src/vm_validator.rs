@@ -20,6 +20,7 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
+use aptos_vm::move_vm_ext::SessionId;
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -74,8 +75,15 @@ impl VMValidator {
 
     pub fn check_randomness(&self, txn: &SignedTransaction) -> bool {
         let resolver = self.vm.as_move_resolver(&self.state_view);
-        self.vm.check_randomness(txn, &resolver)
+        let mut session = self.vm.new_session(&resolver, SessionId::Void, None);
+        self.vm.check_randomness(txn, &resolver, &mut session)
     }
+
+    pub fn check_randomness_in_batch(&self, txn: &Vec<SignedTransaction>) -> Vec<bool> {
+        let resolver = self.vm.as_move_resolver(&self.state_view);
+        self.vm.check_randomness_in_batch(txn, &resolver)
+    }
+
 }
 
 impl TransactionValidation for VMValidator {
@@ -151,9 +159,13 @@ impl PooledVMValidator {
         self.get_next_vm().lock().unwrap().check_randomness(txn)
     }
 
+    pub fn check_randomness_for_batch_txns(&self, txn: &Vec<SignedTransaction>) -> Vec<bool> {
+        self.get_next_vm().lock().unwrap().check_randomness_in_batch(txn)
+    }
+
     pub fn check_randomness_in_batch(&self, txns: &Option<Vec<SignedTransaction>>) -> bool {
         txns.as_ref()
-            .map_or(false, |txns| txns.iter().any(|txn| self.check_randomness(txn)))
+            .map_or(false, |txns| self.check_randomness_for_batch_txns(txns).iter().any(|&x| x))
     }
 
 }
