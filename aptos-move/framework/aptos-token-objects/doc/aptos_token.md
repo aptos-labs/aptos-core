@@ -15,6 +15,8 @@ The key features are:
 
 -  [Resource `AptosCollection`](#0x4_aptos_token_AptosCollection)
 -  [Resource `AptosToken`](#0x4_aptos_token_AptosToken)
+-  [Struct `TokenUpdatePermission`](#0x4_aptos_token_TokenUpdatePermission)
+-  [Struct `CollectionUpdatePermission`](#0x4_aptos_token_CollectionUpdatePermission)
 -  [Constants](#@Constants_0)
 -  [Function `create_collection`](#0x4_aptos_token_create_collection)
 -  [Function `create_collection_object`](#0x4_aptos_token_create_collection_object)
@@ -58,11 +60,16 @@ The key features are:
 -  [Function `set_collection_royalties`](#0x4_aptos_token_set_collection_royalties)
 -  [Function `set_collection_royalties_call`](#0x4_aptos_token_set_collection_royalties_call)
 -  [Function `set_collection_uri`](#0x4_aptos_token_set_collection_uri)
+-  [Function `authorize_token_mutation`](#0x4_aptos_token_authorize_token_mutation)
+-  [Function `revoke_token_mutation`](#0x4_aptos_token_revoke_token_mutation)
+-  [Function `authorize_collection_mutation`](#0x4_aptos_token_authorize_collection_mutation)
+-  [Function `revoke_collection_mutation`](#0x4_aptos_token_revoke_collection_mutation)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="collection.md#0x4_collection">0x4::collection</a>;
@@ -197,6 +204,60 @@ Storage state for managing the no-code Token.
 </dt>
 <dd>
  Used to mutate properties
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x4_aptos_token_TokenUpdatePermission"></a>
+
+## Struct `TokenUpdatePermission`
+
+
+
+<pre><code><b>struct</b> <a href="aptos_token.md#0x4_aptos_token_TokenUpdatePermission">TokenUpdatePermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>token_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x4_aptos_token_CollectionUpdatePermission"></a>
+
+## Struct `CollectionUpdatePermission`
+
+
+
+<pre><code><b>struct</b> <a href="aptos_token.md#0x4_aptos_token_CollectionUpdatePermission">CollectionUpdatePermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>collection_address: <b>address</b></code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -862,6 +923,11 @@ With an existing collection, directly mint a soul bound token into the recipient
 
     <b>assert</b>!(
         <a href="token.md#0x4_token_creator">token::creator</a>(*<a href="token.md#0x4_token">token</a>) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_ENOT_CREATOR">ENOT_CREATOR</a>),
+    );
+
+    <b>assert</b>!(
+        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_check_permission_capacity_above">permissioned_signer::check_permission_capacity_above</a>(creator, 0, <a href="aptos_token.md#0x4_aptos_token_TokenUpdatePermission">TokenUpdatePermission</a> { token_address }),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_ENOT_CREATOR">ENOT_CREATOR</a>),
     );
     <b>borrow_global</b>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a>&gt;(token_address)
@@ -1561,6 +1627,11 @@ With an existing collection, directly mint a soul bound token into the recipient
         <a href="collection.md#0x4_collection_creator">collection::creator</a>(*<a href="collection.md#0x4_collection">collection</a>) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_ENOT_CREATOR">ENOT_CREATOR</a>),
     );
+
+    <b>assert</b>!(
+        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_check_permission_capacity_above">permissioned_signer::check_permission_capacity_above</a>(creator, 0, <a href="aptos_token.md#0x4_aptos_token_CollectionUpdatePermission">CollectionUpdatePermission</a> { collection_address }),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_ENOT_CREATOR">ENOT_CREATOR</a>),
+    );
     <b>borrow_global</b>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>&gt;(collection_address)
 }
 </code></pre>
@@ -1692,6 +1763,140 @@ With an existing collection, directly mint a soul bound token into the recipient
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_EFIELD_NOT_MUTABLE">EFIELD_NOT_MUTABLE</a>),
     );
     <a href="collection.md#0x4_collection_set_uri">collection::set_uri</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&aptos_collection.mutator_ref), uri);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_aptos_token_authorize_token_mutation"></a>
+
+## Function `authorize_token_mutation`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_authorize_token_mutation">authorize_token_mutation</a>&lt;T: key&gt;(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permissioned_creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_authorize_token_mutation">authorize_token_mutation</a>&lt;T: key&gt;(
+    creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    permissioned_creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="token.md#0x4_token">token</a>: Object&lt;T&gt;,
+) {
+    <b>let</b> token_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="token.md#0x4_token">token</a>);
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a>&gt;(token_address),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="aptos_token.md#0x4_aptos_token_ETOKEN_DOES_NOT_EXIST">ETOKEN_DOES_NOT_EXIST</a>),
+    );
+    <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(
+        creator,
+        permissioned_creator,
+        <a href="aptos_token.md#0x4_aptos_token_TokenUpdatePermission">TokenUpdatePermission</a> { token_address },
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_aptos_token_revoke_token_mutation"></a>
+
+## Function `revoke_token_mutation`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_revoke_token_mutation">revoke_token_mutation</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_revoke_token_mutation">revoke_token_mutation</a>&lt;T: key&gt;(
+    <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="token.md#0x4_token">token</a>: Object&lt;T&gt;,
+) {
+    <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_revoke_permission">permissioned_signer::revoke_permission</a>(
+        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>,
+        <a href="aptos_token.md#0x4_aptos_token_TokenUpdatePermission">TokenUpdatePermission</a> { token_address: <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="token.md#0x4_token">token</a>) },
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_aptos_token_authorize_collection_mutation"></a>
+
+## Function `authorize_collection_mutation`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_authorize_collection_mutation">authorize_collection_mutation</a>&lt;T: key&gt;(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_authorize_collection_mutation">authorize_collection_mutation</a>&lt;T: key&gt;(
+    creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="collection.md#0x4_collection">collection</a>: Object&lt;T&gt;,
+) {
+    <b>let</b> collection_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="collection.md#0x4_collection">collection</a>);
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>&gt;(collection_address),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="aptos_token.md#0x4_aptos_token_ETOKEN_DOES_NOT_EXIST">ETOKEN_DOES_NOT_EXIST</a>),
+    );
+    <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(
+        creator,
+        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>,
+        <a href="aptos_token.md#0x4_aptos_token_CollectionUpdatePermission">CollectionUpdatePermission</a> { collection_address },
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_aptos_token_revoke_collection_mutation"></a>
+
+## Function `revoke_collection_mutation`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_revoke_collection_mutation">revoke_collection_mutation</a>&lt;T: key&gt;(<a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_revoke_collection_mutation">revoke_collection_mutation</a>&lt;T: key&gt;(
+    <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="collection.md#0x4_collection">collection</a>: Object&lt;T&gt;,
+) {
+    <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_revoke_permission">permissioned_signer::revoke_permission</a>(
+        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>,
+        <a href="aptos_token.md#0x4_aptos_token_CollectionUpdatePermission">CollectionUpdatePermission</a> { collection_address: <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="collection.md#0x4_collection">collection</a>) },
+    )
 }
 </code></pre>
 
