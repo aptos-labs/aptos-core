@@ -165,7 +165,7 @@ pub struct BufferManager {
 
     pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
 
-    buffered_commit_votes: Arc<DashMap<HashValue, HashMap<Author, IncomingCommitRequest>>>,
+    buffered_commit_votes: HashMap<HashValue, HashMap<Author, IncomingCommitRequest>>,
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
@@ -267,7 +267,7 @@ impl BufferManager {
 
             pending_commit_proofs: BTreeMap::new(),
 
-            buffered_commit_votes: Arc::new(DashMap::new()),
+            buffered_commit_votes: HashMap::new(),
             execution_futures,
         }
     }
@@ -417,8 +417,7 @@ impl BufferManager {
     }
 
     async fn process_buffered_commit_votes(&mut self, block_id: HashValue) {
-        let mut commit_votes = self.buffered_commit_votes.remove(&block_id);
-        if let Some((_, commit_votes)) = commit_votes.take() {
+        if let Some(commit_votes) = self.buffered_commit_votes.remove(&block_id) {
             info!("[PreExecution] process {} buffered commit votes for block id {}", commit_votes.len(), block_id);
             for (_, commit_msg) in commit_votes {
                 self.process_commit_message(commit_msg);
@@ -633,7 +632,6 @@ impl BufferManager {
         let executed_blocks = match inner {
             Ok(result) => result,
             Err(e) => {
-                self.execution_futures.remove(&block_id);
                 log_executor_error_occurred(
                     e,
                     &counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT,
@@ -790,8 +788,7 @@ impl BufferManager {
                         protocol,
                         response_sender: response_sender,
                     };
-                    let mut commit_votes = self.buffered_commit_votes.entry(target_block_id).or_default();
-                    commit_votes.insert(author, commit_msg);
+                    self.buffered_commit_votes.entry(target_block_id).or_default().insert(author, commit_msg);
 
                     // reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }

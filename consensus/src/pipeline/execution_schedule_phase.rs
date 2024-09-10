@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::{NUM_NON_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS}, pipeline::{
+    counters::{NUM_NON_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS, NUM_RE_EXECUTED_BLOCKS}, pipeline::{
         execution_wait_phase::ExecutionWaitRequest,
         pipeline_phase::{CountedRequest, StatelessPipeline},
     }, state_computer::{StateComputeResultFut, SyncStateComputeResultFut}, state_replication::StateComputer
@@ -99,6 +99,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         }
 
         let execution_futures = self.execution_futures.clone();
+        let execution_proxy = self.execution_proxy.clone();
 
         // In the future being returned, wait for the compute results in order.
         let fut = tokio::task::spawn(async move {
@@ -107,10 +108,22 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             // after all executor calls are over
             for block in &ordered_blocks {
                 debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
-                match execution_futures.entry(block_id) {
-                    dashmap::mapref::entry::Entry::Occupied(entry) => {
+                match execution_futures.entry(block.id()) {
+                    dashmap::mapref::entry::Entry::Occupied(mut entry) => {
                         let fut = entry.get().clone();
-                        results.push(fut.await);
+                        let result = match fut.await {
+                            Ok(result) => Ok(result),
+                            Err(e) => {
+                                info!("[Execution] block is re-executed due to error {:?}, epoch {} round {} id {}", e, block.epoch(), block.round(), block.id());
+                                let fut = execution_proxy
+                                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
+                                    .await;
+                                entry.insert(fut.clone());
+                                NUM_RE_EXECUTED_BLOCKS.inc();
+                                fut.await
+                            }
+                        };
+                        results.push(result);
                     }
                     dashmap::mapref::entry::Entry::Vacant(_) => {
                         return Err(ExecutorError::internal_err(format!(
