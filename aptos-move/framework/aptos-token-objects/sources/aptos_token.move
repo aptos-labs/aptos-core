@@ -12,6 +12,7 @@ module aptos_token_objects::aptos_token {
     use std::string::String;
     use std::signer;
     use aptos_framework::object::{Self, ConstructorRef, Object};
+    use aptos_framework::permissioned_signer;
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::royalty;
@@ -66,6 +67,14 @@ module aptos_token_objects::aptos_token {
         mutator_ref: Option<token::MutatorRef>,
         /// Used to mutate properties
         property_mutator_ref: property_map::MutatorRef,
+    }
+
+    struct TokenUpdatePermission has copy, drop, store {
+        token_address: address,
+    }
+
+    struct CollectionUpdatePermission has copy, drop, store {
+        collection_address: address,
     }
 
     /// Create a new collection
@@ -373,6 +382,11 @@ module aptos_token_objects::aptos_token {
             token::creator(*token) == signer::address_of(creator),
             error::permission_denied(ENOT_CREATOR),
         );
+
+        assert!(
+            permissioned_signer::check_permission_capacity_above(creator, 0, TokenUpdatePermission { token_address }),
+            error::permission_denied(ENOT_CREATOR),
+        );
         borrow_global<AptosToken>(token_address)
     }
 
@@ -614,6 +628,11 @@ module aptos_token_objects::aptos_token {
             collection::creator(*collection) == signer::address_of(creator),
             error::permission_denied(ENOT_CREATOR),
         );
+
+        assert!(
+            permissioned_signer::check_permission_capacity_above(creator, 0, CollectionUpdatePermission { collection_address }),
+            error::permission_denied(ENOT_CREATOR),
+        );
         borrow_global<AptosCollection>(collection_address)
     }
 
@@ -665,6 +684,61 @@ module aptos_token_objects::aptos_token {
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
         collection::set_uri(option::borrow(&aptos_collection.mutator_ref), uri);
+    }
+
+    // Permissions
+    public fun authorize_token_mutation<T: key>(
+        creator: &signer,
+        permissioned_creator: &signer,
+        token: Object<T>,
+    ) {
+        let token_address = object::object_address(&token);
+        assert!(
+            exists<AptosToken>(token_address),
+            error::not_found(ETOKEN_DOES_NOT_EXIST),
+        );
+        permissioned_signer::authorize_unlimited(
+            creator,
+            permissioned_creator,
+            TokenUpdatePermission { token_address },
+        )
+    }
+
+    public fun revoke_token_mutation<T: key>(
+        permissioned_signer: &signer,
+        token: Object<T>,
+    ) {
+        permissioned_signer::revoke_permission(
+            permissioned_signer,
+            TokenUpdatePermission { token_address: object::object_address(&token) },
+        )
+    }
+
+    public fun authorize_collection_mutation<T: key>(
+        creator: &signer,
+        permissioned_signer: &signer,
+        collection: Object<T>,
+    ) {
+        let collection_address = object::object_address(&collection);
+        assert!(
+            exists<AptosCollection>(collection_address),
+            error::not_found(ETOKEN_DOES_NOT_EXIST),
+        );
+        permissioned_signer::authorize_unlimited(
+            creator,
+            permissioned_signer,
+            CollectionUpdatePermission { collection_address },
+        )
+    }
+
+    public fun revoke_collection_mutation<T: key>(
+        permissioned_signer: &signer,
+        collection: Object<T>,
+    ) {
+        permissioned_signer::revoke_permission(
+            permissioned_signer,
+            CollectionUpdatePermission { collection_address: object::object_address(&collection) },
+        )
     }
 
     // Tests
