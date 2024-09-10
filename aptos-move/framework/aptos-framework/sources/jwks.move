@@ -201,6 +201,28 @@ module aptos_framework::jwks {
         assert!(num_bytes < MAX_FEDERATED_JWKS_SIZE_BYTES, error::invalid_argument(EFEDERATED_JWKS_TOO_LARGE));
     }
 
+    // Todo: description
+    public fun update_federated_jwk_set(jwk_owner: &signer, iss: vector<u8>, kid_vec: vector<String>, alg_vec: vector<String>, e_vec: vector<String>, n_vec: vector<String>) acquires FederatedJWKs {
+        assert!(!vector::is_empty(&kid_vec), 2);
+        let num_jwk = vector::length<String>(&kid_vec);
+        assert!(vector::length(&alg_vec) == num_jwk , 2);
+        assert!(vector::length(&e_vec) == num_jwk, 2);
+        assert!(vector::length(&n_vec) == num_jwk, 2);
+
+        let remove_all_patch = new_patch_remove_all();
+        let patches = vector[remove_all_patch];
+        while (!vector::is_empty(&kid_vec)) {
+            let kid = vector::pop_back(&mut kid_vec);
+            let alg = vector::pop_back(&mut alg_vec);
+            let e = vector::pop_back(&mut e_vec);
+            let n = vector::pop_back(&mut n_vec);
+            let jwk = new_rsa_jwk(kid, alg, e, n);
+            let patch = new_patch_upsert_jwk(iss, jwk);
+            vector::push_back(&mut patches, patch)
+        };
+        patch_federated_jwks(jwk_owner, patches);
+    }
+
     /// Get a JWK by issuer and key ID from the `PatchedJWKs`.
     /// Abort if such a JWK does not exist.
     /// More convenient to call from Rust, since it does not wrap the JWK in an `Option`.

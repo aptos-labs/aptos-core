@@ -30,6 +30,7 @@ have a simple layout which is easily accessible in Rust.
 -  [Resource `FederatedJWKs`](#0x1_jwks_FederatedJWKs)
 -  [Constants](#@Constants_0)
 -  [Function `patch_federated_jwks`](#0x1_jwks_patch_federated_jwks)
+-  [Function `update_federated_jwk_set`](#0x1_jwks_update_federated_jwk_set)
 -  [Function `get_patched_jwk`](#0x1_jwks_get_patched_jwk)
 -  [Function `try_get_patched_jwk`](#0x1_jwks_try_get_patched_jwk)
 -  [Function `upsert_oidc_provider`](#0x1_jwks_upsert_oidc_provider)
@@ -811,6 +812,47 @@ need to be careful how we read it in Rust (but BCS serialization should be the s
     // TODO: Can we check the size more efficiently instead of serializing it via BCS?
     <b>let</b> num_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(fed_jwks));
     <b>assert</b>!(num_bytes &lt; <a href="jwks.md#0x1_jwks_MAX_FEDERATED_JWKS_SIZE_BYTES">MAX_FEDERATED_JWKS_SIZE_BYTES</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EFEDERATED_JWKS_TOO_LARGE">EFEDERATED_JWKS_TOO_LARGE</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_jwks_update_federated_jwk_set"></a>
+
+## Function `update_federated_jwk_set`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_update_federated_jwk_set">update_federated_jwk_set</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, iss: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, kid_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, alg_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, e_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, n_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_update_federated_jwk_set">update_federated_jwk_set</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, iss: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, kid_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;, alg_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;, e_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;, n_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;) <b>acquires</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> {
+    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&kid_vec), 2);
+    <b>let</b> num_jwk = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>&lt;String&gt;(&kid_vec);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&alg_vec) == num_jwk , 2);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&e_vec) == num_jwk, 2);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&n_vec) == num_jwk, 2);
+
+    <b>let</b> remove_all_patch = <a href="jwks.md#0x1_jwks_new_patch_remove_all">new_patch_remove_all</a>();
+    <b>let</b> patches = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[remove_all_patch];
+    <b>while</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&kid_vec)) {
+        <b>let</b> kid = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> kid_vec);
+        <b>let</b> alg = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> alg_vec);
+        <b>let</b> e = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> e_vec);
+        <b>let</b> n = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> n_vec);
+        <b>let</b> jwk = <a href="jwks.md#0x1_jwks_new_rsa_jwk">new_rsa_jwk</a>(kid, alg, e, n);
+        <b>let</b> patch = <a href="jwks.md#0x1_jwks_new_patch_upsert_jwk">new_patch_upsert_jwk</a>(iss, jwk);
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> patches, patch)
+    };
+    <a href="jwks.md#0x1_jwks_patch_federated_jwks">patch_federated_jwks</a>(jwk_owner, patches);
 }
 </code></pre>
 
