@@ -19,12 +19,14 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use once_cell::sync::Lazy;
 use std::time::Duration;
 
 const ALL_PROTOCOLS: [ProtocolId; 1] = [ProtocolId::MempoolDirectSend];
-static ALL_TXNS: &[TestTransaction] = &[test_transaction(0), test_transaction(1)];
-static TXN_1: &[TestTransaction] = &[test_transaction(0)];
-static TXN_2: &[TestTransaction] = &[test_transaction(1)];
+static ALL_TXNS: Lazy<Vec<TestTransaction>> =
+    Lazy::new(|| vec![test_transaction(0), test_transaction(1)]);
+static TXN_1: Lazy<Vec<TestTransaction>> = Lazy::new(|| vec![test_transaction(0)]);
+static TXN_2: Lazy<Vec<TestTransaction>> = Lazy::new(|| vec![test_transaction(1)]);
 
 fn inbound_node_combinations() -> [(MempoolNode, (PeerNetworkId, ConnectionMetadata)); 6] {
     [
@@ -94,10 +96,10 @@ async fn single_inbound_node_test() {
         node.receive_message(
             ProtocolId::MempoolDirectSend,
             other_peer_network_id,
-            ALL_TXNS,
+            &ALL_TXNS,
         )
         .await;
-        node.assert_only_txns_in_mempool(ALL_TXNS);
+        node.assert_only_txns_in_mempool(&ALL_TXNS);
     }
 }
 
@@ -106,20 +108,20 @@ async fn single_inbound_node_test() {
 async fn single_outbound_node_test() {
     for (mut node, (other_peer_network_id, other_metadata)) in outbound_node_combinations() {
         // Add transactions
-        node.assert_txns_not_in_mempool(TXN_1);
-        node.add_txns_via_client(TXN_1).await;
+        node.assert_txns_not_in_mempool(&TXN_1);
+        node.add_txns_via_client(&TXN_1).await;
 
         // After we connect, all messages should be received and broadcast upstream
         node.connect_self(other_peer_network_id.network_id(), other_metadata);
-        node.send_broadcast_and_receive_ack(other_peer_network_id, TXN_1)
+        node.send_broadcast_and_receive_ack(other_peer_network_id, &TXN_1)
             .await;
-        node.assert_only_txns_in_mempool(TXN_1);
+        node.assert_only_txns_in_mempool(&TXN_1);
 
         // Adding more txns should also broadcast them upstream
-        node.add_txns_via_client(TXN_2).await;
-        node.send_broadcast_and_receive_ack(other_peer_network_id, TXN_2)
+        node.add_txns_via_client(&TXN_2).await;
+        node.send_broadcast_and_receive_ack(other_peer_network_id, &TXN_2)
             .await;
-        node.assert_only_txns_in_mempool(ALL_TXNS);
+        node.assert_only_txns_in_mempool(&ALL_TXNS);
     }
 }
 
@@ -139,12 +141,12 @@ async fn vfn_middle_man_test() {
     node.connect_self(fn_peer_network_id.network_id(), fn_metadata);
 
     // Incoming transactions should be accepted
-    node.receive_message(ProtocolId::MempoolDirectSend, fn_peer_network_id, ALL_TXNS)
+    node.receive_message(ProtocolId::MempoolDirectSend, fn_peer_network_id, &ALL_TXNS)
         .await;
-    node.assert_only_txns_in_mempool(ALL_TXNS);
+    node.assert_only_txns_in_mempool(&ALL_TXNS);
 
     // And they should be forwarded upstream
-    node.send_broadcast_and_receive_ack(validator_peer_network_id, ALL_TXNS)
+    node.send_broadcast_and_receive_ack(validator_peer_network_id, &ALL_TXNS)
         .await;
 }
 
@@ -156,15 +158,15 @@ async fn test_skip_ack_rebroadcast() {
         validator_mock_connection(ConnectionOrigin::Inbound, &ALL_PROTOCOLS);
 
     // Add transactions
-    node.assert_txns_not_in_mempool(ALL_TXNS);
-    node.add_txns_via_client(ALL_TXNS).await;
+    node.assert_txns_not_in_mempool(&ALL_TXNS);
+    node.add_txns_via_client(&ALL_TXNS).await;
 
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
 
     // After we drop, we should rebroadcast successfully
     node.drop_next_network_msg(other_peer_network_id.network_id())
         .await;
-    node.send_broadcast_and_receive_ack(other_peer_network_id, ALL_TXNS)
+    node.send_broadcast_and_receive_ack(other_peer_network_id, &ALL_TXNS)
         .await;
 }
 
@@ -175,9 +177,9 @@ async fn test_interrupt_in_sync_inbound() {
     for (mut node, (other_peer_network_id, other_metadata)) in inbound_node_combinations() {
         // First txn is received
         node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
-        node.receive_message(ProtocolId::MempoolDirectSend, other_peer_network_id, TXN_1)
+        node.receive_message(ProtocolId::MempoolDirectSend, other_peer_network_id, &TXN_1)
             .await;
-        node.assert_only_txns_in_mempool(TXN_1);
+        node.assert_only_txns_in_mempool(&TXN_1);
 
         // Drop the connection, and a reconnect should merge txns
         node.disconnect_self(other_peer_network_id.network_id(), other_metadata.clone());
@@ -186,10 +188,10 @@ async fn test_interrupt_in_sync_inbound() {
         node.receive_message(
             ProtocolId::MempoolDirectSend,
             other_peer_network_id,
-            ALL_TXNS,
+            &ALL_TXNS,
         )
         .await;
-        node.assert_only_txns_in_mempool(ALL_TXNS);
+        node.assert_only_txns_in_mempool(&ALL_TXNS);
     }
 }
 
@@ -201,12 +203,12 @@ async fn test_ready_txns() {
         validator_mock_connection(ConnectionOrigin::Inbound, &ALL_PROTOCOLS);
 
     // Add 2nd txn
-    node.assert_txns_not_in_mempool(TXN_2);
-    node.add_txns_via_client(TXN_2).await;
+    node.assert_txns_not_in_mempool(&TXN_2);
+    node.add_txns_via_client(&TXN_2).await;
 
     // No txns should be sent or ready
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
-    node.assert_txns_not_in_mempool(ALL_TXNS);
+    node.assert_txns_not_in_mempool(&ALL_TXNS);
     node.wait_for_no_msg(
         other_peer_network_id.network_id(),
         Duration::from_millis(100),
@@ -214,11 +216,11 @@ async fn test_ready_txns() {
     .await;
 
     // Adding earlier txns should fill in the gaps, and now it should send all
-    node.add_txns_via_client(TXN_1).await;
-    node.assert_txns_in_mempool(ALL_TXNS);
-    node.send_broadcast_and_receive_ack(other_peer_network_id, ALL_TXNS)
+    node.add_txns_via_client(&TXN_1).await;
+    node.assert_txns_in_mempool(&ALL_TXNS);
+    node.send_broadcast_and_receive_ack(other_peer_network_id, &ALL_TXNS)
         .await;
-    node.assert_only_txns_in_mempool(ALL_TXNS);
+    node.assert_only_txns_in_mempool(&ALL_TXNS);
 }
 
 /// Test that in the validator network, messages won't be sent back to the original sender
@@ -230,16 +232,16 @@ async fn test_broadcast_self_txns() {
 
     // Other node sends earlier txn
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
-    node.receive_message(ProtocolId::MempoolDirectSend, other_peer_network_id, TXN_1)
+    node.receive_message(ProtocolId::MempoolDirectSend, other_peer_network_id, &TXN_1)
         .await;
-    node.assert_txns_in_mempool(TXN_1);
+    node.assert_txns_in_mempool(&TXN_1);
 
     // Add txns to current node
-    node.add_txns_via_client(TXN_2).await;
-    node.assert_txns_in_mempool(ALL_TXNS);
+    node.add_txns_via_client(&TXN_2).await;
+    node.assert_txns_in_mempool(&ALL_TXNS);
 
     // Txns should be sent to other node (but not the earlier txn)
-    node.send_broadcast_and_receive_ack(other_peer_network_id, TXN_2)
+    node.send_broadcast_and_receive_ack(other_peer_network_id, &TXN_2)
         .await;
 }
 
@@ -254,12 +256,12 @@ async fn test_update_gas_price() {
         validator_mock_connection(ConnectionOrigin::Outbound, &ALL_PROTOCOLS);
 
     // Get first txn
-    node.add_txns_via_client(TXN_1).await;
-    node.assert_txns_in_mempool(TXN_1);
+    node.add_txns_via_client(&TXN_1).await;
+    node.assert_txns_in_mempool(&TXN_1);
 
     // Send to other node
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
-    node.send_broadcast_and_receive_ack(other_peer_network_id, TXN_1)
+    node.send_broadcast_and_receive_ack(other_peer_network_id, &TXN_1)
         .await;
 
     // Update txn
@@ -279,16 +281,16 @@ async fn test_mempool_full_rebroadcast() {
         validator_mock_connection(ConnectionOrigin::Outbound, &ALL_PROTOCOLS);
 
     // Get first txn
-    node.add_txns_via_client(ALL_TXNS).await;
-    node.assert_txns_in_mempool(ALL_TXNS);
+    node.add_txns_via_client(&ALL_TXNS).await;
+    node.assert_txns_in_mempool(&ALL_TXNS);
 
     // Send to other node (which is full)
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
-    node.send_broadcast_and_receive_retry(other_peer_network_id, ALL_TXNS)
+    node.send_broadcast_and_receive_retry(other_peer_network_id, &ALL_TXNS)
         .await;
 
     // Txn should be sent again later
-    node.send_broadcast_and_receive_ack(other_peer_network_id, ALL_TXNS)
+    node.send_broadcast_and_receive_ack(other_peer_network_id, &ALL_TXNS)
         .await;
 }
 
@@ -300,20 +302,20 @@ async fn test_rebroadcast_retry_is_empty() {
         validator_mock_connection(ConnectionOrigin::Outbound, &ALL_PROTOCOLS);
 
     // Get first txn
-    node.add_txns_via_client(TXN_1).await;
-    node.assert_txns_in_mempool(TXN_1);
+    node.add_txns_via_client(&TXN_1).await;
+    node.assert_txns_in_mempool(&TXN_1);
 
     // Send to other node (which is full)
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
-    node.send_broadcast_and_receive_retry(other_peer_network_id, TXN_1)
+    node.send_broadcast_and_receive_retry(other_peer_network_id, &TXN_1)
         .await;
 
     // Add txn2. In the meantime, txn1 was committed.
-    node.add_txns_via_client(TXN_2).await;
-    node.commit_txns(TXN_1).await;
+    node.add_txns_via_client(&TXN_2).await;
+    node.commit_txns(&TXN_1).await;
 
     // Txn should be sent again later
-    node.send_broadcast_and_receive_ack(other_peer_network_id, TXN_2)
+    node.send_broadcast_and_receive_ack(other_peer_network_id, &TXN_2)
         .await;
 }
 
@@ -343,7 +345,7 @@ async fn fn_to_val_test() {
 
         // NOTE: Always return node at end, or it will be dropped and channels closed
         let pfn_future = async move {
-            pfn.add_txns_via_client(ALL_TXNS).await;
+            pfn.add_txns_via_client(&ALL_TXNS).await;
             pfn.connect(pfn_vfn_network, vfn_metadata);
 
             // Forward to VFN
@@ -370,13 +372,13 @@ async fn fn_to_val_test() {
                 val.send_next_network_msg(vfn_val_network).await;
             }
 
-            val.wait_on_txns_in_mempool(ALL_TXNS).await;
+            val.wait_on_txns_in_mempool(&ALL_TXNS).await;
             val
         };
 
         let (pfn, vfn, val) = futures::future::join3(pfn_future, vfn_future, val_future).await;
-        pfn.assert_only_txns_in_mempool(ALL_TXNS);
-        vfn.assert_only_txns_in_mempool(ALL_TXNS);
-        val.assert_only_txns_in_mempool(ALL_TXNS);
+        pfn.assert_only_txns_in_mempool(&ALL_TXNS);
+        vfn.assert_only_txns_in_mempool(&ALL_TXNS);
+        val.assert_only_txns_in_mempool(&ALL_TXNS);
     }
 }
