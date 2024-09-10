@@ -64,6 +64,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub const COMMIT_VOTE_BROADCAST_INTERVAL_MS: u64 = 1500;
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 30000;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
+pub const PENDING_COMMIT_VOTES_SOFT_LIMIT: usize = 50;
 
 #[derive(Debug, Default)]
 pub struct ResetAck {}
@@ -375,7 +376,7 @@ impl BufferManager {
                     false
                 }
             } else {
-                if self.pending_commit_votes.len() > 50 {
+                if self.pending_commit_votes.len() > PENDING_COMMIT_VOTES_SOFT_LIMIT {
                     self.try_evict_pending_commit_votes();
                 }
                 let mut votes = HashMap::new();
@@ -397,6 +398,13 @@ impl BufferManager {
     }
 
     fn try_evict_pending_commit_votes(&mut self) {
+        self.pending_commit_votes
+            .retain(|_, (_, last_accessed_timestamp)| {
+                last_accessed_timestamp.elapsed() < Duration::from_secs(10)
+            });
+        if self.pending_commit_votes.len() <= PENDING_COMMIT_VOTES_SOFT_LIMIT {
+            return;
+        }
         let old_pending_blocks = self
             .pending_commit_votes
             .iter()
