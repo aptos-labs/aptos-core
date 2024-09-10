@@ -3773,7 +3773,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    /// Creates a select operation for the given field name, the kind dependening on whether
+    /// Creates a select operation for the given field name, the kind depending on whether
     /// variant fields or struct fields are selected.
     fn create_select_oper(
         &mut self,
