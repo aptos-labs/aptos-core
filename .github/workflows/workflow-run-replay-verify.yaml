@@ -87,6 +87,12 @@ jobs:
     steps:
       - name: Echo Runner Number
         run: echo "Runner is ${{ matrix.number }}"
+
+      - name: Install GCloud CLI
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          skip_install: 'true'
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.GIT_SHA }}
@@ -94,12 +100,6 @@ jobs:
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-
-      - name: Install GCloud SDK
-        uses: "google-github-actions/setup-gcloud@v2"
-        with:
-          version: ">= 418.0.0"
-          install_components: "kubectl,gke-gcloud-auth-plugin"
 
       - name: Build CLI binaries in release mode
         shell: bash
