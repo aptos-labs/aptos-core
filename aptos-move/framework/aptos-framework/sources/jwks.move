@@ -202,7 +202,7 @@ module aptos_framework::jwks {
     }
 
     // Todo: description
-    public fun update_federated_jwk_set(jwk_owner: &signer, iss: vector<u8>, kid_vec: vector<String>, alg_vec: vector<String>, e_vec: vector<String>, n_vec: vector<String>) acquires FederatedJWKs {
+    public entry fun update_federated_jwk_set(jwk_owner: &signer, iss: vector<u8>, kid_vec: vector<String>, alg_vec: vector<String>, e_vec: vector<String>, n_vec: vector<String>) acquires FederatedJWKs {
         assert!(!vector::is_empty(&kid_vec), 2);
         let num_jwk = vector::length<String>(&kid_vec);
         assert!(vector::length(&alg_vec) == num_jwk , 2);
