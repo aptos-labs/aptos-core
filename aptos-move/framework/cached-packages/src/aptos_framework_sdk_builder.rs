@@ -443,6 +443,14 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    JwksUpdateFederatedJwkSet {
+        iss: Vec<u8>,
+        kid_vec: Vec<Vec<u8>>,
+        alg_vec: Vec<Vec<u8>>,
+        e_vec: Vec<Vec<u8>>,
+        n_vec: Vec<Vec<u8>>,
+    },
+
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -1272,6 +1280,13 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
+            JwksUpdateFederatedJwkSet {
+                iss,
+                kid_vec,
+                alg_vec,
+                e_vec,
+                n_vec,
+            } => jwks_update_federated_jwk_set(iss, kid_vec, alg_vec, e_vec, n_vec),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -2815,6 +2830,33 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
         vec![
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+pub fn jwks_update_federated_jwk_set(
+    iss: Vec<u8>,
+    kid_vec: Vec<Vec<u8>>,
+    alg_vec: Vec<Vec<u8>>,
+    e_vec: Vec<Vec<u8>>,
+    n_vec: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("jwks").to_owned(),
+        ),
+        ident_str!("update_federated_jwk_set").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&iss).unwrap(),
+            bcs::to_bytes(&kid_vec).unwrap(),
+            bcs::to_bytes(&alg_vec).unwrap(),
+            bcs::to_bytes(&e_vec).unwrap(),
+            bcs::to_bytes(&n_vec).unwrap(),
         ],
     ))
 }
@@ -5323,6 +5365,22 @@ mod decoder {
         }
     }
 
+    pub fn jwks_update_federated_jwk_set(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::JwksUpdateFederatedJwkSet {
+                iss: bcs::from_bytes(script.args().get(0)?).ok()?,
+                kid_vec: bcs::from_bytes(script.args().get(1)?).ok()?,
+                alg_vec: bcs::from_bytes(script.args().get(2)?).ok()?,
+                e_vec: bcs::from_bytes(script.args().get(3)?).ok()?,
+                n_vec: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
@@ -6628,6 +6686,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
+        );
+        map.insert(
+            "jwks_update_federated_jwk_set".to_string(),
+            Box::new(decoder::jwks_update_federated_jwk_set),
         );
         map.insert(
             "managed_coin_burn".to_string(),

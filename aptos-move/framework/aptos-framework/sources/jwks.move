@@ -39,6 +39,7 @@ module aptos_framework::jwks {
     const EJWK_ID_NOT_FOUND: u64 = 6;
     const EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK: u64 = 7;
     const EFEDERATED_JWKS_TOO_LARGE: u64 = 8;
+    const EINVALID_FEDERATED_JWK_SET: u64 = 9;
 
     const ENATIVE_MISSING_RESOURCE_VALIDATOR_SET: u64 = 0x0101;
     const ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS: u64 = 0x0102;
@@ -201,13 +202,14 @@ module aptos_framework::jwks {
         assert!(num_bytes < MAX_FEDERATED_JWKS_SIZE_BYTES, error::invalid_argument(EFEDERATED_JWKS_TOO_LARGE));
     }
 
-    // Todo: description
+    // This can be called to install or update a set of JWKs for a federated OIDC provider.  This function should
+    // be invoked to intially install a set of JWKs or to update a set of JWKs when a keypair is rotated.
     public entry fun update_federated_jwk_set(jwk_owner: &signer, iss: vector<u8>, kid_vec: vector<String>, alg_vec: vector<String>, e_vec: vector<String>, n_vec: vector<String>) acquires FederatedJWKs {
-        assert!(!vector::is_empty(&kid_vec), 2);
+        assert!(!vector::is_empty(&kid_vec), error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
         let num_jwk = vector::length<String>(&kid_vec);
-        assert!(vector::length(&alg_vec) == num_jwk , 2);
-        assert!(vector::length(&e_vec) == num_jwk, 2);
-        assert!(vector::length(&n_vec) == num_jwk, 2);
+        assert!(vector::length(&alg_vec) == num_jwk , error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(vector::length(&e_vec) == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(vector::length(&n_vec) == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
 
         let remove_all_patch = new_patch_remove_all();
         let patches = vector[remove_all_patch];
