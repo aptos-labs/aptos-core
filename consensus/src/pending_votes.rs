@@ -329,16 +329,7 @@ impl fmt::Display for PendingVotes {
         let votes = self
             .li_digest_to_votes
             .iter()
-            .map(|(li_digest, (_, li))| {
-                (
-                    li_digest,
-                    (
-                        li.verified_voters(),
-                        li.unverified_voters(),
-                        li.aggregated_voters(),
-                    ),
-                )
-            })
+            .map(|(li_digest, (_, li))| (li_digest, (li.verified_voters(), li.unverified_voters())))
             .collect::<BTreeMap<_, _>>();
 
         // collect timeout votes
@@ -350,8 +341,16 @@ impl fmt::Display for PendingVotes {
         // write
         write!(f, "PendingVotes: [")?;
 
-        for (hash, (verified_authors, unverified_authors, aggregated_authors)) in votes {
-            write!(f, "LI {} has {} verified votes {:?}, {} unverified votes {:?}, and {} aggregated votes", hash, verified_authors.len(), verified_authors, unverified_authors.len(), unverified_authors, aggregated_authors)?;
+        for (hash, (verified_authors, unverified_authors)) in votes {
+            write!(
+                f,
+                "LI {} has {} verified votes {:?}, {} unverified votes {:?}",
+                hash,
+                verified_authors.len(),
+                verified_authors,
+                unverified_authors.len(),
+                unverified_authors
+            )?;
         }
 
         if let Some(authors) = timeout_votes {

@@ -424,7 +424,7 @@ impl RoundManager {
             .iter()
             .map(|(_, li_with_sig)| {
                 let (voting_power, votes): (Vec<_>, Vec<_>) = li_with_sig
-                    .all_voters(&epoch_state.verifier)
+                    .all_voters()
                     .into_iter()
                     .map(|author| {
                         epoch_state

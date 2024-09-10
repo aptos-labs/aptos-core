@@ -19,7 +19,7 @@ use proptest_derive::Arbitrary;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::BTreeMap,
     fmt::{Display, Formatter},
     ops::{Deref, DerefMut},
 };
@@ -381,9 +381,8 @@ pub struct LedgerInfoWithMixedSignatures {
     ledger_info: LedgerInfo,
     // These signatures are not yet verified. For efficiency, once enough unverified signatures are collected,
     // they will be aggregated and verified.
-    unverified_signatures: BTreeMap<AccountAddress, Vec<bls12381::Signature>>,
+    unverified_signatures: PartialSignatures,
     verified_signatures: PartialSignatures,
-    verified_aggregate_signature: AggregateSignature,
 }
 
 impl Display for LedgerInfoWithMixedSignatures {
@@ -396,9 +395,8 @@ impl LedgerInfoWithMixedSignatures {
     pub fn new(ledger_info: LedgerInfo) -> Self {
         Self {
             ledger_info,
-            unverified_signatures: BTreeMap::new(),
+            unverified_signatures: PartialSignatures::empty(),
             verified_signatures: PartialSignatures::empty(),
-            verified_aggregate_signature: AggregateSignature::empty(),
         }
     }
 
@@ -412,7 +410,7 @@ impl LedgerInfoWithMixedSignatures {
         signature: bls12381::Signature,
     ) {
         self.verified_signatures.add_signature(validator, signature);
-        self.unverified_signatures.remove(&validator);
+        self.unverified_signatures.remove_signature(validator);
     }
 
     pub fn add_unverified_signature(
@@ -420,21 +418,14 @@ impl LedgerInfoWithMixedSignatures {
         validator: AccountAddress,
         signature: bls12381::Signature,
     ) {
-        if self
-            .verified_signatures
-            .signatures()
-            .contains_key(&validator)
-        {
+        if self.verified_signatures.contains_voter(&validator) {
             return;
         }
-        let entry = self.unverified_signatures.entry(validator).or_default();
-        if !entry.contains(&signature) {
-            entry.push(signature);
+        if self.unverified_signatures.contains_voter(&validator) {
+            self.unverified_signatures.remove_signature(validator);
         }
-    }
-
-    pub fn num_unverified_signatures(&self) -> usize {
-        self.unverified_signatures.len()
+        self.unverified_signatures
+            .add_signature(validator, signature);
     }
 
     pub fn verified_voters(&self) -> Vec<&AccountAddress> {
@@ -446,35 +437,28 @@ impl LedgerInfoWithMixedSignatures {
     }
 
     pub fn unverified_voters(&self) -> Vec<&AccountAddress> {
-        self.unverified_signatures.keys().collect()
-    }
-
-    pub fn aggregated_voters(&self) -> usize {
-        self.verified_aggregate_signature.get_num_voters()
+        self.unverified_signatures
+            .signatures()
+            .keys()
+            .collect_vec()
+            .clone()
     }
 
     // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
-    pub fn all_voters(&self, verifier: &ValidatorVerifier) -> Vec<AccountAddress> {
-        let authors = self.verified_aggregate_signature.get_signers_addresses(
-            verifier
-                .get_ordered_account_addresses_iter()
-                .collect_vec()
-                .as_slice(),
-        );
-        let authors = authors
-            .iter()
-            .chain(self.verified_signatures.signatures().keys());
-        let authors = authors
-            .chain(self.unverified_signatures.keys())
-            .collect::<HashSet<_>>();
-        authors.iter().cloned().cloned().collect()
+    pub fn all_voters(&self) -> Vec<AccountAddress> {
+        self.verified_signatures
+            .signatures()
+            .keys()
+            .chain(self.unverified_signatures.signatures().keys())
+            .cloned()
+            .collect()
     }
 
     pub fn check_voting_power(
         &self,
         verifier: &ValidatorVerifier,
     ) -> std::result::Result<u128, VerifyError> {
-        let all_voters = self.all_voters(verifier);
+        let all_voters = self.all_voters();
         verifier.check_voting_power(all_voters.iter().collect_vec().into_iter(), true)
     }
 
@@ -484,74 +468,44 @@ impl LedgerInfoWithMixedSignatures {
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
         self.check_voting_power(verifier)?;
 
-        // Compute signatures from verified signatures and unverified signatures that are not already
-        // included in the verified aggregate signature.
-        let mut partial_signatures = self.verified_signatures.clone();
-        for (author, signatures) in self.unverified_signatures.iter() {
-            partial_signatures.add_signature(*author, signatures[0].clone());
-        }
-        let authors_in_aggregated_sig = self.verified_aggregate_signature.get_signers_addresses(
-            verifier
-                .get_ordered_account_addresses_iter()
-                .collect_vec()
-                .as_slice(),
-        );
-        for author in authors_in_aggregated_sig {
-            partial_signatures.remove_signature(author);
+        let mut all_signatures = self.verified_signatures.clone();
+        for (author, signature) in self.unverified_signatures.signatures() {
+            all_signatures.add_signature(*author, signature.clone());
         }
 
-        if partial_signatures.is_empty() {
-            return Ok(LedgerInfoWithSignatures::new(
-                self.ledger_info.clone(),
-                self.verified_aggregate_signature.clone(),
-            ));
-        }
-
-        let aggregated_sig = verifier.aggregate_new_signatures_with_existing(
-            &partial_signatures,
-            Some(self.verified_aggregate_signature.clone()),
-        )?;
-        let verified_aggregate_signature =
-            match verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig) {
-                Ok(_) => aggregated_sig,
-                Err(_) => {
-                    let verified = self
-                        .unverified_signatures
-                        .clone()
-                        .into_par_iter()
-                        .flat_map(|(account_address, signatures)| {
-                            // Get the first signature that verifies correctly.
-                            for signature in signatures {
-                                if verifier
-                                    .verify(account_address, self.ledger_info(), &signature)
-                                    .is_ok()
-                                {
-                                    return Some((account_address, signature));
-                                }
-                            }
-                            None
-                        })
-                        .collect::<Vec<_>>();
-                    for (account_address, signature) in verified {
-                        self.verified_signatures
-                            .add_signature(account_address, signature);
-                    }
-                    let aggregated_sig = verifier.aggregate_new_signatures_with_existing(
-                        &self.verified_signatures,
-                        Some(self.verified_aggregate_signature.clone()),
-                    )?;
-                    verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig)?;
-                    aggregated_sig
-                },
-            };
-        self.unverified_signatures.clear();
-        self.verified_signatures = PartialSignatures::empty();
-        self.verified_aggregate_signature = verified_aggregate_signature;
+        let aggregated_sig = verifier.aggregate_signatures(&all_signatures)?;
+        let verified_aggregate_signature = match verifier
+            .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
+        {
+            Ok(_) => aggregated_sig,
+            Err(_) => {
+                // Question: Should we assign min tasks per thread here for into_par_iter()?
+                let verified = self
+                    .unverified_signatures
+                    .signatures()
+                    .into_par_iter()
+                    .flat_map(|(account_address, signature)| {
+                        if verifier
+                            .verify(*account_address, self.ledger_info(), signature)
+                            .is_ok()
+                        {
+                            return Some((account_address, signature));
+                        }
+                        None
+                    })
+                    .collect::<Vec<_>>();
+                for (account_address, signature) in verified {
+                    self.verified_signatures
+                        .add_signature(*account_address, signature.clone());
+                }
+                self.unverified_signatures = PartialSignatures::empty();
+                let aggregated_sig = verifier.aggregate_signatures(&self.verified_signatures)?;
+                verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig)?;
+                aggregated_sig
+            },
+        };
         self.check_voting_power(verifier).map(|_| {
-            LedgerInfoWithSignatures::new(
-                self.ledger_info.clone(),
-                self.verified_aggregate_signature.clone(),
-            )
+            LedgerInfoWithSignatures::new(self.ledger_info.clone(), verified_aggregate_signature)
         })
     }
 

@@ -259,47 +259,6 @@ impl ValidatorVerifier {
         Ok(AggregateSignature::new(masks, Some(aggregated_sig)))
     }
 
-    pub fn aggregate_new_signatures_with_existing(
-        &self,
-        partial_signatures: &PartialSignatures,
-        current_aggregated_signature: Option<AggregateSignature>,
-    ) -> Result<AggregateSignature, VerifyError> {
-        let mut sigs = vec![];
-        let mut masks = BitVec::with_num_bits(self.len() as u16);
-        let mut indices = vec![];
-        for (addr, sig) in partial_signatures.signatures() {
-            let index = *self
-                .address_to_validator_index
-                .get(addr)
-                .ok_or(VerifyError::UnknownAuthor)?;
-            masks.set(index as u16);
-            sigs.push(sig.clone());
-            indices.push(index as u16);
-        }
-
-        if let Some(current_aggregated_signature) = current_aggregated_signature {
-            if let Some(sig) = current_aggregated_signature.sig() {
-                let existing_masks = current_aggregated_signature.get_signers_bitvec();
-                if existing_masks.num_buckets() != masks.num_buckets() {
-                    return Err(VerifyError::FailedToAggregateSignature);
-                }
-                for i in indices {
-                    if existing_masks.is_set(i) {
-                        return Err(VerifyError::FailedToAggregateSignature);
-                    }
-                }
-                masks.or(existing_masks);
-                sigs.push(sig.clone());
-            }
-        }
-
-        // Perform an optimistic aggregation of the signatures without verification.
-        let aggregated_sig = bls12381::Signature::aggregate(sigs)
-            .map_err(|_| VerifyError::FailedToAggregateSignature)?;
-
-        Ok(AggregateSignature::new(masks, Some(aggregated_sig)))
-    }
-
     pub fn get_ordered_account_addresses(&self) -> Vec<AccountAddress> {
         self.get_ordered_account_addresses_iter().collect_vec()
     }
