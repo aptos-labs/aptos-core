@@ -373,6 +373,7 @@ module aptos_token_objects::aptos_token {
             token::creator(*token) == signer::address_of(creator),
             error::permission_denied(ENOT_CREATOR),
         );
+
         borrow_global<AptosToken>(token_address)
     }
 
@@ -614,6 +615,7 @@ module aptos_token_objects::aptos_token {
             collection::creator(*collection) == signer::address_of(creator),
             error::permission_denied(ENOT_CREATOR),
         );
+
         borrow_global<AptosCollection>(collection_address)
     }
 
