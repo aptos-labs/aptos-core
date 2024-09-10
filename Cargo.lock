@@ -306,6 +306,7 @@ dependencies = [
  "chrono",
  "clap 4.4.14",
  "clap_complete",
+ "colored",
  "dashmap",
  "diesel",
  "diesel-async",
@@ -2238,6 +2239,7 @@ dependencies = [
  "futures",
  "google-cloud-storage",
  "hyper 0.14.28",
+ "itertools 0.13.0",
  "rocksdb",
  "serde",
  "serde_json",
@@ -2246,7 +2248,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.10",
- "tonic 0.11.0",
 ]
 
 [[package]]
@@ -13470,6 +13471,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "move-compiler",
+ "move-compiler-v2",
  "move-model",
  "move-prover",
  "move-prover-boogie-backend",
