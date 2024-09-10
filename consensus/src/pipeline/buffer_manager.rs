@@ -50,7 +50,6 @@ use futures::{
     future::{AbortHandle, Abortable},
     FutureExt, SinkExt, StreamExt,
 };
-use lru::LruCache;
 use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -168,8 +167,11 @@ pub struct BufferManager {
     pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
 
     // If the buffer manager receives a commit vote for a block that is not in buffer items, then
-    // the vote will be cached. We can cache upto 30 blocks, and upto 150 commit votes per block.
-    pending_commit_votes: LruCache<HashValue, HashMap<AccountAddress, CommitVote>>,
+    // the vote will be cached. We can cache upto 50 blocks (soft limit), and upto 150 commit votes per block.
+    // For each block, we also store the last timestamp at which a commit vote is added.
+    // If the number of blocks exceeds the limit (50) and a new block is to be added, out of the blocks that were
+    // last accessed 100ms ago, the block with the least voting power will be removed.
+    pending_commit_votes: HashMap<HashValue, (HashMap<AccountAddress, CommitVote>, Instant)>,
 }
 
 impl BufferManager {
@@ -263,7 +265,7 @@ impl BufferManager {
             consensus_publisher,
 
             pending_commit_proofs: BTreeMap::new(),
-            pending_commit_votes: LruCache::new(30),
+            pending_commit_votes: HashMap::new(),
         }
     }
 
@@ -349,7 +351,9 @@ impl BufferManager {
         if (epoch > self.epoch_state.epoch)
             || (epoch == self.epoch_state.epoch && round > self.highest_committed_round)
         {
-            if let Some(votes) = self.pending_commit_votes.get_mut(&block_id) {
+            if let Some((votes, latest_access_timestamp)) =
+                self.pending_commit_votes.get_mut(&block_id)
+            {
                 if votes.len() < 150
                     && self
                         .epoch_state
@@ -357,6 +361,9 @@ impl BufferManager {
                         .get_voting_power(&vote.author())
                         .is_some()
                 {
+                    if !votes.contains_key(&vote.author()) {
+                        *latest_access_timestamp = Instant::now();
+                    }
                     votes.insert(vote.author(), vote);
                     true
                 } else {
@@ -368,9 +375,13 @@ impl BufferManager {
                     false
                 }
             } else {
+                if self.pending_commit_votes.len() > 50 {
+                    self.try_evict_pending_commit_votes();
+                }
                 let mut votes = HashMap::new();
                 votes.insert(vote.author(), vote);
-                self.pending_commit_votes.put(block_id, votes);
+                self.pending_commit_votes
+                    .insert(block_id, (votes, Instant::now()));
                 true
             }
         } else {
@@ -382,6 +393,35 @@ impl BufferManager {
                 "Commit vote too old, ignored."
             );
             false
+        }
+    }
+
+    fn try_evict_pending_commit_votes(&mut self) {
+        let old_pending_blocks = self
+            .pending_commit_votes
+            .iter()
+            .filter_map(|(hash, (votes, last_accessed_timestamp))| {
+                if last_accessed_timestamp.elapsed() > Duration::from_millis(100) {
+                    let voting_power = votes
+                        .iter()
+                        .map(|(author, _)| {
+                            self.epoch_state
+                                .verifier
+                                .get_voting_power(author)
+                                .unwrap_or(0)
+                        })
+                        .sum::<u64>();
+                    Some((*hash, voting_power))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        if let Some((hash, _)) = old_pending_blocks
+            .iter()
+            .min_by_key(|(_, voting_power)| *voting_power)
+        {
+            self.pending_commit_votes.remove(hash);
         }
     }
 
@@ -435,7 +475,7 @@ impl BufferManager {
 
         let mut unverified_signatures = PartialSignatures::empty();
         if let Some(block) = ordered_blocks.last() {
-            if let Some(votes) = self.pending_commit_votes.pop(&block.id()) {
+            if let Some((votes, _)) = self.pending_commit_votes.remove(&block.id()) {
                 for vote in votes.values() {
                     unverified_signatures.add_signature(vote.author(), vote.signature().clone());
                 }
