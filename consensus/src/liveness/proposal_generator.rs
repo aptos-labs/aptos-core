@@ -518,25 +518,25 @@ impl ProposalGenerator {
         // Check if the block contains any randomness transaction
         let maybe_require_randomness = skip_non_rand_blocks.then(|| {
             ref_txns.par_iter().any(|txns| {
-                if let Some(txns) = txns.as_ref() {
-                    for txn in txns {
-                        let entry_fn = match txn.payload() {
-                            TransactionPayload::EntryFunction(entry) => Some(entry),
-                            TransactionPayload::Multisig(_) => None,
-                            _ => None,
-                        };
-                        if let Some(entry) = entry_fn {
-                            if self.randomness_info.lock().contains(entry) {
-                                return true;
-                                // if *self.randomness_info.lock().get(entry).unwrap() {
-                                //     return true;
-                                // }
-                            }
-                        }
-                    }
-                } else {
-                    return false;
-                }
+                // if let Some(txns) = txns.as_ref() {
+                //     for txn in txns {
+                //         let entry_fn = match txn.payload() {
+                //             TransactionPayload::EntryFunction(entry) => Some(entry),
+                //             TransactionPayload::Multisig(_) => None,
+                //             _ => None,
+                //         };
+                //         if let Some(entry) = entry_fn {
+                //             if self.randomness_info.lock().contains(entry) {
+                //                 return true;
+                //                 // if *self.randomness_info.lock().get(entry).unwrap() {
+                //                 //     return true;
+                //                 // }
+                //             }
+                //         }
+                //     }
+                // } else {
+                //     return false;
+                // }
                 // let b = <std::option::Option<Vec<SignedTransaction>> as Clone>::clone(&txns.as_ref()).map(|t| t.iter().any(|txn| {
                 //     let entry_fn = match txn.payload() {
                 //         TransactionPayload::EntryFunction(entry) => Some(entry),
@@ -553,7 +553,7 @@ impl ProposalGenerator {
                 //         false
                 //     }
                 // }));
-                let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
+                let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref(), &self.randomness_info.lock());
                 for entry in entry_map {
                     if !self.randomness_info.lock().contains(&entry) {
                         self.randomness_info.lock().insert(entry);
@@ -574,18 +574,18 @@ impl ProposalGenerator {
             })
             |
                 {
-                    for txn in &inline_txns {
-                        let entry_fn = match txn.payload() {
-                            TransactionPayload::EntryFunction(entry) => Some(entry),
-                            TransactionPayload::Multisig(_) => None,
-                            _ => None,
-                        };
-                        if let Some(entry) = entry_fn {
-                            if self.randomness_info.lock().contains(entry) {
-                                return true;
-                            }
-                        }
-                    }
+                    // for txn in &inline_txns {
+                    //     let entry_fn = match txn.payload() {
+                    //         TransactionPayload::EntryFunction(entry) => Some(entry),
+                    //         TransactionPayload::Multisig(_) => None,
+                    //         _ => None,
+                    //     };
+                    //     if let Some(entry) = entry_fn {
+                    //         if self.randomness_info.lock().contains(entry) {
+                    //             return true;
+                    //         }
+                    //     }
+                    // }
 
                     // let b = inline_txns.iter().any(|txn| {
                     //     let entry_fn = match txn.payload() {
@@ -604,7 +604,7 @@ impl ProposalGenerator {
                     //     }
                     // });
                     //if !b {
-                        let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns));
+                        let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns), &self.randomness_info.lock());
                         for entry in entry_map {
                             if !self.randomness_info.lock().contains(&entry) {
                                 self.randomness_info.lock().insert(entry);

@@ -104,6 +104,7 @@ use std::{
     marker::Sync,
     sync::Arc,
 };
+use std::collections::HashSet;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -2537,13 +2538,17 @@ impl AptosVM {
         &self,
         signed_transaction: &SignedTransaction,
         resolver: &impl AptosMoveResolver,
-        session: & SessionExt
+        session: & SessionExt,
+        entry_sets: &HashSet<EntryFunction>
     ) -> (bool, Option<EntryFunction>) {
         let entry_fn = match signed_transaction.payload() {
             TransactionPayload::EntryFunction(entry) => entry,
             TransactionPayload::Multisig(_) => return (false, None), // daniel todo fix
             _ => return (false, None),
         };
+        if entry_sets.contains(entry_fn) {
+            return (true, None);
+        }
         match get_randomness_annotation(resolver, session, entry_fn) {
             Ok(annotation) => (annotation.is_some(), Some(entry_fn.clone())),
             Err(_) => (false, None),
@@ -2554,12 +2559,13 @@ impl AptosVM {
         &self,
         signed_transactions: &Vec<SignedTransaction>,
         resolver: &impl AptosMoveResolver,
+        entry_sets: &HashSet<EntryFunction>
     ) -> (bool, Option<EntryFunction>) {
         let mut session = self.new_session(resolver, SessionId::Void, None);
         //let mut res = vec![];
         //let mut entry_funs = vec![];
         for txn in signed_transactions {
-            let (result, entry_opt) = self.check_randomness(txn, resolver, & session);
+            let (result, entry_opt) = self.check_randomness(txn, resolver, & session, entry_sets);
             // res.push(result);
             if result {
                 // entry_funs.push(entry_opt);
