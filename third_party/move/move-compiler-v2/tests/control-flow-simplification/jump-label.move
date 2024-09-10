@@ -1,21 +1,31 @@
 module 0x42::test {
-    use std::option::{Self, Option};
-    use std::vector;
+	use 0x1::string::{String, Self};
 
-    public fun test(bytes: vector<u8>): Option<u8> {
-        let len = vector::length(&bytes);
-        if (len == 0) {
-            return option::none<u8>()
-        };
-        let x = len % 42;
-        let y = len / 42;
-        let bar = *vector::borrow(&bytes, len - 1);
-        if (y == 0 || y > 42 || x != 1) {
-            return option::none<u8>()
-        } else if (bar == 0 || bar > (y as u8)) {
-            return option::none<u8>()
-        } else {
-            return option::some(bar)
-        }
-    }
+	fun foo<T>(): String {
+		abort 0
+	}
+
+	fun bar<T>(): T {
+		abort 0
+	}
+
+	fun bar<T>(x: bool): T {
+		abort 0
+	}
+
+	fun test<T>(x: vector<u8>): T {
+		let y = foo<T>();
+		if (y == string::utf8(b"bool")) {
+			let z = baz(x);
+			return bar<T>(z)
+		} else if (y == string::utf8(b"u8")) {
+			let z = baz(x);
+			return bar<T>(z)
+		} else if (y == string::utf8(b"u64")) {
+			let z = baz(x);
+			return bar<T>(z)
+		}else {
+			abort 0
+		}
+	}
 }

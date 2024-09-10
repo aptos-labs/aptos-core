@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+   ┌─ tests/control-flow-simplification/jump-label.move:12:6
+   │
+ 8 │     fun bar<T>(): T {
+   │         --- Alias previously defined here
+   ·
+12 │     fun bar<T>(x: bool): T {
+   │         ^^^ Duplicate module member or alias 'bar'. Top level names in a namespace must be unique
