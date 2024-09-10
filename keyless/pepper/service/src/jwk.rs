@@ -28,16 +28,16 @@ pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
         Some(kid) => kid,
         None => return Err(anyhow!("no kid found on jwt header")),
     };
-    let jwk_url = format!("{}.well-known/jwks.json", &payload.claims.iss);
 
     // Check if it is a test iss
     let keys = if payload.claims.iss.eq("test.federated.oidc.provider"){
         let test_jwk = include_str!("../../../../types/src/jwks/rsa/secure_test_jwk.json");
         parse_jwks(test_jwk).expect("test jwk should parse")
-    } else if !AUTH_0_REGEX.is_match(&payload.claims.iss) {
-        return Err(anyhow!("not a federated iss"));
-    } else {
+    } else if AUTH_0_REGEX.is_match(&payload.claims.iss) {
+        let jwk_url = format!("{}.well-known/jwks.json", &payload.claims.iss);
         fetch_jwks(&jwk_url).await?
+    } else {
+        return Err(anyhow!("not a federated iss"));
     };
 
     let key = keys
