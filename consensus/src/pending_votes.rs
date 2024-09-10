@@ -176,11 +176,7 @@ impl PendingVotes {
         }
 
         // add this vote to the ledger info with signatures
-        if verified {
-            li_with_sig.add_verified_signature(vote.author(), vote.signature().clone());
-        } else {
-            li_with_sig.add_unverified_signature(vote.author(), vote.signature().clone());
-        }
+        li_with_sig.add_signature(vote.author(), vote.signature().clone(), verified);
 
         // check if we have enough signatures to create a QC
         let voting_power = match li_with_sig.check_voting_power(validator_verifier) {

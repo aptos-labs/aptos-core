@@ -97,7 +97,7 @@ fn generate_executed_item_from_ordered(
         order_vote_enabled,
     ));
     for (author, sig) in verified_signatures.signatures() {
-        partial_commit_proof.add_verified_signature(*author, sig.clone());
+        partial_commit_proof.add_signature(*author, sig.clone(), true);
     }
     BufferItem::Executed(Box::new(ExecutedItem {
         executed_blocks,
@@ -475,29 +475,17 @@ impl BufferItem {
             },
             Self::Executed(executed) => {
                 if executed.commit_info == *target_commit_info {
-                    if verified {
-                        executed
-                            .partial_commit_proof
-                            .add_verified_signature(author, signature);
-                    } else {
-                        executed
-                            .partial_commit_proof
-                            .add_unverified_signature(author, signature);
-                    }
+                    executed
+                        .partial_commit_proof
+                        .add_signature(author, signature, verified);
                     return Ok(());
                 }
             },
             Self::Signed(signed) => {
                 if signed.partial_commit_proof.commit_info() == target_commit_info {
-                    if verified {
-                        signed
-                            .partial_commit_proof
-                            .add_verified_signature(author, signature);
-                    } else {
-                        signed
-                            .partial_commit_proof
-                            .add_unverified_signature(author, signature);
-                    }
+                    signed
+                        .partial_commit_proof
+                        .add_signature(author, signature, verified);
                     return Ok(());
                 }
             },

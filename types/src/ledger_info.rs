@@ -404,7 +404,7 @@ impl LedgerInfoWithMixedSignatures {
         self.ledger_info.commit_info()
     }
 
-    pub fn add_verified_signature(
+    fn add_verified_signature(
         &mut self,
         validator: AccountAddress,
         signature: bls12381::Signature,
@@ -413,7 +413,7 @@ impl LedgerInfoWithMixedSignatures {
         self.unverified_signatures.remove_signature(validator);
     }
 
-    pub fn add_unverified_signature(
+    fn add_unverified_signature(
         &mut self,
         validator: AccountAddress,
         signature: bls12381::Signature,
@@ -426,6 +426,19 @@ impl LedgerInfoWithMixedSignatures {
         }
         self.unverified_signatures
             .add_signature(validator, signature);
+    }
+
+    pub fn add_signature(
+        &mut self,
+        validator: AccountAddress,
+        signature: bls12381::Signature,
+        verified: bool,
+    ) {
+        if verified {
+            self.add_verified_signature(validator, signature);
+        } else {
+            self.add_unverified_signature(validator, signature);
+        }
     }
 
     pub fn verified_voters(&self) -> Vec<&AccountAddress> {

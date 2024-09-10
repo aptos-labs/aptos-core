@@ -94,18 +94,11 @@ impl PendingOrderVotes {
                         order_vote.author()
                     );
                 }
-                if verified {
-                    li_with_sig.add_verified_signature(
-                        order_vote.author(),
-                        order_vote.signature().clone(),
-                    );
-                } else {
-                    li_with_sig.add_unverified_signature(
-                        order_vote.author(),
-                        order_vote.signature().clone(),
-                    );
-                }
-
+                li_with_sig.add_signature(
+                    order_vote.author(),
+                    order_vote.signature().clone(),
+                    verified,
+                );
                 match li_with_sig.check_voting_power(validator_verifier) {
                     Ok(aggregated_voting_power) => {
                         assert!(
@@ -140,40 +133,6 @@ impl PendingOrderVotes {
                         OrderVoteReceptionResult::ErrorAddingVote(error)
                     },
                 }
-                // // check if we have enough signatures to create a QC
-                // match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
-                //     // a quorum of signature was reached, a new QC is formed
-                //     Ok(aggregated_voting_power) => {
-                //         assert!(
-                //             aggregated_voting_power >= validator_verifier.quorum_voting_power(),
-                //             "QC aggregation should not be triggered if we don't have enough votes to form a QC"
-                //         );
-                //         match li_with_sig.aggregate_signatures(validator_verifier) {
-                //             Ok(ledger_info_with_sig) => {
-                //                 *status =
-                //                     OrderVoteStatus::EnoughVotes(ledger_info_with_sig.clone());
-                //                 OrderVoteReceptionResult::NewLedgerInfoWithSignatures(
-                //                     ledger_info_with_sig,
-                //                 )
-                //             },
-                //             Err(e) => OrderVoteReceptionResult::ErrorAggregatingSignature(e),
-                //         }
-                //     },
-
-                //     // not enough votes
-                //     Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => {
-                //         OrderVoteReceptionResult::VoteAdded(voting_power)
-                //     },
-
-                //     // error
-                //     Err(error) => {
-                //         error!(
-                //             "MUST_FIX: order vote received could not be added: {}, order vote: {}",
-                //             error, order_vote
-                //         );
-                //         OrderVoteReceptionResult::ErrorAddingVote(error)
-                //     },
-                // }
             },
         }
     }
