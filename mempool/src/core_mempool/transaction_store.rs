@@ -357,8 +357,11 @@ impl TransactionStore {
         curr_sequence_number: u64,
     ) -> bool {
         if self.is_full() && self.check_txn_ready(txn, curr_sequence_number) {
-            // try to free some space in Mempool from ParkingLot by evicting a non-ready txn
-            if let Some(txn_pointer) = self.parking_lot_index.get_poppable() {
+            let now = Instant::now();
+            // try to free some space in Mempool from ParkingLot by evicting non-ready txns
+            let mut evicted_txns = 0;
+            let mut evicted_bytes = 0;
+            while let Some(txn_pointer) = self.parking_lot_index.get_poppable() {
                 if let Some(txn) = self
                     .transactions
                     .get_mut(&txn_pointer.sender)
@@ -370,8 +373,22 @@ impl TransactionStore {
                             txn.sequence_info.transaction_sequence_number
                         ))
                     );
+                    evicted_bytes += txn.get_estimated_bytes() as u64;
+                    evicted_txns += 1;
                     self.index_remove(&txn);
+                    if !self.is_full() {
+                        break;
+                    }
+                } else {
+                    error!("Transaction not found in mempool while evicting from parking lot");
+                    break;
                 }
+            }
+            if evicted_txns > 0 {
+                counters::CORE_MEMPOOL_PARKING_LOT_EVICTED_COUNT.observe(evicted_txns as f64);
+                counters::CORE_MEMPOOL_PARKING_LOT_EVICTED_BYTES.observe(evicted_bytes as f64);
+                counters::CORE_MEMPOOL_PARKING_LOT_EVICTED_LATENCY
+                    .observe(now.elapsed().as_secs_f64());
             }
         }
         self.is_full()
