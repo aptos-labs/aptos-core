@@ -37,6 +37,10 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use std::cell::RefCell;
+use std::collections::HashMap;
+use aptos_types::transaction::{EntryFunction, SignedTransaction, TransactionPayload};
+use move_core_types::language_storage::ModuleId;
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -269,6 +273,9 @@ pub struct ProposalGenerator {
 
     // For checking randomness
     validator: Arc<RwLock<PooledVMValidator>>,
+
+    // randomness info
+    randomness_info: Arc<Mutex<HashMap<EntryFunction, bool>>>,
 }
 
 impl ProposalGenerator {
@@ -311,6 +318,7 @@ impl ProposalGenerator {
             onchain_randomness_config,
             allow_batches_without_pos_in_proposal,
             validator,
+            randomness_info: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -508,10 +516,64 @@ impl ProposalGenerator {
         // Check if the block contains any randomness transaction
         let maybe_require_randomness = skip_non_rand_blocks.then(|| {
             ref_txns.par_iter().any(|txns| {
-                self.validator.read().check_randomness_in_batch(txns.as_ref())
+                let b = <std::option::Option<Vec<SignedTransaction>> as Clone>::clone(&txns.as_ref()).map(|t| t.iter().any(|txn| {
+                    let entry_fn = match txn.payload() {
+                        TransactionPayload::EntryFunction(entry) => Some(entry),
+                        TransactionPayload::Multisig(_) => None,
+                        _ => None,
+                    };
+                    if let Some(entry) = entry_fn {
+                        if self.randomness_info.lock().contains_key(entry) {
+                            *self.randomness_info.lock().get(entry).unwrap()
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }));
+                if !b.is_some_and(|b| b) {
+                    let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
+                    for (entry, val) in entry_map {
+                        if !self.randomness_info.lock().contains_key(&entry) {
+                            self.randomness_info.lock().insert(entry, val);
+                        }
+                    }
+                    result
+                } else {
+                    true
+                }
             })
             |
-                self.validator.read().check_randomness_in_batch(&Some(inline_txns))
+                {
+                    let b = inline_txns.iter().any(|txn| {
+                        let entry_fn = match txn.payload() {
+                            TransactionPayload::EntryFunction(entry) => Some(entry),
+                            TransactionPayload::Multisig(_) => None,
+                            _ => None,
+                        };
+                        if let Some(entry) = entry_fn {
+                            if self.randomness_info.lock().contains_key(entry) {
+                                *self.randomness_info.lock().get(entry).unwrap()
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    });
+                    if !b {
+                        let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns));
+                        for (entry, val) in entry_map {
+                            if !self.randomness_info.lock().contains_key(&entry) {
+                                self.randomness_info.lock().insert(entry, val);
+                            }
+                        }
+                        result
+                    } else {
+                        true
+                    }
+                }
         });
 
         observe_block(timestamp, BlockStage::CHECKED_RAND);

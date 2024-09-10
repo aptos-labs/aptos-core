@@ -2538,15 +2538,15 @@ impl AptosVM {
         signed_transaction: &SignedTransaction,
         resolver: &impl AptosMoveResolver,
         session: &mut SessionExt
-    ) -> bool {
+    ) -> (bool, Option<EntryFunction>) {
         let entry_fn = match signed_transaction.payload() {
             TransactionPayload::EntryFunction(entry) => entry,
-            TransactionPayload::Multisig(_) => return false, // daniel todo fix
-            _ => return false,
+            TransactionPayload::Multisig(_) => return (false, None), // daniel todo fix
+            _ => return (false, None),
         };
         match get_randomness_annotation(resolver, session, entry_fn) {
-            Ok(annotation) => annotation.is_some(),
-            Err(_) => false,
+            Ok(annotation) => (annotation.is_some(), Some(entry_fn.clone())),
+            Err(_) => (false, None),
         }
     }
 
@@ -2554,13 +2554,16 @@ impl AptosVM {
         &self,
         signed_transactions: &Vec<SignedTransaction>,
         resolver: &impl AptosMoveResolver,
-    ) -> Vec<bool> {
+    ) -> (Vec<bool>, Vec<Option<EntryFunction>>) {
         let mut session = self.new_session(resolver, SessionId::Void, None);
         let mut res = vec![];
+        let mut entry_funs = vec![];
         for txn in signed_transactions {
-            res.push(self.check_randomness(txn, resolver, &mut session));
+            let (result, entry_opt) = self.check_randomness(txn, resolver, &mut session);
+            res.push(result);
+            entry_funs.push(entry_opt);
         }
-        res
+        (res, entry_funs)
     }
 
 }
