@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: unnecessary acquires annotation
-  ┌─ tests/more-v1/parser/acquires_list_generic.move:6:24
-  │
-6 │     fun foo() acquires B<CupC<R>> {
-  │                        ^^^^^^^^^^^

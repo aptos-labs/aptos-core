@@ -1,10 +1,7 @@
 
 Diagnostics:
-error: unexpected token
-  ┌─ tests/more-v1/parser/struct_without_fields.move:3:13
+error: invalid 'module' declaration
+  ┌─ tests/more-v1/parser/struct_without_fields.move:1:8
   │
-3 │     struct S;
-  │             ^
-  │             │
-  │             Unexpected ';'
-  │             Expected '{'
+1 │ module M {
+  │        ^ Invalid module declaration. The module does not have a specified address. Either declare it inside of an 'address <address> {' block or declare it with an address 'module <address>::M''
