@@ -381,7 +381,7 @@ impl BufferManager {
                 highest_committed_round = self.highest_committed_round,
                 block_id = block_id,
                 epoch = epoch,
-                "Commit vote too old, ignored."
+                "Received a commit vote not in the next 100 rounds, ignored."
             );
             false
         }
