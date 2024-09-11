@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    logging::expect_no_verification_errors,
     module_cyclic_dependency_error, module_linker_error,
     storage::{
         environment::{RuntimeEnvironment, WithRuntimeEnvironment},
@@ -107,16 +108,6 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
         }
     }
 
-    /// Returns module bytes, and an error if it does not exist.
-    fn get_existing_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Bytes> {
-        self.fetch_module_bytes(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
-    }
-
     /// Returns true if the module is cached.
     fn is_module_cached(&self, address: &AccountAddress, module_name: &IdentStr) -> bool {
         let module_storage = self.module_storage.borrow();
@@ -125,18 +116,23 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
             .is_some_and(|account_module_storage| account_module_storage.contains_key(module_name))
     }
 
-    /// If module is not yet cached in module storage, fetches it from the baseline
-    /// byte storage and caches as a deserialized entry.
-    fn initialize_module_storage_entry(
+    /// If the module does not exist, returns true, and false otherwise. For modules that exist, if
+    /// the module is not yet cached in module storage, fetches it from the baseline storage and
+    /// caches as a deserialized entry.
+    fn module_does_not_exist(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<()> {
+    ) -> VMResult<bool> {
         use btree_map::Entry::*;
         use ModuleStorageEntry::*;
 
         if !self.is_module_cached(address, module_name) {
-            let bytes = self.get_existing_module_bytes(address, module_name)?;
+            let bytes = match self.fetch_module_bytes(address, module_name)? {
+                Some(bytes) => bytes,
+                None => return Ok(true),
+            };
+
             let (module, module_size, module_hash) = self
                 .runtime_environment
                 .deserialize_into_compiled_module(&bytes)?;
@@ -154,17 +150,19 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
                 module_hash,
             });
         }
-        Ok(())
+        Ok(false)
     }
 
-    /// Returns the entry in module storage (deserialized or verified) and an error if it
-    /// does not exist. This API clones the underlying entry pointers.
+    /// Returns the entry in module storage (deserialized or verified) and an error if it does not
+    /// exist. This API clones the underlying entry pointers.
     fn fetch_existing_module_storage_entry(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<ModuleStorageEntry> {
-        self.initialize_module_storage_entry(address, module_name)?;
+        if self.module_does_not_exist(address, module_name)? {
+            return Err(module_linker_error!(address, module_name));
+        }
 
         // At this point module storage contains a deserialized entry, because the function
         // above puts it there if it was not cached already.
@@ -309,44 +307,52 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
+    ) -> VMResult<Option<Vec<Metadata>>> {
         Ok(self
             .fetch_deserialized_module(address, module_name)?
-            .metadata
-            .clone())
+            .map(|module| module.metadata.clone()))
     }
 
     fn fetch_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Arc<CompiledModule>> {
+    ) -> VMResult<Option<Arc<CompiledModule>>> {
         use ModuleStorageEntry::*;
 
-        self.initialize_module_storage_entry(address, module_name)?;
+        if self.module_does_not_exist(address, module_name)? {
+            return Ok(None);
+        }
 
         // At this point module storage contains a deserialized entry, because the function
-        // above puts it there if it was not cached already.
+        // above puts it there if it existed and was not cached already.
         let module_storage = self.module_storage.borrow();
         let entry = get_module_entry_or_panic(&module_storage, address, module_name);
 
-        Ok(match entry {
+        Ok(Some(match entry {
             Deserialized { module, .. } => module.clone(),
             Verified { module } => module.as_compiled_module(),
-        })
+        }))
     }
 
     fn fetch_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
+    ) -> VMResult<Option<Arc<Module>>> {
+        if !self.check_module_exists(address, module_name)? {
+            return Err(module_linker_error!(address, module_name));
+        }
+
         let mut visited = BTreeSet::new();
-        self.fetch_verified_module_and_visit_all_transitive_dependencies(
-            address,
-            module_name,
-            &mut visited,
-        )
+        let module = self
+            .fetch_verified_module_and_visit_all_transitive_dependencies(
+                address,
+                module_name,
+                &mut visited,
+            )
+            .map_err(expect_no_verification_errors)?;
+        Ok(Some(module))
     }
 }
 
@@ -466,11 +472,11 @@ pub(crate) mod test {
         assert_none!(assert_ok!(result));
 
         let result = module_storage.fetch_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
-        assert_eq!(assert_err!(result).major_status(), StatusCode::LINKER_ERROR);
+        assert_none!(assert_ok!(result));
 
         let result =
             module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("a"));
-        assert_eq!(assert_err!(result).major_status(), StatusCode::LINKER_ERROR);
+        assert_none!(assert_ok!(result));
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
         assert_eq!(assert_err!(result).major_status(), StatusCode::LINKER_ERROR);
@@ -506,7 +512,7 @@ pub(crate) mod test {
 
         let result = module_storage.fetch_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
         assert_eq!(
-            assert_ok!(result),
+            assert_some!(assert_ok!(result)),
             module("a", vec!["b", "c"], vec![]).0.metadata
         );
 
@@ -516,7 +522,7 @@ pub(crate) mod test {
         let result =
             module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("c"));
         assert_eq!(
-            assert_ok!(result).as_ref(),
+            assert_some!(assert_ok!(result)).as_ref(),
             &module("c", vec!["d", "e"], vec![]).0
         );
 
