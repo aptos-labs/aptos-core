@@ -25,9 +25,6 @@ runs:
       shell: bash
       run: cargo build --release -p aptos-debugger
 
-    - name: strip and copy to working directory
+    - name: strip binary for faster caching
       shell: bash
-      run: |
-        mkdir -p aptos-debugger-build
-        strip -s target/release/aptos-debugger
-        cp target/release/aptos-debugger aptos-debugger-build/
+      run: strip -s target/release/aptos-debugger

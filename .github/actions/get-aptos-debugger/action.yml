@@ -22,7 +22,7 @@ runs:
       id: cache-aptos-debugger-binary
       uses: actions/cache@v4
       with:
-        path: aptos-debugger-build
+        path: target/release/aptos-debugger
         key: aptos-debugger-${{ inputs.GIT_SHA }}
         fail-on-cache-miss: ${{ inputs.EXPECT_CACHE_HIT }}
 
@@ -31,8 +31,3 @@ runs:
       with:
         GIT_SHA: ${{ inputs.GIT_SHA }}
         GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
-
-    - name: Update Path
-      shell: bash
-      run: |
-        echo "$(pwd)/aptos-debugger-build" >> $GITHUB_PATH

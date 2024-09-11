@@ -111,7 +111,7 @@ def replay_verify_partition(
     # run and print output
     process = subprocess.Popen(
         [
-            "aptos-debugger",
+            "target/release/aptos-debugger",
             "aptos-db",
             "replay-verify",
             # "--enable-storage-sharding",
