@@ -475,10 +475,13 @@ impl LedgerInfoWithMixedSignatures {
         verifier.check_voting_power(all_voters.iter().collect_vec().into_iter(), true)
     }
 
+    // Returns the aggregate signature of all the verified signatures.
+    // If any of the unverified signatures is invalid, returns the list of authors of the invalid signatures.
+    // For the future rounds, votes from these authors are verified beforehand.
     pub fn aggregate_and_verify(
         &mut self,
         verifier: &ValidatorVerifier,
-    ) -> Result<LedgerInfoWithSignatures, VerifyError> {
+    ) -> Result<(LedgerInfoWithSignatures, Vec<AccountAddress>), VerifyError> {
         self.check_voting_power(verifier)?;
 
         let mut all_signatures = self.verified_signatures.clone();
@@ -487,6 +490,7 @@ impl LedgerInfoWithMixedSignatures {
         }
 
         let aggregated_sig = verifier.aggregate_signatures(&all_signatures)?;
+        let mut malicious_signers = vec![];
         let verified_aggregate_signature = match verifier
             .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
         {
@@ -502,15 +506,22 @@ impl LedgerInfoWithMixedSignatures {
                             .verify(*account_address, self.ledger_info(), signature)
                             .is_ok()
                         {
-                            return Some((account_address, signature));
+                            return Some((*account_address, signature.clone()));
                         }
                         None
                     })
                     .collect::<Vec<_>>();
                 for (account_address, signature) in verified {
                     self.verified_signatures
-                        .add_signature(*account_address, signature.clone());
+                        .add_signature(account_address, signature.clone());
+                    self.unverified_signatures.remove_signature(account_address);
                 }
+                malicious_signers = self
+                    .unverified_signatures
+                    .signatures()
+                    .keys()
+                    .cloned()
+                    .collect();
                 self.unverified_signatures = PartialSignatures::empty();
                 let aggregated_sig = verifier.aggregate_signatures(&self.verified_signatures)?;
                 verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig)?;
@@ -518,7 +529,10 @@ impl LedgerInfoWithMixedSignatures {
             },
         };
         self.check_voting_power(verifier).map(|_| {
-            LedgerInfoWithSignatures::new(self.ledger_info.clone(), verified_aggregate_signature)
+            (
+                LedgerInfoWithSignatures::new(self.ledger_info.clone(), verified_aggregate_signature),
+                malicious_signers
+            )
         })
     }
 
