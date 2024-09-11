@@ -16,7 +16,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, session::Session, AsUnsyncCodeStorage, ModuleStorage,
-    TemporaryModuleStorage, UnreachableCodeStorage,
+    RuntimeEnvironment, StagingModuleStorage, UnreachableCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -113,6 +113,7 @@ fn instantiation_err() {
         paranoid_type_checks: false,
         ..VMConfig::default()
     };
+    let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config.clone());
     let vm = MoveVM::new_with_config(vec![], vm_config);
 
     let storage: InMemoryStorage = InMemoryStorage::new();
@@ -133,12 +134,10 @@ fn instantiation_err() {
 
     // Publish (must succeed!) and then load the function.
     if vm.vm_config().use_loader_v2 {
-        let module_storage = storage.as_unsync_code_storage(vm.runtime_environment());
+        let module_storage = storage.as_unsync_code_storage(&runtime_environment);
         let new_module_storage =
-            TemporaryModuleStorage::new(&addr, vm.runtime_environment(), &module_storage, vec![
-                mod_bytes.into(),
-            ])
-            .expect("Module must publish");
+            StagingModuleStorage::create(&addr, &module_storage, vec![mod_bytes.into()])
+                .expect("Module must publish");
         load_function(&mut session, &new_module_storage, &cm.self_id(), &[ty_arg])
     } else {
         #[allow(deprecated)]

@@ -20,7 +20,7 @@ use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::{
@@ -54,10 +54,10 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     AptosVM, VMValidator,
 };
+use aptos_vm_environment::environment::Environment;
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
-    environment::Environment,
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
@@ -69,7 +69,10 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::{MoveResource, MoveStructType},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    WithRuntimeEnvironment,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -127,7 +130,6 @@ pub struct FakeExecutor {
     /// If not set, environment variable E2E_PARALLEL_EXEC must be set
     /// s.t. the comparison test is executed (BothComparison).
     executor_mode: Option<ExecutorMode>,
-    env: Arc<Environment>,
     allow_block_executor_fallback: bool,
 }
 
@@ -144,7 +146,7 @@ pub enum ExecFuncTimerDynamicArgs {
 
 impl FakeExecutor {
     /// Creates an executor from a genesis [`WriteSet`].
-    pub fn from_genesis(write_set: &WriteSet, chain_id: ChainId) -> Self {
+    pub fn from_genesis(write_set: &WriteSet, _chain_id: ChainId) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .num_threads(num_cpus::get())
@@ -160,7 +162,6 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
-            env: Environment::testing(chain_id),
             allow_block_executor_fallback: true,
         };
         executor.apply_write_set(write_set);
@@ -170,7 +171,7 @@ impl FakeExecutor {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn from_genesis_with_existing_thread_pool(
         write_set: &WriteSet,
-        chain_id: ChainId,
+        _chain_id: ChainId,
         executor_thread_pool: Arc<rayon::ThreadPool>,
     ) -> Self {
         let mut executor = FakeExecutor {
@@ -182,7 +183,6 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
-            env: Environment::testing(chain_id),
             allow_block_executor_fallback: true,
         };
         executor.apply_write_set(write_set);
@@ -265,7 +265,6 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
-            env: Environment::testing(ChainId::test()),
             allow_block_executor_fallback: true,
         }
     }
@@ -772,10 +771,13 @@ impl FakeExecutor {
         let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
 
         // TODO(Gas): revisit this.
-        let vm = AptosVM::new(self.get_state_view());
+        let env = Arc::new(Environment::new(self.get_state_view(), false, None));
+        let vm = AptosVM::new_with_environment(env.clone(), self.get_state_view());
 
         let resolver = self.data_store.as_move_resolver();
-        let code_storage = vm.as_aptos_code_storage(&self.data_store);
+        let code_storage = self
+            .get_state_view()
+            .as_aptos_code_storage(env.runtime_environment());
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
@@ -844,7 +846,8 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(self.get_state_view());
+        let env = Arc::new(Environment::new(self.get_state_view(), false, None));
+        let vm = AptosVM::new_with_environment(env, self.get_state_view());
         vm.validate_transaction(txn, &self.data_store)
     }
 
@@ -958,26 +961,14 @@ impl FakeExecutor {
             _ => vec![],
         };
 
+        // TODO(loader_v2): Re-check if this is still correct.
+        let env = Arc::new(Environment::new(&self.data_store, false, None));
         let resolver = self.data_store.as_move_resolver();
-        let (gas_params, storage_gas_params) = match gas_meter_type {
-            GasMeterType::RegularGasMeter => (
-                AptosGasParameters::initial(),
-                StorageGasParameters::latest(),
-            ),
-            GasMeterType::UnmeteredGasMeter => (
-                // In case of unmetered execution, we still want to enforce limits.
-                AptosGasParameters::initial(),
-                StorageGasParameters::unlimited(),
-            ),
-        };
+        let vm = MoveVmExt::new(env.clone(), &resolver);
 
-        let vm = MoveVmExt::new(
-            LATEST_GAS_FEATURE_VERSION,
-            Ok(&gas_params),
-            self.env.clone(),
-            &resolver,
-        );
-        let module_storage = self.data_store.as_aptos_code_storage(&vm);
+        let module_storage = self
+            .data_store
+            .as_aptos_code_storage(env.runtime_environment());
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -1014,8 +1005,8 @@ impl FakeExecutor {
                 GasMeterType::RegularGasMeter => (
                     Some(make_prod_gas_meter(
                         LATEST_GAS_FEATURE_VERSION,
-                        gas_params.vm.clone(),
-                        storage_gas_params.clone(),
+                        env.gas_params().as_ref().unwrap().vm.clone(),
+                        env.storage_gas_params().as_ref().unwrap().clone(),
                         false,
                         1_000_000_000_000_000.into(),
                     )),
@@ -1083,20 +1074,19 @@ impl FakeExecutor {
         let a2 = Arc::clone(&a1);
 
         let (write_set, _events) = {
-            let resolver = self.data_store.as_move_resolver();
-
-            // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new_with_extended_options(
-                LATEST_GAS_FEATURE_VERSION,
-                Ok(&AptosGasParameters::zeros()),
-                self.env.clone(),
+            let env = Arc::new(Environment::new(
+                &self.data_store,
+                false,
                 Some(Arc::new(move |expression| {
                     a2.lock().unwrap().push(expression);
                 })),
-                false,
-                &resolver,
-            );
-            let module_storage = self.data_store.as_aptos_code_storage(&vm);
+            ));
+            let resolver = self.data_store.as_move_resolver();
+            let vm = MoveVmExt::new(env.clone(), &resolver);
+
+            let module_storage = self
+                .data_store
+                .as_aptos_code_storage(env.runtime_environment());
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
@@ -1148,15 +1138,13 @@ impl FakeExecutor {
     ) {
         let module_id = Self::module(module_name);
         let (write_set, events) = {
+            let env = Arc::new(Environment::new(&self.data_store, false, None));
             let resolver = self.data_store.as_move_resolver();
+            let vm = MoveVmExt::new(env.clone(), &resolver);
 
-            let vm = MoveVmExt::new(
-                LATEST_GAS_FEATURE_VERSION,
-                Ok(&AptosGasParameters::initial()),
-                self.env.clone(),
-                &resolver,
-            );
-            let module_storage = self.data_store.as_aptos_code_storage(&vm);
+            let module_storage = self
+                .data_store
+                .as_aptos_code_storage(env.runtime_environment());
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
             let storage = TraversalStorage::new();
             session
@@ -1191,15 +1179,13 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+        let env = Arc::new(Environment::new(&self.data_store, false, None));
         let resolver = self.data_store.as_move_resolver();
+        let vm = MoveVmExt::new(env.clone(), &resolver);
 
-        let vm = MoveVmExt::new(
-            LATEST_GAS_FEATURE_VERSION,
-            Ok(&AptosGasParameters::initial()),
-            self.env.clone(),
-            &resolver,
-        );
-        let module_storage = self.data_store.as_aptos_code_storage(&vm);
+        let module_storage = self
+            .data_store
+            .as_aptos_code_storage(env.runtime_environment());
 
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
         let traversal_storage = TraversalStorage::new();

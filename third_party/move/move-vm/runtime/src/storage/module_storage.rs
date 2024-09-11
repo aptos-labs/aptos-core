@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loader::Module;
+use crate::{loader::Module, WithRuntimeEnvironment};
 use ambassador::delegatable_trait;
 use bytes::Bytes;
 use move_binary_format::{errors::VMResult, CompiledModule};
@@ -12,7 +12,7 @@ use std::sync::Arc;
 /// implement their own module storage to pass to the VM to resolve code.
 // TODO(loader_v2): Implement tests to enforce these invariants for ALL implementations.
 #[delegatable_trait]
-pub trait ModuleStorage {
+pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
     fn check_module_exists(

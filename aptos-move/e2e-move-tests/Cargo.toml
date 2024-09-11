@@ -25,6 +25,7 @@ aptos-package-builder = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
+aptos-vm-environment = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
 hex = { workspace = true }

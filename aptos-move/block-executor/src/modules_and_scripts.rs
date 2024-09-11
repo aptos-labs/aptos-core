@@ -20,8 +20,9 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
-    deserialize_script, module_cyclic_dependency_error, module_linker_error, script_hash,
-    CodeStorage, Module, ModuleStorage, Script,
+    deserialize_script, logging::expect_no_verification_errors, module_cyclic_dependency_error,
+    module_linker_error, script_hash, CodeStorage, Module, ModuleStorage, RuntimeEnvironment,
+    Script, WithRuntimeEnvironment,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -121,7 +122,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         let immediate_dependencies = partially_verified_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
-                self.fetch_verified_module(addr, name)?
+                self.fetch_verified_module(addr, name)
+                    .map_err(expect_no_verification_errors)?
                     .ok_or_else(|| module_linker_error!(addr, name))
             })
             .collect::<VMResult<Vec<_>>>()?;
@@ -228,6 +230,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
             &mut visited,
         )?;
         Ok(Some(module))
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> WithRuntimeEnvironment
+    for LatestView<'a, T, S, X>
+{
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.runtime_environment
     }
 }
 

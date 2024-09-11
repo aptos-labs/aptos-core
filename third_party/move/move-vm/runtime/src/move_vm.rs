@@ -7,7 +7,7 @@ use crate::{
     data_cache::TransactionDataCache,
     loader::{Loader, ModuleStorage, ModuleStorageAdapter},
     native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction,
+    native_functions::{NativeFunction, NativeFunctions},
     runtime::VMRuntime,
     session::Session,
     RuntimeEnvironment,
@@ -48,25 +48,28 @@ impl MoveVM {
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
     ) -> Self {
+        let natives = NativeFunctions::new(natives)
+            .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
         Self {
-            runtime: VMRuntime::new(Arc::new(RuntimeEnvironment::new(vm_config, natives, None))),
+            runtime: VMRuntime::new(natives, vm_config),
         }
     }
 
-    pub fn new_with_runtime_environment(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
+    pub fn new_with_runtime_environment(runtime_environment: &RuntimeEnvironment) -> Self {
+        // Loader V2 does not store any natives, so we save the clone here.
+        let natives = if runtime_environment.vm_config().use_loader_v2 {
+            NativeFunctions::new(vec![]).unwrap()
+        } else {
+            runtime_environment.natives().clone()
+        };
         Self {
-            runtime: VMRuntime::new(runtime_environment),
+            runtime: VMRuntime::new(natives, runtime_environment.vm_config().clone()),
         }
     }
 
     /// Returns VM configuration used to initialize the VM.
     pub fn vm_config(&self) -> &VMConfig {
         self.runtime.loader().vm_config()
-    }
-
-    /// Returns the VM runtime environment.
-    pub fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.runtime.loader().runtime_environment()
     }
 
     /// Create a new Session backed by the given storage.

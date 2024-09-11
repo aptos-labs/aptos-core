@@ -28,19 +28,18 @@ use aptos_vm_types::{
     module_write_set::ModuleWriteSet, storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    CompiledModule,
-};
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
+    account_address::AccountAddress,
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
+    identifier::IdentStr,
     language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
     module_linker_error, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    session::Session,
+    session::Session, ModuleStorage,
 };
 use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use std::{
@@ -122,19 +121,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn convert_modules_into_write_ops(
-        &self,
-        module_storage: &impl AptosModuleStorage,
-        code_and_modules: impl IntoIterator<Item = (Bytes, CompiledModule)>,
-    ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
-        let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
-        woc.convert_modules_into_write_ops(module_storage, code_and_modules)
-    }
-
     pub fn finish(
         self,
         configs: &ChangeSetConfigs,
-        module_storage: &impl AptosModuleStorage,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
         let move_vm = self.inner.get_move_vm();
 
@@ -163,7 +153,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let (change_set, mut extensions) = self
             .inner
-            .finish_with_extensions_with_custom_effects(&resource_converter)?;
+            .finish_with_extensions_with_custom_effects(&resource_converter, module_storage)?;
 
         let (change_set, resource_group_change_set) = Self::split_and_merge_resource_groups(
             move_vm,
@@ -284,7 +274,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn split_and_merge_resource_groups(
         vm: &MoveVM,
         resolver: &dyn AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        module_storage: &impl ModuleStorage,
         is_loader_v2_enabled: bool,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
@@ -500,6 +490,18 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         Ok((change_set, module_write_set))
     }
+}
+
+/// Converts module bytes and their compiled representation extracted from publish request into
+/// write ops. Only used by V2 loader implementation.
+pub fn convert_modules_into_write_ops<'a>(
+    resolver: &impl AptosMoveResolver,
+    features: &Features,
+    module_storage: &impl AptosModuleStorage,
+    staged_modules: impl Iterator<Item = (&'a AccountAddress, &'a IdentStr, Bytes)>,
+) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
+    let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
+    woc.convert_modules_into_write_ops(module_storage, staged_modules)
 }
 
 impl<'r, 'l> Deref for SessionExt<'r, 'l> {
