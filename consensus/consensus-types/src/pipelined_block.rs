@@ -294,13 +294,13 @@ impl PipelinedBlock {
 
     pub fn new_recovered(block: Block, committed_transactions: Vec<HashValue>) -> Self {
         info!(
-            "New Recovered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}, committed_txns: {:?}",
+            "New Recovered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}, committed_txns: {}",
             block.id(),
             block.parent_id(),
             block.round(),
             block.epoch(),
             block.payload().map_or(0, |p| p.len()),
-            committed_transactions,
+            committed_transactions.len(),
         );
         Self {
             block,
