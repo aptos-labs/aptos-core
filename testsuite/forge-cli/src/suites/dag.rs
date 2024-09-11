@@ -385,8 +385,8 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         .add_network_test(PerformanceBenchmark)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             let onchain_consensus_config = OnChainConsensusConfig::V3 {
-                // alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
-                alg: ConsensusAlgorithmConfig::Jolteon { main: ConsensusConfigV1::default(), quorum_store_enabled: false },
+                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                // alg: ConsensusAlgorithmConfig::Jolteon { main: ConsensusConfigV1::default(), quorum_store_enabled: false },
                 vtxn: ValidatorTxnConfig::default_disabled(),
             };
 
