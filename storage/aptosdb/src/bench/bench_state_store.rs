@@ -5,7 +5,7 @@ use aptos_temppath::TempPath;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use arr_macro::arr;
 use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
-use std::{collections::HashMap, fmt::Debug, time::Instant};
+use std::{collections::HashMap, time::Instant};
 
 fn main() {
     // 初始化临时目录和数据库
@@ -14,28 +14,31 @@ fn main() {
     let store = &db.state_store;
 
     // 生成测试数据
-    let input = arb_state_kv_sets(10, 5, 5)
+    let input = arb_state_kv_sets(10000, 5, 5)
         .new_tree(&mut TestRunner::default())
         .unwrap()
         .current();
 
     // 开始计时
     let start = Instant::now();
+    let mut version: u64 = 0;
 
     // 写入状态数据
-    for (version, kv_set) in input.iter().enumerate() {
+    for (i, kv_set) in input.iter().enumerate() {
         for (key, value) in kv_set {
             let value_state_set = vec![(key, value.as_ref())].into_iter().collect();
             let mut sharded_value_state_set = arr![HashMap::new(); 16];
             sharded_value_state_set[key.get_shard_id() as usize].insert(key.clone(), value.clone());
             let jmt_updates = jmt_updates(&value_state_set);
 
-            let version = version as u64;
+            let cur_version = version;
+            version += 1;
+
             let root = store
                 .merklize_value_set(
                     jmt_update_refs(&jmt_updates),
-                    version,
-                    version.checked_sub(1),
+                    cur_version,
+                    cur_version.checked_sub(1),
                 )
                 .unwrap();
             let ledger_batch = SchemaBatch::new();
@@ -44,7 +47,7 @@ fn main() {
             store
                 .put_value_sets(
                     vec![&sharded_value_state_set],
-                    version,
+                    cur_version,
                     StateStorageUsage::new_untracked(),
                     None,
                     &ledger_batch,
