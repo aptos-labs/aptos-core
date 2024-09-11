@@ -209,7 +209,7 @@ module aptos_framework::jwks {
     /// `kid_vec`, `alg_vec`, `e_vec`, `n_vec` are String vectors of the JWK attributes `kid`, `alg`, `e` and `n` respectively.
     ///
     /// For the example JWK set snapshot below containing 2 keys for Google found at https://www.googleapis.com/oauth2/v3/certs -
-    ///
+    /// ```
     /// {
     ///   "keys": [
     ///     {
@@ -230,6 +230,7 @@ module aptos_framework::jwks {
     ///     }
     ///   ]
     /// }
+    /// ```
     ///
     /// We can call update_federated_jwk_set for Google's `iss` - "https://accounts.google.com" and for each vector
     /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
