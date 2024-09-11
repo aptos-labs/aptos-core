@@ -39,7 +39,7 @@ const DECOMPILER_EXTENSION: &str = "mv.move";
 ///
 /// For example, if you want to disassemble an on-chain package `PackName` at account `0x42`:
 /// 1. Download the package with `aptos move download --account 0x42 --package PackName --bytecode`
-/// 2. Disassemble the package bytecode with `aptos disassemble --package-path PackName/bytecode_modules`
+/// 2. Disassemble the package bytecode with `aptos move disassemble --package-path PackName/bytecode_modules`
 #[derive(Debug, Parser)]
 pub struct Disassemble {
     #[clap(flatten)]
