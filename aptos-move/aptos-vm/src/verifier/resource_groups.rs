@@ -13,6 +13,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     vm_status::StatusCode,
 };
+use move_vm_runtime::module_linker_error;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
@@ -209,7 +210,12 @@ fn fetch_module(
     use_loader_v2: bool,
 ) -> VMResult<Arc<CompiledModule>> {
     if use_loader_v2 {
-        module_storage.fetch_deserialized_module(module_id.address(), module_id.name())
+        let addr = module_id.address();
+        let name = module_id.name();
+        let module = module_storage
+            .fetch_deserialized_module(addr, name)?
+            .ok_or_else(|| module_linker_error!(addr, name))?;
+        Ok(module)
     } else {
         #[allow(deprecated)]
         let bytes = session.fetch_module_from_data_store(module_id)?;
