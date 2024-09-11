@@ -77,23 +77,38 @@ on:
         default: "high-perf-docker-with-local-ssd"
 
 jobs:
-  replay-verify:
-    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 720 }}
+  prepare:
     runs-on: ${{ inputs.RUNS_ON }}
-    strategy:
-      fail-fast: false
-      matrix:
-        number: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] # runner number
+    outputs:
+      ranges: ${{ steps.gen-jobs.outputs.ranges }}
     steps:
-      - name: Echo Runner Number
-        run: echo "Runner is ${{ matrix.number }}"
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.GIT_SHA }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - name: Load cached aptos-debugger binary
+        id: cache-aptos-debugger-binary
+        uses: actions/cache@v4
         with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          # copy the binary to the root of the repo and cache it there, because rust-setup calls a cache-rust action
+          # which cleans up the target directory in its post action
+          path: aptos-debugger
+          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+
+      - name: Prepare for build if not cached
+        if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
+        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+      - name: Build and strip aptos-debugger binary if not cached
+        if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          cargo build --release -p aptos-debugger
+          strip -s target/release/aptos-debugger
+          cp target/release/aptos-debugger .
 
       - name: Install GCloud SDK
         uses: "google-github-actions/setup-gcloud@v2"
@@ -101,16 +116,146 @@ jobs:
           version: ">= 418.0.0"
           install_components: "kubectl,gke-gcloud-auth-plugin"
 
-      - name: Build CLI binaries in release mode
-        shell: bash
-        run: cargo build --release -p aptos-debugger
+      - name: get timestamp to use in cache key
+        id: get-timestamp
+        run: echo "ts=$(date +%s)" >> $GITHUB_OUTPUT
 
-      - name: Run replay-verify in parallel
-        shell: bash
-        run: testsuite/replay_verify.py ${{ matrix.number }} 19 # first argument is the runner number, second argument is the total number of runners
+      - name: Load cached backup storage metadata cache dir (and save back afterwards)
+        uses: actions/cache@v4
+        with:
+          path: metadata_cache
+          key: metadata-cache-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-${{ steps.get-timestamp.outputs.ts }}
+          restore-keys: metadata-cache-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-
+
+      - name: Generate job ranges
+        id: gen-jobs
         env:
           BUCKET: ${{ inputs.BUCKET }}
           SUB_DIR: ${{ inputs.SUB_DIR }}
-          HISTORY_START: ${{ inputs.HISTORY_START }}
+          HISTORY_START: ${{ inputs.HISTORY_START || '0' }}
+          BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+        run: |
+          ./aptos-debugger aptos-db gen-replay-verify-jobs  \
+            --metadata-cache-dir ./metadata_cache \
+            --command-adapter-config $BACKUP_CONFIG_TEMPLATE_PATH \
+            --output-json-file job_ranges.json \
+            --start-version $HISTORY_START
+
+          echo "ranges=$(cat job_ranges.json)" >> $GITHUB_OUTPUT
+
+          cat job_ranges.json | jq || true
+
+      - name: Cache backup storage config so the replay jobs don't need to checkout entire repo
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+          key: backup-config-${{ github.run_id }}
+
+  replay-verify:
+    needs: prepare
+    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 720 }}
+    runs-on: ${{ inputs.RUNS_ON }}
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        range: ${{ fromJson(needs.prepare.outputs.ranges) }}
+    steps:
+      - name: Parse job - ${{ matrix.range }}
+        id: parse-job
+        shell: bash
+        run: |
+          read name begin end sesc <<< "${{ matrix.range }}"
+          echo name=$name >> $GITHUB_OUTPUT
+          echo begin=$begin >> $GITHUB_OUTPUT
+          echo end=$end>> $GITHUB_OUTPUT
+          echo desc=$desc>> $GITHUB_OUTPUT
+
+      - name: Load cached aptos-debugger binary
+        uses: actions/cache/restore@v4
+        with:
+          path: aptos-debugger
+          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Load cached backup storage metadata cache dir
+        uses: actions/cache/restore@v4
+        with:
+          path: metadata_cache
+          key: metadata-cache-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-
+          fail-on-cache-miss: true
+
+      - name: Load cached backup storage config
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+          key: backup-config-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      - name: Install GCloud SDK
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          version: ">= 418.0.0"
+          install_components: "kubectl,gke-gcloud-auth-plugin"
+
+      - name: phase 1 - restore snapshot, with retries
+        env:
+          BUCKET: ${{ inputs.BUCKET }}
+          SUB_DIR: ${{ inputs.SUB_DIR }}
+          HISTORY_START: ${{ inputs.HISTORY_START || '0' }}
           TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP }}
           BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+        run: |
+          for try in {0..3}
+          do
+            if [ $try -gt 0 ]; then
+              SLEEP=$((10 * $try))
+              echo "sleeping for $SLEEP seconds before retry #$try" >&2
+              sleep $SLEEP
+            fi
+            ./aptos-debugger aptos-db replay-verify \
+              --metadata-cache-dir ./metadata_cache \
+              --command-adapter-config $BACKUP_CONFIG_TEMPLATE_PATH \
+              --txns-to-skip $TXNS_TO_SKIP \
+              --start-version ${{ steps.parse-job.outputs.begin }} \
+              --end-version ${{ steps.parse-job.outputs.begin }} \
+              \
+              --lazy-quit \
+              --target-db-dir db \
+              --concurrent-downloads 8 \
+              --replay-concurrency-level 8 \
+              \
+              && exit 0 || true # exit 0 if successful, otherwise retry
+          done
+          exit(1)
+
+      - name: phase 2 - replay-verify transactions, with retries
+        env:
+          BUCKET: ${{ inputs.BUCKET }}
+          SUB_DIR: ${{ inputs.SUB_DIR }}
+          HISTORY_START: ${{ inputs.HISTORY_START || '0' }}
+          TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP }}
+          BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+        run: |
+          for try in {0..3}
+          do
+            if [ $try -gt 0 ]; then
+              SLEEP=$((10 * $try))
+              echo "sleeping for $SLEEP seconds before retry #$try" >&2
+              sleep $SLEEP
+            fi
+            ./aptos-debugger aptos-db replay-verify \
+              --metadata-cache-dir ./metadata_cache \
+              --command-adapter-config $BACKUP_CONFIG_TEMPLATE_PATH \
+              --txns-to-skip $TXNS_TO_SKIP \
+              --start-version ${{ steps.parse-job.outputs.begin }} \
+              --end-version ${{ steps.parse-job.outputs.end }} \
+              \
+              --lazy-quit \
+              --target-db-dir db \
+              --concurrent-downloads 8 \
+              --replay-concurrency-level 8 \
+              \
+              && exit 0 || true # exit 0 if successful, otherwise retry
+          done
+          exit(1)
