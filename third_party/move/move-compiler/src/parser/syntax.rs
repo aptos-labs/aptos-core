@@ -1935,6 +1935,14 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                             );
                             Exp_::Block(sequence)
                         },
+                        // x += e
+                        // =>
+                        // x = x + e
+                        x_ @ Exp_::Name(sp!(_, NameAccessChain_::One(_)), _) => {
+                            let x = sp(lhs_loc, x_);
+                            let rhs_expanded = sp(rhs_loc, Exp_::BinopExp(Box::new(x.clone()), sp(op_loc, BinOp_::Add), rhs));
+                            Exp_::Assign(Box::new(x), Box::new(rhs_expanded))
+                        },
                         // e1 += e2
                         // =>
                         // { let t = e1; t = t + e2 }
