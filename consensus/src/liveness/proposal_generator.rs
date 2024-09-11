@@ -553,12 +553,12 @@ impl ProposalGenerator {
                 //         false
                 //     }
                 // }));
-                let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref(), &self.randomness_info.lock());
-                for entry in entry_map {
-                    if !self.randomness_info.lock().contains(&entry) {
-                        self.randomness_info.lock().insert(entry);
-                    }
-                }
+                let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref(), &HashSet::new());
+                // for entry in entry_map {
+                //     if !self.randomness_info.lock().contains(&entry) {
+                //         self.randomness_info.lock().insert(entry);
+                //     }
+                // }
                 result
                 // if !b.is_some_and(|b| b) {
                 //     let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
@@ -604,12 +604,12 @@ impl ProposalGenerator {
                     //     }
                     // });
                     //if !b {
-                        let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns), &self.randomness_info.lock());
-                        for entry in entry_map {
-                            if !self.randomness_info.lock().contains(&entry) {
-                                self.randomness_info.lock().insert(entry);
-                            }
-                        }
+                        let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns), &HashSet::new());
+                        // for entry in entry_map {
+                        //     if !self.randomness_info.lock().contains(&entry) {
+                        //         self.randomness_info.lock().insert(entry);
+                        //     }
+                        // }
                         result
                     // } else {
                     //     true

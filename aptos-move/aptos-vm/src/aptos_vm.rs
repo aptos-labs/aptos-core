@@ -2577,7 +2577,7 @@ impl AptosVM {
             }
         }
         let elapsed = now.elapsed();
-        info!("VM randomness: {:.3?}", elapsed);
+        info!("VM randomness: {:.3?}, num txns:{}", elapsed, signed_transactions.len());
         (false, None)
     }
 
