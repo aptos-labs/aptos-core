@@ -401,7 +401,7 @@ pub fn assert_accounts_match(
             .read_account_resource(account.account())
             .expect("account resource must exist");
         let coin_store_resource = executor
-            .read_coin_store_resource(account.account())
+            .read_apt_coin_store_resource(account.account())
             .expect("account balance resource must exist");
         let auth_key = account.account().auth_key();
         prop_assert_eq!(
