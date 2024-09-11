@@ -1,10 +1,15 @@
 use aptos_db::{
-    db::{test_helper, test_helper::arb_blocks_to_commit},
+    db::{
+        gather_state_updates_until_last_checkpoint, test_helper, test_helper::arb_blocks_to_commit,
+    },
+    transaction_store,
+    transaction_store::TransactionStore,
     AptosDB,
 };
+use aptos_storage_interface::{cached_state_view::ShardedStateCache, DbWriter};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::{TransactionToCommit, Version};
-use proptest::{prelude::*, test_runner::TestRunner};
+use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use std::time::Instant;
 
 fn main() {
@@ -33,6 +38,7 @@ fn main() {
     // 保存交易
     for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
         test_helper::update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
+        let base_checkpoint = in_memory_state.clone(); // 添加这一行
         db.save_transactions(
             txns_to_commit,
             cur_ver,
@@ -40,8 +46,8 @@ fn main() {
             Some(ledger_info_with_sigs),
             true, // sync commit
             in_memory_state.clone(),
-            None,
-            None,
+            gather_state_updates_until_last_checkpoint(cur_ver, &in_memory_state, txns_to_commit),
+            Some(&ShardedStateCache::default()),
         )
         .unwrap();
         cur_ver += txns_to_commit.len() as u64;

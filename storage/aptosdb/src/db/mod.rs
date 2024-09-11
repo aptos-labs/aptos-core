@@ -93,7 +93,7 @@ pub struct AptosDB {
     pub(crate) ledger_db: Arc<LedgerDb>,
     pub(crate) state_kv_db: Arc<StateKvDb>,
     pub(crate) event_store: Arc<EventStore>,
-    pub(crate) state_store: Arc<StateStore>,
+    pub state_store: Arc<StateStore>,
     pub(crate) transaction_store: Arc<TransactionStore>,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,

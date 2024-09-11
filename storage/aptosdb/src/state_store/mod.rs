@@ -89,7 +89,7 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
 
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 
-pub(crate) struct StateDb {
+pub struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_kv_db: Arc<StateKvDb>,
@@ -99,7 +99,7 @@ pub(crate) struct StateDb {
     pub skip_usage: bool,
 }
 
-pub(crate) struct StateStore {
+pub struct StateStore {
     pub state_db: Arc<StateDb>,
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
