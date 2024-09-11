@@ -514,13 +514,13 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        let now = Instant::now();
         // daniel todo: deal with max_txns_from_block_to_execute in check_randomness
         // Check if the block contains any randomness transaction
-        let mut duration1: Duration = Default::default();
-        let mut duration2: Duration = Default::default();
-        let maybe_require_randomness = skip_non_rand_blocks.then(|| {
-            ref_txns.par_iter().any(|txns| {
+        let maybe_require_randomness = if skip_non_rand_blocks {
+            let now = Instant::now();
+            let mut duration1: Duration = Default::default();
+            let mut duration2: Duration = Default::default();
+            let mut x = ref_txns.par_iter().any(|txns| {
                 // if let Some(txns) = txns.as_ref() {
                 //     for txn in txns {
                 //         let entry_fn = match txn.payload() {
@@ -558,8 +558,6 @@ impl ProposalGenerator {
                 // }));
                 let now = Instant::now();
                 let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref(), &HashSet::new());
-                duration1 = now.elapsed();
-                info!("Check randomness ref_txns: {:.3?}", duration1);
                 // for entry in entry_map {
                 //     if !self.randomness_info.lock().contains(&entry) {
                 //         self.randomness_info.lock().insert(entry);
@@ -577,9 +575,10 @@ impl ProposalGenerator {
                 // } else {
                 //     true
                 // }
-            })
-            |
-                {
+            });
+            duration1 = now.elapsed();
+            info!("Check randomness ref_txns: {:.3?}", duration1);
+            if !x {
                     // for txn in &inline_txns {
                     //     let entry_fn = match txn.payload() {
                     //         TransactionPayload::EntryFunction(entry) => Some(entry),
@@ -619,14 +618,17 @@ impl ProposalGenerator {
                         //         self.randomness_info.lock().insert(entry);
                         //     }
                         // }
-                        result
+                    x = result;
                     // } else {
                     //     true
                     // }
                 }
-        });
-        let elapsed = now.elapsed();
-        info!("Check randomness: {:.3?}, duration 1:{:.3?}, duration 2:{:.3?}", elapsed, duration1, duration2);
+            let elapsed = now.elapsed();
+            info!("Check randomness: {:.3?}, duration 1:{:.3?}, duration 2:{:.3?}", elapsed, duration1, duration2);
+            Some(true)
+        } else {
+            None
+        };
 
         observe_block(timestamp, BlockStage::CHECKED_RAND);
 
