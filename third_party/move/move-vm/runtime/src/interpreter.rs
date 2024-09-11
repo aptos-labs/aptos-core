@@ -70,14 +70,17 @@ pub(crate) struct Interpreter {
     active_modules: HashSet<ModuleId>,
 }
 
-struct TypeWithLoader<'a, 'b> {
+struct TypeWithLoader<'a, 'b, 'c> {
     ty: &'a Type,
-    loader: &'b Loader,
+    resolver: &'b Resolver<'c>,
 }
 
-impl<'a, 'b> TypeView for TypeWithLoader<'a, 'b> {
+impl<'a, 'b, 'c> TypeView for TypeWithLoader<'a, 'b, 'c> {
     fn to_type_tag(&self) -> TypeTag {
-        self.loader.type_to_type_tag(self.ty).unwrap()
+        self.resolver
+            .loader()
+            .type_to_type_tag(self.ty, self.resolver.module_storage())
+            .unwrap()
     }
 }
 
@@ -265,10 +268,10 @@ impl Interpreter {
                         .charge_call_generic(
                             module_id,
                             function.name(),
-                            function
-                                .ty_args()
-                                .iter()
-                                .map(|ty| TypeWithLoader { ty, loader }),
+                            function.ty_args().iter().map(|ty| TypeWithLoader {
+                                ty,
+                                resolver: &resolver,
+                            }),
                             self.operand_stack
                                 .last_n(function.param_tys().len())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
@@ -504,10 +507,7 @@ impl Interpreter {
         let native_function = function.get_native()?;
 
         gas_meter.charge_native_function_before_execution(
-            ty_args.iter().map(|ty| TypeWithLoader {
-                ty,
-                loader: resolver.loader(),
-            }),
+            ty_args.iter().map(|ty| TypeWithLoader { ty, resolver }),
             args.iter(),
         )?;
 
@@ -773,10 +773,7 @@ impl Interpreter {
                 if let Some(bytes_loaded) = load_res {
                     gas_meter.charge_load_resource(
                         addr,
-                        TypeWithLoader {
-                            ty,
-                            loader: resolver.loader(),
-                        },
+                        TypeWithLoader { ty, resolver },
                         gv.view(),
                         bytes_loaded,
                     )?;
@@ -802,14 +799,12 @@ impl Interpreter {
         gas_meter.charge_borrow_global(
             is_mut,
             is_generic,
-            TypeWithLoader {
-                ty,
-                loader: resolver.loader(),
-            },
+            TypeWithLoader { ty, resolver },
             res.is_ok(),
         )?;
         self.check_access(
             resolver.loader(),
+            resolver.module_storage(),
             if is_mut {
                 AccessKind::Writes
             } else {
@@ -827,6 +822,7 @@ impl Interpreter {
     fn check_access(
         &self,
         loader: &Loader,
+        module_storage: &dyn ModuleStorage,
         kind: AccessKind,
         ty: &Type,
         addr: AccountAddress,
@@ -841,10 +837,11 @@ impl Interpreter {
                 )
             },
         };
-        let struct_name = loader
-            .runtime_environment()
-            .struct_name_index_map()
-            .idx_to_struct_name(struct_idx);
+        let struct_name_index_map = match loader {
+            Loader::V1(loader) => &loader.name_cache,
+            Loader::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+        };
+        let struct_name = struct_name_index_map.idx_to_struct_name(struct_idx);
         if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
             self.access_control.check_access(access)?
         }
@@ -863,15 +860,14 @@ impl Interpreter {
     ) -> PartialVMResult<()> {
         let gv = Self::load_resource(resolver, data_store, gas_meter, addr, ty)?;
         let exists = gv.exists()?;
-        gas_meter.charge_exists(
-            is_generic,
-            TypeWithLoader {
-                ty,
-                loader: resolver.loader(),
-            },
-            exists,
+        gas_meter.charge_exists(is_generic, TypeWithLoader { ty, resolver }, exists)?;
+        self.check_access(
+            resolver.loader(),
+            resolver.module_storage(),
+            AccessKind::Reads,
+            ty,
+            addr,
         )?;
-        self.check_access(resolver.loader(), AccessKind::Reads, ty, addr)?;
         self.operand_stack.push(Value::bool(exists))?;
         Ok(())
     }
@@ -892,25 +888,21 @@ impl Interpreter {
             Ok(resource) => {
                 gas_meter.charge_move_from(
                     is_generic,
-                    TypeWithLoader {
-                        ty,
-                        loader: resolver.loader(),
-                    },
+                    TypeWithLoader { ty, resolver },
                     Some(&resource),
                 )?;
-                self.check_access(resolver.loader(), AccessKind::Writes, ty, addr)?;
+                self.check_access(
+                    resolver.loader(),
+                    resolver.module_storage(),
+                    AccessKind::Writes,
+                    ty,
+                    addr,
+                )?;
                 resource
             },
             Err(err) => {
                 let val: Option<&Value> = None;
-                gas_meter.charge_move_from(
-                    is_generic,
-                    TypeWithLoader {
-                        ty,
-                        loader: resolver.loader(),
-                    },
-                    val,
-                )?;
+                gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, resolver }, val)?;
                 return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
             },
         };
@@ -936,23 +928,23 @@ impl Interpreter {
             Ok(()) => {
                 gas_meter.charge_move_to(
                     is_generic,
-                    TypeWithLoader {
-                        ty,
-                        loader: resolver.loader(),
-                    },
+                    TypeWithLoader { ty, resolver },
                     gv.view().unwrap(),
                     true,
                 )?;
-                self.check_access(resolver.loader(), AccessKind::Writes, ty, addr)?;
+                self.check_access(
+                    resolver.loader(),
+                    resolver.module_storage(),
+                    AccessKind::Writes,
+                    ty,
+                    addr,
+                )?;
                 Ok(())
             },
             Err((err, resource)) => {
                 gas_meter.charge_move_to(
                     is_generic,
-                    TypeWithLoader {
-                        ty,
-                        loader: resolver.loader(),
-                    },
+                    TypeWithLoader { ty, resolver },
                     &resource,
                     false,
                 )?;
@@ -1002,7 +994,7 @@ impl Interpreter {
     fn debug_print_frame<B: Write>(
         &self,
         buf: &mut B,
-        loader: &Loader,
+        resolver: &Resolver,
         idx: usize,
         frame: &Frame,
     ) -> PartialVMResult<()> {
@@ -1017,7 +1009,11 @@ impl Interpreter {
         if !ty_args.is_empty() {
             let mut ty_tags = vec![];
             for ty in ty_args {
-                ty_tags.push(loader.type_to_type_tag(ty)?);
+                ty_tags.push(
+                    resolver
+                        .loader()
+                        .type_to_type_tag(ty, resolver.module_storage())?,
+                );
             }
             debug_write!(buf, "<")?;
             let mut it = ty_tags.iter();
@@ -1065,11 +1061,11 @@ impl Interpreter {
     pub(crate) fn debug_print_stack_trace<B: Write>(
         &self,
         buf: &mut B,
-        loader: &Loader,
+        resolver: &Resolver,
     ) -> PartialVMResult<()> {
         debug_writeln!(buf, "Call Stack:")?;
         for (i, frame) in self.call_stack.0.iter().enumerate() {
-            self.debug_print_frame(buf, loader, i, frame)?;
+            self.debug_print_frame(buf, resolver, i, frame)?;
         }
         debug_writeln!(buf, "Operand Stack:")?;
         for (idx, val) in self.operand_stack.value.iter().enumerate() {
@@ -2305,10 +2301,7 @@ impl Frame {
 
         macro_rules! make_ty {
             ($ty:expr) => {
-                TypeWithLoader {
-                    ty: $ty,
-                    loader: resolver.loader(),
-                }
+                TypeWithLoader { ty: $ty, resolver }
             };
         }
 
@@ -3043,10 +3036,7 @@ impl Frame {
                             self.function.ty_args(),
                         )?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        gas_meter.charge_vec_len(TypeWithLoader {
-                            ty,
-                            loader: resolver.loader(),
-                        })?;
+                        gas_meter.charge_vec_len(TypeWithLoader { ty, resolver })?;
                         let value = vec_ref.len(ty)?;
                         interpreter.operand_stack.push(value)?;
                     },

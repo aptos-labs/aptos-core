@@ -48,8 +48,11 @@ use aptos_vm::{
     move_vm_ext::{flush_warm_vm_cache, SessionId},
     AptosVM,
 };
+use aptos_vm_environment::environment::Environment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
+use aptos_vm_types::{
+    module_and_script_storage::AsAptosCodeStorage, storage::change_set_configs::ChangeSetConfigs,
+};
 use clap::Parser;
 use move_binary_format::{
     access::ModuleAccess,
@@ -66,7 +69,10 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    WithRuntimeEnvironment,
+};
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -75,6 +81,7 @@ use std::{
     collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use url::Url;
 use walkdir::WalkDir;
@@ -461,9 +468,10 @@ fn add_script_execution_hash(
  **************************************************************************************************/
 fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
     flush_warm_vm_cache();
-    let vm = AptosVM::new_for_gov_sim(&state_view);
+    let env = Arc::new(Environment::new(&state_view, true, None));
+    let vm = AptosVM::new_with_environment(env.clone(), &state_view);
     let resolver = state_view.as_move_resolver();
-    let module_storage = vm.as_aptos_code_storage(&state_view);
+    let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
     let gas_schedule =
         GasScheduleV2::fetch_config(&state_view).context("failed to fetch gas schedule v2")?;
@@ -614,11 +622,12 @@ pub async fn simulate_multistep_proposal(
         // The warm vm cache also needs to be explicitly flushed as it cannot detect the
         // patches we performed.
         flush_warm_vm_cache();
-        let vm = AptosVM::new_for_gov_sim(&state_view);
+        let env = Arc::new(Environment::new(&state_view, true, None));
+        let vm = AptosVM::new_with_environment(env.clone(), &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = vm.as_aptos_code_storage(&state_view);
+        let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
         let (_vm_status, vm_output) = vm.execute_user_transaction(
             &resolver,

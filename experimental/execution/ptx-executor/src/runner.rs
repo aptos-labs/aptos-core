@@ -20,9 +20,15 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm::AptosVM;
+use aptos_vm_environment::environment::Environment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
+use move_vm_runtime::WithRuntimeEnvironment;
 use rayon::Scope;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{
+    mpsc::{channel, Receiver, Sender},
+    Arc,
+};
 
 pub(crate) struct PtxRunner;
 
@@ -233,9 +239,10 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "block_total"]);
         // Share a VM in the same thread.
         // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
+        let env = Arc::new(Environment::new(&self.base_view, false, None));
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new(&self.base_view)
+            AptosVM::new_with_environment(env.clone(), &self.base_view)
         };
 
         loop {
@@ -260,7 +267,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
 
-                    let code_storage = vm.as_aptos_code_storage(&state_view);
+                    let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(

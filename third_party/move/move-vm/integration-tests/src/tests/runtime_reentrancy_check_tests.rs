@@ -10,6 +10,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction, AsUnsyncModuleStorage,
+    RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -157,9 +158,10 @@ fn runtime_reentrancy_check() {
     let args: Vec<Vec<u8>> = vec![];
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
 
+    let runtime_environment = RuntimeEnvironment::new(natives.clone());
     let vm = MoveVM::new(natives);
     let mut sess = vm.new_session(&storage);
-    let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
+    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
     let traversal_storage = TraversalStorage::new();
 
     // Call stack look like following:

@@ -12,36 +12,28 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
 };
+use aptos_vm_environment::environment::SharedEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
-    environment::Environment,
     module_and_script_storage::code_storage::AptosCodeStorage,
     resolver::{ExecutorView, ResourceGroupView},
 };
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
-use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
-use std::sync::Arc;
 
 pub(crate) struct AptosExecutorTask {
     vm: AptosVM,
     id: StateViewId,
 }
 
-impl WithRuntimeEnvironment for AptosExecutorTask {
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.vm.runtime_environment()
-    }
-}
-
 impl ExecutorTask for AptosExecutorTask {
-    type Environment = Arc<Environment>;
+    type Environment = SharedEnvironment;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
     fn init(env: Self::Environment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new_with_environment(env, state_view, false);
+        let vm = AptosVM::new_with_environment(env.0, state_view);
         let id = state_view.id();
         Self { vm, id }
     }

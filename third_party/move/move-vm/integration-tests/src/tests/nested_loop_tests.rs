@@ -6,7 +6,7 @@ use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
-    AsUnsyncModuleStorage, TemporaryModuleStorage,
+    AsUnsyncModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -39,29 +39,27 @@ fn test_publish_module_with_nested_loops() {
     // Should succeed with max_loop_depth = 2
     {
         let storage = InMemoryStorage::new();
-        let vm = MoveVM::new_with_config(
-            move_stdlib::natives::all_natives(
-                AccountAddress::from_hex_literal("0x1").unwrap(),
-                move_stdlib::natives::GasParameters::zeros(),
-            ),
-            VMConfig {
-                verifier_config: VerifierConfig {
-                    max_loop_depth: Some(2),
-                    ..Default::default()
-                },
+        let natives = move_stdlib::natives::all_natives(
+            AccountAddress::from_hex_literal("0x1").unwrap(),
+            move_stdlib::natives::GasParameters::zeros(),
+        );
+        let vm_config = VMConfig {
+            verifier_config: VerifierConfig {
+                max_loop_depth: Some(2),
                 ..Default::default()
             },
-        );
+            ..Default::default()
+        };
+        let runtime_environment =
+            RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
+        let vm = MoveVM::new_with_config(natives, vm_config);
 
         let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
-            let result = TemporaryModuleStorage::new(
-                &TEST_ADDR,
-                vm.runtime_environment(),
-                &module_storage,
-                vec![m_blob.clone().into()],
-            );
+            let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+            let result = StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
+                .clone()
+                .into()]);
             assert!(result.is_ok());
         } else {
             #[allow(deprecated)]
@@ -73,29 +71,27 @@ fn test_publish_module_with_nested_loops() {
     // Should fail with max_loop_depth = 1
     {
         let storage = InMemoryStorage::new();
-        let vm = MoveVM::new_with_config(
-            move_stdlib::natives::all_natives(
-                AccountAddress::from_hex_literal("0x1").unwrap(),
-                move_stdlib::natives::GasParameters::zeros(),
-            ),
-            VMConfig {
-                verifier_config: VerifierConfig {
-                    max_loop_depth: Some(1),
-                    ..Default::default()
-                },
+        let natives = move_stdlib::natives::all_natives(
+            AccountAddress::from_hex_literal("0x1").unwrap(),
+            move_stdlib::natives::GasParameters::zeros(),
+        );
+        let vm_config = VMConfig {
+            verifier_config: VerifierConfig {
+                max_loop_depth: Some(1),
                 ..Default::default()
             },
-        );
+            ..Default::default()
+        };
+        let runtime_environment =
+            RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
+        let vm = MoveVM::new_with_config(natives, vm_config);
 
         let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
-            let result = TemporaryModuleStorage::new(
-                &TEST_ADDR,
-                vm.runtime_environment(),
-                &module_storage,
-                vec![m_blob.clone().into()],
-            );
+            let module_storage = storage.as_unsync_module_storage(&runtime_environment);
+            let result = StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
+                .clone()
+                .into()]);
             assert!(result.is_err());
         } else {
             #[allow(deprecated)]
@@ -132,20 +128,21 @@ fn test_run_script_with_nested_loops() {
     // Should succeed with max_loop_depth = 2
     {
         let storage = InMemoryStorage::new();
-        let vm = MoveVM::new_with_config(
-            move_stdlib::natives::all_natives(
-                AccountAddress::from_hex_literal("0x1").unwrap(),
-                move_stdlib::natives::GasParameters::zeros(),
-            ),
-            VMConfig {
-                verifier_config: VerifierConfig {
-                    max_loop_depth: Some(2),
-                    ..Default::default()
-                },
+        let natives = move_stdlib::natives::all_natives(
+            AccountAddress::from_hex_literal("0x1").unwrap(),
+            move_stdlib::natives::GasParameters::zeros(),
+        );
+        let vm_config = VMConfig {
+            verifier_config: VerifierConfig {
+                max_loop_depth: Some(2),
                 ..Default::default()
             },
-        );
-        let code_storage = storage.as_unsync_code_storage(vm.runtime_environment());
+            ..Default::default()
+        };
+        let runtime_environment =
+            RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
+        let vm = MoveVM::new_with_config(natives, vm_config);
+        let code_storage = storage.as_unsync_code_storage(&runtime_environment);
 
         let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
@@ -163,20 +160,21 @@ fn test_run_script_with_nested_loops() {
     // Should fail with max_loop_depth = 1
     {
         let storage = InMemoryStorage::new();
-        let vm = MoveVM::new_with_config(
-            move_stdlib::natives::all_natives(
-                AccountAddress::from_hex_literal("0x1").unwrap(),
-                move_stdlib::natives::GasParameters::zeros(),
-            ),
-            VMConfig {
-                verifier_config: VerifierConfig {
-                    max_loop_depth: Some(1),
-                    ..Default::default()
-                },
+        let natives = move_stdlib::natives::all_natives(
+            AccountAddress::from_hex_literal("0x1").unwrap(),
+            move_stdlib::natives::GasParameters::zeros(),
+        );
+        let vm_config = VMConfig {
+            verifier_config: VerifierConfig {
+                max_loop_depth: Some(1),
                 ..Default::default()
             },
-        );
-        let code_storage = storage.as_unsync_code_storage(vm.runtime_environment());
+            ..Default::default()
+        };
+        let runtime_environment =
+            RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
+        let vm = MoveVM::new_with_config(natives, vm_config);
+        let code_storage = storage.as_unsync_code_storage(&runtime_environment);
 
         let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];

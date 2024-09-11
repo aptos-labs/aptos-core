@@ -10,7 +10,9 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, RuntimeEnvironment,
+};
 use move_vm_test_utils::{BlankStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -18,6 +20,7 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 
 #[test]
 fn call_non_existent_module() {
+    let runtime_environment = RuntimeEnvironment::new(vec![]);
     let vm = MoveVM::new(vec![]);
     let storage = BlankStorage;
 
@@ -25,7 +28,7 @@ fn call_non_existent_module() {
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
+    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
 
     let err = sess
         .execute_function_bypass_visibility(
@@ -58,13 +61,14 @@ fn call_non_existent_function() {
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     storage.add_module_bytes(module_id.address(), module_id.name(), blob.into());
 
+    let runtime_environment = RuntimeEnvironment::new(vec![]);
     let vm = MoveVM::new(vec![]);
     let mut sess = vm.new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
 
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
+    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
 
     let err = sess
         .execute_function_bypass_visibility(
