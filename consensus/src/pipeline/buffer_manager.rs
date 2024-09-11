@@ -64,7 +64,6 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub const COMMIT_VOTE_BROADCAST_INTERVAL_MS: u64 = 1500;
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 30000;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
-pub const PENDING_COMMIT_VOTES_SOFT_LIMIT: usize = 50;
 
 #[derive(Debug, Default)]
 pub struct ResetAck {}
@@ -168,11 +167,8 @@ pub struct BufferManager {
     pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
 
     // If the buffer manager receives a commit vote for a block that is not in buffer items, then
-    // the vote will be cached. We can cache upto 50 blocks (soft limit), and upto 150 commit votes per block.
-    // For each block, we also store the last timestamp at which a commit vote is added.
-    // If the number of blocks exceeds the limit (50) and a new block is to be added, out of the blocks that were
-    // last accessed 100ms ago, the block with the least voting power will be removed.
-    pending_commit_votes: HashMap<HashValue, (HashMap<AccountAddress, CommitVote>, Instant)>,
+    // the vote will be cached. We can cache upto 100 blocks, and upto 150 commit votes per block.
+    pending_commit_votes: BTreeMap<Round, HashMap<AccountAddress, CommitVote>>,
 }
 
 impl BufferManager {
@@ -266,7 +262,7 @@ impl BufferManager {
             consensus_publisher,
 
             pending_commit_proofs: BTreeMap::new(),
-            pending_commit_votes: HashMap::new(),
+            pending_commit_votes: BTreeMap::new(),
         }
     }
 
@@ -348,13 +344,14 @@ impl BufferManager {
         let round = vote.commit_info().round();
         let epoch = vote.commit_info().epoch();
 
-        // Store the commit vote only if it is for a future round.
-        if (epoch > self.epoch_state.epoch)
-            || (epoch == self.epoch_state.epoch && round > self.highest_committed_round)
+        // Store the commit vote only if it is for one of the next 100 rounds in the same epoch.
+        // As the buffer manager is reset between epoch, we don't benefit from storing the pending commit votes
+        // for the next epoch.
+        if epoch == self.epoch_state.epoch
+            && round > self.highest_committed_round
+            && self.highest_committed_round + 100 > round
         {
-            if let Some((votes, latest_access_timestamp)) =
-                self.pending_commit_votes.get_mut(&block_id)
-            {
+            if let Some(votes) = self.pending_commit_votes.get_mut(&round) {
                 if votes.len() < 150
                     && self
                         .epoch_state
@@ -362,9 +359,6 @@ impl BufferManager {
                         .get_voting_power(&vote.author())
                         .is_some()
                 {
-                    if !votes.contains_key(&vote.author()) {
-                        *latest_access_timestamp = Instant::now();
-                    }
                     votes.insert(vote.author(), vote);
                     true
                 } else {
@@ -376,13 +370,9 @@ impl BufferManager {
                     false
                 }
             } else {
-                if self.pending_commit_votes.len() > PENDING_COMMIT_VOTES_SOFT_LIMIT {
-                    self.try_evict_pending_commit_votes();
-                }
                 let mut votes = HashMap::new();
                 votes.insert(vote.author(), vote);
-                self.pending_commit_votes
-                    .insert(block_id, (votes, Instant::now()));
+                self.pending_commit_votes.insert(round, votes);
                 true
             }
         } else {
@@ -394,42 +384,6 @@ impl BufferManager {
                 "Commit vote too old, ignored."
             );
             false
-        }
-    }
-
-    fn try_evict_pending_commit_votes(&mut self) {
-        self.pending_commit_votes
-            .retain(|_, (_, last_accessed_timestamp)| {
-                last_accessed_timestamp.elapsed() < Duration::from_secs(10)
-            });
-        if self.pending_commit_votes.len() <= PENDING_COMMIT_VOTES_SOFT_LIMIT {
-            return;
-        }
-        let old_pending_blocks = self
-            .pending_commit_votes
-            .iter()
-            .filter_map(|(hash, (votes, last_accessed_timestamp))| {
-                if last_accessed_timestamp.elapsed() > Duration::from_millis(100) {
-                    let voting_power = votes
-                        .iter()
-                        .map(|(author, _)| {
-                            self.epoch_state
-                                .verifier
-                                .get_voting_power(author)
-                                .unwrap_or(0)
-                        })
-                        .sum::<u64>();
-                    Some((*hash, voting_power))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        if let Some((hash, _)) = old_pending_blocks
-            .iter()
-            .min_by_key(|(_, voting_power)| *voting_power)
-        {
-            self.pending_commit_votes.remove(hash);
         }
     }
 
@@ -483,9 +437,12 @@ impl BufferManager {
 
         let mut unverified_signatures = PartialSignatures::empty();
         if let Some(block) = ordered_blocks.last() {
-            if let Some((votes, _)) = self.pending_commit_votes.remove(&block.id()) {
+            if let Some(votes) = self.pending_commit_votes.remove(&block.round()) {
                 for vote in votes.values() {
-                    unverified_signatures.add_signature(vote.author(), vote.signature().clone());
+                    if vote.commit_info().id() == block.id() {
+                        unverified_signatures
+                            .add_signature(vote.author(), vote.signature().clone());
+                    }
                 }
             }
         }
@@ -1059,6 +1016,7 @@ impl BufferManager {
                 },
                 Some(Ok(round)) = self.persisting_phase_rx.next() => {
                     // see where `need_backpressure()` is called.
+                    self.pending_commit_votes.retain(|rnd, _| *rnd > round);
                     self.highest_committed_round = round
                 },
                 Some(rpc_request) = verified_commit_msg_rx.next() => {
