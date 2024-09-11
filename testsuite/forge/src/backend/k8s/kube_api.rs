@@ -61,299 +61,148 @@ where
 
 #[cfg(test)]
 pub mod mocks {
-    use super::*;
+    use super::ReadWrite;
     use crate::Result;
+    use aptos_infallible::Mutex;
     use async_trait::async_trait;
     use hyper::StatusCode;
-    use k8s_openapi::api::{
-        apps::v1::StatefulSet,
-        core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Secret, Service},
+    use k8s_openapi::Metadata;
+    use kube::{
+        api::{ObjectMeta, PostParams},
+        error::ErrorResponse,
+        Error as KubeError,
     };
-    use kube::{api::PostParams, error::ErrorResponse, Error as KubeError};
+    use std::{collections::BTreeMap, sync::Arc};
 
-    // Mock StatefulSet API
-
-    pub struct MockStatefulSetApi {
-        stateful_set: StatefulSet,
+    /// Generic k8s resource mock API where resource names are unique. Use it to mock namespaced resources or cluster-wide resources, but
+    /// not resources across multiple namespaces.
+    #[derive(Clone)]
+    pub struct MockK8sResourceApi<T> {
+        resources: Arc<Mutex<BTreeMap<String, T>>>,
     }
 
-    impl MockStatefulSetApi {
-        pub fn from_stateful_set(stateful_set: StatefulSet) -> Self {
-            MockStatefulSetApi { stateful_set }
+    impl<T> MockK8sResourceApi<T>
+    where
+        T: Clone + Metadata<Ty = ObjectMeta> + Send + Sync, // Ensure T has the necessary traits
+    {
+        pub fn new() -> Self {
+            MockK8sResourceApi {
+                resources: Arc::new(Mutex::new(BTreeMap::new())),
+            }
+        }
+
+        pub fn from_resource(resource: T) -> Self {
+            let resources = Arc::new(Mutex::new(BTreeMap::new()));
+            resources.lock().insert(
+                resource
+                    .metadata()
+                    .name
+                    .as_ref()
+                    .expect("Expected metadata to have name")
+                    .clone(),
+                resource.clone(),
+            );
+            MockK8sResourceApi { resources }
+        }
+
+        pub fn from_resources(resources_vec: Vec<T>) -> Self {
+            let resources = Arc::new(Mutex::new(BTreeMap::new()));
+            for resource in resources_vec {
+                resources.lock().insert(
+                    resource
+                        .metadata()
+                        .name
+                        .as_ref()
+                        .expect("Expected metadata to have name")
+                        .clone(),
+                    resource.clone(),
+                );
+            }
+            MockK8sResourceApi { resources }
         }
     }
 
     #[async_trait]
-    impl ReadWrite<StatefulSet> for MockStatefulSetApi {
-        async fn get(&self, name: &str) -> Result<StatefulSet, KubeError> {
-            if self.stateful_set.metadata.name == Some(name.to_string()) {
-                return Ok(self.stateful_set.clone());
-            }
-            return Err(KubeError::Api(ErrorResponse {
-                status: "failed".to_string(),
-                message: format!(
-                    "StatefulSet with name {} could not be found in {:?}",
-                    name, self.stateful_set
-                ),
-                reason: "not_found".to_string(),
-                code: 404,
-            }));
-        }
-
-        async fn create(
-            &self,
-            _pp: &PostParams,
-            stateful_set: &StatefulSet,
-        ) -> Result<StatefulSet, KubeError> {
-            if self.stateful_set.metadata.name == stateful_set.metadata.name {
-                return Err(KubeError::Api(ErrorResponse {
+    impl<T> ReadWrite<T> for MockK8sResourceApi<T>
+    where
+        T: Clone + Metadata<Ty = ObjectMeta> + Send + Sync, // Ensure T has the necessary traits
+    {
+        async fn get(&self, name: &str) -> Result<T, KubeError> {
+            let resources = self.resources.lock();
+            if let Some(resource) = resources.get(name) {
+                Ok(resource.clone())
+            } else {
+                Err(KubeError::Api(ErrorResponse {
                     status: "failed".to_string(),
-                    message: format!(
-                        "StatefulSet with same name already exists in {:?}",
-                        self.stateful_set
-                    ),
-                    reason: "already_exists".to_string(),
-                    code: 409,
-                }));
-            }
-            Ok(self.stateful_set.clone())
-        }
-    }
-
-    // Mock Pod API
-
-    pub struct MockPodApi {
-        pod: Pod,
-    }
-
-    impl MockPodApi {
-        pub fn from_pod(pod: Pod) -> Self {
-            MockPodApi { pod }
-        }
-    }
-
-    #[async_trait]
-    impl ReadWrite<Pod> for MockPodApi {
-        async fn get(&self, _name: &str) -> Result<Pod, KubeError> {
-            Ok(self.pod.clone())
-        }
-
-        async fn create(&self, _pp: &PostParams, _pod: &Pod) -> Result<Pod, KubeError> {
-            Ok(self.pod.clone())
-        }
-    }
-
-    // Mock ConfigMap API
-
-    pub struct MockConfigMapApi {
-        config_map: ConfigMap,
-    }
-
-    impl MockConfigMapApi {
-        pub fn from_config_map(config_map: ConfigMap) -> Self {
-            MockConfigMapApi { config_map }
-        }
-    }
-
-    #[async_trait]
-    impl ReadWrite<ConfigMap> for MockConfigMapApi {
-        async fn get(&self, name: &str) -> Result<ConfigMap, KubeError> {
-            if self.config_map.metadata.name == Some(name.to_string()) {
-                return Ok(self.config_map.clone());
-            }
-            return Err(KubeError::Api(ErrorResponse {
-                status: "failed".to_string(),
-                message: format!(
-                    "ConfigMap with name {} could not be found in {:?}",
-                    name, self.config_map
-                ),
-                reason: "not_found".to_string(),
-                code: 404,
-            }));
-        }
-
-        async fn create(
-            &self,
-            _pp: &PostParams,
-            config_map: &ConfigMap,
-        ) -> Result<ConfigMap, KubeError> {
-            if self.config_map.metadata.name == config_map.metadata.name {
-                return Err(KubeError::Api(ErrorResponse {
-                    status: "failed".to_string(),
-                    message: format!(
-                        "ConfigMap with same name already exists in {:?}",
-                        self.config_map
-                    ),
-                    reason: "already_exists".to_string(),
-                    code: 409,
-                }));
-            }
-            Ok(self.config_map.clone())
-        }
-    }
-
-    // Mock PersistentVolumeClaim API
-
-    pub struct MockPersistentVolumeClaimApi {
-        persistent_volume_claim: PersistentVolumeClaim,
-    }
-
-    impl MockPersistentVolumeClaimApi {
-        pub fn from_persistent_volume_claim(
-            persistent_volume_claim: PersistentVolumeClaim,
-        ) -> Self {
-            MockPersistentVolumeClaimApi {
-                persistent_volume_claim,
-            }
-        }
-    }
-
-    #[async_trait]
-    impl ReadWrite<PersistentVolumeClaim> for MockPersistentVolumeClaimApi {
-        async fn get(&self, name: &str) -> Result<PersistentVolumeClaim, KubeError> {
-            if self.persistent_volume_claim.metadata.name == Some(name.to_string()) {
-                return Ok(self.persistent_volume_claim.clone());
-            }
-            return Err(KubeError::Api(ErrorResponse {
-                status: "failed".to_string(),
-                message: format!(
-                    "PersistentVolumeClaim with name {} could not be found in {:?}",
-                    name, self.persistent_volume_claim
-                ),
-                reason: "not_found".to_string(),
-                code: 404,
-            }));
-        }
-
-        async fn create(
-            &self,
-            _pp: &PostParams,
-            persistent_volume_claim: &PersistentVolumeClaim,
-        ) -> Result<PersistentVolumeClaim, KubeError> {
-            if self.persistent_volume_claim.metadata.name == persistent_volume_claim.metadata.name {
-                return Err(KubeError::Api(ErrorResponse {
-                    status: "failed".to_string(),
-                    message: format!(
-                        "PersistentVolumeClaim with same name already exists in {:?}",
-                        self.persistent_volume_claim
-                    ),
-                    reason: "already_exists".to_string(),
-                    code: 409,
-                }));
-            }
-            Ok(self.persistent_volume_claim.clone())
-        }
-    }
-
-    // Mock Service API
-
-    pub struct MockServiceApi {
-        service: Service,
-    }
-
-    impl MockServiceApi {
-        pub fn from_service(service: Service) -> Self {
-            MockServiceApi { service }
-        }
-    }
-
-    #[async_trait]
-    impl ReadWrite<Service> for MockServiceApi {
-        async fn get(&self, name: &str) -> Result<Service, KubeError> {
-            if self.service.metadata.name == Some(name.to_string()) {
-                return Ok(self.service.clone());
-            }
-            return Err(KubeError::Api(ErrorResponse {
-                status: "failed".to_string(),
-                message: format!(
-                    "Service with name {} could not be found in {:?}",
-                    name, self.service
-                ),
-                reason: "not_found".to_string(),
-                code: 404,
-            }));
-        }
-
-        async fn create(&self, _pp: &PostParams, service: &Service) -> Result<Service, KubeError> {
-            if self.service.metadata.name == service.metadata.name {
-                return Err(KubeError::Api(ErrorResponse {
-                    status: "failed".to_string(),
-                    message: format!(
-                        "Service with same name already exists in {:?}",
-                        self.service
-                    ),
-                    reason: "already_exists".to_string(),
-                    code: 409,
-                }));
-            }
-            Ok(self.service.clone())
-        }
-    }
-
-    // Mock Service API
-    pub struct MockSecretApi {
-        secret: Option<Secret>,
-    }
-
-    impl MockSecretApi {
-        pub fn from_secret(secret: Option<Secret>) -> Self {
-            MockSecretApi { secret }
-        }
-    }
-
-    #[async_trait]
-    impl ReadWrite<Secret> for MockSecretApi {
-        async fn get(&self, _name: &str) -> Result<Secret, KubeError> {
-            match self.secret {
-                Some(ref s) => Ok(s.clone()),
-                None => Err(KubeError::Api(ErrorResponse {
-                    status: "status".to_string(),
-                    message: "message".to_string(),
-                    reason: "reason".to_string(),
+                    message: format!("Resource with name {} could not be found", name),
+                    reason: "not_found".to_string(),
                     code: 404,
-                })),
+                }))
             }
         }
 
-        async fn create(&self, _pp: &PostParams, secret: &Secret) -> Result<Secret, KubeError> {
-            return Ok(secret.clone());
+        async fn create(&self, _pp: &PostParams, resource: &T) -> Result<T, KubeError> {
+            let mut resources = self.resources.lock();
+            if resources.contains_key(
+                resource
+                    .metadata()
+                    .name
+                    .as_ref()
+                    .expect("Expected metadata to have name"),
+            ) {
+                return Err(KubeError::Api(ErrorResponse {
+                    status: "failed".to_string(),
+                    message: format!("Resource with same name already exists"),
+                    reason: "already_exists".to_string(),
+                    code: 409,
+                }));
+            }
+            resources.insert(
+                resource
+                    .metadata()
+                    .name
+                    .as_ref()
+                    .expect("Expected metadata to have name")
+                    .clone(),
+                resource.clone(),
+            );
+            Ok(resource.clone())
         }
     }
 
     // Mock API that always fails to create a new Namespace
 
-    pub struct FailedNamespacesApi {
+    pub struct FailedK8sResourceApi {
         status_code: u16,
     }
 
-    impl FailedNamespacesApi {
+    impl FailedK8sResourceApi {
         pub fn from_status_code(status_code: u16) -> Self {
-            FailedNamespacesApi { status_code }
+            FailedK8sResourceApi { status_code }
         }
     }
 
     #[async_trait]
-    impl ReadWrite<Namespace> for FailedNamespacesApi {
-        async fn get(&self, _name: &str) -> Result<Namespace, KubeError> {
+    impl<T> ReadWrite<T> for FailedK8sResourceApi
+    where
+        T: Clone + Metadata<Ty = ObjectMeta> + Send + Sync, // Ensure T has the necessary traits
+    {
+        async fn get(&self, _name: &str) -> Result<T, KubeError> {
             let status = StatusCode::from_u16(self.status_code).unwrap();
             Err(KubeError::Api(ErrorResponse {
                 status: status.to_string(),
                 code: status.as_u16(),
-                message: "Failed to get namespace".to_string(),
+                message: "Failed to get resource".to_string(),
                 reason: "Failed to parse error data".into(),
             }))
         }
 
-        async fn create(
-            &self,
-            _pp: &PostParams,
-            _namespace: &Namespace,
-        ) -> Result<Namespace, KubeError> {
+        async fn create(&self, _pp: &PostParams, _resource: &T) -> Result<T, KubeError> {
             let status = StatusCode::from_u16(self.status_code).unwrap();
             Err(KubeError::Api(ErrorResponse {
                 status: status.to_string(),
                 code: status.as_u16(),
-                message: "Failed to create namespace".to_string(),
+                message: "Failed to create resource".to_string(),
                 reason: "Failed to parse error data".into(),
             }))
         }
