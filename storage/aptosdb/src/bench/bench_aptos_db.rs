@@ -30,7 +30,10 @@ fn main() {
         .lock()
         .current_state()
         .clone();
+    let _ancester = in_memory_state.current.clone();
     let mut cur_ver: Version = 0;
+    let mut updates = HashMap::new();
+    let mut snapshot_versions = vec![];
 
     // 开始计时
     let start = Instant::now();
@@ -38,18 +41,27 @@ fn main() {
     // 保存交易
     for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
         test_helper::update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-        let base_checkpoint = in_memory_state.clone(); // 添加这一行
+        let base_checkpoint = in_memory_state.clone();
+        let base_state_version = cur_ver.checked_sub(1);
+
+        println!("当前版本: {}", cur_ver);
+        println!("内存状态更新前: {:?}", in_memory_state);
+
         db.save_transactions(
             txns_to_commit,
             cur_ver,
-            cur_ver.checked_sub(1),
+            base_state_version,
             Some(ledger_info_with_sigs),
-            true, // sync commit
+            false, // sync commit
             in_memory_state.clone(),
             gather_state_updates_until_last_checkpoint(cur_ver, &in_memory_state, txns_to_commit),
-            Some(&ShardedStateCache::default()),
+            //Some(&ShardedStateCache::default()),
+            None,
         )
         .unwrap();
+
+        println!("内存状态更新后: {:?}", in_memory_state);
+
         cur_ver += txns_to_commit.len() as u64;
     }
 

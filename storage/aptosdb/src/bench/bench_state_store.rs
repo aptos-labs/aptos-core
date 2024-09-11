@@ -14,7 +14,7 @@ fn main() {
     let store = &db.state_store;
 
     // 生成测试数据
-    let input = arb_state_kv_sets(10000, 5, 5)
+    let input = arb_state_kv_sets(10000, 5, 5000)
         .new_tree(&mut TestRunner::default())
         .unwrap()
         .current();
