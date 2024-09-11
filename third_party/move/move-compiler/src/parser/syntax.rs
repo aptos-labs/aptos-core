@@ -1880,32 +1880,38 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                     Exp_::Assign(Box::new(lhs), rhs)
                 },
                 Tok::PlusEqual => {
-                    context.tokens.advance()?; // consume the "+="
+                    let op_loc = context.tokens.advance_with_loc()?; // consume the "+="
                     let rhs = Box::new(parse_exp(context)?);
                     let rhs_loc = rhs.loc;
                     let end_loc = context.tokens.previous_end_loc();
+                    // locaion of the entire lhs += rhs
                     let block_loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
                     let sp!(lhs_loc, lhs_) = lhs;
                     match lhs_ {
+                        // *e1 += e2
+                        // { let t = *e1; *t = *t + e2 }
                         Exp_::Dereference(lhs_inner) => {
-                            let use_decl = vec![];
-                            let tmp_name = Symbol::from("__lhs");
-                            let bind_ = Bind_::Var(Var(sp(lhs_loc, tmp_name)));
-                            let bind_ls = sp(lhs_loc, vec![sp(lhs_loc, bind_)]);
-                            let tmp = Exp_::Name(sp(lhs_loc, NameAccessChain_::One(sp(lhs_loc, tmp_name))), None);
+                            let lhs_inner_loc = lhs_inner.loc;
+                            let tmp_name = Symbol::from("__t");
+                            // let t = *e1;
+                            let bind_var = sp(lhs_loc, Bind_::Var(Var(sp(lhs_loc, tmp_name))));
+                            let bind_ls = sp(lhs_loc, vec![bind_var]);
                             let sequence_item = sp(lhs_loc, SequenceItem_::Bind(bind_ls, None, lhs_inner));
-                            let deref_tmp = sp(lhs_loc, Exp_::Dereference(Box::new(sp(lhs_loc, tmp.clone()))));
-                            let rhs_expanded_ = Exp_::BinopExp(Box::new(deref_tmp.clone()), sp(rhs.loc, BinOp_::Add), rhs);
-                            let rhs_expanded = sp(rhs_loc, rhs_expanded_);
-                            let exp_ = Exp_::Assign(Box::new(deref_tmp), Box::new(rhs_expanded));
-                            let exp = sp(block_loc, exp_);
+                            // *t
+                            let tmp = sp(lhs_inner_loc, Exp_::Name(sp(lhs_inner_loc, NameAccessChain_::One(sp(lhs_inner_loc, tmp_name))), None));
+                            let deref_tmp = sp(lhs_loc, Exp_::Dereference(Box::new(tmp)));
+                            // *t + e2
+                            let rhs_expanded = sp(rhs_loc, Exp_::BinopExp(Box::new(deref_tmp.clone()), sp(op_loc, BinOp_::Add), rhs));
+                            // *t = *t + e2
+                            let exp = sp(block_loc, Exp_::Assign(Box::new(deref_tmp), Box::new(rhs_expanded)));
+                            let use_decl = vec![];
                             let sequence = (use_decl, vec![sequence_item], Some(block_loc), Box::new(Some(exp)));
                             Exp_::Block(sequence)
                         }
                         _ => {
                             // let lhs = sp(lhs_loc, lhs_);
                             let use_decl = vec![];
-                            let tmp_name = Symbol::from("__lhs");
+                            let tmp_name = Symbol::from("__t");
                             let bind_ = Bind_::Var(Var(sp(lhs_loc, tmp_name)));
                             let bind_ls = sp(lhs_loc, vec![sp(lhs_loc, bind_)]);
                             let tmp = Exp_::Name(sp(lhs_loc, NameAccessChain_::One(sp(lhs_loc, tmp_name))), None);

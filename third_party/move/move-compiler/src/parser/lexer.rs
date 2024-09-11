@@ -422,6 +422,13 @@ impl<'input> Lexer<'input> {
         Ok(())
     }
 
+    pub fn advance_with_loc(&mut self) -> Result<Loc, Box<Diagnostic>> {
+        let start_loc = self.start_loc();
+        self.advance()?;
+        let end_loc = self.previous_end_loc();
+        Ok(make_loc(self.file_hash, start_loc, end_loc))
+    }
+
     // Replace the current token. The lexer will always match the longest token,
     // but sometimes the parser will prefer to replace it with a shorter one,
     // e.g., ">" instead of ">>".
