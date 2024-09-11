@@ -7,7 +7,7 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
-    gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter},
+    gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
     move_vm_ext::{
         session::user_transaction_sessions::{
@@ -68,6 +68,7 @@ use aptos_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::aptos_try;
+use aptos_vm_environment::environment::Environment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
@@ -75,10 +76,8 @@ use aptos_vm_types::{
         create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled,
         ChangeSetInterface, VMChangeSet,
     },
-    environment::Environment,
     module_and_script_storage::{
-        code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
-        AptosCodeStorageAdapter, AsAptosCodeStorage,
+        code_storage::AptosCodeStorage, module_storage::AptosModuleStorage, AsAptosCodeStorage,
     },
     module_write_set::ModuleWriteSet,
     output::VMOutput,
@@ -112,7 +111,7 @@ use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_linker_error,
     module_traversal::{TraversalContext, TraversalStorage},
-    RuntimeEnvironment, UnreachableCodeStorage,
+    UnreachableCodeStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -218,52 +217,23 @@ fn is_approved_gov_script(
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
-    pub(crate) gas_feature_version: u64,
-    gas_params: Result<AptosGasParameters, String>,
-    pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
 }
 
 impl AptosVM {
-    /// Creates a new VM instance, initializing the runtime environment from the state.
-    pub fn new(state_view: &impl StateView) -> Self {
-        let env = Arc::new(Environment::new(state_view));
-        Self::new_with_environment(env, state_view, false)
-    }
-
-    pub fn new_for_gov_sim(state_view: &impl StateView) -> Self {
-        let env = Arc::new(Environment::new(state_view));
-        Self::new_with_environment(env, state_view, true)
-    }
-
     /// Creates a new VM instance based on the runtime environment, and used by block
     /// executor to create multiple tasks sharing the same execution configurations.
-    // TODO: Passing `state_view` is not needed once we move keyless and gas-related
-    //       configs to the environment.
-    pub(crate) fn new_with_environment(
-        env: Arc<Environment>,
-        state_view: &impl StateView,
-        inject_create_signer_for_gov_sim: bool,
-    ) -> Self {
+    // TODO: Passing `state_view` is not needed once we move keyless configs to the environment.
+    pub fn new_with_environment(env: Arc<Environment>, state_view: &impl StateView) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
-        let (gas_params, storage_gas_params, gas_feature_version) =
-            get_gas_parameters(env.features(), state_view);
-
         let resolver = state_view.as_move_resolver();
-        let move_vm = MoveVmExt::new_with_extended_options(
-            gas_feature_version,
-            gas_params.as_ref(),
-            env,
-            None,
-            inject_create_signer_for_gov_sim,
-            &resolver,
-        );
+        let move_vm = MoveVmExt::new(env.clone(), &resolver);
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let module_storage = state_view.as_aptos_code_storage(&move_vm);
+        let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
         let pvk = keyless_validation::get_groth16_vk_onchain(
             move_vm.env.features(),
             &resolver,
@@ -275,17 +245,8 @@ impl AptosVM {
         Self {
             is_simulation: false,
             move_vm,
-            gas_feature_version,
-            gas_params,
-            storage_gas_params,
             pvk,
         }
-    }
-
-    /// Returns a new MoveVM with the same configs as itself, but a new, cloned,
-    /// struct name index map. Only to be used for module publishing.
-    pub(crate) fn move_vm_for_module_publishing_and_init_module(&self) -> MoveVmExt {
-        self.move_vm.spawn_with_new_struct_name_index_map()
     }
 
     pub fn new_session<'r, S: AptosMoveResolver>(
@@ -319,8 +280,24 @@ impl AptosVM {
     }
 
     #[inline(always)]
-    pub fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.move_vm.runtime_environment()
+    pub(crate) fn gas_feature_version(&self) -> u64 {
+        self.move_vm.env.gas_feature_version()
+    }
+
+    #[inline(always)]
+    pub(crate) fn gas_params(
+        &self,
+        log_context: &AdapterLogSchema,
+    ) -> Result<&AptosGasParameters, VMStatus> {
+        get_or_vm_startup_failure(self.move_vm.env.gas_params(), log_context)
+    }
+
+    #[inline(always)]
+    pub(crate) fn storage_gas_params(
+        &self,
+        log_context: &AdapterLogSchema,
+    ) -> Result<&StorageGasParameters, VMStatus> {
+        get_or_vm_startup_failure(self.move_vm.env.storage_gas_params(), log_context)
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -401,9 +378,9 @@ impl AptosVM {
 
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
     #[cfg(any(test, feature = "testing"))]
-    pub fn gas_params(&self) -> Result<&AptosGasParameters, VMStatus> {
+    pub fn gas_params_for_test(&self) -> Result<&AptosGasParameters, VMStatus> {
         let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
-        get_or_vm_startup_failure(&self.gas_params, &log_context)
+        self.gas_params(&log_context)
     }
 
     pub fn as_move_resolver<'r, R: ExecutorView>(
@@ -412,17 +389,10 @@ impl AptosVM {
     ) -> StorageAdapter<'r, R> {
         StorageAdapter::new_with_config(
             executor_view,
-            self.gas_feature_version,
+            self.gas_feature_version(),
             self.features(),
             None,
         )
-    }
-
-    pub fn as_aptos_code_storage<'s, S: StateView>(
-        &'s self,
-        state_view: &'s S,
-    ) -> AptosCodeStorageAdapter<'s, S> {
-        state_view.as_aptos_code_storage(&self.move_vm)
     }
 
     pub fn as_move_resolver_with_group_view<'r, R: ExecutorView + ResourceGroupView>(
@@ -431,7 +401,7 @@ impl AptosVM {
     ) -> StorageAdapter<'r, R> {
         StorageAdapter::new_with_config(
             executor_view,
-            self.gas_feature_version,
+            self.gas_feature_version(),
             self.features(),
             Some(executor_view),
         )
@@ -464,7 +434,7 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
     ) -> (VMStatus, VMOutput) {
-        if self.gas_feature_version >= 12 {
+        if self.gas_feature_version() >= 12 {
             // Check if the gas meter's internal counters are consistent.
             //
             // Since we are already in the failure epilogue, there is not much we can do
@@ -626,7 +596,7 @@ impl AptosVM {
                     AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
 
                 // Verify we charged sufficiently for creating an account slot
-                let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
+                let gas_params = self.gas_params(log_context)?;
                 let gas_unit_price = u64::from(txn_data.gas_unit_price());
                 let gas_used = fee_statement.gas_used();
                 let storage_fee = fee_statement.storage_fee_used();
@@ -708,7 +678,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         has_modules_published_to_special_address: bool,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if self.gas_feature_version >= 12 {
+        if self.gas_feature_version() >= 12 {
             // Check if the gas meter's internal counters are consistent.
             //
             // It's better to fail the transaction due to invariant violation than to allow
@@ -788,7 +758,7 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version >= 15 {
+        if self.gas_feature_version() >= 15 {
             session.check_script_dependencies_and_check_gas(
                 code_storage,
                 gas_meter,
@@ -858,7 +828,7 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version >= 15 {
+        if self.gas_feature_version() >= 15 {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
@@ -994,7 +964,6 @@ impl AptosVM {
             resolver,
             code_storage,
             gas_meter,
-            txn_data,
             traversal_context,
             new_published_modules_loaded,
             change_set_configs,
@@ -1415,7 +1384,6 @@ impl AptosVM {
             resolver,
             module_storage,
             gas_meter,
-            txn_data,
             traversal_context,
             new_published_modules_loaded,
             change_set_configs,
@@ -1544,7 +1512,6 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         gas_meter: &mut impl AptosGasMeter,
-        transaction_metadata: &TransactionMetadata,
         traversal_context: &mut TraversalContext,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
@@ -1581,7 +1548,7 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version >= 15 {
+        if self.gas_feature_version() >= 15 {
             // Charge old versions of existing modules, in case of upgrades.
             for module in modules.iter() {
                 let addr = module.self_addr();
@@ -1685,12 +1652,11 @@ impl AptosVM {
 
         if self.features().is_loader_v2_enabled() {
             session.finish_with_module_publishing_and_initialization(
-                self,
                 resolver,
                 module_storage,
                 gas_meter,
-                transaction_metadata,
                 traversal_context,
+                self.features(),
                 change_set_configs,
                 destination,
                 bundle,
@@ -1968,17 +1934,14 @@ impl AptosVM {
             )
         });
         unwrap_or_discard!(exec_result);
-        let storage_gas_params = unwrap_or_discard!(get_or_vm_startup_failure(
-            &self.storage_gas_params,
-            log_context
-        ));
+        let storage_gas_params = unwrap_or_discard!(self.storage_gas_params(log_context));
         let change_set_configs = &storage_gas_params.change_set_configs;
         let (prologue_change_set, mut user_session) = unwrap_or_discard!(prologue_session
             .into_user_session(
                 self,
                 &txn_data,
                 resolver,
-                self.gas_feature_version,
+                self.gas_feature_version(),
                 change_set_configs,
                 code_storage,
             ));
@@ -2084,11 +2047,9 @@ impl AptosVM {
 
         let balance = txn.max_gas_amount().into();
         let mut gas_meter = make_gas_meter(
-            self.gas_feature_version,
-            get_or_vm_startup_failure(&self.gas_params, log_context)?
-                .vm
-                .clone(),
-            get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.clone(),
+            self.gas_feature_version(),
+            self.gas_params(log_context)?.vm.clone(),
+            self.storage_gas_params(log_context)?.clone(),
             is_approved_gov_script,
             balance,
         );
@@ -2217,7 +2178,7 @@ impl AptosVM {
                 )?;
 
                 let change_set_configs =
-                    ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
+                    ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version());
 
                 // TODO(loader_v2): This session should not publish modules, and should be using native
                 //                  code context instead.
@@ -2368,7 +2329,7 @@ impl AptosVM {
         let output = get_system_transaction_output(
             session,
             module_storage,
-            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+            &self.storage_gas_params(log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -2450,7 +2411,7 @@ impl AptosVM {
         let output = get_system_transaction_output(
             session,
             module_storage,
-            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+            &self.storage_gas_params(log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -2485,26 +2446,26 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
-        let vm = AptosVM::new(state_view);
+        let env = Arc::new(Environment::new(state_view, false, None));
+        let vm = AptosVM::new_with_environment(env.clone(), state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        let vm_gas_params = match get_or_vm_startup_failure(&vm.gas_params, &log_context) {
+        let vm_gas_params = match vm.gas_params(&log_context) {
             Ok(gas_params) => gas_params.vm.clone(),
             Err(err) => {
                 return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
             },
         };
-        let storage_gas_params =
-            match get_or_vm_startup_failure(&vm.storage_gas_params, &log_context) {
-                Ok(gas_params) => gas_params.clone(),
-                Err(err) => {
-                    return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
-                },
-            };
+        let storage_gas_params = match vm.storage_gas_params(&log_context) {
+            Ok(gas_params) => gas_params.clone(),
+            Err(err) => {
+                return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
+            },
+        };
 
         let mut gas_meter = make_prod_gas_meter(
-            vm.gas_feature_version,
+            vm.gas_feature_version(),
             vm_gas_params,
             storage_gas_params,
             /* is_approved_gov_script */ false,
@@ -2512,7 +2473,7 @@ impl AptosVM {
         );
 
         let resolver = state_view.as_move_resolver();
-        let module_storage = vm.as_aptos_code_storage(&state_view);
+        let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
@@ -2592,8 +2553,8 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
         check_gas(
-            get_or_vm_startup_failure(&self.gas_params, log_context)?,
-            self.gas_feature_version,
+            self.gas_params(log_context)?,
+            self.gas_feature_version(),
             resolver,
             module_storage,
             txn_data,
@@ -2949,7 +2910,9 @@ impl VMValidator for AptosVM {
         let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
-        let module_storage = self.as_aptos_code_storage(&state_view);
+
+        let env = Arc::new(Environment::new(state_view, false, None));
+        let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
 
@@ -2994,8 +2957,8 @@ impl VMValidator for AptosVM {
 pub struct AptosSimulationVM(AptosVM);
 
 impl AptosSimulationVM {
-    pub fn new(state_view: &impl StateView) -> Self {
-        let mut vm = AptosVM::new(state_view);
+    pub fn new(env: Arc<Environment>, state_view: &impl StateView) -> Self {
+        let mut vm = AptosVM::new_with_environment(env, state_view);
         vm.is_simulation = true;
         Self(vm)
     }
@@ -3012,11 +2975,12 @@ impl AptosSimulationVM {
             "Simulated transaction should not have a valid signature"
         );
 
-        let vm = Self::new(state_view);
+        let env = Arc::new(Environment::new(state_view, false, None));
+        let vm = Self::new(env.clone(), state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = vm.0.as_aptos_code_storage(&state_view);
+        let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
         let (vm_status, vm_output) =
             vm.0.execute_user_transaction(&resolver, &code_storage, transaction, &log_context);

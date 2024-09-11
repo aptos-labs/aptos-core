@@ -11,10 +11,11 @@ use crate::{
 };
 use aptos_types::transaction::user_transaction_context::UserTransactionContext;
 use aptos_vm_types::{
-    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
-    module_write_set::ModuleWriteSet, storage::change_set_configs::ChangeSetConfigs,
+    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
+use move_vm_runtime::ModuleStorage;
 
 fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
     value
@@ -71,7 +72,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn finish_with_squashed_change_set(
         mut self,
         change_set_configs: &ChangeSetConfigs,
-        module_storage: &impl AptosModuleStorage,
+        module_storage: &impl ModuleStorage,
         assert_no_additional_creation: bool,
     ) -> Result<(VMChangeSet, ModuleWriteSet), VMStatus> {
         let (additional_change_set, module_write_set) = self.with_session_mut(|session| {

@@ -35,14 +35,16 @@ mod storage;
 pub use loader::{LoadedFunction, Module, Script};
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, deserialize_script, script_hash, CodeStorage},
-    environment::{RuntimeEnvironment, WithRuntimeEnvironment},
+    environment::{
+        ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
+    },
     implementations::{
         unreachable_code_storage::UnreachableCodeStorage,
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
     },
     module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
-    publishing::TemporaryModuleStorage,
+    publishing::StagingModuleStorage,
 };
 
 // TODO(loader_v2): Temporary infra to still have loader V1 to test, run

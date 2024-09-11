@@ -14,7 +14,7 @@ use move_core_types::{
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction, AsUnsyncCodeStorage,
+    native_functions::NativeFunction, AsUnsyncCodeStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -159,6 +159,7 @@ fn main() -> Result<()> {
         &mut builder,
     ));
 
+    let runtime_environment = RuntimeEnvironment::new(natives.clone());
     let vm = MoveVM::new(natives);
     let mut storage = InMemoryStorage::new();
 
@@ -187,7 +188,7 @@ fn main() -> Result<()> {
     let mut sess = vm.new_session_with_extensions(&storage, extensions);
 
     let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage(vm.runtime_environment());
+    let code_storage = storage.as_unsync_code_storage(&runtime_environment);
 
     let args: Vec<Vec<u8>> = vec![];
     match entrypoint {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_vm::{get_or_vm_startup_failure, get_system_transaction_output},
+    aptos_vm::get_system_transaction_output,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, SessionId},
     system_module_names::{JWKS_MODULE, UPSERT_INTO_OBSERVED_JWKS},
@@ -164,7 +164,8 @@ impl AptosVM {
         let output = get_system_transaction_output(
             session,
             module_storage,
-            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)
+            &self
+                .storage_gas_params(log_context)
                 .map_err(Unexpected)?
                 .change_set_configs,
         )

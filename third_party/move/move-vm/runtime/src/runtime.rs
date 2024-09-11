@@ -3,14 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    config::VMConfig,
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
     loader::{LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
+    native_functions::NativeFunctions,
     session::SerializedReturnValues,
     storage::{code_storage::CodeStorage, module_storage::ModuleStorage as ModuleStorageV2},
-    RuntimeEnvironment,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -47,11 +48,11 @@ impl Clone for VMRuntime {
 
 impl VMRuntime {
     /// Creates a new runtime instance with provided environment.
-    pub(crate) fn new(runtime_env: Arc<RuntimeEnvironment>) -> Self {
-        let loader = if runtime_env.vm_config().use_loader_v2 {
-            Loader::v2(runtime_env)
+    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
+        let loader = if vm_config.use_loader_v2 {
+            Loader::v2(vm_config)
         } else {
-            Loader::v1(runtime_env)
+            Loader::v1(natives, vm_config)
         };
 
         VMRuntime {
@@ -224,6 +225,7 @@ impl VMRuntime {
                 // old module.
                 self.loader.mark_as_invalid();
             }
+            #[allow(deprecated)]
             data_store.publish_module(&module.self_id(), blob, is_republishing)?;
         }
         Ok(())

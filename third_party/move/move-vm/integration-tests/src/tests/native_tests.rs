@@ -10,7 +10,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
-    session::Session, AsUnsyncCodeStorage, ModuleStorage, TemporaryModuleStorage,
+    session::Session, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
     UnreachableCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -64,24 +64,25 @@ fn test_publish_module_with_nested_loops() {
             Identifier::new("bar").unwrap(),
             make_failed_native(),
         )];
-        let vm = MoveVM::new_with_config(natives, VMConfig {
+        let vm_config = VMConfig {
             verifier_config: VerifierConfig {
                 max_loop_depth: Some(2),
                 ..Default::default()
             },
             ..Default::default()
-        });
+        };
+        let runtime_environment =
+            RuntimeEnvironment::new_with_config(natives.clone(), vm_config.clone());
+        let vm = MoveVM::new_with_config(natives, vm_config);
 
         let mut sess = vm.new_session(&storage);
         if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_code_storage(vm.runtime_environment());
-            let new_module_storage = TemporaryModuleStorage::new(
-                &TEST_ADDR,
-                vm.runtime_environment(),
-                &module_storage,
-                vec![m_blob.clone().into()],
-            )
-            .expect("Module should be publishable");
+            let module_storage = storage.as_unsync_code_storage(&runtime_environment);
+            let new_module_storage =
+                StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
+                    .clone()
+                    .into()])
+                .expect("Module should be publishable");
             load_and_run_functions(
                 &mut sess,
                 &new_module_storage,
