@@ -10,7 +10,7 @@ use aptos_storage_interface::{cached_state_view::ShardedStateCache, DbWriter};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::{TransactionToCommit, Version};
 use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 fn main() {
     // 初始化临时目录和数据库
@@ -32,8 +32,6 @@ fn main() {
         .clone();
     let _ancester = in_memory_state.current.clone();
     let mut cur_ver: Version = 0;
-    let mut updates = HashMap::new();
-    let mut snapshot_versions = vec![];
 
     // 开始计时
     let start = Instant::now();
@@ -43,9 +41,6 @@ fn main() {
         test_helper::update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         let base_checkpoint = in_memory_state.clone();
         let base_state_version = cur_ver.checked_sub(1);
-
-        println!("当前版本: {}", cur_ver);
-        println!("内存状态更新前: {:?}", in_memory_state);
 
         db.save_transactions(
             txns_to_commit,
@@ -59,8 +54,6 @@ fn main() {
             None,
         )
         .unwrap();
-
-        println!("内存状态更新后: {:?}", in_memory_state);
 
         cur_ver += txns_to_commit.len() as u64;
     }
