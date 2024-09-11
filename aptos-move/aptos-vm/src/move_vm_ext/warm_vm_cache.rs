@@ -3,12 +3,17 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{counters::TIMER, move_vm_ext::AptosMoveResolver, natives::aptos_natives_with_builder};
+use crate::{counters::TIMER, move_vm_ext::AptosMoveResolver};
 use aptos_framework::natives::code::PackageRegistry;
+use aptos_gas_schedule::AptosGasParameters;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
 use aptos_native_interface::SafeNativeBuilder;
-use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, OnChainConfig},
+    state_store::state_key::StateKey,
+};
+use aptos_vm_environment::environment::Environment;
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
@@ -16,72 +21,9 @@ use move_core_types::{
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, RuntimeEnvironment};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, WithRuntimeEnvironment};
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, sync::Arc};
-
-// TODO(loader_v2): Remove this, right now it mimics warm vm cache to bypass
-//                  the problem of the initializing the VM from environment
-//                  from the state.
-/// Caches a single runtime environment used by executor instances running in parallel. We
-/// need to keep a map because there can be multiple instances of executions running at
-/// the same time (e.g., unit tests), enabling & disabling features.
-pub(crate) struct CachedRuntimeEnvironment(RwLock<HashMap<WarmVmId, Arc<RuntimeEnvironment>>>);
-
-static RUNTIME_ENVIRONMENT: Lazy<CachedRuntimeEnvironment> =
-    Lazy::new(|| CachedRuntimeEnvironment(RwLock::new(HashMap::new())));
-
-impl CachedRuntimeEnvironment {
-    pub(crate) fn get_cached_runtime_environment(
-        native_builder: SafeNativeBuilder,
-        vm_config: VMConfig,
-        resolver: &impl AptosMoveResolver,
-        bin_v7_enabled: bool,
-        inject_create_signer_for_gov_sim: bool,
-    ) -> VMResult<Arc<RuntimeEnvironment>> {
-        RUNTIME_ENVIRONMENT.get(
-            native_builder,
-            vm_config,
-            resolver,
-            bin_v7_enabled,
-            inject_create_signer_for_gov_sim,
-        )
-    }
-
-    fn get(
-        &self,
-        mut native_builder: SafeNativeBuilder,
-        vm_config: VMConfig,
-        resolver: &impl AptosMoveResolver,
-        bin_v7_enabled: bool,
-        inject_create_signer_for_gov_sim: bool,
-    ) -> VMResult<Arc<RuntimeEnvironment>> {
-        let id = {
-            WarmVmId::new(
-                &native_builder,
-                &vm_config,
-                resolver,
-                bin_v7_enabled,
-                inject_create_signer_for_gov_sim,
-            )?
-        };
-
-        if let Some(runtime_environment) = self.0.read().get(&id) {
-            return Ok(runtime_environment.clone());
-        }
-
-        let mut cached_runtime_environment = self.0.write();
-        if let Some(runtime_environment) = cached_runtime_environment.get(&id) {
-            return Ok(runtime_environment.clone());
-        }
-
-        let natives =
-            aptos_natives_with_builder(&mut native_builder, inject_create_signer_for_gov_sim);
-        let runtime_environment = Arc::new(RuntimeEnvironment::new(vm_config, natives, None));
-        cached_runtime_environment.insert(id, runtime_environment.clone());
-        Ok(runtime_environment)
-    }
-}
+use std::collections::HashMap;
 
 const WARM_VM_CACHE_SIZE: usize = 8;
 
@@ -99,39 +41,17 @@ pub fn flush_warm_vm_cache() {
 
 impl WarmVmCache {
     pub(crate) fn get_warm_vm(
-        native_builder: SafeNativeBuilder,
-        vm_config: VMConfig,
+        env: &Environment,
         resolver: &impl AptosMoveResolver,
-        bin_v7_enabled: bool,
-        inject_create_signer_for_gov_sim: bool,
     ) -> VMResult<MoveVM> {
-        WARM_VM_CACHE.get(
-            native_builder,
-            vm_config,
-            resolver,
-            bin_v7_enabled,
-            inject_create_signer_for_gov_sim,
-        )
+        WARM_VM_CACHE.get(env, resolver)
     }
 
-    fn get(
-        &self,
-        mut native_builder: SafeNativeBuilder,
-        vm_config: VMConfig,
-        resolver: &impl AptosMoveResolver,
-        bin_v7_enabled: bool,
-        inject_create_signer_for_gov_sim: bool,
-    ) -> VMResult<MoveVM> {
+    fn get(&self, env: &Environment, resolver: &impl AptosMoveResolver) -> VMResult<MoveVM> {
         let _timer = TIMER.timer_with(&["warm_vm_get"]);
         let id = {
             let _timer = TIMER.timer_with(&["get_warm_vm_id"]);
-            WarmVmId::new(
-                &native_builder,
-                &vm_config,
-                resolver,
-                bin_v7_enabled,
-                inject_create_signer_for_gov_sim,
-            )?
+            WarmVmId::new(env, resolver)?
         };
 
         if let Some(vm) = self.cache.read().get(&id) {
@@ -147,10 +67,7 @@ impl WarmVmCache {
                 return Ok(vm.clone());
             }
 
-            let vm = MoveVM::new_with_config(
-                aptos_natives_with_builder(&mut native_builder, inject_create_signer_for_gov_sim),
-                vm_config,
-            );
+            let vm = MoveVM::new_with_runtime_environment(env.runtime_environment());
             Self::warm_vm_up(&vm, resolver);
 
             // Not using LruCache because its `::get()` requires &mut self
@@ -190,23 +107,31 @@ struct WarmVmId {
 }
 
 impl WarmVmId {
-    fn new(
-        native_builder: &SafeNativeBuilder,
-        vm_config: &VMConfig,
-        resolver: &impl AptosMoveResolver,
-        bin_v7_enabled: bool,
-        inject_create_signer_for_gov_sim: bool,
-    ) -> VMResult<Self> {
+    fn new(env: &Environment, resolver: &impl AptosMoveResolver) -> VMResult<Self> {
         let natives = {
+            // Create native builder just in case, even though the environment has more info now.
             let _timer = TIMER.timer_with(&["serialize_native_builder"]);
-            native_builder.id_bytes()
+            let AptosGasParameters { natives, vm } = env
+                .gas_params()
+                .as_ref()
+                .cloned()
+                .unwrap_or(AptosGasParameters::zeros());
+            SafeNativeBuilder::new(
+                env.gas_feature_version(),
+                natives,
+                vm.misc,
+                env.timed_features().clone(),
+                env.features().clone(),
+                None,
+            )
+            .id_bytes()
         };
         Ok(Self {
             natives,
-            vm_config: Self::vm_config_bytes(vm_config),
+            vm_config: Self::vm_config_bytes(env.vm_config()),
             core_packages_registry: Self::core_packages_id_bytes(resolver)?,
-            bin_v7_enabled,
-            inject_create_signer_for_gov_sim,
+            bin_v7_enabled: env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+            inject_create_signer_for_gov_sim: env.inject_create_signer_for_gov_sim(),
         })
     }
 

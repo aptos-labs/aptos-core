@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    logging::expect_no_verification_errors,
     module_cyclic_dependency_error, module_linker_error,
     storage::{
         environment::{RuntimeEnvironment, WithRuntimeEnvironment},
@@ -249,19 +248,9 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
         Ok(module)
     }
 
-    /// The baseline byte storage used by this module storage.
+    /// The reference to the baseline byte storage used by this module storage.
     pub fn byte_storage(&self) -> &S {
         &self.base_storage
-    }
-
-    /// Returns the byte storage used by this module storage.
-    pub(crate) fn release_byte_storage(self) -> S {
-        use BorrowedOrOwned::*;
-        match self.base_storage {
-            // TODO(loader_v2): Revisit publishing APIs to not capture byte storage.
-            Borrowed(_) => unreachable!(),
-            Owned(storage) => storage,
-        }
     }
 }
 
@@ -341,17 +330,15 @@ impl<'e, B: ModuleBytesStorage> ModuleStorage for UnsyncModuleStorage<'e, B> {
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
         if !self.check_module_exists(address, module_name)? {
-            return Err(module_linker_error!(address, module_name));
+            return Ok(None);
         }
 
         let mut visited = BTreeSet::new();
-        let module = self
-            .fetch_verified_module_and_visit_all_transitive_dependencies(
-                address,
-                module_name,
-                &mut visited,
-            )
-            .map_err(expect_no_verification_errors)?;
+        let module = self.fetch_verified_module_and_visit_all_transitive_dependencies(
+            address,
+            module_name,
+            &mut visited,
+        )?;
         Ok(Some(module))
     }
 }
@@ -461,8 +448,9 @@ pub(crate) mod test {
 
     #[test]
     fn test_module_does_not_exist() {
-        let env = RuntimeEnvironment::test();
-        let module_storage = InMemoryStorage::new().into_unsync_module_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let module_storage =
+            InMemoryStorage::new().into_unsync_module_storage(&runtime_environment);
 
         let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
         assert!(!assert_ok!(result));
@@ -479,8 +467,7 @@ pub(crate) mod test {
         assert_none!(assert_ok!(result));
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
-        assert_eq!(assert_err!(result).major_status(), StatusCode::LINKER_ERROR);
-        assert!(module_storage.does_not_have_cached_modules());
+        assert_none!(assert_ok!(result));
     }
 
     #[test]
@@ -488,8 +475,8 @@ pub(crate) mod test {
         let mut module_bytes_storage = InMemoryStorage::new();
         add_module_bytes(&mut module_bytes_storage, "a", vec![], vec![]);
 
-        let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
 
         let result = module_storage.check_module_exists(&AccountAddress::ZERO, ident_str!("a"));
         assert!(assert_ok!(result));
@@ -507,8 +494,8 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "d", vec![], vec![]);
         add_module_bytes(&mut module_bytes_storage, "e", vec![], vec![]);
 
-        let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
 
         let result = module_storage.fetch_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
         assert_eq!(
@@ -541,8 +528,8 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "d", vec![], vec![]);
         add_module_bytes(&mut module_bytes_storage, "e", vec![], vec![]);
 
-        let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("c"));
         assert_ok!(result);
@@ -572,8 +559,8 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "f", vec!["g"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "g", vec![], vec![]);
 
-        let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
 
         assert_ok!(module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("a")));
         assert_ok!(module_storage.fetch_deserialized_module(&AccountAddress::ZERO, ident_str!("c")));
@@ -605,8 +592,8 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "b", vec!["c"], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec!["a"], vec![]);
 
-        let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("c"));
         assert_eq!(
@@ -624,8 +611,8 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "b", vec![], vec!["c"]);
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec!["a"]);
 
-        let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("c"));
         assert_ok!(result);
@@ -645,8 +632,8 @@ pub(crate) mod test {
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec![]);
         add_module_bytes(&mut module_bytes_storage, "d", vec![], vec!["c"]);
 
-        let env = RuntimeEnvironment::test();
-        let module_storage = module_bytes_storage.into_unsync_module_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let module_storage = module_bytes_storage.into_unsync_module_storage(&runtime_environment);
 
         let result = module_storage.fetch_verified_module(&AccountAddress::ZERO, ident_str!("a"));
         assert_ok!(result);

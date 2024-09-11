@@ -30,10 +30,9 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
+use aptos_vm_environment::environment::{Environment, SharedEnvironment};
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, environment::Environment, output::VMOutput,
-};
+use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutput};
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -411,8 +410,9 @@ impl BlockAptosVM {
             ExecutableTestType,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
-        let environment =
-            Arc::new(Environment::new(state_view).try_enable_delayed_field_optimization());
+        let environment = SharedEnvironment(Arc::new(
+            Environment::new(state_view, false, None).try_enable_delayed_field_optimization(),
+        ));
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {

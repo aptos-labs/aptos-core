@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    logging::expect_no_verification_errors,
     module_linker_error, script_hash,
     storage::{
-        code_storage::deserialize_script, environment::WithRuntimeEnvironment,
+        code_storage::deserialize_script,
+        environment::{ambassador_impl_WithRuntimeEnvironment, WithRuntimeEnvironment},
         implementations::unsync_module_storage::AsUnsyncModuleStorage,
         module_storage::ambassador_impl_ModuleStorage,
     },
@@ -34,7 +36,12 @@ enum ScriptStorageEntry {
 
 /// Code storage that stores both modules and scripts (not thread-safe).
 #[derive(Delegate)]
-#[delegate(ModuleStorage, target = "module_storage")]
+#[delegate(
+    WithRuntimeEnvironment,
+    target = "module_storage",
+    where = "M: ModuleStorage"
+)]
+#[delegate(ModuleStorage, target = "module_storage", where = "M: ModuleStorage")]
 pub struct UnsyncCodeStorage<M> {
     script_storage: RefCell<HashMap<[u8; 32], ScriptStorageEntry>>,
     module_storage: M,
@@ -68,7 +75,7 @@ impl<'a, S: ModuleBytesStorage> AsUnsyncCodeStorage<'a, S> for S {
     }
 }
 
-impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
+impl<M: ModuleStorage> UnsyncCodeStorage<M> {
     /// Creates a new storage with no scripts. There are no constrains on which modules exist in
     /// module storage.
     fn new(module_storage: M) -> Self {
@@ -114,7 +121,8 @@ impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
                 self.module_storage
-                    .fetch_verified_module(addr, name)?
+                    .fetch_verified_module(addr, name)
+                    .map_err(expect_no_verification_errors)?
                     .ok_or_else(|| module_linker_error!(addr, name))
             })
             .collect::<VMResult<Vec<_>>>()?;
@@ -126,7 +134,7 @@ impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
     }
 }
 
-impl<M: ModuleStorage + WithRuntimeEnvironment> CodeStorage for UnsyncCodeStorage<M> {
+impl<M: ModuleStorage> CodeStorage for UnsyncCodeStorage<M> {
     fn deserialize_and_cache_script(
         &self,
         serialized_script: &[u8],
@@ -177,7 +185,7 @@ impl<M: ModuleStorage + WithRuntimeEnvironment> CodeStorage for UnsyncCodeStorag
 }
 
 #[cfg(test)]
-impl<M: ModuleStorage + WithRuntimeEnvironment> UnsyncCodeStorage<M> {
+impl<M: ModuleStorage> UnsyncCodeStorage<M> {
     fn matches<P: Fn(&ScriptStorageEntry) -> bool>(
         &self,
         script_hashes: impl IntoIterator<Item = [u8; 32]>,
@@ -224,8 +232,8 @@ mod test {
         add_module_bytes(&mut module_bytes_storage, "b", vec![], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec![]);
 
-        let env = RuntimeEnvironment::test();
-        let code_storage = module_bytes_storage.into_unsync_code_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let code_storage = module_bytes_storage.into_unsync_code_storage(&runtime_environment);
 
         let serialized_script = script(vec!["a"]);
         let hash_1 = script_hash(&serialized_script);
@@ -253,8 +261,8 @@ mod test {
         add_module_bytes(&mut module_bytes_storage, "b", vec![], vec![]);
         add_module_bytes(&mut module_bytes_storage, "c", vec![], vec![]);
 
-        let env = RuntimeEnvironment::test();
-        let code_storage = module_bytes_storage.into_unsync_code_storage(&env);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let code_storage = module_bytes_storage.into_unsync_code_storage(&runtime_environment);
 
         let serialized_script = script(vec!["a"]);
         let hash = script_hash(&serialized_script);

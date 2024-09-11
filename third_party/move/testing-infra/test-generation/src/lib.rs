@@ -36,7 +36,9 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage};
+use move_vm_runtime::{
+    module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, RuntimeEnvironment,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -141,13 +143,15 @@ fn execute_function_in_module(
         module.identifier_at(entry_name_idx)
     };
     {
-        let vm = MoveVM::new(move_stdlib::natives::all_natives(
+        let natives = move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
-        ));
+        );
+        let runtime_environment = RuntimeEnvironment::new(natives.clone());
+        let vm = MoveVM::new(natives);
 
         let storage = storage_with_stdlib_and_modules(vec![&module]);
-        let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
+        let module_storage = storage.as_unsync_module_storage(&runtime_environment);
 
         let mut sess = vm.new_session(&storage);
         let traversal_storage = TraversalStorage::new();

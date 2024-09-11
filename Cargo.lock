@@ -308,6 +308,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "aptos-vm-genesis",
  "aptos-vm-logging",
  "aptos-vm-types",
@@ -1613,10 +1614,12 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
  "hashbrown 0.14.3",
  "move-core-types",
+ "move-vm-runtime",
  "once_cell",
  "rayon",
 ]
@@ -2639,6 +2642,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "aptos-vm-genesis",
  "aptos-vm-logging",
  "aptos-vm-types",
@@ -2811,11 +2815,13 @@ dependencies = [
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
+ "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
  "clap 4.4.14",
  "itertools 0.13.0",
+ "move-vm-runtime",
  "regex",
  "reqwest 0.11.23",
  "tokio",
@@ -3466,6 +3472,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
@@ -4420,12 +4427,12 @@ dependencies = [
  "aptos-logger",
  "aptos-memory-usage-tracker",
  "aptos-metrics-core",
- "aptos-move-stdlib",
  "aptos-mvhashmap",
  "aptos-native-interface",
  "aptos-table-natives",
  "aptos-types",
  "aptos-utils",
+ "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
  "ark-bn254",
@@ -4468,6 +4475,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-vm-environment"
+version = "0.0.1"
+dependencies = [
+ "aptos-framework",
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
+ "aptos-language-e2e-tests",
+ "aptos-move-stdlib",
+ "aptos-native-interface",
+ "aptos-table-natives",
+ "aptos-types",
+ "aptos-vm-types",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+]
+
+[[package]]
 name = "aptos-vm-genesis"
 version = "0.1.0"
 dependencies = [
@@ -4481,6 +4506,8 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
+ "claims",
+ "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
@@ -4571,6 +4598,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "aptos-vm-genesis",
  "aptos-vm-logging",
  "fail",
@@ -7445,6 +7473,7 @@ dependencies = [
  "aptos-transaction-generator-lib",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "aptos-vm-types",
  "bcs 0.1.4",
  "claims",
@@ -11632,6 +11661,7 @@ dependencies = [
  "move-vm-test-utils",
  "move-vm-types",
  "once_cell",
+ "ouroboros",
  "parking_lot 0.12.1",
  "proptest",
  "serde",

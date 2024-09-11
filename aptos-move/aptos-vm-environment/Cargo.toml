@@ -1,0 +1,29 @@
+[package]
+name = "aptos-vm-environment"
+description = "Aptos VM environment"
+version = "0.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-framework = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-move-stdlib = { workspace = true }
+aptos-native-interface = { workspace = true }
+aptos-table-natives = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+
+[dev-dependencies]
+aptos-language-e2e-tests = { workspace = true }

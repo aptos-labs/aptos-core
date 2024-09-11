@@ -26,6 +26,7 @@ members = [
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-benchmarks",
+    "aptos-move/aptos-vm-environment",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
@@ -453,6 +454,7 @@ aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
+aptos-vm-environment = { path = "aptos-move/aptos-vm-environment" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
 aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }

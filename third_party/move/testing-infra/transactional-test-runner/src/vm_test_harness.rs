@@ -9,8 +9,8 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use move_binary_format::{
-    access::ModuleAccess, compatibility::Compatibility, errors::VMResult,
-    file_format::CompiledScript, file_format_common, CompiledModule,
+    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript,
+    file_format_common, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
@@ -42,7 +42,8 @@ use move_vm_runtime::{
     module_traversal::*,
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, TemporaryModuleStorage,
+    AsUnsyncCodeStorage, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
+    StagingModuleStorage, UnreachableCodeStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -62,8 +63,8 @@ const STD_ADDR: AccountAddress = AccountAddress::ONE;
 struct SimpleVMTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
 
-    // VM to be shared by all tasks. If we use V1 loader, we store None here.
-    vm: Option<Rc<MoveVM>>,
+    // VM and runtime environment to be shared by all tasks. If we use V1 loader, we store None here.
+    vm_and_runtime_environment: (Option<Rc<MoveVM>>, Rc<RuntimeEnvironment>),
     storage: InMemoryStorage,
 
     default_syntax: SyntaxChoice,
@@ -151,6 +152,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let vm = vm_config
             .use_loader_v2
             .then_some(Rc::new(create_vm(vm_config.clone())));
+        let runtime_environment = Rc::new(create_runtime_environment(vm_config.clone()));
+        let vm_and_runtime_environment = (vm, runtime_environment);
 
         let mut adapter = Self {
             compiled_state: CompiledState::new(
@@ -162,7 +165,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             default_syntax,
             comparison_mode,
             run_config,
-            vm,
+            vm_and_runtime_environment,
             storage: InMemoryStorage::new(),
         };
 
@@ -189,28 +192,21 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 })
                 .collect();
 
-            let vm = adapter.vm();
+            let (_, runtime_environment) = adapter.vm_and_runtime_environment();
             let module_storage = adapter
                 .storage
                 .clone()
-                .into_unsync_module_storage(vm.runtime_environment());
+                .into_unsync_module_storage(runtime_environment.as_ref());
 
-            TemporaryModuleStorage::new(
-                &sender,
-                vm.runtime_environment(),
-                &module_storage,
-                module_bundle,
-            )
-            .expect("All modules should publish")
-            .release_verified_module_bundle()
-            .for_each(|(bytes, module)| {
-                adapter
-                    .storage
-                    .add_module_bytes(module.self_addr(), module.self_name(), bytes);
-            });
+            StagingModuleStorage::create(&sender, &module_storage, module_bundle)
+                .expect("All modules should publish")
+                .release_verified_module_bundle()
+                .for_each(|(addr, name, bytes)| {
+                    adapter.storage.add_module_bytes(addr, name, bytes);
+                });
         } else {
             adapter
-                .perform_session_action(None, |session, gas_status| {
+                .perform_session_action(None, &UnreachableCodeStorage, |session, gas_status| {
                     for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
                         .into_iter()
                         .map(|tmod| &tmod.named_module.module)
@@ -260,11 +256,11 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraPublishArgs,
     ) -> Result<(Option<String>, CompiledModule)> {
-        let vm = self.vm();
+        let (vm, runtime_environment) = self.vm_and_runtime_environment();
         let module_storage = self
             .storage
             .clone()
-            .into_unsync_module_storage(vm.runtime_environment());
+            .into_unsync_module_storage(runtime_environment.as_ref());
 
         let mut module_bytes = vec![];
         module.serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)?;
@@ -272,53 +268,61 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let id = module.self_id();
         let sender = *id.address();
         let verbose = extra_args.verbose;
-        let result = self.perform_session_action(gas_budget, |session, gas_status| {
-            let compat = if extra_args.skip_check_struct_and_pub_function_linking {
-                Compatibility::no_check()
-            } else {
-                Compatibility::new(
-                    !extra_args.skip_check_struct_layout,
-                    !extra_args.skip_check_friend_linking,
+
+        let compat = if extra_args.skip_check_struct_and_pub_function_linking {
+            Compatibility::no_check()
+        } else {
+            Compatibility::new(
+                !extra_args.skip_check_struct_layout,
+                !extra_args.skip_check_friend_linking,
+            )
+        };
+        if vm.vm_config().use_loader_v2 {
+            let staging_module_storage = StagingModuleStorage::create_with_compat_config(
+                &sender,
+                compat,
+                &module_storage,
+                vec![module_bytes.into()],
+            )
+            .map_err(|err| {
+                anyhow!(
+                    "Unable to publish module '{}'. Got VMError: {}",
+                    module.self_id(),
+                    err.format_test_output(
+                        move_test_debug() || verbose,
+                        !move_test_debug() && self.comparison_mode
+                    )
                 )
-            };
-            if vm.vm_config().use_loader_v2 {
-                let tmp_module_storage = TemporaryModuleStorage::new_with_compat_config(
-                    &sender,
-                    vm.runtime_environment(),
-                    compat,
-                    &module_storage,
-                    vec![module_bytes.into()],
-                )?;
-                Ok(tmp_module_storage
-                    .release_verified_module_bundle()
-                    .collect())
-            } else {
-                #[allow(deprecated)]
-                session.publish_module_bundle_with_compat_config(
-                    vec![module_bytes],
-                    sender,
-                    gas_status,
-                    compat,
-                )?;
-                Ok(vec![])
+            })?;
+            for (addr, name, bytes) in staging_module_storage.release_verified_module_bundle() {
+                self.storage.add_module_bytes(addr, name, bytes);
             }
-        });
-        match result {
-            Ok(modules_to_publish) => {
-                for (bytes, module) in modules_to_publish {
-                    self.storage
-                        .add_module_bytes(module.address(), module.name(), bytes);
-                }
-                Ok((None, module))
-            },
-            Err(vm_error) => Err(anyhow!(
-                "Unable to publish module '{}'. Got VMError: {}",
-                module.self_id(),
-                vm_error.format_test_output(
-                    move_test_debug() || verbose,
-                    !move_test_debug() && self.comparison_mode
-                )
-            )),
+            Ok((None, module))
+        } else {
+            let result = self.perform_session_action(
+                gas_budget,
+                &UnreachableCodeStorage,
+                |session, gas_status| {
+                    #[allow(deprecated)]
+                    session.publish_module_bundle_with_compat_config(
+                        vec![module_bytes],
+                        sender,
+                        gas_status,
+                        compat,
+                    )
+                },
+            );
+            match result {
+                Ok(_) => Ok((None, module)),
+                Err(err) => Err(anyhow!(
+                    "Unable to publish module '{}'. Got VMError: {}",
+                    module.self_id(),
+                    err.format_test_output(
+                        move_test_debug() || verbose,
+                        !move_test_debug() && self.comparison_mode
+                    )
+                )),
+            }
         }
     }
 
@@ -331,11 +335,11 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<Option<String>> {
-        let vm = self.vm();
+        let (_, runtime_environment) = self.vm_and_runtime_environment();
         let code_storage = self
             .storage
             .clone()
-            .into_unsync_code_storage(vm.runtime_environment());
+            .into_unsync_code_storage(runtime_environment.as_ref());
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -357,7 +361,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
-        self.perform_session_action(gas_budget, |session, gas_status| {
+        self.perform_session_action(gas_budget, &code_storage, |session, gas_status| {
             session.execute_script(
                 script_bytes,
                 type_args,
@@ -389,11 +393,11 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
-        let vm = self.vm();
+        let (_, runtime_environment) = self.vm_and_runtime_environment();
         let module_storage = self
             .storage
             .clone()
-            .into_unsync_module_storage(vm.runtime_environment());
+            .into_unsync_module_storage(runtime_environment.as_ref());
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -413,7 +417,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
         let serialized_return_values = self
-            .perform_session_action(gas_budget, |session, gas_status| {
+            .perform_session_action(gas_budget, &module_storage, |session, gas_status| {
                 session.execute_function_bypass_visibility(
                     module,
                     function,
@@ -470,19 +474,21 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 }
 
 impl<'a> SimpleVMTestAdapter<'a> {
-    fn vm(&self) -> Rc<MoveVM> {
-        match &self.vm {
+    fn vm_and_runtime_environment(&self) -> (Rc<MoveVM>, Rc<RuntimeEnvironment>) {
+        let vm = match &self.vm_and_runtime_environment.0 {
             Some(vm) => vm.clone(),
             None => Rc::new(create_vm(vm_config())),
-        }
+        };
+        (vm, self.vm_and_runtime_environment.1.clone())
     }
 
     fn perform_session_action<Ret>(
         &mut self,
         gas_budget: Option<u64>,
+        module_storage: &impl ModuleStorage,
         f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
     ) -> VMResult<Ret> {
-        let vm = self.vm();
+        let (vm, _) = self.vm_and_runtime_environment();
         let (mut session, mut gas_status) = {
             let gas_status = get_gas_status(
                 &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
@@ -497,7 +503,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let res = f(&mut session, &mut gas_status)?;
 
         // save changeset
-        let changeset = session.finish()?;
+        let changeset = session.finish(module_storage)?;
         self.storage.apply(changeset).unwrap();
         Ok(res)
     }
@@ -509,6 +515,17 @@ fn vm_config() -> VMConfig {
         paranoid_type_checks: true,
         ..VMConfig::default()
     }
+}
+
+fn create_runtime_environment(vm_config: VMConfig) -> RuntimeEnvironment {
+    RuntimeEnvironment::new_with_config(
+        move_stdlib::natives::all_natives(
+            STD_ADDR,
+            // TODO: come up with a suitable gas schedule
+            move_stdlib::natives::GasParameters::zeros(),
+        ),
+        vm_config,
+    )
 }
 
 fn create_vm(vm_config: VMConfig) -> MoveVM {

@@ -2466,7 +2466,7 @@ mod test {
         let counter = RefCell::new(5);
         let base_view = MockStateView::new(HashMap::new());
         let start_counter = 5;
-        let runtime_environment = RuntimeEnvironment::test();
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
 
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
@@ -2741,7 +2741,7 @@ mod test {
             let unsync_map = UnsyncMap::new();
             let counter = RefCell::new(start_counter);
             let base_view = MockStateView::new(data);
-            let runtime_environment = RuntimeEnvironment::test();
+            let runtime_environment = RuntimeEnvironment::new(vec![]);
             Self {
                 unsync_map,
                 counter,
@@ -2782,7 +2782,7 @@ mod test {
             let base_view = MockStateView::new(data);
             let versioned_map = MVHashMap::new();
             let scheduler = Scheduler::new(30);
-            let runtime_environment = RuntimeEnvironment::test();
+            let runtime_environment = RuntimeEnvironment::new(vec![]);
 
             Self {
                 start_counter,

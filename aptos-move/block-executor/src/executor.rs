@@ -51,7 +51,7 @@ use claims::assert_none;
 use core::panic;
 use fail::fail_point;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::RuntimeEnvironment;
+use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -857,7 +857,7 @@ where
         drop(init_timer);
 
         // Shared environment used by each executor.
-        let runtime_environment = executor.runtime_environment();
+        let runtime_environment = env.runtime_environment();
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::Retry;
@@ -1143,17 +1143,17 @@ where
 
     pub(crate) fn execute_transactions_sequential(
         &self,
-        env: E::Environment,
+        env: &E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(env, base_view);
+        let executor = E::init(env.clone(), base_view);
         drop(init_timer);
 
-        let runtime_environment = executor.runtime_environment();
+        let runtime_environment = env.runtime_environment();
 
         let start_counter = gen_id_start_value(true);
         let counter = RefCell::new(start_counter);
@@ -1487,12 +1487,8 @@ where
         }
 
         // If we didn't run parallel, or it didn't finish successfully - run sequential
-        let sequential_result = self.execute_transactions_sequential(
-            env.clone(),
-            signature_verified_block,
-            base_view,
-            false,
-        );
+        let sequential_result =
+            self.execute_transactions_sequential(&env, signature_verified_block, base_view, false);
 
         // If sequential gave us result, return it
         let sequential_error = match sequential_result {
@@ -1511,7 +1507,7 @@ where
                 init_speculative_logs(signature_verified_block.len());
 
                 let sequential_result = self.execute_transactions_sequential(
-                    env,
+                    &env,
                     signature_verified_block,
                     base_view,
                     true,

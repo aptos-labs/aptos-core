@@ -4,19 +4,25 @@
 use crate::AptosVM;
 #[cfg(any(test, feature = "testing"))]
 use crate::{
-    aptos_vm::get_or_vm_startup_failure, data_cache::AsMoveResolver,
+    data_cache::AsMoveResolver,
     move_vm_ext::session::user_transaction_sessions::session_change_sets::SystemSessionChangeSet,
     transaction_metadata::TransactionMetadata,
 };
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::{state_store::StateView, transaction::SignedTransaction};
 #[cfg(any(test, feature = "testing"))]
+use aptos_vm_environment::environment::Environment;
+#[cfg(any(test, feature = "testing"))]
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 #[cfg(any(test, feature = "testing"))]
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use move_binary_format::errors::VMResult;
 #[cfg(any(test, feature = "testing"))]
 use move_core_types::vm_status::VMStatus;
+#[cfg(any(test, feature = "testing"))]
+use move_vm_runtime::WithRuntimeEnvironment;
+#[cfg(any(test, feature = "testing"))]
+use std::sync::Arc;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum InjectedError {
@@ -79,30 +85,31 @@ impl AptosVM {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let vm_gas_params = self
-            .gas_params()
+            .gas_params_for_test()
             .expect("should be able to get gas params")
             .vm
             .clone();
         let storage_gas_params = self
-            .storage_gas_params
-            .as_ref()
+            .storage_gas_params(&log_context)
             .expect("should be able to get storage gas params")
             .clone();
 
         let mut gas_meter = make_prod_gas_meter(
-            self.gas_feature_version,
+            self.gas_feature_version(),
             vm_gas_params,
             storage_gas_params,
             false,
             gas_meter_balance.into(),
         );
 
-        let change_set_configs = &get_or_vm_startup_failure(&self.storage_gas_params, &log_context)
+        let change_set_configs = &self
+            .storage_gas_params(&log_context)
             .expect("Storage gas parameters should exist for tests")
             .change_set_configs;
 
         let resolver = state_view.as_move_resolver();
-        let module_storage = self.as_aptos_code_storage(&state_view);
+        let env = Arc::new(Environment::new(state_view, false, None));
+        let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
         let traversal_storage = TraversalStorage::new();
         self.failed_transaction_cleanup(

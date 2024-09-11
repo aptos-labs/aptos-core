@@ -845,20 +845,31 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 ///////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct MockTask<K, E> {
-    runtime_environment: RuntimeEnvironment,
     phantom_data: PhantomData<(K, E)>,
 }
 
 impl<K, E> MockTask<K, E> {
     pub fn new() -> Self {
         Self {
-            runtime_environment: RuntimeEnvironment::test(),
             phantom_data: PhantomData,
         }
     }
 }
 
-impl<K, E> WithRuntimeEnvironment for MockTask<K, E> {
+#[derive(Clone)]
+pub(crate) struct MockEnvironment {
+    runtime_environment: RuntimeEnvironment,
+}
+
+impl MockEnvironment {
+    pub(crate) fn new() -> Self {
+        Self {
+            runtime_environment: RuntimeEnvironment::new(vec![]),
+        }
+    }
+}
+
+impl WithRuntimeEnvironment for MockEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         &self.runtime_environment
     }
@@ -869,7 +880,7 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type Environment = ();
+    type Environment = MockEnvironment;
     type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;

@@ -13,12 +13,11 @@ use aptos_vm_types::{
     resolver::ResourceGroupSize, resource_group_adapter::group_tagged_resource_size,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
-    CompiledModule,
-};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    account_address::AccountAddress,
     effects::{Op as MoveStorageOp, Op},
+    identifier::IdentStr,
     language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -166,18 +165,13 @@ impl<'r> WriteOpConverter<'r> {
         }
     }
 
-    /// Converts module bytes and their compiled representation extracted from publish
-    /// request into write ops. Only used by V2 loader implementation.
-    pub(crate) fn convert_modules_into_write_ops(
+    pub(crate) fn convert_modules_into_write_ops<'a>(
         &self,
         module_storage: &impl AptosModuleStorage,
-        code_and_modules: impl IntoIterator<Item = (Bytes, CompiledModule)>,
+        staged_modules: impl Iterator<Item = (&'a AccountAddress, &'a IdentStr, Bytes)>,
     ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
         let mut write_ops = BTreeMap::new();
-        for (bytes, compiled_module) in code_and_modules.into_iter() {
-            let addr = compiled_module.self_addr();
-            let name = compiled_module.self_name();
-
+        for (addr, name, bytes) in staged_modules {
             let module_exists = module_storage
                 .check_module_exists(addr, name)
                 .map_err(|e| e.to_partial())?;
@@ -389,18 +383,20 @@ mod tests {
         },
         write_set::TransactionWrite,
     };
+    use aptos_vm_environment::environment::Environment;
     use aptos_vm_types::{
         module_and_script_storage::AsAptosCodeStorage,
         resource_group_adapter::{group_size_as_sum, GroupSizeKind},
     };
     use claims::{assert_none, assert_ok, assert_some, assert_some_eq};
-    use move_binary_format::file_format::empty_module_with_dependencies_and_friends;
+    use move_binary_format::{
+        file_format::empty_module_with_dependencies_and_friends, CompiledModule,
+    };
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-    use move_vm_runtime::move_vm::MoveVM;
-    use once_cell::sync::Lazy;
+    use move_vm_runtime::WithRuntimeEnvironment;
 
     fn raw_metadata(v: u64) -> StateValueMetadata {
         StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -459,8 +455,6 @@ mod tests {
         }
     }
 
-    static MOCK_VM: Lazy<MoveVM> = Lazy::new(|| MoveVM::new(vec![]));
-
     fn module(name: &str) -> (StateKey, Bytes, CompiledModule) {
         let module = empty_module_with_dependencies_and_friends(name, vec![], vec![]);
         let state_key = StateKey::module(module.self_addr(), module.self_name());
@@ -509,18 +503,20 @@ mod tests {
             (c_state_key.clone(), c_state_value.clone()),
         ]));
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(&MOCK_VM);
+        let env = Environment::new(&state_view, false, None);
+        let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
         // Storage slot metadata is enabled on the mainnet.
         let woc = WriteOpConverter::new(&resolver, true);
 
         let modules = vec![
-            (a_bytes.clone(), a),
-            (b_bytes.clone(), b),
-            (c_bytes.clone(), c),
-            (d_bytes.clone(), d),
+            (a.self_addr(), a.self_name(), a_bytes.clone()),
+            (b.self_addr(), b.self_name(), b_bytes.clone()),
+            (c.self_addr(), c.self_name(), c_bytes.clone()),
+            (d.self_addr(), d.self_name(), d_bytes.clone()),
         ];
 
-        let results = assert_ok!(woc.convert_modules_into_write_ops(&code_storage, modules));
+        let results =
+            assert_ok!(woc.convert_modules_into_write_ops(&code_storage, modules.into_iter()));
         assert_eq!(results.len(), 4);
 
         // For `a`, `b`, and `c`, since they exist, metadata is inherited
