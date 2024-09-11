@@ -20,8 +20,8 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
-    deserialize_script, logging::expect_no_verification_errors, module_cyclic_dependency_error,
-    module_linker_error, script_hash, CodeStorage, Module, ModuleStorage, Script,
+    deserialize_script, module_cyclic_dependency_error, module_linker_error, script_hash,
+    CodeStorage, Module, ModuleStorage, Script,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -121,12 +121,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         let immediate_dependencies = partially_verified_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
-                if self.check_module_exists(addr, name)? {
-                    self.fetch_verified_module(addr, name)
-                        .map_err(expect_no_verification_errors)
-                } else {
-                    Err(module_linker_error!(addr, name))
-                }
+                self.fetch_verified_module(addr, name)?
+                    .ok_or_else(|| module_linker_error!(addr, name))
             })
             .collect::<VMResult<Vec<_>>>()?;
         let script = self
@@ -188,32 +184,50 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
+    ) -> VMResult<Option<Vec<Metadata>>> {
         Ok(self
-            .get_existing_module_storage_entry_with_version(address, module_name)?
-            .1
-            .metadata()
-            .to_vec())
+            .read_module_storage(address, module_name)?
+            .into_versioned()
+            .map(|(_, entry)| entry.metadata().to_vec()))
     }
 
     fn fetch_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Arc<CompiledModule>> {
+    ) -> VMResult<Option<Arc<CompiledModule>>> {
         Ok(self
-            .get_existing_module_storage_entry_with_version(address, module_name)?
-            .1
-            .as_compiled_module())
+            .read_module_storage(address, module_name)?
+            .into_versioned()
+            .map(|(_, entry)| entry.as_compiled_module()))
     }
 
     fn fetch_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
+    ) -> VMResult<Option<Arc<Module>>> {
         let mut visited = HashSet::new();
-        self.traversed_published_dependencies(address, module_name, &mut visited)
+
+        let (version, entry) = match self
+            .read_module_storage(address, module_name)?
+            .into_versioned()
+        {
+            Some((version, entry)) => (version, entry),
+            None => return Ok(None),
+        };
+        if let Some(module) = entry.try_as_verified_module() {
+            return Ok(Some(module));
+        }
+
+        let module = self.traversed_published_dependencies(
+            version,
+            entry,
+            address,
+            module_name,
+            &mut visited,
+        )?;
+        Ok(Some(module))
     }
 }
 
@@ -307,21 +321,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     /// the verified dependencies are made visible in the module storage.
     fn traversed_published_dependencies(
         &self,
+        version: ModuleVersion,
+        entry: Arc<ModuleStorageEntry>,
         address: &AccountAddress,
         module_name: &IdentStr,
         visited: &mut HashSet<T::Key>,
     ) -> VMResult<Arc<Module>> {
-        // Get the module and check if is verified, if so, return it.
-        let (version, entry) =
-            self.get_existing_module_storage_entry_with_version(address, module_name)?;
-        if let Some(module) = entry.try_as_verified_module() {
-            return Ok(module);
-        }
-
         // At this point, the following holds:
-        //  1. The index of returned entry corresponds to a committed transaction.
-        //     This is true because otherwise we would observe non-existent module
-        //     an exit early.
+        //  1. The version of the returned entry corresponds to a committed transaction. This is
+        //     true because otherwise we would observe non-existent module and exit early.
         //  2. Entry exists at this index.
 
         // Otherwise, run the local verification first.
@@ -340,7 +348,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         let mut verified_dependencies = vec![];
         for (addr, name) in partially_verified_module.immediate_dependencies_iter() {
             // A verified dependency, continue early.
-            let (_, dep_entry) = self.get_existing_module_storage_entry_with_version(addr, name)?;
+            let (dep_ver, dep_entry) =
+                self.get_existing_module_storage_entry_with_version(addr, name)?;
             if let Some(module) = dep_entry.try_as_verified_module() {
                 verified_dependencies.push(module);
                 continue;
@@ -356,7 +365,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             let dep_key = T::Key::from_address_and_module_name(addr, name);
 
             if visited.insert(dep_key.clone()) {
-                let module = self.traversed_published_dependencies(addr, name, visited)?;
+                let module =
+                    self.traversed_published_dependencies(dep_ver, dep_entry, addr, name, visited)?;
                 verified_dependencies.push(module);
             } else {
                 return Err(module_cyclic_dependency_error!(address, module_name));

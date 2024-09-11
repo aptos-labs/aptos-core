@@ -16,6 +16,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress, language_storage::ModuleId, vm_status::StatusCode,
 };
+use move_vm_runtime::module_linker_error;
 use std::collections::HashSet;
 
 const EVENT_MODULE_NAME: &str = "event";
@@ -130,14 +131,17 @@ pub(crate) fn extract_event_metadata_from_module(
     use_loader_v2: bool,
 ) -> VMResult<HashSet<String>> {
     if use_loader_v2 {
+        let addr = module_id.address();
+        let name = module_id.name();
+
         // TODO(loader_v2): We can optimize metadata calls as well.
-        let metadata = module_storage
-            .fetch_deserialized_module(module_id.address(), module_id.name())
-            .map(|m| aptos_framework::get_metadata_from_compiled_module(m.as_ref()));
-        if let Ok(Some(metadata)) = metadata {
-            extract_event_metadata(&metadata)
-        } else {
-            Ok(HashSet::new())
+        let module = module_storage
+            .fetch_deserialized_module(addr, name)?
+            .ok_or_else(|| module_linker_error!(addr, name))?;
+
+        match aptos_framework::get_metadata_from_compiled_module(module.as_ref()) {
+            Some(metadata) => extract_event_metadata(&metadata),
+            None => Ok(HashSet::new()),
         }
     } else {
         #[allow(deprecated)]

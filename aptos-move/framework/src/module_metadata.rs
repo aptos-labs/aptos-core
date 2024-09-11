@@ -237,7 +237,7 @@ pub fn get_vm_metadata(
     if features.is_loader_v2_enabled() {
         let metadata = module_storage
             .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()?;
+            .ok()??;
         get_metadata(&metadata)
     } else {
         #[allow(deprecated)]
@@ -255,7 +255,7 @@ pub fn get_vm_metadata_v0(
     if features.is_loader_v2_enabled() {
         let metadata = module_storage
             .fetch_module_metadata(module_id.address(), module_id.name())
-            .ok()?;
+            .ok()??;
         get_metadata_v0(&metadata)
     } else {
         #[allow(deprecated)]
