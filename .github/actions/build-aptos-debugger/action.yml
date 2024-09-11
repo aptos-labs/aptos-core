@@ -1,0 +1,33 @@
+name: "Build aptos-debugger binary"
+description: Build aptos-debugger binary
+
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git"
+    required: false
+  GIT_SHA:
+    required: true
+    type: string
+    description: The git SHA1 to test.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.GIT_SHA }}
+
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    - name: Build aptos-debugger in release mode
+      shell: bash
+      run: cargo build --release -p aptos-debugger
+
+    - name: strip and copy to working directory
+      shell: bash
+      run: |
+        mkdir -p aptos-debugger-build
+        strip -s target/release/aptos-debugger
+        cp target/release/aptos-debugger aptos-debugger-build/

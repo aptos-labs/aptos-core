@@ -45,7 +45,7 @@ def warm_cache_and_get_latest_backup_version(
     """query latest version in backup, at the same time, pre-heat metadata cache"""
     db_backup_result = subprocess.Popen(
         [
-            "target/release/aptos-debugger",
+            "aptos-debugger",
             "aptos-db",
             "backup",
             "query",

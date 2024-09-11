@@ -1,0 +1,38 @@
+name: "Build aptos-debugger binary"
+description: Build aptos-debugger binary
+
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git"
+    required: false
+  GIT_SHA:
+    required: true
+    type: string
+    description: The git SHA1 to test.
+  EXPECT_CACHE_HIT:
+    required: false
+    type: boolean
+    description: if true, will fail fast on cache miss
+    default: false
+
+runs:
+  using: composite
+  steps:
+    - name: Check Cache
+      id: cache-aptos-debugger-binary
+      uses: actions/cache@v4
+      with:
+        path: aptos-debugger-build
+        key: aptos-debugger-${{ inputs.GIT_SHA }}
+        fail-on-cache-miss: ${{ inputs.EXPECT_CACHE_HIT }}
+
+    - uses: aptos-labs/aptos-core/.github/actions/build-aptos-debugger@main
+      if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
+      with:
+        GIT_SHA: ${{ inputs.GIT_SHA }}
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    - name: Update Path
+      shell: bash
+      run: |
+        echo "$(pwd)/aptos-debugger-build" >> $GITHUB_PATH
