@@ -1889,6 +1889,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                     let sp!(lhs_loc, lhs_) = lhs;
                     match lhs_ {
                         // *e1 += e2
+                        // =>
                         // { let t = *e1; *t = *t + e2 }
                         Exp_::Dereference(lhs_inner) => {
                             let lhs_inner_loc = lhs_inner.loc;
@@ -1934,34 +1935,43 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                             );
                             Exp_::Block(sequence)
                         },
+                        // e1 += e2
+                        // =>
+                        // { let t = e1; t = t + e2 }
                         _ => {
-                            // let lhs = sp(lhs_loc, lhs_);
-                            let use_decl = vec![];
                             let tmp_name = Symbol::from("__t");
-                            let bind_ = Bind_::Var(Var(sp(lhs_loc, tmp_name)));
-                            let bind_ls = sp(lhs_loc, vec![sp(lhs_loc, bind_)]);
-                            let tmp = Exp_::Name(
-                                sp(lhs_loc, NameAccessChain_::One(sp(lhs_loc, tmp_name))),
-                                None,
-                            );
+                            let bind_var = Bind_::Var(Var(sp(lhs_loc, tmp_name)));
+                            let bind_ls = sp(lhs_loc, vec![sp(lhs_loc, bind_var)]);
+                            // &mut e1
                             let mut_borrow_lhs =
                                 sp(lhs_loc, Exp_::Borrow(true, Box::new(sp(lhs_loc, lhs_))));
+                            // let t = &mut e1;
                             let sequence_item = sp(
                                 lhs_loc,
                                 SequenceItem_::Bind(bind_ls, None, Box::new(mut_borrow_lhs)),
                             );
+                            // t
+                            let tmp = Exp_::Name(
+                                sp(lhs_loc, NameAccessChain_::One(sp(lhs_loc, tmp_name))),
+                                None,
+                            );
+                            // *t
                             let deref_tmp = sp(
                                 lhs_loc,
                                 Exp_::Dereference(Box::new(sp(lhs_loc, tmp.clone()))),
                             );
+                            // *t + e2
                             let rhs_expanded_ = Exp_::BinopExp(
                                 Box::new(deref_tmp.clone()),
-                                sp(rhs.loc, BinOp_::Add),
+                                sp(op_loc, BinOp_::Add),
                                 rhs,
                             );
                             let rhs_expanded = sp(rhs_loc, rhs_expanded_);
+                            // *t = *t + e2
                             let exp_ = Exp_::Assign(Box::new(deref_tmp), Box::new(rhs_expanded));
                             let exp = sp(block_loc, exp_);
+                            let use_decl = vec![];
+                            // { let t = &mut e1; *t = *t + e2 }
                             let sequence = (
                                 use_decl,
                                 vec![sequence_item],
