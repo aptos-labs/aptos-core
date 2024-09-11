@@ -2562,10 +2562,10 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         entry_sets: &HashSet<EntryFunction>
     ) -> (bool, Option<EntryFunction>) {
+        let now = Instant::now();
         let mut session = self.new_session(resolver, SessionId::Void, None);
         //let mut res = vec![];
         //let mut entry_funs = vec![];
-        let now = Instant::now();
         for txn in signed_transactions {
             let (result, entry_opt) = self.check_randomness(txn, resolver, & session, entry_sets);
             // res.push(result);
