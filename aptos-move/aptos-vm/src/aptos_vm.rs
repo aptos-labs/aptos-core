@@ -105,6 +105,7 @@ use std::{
     sync::Arc,
 };
 use std::collections::HashSet;
+use std::time::Instant;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -2564,14 +2565,19 @@ impl AptosVM {
         let mut session = self.new_session(resolver, SessionId::Void, None);
         //let mut res = vec![];
         //let mut entry_funs = vec![];
+        let now = Instant::now();
         for txn in signed_transactions {
             let (result, entry_opt) = self.check_randomness(txn, resolver, & session, entry_sets);
             // res.push(result);
             if result {
+                let elapsed = now.elapsed();
+                info!("VM randomness early return: {:.3?}", elapsed);
                 // entry_funs.push(entry_opt);
                 return (true, entry_opt)
             }
         }
+        let elapsed = now.elapsed();
+        info!("VM randomness: {:.3?}", elapsed);
         (false, None)
     }
 
