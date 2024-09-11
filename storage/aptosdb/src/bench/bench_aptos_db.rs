@@ -1,6 +1,7 @@
 use aptos_db::{
     db::{
-        gather_state_updates_until_last_checkpoint, test_helper, test_helper::arb_blocks_to_commit,
+        gather_state_updates_until_last_checkpoint, test_helper,
+        test_helper::{arb_blocks_to_commit, arb_blocks_to_commit_with_block_nums},
     },
     transaction_store,
     transaction_store::TransactionStore,
@@ -18,7 +19,7 @@ fn main() {
     let db = AptosDB::new_for_test(&tmp_dir);
 
     // 生成测试数据
-    let input = arb_blocks_to_commit()
+    let (input, _) = arb_blocks_to_commit_with_block_nums(10000, 20000)
         .new_tree(&mut TestRunner::default())
         .unwrap()
         .current();
