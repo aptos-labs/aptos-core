@@ -21,6 +21,6 @@ pub(crate) fn get_progress(db: &DB, progress_key: &DbMetadataKey) -> Result<Opti
         .map(|v| v.expect_version()))
 }
 
-pub(crate) fn new_sharded_kv_schema_batch() -> ShardedStateKvSchemaBatch {
+pub fn new_sharded_kv_schema_batch() -> ShardedStateKvSchemaBatch {
     arr![SchemaBatch::new(); 16]
 }

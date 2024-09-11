@@ -84,7 +84,7 @@ impl LedgerMetadataDb {
         Arc::clone(&self.db)
     }
 
-    pub(crate) fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
+    pub fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         self.db.write_schemas(batch)
     }
 

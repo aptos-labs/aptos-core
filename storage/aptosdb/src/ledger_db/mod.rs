@@ -294,7 +294,7 @@ impl LedgerDb {
         Ok(())
     }
 
-    pub(crate) fn metadata_db(&self) -> &LedgerMetadataDb {
+    pub fn metadata_db(&self) -> &LedgerMetadataDb {
         &self.ledger_metadata_db
     }
 

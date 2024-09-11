@@ -1,7 +1,9 @@
+use aptos_db::{db::test_helper::arb_state_kv_sets, utils::new_sharded_kv_schema_batch, AptosDB};
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::jmt_update_refs;
 use aptos_temppath::TempPath;
-use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-use aptosdb::AptosDB;
-use proptest::{prelude::*, test_runner::TestRunner};
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use std::time::Instant;
 
 fn main() {
@@ -23,14 +25,14 @@ fn main() {
     for (version, kv_set) in input.iter().enumerate() {
         let version = version as u64;
         let root = store
-            .merklize_value_set(jmt_update_refs(&kv_set), version, None)
+            .merklize_value_set(jmt_update_refs(&kv_set).collect(), version, None)
             .unwrap();
         let ledger_batch = SchemaBatch::new();
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
         let state_kv_metadata_batch = SchemaBatch::new();
         store
             .put_value_sets(
-                vec![&kv_set],
+                vec![&kv_set.clone()].into_iter().collect::<Vec<_>>(),
                 version,
                 StateStorageUsage::new_untracked(),
                 None,

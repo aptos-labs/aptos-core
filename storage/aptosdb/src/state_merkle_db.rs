@@ -25,7 +25,6 @@ use aptos_jellyfish_merkle::{
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
-#[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
@@ -371,7 +370,6 @@ impl StateMerkleDb {
     }
 
     // A non-sharded helper function accepting KV updates from all shards.
-    #[cfg(test)]
     pub fn merklize_value_set(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,

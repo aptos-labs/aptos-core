@@ -112,7 +112,7 @@ impl StateKvDb {
         Ok(state_kv_db)
     }
 
-    pub(crate) fn commit(
+    pub fn commit(
         &self,
         version: Version,
         state_kv_metadata_batch: SchemaBatch,
