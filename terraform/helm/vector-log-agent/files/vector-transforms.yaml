@@ -120,27 +120,27 @@ transforms:
     source: |
       . = flatten(., ".") # in order for fields to become individual, filterable top-level fields in uptrace we need to flatten nested objects into top-level keys.
       .service_name = .k8s.labels.app
-      .repo = "gcp"
+      .repo = "k8s"
 
-  datadog_logs:
-    type: remap
-    inputs:
-      - final_logs
-    source: |
-      .ddsource = "k8s"
-      if is_string(.k8s.labels.app) {
-        .service = .k8s.labels.app
-      }
-      .ddtags, _ = "kube_cluster_name:" + .k8s.cluster + ",kube_namespace:" + .k8s.namespace + ",pod_name:" + .k8s.pod_name
+  # datadog_logs:
+  #   type: remap
+  #   inputs:
+  #     - final_logs
+  #   source: |
+  #     .ddsource = "k8s"
+  #     if is_string(.k8s.labels.app) {
+  #       .service = .k8s.labels.app
+  #     }
+  #     .ddtags, _ = "kube_cluster_name:" + .k8s.cluster + ",kube_namespace:" + .k8s.namespace + ",pod_name:" + .k8s.pod_name
 
-  signoz_logs:
-    type: remap
-    inputs:
-      - final_logs
-    source: |
-      .severity_text = del(.level)
-      .source_type = "k8s"
-      tmp = { "k8s": del(.k8s)}
-      resources_tmp = flatten(tmp, ".")
-      . = flatten(., ".")
-      .resources = resources_tmp
+  # signoz_logs:
+  #   type: remap
+  #   inputs:
+  #     - final_logs
+  #   source: |
+  #     .severity_text = del(.level)
+  #     .source_type = "k8s"
+  #     tmp = { "k8s": del(.k8s)}
+  #     resources_tmp = flatten(tmp, ".")
+  #     . = flatten(., ".")
+  #     .resources = resources_tmp

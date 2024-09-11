@@ -87,9 +87,10 @@ validator:
   affinity: {}
   # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config: {}
-
+  # -- DEPRECATED: it's broken with Cillium a.k.a. GKE DataplaneV2.
+  # -- templates/networkpolicy.yaml kept around for reference in case we want to resurrect it.
   # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
-  enableNetworkPolicy: true
+  enableNetworkPolicy: false
 
 fullnode:
   # -- Specify fullnode groups by `name` and number of `replicas`
