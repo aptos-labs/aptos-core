@@ -527,6 +527,7 @@ impl ProposalGenerator {
             info!("Check randomness inline txns: {:.3?}", duration2);
             // for entry in entry_map {
             //     if !self.randomness_info.lock().contains(&entry) {
+            //         info!("add entry:{:?}", entry.function());
             //         self.randomness_info.lock().insert(entry);
             //     }
             // }
@@ -572,6 +573,7 @@ impl ProposalGenerator {
                     let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref(), &HashSet::new());
                     // for entry in entry_map {
                     //     if !self.randomness_info.lock().contains(&entry) {
+                    //         info!("add entry:{:?}", entry.function());
                     //         self.randomness_info.lock().insert(entry);
                     //     }
                     // }

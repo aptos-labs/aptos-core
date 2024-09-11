@@ -871,6 +871,39 @@ impl Loader {
         Ok(module_ref)
     }
 
+    pub(crate) fn load_module_no_dependency(
+        &self,
+        id: &ModuleId,
+        data_store: &mut TransactionDataCache,
+        module_store: &ModuleStorageAdapter,
+    ) -> VMResult<Arc<Module>> {
+        // if the module is already in the code cache, load the cached version
+        if let Some(cached) = module_store.module_at(id) {
+            self.module_cache_hits.write().insert(id.clone());
+            return Ok(cached);
+        }
+
+        // otherwise, load the transitive closure of the target module
+        let (module_ref, size) = self.load_and_verify_module(
+            id,
+            data_store,
+            /* allow_module_loading_failure */ true,
+        )?;
+
+        let module_ref =
+            module_store.insert(&self.natives, id.clone(), size, module_ref, &self.name_cache)?;
+
+        // verify that the transitive closure does not have cycles
+        // self.verify_module_cyclic_relations(
+        //     module_ref.module(),
+        //     &BTreeMap::new(),
+        //     &BTreeSet::new(),
+        //     module_store,
+        // )
+        //     .map_err(expect_no_verification_errors)?;
+        Ok(module_ref)
+    }
+
     // Load, deserialize, and check the module with the bytecode verifier, without linking
     fn load_and_verify_module(
         &self,
