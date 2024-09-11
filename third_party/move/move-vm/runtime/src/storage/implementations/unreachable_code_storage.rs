@@ -1,7 +1,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{CodeStorage, Module, ModuleStorage, Script};
+use crate::{
+    CodeStorage, Module, ModuleStorage, RuntimeEnvironment, Script, WithRuntimeEnvironment,
+};
 use bytes::Bytes;
 use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
@@ -34,6 +36,13 @@ macro_rules! unreachable_error {
 /// to take a reference to loader V2 storage interfaces, even if VM uses V1 loader. In this
 /// case, they would be just unreachable.
 pub struct UnreachableCodeStorage;
+
+impl WithRuntimeEnvironment for UnreachableCodeStorage {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        // TODO(loader_v2): Double check this can never be called.
+        unreachable!("Should not be called for unreachable storage")
+    }
+}
 
 impl ModuleStorage for UnreachableCodeStorage {
     fn check_module_exists(

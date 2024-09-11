@@ -26,9 +26,11 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     AptosVM,
 };
+use aptos_vm_environment::environment::Environment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use itertools::Itertools;
+use move_vm_runtime::WithRuntimeEnvironment;
 use std::{path::Path, sync::Arc, time::Instant};
 
 pub struct AptosDebugger {
@@ -118,9 +120,10 @@ impl AptosDebugger {
             bail!("Module bundle payload has been removed")
         }
 
-        let vm = AptosVM::new(&state_view);
+        let env = Arc::new(Environment::new(&state_view, false, None));
+        let vm = AptosVM::new_with_environment(env.clone(), &state_view);
         let resolver = state_view.as_move_resolver();
-        let code_storage = vm.as_aptos_code_storage(&state_view);
+        let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,

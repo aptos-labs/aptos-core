@@ -3,7 +3,7 @@
 
 use crate::{
     config::VMConfig,
-    loader::check_natives,
+    loader::{check_natives, TypeCache},
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
         struct_name_index_map::StructNameIndexMap, verified_module_cache::VERIFIED_MODULES_V2,
@@ -11,6 +11,7 @@ use crate::{
     },
     Module, Script,
 };
+use ambassador::delegatable_trait;
 use bytes::Bytes;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -24,12 +25,12 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
+use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
-/// Wrapper around partially verified compiled module, i.e., one that passed
-/// local bytecode verification, but not the dependency checks yet. Also
-/// carries size in bytes.
+/// Wrapper around partially verified compiled module, i.e., one that passed local bytecode
+/// verification, but not the dependency checks yet. Also carries module size in bytes.
 pub struct PartiallyVerifiedModule(Arc<CompiledModule>, usize);
 
 impl PartiallyVerifiedModule {
@@ -40,8 +41,8 @@ impl PartiallyVerifiedModule {
     }
 }
 
-/// Wrapper around partially verified compiled script, i.e., one that passed
-/// local bytecode verification, but not the dependency checks yet.
+/// Wrapper around partially verified compiled script, i.e., one that passed local bytecode
+/// verification, but not the dependency checks yet.
 pub struct PartiallyVerifiedScript(Arc<CompiledScript>);
 
 impl PartiallyVerifiedScript {
@@ -52,49 +53,53 @@ impl PartiallyVerifiedScript {
     }
 }
 
-/// [MoveVM] runtime environment encapsulating different configurations. Shared
-/// between the VM and the code cache.
+/// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
+/// the code cache, possibly across multiple threads.
 pub struct RuntimeEnvironment {
-    /// Configuration for the VM. Contains information about enabled checks,
-    /// verification, deserialization, etc.
+    /// Configuration for the VM. Contains information about enabled checks, verification,
+    /// deserialization, etc.
     vm_config: VMConfig,
-    /// All registered native functions in the current context (binary). When
-    /// a verified [Module] is constructed, existing native functions are inlined
-    /// in the module representation, so that the interpreter can call them directly.
+    /// All registered native functions in the current context (binary). When a verified [Module]
+    /// is constructed, existing native functions are inlined in the module representation, so that
+    /// the interpreter can call them directly.
     natives: NativeFunctions,
     /// Optional verifier extension to run passes on modules and scripts provided externally.
     verifier_extension: Option<Arc<dyn VerifierExtension>>,
 
-    /// Map from struct names to indices, to save on unnecessary cloning and reduce
-    /// memory consumption. Used by all struct type creations in the VM and in code cache.
+    /// Map from struct names to indices, to save on unnecessary cloning and reduce memory
+    /// consumption. Used by all struct type creations in the VM and in code cache.
     struct_name_index_map: StructNameIndexMap,
+
+    /// Type cache for struct layouts, tags and depths.
+    ty_cache: RwLock<TypeCache>,
 }
 
 impl RuntimeEnvironment {
-    /// Creates a new runtime environment with native functions and VM configurations.
-    /// If there are duplicated natives, creation panics. Also, callers can provide
-    /// verification extensions to add hooks on top of a bytecode verifier.
     pub fn new(
-        vm_config: VMConfig,
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-        verifier_extension: Option<Arc<dyn VerifierExtension>>,
+    ) -> Self {
+        let vm_config = VMConfig {
+            // Keep the paranoid mode on as we most likely want this for tests.
+            paranoid_type_checks: true,
+            ..VMConfig::default()
+        };
+        Self::new_with_config(natives, vm_config)
+    }
+
+    /// Creates a new runtime environment with native functions and VM configurations. If there are
+    /// duplicated natives, panics.
+    pub fn new_with_config(
+        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        vm_config: VMConfig,
     ) -> Self {
         let natives = NativeFunctions::new(natives)
             .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
         Self {
             vm_config,
             natives,
-            struct_name_index_map: StructNameIndexMap::empty(),
-            verifier_extension,
-        }
-    }
-
-    pub fn test() -> Self {
-        Self {
-            vm_config: VMConfig::default(),
-            natives: NativeFunctions::new(vec![]).unwrap(),
-            struct_name_index_map: StructNameIndexMap::empty(),
             verifier_extension: None,
+            struct_name_index_map: StructNameIndexMap::empty(),
+            ty_cache: RwLock::new(TypeCache::empty()),
         }
     }
 
@@ -108,20 +113,21 @@ impl RuntimeEnvironment {
         &self.natives
     }
 
-    /// Returns the re-indexing map currently used by this runtime environment
-    /// to remap struct identifiers into indices.
+    /// Returns the re-indexing map currently used by this runtime environment to remap struct
+    /// identifiers into indices.
     pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
         &self.struct_name_index_map
     }
 
-    /// Returns the cloned environment, with a deep-clone of struct name index map.
-    pub fn clone_with_new_struct_name_index_map(&self) -> Self {
-        Self {
-            vm_config: self.vm_config.clone(),
-            natives: self.natives.clone(),
-            verifier_extension: self.verifier_extension.clone(),
-            struct_name_index_map: self.struct_name_index_map.clone(),
-        }
+    /// Returns the type cache owned by this runtime environment which stores information about
+    /// struct layouts, tags and depth formulae.
+    pub(crate) fn ty_cache(&self) -> &RwLock<TypeCache> {
+        &self.ty_cache
+    }
+
+    /// Enables delayed field optimization for this environment.
+    pub fn enable_delayed_field_optimization(&mut self) {
+        self.vm_config.delayed_field_optimization_enabled = true;
     }
 
     /// Creates a partially verified compiled script by running:
@@ -141,8 +147,8 @@ impl RuntimeEnvironment {
         Ok(PartiallyVerifiedScript(compiled_script))
     }
 
-    /// Creates a fully verified script by running dependency verification
-    /// pass. The caller must provide verified module dependencies.
+    /// Creates a fully verified script by running dependency verification pass. The caller must
+    /// provide verified module dependencies.
     pub fn build_verified_script(
         &self,
         partially_verified_script: PartiallyVerifiedScript,
@@ -187,8 +193,8 @@ impl RuntimeEnvironment {
         Ok(PartiallyVerifiedModule(compiled_module, module_size))
     }
 
-    /// Creates a fully verified module by running dependency verification
-    /// pass. The caller must provide verified module dependencies.
+    /// Creates a fully verified module by running dependency verification pass. The caller must
+    /// provide verified module dependencies.
     pub fn build_verified_module(
         &self,
         partially_verified_module: PartiallyVerifiedModule,
@@ -209,8 +215,7 @@ impl RuntimeEnvironment {
         result.map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Deserializes bytes into a compiled module. In addition, returns the size
-    /// of the module and its hash.
+    /// Deserializes bytes into a compiled module, also returning its size and hash.
     pub fn deserialize_into_compiled_module(
         &self,
         bytes: &Bytes,
@@ -231,8 +236,7 @@ impl RuntimeEnvironment {
         Ok((compiled_module, bytes.len(), module_hash))
     }
 
-    /// Returns ann error is module's address and name do not match the expected values.
-    /// In general, we enforce this is the case at module publish time.
+    /// Returns an error is module's address and name do not match the expected values.
     #[inline]
     pub fn paranoid_check_module_address_and_name(
         &self,
@@ -260,7 +264,23 @@ impl RuntimeEnvironment {
     }
 }
 
+impl Clone for RuntimeEnvironment {
+    /// Returns the cloned environment. Struct re-indexing map and type caches are cloned and no
+    /// longer shared with the original environment.
+
+    fn clone(&self) -> Self {
+        Self {
+            vm_config: self.vm_config.clone(),
+            natives: self.natives.clone(),
+            verifier_extension: self.verifier_extension.clone(),
+            struct_name_index_map: self.struct_name_index_map.clone(),
+            ty_cache: RwLock::new(self.ty_cache.read().clone()),
+        }
+    }
+}
+
 /// Represents any type that contains a [RuntimeEnvironment].
+#[delegatable_trait]
 pub trait WithRuntimeEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment;
 }

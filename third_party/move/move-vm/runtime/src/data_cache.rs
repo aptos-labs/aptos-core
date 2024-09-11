@@ -7,7 +7,7 @@ use crate::{
     logging::expect_no_verification_errors,
     module_linker_error,
     storage::code_storage::deserialize_script,
-    ModuleStorage, RuntimeEnvironment,
+    ModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -31,6 +31,7 @@ use move_vm_types::{
     value_serde::deserialize_and_allow_delayed_values,
     values::{GlobalValue, Value},
 };
+use sha3::{Digest, Sha3_256};
 use std::{
     collections::btree_map::{self, BTreeMap},
     sync::Arc,
@@ -52,7 +53,7 @@ impl AccountDataCache {
     }
 }
 
-fn fetch_module_impl(
+fn load_module_impl(
     remote: &dyn MoveResolver,
     account_map: &BTreeMap<AccountAddress, AccountDataCache>,
     module_id: &ModuleId,
@@ -112,7 +113,11 @@ impl<'r> TransactionDataCache<'r> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<ChangeSet> {
+    pub(crate) fn into_effects(
+        self,
+        loader: &Loader,
+        module_storage: &dyn ModuleStorage,
+    ) -> PartialVMResult<ChangeSet> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 value
@@ -123,7 +128,7 @@ impl<'r> TransactionDataCache<'r> {
                             .with_message(format!("Error when serializing resource {}.", value))
                     })
             };
-        self.into_custom_effects(&resource_converter, loader)
+        self.into_custom_effects(&resource_converter, loader, module_storage)
     }
 
     /// Same like `into_effects`, but also allows clients to select the format of
@@ -132,6 +137,7 @@ impl<'r> TransactionDataCache<'r> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         loader: &Loader,
+        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<Changes<Bytes, Resource>> {
         let mut change_set = Changes::<Bytes, Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
@@ -148,7 +154,7 @@ impl<'r> TransactionDataCache<'r> {
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
-                    let struct_tag = match loader.type_to_type_tag(&ty)? {
+                    let struct_tag = match loader.type_to_type_tag(&ty, module_storage)? {
                         TypeTag::Struct(struct_tag) => *struct_tag,
                         _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
                     };
@@ -213,7 +219,7 @@ impl<'r> TransactionDataCache<'r> {
 
         let mut load_res = None;
         if !account_cache.data_map.contains_key(ty) {
-            let ty_tag = match loader.type_to_type_tag(ty)? {
+            let ty_tag = match loader.type_to_type_tag(ty, module_storage)? {
                 TypeTag::Struct(s_tag) => s_tag,
                 _ =>
                 // non-struct top-level value; can't happen
@@ -307,8 +313,8 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn fetch_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
-        fetch_module_impl(self.remote, &self.account_map, module_id)
+    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
+        load_module_impl(self.remote, &self.account_map, module_id)
     }
 
     pub(crate) fn load_compiled_script_to_cache(
@@ -330,14 +336,13 @@ impl<'r> TransactionDataCache<'r> {
         &mut self,
         id: ModuleId,
         allow_loading_failure: bool,
-        runtime_environment: &RuntimeEnvironment,
     ) -> VMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
         let cache = &mut self.compiled_modules;
         match cache.entry(id) {
             btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
             btree_map::Entry::Vacant(entry) => {
                 // bytes fetching, allow loading to fail if the flag is set
-                let bytes = match fetch_module_impl(self.remote, &self.account_map, entry.key())
+                let bytes = match load_module_impl(self.remote, &self.account_map, entry.key())
                     .map_err(|err| err.finish(Location::Undefined))
                 {
                     Ok(bytes) => bytes,
@@ -347,16 +352,30 @@ impl<'r> TransactionDataCache<'r> {
                     },
                 };
 
+                let mut sha3_256 = Sha3_256::new();
+                sha3_256.update(&bytes);
+                let hash_value: [u8; 32] = sha3_256.finalize().into();
+
                 // for bytes obtained from the data store, they should always deserialize and verify.
                 // It is an invariant violation if they don't.
-                let (module, size, hash_value) = runtime_environment
-                    .deserialize_into_compiled_module(&bytes)
-                    .map_err(expect_no_verification_errors)?;
-                Ok(entry.insert((Arc::new(module), size, hash_value)).clone())
+                let module =
+                    CompiledModule::deserialize_with_config(&bytes, &self.deserializer_config)
+                        .map_err(|err| {
+                            let msg = format!("Deserialization error: {:?}", err);
+                            PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                                .with_message(msg)
+                                .finish(Location::Module(entry.key().clone()))
+                        })
+                        .map_err(expect_no_verification_errors)?;
+
+                Ok(entry
+                    .insert((Arc::new(module), bytes.len(), hash_value))
+                    .clone())
             },
         }
     }
 
+    #[deprecated]
     pub(crate) fn publish_module(
         &mut self,
         module_id: &ModuleId,

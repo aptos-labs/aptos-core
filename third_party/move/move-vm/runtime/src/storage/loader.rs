@@ -3,13 +3,11 @@
 
 use crate::{
     config::VMConfig,
-    loader::{Function, LoadedFunctionOwner, Module, TypeCache},
+    loader::{Function, LoadedFunctionOwner, Module},
+    logging::expect_no_verification_errors,
     module_linker_error,
     module_traversal::TraversalContext,
-    storage::{
-        environment::RuntimeEnvironment, module_storage::ModuleStorage,
-        struct_name_index_map::StructNameIndexMap,
-    },
+    storage::module_storage::ModuleStorage,
     CodeStorage, LoadedFunction,
 };
 use move_binary_format::{
@@ -28,7 +26,6 @@ use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{StructType, Type, TypeBuilder},
 };
-use parking_lot::RwLock;
 use std::{collections::BTreeMap, sync::Arc};
 use typed_arena::Arena;
 
@@ -36,42 +33,20 @@ use typed_arena::Arena;
 /// module or script cache. Instead, module and script storages are passed to all
 /// APIs by reference.
 pub(crate) struct LoaderV2 {
-    runtime_environment: Arc<RuntimeEnvironment>,
-    // Local caches:
-    //   These caches are owned by this loader and are not affected by module
-    //   upgrades. When a new cache is added, the safety guarantees (i.e., why
-    //   it is safe for the loader to own this cache) MUST be documented.
-    // TODO(loader_v2): Revisit type cache implementation. For now re-use the existing
-    //                  one to unblock upgradable module and script storage first.
-    ty_cache: RwLock<TypeCache>,
+    vm_config: VMConfig,
 }
 
 impl LoaderV2 {
-    pub(crate) fn new(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
-        Self {
-            runtime_environment,
-            ty_cache: RwLock::new(TypeCache::empty()),
-        }
-    }
-
-    pub(crate) fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.runtime_environment.as_ref()
+    pub(crate) fn new(vm_config: VMConfig) -> Self {
+        Self { vm_config }
     }
 
     pub(crate) fn vm_config(&self) -> &VMConfig {
-        self.runtime_environment.vm_config()
+        &self.vm_config
     }
 
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
-        &self.vm_config().ty_builder
-    }
-
-    pub(crate) fn ty_cache(&self) -> &RwLock<TypeCache> {
-        &self.ty_cache
-    }
-
-    pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
-        self.runtime_environment.struct_name_index_map()
+        &self.vm_config.ty_builder
     }
 
     pub(crate) fn check_script_dependencies_and_check_gas(
@@ -182,7 +157,8 @@ impl LoaderV2 {
         module_name: &IdentStr,
     ) -> VMResult<Arc<Module>> {
         module_storage
-            .fetch_verified_module(address, module_name)?
+            .fetch_verified_module(address, module_name)
+            .map_err(expect_no_verification_errors)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
@@ -266,8 +242,7 @@ impl LoaderV2 {
 impl Clone for LoaderV2 {
     fn clone(&self) -> Self {
         Self {
-            runtime_environment: self.runtime_environment.clone(),
-            ty_cache: RwLock::new(self.ty_cache().read().clone()),
+            vm_config: self.vm_config.clone(),
         }
     }
 }

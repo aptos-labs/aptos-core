@@ -5,7 +5,7 @@
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     module_traversal::TraversalContext, script_hash,
-    storage::module_storage::ModuleStorage as ModuleStorageV2, CodeStorage, RuntimeEnvironment,
+    storage::module_storage::ModuleStorage as ModuleStorageV2, CodeStorage,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -52,6 +52,7 @@ mod type_loader;
 
 use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
+    native_functions::NativeFunctions,
     storage::{loader::LoaderV2, struct_name_index_map::StructNameIndexMap},
 };
 pub use function::LoadedFunction;
@@ -142,26 +143,22 @@ macro_rules! versioned_loader_getter {
 impl Loader {
     versioned_loader_getter!(vm_config, VMConfig);
 
-    versioned_loader_getter!(struct_name_index_map, StructNameIndexMap);
-
     versioned_loader_getter!(ty_builder, TypeBuilder);
 
-    versioned_loader_getter!(ty_cache, RwLock<TypeCache>);
-
-    versioned_loader_getter!(runtime_environment, RuntimeEnvironment);
-
-    pub(crate) fn v1(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
+    pub(crate) fn v1(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::empty()),
+            name_cache: StructNameIndexMap::empty(),
+            natives,
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
-            runtime_environment,
+            vm_config,
         })
     }
 
-    pub(crate) fn v2(runtime_environment: Arc<RuntimeEnvironment>) -> Self {
-        Self::V2(LoaderV2::new(runtime_environment))
+    pub(crate) fn v2(vm_config: VMConfig) -> Self {
+        Self::V2(LoaderV2::new(vm_config))
     }
 
     /// Flush this cache if it is marked as invalidated.
@@ -318,7 +315,11 @@ impl Loader {
     ) -> PartialVMResult<Arc<StructType>> {
         // Ensure that the struct name index map is unlocked immediately by getting an arced
         // struct name.
-        let struct_name = self.struct_name_index_map().idx_to_struct_name_ref(idx);
+        let struct_name_index_map = match self {
+            Self::V1(loader) => &loader.name_cache,
+            Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+        };
+        let struct_name = struct_name_index_map.idx_to_struct_name_ref(idx);
 
         match self {
             Loader::V1(_) => {
@@ -341,6 +342,8 @@ impl Loader {
 pub(crate) struct LoaderV1 {
     scripts: RwLock<ScriptCache>,
     type_cache: RwLock<TypeCache>,
+    natives: NativeFunctions,
+    pub(crate) name_cache: StructNameIndexMap,
 
     // The below field supports a hack to workaround well-known issues with the
     // loader cache. This cache is not designed to support module upgrade or deletion.
@@ -372,8 +375,7 @@ pub(crate) struct LoaderV1 {
     // other transactions.
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
-    // The environment used by the loader, e.g, VM config, available native functions, etc..
-    runtime_environment: Arc<RuntimeEnvironment>,
+    vm_config: VMConfig,
 }
 
 impl Clone for LoaderV1 {
@@ -381,32 +383,22 @@ impl Clone for LoaderV1 {
         Self {
             scripts: RwLock::new(self.scripts.read().clone()),
             type_cache: RwLock::new(self.type_cache.read().clone()),
+            natives: self.natives.clone(),
+            name_cache: self.name_cache.clone(),
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
-            runtime_environment: self.runtime_environment.clone(),
+            vm_config: self.vm_config.clone(),
         }
     }
 }
 
 impl LoaderV1 {
     pub(crate) fn vm_config(&self) -> &VMConfig {
-        self.runtime_environment().vm_config()
-    }
-
-    pub(crate) fn runtime_environment(&self) -> &RuntimeEnvironment {
-        &self.runtime_environment
+        &self.vm_config
     }
 
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
-        &self.vm_config().ty_builder
-    }
-
-    pub(crate) fn ty_cache(&self) -> &RwLock<TypeCache> {
-        &self.type_cache
-    }
-
-    pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
-        self.runtime_environment().struct_name_index_map()
+        &self.vm_config.ty_builder
     }
 
     //
@@ -466,7 +458,7 @@ impl LoaderV1 {
                     module_store,
                 )?;
 
-                let script = Script::new(ver_script, self.struct_name_index_map())
+                let script = Script::new(ver_script, &self.name_cache)
                     .map_err(|e| e.finish(Location::Script))?;
                 scripts.insert(hash_value, script)
             },
@@ -842,7 +834,6 @@ impl LoaderV1 {
                     let (module, size, _) = data_store.load_compiled_module_to_cache(
                         ModuleId::new(*addr, name.to_owned()),
                         allow_loading_failure,
-                        self.runtime_environment(),
                     )?;
                     (module, size)
                 },
@@ -919,18 +910,21 @@ impl LoaderV1 {
         data_store: &mut TransactionDataCache,
         allow_loading_failure: bool,
     ) -> VMResult<(Arc<CompiledModule>, usize)> {
-        let (module, size, hash_value) = data_store.load_compiled_module_to_cache(
-            id.clone(),
-            allow_loading_failure,
-            self.runtime_environment(),
-        )?;
-        self.runtime_environment
-            .paranoid_check_module_address_and_name(module.as_ref(), id.address(), id.name())?;
+        let (module, size, hash_value) =
+            data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
+
+        if self.vm_config.paranoid_type_checks && &module.self_id() != id {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Module self id mismatch with storage".to_string())
+                    .finish(Location::Module(id.clone())),
+            );
+        }
 
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
             move_bytecode_verifier::verify_module_with_config(
-                &self.vm_config().verifier_config,
+                &self.vm_config.verifier_config,
                 &module,
             )
             .map_err(expect_no_verification_errors)?;
@@ -979,13 +973,8 @@ impl LoaderV1 {
         )?;
 
         // if linking goes well, insert the module to the code cache
-        let module_ref = module_store.insert(
-            self.runtime_environment().natives(),
-            id.clone(),
-            size,
-            module,
-            self.struct_name_index_map(),
-        )?;
+        let module_ref =
+            module_store.insert(&self.natives, id.clone(), size, module, &self.name_cache)?;
 
         Ok(module_ref)
     }
@@ -1703,8 +1692,14 @@ impl Loader {
         struct_name_idx: StructNameIndex,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
+        module_storage: &dyn ModuleStorageV2,
     ) -> PartialVMResult<StructTag> {
-        if let Some(struct_map) = self.ty_cache().read().structs.get(&struct_name_idx) {
+        let ty_cache = match self {
+            Self::V1(loader) => &loader.type_cache,
+            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
+        };
+
+        if let Some(struct_map) = ty_cache.read().structs.get(&struct_name_idx) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some((struct_tag, gas)) = &struct_info.struct_tag {
                     gas_context.charge(*gas)?;
@@ -1717,16 +1712,19 @@ impl Loader {
 
         let type_args = ty_args
             .iter()
-            .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
+            .map(|ty| self.type_to_type_tag_impl(ty, gas_context, module_storage))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let struct_tag = self
-            .struct_name_index_map()
-            .idx_to_struct_tag(struct_name_idx, type_args);
+
+        let struct_name_index_map = match self {
+            Self::V1(loader) => &loader.name_cache,
+            Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+        };
+        let struct_tag = struct_name_index_map.idx_to_struct_tag(struct_name_idx, type_args);
 
         let size =
             (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
         gas_context.charge(size * gas_context.cost_per_byte)?;
-        self.ty_cache()
+        ty_cache
             .write()
             .structs
             .entry(struct_name_idx)
@@ -1742,6 +1740,7 @@ impl Loader {
         &self,
         ty: &Type,
         gas_context: &mut PseudoGasContext,
+        module_storage: &dyn ModuleStorageV2,
     ) -> PartialVMResult<TypeTag> {
         gas_context.charge(gas_context.cost_base)?;
         Ok(match ty {
@@ -1755,16 +1754,17 @@ impl Loader {
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
             Type::Vector(ty) => {
-                let el_ty_tag = self.type_to_type_tag_impl(ty, gas_context)?;
+                let el_ty_tag = self.type_to_type_tag_impl(ty, gas_context, module_storage)?;
                 TypeTag::Vector(Box::new(el_ty_tag))
             },
             Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
                 *idx,
                 &[],
                 gas_context,
+                module_storage,
             )?)),
             Type::StructInstantiation { idx, ty_args, .. } => TypeTag::Struct(Box::new(
-                self.struct_name_to_type_tag(*idx, ty_args, gas_context)?,
+                self.struct_name_to_type_tag(*idx, ty_args, gas_context, module_storage)?,
             )),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -1784,7 +1784,12 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        if let Some(struct_map) = self.ty_cache().read().structs.get(&struct_name_idx) {
+        let ty_cache = match self {
+            Self::V1(loader) => &loader.type_cache,
+            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
+        };
+
+        if let Some(struct_map) = ty_cache.read().structs.get(&struct_name_idx) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(struct_layout_info) = &struct_info.struct_layout_info {
                     *count += struct_layout_info.node_count;
@@ -1804,11 +1809,14 @@ impl Loader {
 
         let layout = match &struct_type.layout {
             StructLayout::Single(fields) => {
+                let struct_name_index_map = match self {
+                    Self::V1(loader) => &loader.name_cache,
+                    Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+                };
+
                 // Some types can have fields which are lifted at serialization or deserialization
                 // times. Right now these are Aggregator and AggregatorSnapshot.
-                let struct_name = self
-                    .struct_name_index_map()
-                    .idx_to_struct_name_ref(struct_name_idx);
+                let struct_name = struct_name_index_map.idx_to_struct_name_ref(struct_name_idx);
                 let maybe_mapping = self.get_identifier_mapping_kind(struct_name.as_ref());
 
                 let field_tys = fields
@@ -1882,7 +1890,7 @@ impl Loader {
         };
 
         let field_node_count = *count - count_before;
-        let mut cache = self.ty_cache().write();
+        let mut cache = ty_cache.write();
         let info = cache
             .structs
             .entry(struct_name_idx)
@@ -2046,7 +2054,12 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
-        if let Some(struct_map) = self.ty_cache().read().structs.get(&struct_name_idx) {
+        let ty_cache = match self {
+            Self::V1(loader) => &loader.type_cache,
+            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
+        };
+
+        if let Some(struct_map) = ty_cache.read().structs.get(&struct_name_idx) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(annotated_node_count) = &struct_info.annotated_node_count {
                     *count += *annotated_node_count
@@ -2082,8 +2095,12 @@ impl Loader {
             cost_base: self.vm_config().type_base_cost,
             cost_per_byte: self.vm_config().type_byte_cost,
         };
-        let struct_tag =
-            self.struct_name_to_type_tag(struct_name_idx, ty_args, &mut gas_context)?;
+        let struct_tag = self.struct_name_to_type_tag(
+            struct_name_idx,
+            ty_args,
+            &mut gas_context,
+            module_storage,
+        )?;
         let fields = struct_type.fields(None)?;
 
         let field_layouts = fields
@@ -2104,7 +2121,7 @@ impl Loader {
             MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
         let field_node_count = *count - count_before;
 
-        let mut cache = self.ty_cache().write();
+        let mut cache = ty_cache.write();
         let info = cache
             .structs
             .entry(struct_name_idx)
@@ -2192,7 +2209,12 @@ impl Loader {
         module_store: &ModuleStorageAdapter,
         module_storage: &dyn ModuleStorageV2,
     ) -> PartialVMResult<DepthFormula> {
-        if let Some(depth_formula) = self.ty_cache().read().depth_formula.get(&struct_name_idx) {
+        let ty_cache = match self {
+            Self::V1(loader) => &loader.type_cache,
+            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
+        };
+
+        if let Some(depth_formula) = ty_cache.read().depth_formula.get(&struct_name_idx) {
             return Ok(depth_formula.clone());
         }
 
@@ -2215,8 +2237,7 @@ impl Loader {
         };
 
         let formula = DepthFormula::normalize(formulas);
-        let prev = self
-            .ty_cache()
+        let prev = ty_cache
             .write()
             .depth_formula
             .insert(struct_name_idx, formula.clone());
@@ -2226,9 +2247,11 @@ impl Loader {
             //       correct because some other thread can cache depth formula before we reach
             //       this line, and result in an invariant violation. We need to ensure correct
             //       behavior, e.g., make the cache available per thread.
-            let struct_name = self
-                .struct_name_index_map()
-                .idx_to_struct_name_ref(struct_name_idx);
+            let struct_name_index_map = match self {
+                Self::V1(loader) => &loader.name_cache,
+                Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+            };
+            let struct_name = struct_name_index_map.idx_to_struct_name_ref(struct_name_idx);
 
             // TODO(loader_v2): Revisit this, because now we do share the VM...
             println!(
@@ -2308,14 +2331,18 @@ impl Loader {
         })
     }
 
-    pub(crate) fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
+    pub(crate) fn type_to_type_tag(
+        &self,
+        ty: &Type,
+        module_storage: &dyn ModuleStorageV2,
+    ) -> PartialVMResult<TypeTag> {
         let mut gas_context = PseudoGasContext {
             cost: 0,
             max_cost: self.vm_config().type_max_cost,
             cost_base: self.vm_config().type_base_cost,
             cost_per_byte: self.vm_config().type_byte_cost,
         };
-        self.type_to_type_tag_impl(ty, &mut gas_context)
+        self.type_to_type_tag_impl(ty, &mut gas_context, module_storage)
     }
 
     pub(crate) fn type_to_type_layout_with_identifier_mappings(

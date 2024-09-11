@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ambassador_impl_ModuleStorage, module_linker_error, AsUnsyncModuleStorage, Module,
-    ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
+    module_linker_error, AsUnsyncModuleStorage, Module, ModuleStorage, RuntimeEnvironment,
+    UnsyncModuleStorage, WithRuntimeEnvironment,
 };
-use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
@@ -25,30 +24,76 @@ use std::{
     sync::Arc,
 };
 
-/// An implementation of [ModuleBytesStorage] that stores temporary changes. If used by
-/// [ModuleStorage], the most recent version of a module will be fetched.
-struct TemporaryModuleBytesStorage<'m, M> {
+/// An implementation of [ModuleBytesStorage] that stores some additional staged changes. If used
+/// by [ModuleStorage], the most recent version of a module will be fetched.
+struct StagingModuleBytesStorage<'a, M> {
     // Modules to be published, staged temporarily.
-    temporary_storage: BTreeMap<AccountAddress, BTreeMap<Identifier, (Bytes, CompiledModule)>>,
-    // Underlying ground-truth module storage.
-    module_storage: &'m M,
+    staged_module_bytes: BTreeMap<AccountAddress, BTreeMap<Identifier, Bytes>>,
+    // Underlying ground-truth module storage, used as a raw byte storage.
+    module_storage: &'a M,
 }
 
-impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
-    /// Returns a new storage instance, performing compatibility checks during staging
-    /// of published modules.
-    fn new(
+impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, M> {
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
+        if let Some(account_storage) = self.staged_module_bytes.get(address) {
+            if let Some(bytes) = account_storage.get(module_name) {
+                return Ok(Some(bytes.clone()));
+            }
+        }
+        self.module_storage.fetch_module_bytes(address, module_name)
+    }
+}
+
+/// A [ModuleStorage] implementation which can stage published modules temporarily, without
+/// leaking them into the underlying module storage. When modules are staged, multiple
+/// checks are performed to ensure that:
+///   1) Published modules are published to correct address of the sender.
+///   2) Published modules satisfy compatibility constraints.
+///   3) Published modules are verifiable and can link to existing modules without breaking
+///      invariants such as cyclic dependencies.
+#[ouroboros::self_referencing]
+pub struct StagingModuleStorage<'a, M: 'a> {
+    runtime_environment: RuntimeEnvironment,
+    #[borrows(runtime_environment)]
+    #[covariant]
+    storage: UnsyncModuleStorage<'this, StagingModuleBytesStorage<'a, M>>,
+}
+
+impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
+    /// Returns new module storage with staged modules, running full compatability checks for them.
+    pub fn create(
         sender: &AccountAddress,
-        env: &RuntimeEnvironment,
-        compatibility: Compatibility,
-        module_storage: &'m M,
+        existing_module_storage: &'a M,
         module_bundle: Vec<Bytes>,
     ) -> VMResult<Self> {
-        use btree_map::Entry::*;
+        Self::create_with_compat_config(
+            sender,
+            Compatibility::full_check(),
+            existing_module_storage,
+            module_bundle,
+        )
+    }
 
-        let mut temporary_storage = BTreeMap::new();
+    /// Returns new module storage with staged modules, checking compatibility based on the
+    /// provided config.
+    pub fn create_with_compat_config(
+        sender: &AccountAddress,
+        compatibility: Compatibility,
+        existing_module_storage: &'a M,
+        module_bundle: Vec<Bytes>,
+    ) -> VMResult<Self> {
+        // Create a new runtime environment, so that it is not shared with the existing one.
+        let runtime_environment = existing_module_storage.runtime_environment().clone();
+        let deserializer_config = &runtime_environment.vm_config().deserializer_config;
+
+        // For every module in bundle, run compatibility checks and construct a new bytes storage
+        // view such that added modules shadow any existing ones.
+        let mut staged_module_bytes = BTreeMap::new();
         for module_bytes in module_bundle {
-            let deserializer_config = &env.vm_config().deserializer_config;
             let compiled_module =
                 CompiledModule::deserialize_with_config(&module_bytes, deserializer_config)
                     .map_err(|err| {
@@ -81,9 +126,11 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
             // All modules can be republished, as long as the new module is compatible
             // with the old module.
             if compatibility.need_check_compat() {
-                if let Some(old_module_ref) = module_storage.fetch_verified_module(addr, name)? {
-                    let old_module = old_module_ref.module();
-                    if env.vm_config().use_compatibility_checker_v2 {
+                if let Some(old_module_ref) =
+                    existing_module_storage.fetch_deserialized_module(addr, name)?
+                {
+                    let old_module = old_module_ref.as_ref();
+                    if runtime_environment.vm_config().use_compatibility_checker_v2 {
                         compatibility
                             .check(old_module, &compiled_module)
                             .map_err(|e| e.finish(Location::Undefined))?;
@@ -101,18 +148,18 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
                 }
             }
 
-            let account_module_storage = match temporary_storage.entry(*compiled_module.self_addr())
-            {
-                Occupied(entry) => entry.into_mut(),
-                Vacant(entry) => entry.insert(BTreeMap::new()),
-            };
+            // Modules that pass compatibility checks are added to the staged storage.
+            use btree_map::Entry::*;
+            let account_module_storage =
+                match staged_module_bytes.entry(*compiled_module.self_addr()) {
+                    Occupied(entry) => entry.into_mut(),
+                    Vacant(entry) => entry.insert(BTreeMap::new()),
+                };
+            let prev =
+                account_module_storage.insert(compiled_module.self_name().to_owned(), module_bytes);
 
             // Publishing the same module in the same bundle is not allowed.
-            let prev = account_module_storage.insert(
-                compiled_module.self_name().to_owned(),
-                (module_bytes, compiled_module),
-            );
-            if let Some((_, compiled_module)) = prev {
+            if prev.is_some() {
                 let msg = format!(
                     "Module {}::{} occurs more than once in published bundle",
                     compiled_module.self_addr(),
@@ -124,95 +171,35 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
             }
         }
 
-        Ok(Self {
-            temporary_storage,
-            module_storage,
-        })
-    }
+        // At this point, we have successfully created a new module storage that also contains the
+        // newly published bundle.
+        let staged_module_storage = StagingModuleStorageBuilder {
+            runtime_environment,
+            storage_builder: |runtime_environment| {
+                let staged_module_bytes_storage = StagingModuleBytesStorage {
+                    staged_module_bytes,
+                    module_storage: existing_module_storage,
+                };
+                // Create module storage by "owning" the underlying bytes.
+                staged_module_bytes_storage.into_unsync_module_storage(runtime_environment)
+            },
+        }
+        .build();
 
-    /// Returns addresses and names of all modules that were temporarily staged.
-    fn staged_modules_iter(&self) -> impl Iterator<Item = (&AccountAddress, &IdentStr)> {
-        self.temporary_storage
+        // Finally, verify the bundle, performing linking checks for all staged modules.
+        for (addr, name) in staged_module_storage
+            .borrow_storage()
+            .byte_storage()
+            .staged_module_bytes
             .iter()
             .flat_map(|(addr, account_storage)| {
                 account_storage
                     .iter()
                     .map(move |(name, _)| (addr, name.as_ident_str()))
             })
-    }
-}
-
-impl<'m, M: ModuleStorage> ModuleBytesStorage for TemporaryModuleBytesStorage<'m, M> {
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.temporary_storage.get(address) {
-            if let Some((bytes, _)) = account_storage.get(module_name) {
-                return Ok(Some(bytes.clone()));
-            }
-        }
-        self.module_storage.fetch_module_bytes(address, module_name)
-    }
-}
-
-/// A [ModuleStorage] implementation which can stage published modules temporarily, without
-/// leaking them into the underlying module storage. When modules are staged, multiple
-/// checks are performed to ensure that:
-///   1) Published modules are published to correct address of the sender.
-///   2) Published modules satisfy compatibility constraints.
-///   3) Published modules are verifiable and can link to existing modules without breaking
-///      invariants such as cyclic dependencies.
-#[derive(Delegate)]
-#[delegate(ModuleStorage)]
-pub struct TemporaryModuleStorage<'a, M> {
-    storage: UnsyncModuleStorage<'a, TemporaryModuleBytesStorage<'a, M>>,
-}
-
-impl<'a, M: ModuleStorage> TemporaryModuleStorage<'a, M> {
-    /// Returns new temporary module storage running full compatability checks.
-    pub fn new(
-        sender: &AccountAddress,
-        env: &'a RuntimeEnvironment,
-        existing_module_storage: &'a M,
-        module_bundle: Vec<Bytes>,
-    ) -> VMResult<Self> {
-        Self::new_with_compat_config(
-            sender,
-            env,
-            Compatibility::full_check(),
-            existing_module_storage,
-            module_bundle,
-        )
-    }
-
-    /// Returns new temporary module storage.
-    pub fn new_with_compat_config(
-        sender: &AccountAddress,
-        env: &'a RuntimeEnvironment,
-        compatibility: Compatibility,
-        existing_module_storage: &'a M,
-        module_bundle: Vec<Bytes>,
-    ) -> VMResult<Self> {
-        // Verify compatibility here.
-        let temporary_module_bytes_storage = TemporaryModuleBytesStorage::new(
-            sender,
-            env,
-            compatibility,
-            existing_module_storage,
-            module_bundle,
-        )?;
-        let temporary_module_storage =
-            temporary_module_bytes_storage.into_unsync_module_storage(env);
-
-        // Verify the bundle, performing linking checks.
-        for (addr, name) in temporary_module_storage
-            .byte_storage()
-            .staged_modules_iter()
         {
             // Verify the module and its dependencies, and that they do not form a cycle.
-            let module = temporary_module_storage
+            let module = staged_module_storage
                 .fetch_verified_module(addr, name)?
                 .ok_or_else(|| {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -223,24 +210,94 @@ impl<'a, M: ModuleStorage> TemporaryModuleStorage<'a, M> {
                         .finish(Location::Undefined)
                 })?;
 
-            // Also verify that its friends exist.
+            // Also verify that all friends exist.
             for (friend_addr, friend_name) in module.module().immediate_friends_iter() {
-                if !temporary_module_storage.check_module_exists(friend_addr, friend_name)? {
+                if !staged_module_storage.check_module_exists(friend_addr, friend_name)? {
                     return Err(module_linker_error!(friend_addr, friend_name));
                 }
             }
         }
 
-        Ok(Self {
-            storage: temporary_module_storage,
-        })
+        // All checks passed! Now this storage can be used to run Move functions.
+        Ok(staged_module_storage)
     }
 
-    pub fn release_verified_module_bundle(self) -> impl Iterator<Item = (Bytes, CompiledModule)> {
-        self.storage
-            .release_byte_storage()
-            .temporary_storage
-            .into_iter()
-            .flat_map(|(_, account_storage)| account_storage.into_values())
+    pub fn release_verified_module_bundle(
+        &self,
+    ) -> impl Iterator<Item = (&AccountAddress, &IdentStr, Bytes)> {
+        let staged_module_bytes = &self.borrow_storage().byte_storage().staged_module_bytes;
+        staged_module_bytes
+            .iter()
+            .flat_map(|(addr, account_storage)| {
+                account_storage
+                    .iter()
+                    .map(move |(name, bytes)| (addr, name.as_ident_str(), bytes.clone()))
+            })
+    }
+}
+
+/// Note: [ambassador::Delegate] cannot be used for [StagingModuleStorage] because it is a self-
+/// referencing struct.
+impl<'a, M: ModuleStorage> WithRuntimeEnvironment for StagingModuleStorage<'a, M> {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.borrow_runtime_environment()
+    }
+}
+
+/// Note: [ambassador::Delegate] cannot be used for [StagingModuleStorage] because it is a self-
+/// referencing struct.
+impl<'a, M: ModuleStorage> ModuleStorage for StagingModuleStorage<'a, M> {
+    fn check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<bool> {
+        self.borrow_storage()
+            .check_module_exists(address, module_name)
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
+        self.borrow_storage()
+            .fetch_module_bytes(address, module_name)
+    }
+
+    fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<usize>> {
+        self.borrow_storage()
+            .fetch_module_size_in_bytes(address, module_name)
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Vec<Metadata>>> {
+        self.borrow_storage()
+            .fetch_module_metadata(address, module_name)
+    }
+
+    fn fetch_deserialized_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<CompiledModule>>> {
+        self.borrow_storage()
+            .fetch_deserialized_module(address, module_name)
+    }
+
+    fn fetch_verified_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<Module>>> {
+        self.borrow_storage()
+            .fetch_verified_module(address, module_name)
     }
 }

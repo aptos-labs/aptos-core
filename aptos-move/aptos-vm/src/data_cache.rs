@@ -3,12 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::{
-    gas::get_gas_config_from_storage,
-    move_vm_ext::{
-        resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
-        ResourceGroupResolver,
-    },
+use crate::move_vm_ext::{
+    resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
+    ResourceGroupResolver,
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
@@ -28,6 +25,7 @@ use aptos_types::{
     },
     vm::configs::aptos_prod_deserializer_config,
 };
+use aptos_vm_environment::gas::get_gas_config_from_storage;
 use aptos_vm_types::{
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
