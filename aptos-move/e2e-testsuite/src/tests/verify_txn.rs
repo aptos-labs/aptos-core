@@ -267,8 +267,7 @@ fn verify_simple_payment() {
         StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE
     );
 
-    // Create a new transaction from a bogus account that doesn't exist
-    // Account can be non-existent.
+    // Create a new transaction from a bogus account whose resource doesn't exist
     let bogus_account = executor.create_raw_account_data(100_000, 0);
     let txn = bogus_account
         .account()

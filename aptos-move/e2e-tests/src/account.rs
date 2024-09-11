@@ -174,8 +174,8 @@ impl Account {
     /// Returns the AccessPath that describes the LiteAccount resource instance.
     ///
     /// Use this to retrieve or publish the Account blob.
-    pub fn make_resource_group_access_path(&self, type_: StructTag) -> AccessPath {
-        AccessPath::resource_group_access_path(self.addr, type_)
+    pub fn make_resource_group_access_path(&self, struct_tag: StructTag) -> AccessPath {
+        AccessPath::resource_group_access_path(self.addr, struct_tag)
     }
 
     /// Returns the AccessPath that describes the Account's CoinStore resource instance.
@@ -664,11 +664,8 @@ impl LiteAccountData {
             MigrationFlag::struct_tag(),
             bcs::to_bytes(&MigrationFlag::default()).unwrap(),
         );
+        self.lite_account.add_to_object_group(&mut object_group);
         WriteSetMut::new(vec![
-            (
-                StateKey::resource_group(self.account.address(), &LiteAccountGroup::struct_tag()),
-                WriteOp::legacy_modification(self.lite_account.to_bytes().unwrap().into()),
-            ),
             (
                 StateKey::resource_group(
                     &primary_store_object_address,

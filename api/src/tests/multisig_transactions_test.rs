@@ -7,6 +7,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, MultisigTransactionPayload},
 };
+use aptos_types::account_config::primary_apt_store;
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -487,13 +488,13 @@ async fn test_multisig_transaction_simulation_2_of_3() {
     let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
     assert_eq!(
         withdraw_event["type"].as_str().unwrap(),
-        "0x1::coin::CoinWithdraw"
+        "0x1::fungible_asset::Withdraw"
     );
     let withdraw_from_account =
-        AccountAddress::from_hex_literal(withdraw_event["data"]["account"].as_str().unwrap())
+        AccountAddress::from_hex_literal(withdraw_event["data"]["store"].as_str().unwrap())
             .unwrap();
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
-    assert_eq!(withdraw_from_account, multisig_account);
+    assert_eq!(withdraw_from_account, primary_apt_store(multisig_account));
     assert_eq!(withdrawn_amount, "1000");
 }
 

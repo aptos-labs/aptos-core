@@ -29,7 +29,7 @@ use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
     account_config::{
-        lite_account, lite_account::LiteAccountGroup, AccountResource, NewBlockEvent,
+        lite_account, AccountResource, NewBlockEvent,
     },
     block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
@@ -65,6 +65,7 @@ use std::{
     },
     time::Instant,
 };
+use aptos_types::account_config::{ObjectGroupResource, primary_apt_store};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -869,9 +870,9 @@ impl Context {
             account_v1.sequence_number().saturating_sub(limit as u64)
         } else {
             self.expect_resource_from_group_poem::<lite_account::AccountResource, E>(
-                address,
+                primary_apt_store(address),
                 ledger_info.version(),
-                &LiteAccountGroup::struct_tag(),
+                &ObjectGroupResource::struct_tag(),
                 ledger_info,
             )?
             .sequence_number

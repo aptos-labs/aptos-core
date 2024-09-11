@@ -181,7 +181,22 @@
     "accumulator_root_hash": "",
     "changes": [
       {
-        "address": "0xa550c18",
+        "address": "0xb26af11b4f332a7794398554b6313a38c6a102c74c5ba9a12629ae3a492acb2f",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::fungible_asset::FungibleStore",
+          "data": {
+            "balance": "18446744073709551615",
+            "frozen": false,
+            "metadata": {
+              "inner": "0xa"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0xb26af11b4f332a7794398554b6313a38c6a102c74c5ba9a12629ae3a492acb2f",
         "state_key_hash": "",
         "data": {
           "type": "0x1::lite_account::Account",
@@ -192,7 +207,7 @@
         "type": "write_resource"
       },
       {
-        "address": "0xa550c18",
+        "address": "0xb26af11b4f332a7794398554b6313a38c6a102c74c5ba9a12629ae3a492acb2f",
         "state_key_hash": "",
         "data": {
           "type": "0x1::lite_account::NativeAuthenticator",
@@ -201,6 +216,28 @@
               "vec": [
                 "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a"
               ]
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0xb26af11b4f332a7794398554b6313a38c6a102c74c5ba9a12629ae3a492acb2f",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::object::ObjectCore",
+          "data": {
+            "allow_ungated_transfer": false,
+            "guid_creation_num": "1125899906842625",
+            "owner": "0xa550c18",
+            "transfer_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0xb26af11b4f332a7794398554b6313a38c6a102c74c5ba9a12629ae3a492acb2f",
+                  "creation_num": "1125899906842624"
+                }
+              }
             }
           }
         },

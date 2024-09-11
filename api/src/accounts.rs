@@ -31,6 +31,7 @@ use poem_openapi::{
     OpenApi,
 };
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
+use aptos_types::account_config::{ObjectGroupResource, primary_apt_store};
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {
@@ -293,7 +294,7 @@ impl Account {
 
     pub fn get_account_v2_resource(&self) -> Result<LiteAccountGroup, BasicErrorWith404> {
         let state_key =
-            StateKey::resource_group(self.address.inner(), &LiteAccountGroup::struct_tag());
+            StateKey::resource_group(&primary_apt_store(*self.address.inner()), &ObjectGroupResource::struct_tag());
 
         let state_value = self.context.get_state_value_poem(
             &state_key,

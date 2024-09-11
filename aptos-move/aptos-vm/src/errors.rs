@@ -97,7 +97,6 @@ pub fn convert_prologue_error(
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                     location, code, category, reason);
                     speculative_error!(log_context, err_msg.clone());
-                    println!("{:?}", err_msg);
                     return Err(VMStatus::error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                         Some(err_msg),

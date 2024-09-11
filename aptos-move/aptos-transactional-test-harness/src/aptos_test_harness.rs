@@ -14,7 +14,7 @@ use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEA
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_types::{
     account_config::{
-        aptos_test_root_address, lite_account, lite_account::LiteAccountGroup, AccountResource,
+        aptos_test_root_address, lite_account, AccountResource,
         CoinStoreResource, FungibleStoreResource, ObjectGroupResource,
     },
     block_executor::config::BlockExecutorConfigFromOnchain,
@@ -474,8 +474,8 @@ impl<'a> AptosTestAdapter<'a> {
             acct_v1.sequence_number()
         } else {
             self.read_resource_from_resource_group::<lite_account::AccountResource>(
-                addr,
-                LiteAccountGroup::struct_tag(),
+                &aptos_types::account_config::fungible_store::primary_apt_store(*addr),
+                ObjectGroupResource::struct_tag(),
                 lite_account::AccountResource::struct_tag(),
             )
             .unwrap_or_default()

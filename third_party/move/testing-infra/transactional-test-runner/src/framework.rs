@@ -1119,6 +1119,7 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
         Err(e) => format!("Error: {}", e),
     };
     let result_string = adapter.rewrite_temp_filenames(result_string);
+    println!("hah {:?}", result_string);
     assert!(!result_string.is_empty());
     writeln!(
         output,

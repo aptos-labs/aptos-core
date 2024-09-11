@@ -6,7 +6,7 @@ use aptos_sdk::types::get_apt_primary_store_address;
 use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{lite_account::LiteAccountGroup, ObjectGroupResource},
+    account_config::ObjectGroupResource,
     state_store::{state_key::StateKey, StateView},
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
@@ -100,17 +100,6 @@ impl DbAccessUtil {
                 vec![],
             ))),
         ])
-    }
-
-    pub fn get_lite_account_group(
-        account: &AccountAddress,
-        state_view: &impl StateView,
-    ) -> Result<LiteAccountGroup> {
-        let bytes = Self::get_value_bytes(
-            &StateKey::resource_group(account, &LiteAccountGroup::struct_tag()),
-            state_view,
-        )?;
-        Ok(LiteAccountGroup::from_bytes(account, bytes.as_deref())?)
     }
 
     pub fn get_fungible_store_group(

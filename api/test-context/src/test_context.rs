@@ -670,7 +670,7 @@ impl TestContext {
                 .unwrap()
         } else {
             let lite_account_resource = self
-                .gen_resource(&account, "0x1::lite_account::Account")
+                .gen_resource(&get_apt_primary_store_address(account), "0x1::lite_account::Account")
                 .await;
             lite_account_resource
                 .map(|x| {

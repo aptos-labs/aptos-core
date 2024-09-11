@@ -617,7 +617,7 @@ module std::features {
     /// Whether to use lite account as the default account for query.
     ///
     /// Lifetime: transient
-    const DEFAULT_TO_LITE_ACCOUNT: u64 = 78;
+    const DEFAULT_TO_LITE_ACCOUNT: u64 = 81;
 
     public fun get_default_to_lite_account_feature(): u64 { DEFAULT_TO_LITE_ACCOUNT }
 

@@ -446,7 +446,7 @@ Whether to use lite account as the default account for query.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_DEFAULT_TO_LITE_ACCOUNT">DEFAULT_TO_LITE_ACCOUNT</a>: u64 = 78;
+<pre><code><b>const</b> <a href="features.md#0x1_features_DEFAULT_TO_LITE_ACCOUNT">DEFAULT_TO_LITE_ACCOUNT</a>: u64 = 81;
 </code></pre>
 
 

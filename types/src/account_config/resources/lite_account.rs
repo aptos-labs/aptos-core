@@ -15,6 +15,7 @@ use move_core_types::{
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use crate::account_config::ObjectGroupResource;
 
 /// A Rust representation of an Account resource.
 /// This is not how the Account is represented in the VM but it's a convenient representation.
@@ -87,8 +88,7 @@ impl LiteAccountGroup {
         }
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        let mut group = BTreeMap::new();
+    pub fn add_to_object_group(&self, group: &mut ObjectGroupResource) {
         if let Some(ar) = &self.account {
             group.insert(AccountResource::struct_tag(), bcs::to_bytes(ar).unwrap());
         }
@@ -104,7 +104,6 @@ impl LiteAccountGroup {
                 bcs::to_bytes(da).unwrap(),
             );
         }
-        Ok(bcs::to_bytes(&group)?)
     }
 
     pub fn from_bytes(addr: &AccountAddress, value: Option<&[u8]>) -> Result<Self> {
@@ -133,13 +132,6 @@ impl LiteAccountGroup {
         }
     }
 }
-
-impl MoveStructType for LiteAccountGroup {
-    const MODULE_NAME: &'static IdentStr = ident_str!("lite_account");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("LiteAccountGroup");
-}
-
-impl MoveResource for LiteAccountGroup {}
 
 impl MoveStructType for AccountResource {
     const MODULE_NAME: &'static IdentStr = ident_str!("lite_account");

@@ -25,7 +25,7 @@ use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::{
         fungible_asset_metadata::ConcurrentSupply,
-        lite_account::{self, LiteAccountGroup},
+        lite_account,
         new_block_event_key, primary_apt_store, AccountResource, CoinInfoResource,
         CoinStoreResource, FungibleStoreResource, NewBlockEvent, ObjectGroupResource,
         CORE_CODE_ADDRESS,
@@ -467,8 +467,8 @@ impl FakeExecutor {
         account: &Account,
     ) -> Option<lite_account::AccountResource> {
         self.read_resource_from_group::<lite_account::AccountResource>(
-            account.address(),
-            &LiteAccountGroup::struct_tag(),
+            &primary_apt_store(*account.address()),
+            &ObjectGroupResource::struct_tag(),
         )
     }
 

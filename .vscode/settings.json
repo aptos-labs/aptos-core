@@ -2,6 +2,5 @@
     "rust-analyzer.rustfmt.extraArgs": [
         "+nightly"
     ],
-    "rust-analyzer.showUnlinkedFileNotification": false,
+    "rust-analyzer.showUnlinkedFileNotification": false
 }
-

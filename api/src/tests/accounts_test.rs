@@ -9,7 +9,7 @@ use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyW
 use aptos_cached_packages::aptos_stdlib;
 use serde_json::json;
 use std::str::FromStr;
-
+use aptos_sdk::types::get_apt_primary_store_address;
 /* TODO: reactivate once cause of failure for `"8"` vs `8` in the JSON output is known.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resources_returns_empty_array_for_account_has_no_resources() {
@@ -120,7 +120,7 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
 
     let ledger_version_1_resources = context
         .get(&account_resources(
-            &context.root_account().await.address().to_hex_literal(),
+            &get_apt_primary_store_address(context.root_account().await.address()).to_hex_literal(),
         ))
         .await;
     let root_account = find_value(&ledger_version_1_resources, |f| {
@@ -130,7 +130,7 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
 
     let ledger_version_0_resources = context
         .get(&account_resources_with_ledger_version(
-            &context.root_account().await.address().to_hex_literal(),
+            &get_apt_primary_store_address(context.root_account().await.address()).to_hex_literal(),
             0,
         ))
         .await;

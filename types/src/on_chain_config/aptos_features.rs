@@ -175,7 +175,6 @@ impl FeatureFlag {
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
             FeatureFlag::LITE_ACCOUNT,
-            FeatureFlag::DEFAULT_TO_LITE_ACCOUNT,
         ]
     }
 }

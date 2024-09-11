@@ -16,7 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{
         fungible_store::FungibleStoreResource,
-        lite_account::{self, LiteAccountGroup},
+        lite_account,
         object::ObjectGroupResource,
         AccountResource, CoinStoreResource, CORE_CODE_ADDRESS,
     },
@@ -888,9 +888,9 @@ impl MoveHarness {
             acct_v1.sequence_number()
         } else {
             self.read_resource_from_resource_group::<lite_account::AccountResource>(
-                addr,
-                LiteAccountGroup::struct_tag(),
-                lite_account::AccountResource::struct_tag(),
+                &aptos_types::account_config::fungible_store::primary_apt_store(*addr),
+                ObjectGroupResource::struct_tag(),
+                AccountResource::struct_tag(),
             )
             .unwrap_or_default()
             .sequence_number

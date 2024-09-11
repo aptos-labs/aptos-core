@@ -157,7 +157,6 @@ spec aptos_framework::transaction_validation {
 
         // If any account does not exist, or public key hash does not match, abort.
         // property 2: All secondary signer addresses are verified to be authentic through a validation process.
-        /// [high-level-req-2]
         // aborts_if exists i in 0..num_secondary_signers:
         //     !account::exists_at(secondary_signer_addresses[i]);
         // aborts_if exists i in 0..num_secondary_signers:

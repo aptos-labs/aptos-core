@@ -28,6 +28,7 @@ use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use once_cell::sync::{Lazy, OnceCell};
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
 use std::collections::HashMap;
+use aptos_types::account_config::lite_account::AccountResource;
 
 struct IncrementalOutput {
     write_set: Vec<(StateKey, WriteOp)>,
@@ -91,12 +92,6 @@ impl NativeExecutor {
         transfer_amount: u64,
         state_view: &CachedStateView,
     ) -> Result<Result<IncrementalOutput, TransactionStatus>> {
-        let mut sender_lite_account_group = {
-            let _timer = TIMER
-                .with_label_values(&["read_sender_account"])
-                .start_timer();
-            DbAccessUtil::get_lite_account_group(&sender_address, state_view)?
-        };
         let mut sender_fungible_group = {
             let _timer = TIMER
                 .with_label_values(&["read_sender_fungible_store_resource_group"])
@@ -114,18 +109,25 @@ impl NativeExecutor {
             FungibleStoreResource::new(sender_address, 0, false)
         };
 
+        let mut lite_account = if let Some(lite_account_resource) = sender_fungible_group
+            .group
+            .get_mut(&AccountResource::struct_tag())
+            .and_then(|bytes| Some(bcs::from_bytes(bytes).unwrap()))
+        {
+            lite_account_resource
+        } else {
+            AccountResource { sequence_number: 0 }
+        };
+        lite_account.sequence_number += 1;
+
         // Note: numbers below may not be real. When runninng in parallel there might be conflicts.
         fungible_store.balance -= transfer_amount;
 
         let gas = 1;
         fungible_store.balance -= gas;
 
-        if let Some(account) = sender_lite_account_group.account.as_mut() {
-            account.sequence_number += 1;
-        } else {
-            sender_lite_account_group.account =
-                Some(lite_account::AccountResource { sequence_number: 1 });
-        }
+        sender_fungible_group.group.insert(AccountResource::struct_tag(), bcs::to_bytes(&lite_account).unwrap());
+        sender_fungible_group.group.insert(FungibleStoreResource::struct_tag(), bcs::to_bytes(&fungible_store).unwrap());
 
         // add total supply via aggregators?
         // let mut total_supply: u128 =
@@ -134,10 +136,6 @@ impl NativeExecutor {
 
         // TODO(grao): Add other reads to match the read set of the real transaction.
         let write_set = vec![
-            (
-                StateKey::resource_group(&sender_address, &LiteAccountGroup::struct_tag()),
-                WriteOp::legacy_modification(sender_lite_account_group.to_bytes()?.into()),
-            ),
             (
                 StateKey::resource_group(
                     &get_apt_primary_store_address(sender_address),
