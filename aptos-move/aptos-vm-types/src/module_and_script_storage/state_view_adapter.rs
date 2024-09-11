@@ -14,9 +14,10 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
-    ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage, module_storage_error,
-    move_vm::MoveVM, AsUnsyncCodeStorage, CodeStorage, Module, ModuleStorage, Script,
-    UnsyncCodeStorage, UnsyncModuleStorage,
+    ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
+    ambassador_impl_WithRuntimeEnvironment, module_storage_error, AsUnsyncCodeStorage, CodeStorage,
+    Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
+    WithRuntimeEnvironment,
 };
 use move_vm_types::code_storage::ModuleBytesStorage;
 use std::sync::Arc;
@@ -57,16 +58,17 @@ impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
 /// It is never built directly by clients - only via [AsAptosCodeStorage] trait.
 /// Can be used to resolve both modules and scripts.
 #[derive(Delegate)]
-#[delegate(ModuleStorage)]
-#[delegate(CodeStorage)]
+#[delegate(WithRuntimeEnvironment, where = "S: StateView")]
+#[delegate(ModuleStorage, where = "S: StateView")]
+#[delegate(CodeStorage, where = "S: StateView")]
 pub struct AptosCodeStorageAdapter<'s, S> {
     storage: UnsyncCodeStorage<UnsyncModuleStorage<'s, StateViewAdapter<'s, S>>>,
 }
 
 impl<'s, S: StateView> AptosCodeStorageAdapter<'s, S> {
-    fn new(state_view: &'s S, vm: &'s MoveVM) -> Self {
+    fn new(state_view: &'s S, runtime_environment: &'s RuntimeEnvironment) -> Self {
         let adapter = StateViewAdapter { state_view };
-        let storage = adapter.into_unsync_code_storage(vm.runtime_environment());
+        let storage = adapter.into_unsync_code_storage(runtime_environment);
         Self { storage }
     }
 
@@ -108,12 +110,18 @@ impl<'s, S: StateView> AptosCodeStorage for AptosCodeStorageAdapter<'s, S> {}
 /// the long-living environment or block executor, e.g., for single transaction
 /// simulation, Aptos debugger, etc.
 pub trait AsAptosCodeStorage<'s, S> {
-    fn as_aptos_code_storage(&'s self, vm: &'s MoveVM) -> AptosCodeStorageAdapter<'s, S>;
+    fn as_aptos_code_storage(
+        &'s self,
+        runtime_environment: &'s RuntimeEnvironment,
+    ) -> AptosCodeStorageAdapter<'s, S>;
 }
 
 impl<'s, S: StateView> AsAptosCodeStorage<'s, S> for S {
-    fn as_aptos_code_storage(&'s self, vm: &'s MoveVM) -> AptosCodeStorageAdapter<S> {
-        AptosCodeStorageAdapter::new(self, vm)
+    fn as_aptos_code_storage(
+        &'s self,
+        runtime_environment: &'s RuntimeEnvironment,
+    ) -> AptosCodeStorageAdapter<S> {
+        AptosCodeStorageAdapter::new(self, runtime_environment)
     }
 }
 
@@ -135,8 +143,8 @@ mod test {
 
         let state_key_3 = StateKey::raw(&[3]);
 
-        let vm = MoveVM::new(vec![]);
-        let code_storage = state_view.as_aptos_code_storage(&vm);
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let code_storage = state_view.as_aptos_code_storage(&runtime_environment);
 
         let size_1 = assert_ok!(code_storage.fetch_module_size_by_state_key(&state_key_1));
         assert_some_eq!(size_1, 0);

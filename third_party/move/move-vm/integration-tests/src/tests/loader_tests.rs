@@ -20,7 +20,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, ModuleStorage,
-    TemporaryModuleStorage, UnreachableCodeStorage,
+    RuntimeEnvironment, StagingModuleStorage, UnreachableCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -31,6 +31,7 @@ const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
 struct Adapter {
     resource_storage: InMemoryStorage,
     vm: Arc<MoveVM>,
+    runtime_environment: RuntimeEnvironment,
     functions: Vec<(ModuleId, Identifier)>,
 }
 
@@ -65,11 +66,13 @@ impl Adapter {
             },
             ..Default::default()
         };
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], config.clone());
         let vm = Arc::new(MoveVM::new_with_config(vec![], config));
 
         Self {
             resource_storage,
             vm,
+            runtime_environment,
             functions,
         }
     }
@@ -81,11 +84,13 @@ impl Adapter {
             },
             ..Default::default()
         };
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], config.clone());
         let vm = Arc::new(MoveVM::new_with_config(vec![], config));
 
         Self {
             resource_storage: self.resource_storage,
             vm,
+            runtime_environment,
             functions: self.functions,
         }
     }
@@ -104,7 +109,9 @@ impl Adapter {
                 .publish_module(binary, WORKING_ACCOUNT, &mut UnmeteredGasMeter)
                 .unwrap_or_else(|_| panic!("failure publishing module: {:#?}", module));
         }
-        let changeset = session.finish().expect("failure getting write set");
+        let changeset = session
+            .finish(&UnreachableCodeStorage)
+            .expect("failure getting write set");
         self.resource_storage
             .apply(changeset)
             .expect("failure applying write set");
@@ -114,7 +121,7 @@ impl Adapter {
         &'a self,
         module_storage: &'a M,
         modules: Vec<CompiledModule>,
-    ) -> TemporaryModuleStorage<M> {
+    ) -> StagingModuleStorage<M> {
         let module_bundle = modules
             .into_iter()
             .map(|module| {
@@ -125,13 +132,8 @@ impl Adapter {
                 binary.into()
             })
             .collect();
-        TemporaryModuleStorage::new(
-            &WORKING_ACCOUNT,
-            self.vm.runtime_environment(),
-            module_storage,
-            module_bundle,
-        )
-        .expect("failure publishing modules")
+        StagingModuleStorage::create(&WORKING_ACCOUNT, module_storage, module_bundle)
+            .expect("failure publishing modules")
     }
 
     fn publish_modules_with_error(&mut self, modules: Vec<CompiledModule>) {
@@ -220,7 +222,7 @@ fn load() {
     // calls all functions sequentially
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.vm.runtime_environment());
+            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.call_functions(&module_storage);
     } else {
@@ -309,7 +311,7 @@ fn load_phantom_module() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.vm.runtime_environment());
+            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
         let mut session = adapter.vm.new_session(&adapter.resource_storage);
@@ -379,7 +381,7 @@ fn load_with_extra_ability() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.vm.runtime_environment());
+            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
         let mut session = adapter.vm.new_session(&adapter.resource_storage);
@@ -455,7 +457,7 @@ fn deep_dependency_list_ok_0() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.vm.runtime_environment());
+            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -482,7 +484,7 @@ fn deep_dependency_list_ok_1() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.vm.runtime_environment());
+            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -643,7 +645,7 @@ fn deep_friend_list_ok_0() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.vm.runtime_environment());
+            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {
@@ -670,7 +672,7 @@ fn deep_friend_list_ok_1() {
 
     if adapter.vm.vm_config().use_loader_v2 {
         let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(adapter.vm.runtime_environment());
+            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.publish_modules_using_loader_v2(&module_storage, vec![module]);
     } else {

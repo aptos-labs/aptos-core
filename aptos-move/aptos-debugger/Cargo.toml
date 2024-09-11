@@ -23,11 +23,13 @@ aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }
+move-vm-runtime = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }

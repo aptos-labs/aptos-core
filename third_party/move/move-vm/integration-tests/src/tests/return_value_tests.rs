@@ -12,6 +12,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues, AsUnsyncModuleStorage,
+    RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -51,6 +52,7 @@ fn run(
     let mut storage = InMemoryStorage::new();
     storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
 
+    let runtime_environment = RuntimeEnvironment::new(vec![]);
     let vm = MoveVM::new(vec![]);
     let mut sess = vm.new_session(&storage);
 
@@ -61,7 +63,7 @@ fn run(
         .map(|val| val.simple_serialize().unwrap())
         .collect();
 
-    let module_storage = storage.as_unsync_module_storage(vm.runtime_environment());
+    let module_storage = storage.as_unsync_module_storage(&runtime_environment);
     let traversal_storage = TraversalStorage::new();
 
     let SerializedReturnValues {

@@ -127,8 +127,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub fn print_stack_trace<B: Write>(&self, buf: &mut B) -> PartialVMResult<()> {
-        self.interpreter
-            .debug_print_stack_trace(buf, self.resolver.loader())
+        self.interpreter.debug_print_stack_trace(buf, self.resolver)
     }
 
     pub fn exists_at(
@@ -156,7 +155,9 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        self.resolver.loader().type_to_type_tag(ty)
+        self.resolver
+            .loader()
+            .type_to_type_tag(ty, self.resolver.module_storage())
     }
 
     pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {

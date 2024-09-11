@@ -53,7 +53,7 @@ pub struct Accesses<K> {
 
 /// Trait for single threaded transaction executor.
 // TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
-pub trait ExecutorTask: Sync + WithRuntimeEnvironment {
+pub trait ExecutorTask: Sync {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
@@ -65,7 +65,7 @@ pub trait ExecutorTask: Sync + WithRuntimeEnvironment {
 
     /// Type to initialize the single thread transaction executor. Clone and Sync are required because
     /// we will create an instance of executor on each individual thread.
-    type Environment: Sync + Clone;
+    type Environment: Sync + Clone + WithRuntimeEnvironment;
 
     /// Create an instance of the transaction executor.
     fn init(

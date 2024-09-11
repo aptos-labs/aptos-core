@@ -7,7 +7,7 @@ use crate::debug::DebugContext;
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use crate::{
     interpreter::Interpreter,
-    loader::{LoadedFunction, Loader},
+    loader::{LoadedFunction, Resolver},
 };
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use ::{
@@ -71,7 +71,7 @@ pub(crate) fn trace(
     locals: &Locals,
     pc: u16,
     instr: &Bytecode,
-    loader: &Loader,
+    resolver: &Resolver,
     interp: &Interpreter,
 ) {
     if *TRACING_ENABLED {
@@ -91,7 +91,7 @@ pub(crate) fn trace(
         DEBUG_CONTEXT
             .lock()
             .unwrap()
-            .debug_loop(function, locals, pc, instr, loader, interp);
+            .debug_loop(function, locals, pc, instr, resolver, interp);
     }
 }
 
@@ -100,13 +100,6 @@ macro_rules! trace {
     ($function_desc:expr, $locals:expr, $pc:expr, $instr:tt, $resolver:expr, $interp:expr) => {
         // Only include this code in debug releases
         #[cfg(any(debug_assertions, feature = "debugging"))]
-        $crate::tracing::trace(
-            &$function_desc,
-            $locals,
-            $pc,
-            &$instr,
-            $resolver.loader(),
-            $interp,
-        )
+        $crate::tracing::trace(&$function_desc, $locals, $pc, &$instr, $resolver, $interp)
     };
 }

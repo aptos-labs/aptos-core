@@ -11,7 +11,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncCodeStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -108,11 +108,13 @@ fn script_large_ty() {
     CompiledModule::deserialize(&module).unwrap();
 
     let mut storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_config(vec![], VMConfig {
+    let vm_config = VMConfig {
         verifier_config,
         paranoid_type_checks: true,
         ..Default::default()
-    });
+    };
+    let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config.clone());
+    let move_vm = MoveVM::new_with_config(vec![], vm_config);
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();
@@ -135,7 +137,7 @@ fn script_large_ty() {
     );
 
     let mut session = move_vm.new_session(&storage);
-    let code_storage = storage.as_unsync_code_storage(move_vm.runtime_environment());
+    let code_storage = storage.as_unsync_code_storage(&runtime_environment);
     let traversal_storage = TraversalStorage::new();
     let res = session
         .execute_script(

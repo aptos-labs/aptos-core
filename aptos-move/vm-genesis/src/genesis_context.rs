@@ -13,6 +13,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
+use claims::assert_some;
 use move_core_types::language_storage::ModuleId;
 use std::collections::{BTreeMap, HashMap};
 
@@ -38,7 +39,7 @@ impl GenesisStateView {
     pub(crate) fn add_module_write_ops(&mut self, module_write_ops: BTreeMap<StateKey, WriteOp>) {
         for (state_key, write_op) in module_write_ops {
             assert!(state_key.is_module_path());
-            let bytes = write_op.bytes().expect("Modules cannot be deleted");
+            let bytes = assert_some!(write_op.bytes(), "Modules cannot be deleted");
             self.state_data.insert(state_key, bytes.to_vec());
         }
     }

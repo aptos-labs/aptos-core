@@ -255,6 +255,7 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
+    #[deprecated]
     pub fn publish_module_bundle_relax_compatibility(
         &mut self,
         modules: Vec<Vec<u8>>,
@@ -281,30 +282,38 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This function should always succeed with no user errors returned, barring invariant violations.
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
-    pub fn finish(self) -> VMResult<ChangeSet> {
+    pub fn finish(self, module_storage: &impl ModuleStorage) -> VMResult<ChangeSet> {
         self.data_cache
-            .into_effects(self.move_vm.runtime.loader())
+            .into_effects(self.move_vm.runtime.loader(), module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn finish_with_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<Changes<Bytes, Resource>> {
         self.data_cache
-            .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
+            .into_custom_effects(
+                resource_converter,
+                self.move_vm.runtime.loader(),
+                module_storage,
+            )
             .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Same like `finish`, but also extracts the native context extensions from the session.
-    pub fn finish_with_extensions(self) -> VMResult<(ChangeSet, NativeContextExtensions<'r>)> {
+    pub fn finish_with_extensions(
+        self,
+        module_storage: &impl ModuleStorage,
+    ) -> VMResult<(ChangeSet, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
             native_extensions,
             ..
         } = self;
         let change_set = data_cache
-            .into_effects(self.move_vm.runtime.loader())
+            .into_effects(self.move_vm.runtime.loader(), module_storage)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, native_extensions))
     }
@@ -312,6 +321,7 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn finish_with_extensions_with_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        module_storage: &impl ModuleStorage,
     ) -> VMResult<(Changes<Bytes, Resource>, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
@@ -319,7 +329,11 @@ impl<'r, 'l> Session<'r, 'l> {
             ..
         } = self;
         let change_set = data_cache
-            .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
+            .into_custom_effects(
+                resource_converter,
+                self.move_vm.runtime.loader(),
+                module_storage,
+            )
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, native_extensions))
     }
@@ -347,9 +361,8 @@ impl<'r, 'l> Session<'r, 'l> {
     /// via ModuleStorage directly.
     #[deprecated]
     pub fn fetch_module_from_data_store(&self, module_id: &ModuleId) -> VMResult<Bytes> {
-        // TODO: This function should be removed...
         self.data_cache
-            .fetch_module(module_id)
+            .load_module(module_id)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -455,14 +468,6 @@ impl<'r, 'l> Session<'r, 'l> {
                 &self.module_store,
                 module_storage,
             )
-    }
-
-    pub fn get_type_tag(&self, ty: &Type) -> VMResult<TypeTag> {
-        self.move_vm
-            .runtime
-            .loader()
-            .type_to_type_tag(ty)
-            .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the underlying native extensions.
