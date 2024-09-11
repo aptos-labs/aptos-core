@@ -5,6 +5,7 @@
 use crate::{
     loader::{Loader, ModuleStorageAdapter},
     logging::expect_no_verification_errors,
+    module_linker_error,
     storage::code_storage::deserialize_script,
     ModuleStorage, RuntimeEnvironment,
 };
@@ -246,9 +247,15 @@ impl<'r> TransactionDataCache<'r> {
                     )?
                 },
                 Loader::V2(_) => {
+                    let module_addr = &ty_tag.address;
+                    let module_name = ty_tag.module.as_ident_str();
                     let metadata = module_storage
-                        .fetch_module_metadata(&ty_tag.address, ty_tag.module.as_ident_str())
-                        .map_err(|e| e.to_partial())?;
+                        .fetch_module_metadata(module_addr, module_name)
+                        .map_err(|e| e.to_partial())?
+                        .ok_or_else(|| {
+                            module_linker_error!(module_addr, module_name).to_partial()
+                        })?;
+
                     // If we need to process aggregator lifting, we pass type layout to remote.
                     // Remote, in turn ensures that all aggregator values are lifted if the resolved
                     // resource comes from storage.

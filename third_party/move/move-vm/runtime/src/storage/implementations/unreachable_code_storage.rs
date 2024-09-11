@@ -64,7 +64,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
+    ) -> VMResult<Option<Vec<Metadata>>> {
         unreachable_error!()
     }
 
@@ -72,7 +72,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> VMResult<Arc<CompiledModule>> {
+    ) -> VMResult<Option<Arc<CompiledModule>>> {
         unreachable_error!()
     }
 
@@ -80,7 +80,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
+    ) -> VMResult<Option<Arc<Module>>> {
         unreachable_error!()
     }
 }
