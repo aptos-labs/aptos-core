@@ -77,7 +77,16 @@ on:
         default: "high-perf-docker-with-local-ssd"
 
 jobs:
+  build:
+    runs-on: ${{ inputs.RUNS_ON }}
+    steps:
+      - uses: aptos-labs/aptos-core/.github/actions/get-aptos-debugger@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          GIT_SHA: ${{ inputs.GIT_SHA || github.sha }}
+
   replay-verify:
+    needs: build
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 720 }}
     runs-on: ${{ inputs.RUNS_ON }}
     strategy:
@@ -87,23 +96,22 @@ jobs:
     steps:
       - name: Echo Runner Number
         run: echo "Runner is ${{ matrix.number }}"
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.GIT_SHA }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - uses: aptos-labs/aptos-core/.github/actions/get-aptos-debugger@main
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          GIT_SHA: ${{ inputs.GIT_SHA || github.sha }}
+          EXPECT_CACHE_HIT: 'true'
 
       - name: Install GCloud SDK
         uses: "google-github-actions/setup-gcloud@v2"
         with:
           version: ">= 418.0.0"
           install_components: "kubectl,gke-gcloud-auth-plugin"
-
-      - name: Build CLI binaries in release mode
-        shell: bash
-        run: cargo build --release -p aptos-debugger
 
       - name: Run replay-verify in parallel
         shell: bash
