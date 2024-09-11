@@ -176,7 +176,7 @@ impl
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
-    UserTransaction(Box<UserTransaction>),
+    UserTransaction(UserTransaction),
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
     StateCheckpointTransaction(StateCheckpointTransaction),
@@ -292,12 +292,12 @@ impl
             u64,
         ),
     ) -> Self {
-        Transaction::UserTransaction(Box::new(UserTransaction {
+        Transaction::UserTransaction(UserTransaction {
             info,
             request: (txn, payload).into(),
             events,
             timestamp: timestamp.into(),
-        }))
+        })
     }
 }
 
@@ -621,6 +621,13 @@ impl ValidatorTransaction {
             ValidatorTransaction::DkgResult(t) => t.timestamp,
         }
     }
+
+    pub fn events(&self) -> &[Event] {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(t) => &t.events,
+            ValidatorTransaction::DkgResult(t) => &t.events,
+        }
+    }
 }
 
 impl
@@ -690,9 +697,9 @@ impl From<QuorumCertifiedUpdate> for ExportedQuorumCertifiedUpdate {
 /// A more API-friendly representation of the on-chain `aptos_types::aggregate_signature::AggregateSignature`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ExportedAggregateSignature {
-    signer_indices: Vec<usize>,
+    pub signer_indices: Vec<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sig: Option<HexEncodedBytes>,
+    pub sig: Option<HexEncodedBytes>,
 }
 
 impl From<AggregateSignature> for ExportedAggregateSignature {
@@ -744,9 +751,9 @@ pub struct DKGResultTransaction {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct ExportedDKGTranscript {
-    epoch: U64,
-    author: Address,
-    payload: HexEncodedBytes,
+    pub epoch: U64,
+    pub author: Address,
+    pub payload: HexEncodedBytes,
 }
 
 impl From<DKGTranscript> for ExportedDKGTranscript {
@@ -1405,7 +1412,12 @@ impl VerifyInput for KeylessSignature {
     fn verify(&self) -> anyhow::Result<()> {
         let public_key_len = self.public_key.inner().len();
         let signature_len = self.signature.inner().len();
-        if public_key_len > keyless::KeylessPublicKey::MAX_LEN {
+        if public_key_len
+            > std::cmp::max(
+                keyless::KeylessPublicKey::MAX_LEN,
+                keyless::FederatedKeylessPublicKey::MAX_LEN,
+            )
+        {
             bail!(
                 "Keyless public key length is greater than the maximum number of {} bytes: found {} bytes",
                 keyless::KeylessPublicKey::MAX_LEN, public_key_len
@@ -1485,6 +1497,17 @@ impl Keyless {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct FederatedKeyless {
+    pub value: HexEncodedBytes,
+}
+
+impl FederatedKeyless {
+    pub fn new(value: HexEncodedBytes) -> Self {
+        Self { value }
+    }
+}
+
 impl TryFrom<Signature> for AnySignature {
     type Error = anyhow::Error;
 
@@ -1527,6 +1550,7 @@ pub enum PublicKey {
     Secp256k1Ecdsa(Secp256k1Ecdsa),
     Secp256r1Ecdsa(Secp256r1Ecdsa),
     Keyless(Keyless),
+    FederatedKeyless(FederatedKeyless),
 }
 
 impl TryFrom<PublicKey> for AnyPublicKey {
@@ -1542,6 +1566,9 @@ impl TryFrom<PublicKey> for AnyPublicKey {
                 AnyPublicKey::secp256r1_ecdsa(p.value.inner().try_into()?)
             },
             PublicKey::Keyless(p) => AnyPublicKey::keyless(p.value.inner().try_into()?),
+            PublicKey::FederatedKeyless(p) => {
+                AnyPublicKey::federated_keyless(p.value.inner().try_into()?)
+            },
         })
     }
 }
@@ -1560,6 +1587,9 @@ impl From<AnyPublicKey> for PublicKey {
             ),
             AnyPublicKey::Keyless { public_key } => {
                 PublicKey::Keyless(Keyless::new(public_key.to_bytes().into()))
+            },
+            AnyPublicKey::FederatedKeyless { public_key } => {
+                PublicKey::FederatedKeyless(FederatedKeyless::new(public_key.to_bytes().into()))
             },
         }
     }
@@ -1593,6 +1623,11 @@ impl VerifyInput for SingleKeySignature {
             }
             .verify(),
             (PublicKey::Keyless(p), Signature::Keyless(s)) => KeylessSignature {
+                public_key: p.value.clone(),
+                signature: s.value.clone(),
+            }
+            .verify(),
+            (PublicKey::FederatedKeyless(p), Signature::Keyless(s)) => KeylessSignature {
                 public_key: p.value.clone(),
                 signature: s.value.clone(),
             }
@@ -1639,6 +1674,12 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
                 PublicKey::Keyless(p) => {
                     let key = p.value.inner().try_into().context(
                         "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
+                    )?;
+                    AnyPublicKey::keyless(key)
+                },
+                PublicKey::FederatedKeyless(p) => {
+                    let key = p.value.inner().try_into().context(
+                        "Failed to parse given public_key bytes as AnyPublicKey::FederatedKeyless",
                     )?;
                     AnyPublicKey::keyless(key)
                 },
@@ -1744,6 +1785,12 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
                     )?;
                     AnyPublicKey::keyless(key)
                 },
+                PublicKey::FederatedKeyless(p) => {
+                    let key = p.value.inner().try_into().context(
+                        "Failed to parse given public_key bytes as AnyPublicKey::FederatedKeyless",
+                    )?;
+                    AnyPublicKey::federated_keyless(key)
+                },
             };
             public_keys.push(key);
         }
@@ -1787,6 +1834,33 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
     }
 }
 
+/// A placeholder to represent the absence of account signature
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct NoAccountSignature;
+
+impl VerifyInput for NoAccountSignature {
+    fn verify(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+impl TryFrom<NoAccountSignature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(signature: NoAccountSignature) -> Result<Self, Self::Error> {
+        let account_auth = signature.try_into()?;
+        Ok(TransactionAuthenticator::single_sender(account_auth))
+    }
+}
+
+impl TryFrom<NoAccountSignature> for AccountAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(_value: NoAccountSignature) -> Result<Self, Self::Error> {
+        Ok(AccountAuthenticator::NoAccountAuthenticator)
+    }
+}
+
 /// Account signature scheme
 ///
 /// The account signature scheme allows you to have two types of accounts:
@@ -1802,6 +1876,7 @@ pub enum AccountSignature {
     MultiEd25519Signature(MultiEd25519Signature),
     SingleKeySignature(SingleKeySignature),
     MultiKeySignature(MultiKeySignature),
+    NoAccountSignature(NoAccountSignature),
 }
 
 impl VerifyInput for AccountSignature {
@@ -1811,6 +1886,7 @@ impl VerifyInput for AccountSignature {
             AccountSignature::MultiEd25519Signature(inner) => inner.verify(),
             AccountSignature::SingleKeySignature(inner) => inner.verify(),
             AccountSignature::MultiKeySignature(inner) => inner.verify(),
+            AccountSignature::NoAccountSignature(inner) => inner.verify(),
         }
     }
 }
@@ -1824,6 +1900,7 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
             AccountSignature::MultiEd25519Signature(s) => s.try_into()?,
             AccountSignature::SingleKeySignature(s) => s.try_into()?,
             AccountSignature::MultiKeySignature(s) => s.try_into()?,
+            AccountSignature::NoAccountSignature(s) => s.try_into()?,
         })
     }
 }
@@ -1984,6 +2061,7 @@ impl From<&AccountAuthenticator> for AccountSignature {
                     signatures_required: public_keys.signatures_required(),
                 })
             },
+            NoAccountAuthenticator => AccountSignature::NoAccountSignature(NoAccountSignature),
         }
     }
 }

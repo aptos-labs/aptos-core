@@ -37,18 +37,19 @@ cd $repodir
   cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/spec.json
 )
 
-(
-  echo
-  echo "Regenerating Typescript SDK (in `pwd`)"
-  # Typescript SDK client files
-  cd ecosystem/typescript/sdk
-  pnpm install
-  pnpm generate-client
-
-  # Typescript SDK docs
-  pnpm generate-ts-docs
-  cd ..
-)
+## Disabled due to errors, and it's for the V1 which is going to be deprecated.
+# (
+#   echo
+#   echo "Regenerating Typescript SDK (in `pwd`)"
+#   # Typescript SDK client files
+#   cd ecosystem/typescript/sdk
+#   pnpm install
+#   pnpm generate-client
+#
+#   # Typescript SDK docs
+#   pnpm generate-ts-docs
+#   cd ..
+# )
 
 echo
 echo "WARNING: If you are adding a new transaction authenticator..."

@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::buffered_state::BufferedState;
-use aptos_config::config::{
-    BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-};
+use aptos_config::config::{ BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
 use aptos_infallible::Mutex;
 use aptos_types::state_store::create_empty_sharded_state_updates;
 use std::default::Default;
@@ -15,7 +13,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             false,
-            BUFFERED_STATE_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false, /* indexer */
             false,
@@ -37,15 +35,18 @@ impl AptosDB {
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             db_config,
             false, /* indexer */
-            BUFFERED_STATE_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             max_node_cache,
+            None,
         )
         .expect("Unable to open AptosDB")
     }
 
     /// This opens db in non-readonly mode, without the pruner and cache.
     pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS, 0, false, false)
+        Self::new_without_pruner(db_root_path, false,
+                                 BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+                                 0, false, false)
     }
 
     /// This opens db in non-readonly mode, without the pruner, and with the indexer
@@ -53,7 +54,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             false,
-            BUFFERED_STATE_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             true, /* indexer */
             enable_sharding,
@@ -80,7 +81,7 @@ impl AptosDB {
         Self::new_without_pruner(
             db_root_path,
             true,
-            BUFFERED_STATE_TARGET_ITEMS,
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false, /* indexer */
             false,

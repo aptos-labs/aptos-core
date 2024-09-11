@@ -33,6 +33,7 @@ move-symbol-pool = { path = "../move-symbol-pool" }
 [dev-dependencies]
 datatest-stable = { workspace = true }
 move-stdlib = { path = "../move-stdlib" }
+pathdiff = "0.2.1"
 
 [[test]]
 name = "move_check_testsuite"

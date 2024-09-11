@@ -3,7 +3,7 @@
 
 use crate::{
     common::NUM_STATE_SHARDS,
-    db_options::{gen_state_merkle_cfds, state_merkle_db_column_families},
+    db_options::gen_state_merkle_cfds,
     lru_node_cache::LruNodeCache,
     metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
     schema::{
@@ -137,6 +137,7 @@ impl StateMerkleDb {
         self.commit_top_levels(version, top_levels_batch)
     }
 
+    /// Only used by fast sync / restore.
     pub(crate) fn commit_no_progress(
         &self,
         top_level_batch: SchemaBatch,
@@ -146,19 +147,11 @@ impl StateMerkleDb {
             batches_for_shards.len() == NUM_STATE_SHARDS,
             "Shard count mismatch."
         );
-        THREAD_MANAGER.get_io_pool().scope(|s| {
-            let mut state_merkle_batch = batches_for_shards.into_iter();
-            for shard_id in 0..NUM_STATE_SHARDS {
-                let batch = state_merkle_batch.next().unwrap();
-                s.spawn(move |_| {
-                    self.state_merkle_db_shards[shard_id]
-                        .write_schemas(batch)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to commit state merkle shard {shard_id}.")
-                        });
-                });
-            }
-        });
+        let mut batches = batches_for_shards.into_iter();
+        for shard_id in 0..NUM_STATE_SHARDS {
+            let state_merkle_batch = batches.next().unwrap();
+            self.state_merkle_db_shards[shard_id].write_schemas(state_merkle_batch)?;
+        }
 
         self.state_merkle_metadata_db.write_schemas(top_level_batch)
     }
@@ -645,7 +638,7 @@ impl StateMerkleDb {
                 &gen_rocksdb_options(state_merkle_db_config, true),
                 path,
                 name,
-                state_merkle_db_column_families(),
+                gen_state_merkle_cfds(state_merkle_db_config),
             )?
         } else {
             DB::open_cf(

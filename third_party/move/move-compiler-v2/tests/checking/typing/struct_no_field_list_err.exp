@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: field `0` not declared in `m::S`
+  ┌─ tests/checking/typing/struct_no_field_list_err.move:6:11
+  │
+6 │         S(1)
+  │           ^

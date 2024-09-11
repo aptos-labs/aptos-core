@@ -24,7 +24,7 @@ module aptos_framework::code {
     }
 
     /// Metadata for a package. All byte blobs are represented as base64-of-gzipped-bytes
-    struct PackageMetadata has store, drop {
+    struct PackageMetadata has copy, drop, store {
         /// Name of this package.
         name: String,
         /// The upgrade policy of this package.
@@ -52,7 +52,7 @@ module aptos_framework::code {
     }
 
     /// Metadata about a module in a package.
-    struct ModuleMetadata has store, drop {
+    struct ModuleMetadata has copy, drop, store {
         /// Name of the module.
         name: String,
         /// Source text, gzipped String. Empty if not provided.
@@ -214,9 +214,17 @@ module aptos_framework::code {
         );
 
         let registry = borrow_global_mut<PackageRegistry>(code_object_addr);
-        vector::for_each_mut<PackageMetadata>(&mut registry.packages, |pack| {
+        vector::for_each_mut(&mut registry.packages, |pack| {
             let package: &mut PackageMetadata = pack;
             package.upgrade_policy = upgrade_policy_immutable();
+        });
+
+        // We unfortunately have to make a copy of each package to avoid borrow checker issues as check_dependencies
+        // needs to borrow PackageRegistry from the dependency packages.
+        // This would increase the amount of gas used, but this is a rare operation and it's rare to have many packages
+        // in a single code object.
+        vector::for_each(registry.packages, |pack| {
+            check_dependencies(code_object_addr, &pack);
         });
     }
 

@@ -425,18 +425,22 @@ impl BatchGenerator {
                             trace!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
                         }
                         counters::QS_BACKPRESSURE_TXN_COUNT.observe(1.0);
+                        counters::QS_BACKPRESSURE_MAKE_STRICTER_TXN_COUNT.observe(1.0);
                         counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s as f64);
                     } else {
                         // additive increase, every second
                         if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
                             back_pressure_increase_latest = tick_start;
                             dynamic_pull_txn_per_s = std::cmp::min(
-                                dynamic_pull_txn_per_s + self.config.back_pressure.dynamic_min_txn_per_s,
+                                dynamic_pull_txn_per_s + self.config.back_pressure.additive_increase_when_no_backpressure,
                                 self.config.back_pressure.dynamic_max_txn_per_s,
                             );
                             trace!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
                         }
-                        counters::QS_BACKPRESSURE_TXN_COUNT.observe(0.0);
+                        counters::QS_BACKPRESSURE_TXN_COUNT.observe(
+                            if dynamic_pull_txn_per_s < self.config.back_pressure.dynamic_max_txn_per_s { 1.0 } else { 0.0 }
+                        );
+                        counters::QS_BACKPRESSURE_MAKE_STRICTER_TXN_COUNT.observe(0.0);
                         counters::QS_BACKPRESSURE_DYNAMIC_MAX.observe(dynamic_pull_txn_per_s as f64);
                     }
                     if self.back_pressure.proof_count {

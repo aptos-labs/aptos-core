@@ -60,10 +60,6 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: python3 scripts/check-cryptohasher-symbols.py
 
   # Run all rust lints. This is a PR required job.
@@ -82,6 +78,36 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: echo "Skipping rust lints! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+
+  # Run cargo deny. This is a PR required job.
+  rust-cargo-deny:
+    needs: file_change_determinator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check licenses
+      - run: echo "Skipping cargo deny! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+
+  # Run the docs tests. This is a PR required job.
+  rust-doc-tests:
+    if: | # Only run when an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null
+      )
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run rust doc tests
+        uses: ./.github/actions/rust-doc-tests
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
   # Run all rust smoke tests. This is a PR required job.
   rust-smoke-tests:
@@ -106,8 +132,12 @@ jobs:
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Run only the targeted rust unit tests. This is a PR required job.
-  rust-targeted-unit-tests:
+  # Check the freshess of the merge base. This is a PR required job.
+  rust-check-merge-base:
+    if: | # Don't run on release branches
+      (
+        !contains(github.event.pull_request.base.ref, '-release-')
+      )
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
@@ -115,6 +145,29 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
+      - name: Run the merge base freshness check
+        uses: ./.github/actions/rust-check-merge-base
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+  # Run only the targeted rust unit tests. This is a PR required job.
+  rust-targeted-unit-tests:
+    if: | # Don't run on release branches. Instead, all unit tests will be triggered.
+      (
+        !contains(github.event.pull_request.base.ref, '-release-')
+      )
+    needs: file_change_determinator
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # Fetch all git history for accurate target determination
+
+      - name: Run dev_setup.sh
+        run: |
+          scripts/dev_setup.sh -b -p -r -y -P -t
+
       - name: Run targeted rust unit tests
         uses: ./.github/actions/rust-targeted-unit-tests
         with:
@@ -126,7 +179,8 @@ jobs:
       (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests')
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests') ||
+        contains(github.event.pull_request.base.ref, '-release-')
       )
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
@@ -135,7 +189,6 @@ jobs:
         uses: ./.github/actions/rust-unit-tests
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_ANALYTICS_TOKEN }}
 
   # Run the cached packages build. This is a PR required job.
   rust-build-cached-packages:
@@ -151,9 +204,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Run aptos cached packages build test
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         run: scripts/cargo_build_aptos_cached_packages.sh --check
@@ -166,12 +216,6 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v4
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - uses: taiki-e/install-action@v1.5.6
-        with:
-          tool: nextest
       - run: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-api --exclude aptos-executor-benchmark --exclude aptos-backup-cli --retries 3 --no-fail-fast -F consensus-only-perf-test
         env:
           RUST_MIN_STACK: 4297152
@@ -182,19 +226,13 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v4
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - uses: taiki-e/install-action@v1.5.6
-        with:
-          tool: nextest
       # prebuild aptos-node binary, so that tests don't start before node is built.
       # also prebuild aptos-node binary as a separate step to avoid feature unification issues
       - run: cargo build --locked --package=aptos-node -F consensus-only-perf-test --release && LOCAL_SWARM_NODE_RELEASE=1 CONSENSUS_ONLY_PERF_TEST=1 cargo nextest run --release --package smoke-test -E "test(test_consensus_only_with_txn_emitter)" --run-ignored all
 
       # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
       - name: Upload smoke test logs for failed and flaky tests
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ failure() || success() }}
         with:
           name: failed-consensus-only-smoke-test-logs

@@ -10,18 +10,15 @@ use crate::{
 use anyhow::bail;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
-use aptos_db::AptosDB;
-use aptos_db_indexer_schemas::schema::state_keys::StateKeysSchema;
+use aptos_db_indexer_schemas::{
+    metadata::MetadataKey,
+    schema::{indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema},
+};
 use aptos_forge::{NodeExt, Result, Swarm, SwarmExt};
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_rest_client::Client as RestClient;
 use aptos_schemadb::DB;
-use aptos_storage_interface::DbReader;
-use aptos_types::{
-    account_address::AccountAddress,
-    state_store::state_key::{prefix::StateKeyPrefix, StateKey},
-    transaction::Version,
-};
+use aptos_types::{account_address::AccountAddress, state_store::state_key::StateKey};
 use std::{
     collections::HashSet,
     sync::Arc,
@@ -104,6 +101,7 @@ async fn wait_for_account(client: &RestClient, address: AccountAddress) -> Resul
 }
 
 fn enable_internal_indexer(node_config: &mut NodeConfig) {
+    node_config.storage.rocksdb_configs.enable_storage_sharding = true;
     node_config.indexer_db_config.enable_event = true;
     node_config.indexer_db_config.enable_transaction = true;
     node_config.indexer_db_config.enable_statekeys = true;
@@ -137,8 +135,30 @@ async fn test_internal_indexer_with_fast_sync() {
     let ledger_info = validator_client.get_ledger_information().await.unwrap();
     println!("ledger_info: {:?}", ledger_info);
     let mut vfn_config = NodeConfig::get_default_vfn_config();
+    vfn_config.storage.rocksdb_configs.enable_storage_sharding = true;
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::DownloadLatestStates;
+    vfn_config
+        .storage
+        .storage_pruner_config
+        .ledger_pruner_config
+        .enable = true;
+    vfn_config
+        .storage
+        .storage_pruner_config
+        .ledger_pruner_config
+        .prune_window = 100;
+    vfn_config
+        .storage
+        .storage_pruner_config
+        .ledger_pruner_config
+        .batch_size = 50;
+    vfn_config
+        .storage
+        .storage_pruner_config
+        .ledger_pruner_config
+        .user_pruning_window_offset = 30;
+
     enable_internal_indexer(&mut vfn_config);
 
     let peer_id = create_fullnode(vfn_config.clone(), &mut swarm).await;
@@ -153,30 +173,20 @@ async fn test_internal_indexer_with_fast_sync() {
 }
 
 fn check_indexer_db(vfn_config: &NodeConfig) {
-    let aptos_db_dir = vfn_config
-        .storage
-        .get_dir_paths()
-        .default_root_path()
-        .to_owned();
-    let path = aptos_db_dir.as_path();
-    let aptos_db = AptosDB::new_for_test(path);
-
     let internal_indexer_db = InternalIndexerDBService::get_indexer_db(vfn_config).unwrap();
-    let prefix = StateKeyPrefix::from(AccountAddress::from_hex_literal("0x1").unwrap());
-    let main_db_iter = aptos_db
-        .get_prefixed_state_value_iterator(&prefix, None, Version::MAX)
+    let opt = internal_indexer_db
+        .get_restore_version_and_progress()
         .unwrap();
-    let main_db_keys: HashSet<StateKey> = main_db_iter.map(|iter| iter.unwrap().0).collect();
-    let indexer_keys: HashSet<StateKey> =
-        get_indexer_db_content::<StateKeysSchema, StateKey>(internal_indexer_db.clone());
-    println!(
-        "Total state keys: {}, {}",
-        main_db_keys.len(),
-        indexer_keys.len()
+    assert!(opt.is_some());
+    let indexer_keys: HashSet<StateKey> = get_indexer_db_content::<StateKeysSchema, StateKey>(
+        internal_indexer_db.get_inner_db_clone(),
     );
-    assert!(!main_db_keys.is_empty());
-    // 0x1 statekeys are synced and is subset of indexer statekeys
-    assert!(main_db_keys.is_subset(&indexer_keys));
+    let meta_keys = get_indexer_db_content::<InternalIndexerMetadataSchema, MetadataKey>(
+        internal_indexer_db.get_inner_db_clone(),
+    );
+    assert!(meta_keys.contains(&MetadataKey::EventPrunerProgress));
+    assert!(meta_keys.contains(&MetadataKey::TransactionPrunerProgress));
+    assert!(!indexer_keys.is_empty());
 }
 
 fn get_indexer_db_content<T, U>(internal_indexer_db: Arc<DB>) -> HashSet<U>

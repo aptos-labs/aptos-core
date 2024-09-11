@@ -4,15 +4,18 @@
 
 use crate::{
     error::StateSyncError,
-    payload_manager::PayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
-    state_computer::{PipelineExecutionResult, StateComputeResultFut},
+    payload_manager::TPayloadManager,
+    pipeline::{buffer_manager::OrderedBlocks, pipeline_phase::CountedRequest},
+    state_computer::StateComputeResultFut,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
-use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    block::Block, pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::PipelinedBlock,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_logger::debug;
@@ -22,7 +25,7 @@ use aptos_types::{
 };
 use futures::SinkExt;
 use futures_channel::mpsc::UnboundedSender;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub struct EmptyStateComputer {
     executor_channel: UnboundedSender<OrderedBlocks>,
@@ -36,18 +39,6 @@ impl EmptyStateComputer {
 
 #[async_trait::async_trait]
 impl StateComputer for EmptyStateComputer {
-    async fn compute(
-        &self,
-        _block: &Block,
-        _parent_block_id: HashValue,
-        _randomness: Option<Randomness>,
-    ) -> ExecutorResult<PipelineExecutionResult> {
-        Ok(PipelineExecutionResult::new(
-            vec![],
-            StateComputeResult::new_dummy(),
-        ))
-    }
-
     async fn commit(
         &self,
         blocks: &[Arc<PipelinedBlock>],
@@ -83,7 +74,7 @@ impl StateComputer for EmptyStateComputer {
     fn new_epoch(
         &self,
         _: &EpochState,
-        _: Arc<PayloadManager>,
+        _: Arc<dyn TPayloadManager>,
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
@@ -120,6 +111,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _block: &Block,
         parent_block_id: HashValue,
         _randomness: Option<Randomness>,
+        _lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         // trapdoor for Execution Error
         let res = if parent_block_id == self.random_compute_result_root_hash {
@@ -129,7 +121,14 @@ impl StateComputer for RandomComputeResultStateComputer {
                 self.random_compute_result_root_hash,
             ))
         };
-        let pipeline_execution_res = res.map(|res| PipelineExecutionResult::new(vec![], res));
+        let pipeline_execution_res = res.map(|res| {
+            PipelineExecutionResult::new(
+                vec![],
+                res,
+                Duration::from_secs(0),
+                Box::pin(async { Ok(()) }),
+            )
+        });
         Box::pin(async move { pipeline_execution_res })
     }
 
@@ -149,7 +148,7 @@ impl StateComputer for RandomComputeResultStateComputer {
     fn new_epoch(
         &self,
         _: &EpochState,
-        _: Arc<PayloadManager>,
+        _: Arc<dyn TPayloadManager>,
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,

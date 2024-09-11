@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: unsupported language construct
+  ┌─ tests/checking-lang-v1/direct_visibility.move:2:5
+  │
+2 │     package fun f() {}
+  │     ^^^^^^^ Move 2 language construct is not enabled: direct `package` declaration
+
+error: unsupported language construct
+  ┌─ tests/checking-lang-v1/direct_visibility.move:7:5
+  │
+7 │     friend fun f() {}
+  │     ^^^^^^ Move 2 language construct is not enabled: direct `friend` declaration
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/direct_visibility.move:11:5
+   │
+11 │     friend fun f() {
+   │     ^^^^^^ Move 2 language construct is not enabled: direct `friend` declaration

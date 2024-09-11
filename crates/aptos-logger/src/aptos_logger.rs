@@ -204,8 +204,21 @@ impl LogEntry {
 
         let hostname = HOSTNAME.as_deref();
         let namespace = NAMESPACE.as_deref();
-        let peer_id = aptos_node_identity::peer_id_as_str();
-        let chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
+
+        let peer_id: Option<&str>;
+        let chain_id: Option<u8>;
+
+        #[cfg(node_identity)]
+        {
+            peer_id = aptos_node_identity::peer_id_as_str();
+            chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
+        }
+
+        #[cfg(not(node_identity))]
+        {
+            peer_id = None;
+            chain_id = None;
+        }
 
         let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
             let mut backtrace = Backtrace::new();

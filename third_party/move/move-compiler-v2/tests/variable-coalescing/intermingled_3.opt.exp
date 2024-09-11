@@ -99,16 +99,13 @@ module c0ffee.m {
 
 
 test(): u64 /* def_idx: 0 */ {
-L0:	loc0: u64
 B0:
 	0: LdU64(1)
 	1: LdU64(1)
 	2: Add
-	3: LdU64(2)
-	4: StLoc[0](loc0: u64)
-	5: Pop
-	6: MoveLoc[0](loc0: u64)
-	7: Ret
+	3: Pop
+	4: LdU64(2)
+	5: Ret
 }
 }
 ============ bytecode verification succeeded ========

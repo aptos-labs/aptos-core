@@ -977,13 +977,14 @@ impl FakeExecutor {
             let resolver = self.data_store.as_move_resolver();
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new_with_gas_hook(
+            let vm = MoveVmExt::new_with_extended_options(
                 LATEST_GAS_FEATURE_VERSION,
                 Ok(&AptosGasParameters::zeros()),
                 self.env.clone(),
                 Some(Arc::new(move |expression| {
                     a2.lock().unwrap().push(expression);
                 })),
+                false,
                 &resolver,
             );
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
@@ -1015,14 +1016,14 @@ impl FakeExecutor {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
-            let change_set = session
+            let (change_set, module_write_set) = session
                 .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                     LATEST_GAS_FEATURE_VERSION,
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set()
-                .expect("Failed to convert to ChangeSet")
+                .try_combine_into_storage_change_set(module_write_set)
+                .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
         self.data_store.add_write_set(&write_set);
@@ -1071,14 +1072,14 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let change_set = session
+            let (change_set, module_write_set) = session
                 .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                     LATEST_GAS_FEATURE_VERSION,
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set()
-                .expect("Failed to convert to ChangeSet")
+                .try_combine_into_storage_change_set(module_write_set)
+                .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
         self.data_store.add_write_set(&write_set);
@@ -1123,15 +1124,14 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
 
-        let change_set = session
+        let (change_set, module_write_set) = session
             .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                 LATEST_GAS_FEATURE_VERSION,
             ))
             .expect("Failed to generate txn effects");
-        // TODO: Support deltas in fake executor.
         let (write_set, events) = change_set
-            .try_into_storage_change_set()
-            .expect("Failed to convert to ChangeSet")
+            .try_combine_into_storage_change_set(module_write_set)
+            .expect("Failed to convert to storage ChangeSet")
             .into_inner();
         Ok((write_set, events))
     }

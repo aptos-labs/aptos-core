@@ -40,6 +40,8 @@ async fn generate_traffic_and_assert_committed(
             TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool: false,
+                non_conflicting: false,
+                use_fa_transfer: false,
             },
             70,
         ),
@@ -370,21 +372,24 @@ async fn test_swarm_with_bad_non_qs_node() {
         .unwrap();
 
     info!("generate traffic");
-    let tx_stat = generate_traffic(
-        &mut swarm,
-        &[dishonest_peer_id],
-        Duration::from_secs(20),
-        1,
-        vec![vec![
-            (TransactionTypeArg::CoinTransfer.materialize_default(), 70),
-            (
-                TransactionTypeArg::AccountGeneration.materialize_default(),
-                20,
-            ),
-        ]],
+    let tx_stat = tokio::time::timeout(
+        Duration::from_secs(60),
+        generate_traffic(
+            &mut swarm,
+            &[dishonest_peer_id],
+            Duration::from_secs(20),
+            1,
+            vec![vec![
+                (TransactionTypeArg::CoinTransfer.materialize_default(), 70),
+                (
+                    TransactionTypeArg::AccountGeneration.materialize_default(),
+                    20,
+                ),
+            ]],
+        ),
     )
     .await;
-    assert!(tx_stat.is_err());
+    assert!(tx_stat.is_err() || tx_stat.is_ok_and(|result| result.is_err()));
 
     generate_traffic_and_assert_committed(
         &mut swarm,

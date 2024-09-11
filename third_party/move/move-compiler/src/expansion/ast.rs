@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    expansion::translate::is_valid_struct_constant_or_schema_name,
     parser::ast::{
         self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName,
         ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
@@ -171,7 +172,8 @@ pub struct StructDefinition {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructLayout {
-    Singleton(Fields<Type>),
+    // the second field is true iff the struct has positional fields
+    Singleton(Fields<Type>, bool),
     Variants(Vec<StructVariant>),
     Native(Loc),
 }
@@ -182,6 +184,7 @@ pub struct StructVariant {
     pub loc: Loc,
     pub name: VariantName,
     pub fields: Fields<Type>,
+    pub is_positional: bool,
 }
 
 //**************************************************************************************************
@@ -377,6 +380,19 @@ pub enum ModuleAccess_ {
     // ModuleAccess(module_ident, member_ident, optional_variant_ident)
     ModuleAccess(ModuleIdent, Name, Option<Name>),
 }
+
+impl ModuleAccess_ {
+    fn get_name(&self) -> &Name {
+        match self {
+            ModuleAccess_::Name(n) | ModuleAccess_::ModuleAccess(_, n, _) => n,
+        }
+    }
+
+    pub fn is_valid_struct_constant_or_schema_name(&self) -> bool {
+        is_valid_struct_constant_or_schema_name(self.get_name().value.as_str())
+    }
+}
+
 pub type ModuleAccess = Spanned<ModuleAccess_>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -398,11 +414,36 @@ pub type Type = Spanned<Type_>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum LValue_ {
     Var(ModuleAccess, Option<Vec<Type>>),
-    Unpack(ModuleAccess, Option<Vec<Type>>, Fields<LValue>),
+    Unpack(
+        ModuleAccess,
+        Option<Vec<Type>>,
+        Fields<LValue>,
+        Option<DotDot>,
+    ),
+    PositionalUnpack(ModuleAccess, Option<Vec<Type>>, LValueOrDotDotList),
 }
 pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
 pub type LValueList = Spanned<LValueList_>;
+
+pub fn wild_card(loc: Loc) -> LValue {
+    let wildcard = sp(loc, Symbol::from("_"));
+    let lvalue_ = LValue_::Var(sp(loc, ModuleAccess_::Name(wildcard)), None);
+    sp(loc, lvalue_)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DotDot_;
+pub type DotDot = Spanned<DotDot_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum LValueOrDotDot_ {
+    LValue(LValue),
+    DotDot,
+}
+pub type LValueOrDotDot = Spanned<LValueOrDotDot_>;
+pub type LValueOrDotDotList_ = Vec<LValueOrDotDot>;
+pub type LValueOrDotDotList = Spanned<LValueOrDotDotList_>;
 
 pub type LValueWithRange_ = (LValue, Exp);
 pub type LValueWithRange = Spanned<LValueWithRange_>;
@@ -488,10 +529,11 @@ pub enum Exp_ {
 
     Borrow(bool, Box<Exp>),
     ExpDotted(Box<ExpDotted>),
-    Index(Box<Exp>, Box<Exp>), // spec only (no mutation needed right now)
+    Index(Box<Exp>, Box<Exp>), // spec only unless language >= v2
 
     Cast(Box<Exp>, Type),
     Annotate(Box<Exp>, Type),
+    Test(Box<Exp>, Vec<Type>),
 
     Spec(SpecId, BTreeSet<Name>, BTreeSet<Name>),
 
@@ -1086,7 +1128,7 @@ impl AstDebug for (StructName, &StructDefinition) {
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
-        if let StructLayout::Singleton(fields) = fields {
+        if let StructLayout::Singleton(fields, _) = fields {
             w.block(|w| {
                 w.list(fields, ",", |w, (_, f, idx_st)| {
                     let (idx, st) = idx_st;
@@ -1655,7 +1697,9 @@ impl AstDebug for Exp_ {
                 rhs.ast_debug(w);
             },
             E::Mutate(lhs, rhs) => {
-                w.write("*");
+                if !matches!(lhs.value, E::Index(_, _)) {
+                    w.write("*");
+                }
                 lhs.ast_debug(w);
                 w.write(" = ");
                 rhs.ast_debug(w);
@@ -1700,6 +1744,16 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
                 w.write(" as ");
                 ty.ast_debug(w);
+                w.write(")");
+            },
+            E::Test(e, tys) => {
+                w.write("(");
+                e.ast_debug(w);
+                w.write(" is ");
+                w.list(tys, "|", |w, item| {
+                    item.ast_debug(w);
+                    false
+                });
                 w.write(")");
             },
             E::Index(oper, index) => {
@@ -1771,7 +1825,7 @@ impl AstDebug for LValue_ {
                     w.write(">");
                 }
             },
-            L::Unpack(ma, tys_opt, fields) => {
+            L::Unpack(ma, tys_opt, fields, dotdot) => {
                 ma.ast_debug(w);
                 if let Some(ss) = tys_opt {
                     w.write("<");
@@ -1784,8 +1838,35 @@ impl AstDebug for LValue_ {
                     w.write(&format!("{}#{}: ", idx, f));
                     b.ast_debug(w);
                 });
+                if !fields.is_empty() {
+                    w.write(", ");
+                }
+                if dotdot.is_some() {
+                    w.write("..");
+                }
                 w.write("}");
             },
+            L::PositionalUnpack(ma, tys_opt, args) => {
+                ma.ast_debug(w);
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("(");
+                w.comma(&args.value, |w, b| b.ast_debug(w));
+                w.write(")");
+            },
+        }
+    }
+}
+
+impl AstDebug for LValueOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use LValueOrDotDot_::*;
+        match self {
+            LValue(l) => l.ast_debug(w),
+            DotDot => w.write(".."),
         }
     }
 }

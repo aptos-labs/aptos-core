@@ -17,6 +17,7 @@ use std::{
     str::FromStr,
 };
 
+// TODO: Move these to `move_types.rs`
 static DELEGATION_POOL_GET_STAKE_FUNCTION: Lazy<EntryFunctionId> =
     Lazy::new(|| "0x1::delegation_pool::get_stake".parse().unwrap());
 static STAKE_GET_LOCKUP_SECS_FUNCTION: Lazy<EntryFunctionId> =
@@ -28,6 +29,8 @@ static STAKING_CONTRACT_AMOUNTS_FUNCTION: Lazy<EntryFunctionId> = Lazy::new(|| {
 });
 
 /// Errors that can be returned by the API
+///
+/// Internally [`ApiError`] is used, but it is converted to this for on wire representation
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Error.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -59,7 +62,7 @@ pub struct OperationStatus {
     pub successful: bool,
 }
 
-/// Represents a Peer, used for discovery
+/// UNUSED Represents a Peer, used for discovery
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Peer.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -67,6 +70,8 @@ pub struct Peer {
     peer_id: String,
 }
 
+/// UNUSED Represents the current status of the node vs expected state
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/SyncStatus.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SyncStatus {
@@ -101,6 +106,10 @@ pub struct BalanceResult {
 }
 
 /// An internal enum to support Operation typing
+///
+/// NOTE: Order is important here for sorting later, this order must not change, and if there are new
+/// types added, they should be added before Fee.  We sort the sub operations so that they have a
+/// stable order for things like transfers.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum OperationType {
     // Create must always be first for ordering
@@ -140,6 +149,7 @@ impl OperationType {
     const WITHDRAW: &'static str = "withdraw";
     const WITHDRAW_UNDELEGATED_FUNDS: &'static str = "withdraw_undelegated_funds";
 
+    /// Returns all operations types, order doesn't matter.
     pub fn all() -> Vec<OperationType> {
         use OperationType::*;
         vec![
@@ -165,6 +175,7 @@ impl FromStr for OperationType {
     type Err = ApiError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Handles string to operation Rust typing
         match s.to_lowercase().trim() {
             Self::CREATE_ACCOUNT => Ok(OperationType::CreateAccount),
             Self::DEPOSIT => Ok(OperationType::Deposit),
@@ -276,6 +287,7 @@ impl Display for OperationStatusType {
     }
 }
 
+/// Retrieves stake balances for an owner with the associated pool
 pub async fn get_stake_balances(
     rest_client: &aptos_rest_client::Client,
     owner_account: &AccountIdentifier,
@@ -283,6 +295,8 @@ pub async fn get_stake_balances(
     version: u64,
 ) -> ApiResult<Option<BalanceResult>> {
     const STAKE_POOL: &str = "0x1::stake::StakePool";
+
+    // Retreive the pool resource
     if let Ok(response) = rest_client
         .get_account_resource_at_version_bcs::<StakePool>(pool_address, STAKE_POOL, version)
         .await
@@ -362,6 +376,7 @@ pub async fn get_stake_balances(
     }
 }
 
+/// Retrieve delegation stake balances for a given owner, pool, and version
 pub async fn get_delegation_stake_balances(
     rest_client: &aptos_rest_client::Client,
     account_identifier: &AccountIdentifier,

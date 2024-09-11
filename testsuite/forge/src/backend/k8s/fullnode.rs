@@ -169,7 +169,7 @@ fn create_fullnode_container(
 ) -> Result<Container> {
     Ok(Container {
         image: Some(fullnode_image),
-        command: Some(vec![
+        args: Some(vec![
             "/usr/local/bin/aptos-node".to_string(),
             "-f".to_string(),
             format!("/opt/aptos/etc/{}", FULLNODE_CONFIG_MAP_KEY),

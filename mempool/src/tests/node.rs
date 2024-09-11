@@ -4,7 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::MempoolSyncMsg,
+    network::{BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
     tests::common::TestTransaction,
 };
@@ -22,12 +22,11 @@ use aptos_network::{
         interface::{NetworkClient, NetworkServiceEvents},
         storage::PeersAndMetadata,
     },
-    peer_manager::{
-        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
-        PeerManagerRequestSender,
-    },
+    peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
-        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
+        network::{
+            NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage,
+        },
         wire::handshake::v1::ProtocolId::MempoolDirectSend,
     },
     transport::ConnectionMetadata,
@@ -383,6 +382,8 @@ impl Node {
                 0,
                 TimelineState::NotReady,
                 false,
+                None,
+                Some(BroadcastPeerPriority::Primary),
             );
         }
     }
@@ -449,12 +450,12 @@ impl Node {
             .get_next_network_req(runtime)
     }
 
-    /// Send network request `PeerManagerNotification` from a remote peer to the local node
+    /// Send network request `ReceivedMessage` from a remote peer to the local node
     pub fn send_network_req(
         &mut self,
         network_id: NetworkId,
         protocol: ProtocolId,
-        notif: PeerManagerNotification,
+        notif: ReceivedMessage,
     ) {
         self.get_network_interface(network_id)
             .send_network_req(protocol, notif);
@@ -467,8 +468,7 @@ pub struct NodeNetworkInterface {
     /// Peer request receiver for messages
     pub(crate) network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Peer notification sender for sending outgoing messages to other peers
-    pub(crate) network_notifs_tx:
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    pub(crate) network_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
 }
 
 impl NodeNetworkInterface {
@@ -476,11 +476,8 @@ impl NodeNetworkInterface {
         runtime.block_on(self.network_reqs_rx.next()).unwrap()
     }
 
-    fn send_network_req(&mut self, protocol: ProtocolId, message: PeerManagerNotification) {
-        let remote_peer_id = match &message {
-            PeerManagerNotification::RecvRpc(peer_id, _) => *peer_id,
-            PeerManagerNotification::RecvMessage(peer_id, _) => *peer_id,
-        };
+    fn send_network_req(&mut self, protocol: ProtocolId, message: ReceivedMessage) {
+        let remote_peer_id = message.sender.peer_id();
 
         self.network_notifs_tx
             .push((remote_peer_id, protocol), message)

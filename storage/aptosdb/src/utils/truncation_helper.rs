@@ -18,6 +18,7 @@ use crate::{
         state_value_by_key_hash::StateValueByKeyHashSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
         transaction_info::TransactionInfoSchema,
         version_data::VersionDataSchema,
         write_set::WriteSetSchema,
@@ -346,6 +347,11 @@ fn delete_per_version_data(
     start_version: Version,
     batch: &LedgerDbSchemaBatches,
 ) -> Result<()> {
+    delete_per_version_data_impl::<TransactionAccumulatorRootHashSchema>(
+        ledger_db.transaction_accumulator_db_raw(),
+        start_version,
+        &batch.transaction_accumulator_db_batches,
+    )?;
     delete_per_version_data_impl::<TransactionInfoSchema>(
         ledger_db.transaction_info_db_raw(),
         start_version,
@@ -380,15 +386,15 @@ where
 {
     let mut iter = ledger_db.iter::<S>()?;
     iter.seek_to_last();
-    if let Some((lastest_version, _)) = iter.next().transpose()? {
-        if lastest_version >= start_version {
+    if let Some((latest_version, _)) = iter.next().transpose()? {
+        if latest_version >= start_version {
             info!(
                 start_version = start_version,
-                latest_version = lastest_version,
+                latest_version = latest_version,
                 cf_name = S::COLUMN_FAMILY_NAME,
                 "Truncate per version data."
             );
-            for version in start_version..=lastest_version {
+            for version in start_version..=latest_version {
                 batch.delete::<S>(&version)?;
             }
         }
@@ -408,9 +414,15 @@ fn delete_event_data(
                 latest_version = latest_version,
                 "Truncate event data."
             );
-            ledger_db
-                .event_db()
-                .prune_events(start_version, latest_version + 1, batch)?;
+            ledger_db.event_db().prune_events(
+                start_version,
+                latest_version + 1,
+                batch,
+                // Assuming same data will be overwritten into indices, we don't bother to deal
+                // with the existence or placement of indices
+                // TODO: prune data from internal indices
+                None,
+            )?;
         }
     }
     Ok(())

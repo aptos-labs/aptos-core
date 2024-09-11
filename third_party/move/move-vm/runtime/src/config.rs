@@ -22,10 +22,10 @@ pub struct VMConfig {
     pub type_max_cost: u64,
     pub type_base_cost: u64,
     pub type_byte_cost: u64,
-    pub pseudo_meter_vector_ty_to_ty_tag_construction: bool,
     pub delayed_field_optimization_enabled: bool,
     pub ty_builder: TypeBuilder,
     pub disallow_dispatch_for_native: bool,
+    pub use_compatibility_checker_v2: bool,
 }
 
 impl Default for VMConfig {
@@ -39,10 +39,10 @@ impl Default for VMConfig {
             type_max_cost: 0,
             type_base_cost: 0,
             type_byte_cost: 0,
-            pseudo_meter_vector_ty_to_ty_tag_construction: true,
             delayed_field_optimization_enabled: false,
-            ty_builder: TypeBuilder::Legacy,
+            ty_builder: TypeBuilder::with_limits(128, 20),
             disallow_dispatch_for_native: true,
+            use_compatibility_checker_v2: true,
         }
     }
 }

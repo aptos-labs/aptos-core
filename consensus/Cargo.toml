@@ -92,6 +92,7 @@ aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
 aptos-executor-test-helpers = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
+aptos-netcore = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-safety-rules = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true, features = ["fuzzing"] }
@@ -100,6 +101,7 @@ claims = { workspace = true }
 mockall = { workspace = true }
 move-core-types = { workspace = true }
 proptest = { workspace = true }
+proptest-derive = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
@@ -116,3 +118,6 @@ failpoints = ["fail/failpoints"]
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
+
+[lints.clippy]
+unwrap_used = "deny"

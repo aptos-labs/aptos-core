@@ -1,18 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{create_emitter_and_request, LoadDestination, NetworkLoadTest};
+use crate::{
+    create_buffered_load, LoadDestination, NetworkLoadTest, COOLDOWN_DURATION_FRACTION,
+    WARMUP_DURATION_FRACTION,
+};
 use aptos_forge::{
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
     EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport,
 };
 use aptos_logger::info;
 use async_trait::async_trait;
-use rand::{rngs::OsRng, Rng, SeedableRng};
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 
 pub struct TwoTrafficsTest {
     pub inner_traffic: EmitJobRequest,
@@ -40,44 +39,34 @@ impl NetworkLoadTest for TwoTrafficsTest {
         let nodes_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
             .get_destination_nodes(swarm.clone())
             .await;
-        let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
 
-        let (emitter, emit_job_request) = create_emitter_and_request(
-            swarm.clone(),
-            self.inner_traffic.clone(),
+        let stats_by_phase = create_buffered_load(
+            swarm,
             &nodes_to_send_load_to,
-            rng,
+            self.inner_traffic.clone(),
+            duration,
+            WARMUP_DURATION_FRACTION,
+            COOLDOWN_DURATION_FRACTION,
+            None,
+            None,
         )
         .await?;
 
-        let test_start = Instant::now();
+        for phase_stats in stats_by_phase.into_iter() {
+            report.report_txn_stats(
+                format!("{}: inner traffic", self.name()),
+                &phase_stats.emitter_stats,
+            );
 
-        let stats = emitter
-            .emit_txn_for(
-                swarm.read().await.chain_info().root_account,
-                emit_job_request,
-                duration,
-            )
-            .await?;
+            SuccessCriteriaChecker::check_core_for_success(
+                &self.inner_success_criteria,
+                report,
+                &phase_stats.emitter_stats.rate(),
+                None,
+                Some("inner traffic".to_string()),
+            )?;
+        }
 
-        let actual_test_duration = test_start.elapsed();
-        info!(
-            "End to end duration: {}s, while txn emitter lasted: {}s",
-            actual_test_duration.as_secs(),
-            stats.lasted.as_secs()
-        );
-
-        let rate = stats.rate();
-
-        report.report_txn_stats(format!("{}: inner traffic", self.name()), &stats);
-
-        SuccessCriteriaChecker::check_core_for_success(
-            &self.inner_success_criteria,
-            report,
-            &rate,
-            None,
-            Some("inner traffic".to_string()),
-        )?;
         Ok(())
     }
 }

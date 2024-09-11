@@ -163,12 +163,36 @@ define_index! {
     doc: "Index into the `FunctionDefinition` table.",
 }
 
+// Since bytecode version 7
+define_index! {
+    name: StructVariantHandleIndex,
+    kind: StructVariantHandle,
+    doc: "Index into the `StructVariantHandle` table.",
+}
+define_index! {
+    name: StructVariantInstantiationIndex,
+    kind: StructVariantInstantiation,
+    doc: "Index into the `StructVariantInstantiation` table.",
+}
+define_index! {
+    name: VariantFieldHandleIndex,
+    kind: VariantFieldHandle,
+    doc: "Index into the `VariantFieldHandle` table.",
+}
+define_index! {
+    name: VariantFieldInstantiationIndex,
+    kind: VariantFieldInstantiation,
+    doc: "Index into the `VariantFieldInstantiation` table.",
+}
+
 /// Index of a local variable in a function.
 ///
 /// Bytecodes that operate on locals carry indexes to the locals of a function.
 pub type LocalIndex = u8;
 /// Max number of fields in a `StructDefinition`.
 pub type MemberCount = u16;
+/// Max number of variants in a `StructDefinition`, as well as index for variants.
+pub type VariantIndex = u16;
 /// Index into the code stream for a jump. The offset is relative to the beginning of
 /// the instruction stream.
 pub type CodeOffset = u16;
@@ -319,6 +343,31 @@ pub struct FieldHandle {
     pub field: MemberCount,
 }
 
+/// A variant field access info
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct VariantFieldHandle {
+    /// The structure which defines the variant.
+    pub struct_index: StructDefinitionIndex,
+    /// The sequence of variants which share the field at the given
+    /// field offset.
+    pub variants: Vec<VariantIndex>,
+    /// The field offset.
+    pub field: MemberCount,
+}
+
+/// A struct variant access info
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct StructVariantHandle {
+    pub struct_index: StructDefinitionIndex,
+    pub variant: VariantIndex,
+}
+
 // DEFINITIONS:
 // Definitions are the module code. So the set of types and functions in the module.
 
@@ -330,6 +379,62 @@ pub struct FieldHandle {
 pub enum StructFieldInformation {
     Native,
     Declared(Vec<FieldDefinition>),
+    DeclaredVariants(Vec<VariantDefinition>),
+}
+
+impl StructFieldInformation {
+    /// Returns the fields described by this field information. If no variant is
+    /// provided, this returns all fields of a struct. Otherwise, the fields of the
+    /// variant are returned.
+    pub fn fields(&self, variant: Option<VariantIndex>) -> Vec<&FieldDefinition> {
+        use StructFieldInformation::*;
+        match self {
+            Native => vec![],
+            Declared(fields) => fields.iter().collect(),
+            DeclaredVariants(variants) => {
+                if let Some(variant) = variant.filter(|v| (*v as usize) < variants.len()) {
+                    variants[variant as usize].fields.iter().collect()
+                } else {
+                    vec![]
+                }
+            },
+        }
+    }
+
+    /// Returns the number of fields. This is an optimized version of
+    /// `self.fields(variant).len()`
+    pub fn field_count(&self, variant: Option<VariantIndex>) -> usize {
+        use StructFieldInformation::*;
+        match self {
+            Native => 0,
+            Declared(fields) => fields.len(),
+            DeclaredVariants(variants) => {
+                if let Some(variant) = variant.filter(|v| (*v as usize) < variants.len()) {
+                    variants[variant as usize].fields.len()
+                } else {
+                    0
+                }
+            },
+        }
+    }
+
+    /// Returns the variant definitions. For non-variant types, an empty
+    /// slice is returned.
+    pub fn variants(&self) -> &[VariantDefinition] {
+        use StructFieldInformation::*;
+        match self {
+            Native | Declared(_) => &[],
+            DeclaredVariants(variants) => variants,
+        }
+    }
+
+    /// Returns the number of variants (zero for struct or native)
+    pub fn variant_count(&self) -> usize {
+        match self {
+            StructFieldInformation::Native | StructFieldInformation::Declared(_) => 0,
+            StructFieldInformation::DeclaredVariants(variants) => variants.len(),
+        }
+    }
 }
 
 //
@@ -347,6 +452,16 @@ pub enum StructFieldInformation {
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct StructDefInstantiation {
     pub def: StructDefinitionIndex,
+    pub type_parameters: SignatureIndex,
+}
+
+/// A complete or partial instantiation of a generic struct variant
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct StructVariantInstantiation {
+    pub handle: StructVariantHandleIndex,
     pub type_parameters: SignatureIndex,
 }
 
@@ -375,6 +490,16 @@ pub struct FieldInstantiation {
     pub type_parameters: SignatureIndex,
 }
 
+/// A complete or partial instantiation of a variant field.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct VariantFieldInstantiation {
+    pub handle: VariantFieldHandleIndex,
+    pub type_parameters: SignatureIndex,
+}
+
 /// A `StructDefinition` is a type definition. It either indicates it is native or defines all the
 /// user-specified fields declared on the type.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -391,23 +516,6 @@ pub struct StructDefinition {
     pub field_information: StructFieldInformation,
 }
 
-impl StructDefinition {
-    pub fn declared_field_count(&self) -> PartialVMResult<MemberCount> {
-        match &self.field_information {
-            StructFieldInformation::Native => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message("Looking for field in native structure. Native structures have no accessible fields.".to_string())),
-            StructFieldInformation::Declared(fields) => Ok(fields.len() as u16),
-        }
-    }
-
-    pub fn field(&self, offset: usize) -> Option<&FieldDefinition> {
-        match &self.field_information {
-            StructFieldInformation::Native => None,
-            StructFieldInformation::Declared(fields) => fields.get(offset),
-        }
-    }
-}
-
 /// A `FieldDefinition` is the definition of a field: its name and the field type.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
@@ -418,6 +526,15 @@ pub struct FieldDefinition {
     pub name: IdentifierIndex,
     /// The type of the field.
     pub signature: TypeSignature,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct VariantDefinition {
+    pub name: IdentifierIndex,
+    pub fields: Vec<FieldDefinition>,
 }
 
 /// `Visibility` restricts the accessibility of the associated entity.
@@ -1613,6 +1730,7 @@ pub enum Bytecode {
     "#]
     #[gas_type_creation_tier_1 = "local_tys"]
     Call(FunctionHandleIndex),
+
     #[group = "control_flow"]
     #[static_operands = "[func_inst_idx]"]
     #[description = "Generic version of `Call`."]
@@ -1651,6 +1769,37 @@ pub enum Bytecode {
     #[gas_type_creation_tier_1 = "field_tys"]
     PackGeneric(StructDefInstantiationIndex),
 
+    #[group = "variant"]
+    #[static_operands = "[struct_variant_handle_idx]"]
+    #[description = r#"
+        Create an instance of the struct variant specified by the handle and push it on the stack.
+        The values of the fields of the variant, in the order they are determined by the
+        declaration, must be pushed on the stack. All fields must be provided.
+    "#]
+    #[semantics = r#"
+        stack >> field_n-1
+        ...
+        stack >> field_0
+        stack << struct/variant { field_0, ..., field_n-1 }
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> tys
+        assert tys == field_tys
+        check field abilities
+        ty_stack << struct_ty
+    "#]
+    PackVariant(StructVariantHandleIndex),
+
+    #[group = "variant"]
+    #[static_operands = "[struct_variant_inst_idx]"]
+    #[description = "Generic version of `PackVariant`."]
+    #[semantics = "See `PackVariant`."]
+    #[runtime_check_epilogue = "See `PackVariant`."]
+    #[gas_type_creation_tier_0 = "struct_ty"]
+    #[gas_type_creation_tier_1 = "field_tys"]
+    PackVariantGeneric(StructVariantInstantiationIndex),
+
+    //TODO: Unpack, Test
     #[group = "struct"]
     #[static_operands = "[struct_def_idx]"]
     #[description = "Destroy an instance of a struct and push the values bound to each field onto the stack."]
@@ -1674,6 +1823,63 @@ pub enum Bytecode {
     #[gas_type_creation_tier_0 = "struct_ty"]
     #[gas_type_creation_tier_1 = "field_tys"]
     UnpackGeneric(StructDefInstantiationIndex),
+
+    #[group = "variant"]
+    #[static_operands = "[struct_variant_handle_idx]"]
+    #[description = r#"
+        If the value on the stack is of the specified variant, destroy it and push the
+        values bound to each field onto the stack.
+
+        Aborts if the value is not of the specified variant.
+    "#]
+    #[semantics = r#"
+        if struct_ref is variant_field.variant
+            stack >> struct/variant { field_0, .., field_n-1 }
+            stack << field_0
+            ...
+            stack << field_n-1
+        else
+            error
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == struct_ty
+        ty_stack << field_tys
+    "#]
+    #[gas_type_creation_tier_0 = "struct_ty"]
+    #[gas_type_creation_tier_1 = "field_tys"]
+    UnpackVariant(StructVariantHandleIndex),
+
+    #[group = "struct"]
+    #[static_operands = "[struct_variant_inst_idx]"]
+    #[description = "Generic version of `UnpackVariant`."]
+    #[semantics = "See `UnpackVariant`."]
+    #[runtime_check_epilogue = "See `UnpackVariant`."]
+    #[gas_type_creation_tier_0 = "struct_ty"]
+    #[gas_type_creation_tier_1 = "field_tys"]
+    UnpackVariantGeneric(StructVariantInstantiationIndex),
+
+    #[group = "variant"]
+    #[static_operands = "[struct_variant_handle_idx]"]
+    #[description = r#"
+        Tests whether the reference value on the stack is of the specified variant.
+    "#]
+    #[semantics = r#"
+        stack >> struct_ref
+        stack << struct_if is variant
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &struct_ty
+        ty_stack << bool
+    "#]
+    TestVariant(StructVariantHandleIndex),
+
+    #[group = "variant"]
+    #[description = "Generic version of `TestVariant`."]
+    #[semantics = "See `TestVariant`."]
+    #[runtime_check_epilogue = "See `TestVariant`."]
+    TestVariantGeneric(StructVariantInstantiationIndex),
 
     #[group = "reference"]
     #[description = r#"
@@ -1762,6 +1968,29 @@ pub enum Bytecode {
     "#]
     MutBorrowField(FieldHandleIndex),
 
+    #[group = "variant"]
+    #[static_operands = "[variant_field_handle_idx]"]
+    #[description = r#"
+        Consume the reference to a struct at the top of the stack,
+        and provided that the struct is of the given variant, load a mutable reference to
+        the field of the variant.
+
+        Aborts execution if the operand is not of the given variant.
+    "#]
+    #[semantics = r#"
+        stack >> struct_ref
+        if struct_ref is variant
+            stack << &mut (*struct_ref).field(variant_field.field_index)
+        else
+            error
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &mut struct_ty
+        ty_stack << &mut field_ty
+    "#]
+    MutBorrowVariantField(VariantFieldHandleIndex),
+
     #[group = "struct"]
     #[static_operands = "[field_inst_idx]"]
     #[description = r#"
@@ -1781,6 +2010,29 @@ pub enum Bytecode {
     #[gas_type_creation_tier_1 = "field_ty"]
     MutBorrowFieldGeneric(FieldInstantiationIndex),
 
+    #[group = "variant"]
+    #[static_operands = "[variant_field_inst_idx]"]
+    #[description = r#"
+        Consume the reference to a generic struct at the top of the stack,
+        and provided that the struct is of the given variant, load a mutable reference to
+        the field of the variant.
+
+        Aborts execution if the operand is not of the given variant.
+    "#]
+    #[semantics = r#"
+        stack >> struct_ref
+        if struct_ref is variant_field
+            stack << &mut (*struct_ref).field(field_index)
+        else
+            error
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &mut struct_ty
+        ty_stack << &mut field_ty
+    "#]
+    MutBorrowVariantFieldGeneric(VariantFieldInstantiationIndex),
+
     #[group = "struct"]
     #[static_operands = "[field_handle_idx]"]
     #[description = r#"
@@ -1798,11 +2050,35 @@ pub enum Bytecode {
     "#]
     ImmBorrowField(FieldHandleIndex),
 
+    #[group = "variant"]
+    #[static_operands = "[variant_field_inst_idx]"]
+    #[description = r#"
+        Consume the reference to a struct at the top of the stack,
+        and provided that the struct is of the given variant, load an
+        immutable reference to the field of the variant.
+
+        Aborts execution if the operand is not of the given variant.
+    "#]
+    #[semantics = r#"
+        stack >> struct_ref
+        if struct_ref is variant
+            stack << &(*struct_ref).field(field_index)
+        else
+            error
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &mut struct_ty
+        ty_stack << &mut field_ty
+    "#]
+    ImmBorrowVariantField(VariantFieldHandleIndex),
+
     #[group = "struct"]
     #[static_operands = "[field_inst_idx]"]
     #[description = r#"
         Consume the reference to a generic struct at the top of the stack,
-        and load an immutable reference to the field identified by the field handle index.
+        and load an immutable reference to the field identified by the
+        field handle index.
     "#]
     #[semantics = r#"
         stack >> struct_ref
@@ -1816,6 +2092,29 @@ pub enum Bytecode {
     #[gas_type_creation_tier_0 = "struct_ty"]
     #[gas_type_creation_tier_1 = "field_ty"]
     ImmBorrowFieldGeneric(FieldInstantiationIndex),
+
+    #[group = "variant"]
+    #[static_operands = "[variant_field_inst_idx]"]
+    #[description = r#"
+        Consume the reference to a generic struct at the top of the stack,
+        and provided that the struct is of the given variant, load an immutable
+        reference to the field of the variant.
+
+        Aborts execution if the operand is not of the given variant.
+    "#]
+    #[semantics = r#"
+        stack >> struct_ref
+        if struct_ref is variant_field.variant
+            stack << &(*struct_ref).field(variant_field.field_index)
+        else
+            error
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &mut struct_ty
+        ty_stack << &mut field_ty
+    "#]
+    ImmBorrowVariantFieldGeneric(VariantFieldInstantiationIndex),
 
     #[group = "global"]
     #[static_operands = "[struct_def_idx]"]
@@ -2640,8 +2939,14 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::CallGeneric(a) => write!(f, "CallGeneric({})", a),
             Bytecode::Pack(a) => write!(f, "Pack({})", a),
             Bytecode::PackGeneric(a) => write!(f, "PackGeneric({})", a),
+            Bytecode::PackVariant(a) => write!(f, "PackVariant({})", a),
+            Bytecode::TestVariant(a) => write!(f, "TestVariant({})", a),
+            Bytecode::PackVariantGeneric(a) => write!(f, "PackVariantGeneric({})", a),
+            Bytecode::TestVariantGeneric(a) => write!(f, "TestVariantGeneric({})", a),
             Bytecode::Unpack(a) => write!(f, "Unpack({})", a),
             Bytecode::UnpackGeneric(a) => write!(f, "UnpackGeneric({})", a),
+            Bytecode::UnpackVariant(a) => write!(f, "UnpackVariant({})", a),
+            Bytecode::UnpackVariantGeneric(a) => write!(f, "UnpackVariantGeneric({})", a),
             Bytecode::ReadRef => write!(f, "ReadRef"),
             Bytecode::WriteRef => write!(f, "WriteRef"),
             Bytecode::FreezeRef => write!(f, "FreezeRef"),
@@ -2649,8 +2954,16 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::ImmBorrowLoc(a) => write!(f, "ImmBorrowLoc({})", a),
             Bytecode::MutBorrowField(a) => write!(f, "MutBorrowField({:?})", a),
             Bytecode::MutBorrowFieldGeneric(a) => write!(f, "MutBorrowFieldGeneric({:?})", a),
+            Bytecode::MutBorrowVariantField(a) => write!(f, "MutBorrowVariantField({:?})", a),
+            Bytecode::MutBorrowVariantFieldGeneric(a) => {
+                write!(f, "MutBorrowVariantFieldGeneric({:?})", a)
+            },
             Bytecode::ImmBorrowField(a) => write!(f, "ImmBorrowField({:?})", a),
             Bytecode::ImmBorrowFieldGeneric(a) => write!(f, "ImmBorrowFieldGeneric({:?})", a),
+            Bytecode::ImmBorrowVariantField(a) => write!(f, "ImmBorrowVariantField({:?})", a),
+            Bytecode::ImmBorrowVariantFieldGeneric(a) => {
+                write!(f, "ImmBorrowVariantFieldGeneric({:?})", a)
+            },
             Bytecode::MutBorrowGlobal(a) => write!(f, "MutBorrowGlobal({:?})", a),
             Bytecode::MutBorrowGlobalGeneric(a) => write!(f, "MutBorrowGlobalGeneric({:?})", a),
             Bytecode::ImmBorrowGlobal(a) => write!(f, "ImmBorrowGlobal({:?})", a),
@@ -2853,6 +3166,12 @@ pub struct CompiledModule {
     pub struct_defs: Vec<StructDefinition>,
     /// Function defined in this module.
     pub function_defs: Vec<FunctionDefinition>,
+
+    /// Since bytecode version 7: variant related handle tables
+    pub struct_variant_handles: Vec<StructVariantHandle>,
+    pub struct_variant_instantiations: Vec<StructVariantInstantiation>,
+    pub variant_field_handles: Vec<VariantFieldHandle>,
+    pub variant_field_instantiations: Vec<VariantFieldInstantiation>,
 }
 
 // Need a custom implementation of Arbitrary because as of proptest-derive 0.1.1, the derivation
@@ -2963,6 +3282,10 @@ impl Arbitrary for CompiledModule {
                         metadata: vec![],
                         struct_defs,
                         function_defs,
+                        struct_variant_handles: vec![],
+                        struct_variant_instantiations: vec![],
+                        variant_field_handles: vec![],
+                        variant_field_instantiations: vec![],
                     }
                 },
             )
@@ -2978,6 +3301,7 @@ impl CompiledModule {
             IndexKind::LocalPool
                 | IndexKind::CodeDefinition
                 | IndexKind::FieldDefinition
+                | IndexKind::VariantDefinition
                 | IndexKind::TypeParameter
                 | IndexKind::MemberCount
         ));
@@ -2996,10 +3320,17 @@ impl CompiledModule {
             IndexKind::Identifier => self.identifiers.len(),
             IndexKind::AddressIdentifier => self.address_identifiers.len(),
             IndexKind::ConstantPool => self.constant_pool.len(),
+            // Since bytecode version 7
+            IndexKind::VariantFieldHandle => self.variant_field_handles.len(),
+            IndexKind::VariantFieldInstantiation => self.variant_field_instantiations.len(),
+            IndexKind::StructVariantHandle => self.struct_variant_handles.len(),
+            IndexKind::StructVariantInstantiation => self.struct_variant_instantiations.len(),
+
             // XXX these two don't seem to belong here
             other @ IndexKind::LocalPool
             | other @ IndexKind::CodeDefinition
             | other @ IndexKind::FieldDefinition
+            | other @ IndexKind::VariantDefinition
             | other @ IndexKind::TypeParameter
             | other @ IndexKind::MemberCount => unreachable!("invalid kind for count: {:?}", other),
         }
@@ -3050,6 +3381,10 @@ pub fn empty_module() -> CompiledModule {
         function_instantiations: vec![],
         field_instantiations: vec![],
         signatures: vec![Signature(vec![])],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     }
 }
 

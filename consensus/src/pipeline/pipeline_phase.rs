@@ -33,6 +33,10 @@ impl TaskGuard {
         counter.fetch_add(1, Ordering::SeqCst);
         Self { counter }
     }
+
+    fn spawn(&self) -> Self {
+        Self::new(self.counter.clone())
+    }
 }
 
 impl Drop for TaskGuard {
@@ -50,6 +54,13 @@ impl<Request> CountedRequest<Request> {
     pub fn new(req: Request, counter: Arc<AtomicU64>) -> Self {
         let guard = TaskGuard::new(counter);
         Self { req, guard }
+    }
+
+    pub fn spawn<OtherRequest>(&self, other_req: OtherRequest) -> CountedRequest<OtherRequest> {
+        CountedRequest {
+            req: other_req,
+            guard: self.guard.spawn(),
+        }
     }
 }
 

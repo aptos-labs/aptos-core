@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::lagrange::lagrange_coefficients,
+    algebra::{lagrange::lagrange_coefficients, polynomials::get_powers_of_tau},
     pvss,
     pvss::{Player, WeightedConfig},
-    utils::{g1_multi_exp, multi_pairing, random::random_scalars, HasMultiExp},
+    utils::{g1_multi_exp, multi_pairing, random::random_scalar, HasMultiExp},
     weighted_vuf::traits::WeightedVUF,
 };
 use anyhow::bail;
@@ -82,13 +82,14 @@ impl WeightedVUF for BlsWUF {
         proof: &Self::ProofShare,
     ) -> anyhow::Result<()> {
         let hash = Self::hash_to_curve(msg);
-        // TODO: Use Fiat-Shamir
-        let coeffs = random_scalars(apk.len(), &mut thread_rng());
+        // TODO: Use Fiat-Shamir instead of random_scalar
+        let coeffs = get_powers_of_tau(&random_scalar(&mut thread_rng()), apk.len());
 
         let pks = apk
             .iter()
             .map(|pk| *pk.as_group_element())
             .collect::<Vec<G2Projective>>();
+        // TODO: Calling multi-exp seems to decrease performance by 100+ microseconds even when |coeffs| = 1 and the coefficient is 1. Not sure what's going on here.
         let agg_pk = G2Projective::multi_exp_slice(pks.as_slice(), coeffs.as_slice());
         let agg_sig = G1Projective::multi_exp_slice(proof.to_vec().as_slice(), coeffs.as_slice());
 

@@ -1,3 +1,4 @@
+{{- if $.Values.backup.enable }}
 {{ $backup_compaction_cronjob := lookup "batch/v1" "CronJob" $.Release.Namespace (print (include "backup.fullname" .) "-backup-compaction")}}
 apiVersion: batch/v1
 kind: CronJob
@@ -8,7 +9,6 @@ metadata:
     app.kubernetes.io/name: backup-compaction
 spec:
   concurrencyPolicy: Replace
-  suspend: {{ not .Values.backup.enable }}
   schedule: {{ .Values.backup_compaction.schedule | quote }}
   jobTemplate:
     spec:
@@ -17,13 +17,15 @@ spec:
           labels:
             {{- include "backup.selectorLabels" . | nindent 12 }}
             app.kubernetes.io/name: backup-compaction
+            {{- if or $.Values.chain.label $.Values.chain.name }}
+            chain_name: {{ $.Values.chain.label | default $.Values.chain.name }}
+            {{- end}}
           annotations:
             {{- if $.Values.metrics.destination }}
             aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
             {{- end}}
         spec:
           restartPolicy: Never
-          terminationGracePeriodSeconds: 0
           containers:
           - name: backup-compaction
             {{- if and $backup_compaction_cronjob (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -107,3 +109,4 @@ spec:
           imagePullSecrets:
           - name: {{.Values.imagePullSecret}}
           {{- end }}
+{{- end }} # if $.Values.backup.enable

@@ -641,7 +641,6 @@ async fn test_initialize_state_synchronizer_missing_info() {
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
             output_list_with_proof,
-            None,
         )
         .unwrap();
 
@@ -674,7 +673,6 @@ async fn test_initialize_state_synchronizer_receiver_error() {
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
             create_output_list_with_proof(),
-            None,
         )
         .unwrap();
 
@@ -746,7 +744,6 @@ async fn test_save_states_completion() {
             epoch_change_proofs.to_vec(),
             target_ledger_info,
             output_list_with_proof.clone(),
-            None,
         )
         .unwrap();
 
@@ -806,7 +803,6 @@ async fn test_save_states_dropped_error_listener() {
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
             create_output_list_with_proof(),
-            None,
         )
         .unwrap();
 
@@ -849,7 +845,6 @@ async fn test_save_states_invalid_chunk() {
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
             create_output_list_with_proof(),
-            None,
         )
         .unwrap();
 
