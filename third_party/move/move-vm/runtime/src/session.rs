@@ -6,7 +6,6 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     loader::{LoadedFunction, ModuleStorageAdapter},
-    module_linker_error,
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
@@ -100,14 +99,6 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        if self.move_vm.vm_config().use_loader_v2 {
-            let addr = module_id.address();
-            let name = module_id.name();
-            if !module_storage.check_module_exists(addr, name)? {
-                return Err(module_linker_error!(addr, name));
-            }
-        }
-
         let func = self.move_vm.runtime.loader().load_function(
             module_id,
             function_name,
