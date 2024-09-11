@@ -19,6 +19,9 @@ pub mod prometheus;
 mod stateful_set;
 mod swarm;
 
+use super::{
+    ForgeDeployerManager, ForgeDeployerType, ForgeDeployerValues, DEFAULT_FORGE_DEPLOYER_PROFILE,
+};
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
@@ -39,6 +42,7 @@ pub struct K8sFactory {
     reuse: bool,
     keep: bool,
     enable_haproxy: bool,
+    enable_indexer: bool,
 }
 
 impl K8sFactory {
@@ -50,6 +54,7 @@ impl K8sFactory {
         reuse: bool,
         keep: bool,
         enable_haproxy: bool,
+        enable_indexer: bool,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
             hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
@@ -78,6 +83,7 @@ impl K8sFactory {
             reuse,
             keep,
             enable_haproxy,
+            enable_indexer,
         })
     }
 }
@@ -148,14 +154,14 @@ impl Factory for K8sFactory {
 
                 // We return early here if there are not enough PVs to claim.
                 check_persistent_volumes(
-                    kube_client,
+                    kube_client.clone(),
                     num_validators.get() + num_fullnodes,
                     existing_db_tag,
                 )
                 .await?;
             }
             // try installing testnet resources, but clean up if it fails
-            match install_testnet_resources(
+            let (new_era, validators, fullnodes) = match install_testnet_resources(
                 self.kube_namespace.clone(),
                 num_validators.get(),
                 num_fullnodes,
@@ -174,7 +180,29 @@ impl Factory for K8sFactory {
                     uninstall_testnet_resources(self.kube_namespace.clone()).await?;
                     bail!(e);
                 },
+            };
+
+            // add an indexer too!
+            if self.enable_indexer {
+                // NOTE: by default, use a deploy profile and no additional configuration values
+                let values = ForgeDeployerValues {
+                    profile: DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    era: new_era.clone().expect("Era not set in created testnet"),
+                    namespace: self.kube_namespace.clone(),
+                    indexer_grpc_values: None,
+                    indexer_processor_values: None,
+                };
+
+                let forge_deployer_manager =
+                    ForgeDeployerManager::from_k8s_client(kube_client.clone(), values);
+
+                forge_deployer_manager.ensure_namespace_prepared().await?;
+                forge_deployer_manager
+                    .start(ForgeDeployerType::Indexer)
+                    .await?;
             }
+
+            (new_era, validators, fullnodes)
         };
 
         let swarm = K8sSwarm::new(

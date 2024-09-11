@@ -513,9 +513,7 @@ pub async fn install_public_fullnode<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        MockConfigMapApi, MockPersistentVolumeClaimApi, MockServiceApi, MockStatefulSetApi,
-    };
+    use crate::MockK8sResourceApi;
     use aptos_config::config::Identity;
     use aptos_sdk::crypto::{x25519::PrivateKey, Uniform};
     use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
@@ -728,15 +726,14 @@ mod tests {
         let version = Version::new(0, "banana".to_string());
 
         // create APIs
-        let stateful_set_api = Arc::new(MockStatefulSetApi::from_stateful_set(
-            get_dummy_validator_stateful_set(),
+        let stateful_set_api: Arc<MockK8sResourceApi<StatefulSet>> = Arc::new(
+            MockK8sResourceApi::from_resource(get_dummy_validator_stateful_set()),
+        );
+        let configmap_api = Arc::new(MockK8sResourceApi::new());
+        let persistent_volume_claim_api = Arc::new(MockK8sResourceApi::from_resource(
+            get_dummy_validator_persistent_volume_claim(),
         ));
-        let configmap_api = Arc::new(MockConfigMapApi::from_config_map(ConfigMap::default()));
-        let persistent_volume_claim_api =
-            Arc::new(MockPersistentVolumeClaimApi::from_persistent_volume_claim(
-                get_dummy_validator_persistent_volume_claim(),
-            ));
-        let service_api = Arc::new(MockServiceApi::from_service(Service::default()));
+        let service_api = Arc::new(MockK8sResourceApi::new());
 
         // get the base config and mutate it
         let mut node_config = get_default_pfn_node_config();

@@ -1147,6 +1147,7 @@ def create_forge_command(
     forge_namespace_reuse: Optional[str],
     forge_namespace_keep: Optional[str],
     forge_enable_haproxy: Optional[str],
+    forge_enable_indexer: Optional[str],
     cargo_args: Optional[Sequence[str]],
     forge_cli_args: Optional[Sequence[str]],
     test_args: Optional[Sequence[str]],
@@ -1216,6 +1217,8 @@ def create_forge_command(
         forge_args.append("--keep")
     if forge_enable_haproxy == "true":
         forge_args.append("--enable-haproxy")
+    if forge_enable_indexer == "true":
+        forge_args.append("--enable-indexer")
 
     if test_args:
         forge_args.extend(test_args)
@@ -1328,6 +1331,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
+@envoption("FORGE_ENABLE_INDEXER")
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
 @envoption("FORGE_TEST_SUITE")
@@ -1373,6 +1377,7 @@ def test(
     forge_enable_failpoints: Optional[str],
     forge_enable_performance: Optional[str],
     forge_enable_haproxy: Optional[str],
+    forge_enable_indexer: Optional[str],
     forge_test_suite: str,
     forge_runner_duration_secs: str,
     forge_image_tag: Optional[str],
@@ -1598,6 +1603,7 @@ def test(
         forge_namespace_reuse=forge_namespace_reuse,
         forge_namespace_keep=forge_namespace_keep,
         forge_enable_haproxy=forge_enable_haproxy,
+        forge_enable_indexer=forge_enable_indexer,
         cargo_args=cargo_args,
         forge_cli_args=forge_cli_args,
         test_args=test_args,

@@ -140,8 +140,8 @@ enum OperatorCommand {
     SetNodeImageTag(SetNodeImageTag),
     /// Clean up an existing cluster
     CleanUp(CleanUp),
-    /// Resize an existing cluster
-    Resize(Resize),
+    /// Create a new cluster for testing purposes
+    Create(Create),
 }
 
 #[derive(Parser, Debug)]
@@ -193,6 +193,11 @@ struct K8sSwarm {
         help = "Retain debug logs and above for all nodes instead of just the first 5 nodes"
     )]
     retain_debug_logs: bool,
+    #[clap(
+        long,
+        help = "If set, spins up an indexer stack alongside the testnet. Same as --enable-indexer"
+    )]
+    enable_indexer: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -217,8 +222,8 @@ struct CleanUp {
 }
 
 #[derive(Parser, Debug)]
-struct Resize {
-    #[clap(long, help = "The kubernetes namespace to resize")]
+struct Create {
+    #[clap(long, help = "The kubernetes namespace to create in")]
     namespace: String,
     #[clap(long, default_value_t = 30)]
     num_validators: usize,
@@ -227,13 +232,13 @@ struct Resize {
     #[clap(
         long,
         help = "Override the image tag used for validators",
-        default_value = "devnet"
+        default_value = "main"
     )]
     validator_image_tag: String,
     #[clap(
         long,
         help = "Override the image tag used for testnet-specific components",
-        default_value = "devnet"
+        default_value = "main"
     )]
     testnet_image_tag: String,
     #[clap(
@@ -248,6 +253,8 @@ struct Resize {
     connect_directly: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
+    #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
+    enable_indexer: bool,
 }
 
 // common metrics thresholds:
@@ -393,6 +400,7 @@ fn main() -> Result<()> {
                             k8s.reuse,
                             k8s.keep,
                             k8s.enable_haproxy,
+                            k8s.enable_indexer,
                         )
                         .unwrap(),
                         &args.options,
@@ -421,19 +429,25 @@ fn main() -> Result<()> {
                 }
                 Ok(())
             },
-            OperatorCommand::Resize(resize) => {
-                runtime.block_on(install_testnet_resources(
-                    resize.namespace,
-                    resize.num_validators,
-                    resize.num_fullnodes,
-                    resize.validator_image_tag,
-                    resize.testnet_image_tag,
-                    resize.move_modules_dir,
-                    !resize.connect_directly,
-                    resize.enable_haproxy,
-                    None,
-                    None,
-                ))?;
+            OperatorCommand::Create(create) => {
+                let kube_client = runtime.block_on(create_k8s_client())?;
+                let era = generate_new_era();
+                let values = ForgeDeployerValues {
+                    profile: DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    era,
+                    namespace: create.namespace,
+                    indexer_grpc_values: None,
+                    indexer_processor_values: None,
+                };
+                let forge_deployer_manager =
+                    ForgeDeployerManager::from_k8s_client(kube_client, values);
+                runtime.block_on(forge_deployer_manager.ensure_namespace_prepared())?;
+                // NOTE: this is generally not going to run from within the cluster, do not perform any operations
+                // that might require internal DNS resolution to work, such as txn emission directly against the node service IPs.
+                runtime.block_on(forge_deployer_manager.start(ForgeDeployerType::Testnet))?;
+                if create.enable_indexer {
+                    runtime.block_on(forge_deployer_manager.start(ForgeDeployerType::Indexer))?;
+                }
                 Ok(())
             },
         },

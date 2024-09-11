@@ -405,7 +405,7 @@ pub async fn uninstall_testnet_resources(kube_namespace: String) -> Result<()> {
     Ok(())
 }
 
-fn generate_new_era() -> String {
+pub fn generate_new_era() -> String {
     let mut rng = rand::thread_rng();
     let r: u8 = rng.gen();
     format!("forge{}", r)
@@ -826,15 +826,41 @@ fn dump_helm_values_to_file(helm_release_name: &str, tmp_dir: &TempDir) -> Resul
 
 #[derive(Error, Debug)]
 #[error("{0}")]
-enum ApiError {
+pub enum ApiError {
     RetryableError(String),
     FinalError(String),
 }
 
-async fn create_namespace(
+/// Does the same as create_namespace and handling the 409, but for any k8s resource T
+pub async fn maybe_create_k8s_resource<T>(
+    api: Arc<dyn ReadWrite<T>>,
+    resource: T,
+) -> Result<T, ApiError>
+where
+    T: kube::Resource + Clone + DeserializeOwned + Debug,
+    <T as kube::Resource>::DynamicType: Default,
+{
+    if let Err(KubeError::Api(api_err)) = api.create(&PostParams::default(), &resource).await {
+        if api_err.code == 409 {
+            info!(
+                "Resource {} already exists, continuing with it",
+                resource.name()
+            );
+        } else {
+            return Err(ApiError::RetryableError(format!(
+                "Failed to use existing resource {}: {:?}",
+                resource.name(),
+                api_err
+            )));
+        }
+    }
+    Ok(resource)
+}
+
+pub async fn create_namespace(
     namespace_api: Arc<dyn ReadWrite<Namespace>>,
     kube_namespace: String,
-) -> Result<(), ApiError> {
+) -> Result<Namespace, ApiError> {
     let kube_namespace_name = kube_namespace.clone();
     let namespace = Namespace {
         metadata: ObjectMeta {
@@ -866,7 +892,7 @@ async fn create_namespace(
             )));
         }
     }
-    Ok(())
+    Ok(namespace)
 }
 
 pub async fn create_management_configmap(
@@ -1067,11 +1093,11 @@ pub fn make_k8s_label(value: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FailedNamespacesApi;
+    use crate::FailedK8sResourceApi;
 
     #[tokio::test]
     async fn test_create_namespace_final_error() {
-        let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(401));
+        let namespace_creator = Arc::new(FailedK8sResourceApi::from_status_code(401));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
             Err(ApiError::FinalError(_)) => {},
@@ -1148,7 +1174,7 @@ labels:
 
     #[tokio::test]
     async fn test_create_namespace_retryable_error() {
-        let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(403));
+        let namespace_creator = Arc::new(FailedK8sResourceApi::from_status_code(403));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
             Err(ApiError::RetryableError(_)) => {},
