@@ -79,7 +79,7 @@ spec:
       value: validators
     - effect: NoExecute
       key: AptosNodeOnly
-      value: false
+      value: "false"
   volumes:
     - name: multiregion-kubeconfig
       secret:
