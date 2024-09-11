@@ -520,65 +520,77 @@ impl ProposalGenerator {
             let now = Instant::now();
             let mut duration1: Duration = Default::default();
             let mut duration2: Duration = Default::default();
-            let mut x = ref_txns.par_iter().any(|txns| {
-                // if let Some(txns) = txns.as_ref() {
-                //     for txn in txns {
-                //         let entry_fn = match txn.payload() {
-                //             TransactionPayload::EntryFunction(entry) => Some(entry),
-                //             TransactionPayload::Multisig(_) => None,
-                //             _ => None,
-                //         };
-                //         if let Some(entry) = entry_fn {
-                //             if self.randomness_info.lock().contains(entry) {
-                //                 return true;
-                //                 // if *self.randomness_info.lock().get(entry).unwrap() {
-                //                 //     return true;
-                //                 // }
-                //             }
-                //         }
-                //     }
-                // } else {
-                //     return false;
-                // }
-                // let b = <std::option::Option<Vec<SignedTransaction>> as Clone>::clone(&txns.as_ref()).map(|t| t.iter().any(|txn| {
-                //     let entry_fn = match txn.payload() {
-                //         TransactionPayload::EntryFunction(entry) => Some(entry),
-                //         TransactionPayload::Multisig(_) => None,
-                //         _ => None,
-                //     };
-                //     if let Some(entry) = entry_fn {
-                //         if self.randomness_info.lock().contains_key(entry) {
-                //             *self.randomness_info.lock().get(entry).unwrap()
-                //         } else {
-                //             false
-                //         }
-                //     } else {
-                //         false
-                //     }
-                // }));
-                let now = Instant::now();
-                let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref(), &HashSet::new());
-                // for entry in entry_map {
-                //     if !self.randomness_info.lock().contains(&entry) {
-                //         self.randomness_info.lock().insert(entry);
-                //     }
-                // }
-                result
-                // if !b.is_some_and(|b| b) {
-                //     let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
-                //     for (entry, val) in entry_map {
-                //         if !self.randomness_info.lock().contains_key(&entry) {
-                //             self.randomness_info.lock().insert(entry, val);
-                //         }
-                //     }
-                //     result
-                // } else {
-                //     true
-                // }
-            });
-            duration1 = now.elapsed();
-            info!("Check randomness ref_txns: {:.3?}", duration1);
+
+            let now = Instant::now();
+            let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns), &HashSet::new());
+            duration2 = now.elapsed();
+            info!("Check randomness inline txns: {:.3?}", duration2);
+            // for entry in entry_map {
+            //     if !self.randomness_info.lock().contains(&entry) {
+            //         self.randomness_info.lock().insert(entry);
+            //     }
+            // }
+            let mut x = result;
             if !x {
+                x = ref_txns.par_iter().any(|txns| {
+                    // if let Some(txns) = txns.as_ref() {
+                    //     for txn in txns {
+                    //         let entry_fn = match txn.payload() {
+                    //             TransactionPayload::EntryFunction(entry) => Some(entry),
+                    //             TransactionPayload::Multisig(_) => None,
+                    //             _ => None,
+                    //         };
+                    //         if let Some(entry) = entry_fn {
+                    //             if self.randomness_info.lock().contains(entry) {
+                    //                 return true;
+                    //                 // if *self.randomness_info.lock().get(entry).unwrap() {
+                    //                 //     return true;
+                    //                 // }
+                    //             }
+                    //         }
+                    //     }
+                    // } else {
+                    //     return false;
+                    // }
+                    // let b = <std::option::Option<Vec<SignedTransaction>> as Clone>::clone(&txns.as_ref()).map(|t| t.iter().any(|txn| {
+                    //     let entry_fn = match txn.payload() {
+                    //         TransactionPayload::EntryFunction(entry) => Some(entry),
+                    //         TransactionPayload::Multisig(_) => None,
+                    //         _ => None,
+                    //     };
+                    //     if let Some(entry) = entry_fn {
+                    //         if self.randomness_info.lock().contains_key(entry) {
+                    //             *self.randomness_info.lock().get(entry).unwrap()
+                    //         } else {
+                    //             false
+                    //         }
+                    //     } else {
+                    //         false
+                    //     }
+                    // }));
+                    let now = Instant::now();
+                    let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref(), &HashSet::new());
+                    // for entry in entry_map {
+                    //     if !self.randomness_info.lock().contains(&entry) {
+                    //         self.randomness_info.lock().insert(entry);
+                    //     }
+                    // }
+                    result
+                    // if !b.is_some_and(|b| b) {
+                    //     let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
+                    //     for (entry, val) in entry_map {
+                    //         if !self.randomness_info.lock().contains_key(&entry) {
+                    //             self.randomness_info.lock().insert(entry, val);
+                    //         }
+                    //     }
+                    //     result
+                    // } else {
+                    //     true
+                    // }
+                });
+                duration1 = now.elapsed();
+                info!("Check randomness ref_txns: {:.3?}", duration1);
+            }
                     // for txn in &inline_txns {
                     //     let entry_fn = match txn.payload() {
                     //         TransactionPayload::EntryFunction(entry) => Some(entry),
@@ -609,23 +621,23 @@ impl ProposalGenerator {
                     //     }
                     // });
                     //if !b {
-                    let now = Instant::now();
-                    let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns), &HashSet::new());
-                    duration2 = now.elapsed();
-                    info!("Check randomness inline txns: {:.3?}", duration2);
+                    // let now = Instant::now();
+                    // let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns), &HashSet::new());
+                    // duration2 = now.elapsed();
+                    // info!("Check randomness inline txns: {:.3?}", duration2);
                         // for entry in entry_map {
                         //     if !self.randomness_info.lock().contains(&entry) {
                         //         self.randomness_info.lock().insert(entry);
                         //     }
                         // }
-                    x = result;
+                    //x = result;
                     // } else {
                     //     true
                     // }
-                }
+                //}
             let elapsed = now.elapsed();
             info!("Check randomness: {:.3?}, duration 1:{:.3?}, duration 2:{:.3?}", elapsed, duration1, duration2);
-            Some(true)
+            Some(x)
         } else {
             None
         };
