@@ -438,12 +438,12 @@ impl BufferManager {
         let mut unverified_signatures = PartialSignatures::empty();
         if let Some(block) = ordered_blocks.last() {
             if let Some(votes) = self.pending_commit_votes.remove(&block.round()) {
-                for vote in votes.values() {
-                    if vote.commit_info().id() == block.id() {
-                        unverified_signatures
-                            .add_signature(vote.author(), vote.signature().clone());
-                    }
-                }
+                votes
+                    .values()
+                    .filter(|vote| vote.commit_info().id() == block.id())
+                    .for_each(|vote| {
+                        unverified_signatures.add_signature(vote.author(), vote.signature().clone())
+                    });
             }
         }
         let item = BufferItem::new_ordered(
