@@ -62,8 +62,9 @@ pub use shared_mempool::{
     bootstrap, network,
     network::MempoolSyncMsg,
     types::{
-        MempoolClientRequest, MempoolClientSender, MempoolEventsReceiver, QuorumStoreRequest,
-        QuorumStoreResponse, SubmissionStatus,
+        GetLatencySummaryRequest, IndividualLatencyStat, MempoolClientRequest, MempoolClientSender,
+        MempoolEventsReceiver, MempoolLatencySummary, QuorumStoreRequest, QuorumStoreResponse,
+        SubmissionStatus,
     },
 };
 #[cfg(any(test, feature = "fuzzing"))]

@@ -7,7 +7,7 @@ use crate::{
     txn_emitter::generate_traffic,
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config::GasEstimationConfig;
+use aptos_config::config::{FromOnChainGasEstimationMode, GasEstimationMode};
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, TransactionType};
 use aptos_global_constants::{DEFAULT_BUCKETS, GAS_UNIT_PRICE};
@@ -146,7 +146,8 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
     );
 
     // Wait for enough empty blocks to reset the prices
-    let num_blocks_to_reset = GasEstimationConfig::default().aggressive_block_history as u64;
+    let num_blocks_to_reset =
+        FromOnChainGasEstimationMode::default().aggressive_block_history as u64;
     let base_height = block_height(&client).await;
     loop {
         let num_blocks_passed = block_height(&client).await - base_height;
@@ -184,7 +185,11 @@ async fn test_gas_estimation_txns_limit() {
             let max_block_txns = 3;
             conf.api.gas_estimation.enabled = true;
             // Use a small full block threshold to make gas estimates update sooner.
-            conf.api.gas_estimation.full_block_txns = max_block_txns as usize;
+            conf.api.gas_estimation.mode =
+                GasEstimationMode::OnChainEstimation(FromOnChainGasEstimationMode {
+                    full_block_txns: max_block_txns as usize,
+                    ..Default::default()
+                });
             // Wait for full blocks with small block size to advance consensus at a fast rate.
             conf.consensus.quorum_store_poll_time_ms = 200;
             conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;
@@ -222,7 +227,11 @@ async fn test_gas_estimation_gas_used_limit() {
             let max_block_txns = 3;
             conf.api.gas_estimation.enabled = true;
             // The full block threshold will never be hit
-            conf.api.gas_estimation.full_block_txns = (max_block_txns * 2) as usize;
+            conf.api.gas_estimation.mode =
+                GasEstimationMode::OnChainEstimation(FromOnChainGasEstimationMode {
+                    full_block_txns: (max_block_txns * 2) as usize,
+                    ..Default::default()
+                });
             // Wait for full blocks with small block size to advance consensus at a fast rate.
             conf.consensus.quorum_store_poll_time_ms = 200;
             conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;

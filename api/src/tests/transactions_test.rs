@@ -7,7 +7,9 @@ use crate::tests::{
     new_test_context_with_config, new_test_context_with_db_sharding_and_internal_indexer,
 };
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
-use aptos_config::config::{GasEstimationStaticOverride, NodeConfig};
+use aptos_config::config::{
+    FromOnChainGasEstimationMode, GasEstimationMode, GasEstimationStaticOverride, NodeConfig,
+};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
@@ -1376,9 +1378,13 @@ async fn test_gas_estimation_cache() {
     node_config.api.gas_estimation.enabled = true;
     // Sets max cache size to 10
     let max_block_history = 10;
-    node_config.api.gas_estimation.low_block_history = max_block_history;
-    node_config.api.gas_estimation.market_block_history = max_block_history;
-    node_config.api.gas_estimation.aggressive_block_history = max_block_history;
+    node_config.api.gas_estimation.mode =
+        GasEstimationMode::OnChainEstimation(FromOnChainGasEstimationMode {
+            low_block_history: max_block_history,
+            market_block_history: max_block_history,
+            aggressive_block_history: max_block_history,
+            ..Default::default()
+        });
     let sleep_duration =
         Duration::from_millis(node_config.api.gas_estimation.cache_expiration_ms * 2);
     let mut context = new_test_context_with_config(current_function_name!(), node_config);

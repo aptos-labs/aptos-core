@@ -38,10 +38,9 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::Waker,
-    time::{Instant, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 use tokio::runtime::Handle;
-use super::latency_tracking::MempoolLatencyStatsTracking;
 
 pub type MempoolSenderBucket = u8;
 pub type TimelineIndexIdentifier = u8;
@@ -80,7 +79,10 @@ impl<
             config.usecase_stats_num_blocks_to_track,
             config.usecase_stats_num_top_to_track,
         );
-        let latency_stats_tracking = MempoolLatencyStatsTracking {};
+        let latency_stats_tracking = MempoolLatencyStatsTracking::new(
+            config.latency_stats_tracking_config.num_intervals,
+            Duration::from_secs_f32(config.latency_stats_tracking_config.time_per_interval_s),
+        );
         SharedMempool {
             mempool,
             config,
@@ -239,16 +241,84 @@ pub type SubmissionStatus = (MempoolStatus, Option<DiscardedVMStatus>);
 
 pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
 
+pub struct GetLatencySummaryRequest {
+    pub target_samples: usize,
+}
+
 pub enum MempoolClientRequest {
     SubmitTransaction(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>),
     GetTransactionByHash(HashValue, oneshot::Sender<Option<SignedTransaction>>),
-    GetLatencySummary(oneshot::Sender<MempoolLatencySummary>),
+    GetLatencySummary(
+        GetLatencySummaryRequest,
+        oneshot::Sender<MempoolLatencySummary>,
+    ),
 }
 
 pub type MempoolClientSender = mpsc::Sender<MempoolClientRequest>;
 pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
 
-pub struct MempoolLatencySummary {}
+#[derive(Default, Debug)]
+pub struct IndividualLatencyStat {
+    count: usize,
+    latency_s_sum: f64,
+}
+
+impl IndividualLatencyStat {
+    pub fn new(count: usize, latency_s_sum: f64) -> Self {
+        Self {
+            count,
+            latency_s_sum,
+        }
+    }
+
+    fn observe(&mut self, latency_s: f64) {
+        self.count += 1;
+        self.latency_s_sum += latency_s;
+    }
+
+    fn aggregate(&mut self, other: &Self) {
+        self.count += other.count;
+        self.latency_s_sum += other.latency_s_sum;
+    }
+
+    pub fn avg_s(&self) -> f64 {
+        self.latency_s_sum / self.count as f64
+    }
+}
+
+pub struct MempoolLatencySummary {
+    // mempool bucket_floor -> latency
+    pub inclusion_latency: HashMap<u64, IndividualLatencyStat>,
+
+    pub count: usize,
+}
+
+impl MempoolLatencySummary {
+    pub fn empty() -> Self {
+        Self {
+            inclusion_latency: HashMap::new(),
+            count: 0,
+        }
+    }
+
+    pub fn observe_inclusion_time(&mut self, bucket_floor: u64, inclusion_time_s: f64) {
+        self.count += 1;
+        self.inclusion_latency
+            .entry(bucket_floor)
+            .or_default()
+            .observe(inclusion_time_s);
+    }
+
+    pub fn aggregate(&mut self, other: &Self) {
+        self.count += other.count;
+        for (bucket_floor, other_stat) in &other.inclusion_latency {
+            self.inclusion_latency
+                .entry(*bucket_floor)
+                .or_default()
+                .aggregate(other_stat);
+        }
+    }
+}
 
 /// State of last sync with peer:
 /// `timeline_id` is position in log of ready transactions

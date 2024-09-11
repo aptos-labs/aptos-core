@@ -176,14 +176,16 @@ impl TransactionStore {
         &self,
         address: &AccountAddress,
         sequence_number: u64,
-    ) -> Option<(&InsertionInfo, String, String)> {
+    ) -> Option<(&InsertionInfo, String, String, u64)> {
         if let Some(txn) = self.get_mempool_txn(address, sequence_number) {
+            let (bucket, floor) = self.get_bucket_and_floor(txn.ranking_score, address);
             return Some((
                 &txn.insertion_info,
-                self.get_bucket(txn.ranking_score, address),
+                bucket,
                 txn.priority_of_sender
                     .clone()
                     .map_or_else(|| "Unknown".to_string(), |priority| priority.to_string()),
+                floor,
             ));
         }
         None
@@ -207,9 +209,23 @@ impl TransactionStore {
             .timeline_index
             .get(&sender_bucket)
             .unwrap()
-            .get_bucket(ranking_score)
-            .to_string();
+            .get_bucket(ranking_score);
         format!("{}_{}", sender_bucket, bucket)
+    }
+
+    #[inline]
+    pub(crate) fn get_bucket_and_floor(
+        &self,
+        ranking_score: u64,
+        sender: &AccountAddress,
+    ) -> (String, u64) {
+        let sender_bucket = sender_bucket(sender, self.num_sender_buckets);
+        let (bucket, floor) = self
+            .timeline_index
+            .get(&sender_bucket)
+            .unwrap()
+            .get_bucket_and_floor(ranking_score);
+        (format!("{}_{}", sender_bucket, bucket), floor)
     }
 
     pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {

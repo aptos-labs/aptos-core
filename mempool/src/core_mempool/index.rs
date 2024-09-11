@@ -400,6 +400,18 @@ impl MultiBucketTimelineIndex {
     }
 
     #[inline]
+    pub(crate) fn get_bucket_and_floor(&self, ranking_score: u64) -> (&str, u64) {
+        let index = self
+            .bucket_mins
+            .binary_search(&ranking_score)
+            .unwrap_or_else(|i| i - 1);
+        (
+            self.bucket_mins_to_string[index].as_str(),
+            self.bucket_mins[index],
+        )
+    }
+
+    #[inline]
     pub(crate) fn get_bucket(&self, ranking_score: u64) -> &str {
         let index = self
             .bucket_mins

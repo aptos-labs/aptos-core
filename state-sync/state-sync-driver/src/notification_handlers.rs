@@ -407,11 +407,11 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
     pub async fn notify_mempool_of_committed_transactions(
         &mut self,
         committed_transactions: Vec<Transaction>,
-        block_timestamp_usecs: u64,
+        latest_chain_timestamp_usecs: u64,
     ) -> Result<(), Error> {
         let result = self
             .mempool_notification_sender
-            .notify_new_commit(committed_transactions, block_timestamp_usecs)
+            .notify_new_commit(committed_transactions, latest_chain_timestamp_usecs)
             .await;
 
         if let Err(error) = result {

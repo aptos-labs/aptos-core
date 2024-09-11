@@ -102,20 +102,20 @@ fn test_transaction_metrics() {
     );
 
     // Check timestamp returned as end-to-end for broadcast-able transaction
-    let (insertion_info, _bucket, _priority) = mempool
+    let (insertion_info, _bucket, _priority, _bucket_floor) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(0), 0)
         .unwrap();
     assert_eq!(insertion_info.submitted_by, SubmittedBy::Downstream);
 
     // Check timestamp returned as not end-to-end for non-broadcast-able transaction
-    let (insertion_info, _bucket, _priority) = mempool
+    let (insertion_info, _bucket, _priority, _bucket_floor) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(1), 0)
         .unwrap();
     assert_eq!(insertion_info.submitted_by, SubmittedBy::PeerValidator);
 
-    let (insertion_info, _bucket, _priority) = mempool
+    let (insertion_info, _bucket, _priority, _bucket_floor) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(2), 0)
         .unwrap();
