@@ -38,7 +38,7 @@ fn get_latest_ledger_info_in_db_impl(db: &DB) -> Result<Option<LedgerInfoWithSig
 }
 
 #[derive(Debug)]
-pub(crate) struct LedgerMetadataDb {
+pub struct LedgerMetadataDb {
     db: Arc<DB>,
 
     /// We almost always need the latest ledger info and signatures to serve read requests, so we
