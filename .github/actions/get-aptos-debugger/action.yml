@@ -34,7 +34,7 @@ runs:
         key: aptos-debugger-${{ inputs.GIT_SHA }}
         fail-on-cache-miss: ${{ inputs.EXPECT_CACHE_HIT }}
 
-    - uses: aptos-labs/aptos-core/.github/actions/build-aptos-debugger@main
+    - uses: aptos-labs/aptos-core/.github/actions/build-aptos-debugger@0911-alden-cache-build
       if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
       with:
         GIT_SHA: ${{ inputs.GIT_SHA }}
