@@ -8,22 +8,22 @@ use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use std::{collections::HashMap, time::Instant};
 
 fn main() {
-    // 初始化临时目录和数据库
+    // Initialize temporary directory and database
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
 
-    // 生成测试数据
+    // Generate test data
     let input = arb_state_kv_sets(10000, 5, 5000)
         .new_tree(&mut TestRunner::default())
         .unwrap()
         .current();
 
-    // 开始计时
+    // Start timing
     let start = Instant::now();
     let mut version: u64 = 0;
 
-    // 写入状态数据
+    // Write state data
     for (i, kv_set) in input.iter().enumerate() {
         for (key, value) in kv_set {
             let value_state_set = vec![(key, value.as_ref())].into_iter().collect();
@@ -69,7 +69,7 @@ fn main() {
         }
     }
 
-    // 结束计时
+    // End timing
     let duration = start.elapsed();
     let num_versions = input.len() as u64;
     let tps = num_versions as f64 / duration.as_secs_f64();
