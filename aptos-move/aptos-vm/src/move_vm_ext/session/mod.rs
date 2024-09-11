@@ -39,7 +39,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
+    module_linker_error, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    session::Session,
 };
 use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use std::{
@@ -315,10 +316,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = if is_loader_v2_enabled {
-                    module_storage
-                        .fetch_module_metadata(&struct_tag.address, &struct_tag.module)
-                        .ok()
-                        .and_then(|md| get_resource_group_member_from_metadata(&struct_tag, &md))
+                    let struct_tag_addr = &struct_tag.address;
+                    let struct_tag_name = &struct_tag.module;
+                    let metadata = module_storage
+                        .fetch_module_metadata(struct_tag_addr, struct_tag_name)
+                        .map_err(|e| e.to_partial())?
+                        .ok_or_else(|| {
+                            module_linker_error!(struct_tag_addr, struct_tag_name).to_partial()
+                        })?;
+                    get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 } else {
                     #[allow(deprecated)]
                     vm.with_module_metadata(&struct_tag.module_id(), |md| {

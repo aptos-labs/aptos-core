@@ -855,14 +855,6 @@ impl AptosVM {
         entry_fn: &EntryFunction,
         _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
-        if self.features().is_loader_v2_enabled() {
-            let addr = entry_fn.module().address();
-            let name = entry_fn.module().name();
-            if !module_storage.check_module_exists(addr, name)? {
-                return Err(module_linker_error!(addr, name).into_vm_status());
-            }
-        }
-
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
@@ -3097,7 +3089,11 @@ pub(crate) fn fetch_module_metadata_for_struct_tag(
     module_storage: &impl AptosModuleStorage,
 ) -> VMResult<Vec<Metadata>> {
     if features.is_loader_v2_enabled() {
-        module_storage.fetch_module_metadata(&struct_tag.address, &struct_tag.module)
+        let addr = &struct_tag.address;
+        let name = &struct_tag.module;
+        module_storage
+            .fetch_module_metadata(addr, name)?
+            .ok_or_else(|| module_linker_error!(addr, name))
     } else {
         Ok(resolver.get_module_metadata(&struct_tag.module_id()))
     }

@@ -4,7 +4,6 @@
 use crate::{
     config::VMConfig,
     loader::{Function, LoadedFunctionOwner, Module, TypeCache},
-    logging::expect_no_verification_errors,
     module_linker_error,
     module_traversal::TraversalContext,
     storage::{
@@ -130,7 +129,9 @@ impl LoaderV2 {
             //
             // This is needed because we need to store references derived from it in the
             // work list.
-            let compiled_module = module_storage.fetch_deserialized_module(addr, name)?;
+            let compiled_module = module_storage
+                .fetch_deserialized_module(addr, name)?
+                .ok_or_else(|| module_linker_error!(addr, name))?;
             let compiled_module = referenced_modules.alloc(compiled_module);
 
             // Explore all dependencies and friends that have been visited yet.
@@ -181,8 +182,8 @@ impl LoaderV2 {
         module_name: &IdentStr,
     ) -> VMResult<Arc<Module>> {
         module_storage
-            .fetch_verified_module(address, module_name)
-            .map_err(expect_no_verification_errors)
+            .fetch_verified_module(address, module_name)?
+            .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
     /// Returns a function definition corresponding to the specified name. The module

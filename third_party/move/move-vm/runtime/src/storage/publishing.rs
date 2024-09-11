@@ -80,24 +80,24 @@ impl<'m, M: ModuleStorage> TemporaryModuleBytesStorage<'m, M> {
 
             // All modules can be republished, as long as the new module is compatible
             // with the old module.
-            let module_exists = module_storage.check_module_exists(addr, name)?;
-            if module_exists && compatibility.need_check_compat() {
-                let old_module_ref = module_storage.fetch_verified_module(addr, name)?;
-                let old_module = old_module_ref.module();
-                if env.vm_config().use_compatibility_checker_v2 {
-                    compatibility
-                        .check(old_module, &compiled_module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                } else {
-                    #[allow(deprecated)]
-                    let old_m = normalized::Module::new(old_module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                    #[allow(deprecated)]
-                    let new_m = normalized::Module::new(&compiled_module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                    compatibility
-                        .legacy_check(&old_m, &new_m)
-                        .map_err(|e| e.finish(Location::Undefined))?;
+            if compatibility.need_check_compat() {
+                if let Some(old_module_ref) = module_storage.fetch_verified_module(addr, name)? {
+                    let old_module = old_module_ref.module();
+                    if env.vm_config().use_compatibility_checker_v2 {
+                        compatibility
+                            .check(old_module, &compiled_module)
+                            .map_err(|e| e.finish(Location::Undefined))?;
+                    } else {
+                        #[allow(deprecated)]
+                        let old_m = normalized::Module::new(old_module)
+                            .map_err(|e| e.finish(Location::Undefined))?;
+                        #[allow(deprecated)]
+                        let new_m = normalized::Module::new(&compiled_module)
+                            .map_err(|e| e.finish(Location::Undefined))?;
+                        compatibility
+                            .legacy_check(&old_m, &new_m)
+                            .map_err(|e| e.finish(Location::Undefined))?;
+                    }
                 }
             }
 
@@ -212,7 +212,16 @@ impl<'a, M: ModuleStorage> TemporaryModuleStorage<'a, M> {
             .staged_modules_iter()
         {
             // Verify the module and its dependencies, and that they do not form a cycle.
-            let module = temporary_module_storage.fetch_verified_module(addr, name)?;
+            let module = temporary_module_storage
+                .fetch_verified_module(addr, name)?
+                .ok_or_else(|| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                            "Staged module {}::{} must always exist",
+                            addr, name
+                        ))
+                        .finish(Location::Undefined)
+                })?;
 
             // Also verify that its friends exist.
             for (friend_addr, friend_name) in module.module().immediate_friends_iter() {
