@@ -32,6 +32,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -40,7 +41,6 @@ use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
 };
-use aptos_infallible::RwLock;
 use bytes::Bytes;
 use futures::{
     channel::{
@@ -205,7 +205,7 @@ impl BufferManager {
             .max_delay(Duration::from_secs(5));
 
         let (tx, rx) = unbounded();
-
+        let validators = epoch_state.read().verifier.get_ordered_account_addresses();
         Self {
             author,
 
@@ -223,7 +223,7 @@ impl BufferManager {
 
             reliable_broadcast: ReliableBroadcast::new(
                 author,
-                epoch_state.read().verifier.get_ordered_account_addresses(),
+                validators,
                 commit_msg_tx.clone(),
                 rb_backoff_policy,
                 TimeService::real(),
@@ -275,6 +275,7 @@ impl BufferManager {
             message,
             AckState::new(
                 self.epoch_state
+                    .read()
                     .verifier
                     .get_ordered_account_addresses_iter(),
             ),
@@ -638,7 +639,7 @@ impl BufferManager {
         let round = item.round();
         let mut new_item = item.advance_to_executed_or_aggregated(
             executed_blocks,
-            &self.epoch_state.verifier,
+            self.epoch_state.clone(),
             self.end_epoch_timestamp.get().cloned(),
             self.order_vote_enabled,
         );

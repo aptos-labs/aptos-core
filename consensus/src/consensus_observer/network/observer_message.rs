@@ -8,6 +8,7 @@ use aptos_consensus_types::{
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
 use aptos_crypto::hash::CryptoHash;
+use aptos_infallible::RwLock;
 use aptos_types::{
     block_info::{BlockInfo, Round},
     epoch_change::Verifier,
@@ -255,14 +256,17 @@ impl OrderedBlock {
     }
 
     /// Verifies the ordered proof and returns an error if the proof is invalid
-    pub fn verify_ordered_proof(&self, epoch_state: &EpochState) -> Result<(), Error> {
-        epoch_state.verify(&self.ordered_proof).map_err(|error| {
-            Error::InvalidMessageError(format!(
-                "Failed to verify ordered proof ledger info: {:?}, Error: {:?}",
-                self.proof_block_info(),
-                error
-            ))
-        })
+    pub fn verify_ordered_proof(&self, epoch_state: Arc<RwLock<EpochState>>) -> Result<(), Error> {
+        epoch_state
+            .read()
+            .verify(&self.ordered_proof)
+            .map_err(|error| {
+                Error::InvalidMessageError(format!(
+                    "Failed to verify ordered proof ledger info: {:?}, Error: {:?}",
+                    self.proof_block_info(),
+                    error
+                ))
+            })
     }
 }
 
@@ -298,14 +302,17 @@ impl CommitDecision {
     }
 
     /// Verifies the commit proof and returns an error if the proof is invalid
-    pub fn verify_commit_proof(&self, epoch_state: &EpochState) -> Result<(), Error> {
-        epoch_state.verify(&self.commit_proof).map_err(|error| {
-            Error::InvalidMessageError(format!(
-                "Failed to verify commit proof ledger info: {:?}, Error: {:?}",
-                self.proof_block_info(),
-                error
-            ))
-        })
+    pub fn verify_commit_proof(&self, epoch_state: Arc<RwLock<EpochState>>) -> Result<(), Error> {
+        epoch_state
+            .read()
+            .verify(&self.commit_proof)
+            .map_err(|error| {
+                Error::InvalidMessageError(format!(
+                    "Failed to verify commit proof ledger info: {:?}, Error: {:?}",
+                    self.proof_block_info(),
+                    error
+                ))
+            })
     }
 }
 
@@ -669,16 +676,18 @@ impl BlockPayload {
 
     /// Verifies that the block payload proofs are correctly signed according
     /// to the current epoch state. Returns an error if the data is invalid.
-    pub fn verify_payload_signatures(&self, epoch_state: &EpochState) -> Result<(), Error> {
+    pub fn verify_payload_signatures(
+        &self,
+        epoch_state: Arc<RwLock<EpochState>>,
+    ) -> Result<(), Error> {
         // Create a dummy proof cache to verify the proofs
         let proof_cache = ProofCache::new(1);
 
         // TODO: parallelize the verification of the proof signatures!
 
         // Verify each of the proof signatures
-        let validator_verifier = &epoch_state.verifier;
         for proof_of_store in &self.transaction_payload.payload_proofs() {
-            if let Err(error) = proof_of_store.verify(validator_verifier, &proof_cache) {
+            if let Err(error) = proof_of_store.verify(&epoch_state.read().verifier, &proof_cache) {
                 return Err(Error::InvalidMessageError(format!(
                     "Failed to verify the proof of store for batch: {:?}, Error: {:?}",
                     proof_of_store.info(),
@@ -924,13 +933,16 @@ mod test {
         let ledger_info = create_empty_ledger_info(current_epoch);
 
         // Create an epoch state for the current epoch (with an empty verifier)
-        let epoch_state = EpochState::new(current_epoch, ValidatorVerifier::new(vec![]));
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            current_epoch,
+            ValidatorVerifier::new(vec![]),
+        )));
 
         // Create a commit decision message with the ledger info
         let commit_decision = CommitDecision::new(ledger_info);
 
         // Verify the commit proof and ensure it passes
-        commit_decision.verify_commit_proof(&epoch_state).unwrap();
+        commit_decision.verify_commit_proof(epoch_state).unwrap();
 
         // Create an epoch state for the current epoch (with a non-empty verifier)
         let validator_signer = ValidatorSigner::random(None);
@@ -940,11 +952,14 @@ mod test {
             100,
         );
         let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(current_epoch, validator_verifier.clone());
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            current_epoch,
+            validator_verifier.clone(),
+        )));
 
         // Verify the commit proof and ensure it fails (the signature set is insufficient)
         let error = commit_decision
-            .verify_commit_proof(&epoch_state)
+            .verify_commit_proof(epoch_state)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
     }
@@ -1056,13 +1071,16 @@ mod test {
         let ledger_info = create_empty_ledger_info(current_epoch);
 
         // Create an epoch state for the current epoch (with an empty verifier)
-        let epoch_state = EpochState::new(current_epoch, ValidatorVerifier::new(vec![]));
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            current_epoch,
+            ValidatorVerifier::new(vec![]),
+        )));
 
         // Create an ordered block message with an empty block and ordered proof
         let ordered_block = OrderedBlock::new(vec![], ledger_info);
 
         // Verify the ordered proof and ensure it passes
-        ordered_block.verify_ordered_proof(&epoch_state).unwrap();
+        ordered_block.verify_ordered_proof(epoch_state).unwrap();
 
         // Create an epoch state for the current epoch (with a non-empty verifier)
         let validator_signer = ValidatorSigner::random(None);
@@ -1072,12 +1090,13 @@ mod test {
             100,
         );
         let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(current_epoch, validator_verifier.clone());
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            current_epoch,
+            validator_verifier.clone(),
+        )));
 
         // Verify the ordered proof and ensure it fails (the signature set is insufficient)
-        let error = ordered_block
-            .verify_ordered_proof(&epoch_state)
-            .unwrap_err();
+        let error = ordered_block.verify_ordered_proof(epoch_state).unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
     }
 
@@ -1180,11 +1199,14 @@ mod test {
         let block_payload = BlockPayload::new(block_info, transaction_payload);
 
         // Create an epoch state for the current epoch (with an empty verifier)
-        let epoch_state = EpochState::new(current_epoch, ValidatorVerifier::new(vec![]));
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            current_epoch,
+            ValidatorVerifier::new(vec![]),
+        )));
 
         // Verify the block payload signatures and ensure it passes
         block_payload
-            .verify_payload_signatures(&epoch_state)
+            .verify_payload_signatures(epoch_state)
             .unwrap();
 
         // Create an epoch state for the current epoch (with a non-empty verifier)
@@ -1195,11 +1217,14 @@ mod test {
             100,
         );
         let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(current_epoch, validator_verifier.clone());
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            current_epoch,
+            validator_verifier.clone(),
+        )));
 
         // Verify the block payload signatures and ensure it fails (the signature set is insufficient)
         let error = block_payload
-            .verify_payload_signatures(&epoch_state)
+            .verify_payload_signatures(epoch_state)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
     }

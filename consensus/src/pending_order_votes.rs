@@ -5,11 +5,13 @@
 use crate::counters;
 use aptos_consensus_types::{common::Author, order_vote::OrderVote};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures}, validator_verifier::VerifyError,
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
+    validator_verifier::VerifyError,
 };
-use aptos_infallible::RwLock;
 use std::{collections::HashMap, sync::Arc};
 
 /// Result of the order vote processing. The failure case (Verification error) is returned
@@ -76,8 +78,10 @@ impl PendingOrderVotes {
             },
             OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
                 // we don't have enough votes for this ledger info yet
-                let validator_voting_power =
-                    epoch_state.read().verifier.get_voting_power(&order_vote.author());
+                let validator_voting_power = epoch_state
+                    .read()
+                    .verifier
+                    .get_voting_power(&order_vote.author());
                 if validator_voting_power.is_none() {
                     warn!(
                         "Received order vote from an unknown author: {}",
@@ -160,15 +164,15 @@ impl PendingOrderVotes {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::{OrderVoteReceptionResult, PendingOrderVotes};
     use aptos_consensus_types::order_vote::OrderVote;
     use aptos_crypto::HashValue;
-    use aptos_types::{
-        block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier
-    };
     use aptos_infallible::RwLock;
+    use aptos_types::{
+        block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
+        validator_verifier::random_validator_verifier,
+    };
+    use std::sync::Arc;
 
     /// Creates a random ledger info for epoch 1 and round 1.
     fn random_ledger_info() -> LedgerInfo {
@@ -197,13 +201,21 @@ mod tests {
 
         // first time a new order vote is added -> OrderVoteAdded
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_1_author_0, epoch_state.clone(), true),
+            pending_order_votes.insert_order_vote(
+                &order_vote_1_author_0,
+                epoch_state.clone(),
+                true
+            ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
         // same author voting for the same thing -> OrderVoteAdded
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_1_author_0, epoch_state.clone(), true),
+            pending_order_votes.insert_order_vote(
+                &order_vote_1_author_0,
+                epoch_state.clone(),
+                true
+            ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
@@ -215,7 +227,11 @@ mod tests {
             signers[1].sign(&li2).expect("Unable to sign ledger info"),
         );
         assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_2_author_1, epoch_state.clone(), true),
+            pending_order_votes.insert_order_vote(
+                &order_vote_2_author_1,
+                epoch_state.clone(),
+                true
+            ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
@@ -227,9 +243,15 @@ mod tests {
             li2.clone(),
             signers[2].sign(&li2).expect("Unable to sign ledger info"),
         );
-        match pending_order_votes.insert_order_vote(&order_vote_2_author_2, epoch_state.clone(), true) {
+        match pending_order_votes.insert_order_vote(
+            &order_vote_2_author_2,
+            epoch_state.clone(),
+            true,
+        ) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
-                assert!(li_with_sig.check_voting_power(&epoch_state.read().verifier).is_ok());
+                assert!(li_with_sig
+                    .check_voting_power(&epoch_state.read().verifier)
+                    .is_ok());
             },
             _ => {
                 panic!("No QC formed.");

@@ -19,6 +19,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel::Receiver;
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::common::Author;
+use aptos_infallible::RwLock;
 use aptos_types::{account_address::AccountAddress, epoch_state::EpochState};
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{
@@ -37,7 +38,7 @@ pub fn prepare_phases_and_buffer_manager(
     persisting_proxy: Arc<dyn StateComputer>,
     block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
-    epoch_state: Arc<EpochState>,
+    epoch_state: Arc<RwLock<EpochState>>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
     back_pressure_enabled: bool,

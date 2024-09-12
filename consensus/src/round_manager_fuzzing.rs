@@ -26,7 +26,7 @@ use crate::{
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
 use aptos_consensus_types::{proposal_msg::ProposalMsg, utils::PayloadTxnsSize};
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
@@ -148,15 +148,15 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     let (self_sender, _self_receiver) = aptos_channels::new_unbounded_test();
 
-    let epoch_state = Arc::new(EpochState {
+    let epoch_state = Arc::new(RwLock::new(EpochState {
         epoch: 1,
         verifier: storage.get_validator_set().into(),
-    });
+    }));
     let network = Arc::new(NetworkSender::new(
         signer.author(),
         consensus_network_client,
         self_sender,
-        epoch_state.verifier.clone(),
+        epoch_state.read().verifier.clone(),
     ));
 
     // TODO: mock

@@ -12,9 +12,11 @@ use crate::{
 use aptos_consensus_types::proof_of_store::{
     BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
+    aggregate_signature::PartialSignatures, epoch_state::EpochState,
+    validator_verifier::ValidatorVerifier, PeerId,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
@@ -78,7 +80,7 @@ impl IncrementalProofState {
     fn add_signature(
         &mut self,
         signed_batch_info: &SignedBatchInfo,
-        validator_verifier: &ValidatorVerifier,
+        epoch_state: Arc<RwLock<EpochState>>,
         verified: bool,
     ) -> Result<(), SignedBatchInfoError> {
         if signed_batch_info.batch_info() != &self.info {
@@ -88,7 +90,11 @@ impl IncrementalProofState {
             )));
         }
 
-        match validator_verifier.get_voting_power(&signed_batch_info.signer()) {
+        match epoch_state
+            .read()
+            .verifier
+            .get_voting_power(&signed_batch_info.signer())
+        {
             Some(_voting_power) => {
                 let signer = signed_batch_info.signer();
                 if verified {
@@ -123,16 +129,20 @@ impl IncrementalProofState {
         Ok(())
     }
 
-    fn ready(&self, verifier: &ValidatorVerifier) -> bool {
+    fn ready(&self, epoch_state: Arc<RwLock<EpochState>>) -> bool {
         let all_voters = self.all_voters();
-        verifier.check_voting_power(all_voters.iter(), true).is_ok()
+        epoch_state
+            .read()
+            .verifier
+            .check_voting_power(all_voters.iter(), true)
+            .is_ok()
     }
 
     fn aggregate_and_verify(
         &mut self,
-        verifier: &ValidatorVerifier,
+        epoch_state: Arc<RwLock<EpochState>>,
     ) -> Result<ProofOfStore, SignedBatchInfoError> {
-        if !self.ready(verifier) {
+        if !self.ready(epoch_state.clone()) {
             return Err(SignedBatchInfoError::LowVotingPower);
         }
         if self.completed {
@@ -144,7 +154,9 @@ impl IncrementalProofState {
             all_signatures.add_signature(*author, signature.clone());
         }
 
-        let aggregated_sig = verifier
+        let aggregated_sig = epoch_state
+            .read()
+            .verifier
             .aggregate_signatures(&all_signatures)
             .map_err(|e| {
                 error!(
@@ -154,52 +166,61 @@ impl IncrementalProofState {
                 SignedBatchInfoError::UnableToAggregate
             })?;
 
-        let verified_aggregate_signature =
-            match verifier.verify_multi_signatures(&self.info, &aggregated_sig) {
-                Ok(_) => aggregated_sig,
-                Err(_) => {
-                    // Question: Should we assign min tasks per thread here for into_par_iter()?
-                    let verified = self
-                        .unverified_signatures
-                        .signatures()
-                        .into_par_iter()
-                        .flat_map(|(account_address, signature)| {
-                            if verifier
-                                .verify(*account_address, &self.info, signature)
-                                .is_ok()
-                            {
-                                return Some((account_address, signature));
-                            }
-                            None
-                        })
-                        .collect::<Vec<_>>();
-                    for (account_address, signature) in verified {
-                        self.verified_signatures
-                            .add_signature(*account_address, signature.clone());
-                    }
-                    self.unverified_signatures = PartialSignatures::empty();
-                    let aggregated_sig = verifier
-                        .aggregate_signatures(&self.verified_signatures)
-                        .map_err(|e| {
+        let verified_aggregate_signature = match epoch_state
+            .read()
+            .verifier
+            .verify_multi_signatures(&self.info, &aggregated_sig)
+        {
+            Ok(_) => aggregated_sig,
+            Err(_) => {
+                // Question: Should we assign min tasks per thread here for into_par_iter()?
+                let verified = self
+                    .unverified_signatures
+                    .signatures()
+                    .into_par_iter()
+                    .flat_map(|(account_address, signature)| {
+                        if epoch_state
+                            .read()
+                            .verifier
+                            .verify(*account_address, &self.info, signature)
+                            .is_ok()
+                        {
+                            return Some((account_address, signature));
+                        }
+                        None
+                    })
+                    .collect::<Vec<_>>();
+                for (account_address, signature) in verified {
+                    self.verified_signatures
+                        .add_signature(*account_address, signature.clone());
+                }
+                self.unverified_signatures = PartialSignatures::empty();
+                let aggregated_sig = epoch_state
+                    .read()
+                    .verifier
+                    .aggregate_signatures(&self.verified_signatures)
+                    .map_err(|e| {
                         error!(
                             "Unable to aggregate signatures in proof coordinator err = {:?}",
                             e
                         );
                         SignedBatchInfoError::UnableToAggregate
                     })?;
-                    verifier
-                        .verify_multi_signatures(&self.info, &aggregated_sig)
-                        .map_err(|e| {
-                            error!(
+                epoch_state
+                    .read()
+                    .verifier
+                    .verify_multi_signatures(&self.info, &aggregated_sig)
+                    .map_err(|e| {
+                        error!(
                             "Unable to verify aggregated signature in proof coordinator err = {:?}",
                             e
                         );
-                            SignedBatchInfoError::InvalidAggregatedSignature
-                        })?;
-                    aggregated_sig
-                },
-            };
-        if self.ready(verifier) {
+                        SignedBatchInfoError::InvalidAggregatedSignature
+                    })?;
+                aggregated_sig
+            },
+        };
+        if self.ready(epoch_state) {
             self.completed = true;
             Ok(ProofOfStore::new(
                 self.info.clone(),
@@ -289,7 +310,7 @@ impl ProofCoordinator {
     fn add_signature(
         &mut self,
         signed_batch_info: SignedBatchInfo,
-        validator_verifier: &ValidatorVerifier,
+        epoch_state: Arc<RwLock<EpochState>>,
         verified: bool,
     ) -> Result<Option<ProofOfStore>, SignedBatchInfoError> {
         if !self
@@ -302,11 +323,11 @@ impl ProofCoordinator {
             .batch_info_to_proof
             .get_mut(signed_batch_info.batch_info())
         {
-            value.add_signature(&signed_batch_info, validator_verifier, verified)?;
-            if !value.completed && value.ready(validator_verifier) {
+            value.add_signature(&signed_batch_info, epoch_state.clone(), verified)?;
+            if !value.completed && value.ready(epoch_state.clone()) {
                 let proof = {
                     let _timer = counters::SIGNED_BATCH_INFO_VERIFY_DURATION.start_timer();
-                    value.aggregate_and_verify(validator_verifier)?
+                    value.aggregate_and_verify(epoch_state)?
                 };
                 // proof validated locally, so adding to cache
                 self.proof_cache
@@ -329,7 +350,10 @@ impl ProofCoordinator {
         Ok(None)
     }
 
-    fn update_counters_on_expire(state: &IncrementalProofState, verifier: &ValidatorVerifier) {
+    fn update_counters_on_expire(
+        state: &IncrementalProofState,
+        epoch_state: Arc<RwLock<EpochState>>,
+    ) {
         // Count late votes separately
         if !state.completed && !state.self_voted {
             counters::BATCH_RECEIVED_LATE_REPLIES_COUNT.inc_by(state.voter_count());
@@ -338,13 +362,13 @@ impl ProofCoordinator {
 
         counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.voter_count() as f64);
         counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
-            .observe(state.aggregate_voting_power(verifier) as f64);
+            .observe(state.aggregate_voting_power(&epoch_state.read().verifier) as f64);
         if !state.completed {
             counters::BATCH_SUCCESSFUL_CREATION.observe(0.0);
         }
     }
 
-    async fn expire(&mut self, verifier: &ValidatorVerifier) {
+    async fn expire(&mut self, epoch_state: Arc<RwLock<EpochState>>) {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
             if let Some(state) = self.batch_info_to_proof.remove(&signed_batch_info_info) {
@@ -366,7 +390,7 @@ impl ProofCoordinator {
                         self_voted = state.self_voted,
                     );
                 }
-                Self::update_counters_on_expire(&state, verifier);
+                Self::update_counters_on_expire(&state, epoch_state.clone());
             }
         }
         if self
@@ -383,7 +407,7 @@ impl ProofCoordinator {
         mut self,
         mut rx: Receiver<ProofCoordinatorCommand>,
         mut network_sender: impl QuorumStoreSender,
-        validator_verifier: ValidatorVerifier,
+        epoch_state: Arc<RwLock<EpochState>>,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));
         loop {
@@ -425,7 +449,7 @@ impl ProofCoordinator {
                                 let peer_id = signed_batch_info.signer();
                                 let digest = *signed_batch_info.digest();
                                 let batch_id = signed_batch_info.batch_id();
-                                match self.add_signature(signed_batch_info, &validator_verifier, verified) {
+                                match self.add_signature(signed_batch_info, epoch_state.clone(), verified) {
                                     Ok(result) => {
                                         if let Some(proof) = result {
                                             debug!(
@@ -457,7 +481,7 @@ impl ProofCoordinator {
                     }
                 }),
                 _ = interval.tick() => {
-                    monitor!("proof_coordinator_handle_tick", self.expire(&validator_verifier).await);
+                    monitor!("proof_coordinator_handle_tick", self.expire(epoch_state.clone()).await);
                 }
             }
         }

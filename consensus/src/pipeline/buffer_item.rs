@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
 use crate::{
     counters, pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType,
 };
@@ -14,15 +13,19 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, block_info::BlockInfo, epoch_state::EpochState, ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures}, validator_verifier::ValidatorVerifier
+    aggregate_signature::PartialSignatures,
+    block_info::BlockInfo,
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
 };
-use aptos_infallible::RwLock;
 use futures::future::BoxFuture;
 use itertools::zip_eq;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::sync::Arc;
 use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
@@ -42,7 +45,7 @@ fn generate_commit_ledger_info(
 
 fn verify_signatures(
     unverified_signatures: PartialSignatures,
-    verifier: &ValidatorVerifier,
+    epoch_state: Arc<RwLock<EpochState>>,
     commit_ledger_info: &LedgerInfo,
 ) -> PartialSignatures {
     // Returns a valid partial signature from a set of unverified signatures.
@@ -51,8 +54,14 @@ fn verify_signatures(
     // filters out invalid signature shares much faster when there are only a few of them
     // (e.g., [LM07]: Finding Invalid Signatures in Pairing-Based Batches,
     // by Law, Laurie and Matt, Brian J., in Cryptography and Coding, 2007).
-    if let Ok(aggregated_signature) = verifier.aggregate_signatures(&unverified_signatures) {
-        if verifier
+    if let Ok(aggregated_signature) = epoch_state
+        .read()
+        .verifier
+        .aggregate_signatures(&unverified_signatures)
+    {
+        if epoch_state
+            .read()
+            .verifier
             .verify_multi_signatures(commit_ledger_info, &aggregated_signature)
             .is_ok()
         {
@@ -69,7 +78,9 @@ fn verify_signatures(
                 let _timer = counters::VERIFY_MSG
                     .with_label_values(&["commit_votes_from_ordered_bufer_item"])
                     .start_timer();
-                if verifier
+                if epoch_state
+                    .read()
+                    .verifier
                     .verify(account_address, commit_ledger_info, &signature)
                     .is_ok()
                 {
@@ -110,9 +121,11 @@ fn generate_executed_item_from_ordered(
 fn aggregate_commit_proof(
     commit_ledger_info: &LedgerInfo,
     verified_signatures: &PartialSignatures,
-    validator: &ValidatorVerifier,
+    epoch_state: Arc<RwLock<EpochState>>,
 ) -> LedgerInfoWithSignatures {
-    let aggregated_sig = validator
+    let aggregated_sig = epoch_state
+        .read()
+        .verifier
         .aggregate_signatures(verified_signatures)
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
@@ -186,7 +199,7 @@ impl BufferItem {
     pub fn advance_to_executed_or_aggregated(
         self,
         executed_blocks: Vec<PipelinedBlock>,
-        verifier: &ValidatorVerifier,
+        epoch_state: Arc<RwLock<EpochState>>,
         epoch_end_timestamp: Option<u64>,
         order_vote_enabled: bool,
     ) -> Self {
@@ -236,15 +249,21 @@ impl BufferItem {
                         order_vote_enabled,
                     );
 
-                    let verified_signatures =
-                        verify_signatures(unverified_signatures, verifier, &commit_ledger_info);
-                    if (verifier.check_voting_power(verified_signatures.signatures().keys(), true))
-                        .is_ok()
+                    let verified_signatures = verify_signatures(
+                        unverified_signatures,
+                        epoch_state.clone(),
+                        &commit_ledger_info,
+                    );
+                    if (epoch_state
+                        .read()
+                        .verifier
+                        .check_voting_power(verified_signatures.signatures().keys(), true))
+                    .is_ok()
                     {
                         let commit_proof = aggregate_commit_proof(
                             &commit_ledger_info,
                             &verified_signatures,
-                            verifier,
+                            epoch_state,
                         );
                         debug!(
                             "{} advance to aggregated from ordered",

@@ -12,11 +12,9 @@ use aptos_consensus_types::{
     vote::Vote,
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{prelude::*, Schema};
-use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures,
-};
 use aptos_infallible::RwLock;
+use aptos_logger::{prelude::*, Schema};
+use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures};
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};

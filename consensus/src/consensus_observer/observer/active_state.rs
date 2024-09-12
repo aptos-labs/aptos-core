@@ -18,7 +18,7 @@ use crate::{
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{error, info, warn};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
@@ -41,7 +41,7 @@ pub struct ActiveObserverState {
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 
     // The current epoch state
-    epoch_state: Option<Arc<EpochState>>,
+    epoch_state: Option<Arc<RwLock<EpochState>>>,
 
     // Whether quorum store is enabled for the current epoch
     quorum_store_enabled: bool,
@@ -120,7 +120,7 @@ impl ActiveObserverState {
     }
 
     /// Returns the current epoch state
-    pub fn epoch_state(&self) -> Arc<EpochState> {
+    pub fn epoch_state(&self) -> Arc<RwLock<EpochState>> {
         self.epoch_state
             .clone()
             .expect("The epoch state is not set! This should never happen!")
@@ -164,7 +164,8 @@ impl ActiveObserverState {
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                 "New epoch started: {:?}. Updated the epoch state! Quorum store enabled: {:?}",
-                epoch_state.epoch, self.quorum_store_enabled,
+                epoch_state.read().epoch,
+                self.quorum_store_enabled,
             ))
         );
 
@@ -193,7 +194,7 @@ async fn extract_on_chain_configs(
     node_config: &NodeConfig,
     reconfig_events: &mut ReconfigNotificationListener<DbBackedOnChainConfig>,
 ) -> (
-    Arc<EpochState>,
+    Arc<RwLock<EpochState>>,
     OnChainConsensusConfig,
     OnChainExecutionConfig,
     OnChainRandomnessConfig,
@@ -209,10 +210,10 @@ async fn extract_on_chain_configs(
     let validator_set: ValidatorSet = on_chain_configs
         .get()
         .expect("Failed to get the validator set from the on-chain configs!");
-    let epoch_state = Arc::new(EpochState {
+    let epoch_state = Arc::new(RwLock::new(EpochState {
         epoch: on_chain_configs.epoch(),
         verifier: (&validator_set).into(),
-    });
+    }));
 
     // Extract the consensus config (or use the default if it's missing)
     let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = on_chain_configs.get();
@@ -484,12 +485,15 @@ mod test {
         assert!(!observer_state.is_quorum_store_enabled());
 
         // Manually update the epoch state and quorum store flag
-        let epoch_state = Arc::new(EpochState::empty());
+        let epoch_state = Arc::new(RwLock::new(EpochState::empty()));
         observer_state.epoch_state = Some(epoch_state.clone());
         observer_state.quorum_store_enabled = true;
 
         // Verify the epoch state and quorum store flag are updated
-        assert_eq!(observer_state.epoch_state(), epoch_state);
+        assert_eq!(
+            observer_state.epoch_state().read().clone(),
+            epoch_state.read().clone()
+        );
         assert!(observer_state.is_quorum_store_enabled());
     }
 

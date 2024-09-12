@@ -16,11 +16,12 @@ use aptos_consensus_types::{
     vote::Vote,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures, validator_verifier::VerifyError,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures,
+    validator_verifier::VerifyError,
 };
-use aptos_infallible::RwLock;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
@@ -236,25 +237,28 @@ impl PendingVotes {
                 .maybe_partial_2chain_tc
                 .get_or_insert_with(|| TwoChainTimeoutWithPartialSignatures::new(timeout.clone()));
             partial_tc.add(vote.author(), timeout.clone(), signature.clone());
-            let tc_voting_power =
-                match epoch_state.read().verifier.check_voting_power(partial_tc.signers(), true) {
-                    Ok(_) => {
-                        return match partial_tc.aggregate_signatures(&epoch_state.read().verifier) {
-                            Ok(tc_with_sig) => VoteReceptionResult::New2ChainTimeoutCertificate(
-                                Arc::new(tc_with_sig),
-                            ),
-                            Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
-                        };
-                    },
-                    Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
-                    Err(error) => {
-                        error!(
+            let tc_voting_power = match epoch_state
+                .read()
+                .verifier
+                .check_voting_power(partial_tc.signers(), true)
+            {
+                Ok(_) => {
+                    return match partial_tc.aggregate_signatures(&epoch_state.read().verifier) {
+                        Ok(tc_with_sig) => {
+                            VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
+                        },
+                        Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
+                    };
+                },
+                Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
+                Err(error) => {
+                    error!(
                         "MUST_FIX: 2-chain timeout vote received could not be added: {}, vote: {}",
                         error, vote
                     );
-                        return VoteReceptionResult::ErrorAddingVote(error);
-                    },
-                };
+                    return VoteReceptionResult::ErrorAddingVote(error);
+                },
+            };
 
             // Echo timeout if receive f+1 timeout message.
             if !self.echo_timeout {
@@ -363,18 +367,18 @@ impl fmt::Display for PendingVotes {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::{PendingVotes, VoteReceptionResult};
     use aptos_consensus_types::{
         block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
     use aptos_crypto::HashValue;
-    use aptos_types::{
-        block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier
-    };
     use aptos_infallible::RwLock;
+    use aptos_types::{
+        block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
+        validator_verifier::random_validator_verifier,
+    };
     use itertools::Itertools;
+    use std::sync::Arc;
 
     /// Creates a random ledger info for epoch 1 and round 1.
     fn random_ledger_info() -> LedgerInfo {
@@ -451,7 +455,10 @@ mod tests {
             Vote::new(vote_data_2, signers[2].author(), li2, &signers[2]).unwrap();
         match pending_votes.insert_vote(&vote_data_2_author_2, epoch_state.clone(), true) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
-                assert!(qc.ledger_info().check_voting_power(&epoch_state.read().verifier).is_ok());
+                assert!(qc
+                    .ledger_info()
+                    .check_voting_power(&epoch_state.read().verifier)
+                    .is_ok());
             },
             _ => {
                 panic!("No QC formed.");
@@ -522,11 +529,16 @@ mod tests {
         match pending_votes.insert_vote(&vote2_author_2, epoch_state.clone(), true) {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 assert!(epoch_state
+                    .read()
                     .verifier
                     .check_voting_power(
                         tc.signatures_with_rounds()
                             .get_voters(
-                                &epoch_state.read().verifier.get_ordered_account_addresses_iter().collect_vec()
+                                &epoch_state
+                                    .read()
+                                    .verifier
+                                    .get_ordered_account_addresses_iter()
+                                    .collect_vec()
                             )
                             .iter(),
                         true

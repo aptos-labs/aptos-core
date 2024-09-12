@@ -11,7 +11,7 @@ use crate::consensus_observer::{
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{error, warn};
 use aptos_types::epoch_state::EpochState;
 use std::{
@@ -205,9 +205,12 @@ impl BlockPayloadStore {
     /// Verifies the block payload signatures against the given epoch state.
     /// If verification is successful, blocks are marked as verified. Each
     /// new verified block is
-    pub fn verify_payload_signatures(&mut self, epoch_state: &EpochState) -> Vec<Round> {
+    pub fn verify_payload_signatures(
+        &mut self,
+        epoch_state: Arc<RwLock<EpochState>>,
+    ) -> Vec<Round> {
         // Get the current epoch
-        let current_epoch = epoch_state.epoch;
+        let current_epoch = epoch_state.read().epoch;
 
         // Gather the keys for the block payloads
         let payload_epochs_and_rounds: Vec<(u64, Round)> =
@@ -228,7 +231,9 @@ impl BlockPayloadStore {
                     if let BlockPayloadStatus::AvailableAndUnverified(block_payload) =
                         entry.get_mut()
                     {
-                        if let Err(error) = block_payload.verify_payload_signatures(epoch_state) {
+                        if let Err(error) =
+                            block_payload.verify_payload_signatures(epoch_state.clone())
+                        {
                             // Log the verification failure
                             error!(
                                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -818,10 +823,13 @@ mod test {
         );
 
         // Create an epoch state for the next epoch (with an empty verifier)
-        let epoch_state = EpochState::new(next_epoch, ValidatorVerifier::new(vec![]));
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            next_epoch,
+            ValidatorVerifier::new(vec![]),
+        )));
 
         // Verify the block payload signatures
-        let verified_rounds = block_payload_store.verify_payload_signatures(&epoch_state);
+        let verified_rounds = block_payload_store.verify_payload_signatures(epoch_state);
 
         // Verify the unverified payloads were moved to the verified store
         assert!(block_payload_store.all_payloads_exist(&unverified_blocks));
@@ -846,10 +854,13 @@ mod test {
         assert_eq!(get_num_verified_payloads(&block_payload_store), 0);
 
         // Create an epoch state for the future epoch (with an empty verifier)
-        let epoch_state = EpochState::new(future_epoch, ValidatorVerifier::new(vec![]));
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            future_epoch,
+            ValidatorVerifier::new(vec![]),
+        )));
 
         // Verify the block payload signatures for a future epoch
-        let verified_rounds = block_payload_store.verify_payload_signatures(&epoch_state);
+        let verified_rounds = block_payload_store.verify_payload_signatures(epoch_state);
 
         // Verify the future unverified payloads were moved to the verified store
         assert!(block_payload_store.all_payloads_exist(&future_unverified_blocks));
@@ -957,10 +968,13 @@ mod test {
             100,
         );
         let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(next_epoch, validator_verifier.clone());
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            next_epoch,
+            validator_verifier.clone(),
+        )));
 
         // Verify the block payload signatures (for this epoch)
-        block_payload_store.verify_payload_signatures(&epoch_state);
+        block_payload_store.verify_payload_signatures(epoch_state);
 
         // Ensure the unverified payloads were not verified
         assert!(!block_payload_store.all_payloads_exist(&unverified_blocks));
@@ -972,10 +986,13 @@ mod test {
         );
 
         // Create an epoch state for the future epoch (with a non-empty verifier)
-        let epoch_state = EpochState::new(future_epoch, validator_verifier);
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(
+            future_epoch,
+            validator_verifier,
+        )));
 
         // Verify the block payload signatures (for the future epoch)
-        block_payload_store.verify_payload_signatures(&epoch_state);
+        block_payload_store.verify_payload_signatures(epoch_state);
 
         // Ensure the future unverified payloads were not verified
         assert!(!block_payload_store.all_payloads_exist(&unverified_future_blocks));
