@@ -1439,11 +1439,16 @@ impl TransactionsApi {
             output.gas_used(),
             exe_status,
         );
+        let mut events = output.events().to_vec();
+        let _ = self
+            .context
+            .translate_v2_to_v1_events_for_simulation(&mut events);
+
         let simulated_txn = TransactionOnChainData {
             version,
             transaction: txn,
             info,
-            events: output.events().to_vec(),
+            events,
             accumulator_root_hash: zero_hash,
             changes: output.write_set().clone(),
         };

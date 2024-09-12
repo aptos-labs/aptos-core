@@ -373,6 +373,56 @@ impl TestContext {
         )
     }
 
+    pub async fn enable_feature(&mut self, feature: u64) {
+        // This function executes the following script as the root account:
+        // script {
+        //     fun main(root: &signer, feature: u64) {
+        //     let aptos_framework = aptos_framework::aptos_governance::get_signer_testnet_only(root, @0x1);
+        //     std::features::change_feature_flags_for_next_epoch(&aptos_framework, vector[feature], vector[]);
+        //     aptos_framework::aptos_governance::reconfigure(&aptos_framework);
+        //     std::features::on_new_epoch(&aptos_framework);
+        //     }
+        // }
+        let mut root = self.root_account().await;
+        self.api_execute_script(
+            &mut root,
+            "a11ceb0b0700000a06010004030418051c1707336f08a2012006c201260000000100020301000101030502000100040602000101050602000102060c03010c0002060c05010303060c0a030a0301060c106170746f735f676f7665726e616e6365086665617475726573176765745f7369676e65725f746573746e65745f6f6e6c79236368616e67655f666561747572655f666c6167735f666f725f6e6578745f65706f63680b7265636f6e6669677572650c6f6e5f6e65775f65706f63680000000000000000000000000000000000000000000000000000000000000001052000000000000000000000000000000000000000000000000000000000000000010a0301000000010e0b00070011000c020e020b0140040100000000000000070111010e0211020e02110302",
+            json!([]),
+            json!([feature.to_string()]),
+        ).await;
+        self.wait_for_internal_indexer_caught_up().await;
+    }
+
+    pub async fn disable_feature(&mut self, feature: u64) {
+        // This function executes the following script as the root account:
+        // script {
+        //     fun main(root: &signer, feature: u64) {
+        //     let aptos_framework = aptos_framework::aptos_governance::get_signer_testnet_only(root, @0x1);
+        //     std::features::change_feature_flags_for_next_epoch(&aptos_framework, vector[], vector[feature]);
+        //     aptos_framework::aptos_governance::reconfigure(&aptos_framework);
+        //     std::features::on_new_epoch(&aptos_framework);
+        //     }
+        // }
+        let mut root = self.root_account().await;
+        self.api_execute_script(
+            &mut root,
+            "a11ceb0b0700000a06010004030418051c1707336f08a2012006c201260000000100020301000101030502000100040602000101050602000102060c03010c0002060c05010303060c0a030a0301060c106170746f735f676f7665726e616e6365086665617475726573176765745f7369676e65725f746573746e65745f6f6e6c79236368616e67655f666561747572655f666c6167735f666f725f6e6578745f65706f63680b7265636f6e6669677572650c6f6e5f6e65775f65706f63680000000000000000000000000000000000000000000000000000000000000001052000000000000000000000000000000000000000000000000000000000000000010a0301000000010e0b00070011000c020e0207010b014004010000000000000011010e0211020e02110302",
+            json!([]),
+            json!([feature.to_string()]),
+        ).await;
+        self.wait_for_internal_indexer_caught_up().await;
+    }
+
+    pub async fn is_feature_enabled(&self, feature: u64) -> bool {
+        let request = json!({
+            "function":"0x1::features::is_enabled",
+            "arguments": vec![feature.to_string()],
+            "type_arguments": Vec::<String>::new(),
+        });
+        let resp = self.post("/view", request).await;
+        resp[0].as_bool().unwrap()
+    }
+
     pub fn latest_state_view(&self) -> DbStateView {
         self.context
             .state_view_at_version(self.get_latest_ledger_info().version())
@@ -399,6 +449,46 @@ impl TestContext {
             .await;
         self.commit_mempool_txns(1).await;
         account
+    }
+
+    pub async fn api_create_account(&mut self) -> LocalAccount {
+        let root = &mut self.root_account().await;
+        let account = self.gen_account();
+        self.api_execute_aptos_account_transfer(root, account.address(), TRANSFER_AMOUNT)
+            .await;
+        account
+    }
+
+    pub async fn api_execute_aptos_account_transfer(
+        &mut self,
+        sender: &mut LocalAccount,
+        receiver: AccountAddress,
+        amount: u64,
+    ) {
+        self.api_execute_entry_function(
+            sender,
+            "0x1::aptos_account::transfer",
+            json!([]),
+            json!([receiver.to_hex_literal(), amount.to_string()]),
+        )
+        .await;
+        self.wait_for_internal_indexer_caught_up().await;
+    }
+
+    pub async fn wait_for_internal_indexer_caught_up(&self) {
+        let (internal_indexer_ledger_info_opt, storage_ledger_info) = self
+            .context
+            .get_latest_internal_and_storage_ledger_info::<BasicError>()
+            .expect("cannot get ledger info");
+        if let Some(mut internal_indexer_ledger_info) = internal_indexer_ledger_info_opt {
+            while internal_indexer_ledger_info.version() < storage_ledger_info.version() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                internal_indexer_ledger_info = self
+                    .context
+                    .get_latest_internal_indexer_ledger_info::<BasicError>()
+                    .expect("cannot get internal indexer version");
+            }
+        }
     }
 
     pub async fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
@@ -860,6 +950,27 @@ impl TestContext {
             json!({
                 "type": "entry_function_payload",
                 "function": function,
+                "type_arguments": type_args,
+                "arguments": args
+            }),
+        )
+        .await;
+    }
+
+    pub async fn api_execute_script(
+        &mut self,
+        account: &mut LocalAccount,
+        bytecode: &str,
+        type_args: serde_json::Value,
+        args: serde_json::Value,
+    ) {
+        self.api_execute_txn(
+            account,
+            json!({
+                "type": "script_payload",
+                "code": {
+                    "bytecode": bytecode,
+                },
                 "type_arguments": type_args,
                 "arguments": args
             }),

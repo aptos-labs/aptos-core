@@ -13,8 +13,10 @@ use aptos_crypto::HashValue;
 use bytes::Bytes;
 use move_core_types::move_resource::MoveResource;
 #[cfg(any(test, feature = "testing"))]
+use std::collections::HashMap;
+#[cfg(any(test, feature = "testing"))]
 use std::hash::Hash;
-use std::{collections::HashMap, ops::Deref};
+use std::ops::Deref;
 
 pub mod errors;
 pub mod state_key;

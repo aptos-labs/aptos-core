@@ -1,27 +1,33 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::TIMER, utils::PrefixedStateValueIterator};
+use crate::{
+    event_v2_translator::EventV2TranslationEngine, metrics::TIMER,
+    utils::PrefixedStateValueIterator,
+};
 use aptos_config::config::internal_indexer_db_config::InternalIndexerDBConfig;
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
     schema::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
+        event_sequence_number::EventSequenceNumberSchema,
         indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema,
         transaction_by_account::TransactionByAccountSchema,
+        translated_v1_event::TranslatedV1EventSchema,
     },
     utils::{
         error_if_too_many_requested, get_first_seq_num_and_limit, AccountTransactionVersionIter,
         MAX_REQUEST_LIMIT,
     },
 };
+use aptos_logger::warn;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, Result,
 };
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::{ContractEvent, EventWithVersion},
+    contract_event::{ContractEvent, ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,
     indexer::indexer_db_reader::Order,
     state_store::{
@@ -33,6 +39,7 @@ use aptos_types::{
 };
 use std::{
     cmp::min,
+    collections::HashSet,
     sync::{
         mpsc::{self, Receiver, Sender},
         Arc,
@@ -69,7 +76,7 @@ impl DBCommitter {
 
 #[derive(Clone, Debug)]
 pub struct InternalIndexerDB {
-    db: Arc<DB>,
+    pub db: Arc<DB>,
     config: InternalIndexerDBConfig,
 }
 
@@ -114,8 +121,16 @@ impl InternalIndexerDB {
         self.get_version(&MetadataKey::TransactionVersion)
     }
 
+    pub fn get_event_v2_translation_version(&self) -> Result<Option<Version>> {
+        self.get_version(&MetadataKey::EventV2TranslationVersion)
+    }
+
     pub fn event_enabled(&self) -> bool {
         self.config.enable_event
+    }
+
+    pub fn event_v2_translation_enabled(&self) -> bool {
+        self.config.enable_event_v2_translation
     }
 
     pub fn transaction_enabled(&self) -> bool {
@@ -273,6 +288,16 @@ impl InternalIndexerDB {
             .get::<InternalIndexerMetadataSchema>(key)?
             .map(|v| v.expect_version()))
     }
+
+    pub fn get_translated_v1_event_by_version_and_index(
+        &self,
+        version: Version,
+        index: u64,
+    ) -> Result<ContractEventV1> {
+        self.db
+            .get::<TranslatedV1EventSchema>(&(version, index))?
+            .ok_or_else(|| AptosDbError::NotFound(format!("Event {} of Txn {}", index, version)))
+    }
 }
 
 pub struct DBIndexer {
@@ -280,6 +305,7 @@ pub struct DBIndexer {
     pub main_db_reader: Arc<dyn DbReader>,
     sender: Sender<Option<SchemaBatch>>,
     committer_handle: Option<thread::JoinHandle<()>>,
+    pub event_v2_translation_engine: EventV2TranslationEngine,
 }
 
 impl Drop for DBIndexer {
@@ -300,6 +326,7 @@ impl DBIndexer {
         let (sender, reciver) = mpsc::channel();
 
         let db = indexer_db.get_inner_db_ref().to_owned();
+        let internal_indexer_db = db.clone();
         let committer_handle = thread::spawn(move || {
             let committer = DBCommitter::new(db, reciver);
             committer.run();
@@ -307,9 +334,13 @@ impl DBIndexer {
 
         Self {
             indexer_db,
-            main_db_reader: db_reader,
+            main_db_reader: db_reader.clone(),
             sender,
             committer_handle: Some(committer_handle),
+            event_v2_translation_engine: EventV2TranslationEngine::new(
+                db_reader,
+                internal_indexer_db,
+            ),
         }
     }
 
@@ -367,6 +398,7 @@ impl DBIndexer {
         // This promises num_transactions should be readable from main db
         let mut db_iter = self.get_main_db_iter(version, num_transactions)?;
         let batch = SchemaBatch::new();
+        let mut event_keys: HashSet<EventKey> = HashSet::new();
         db_iter.try_for_each(|res| {
             let (txn, events, writeset) = res?;
             if let Some(txn) = txn.try_as_signed_user_txn() {
@@ -379,7 +411,7 @@ impl DBIndexer {
             }
 
             if self.indexer_db.event_enabled() {
-                events.iter().enumerate().for_each(|(idx, event)| {
+                events.iter().enumerate().try_for_each(|(idx, event)| {
                     if let ContractEvent::V1(v1) = event {
                         batch
                             .put::<EventByKeySchema>(
@@ -394,7 +426,45 @@ impl DBIndexer {
                             )
                             .expect("Failed to put events by version to a batch");
                     }
-                });
+                    if self.indexer_db.event_v2_translation_enabled() {
+                        if let ContractEvent::V2(v2) = event {
+                            if let Some(translated_v1_event) =
+                                self.translate_event_v2_to_v1(v2).map_err(|e| {
+                                    anyhow::anyhow!(
+                                        "Failed to translate event: {:?}. Error: {}",
+                                        v2,
+                                        e
+                                    )
+                                })?
+                            {
+                                let key = *translated_v1_event.key();
+                                let sequence_number = translated_v1_event.sequence_number();
+                                self.event_v2_translation_engine
+                                    .cache_sequence_number(&key, sequence_number);
+                                event_keys.insert(key);
+                                batch
+                                    .put::<EventByKeySchema>(
+                                        &(key, sequence_number),
+                                        &(version, idx as u64),
+                                    )
+                                    .expect("Failed to put events by key to a batch");
+                                batch
+                                    .put::<EventByVersionSchema>(
+                                        &(key, version, sequence_number),
+                                        &(idx as u64),
+                                    )
+                                    .expect("Failed to put events by version to a batch");
+                                batch
+                                    .put::<TranslatedV1EventSchema>(
+                                        &(version, idx as u64),
+                                        &translated_v1_event,
+                                    )
+                                    .expect("Failed to put translated v1 events to a batch");
+                            }
+                        }
+                    }
+                    Ok::<(), AptosDbError>(())
+                })?;
             }
 
             if self.indexer_db.statekeys_enabled() {
@@ -412,6 +482,25 @@ impl DBIndexer {
         assert!(version > 0, "batch number should be greater than 0");
 
         assert_eq!(num_transactions, version - start_version);
+
+        if self.indexer_db.event_v2_translation_enabled() {
+            batch.put::<InternalIndexerMetadataSchema>(
+                &MetadataKey::EventV2TranslationVersion,
+                &MetadataValue::Version(version - 1),
+            )?;
+
+            for event_key in event_keys {
+                batch
+                    .put::<EventSequenceNumberSchema>(
+                        &event_key,
+                        &self
+                            .event_v2_translation_engine
+                            .get_cached_sequence_number(&event_key)
+                            .unwrap_or(0),
+                    )
+                    .expect("Failed to put events by key to a batch");
+            }
+        }
 
         if self.indexer_db.transaction_enabled() {
             batch.put::<InternalIndexerMetadataSchema>(
@@ -439,6 +528,35 @@ impl DBIndexer {
             .send(Some(batch))
             .map_err(|e| AptosDbError::Other(e.to_string()))?;
         Ok(version)
+    }
+
+    pub fn translate_event_v2_to_v1(
+        &self,
+        v2: &ContractEventV2,
+    ) -> Result<Option<ContractEventV1>> {
+        let _timer = TIMER
+            .with_label_values(&["translate_event_v2_to_v1"])
+            .start_timer();
+        if let Some(translator) = self
+            .event_v2_translation_engine
+            .translators
+            .get(v2.type_tag())
+        {
+            let result = translator.translate_event_v2_to_v1(v2, &self.event_v2_translation_engine);
+            match result {
+                Ok(v1) => Ok(Some(v1)),
+                Err(e) => {
+                    warn!(
+                        "Failed to translate event: {:?}. Error: {}",
+                        v2,
+                        e.to_string()
+                    );
+                    Ok(None)
+                },
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn get_account_transactions(
@@ -550,9 +668,16 @@ impl DBIndexer {
         let mut events_with_version = event_indices
             .into_iter()
             .map(|(seq, ver, idx)| {
-                let event = self
+                let event = match self
                     .main_db_reader
-                    .get_event_by_version_and_index(ver, idx)?;
+                    .get_event_by_version_and_index(ver, idx)?
+                {
+                    event @ ContractEvent::V1(_) => event,
+                    ContractEvent::V2(_) => ContractEvent::V1(
+                        self.indexer_db
+                            .get_translated_v1_event_by_version_and_index(ver, idx)?,
+                    ),
+                };
                 let v0 = match &event {
                     ContractEvent::V1(event) => event,
                     ContractEvent::V2(_) => bail!("Unexpected module event"),
@@ -563,6 +688,7 @@ impl DBIndexer {
                     seq,
                     v0.sequence_number()
                 );
+
                 Ok(EventWithVersion::new(ver, event))
             })
             .collect::<Result<Vec<_>>>()?;
