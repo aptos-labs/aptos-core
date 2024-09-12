@@ -451,7 +451,7 @@ pub enum EntryFunctionCall {
     /// See https://datatracker.ietf.org/doc/html/rfc7517#section-4 for more details about the JWK attributes aforementioned.
     ///
     /// For the example JWK set snapshot below containing 2 keys for Google found at https://www.googleapis.com/oauth2/v3/certs -
-    /// ```
+    /// ```json
     /// {
     ///   "keys": [
     ///     {
@@ -478,7 +478,7 @@ pub enum EntryFunctionCall {
     /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
     /// the corresponding attribute in the second JWK as shown below.
     ///
-    /// ```
+    /// ```move
     /// use std::string::utf8;
     /// aptos_framework::jwks::update_federated_jwk_set(
     ///     jwk_owner,
@@ -2895,7 +2895,7 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
 /// See https://datatracker.ietf.org/doc/html/rfc7517#section-4 for more details about the JWK attributes aforementioned.
 ///
 /// For the example JWK set snapshot below containing 2 keys for Google found at https://www.googleapis.com/oauth2/v3/certs -
-/// ```
+/// ```json
 /// {
 ///   "keys": [
 ///     {
@@ -2922,7 +2922,7 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
 /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
 /// the corresponding attribute in the second JWK as shown below.
 ///
-/// ```
+/// ```move
 /// use std::string::utf8;
 /// aptos_framework::jwks::update_federated_jwk_set(
 ///     jwk_owner,

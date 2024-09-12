@@ -840,7 +840,7 @@ The <code>iss</code> parameter is the value of the <code>iss</code> claim on the
 See https://datatracker.ietf.org/doc/html/rfc7517#section-4 for more details about the JWK attributes aforementioned.
 
 For the example JWK set snapshot below containing 2 keys for Google found at https://www.googleapis.com/oauth2/v3/certs -
-```
+```json
 {
 "keys": [
 {
@@ -867,7 +867,7 @@ We can call update_federated_jwk_set for Google's <code>iss</code> - "https://ac
 argument <code>kid_vec</code>, <code>alg_vec</code>, <code>e_vec</code>, <code>n_vec</code>, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
 the corresponding attribute in the second JWK as shown below.
 
-```
+```move
 use std::string::utf8;
 aptos_framework::jwks::update_federated_jwk_set(
 jwk_owner,
