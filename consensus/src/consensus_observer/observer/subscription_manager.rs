@@ -87,26 +87,7 @@ impl SubscriptionManager {
         // Check the health of the subscription
         match active_subscription {
             Some(active_subscription) => {
-                // Verify the peer is still connected
-                if !connected_peers_and_metadata.contains_key(&peer_network_id) {
-                    return Err(Error::SubscriptionDisconnected(format!(
-                        "The peer: {:?} is no longer connected!",
-                        peer_network_id
-                    )));
-                }
-
-                // Verify the subscription has not timed out
-                active_subscription.check_subscription_timeout()?;
-
-                // Verify that the DB is continuing to sync and commit new data
-                active_subscription.check_syncing_progress()?;
-
-                // Verify that the subscription peer is still optimal
-                active_subscription
-                    .check_subscription_peer_optimality(connected_peers_and_metadata)?;
-
-                // The subscription seems healthy
-                Ok(())
+                active_subscription.check_subscription_health(connected_peers_and_metadata)
             },
             None => Err(Error::UnexpectedError(format!(
                 "The subscription to peer: {:?} is not active!",
@@ -217,7 +198,7 @@ impl SubscriptionManager {
         let db_reader = self.db_reader.clone();
         let time_service = self.time_service.clone();
 
-        // Otherwise, we should spawn a new subscription creation task
+        // Spawn a new subscription creation task
         let subscription_creation_task = tokio::spawn(async move {
             // Identify the terminated subscription peers
             let terminated_subscription_peers = terminated_subscriptions
