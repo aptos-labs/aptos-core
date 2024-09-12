@@ -975,7 +975,7 @@ impl SaveFile {
 }
 
 /// Options specific to using the Rest endpoint
-#[derive(Debug, Default, Parser)]
+#[derive(Debug, Parser)]
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
@@ -992,6 +992,16 @@ pub struct RestOptions {
     /// environment variable.
     #[clap(long, env)]
     pub node_api_key: Option<String>,
+}
+
+impl Default for RestOptions {
+    fn default() -> Self {
+        Self {
+            url: None,
+            connection_timeout_secs: DEFAULT_EXPIRATION_SECS,
+            node_api_key: None,
+        }
+    }
 }
 
 impl RestOptions {
@@ -1491,12 +1501,12 @@ pub struct ChangeSummary {
 pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
-    faucet_url: Option<reqwest::Url>,
+    pub faucet_url: Option<reqwest::Url>,
 
     /// Auth token to bypass faucet ratelimits. You can also set this as an environment
     /// variable with FAUCET_AUTH_TOKEN.
     #[clap(long, env)]
-    faucet_auth_token: Option<String>,
+    pub faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {

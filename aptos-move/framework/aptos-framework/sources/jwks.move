@@ -39,6 +39,7 @@ module aptos_framework::jwks {
     const EJWK_ID_NOT_FOUND: u64 = 6;
     const EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK: u64 = 7;
     const EFEDERATED_JWKS_TOO_LARGE: u64 = 8;
+    const EINVALID_FEDERATED_JWK_SET: u64 = 9;
 
     const ENATIVE_MISSING_RESOURCE_VALIDATOR_SET: u64 = 0x0101;
     const ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS: u64 = 0x0102;
@@ -199,6 +200,80 @@ module aptos_framework::jwks {
         // TODO: Can we check the size more efficiently instead of serializing it via BCS?
         let num_bytes = vector::length(&bcs::to_bytes(fed_jwks));
         assert!(num_bytes < MAX_FEDERATED_JWKS_SIZE_BYTES, error::invalid_argument(EFEDERATED_JWKS_TOO_LARGE));
+    }
+
+    /// This can be called to install or update a set of JWKs for a federated OIDC provider.  This function should
+    /// be invoked to intially install a set of JWKs or to update a set of JWKs when a keypair is rotated.
+    ///
+    /// The `iss` parameter is the value of the `iss` claim on the JWTs that are to be verified by the JWK set.
+    /// `kid_vec`, `alg_vec`, `e_vec`, `n_vec` are String vectors of the JWK attributes `kid`, `alg`, `e` and `n` respectively.
+    /// See https://datatracker.ietf.org/doc/html/rfc7517#section-4 for more details about the JWK attributes aforementioned.
+    ///
+    /// For the example JWK set snapshot below containing 2 keys for Google found at https://www.googleapis.com/oauth2/v3/certs -
+    /// ```json
+    /// {
+    ///   "keys": [
+    ///     {
+    ///       "alg": "RS256",
+    ///       "use": "sig",
+    ///       "kty": "RSA",
+    ///       "n": "wNHgGSG5B5xOEQNFPW2p_6ZxZbfPoAU5VceBUuNwQWLop0ohW0vpoZLU1tAsq_S9s5iwy27rJw4EZAOGBR9oTRq1Y6Li5pDVJfmzyRNtmWCWndR-bPqhs_dkJU7MbGwcvfLsN9FSHESFrS9sfGtUX-lZfLoGux23TKdYV9EE-H-NDASxrVFUk2GWc3rL6UEMWrMnOqV9-tghybDU3fcRdNTDuXUr9qDYmhmNegYjYu4REGjqeSyIG1tuQxYpOBH-tohtcfGY-oRTS09kgsSS9Q5BRM4qqCkGP28WhlSf4ui0-norS0gKMMI1P_ZAGEsLn9p2TlYMpewvIuhjJs1thw",
+    ///       "kid": "d7b939771a7800c413f90051012d975981916d71",
+    ///       "e": "AQAB"
+    ///     },
+    ///     {
+    ///       "kty": "RSA",
+    ///       "kid": "b2620d5e7f132b52afe8875cdf3776c064249d04",
+    ///       "alg": "RS256",
+    ///       "n": "pi22xDdK2fz5gclIbDIGghLDYiRO56eW2GUcboeVlhbAuhuT5mlEYIevkxdPOg5n6qICePZiQSxkwcYMIZyLkZhSJ2d2M6Szx2gDtnAmee6o_tWdroKu0DjqwG8pZU693oLaIjLku3IK20lTs6-2TeH-pUYMjEqiFMhn-hb7wnvH_FuPTjgz9i0rEdw_Hf3Wk6CMypaUHi31y6twrMWq1jEbdQNl50EwH-RQmQ9bs3Wm9V9t-2-_Jzg3AT0Ny4zEDU7WXgN2DevM8_FVje4IgztNy29XUkeUctHsr-431_Iu23JIy6U4Kxn36X3RlVUKEkOMpkDD3kd81JPW4Ger_w",
+    ///       "e": "AQAB",
+    ///       "use": "sig"
+    ///     }
+    ///   ]
+    /// }
+    /// ```
+    ///
+    /// We can call update_federated_jwk_set for Google's `iss` - "https://accounts.google.com" and for each vector
+    /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
+    /// the corresponding attribute in the second JWK as shown below.
+    ///
+    /// ```move
+    /// use std::string::utf8;
+    /// aptos_framework::jwks::update_federated_jwk_set(
+    ///     jwk_owner,
+    ///     b"https://accounts.google.com",
+    ///     vector[utf8(b"d7b939771a7800c413f90051012d975981916d71"), utf8(b"b2620d5e7f132b52afe8875cdf3776c064249d04")],
+    ///     vector[utf8(b"RS256"), utf8(b"RS256")],
+    ///     vector[utf8(b"AQAB"), utf8(b"AQAB")],
+    ///     vector[
+    ///         utf8(b"wNHgGSG5B5xOEQNFPW2p_6ZxZbfPoAU5VceBUuNwQWLop0ohW0vpoZLU1tAsq_S9s5iwy27rJw4EZAOGBR9oTRq1Y6Li5pDVJfmzyRNtmWCWndR-bPqhs_dkJU7MbGwcvfLsN9FSHESFrS9sfGtUX-lZfLoGux23TKdYV9EE-H-NDASxrVFUk2GWc3rL6UEMWrMnOqV9-tghybDU3fcRdNTDuXUr9qDYmhmNegYjYu4REGjqeSyIG1tuQxYpOBH-tohtcfGY-oRTS09kgsSS9Q5BRM4qqCkGP28WhlSf4ui0-norS0gKMMI1P_ZAGEsLn9p2TlYMpewvIuhjJs1thw"),
+    ///         utf8(b"pi22xDdK2fz5gclIbDIGghLDYiRO56eW2GUcboeVlhbAuhuT5mlEYIevkxdPOg5n6qICePZiQSxkwcYMIZyLkZhSJ2d2M6Szx2gDtnAmee6o_tWdroKu0DjqwG8pZU693oLaIjLku3IK20lTs6-2TeH-pUYMjEqiFMhn-hb7wnvH_FuPTjgz9i0rEdw_Hf3Wk6CMypaUHi31y6twrMWq1jEbdQNl50EwH-RQmQ9bs3Wm9V9t-2-_Jzg3AT0Ny4zEDU7WXgN2DevM8_FVje4IgztNy29XUkeUctHsr-431_Iu23JIy6U4Kxn36X3RlVUKEkOMpkDD3kd81JPW4Ger_w")
+    ///     ]
+    /// )
+    /// ```
+    ///
+    /// See AIP-96 for more details about federated keyless - https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-96.md
+    ///
+    /// NOTE: Currently only RSA keys are supported.
+    public entry fun update_federated_jwk_set(jwk_owner: &signer, iss: vector<u8>, kid_vec: vector<String>, alg_vec: vector<String>, e_vec: vector<String>, n_vec: vector<String>) acquires FederatedJWKs {
+        assert!(!vector::is_empty(&kid_vec), error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        let num_jwk = vector::length<String>(&kid_vec);
+        assert!(vector::length(&alg_vec) == num_jwk , error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(vector::length(&e_vec) == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+        assert!(vector::length(&n_vec) == num_jwk, error::invalid_argument(EINVALID_FEDERATED_JWK_SET));
+
+        let remove_all_patch = new_patch_remove_all();
+        let patches = vector[remove_all_patch];
+        while (!vector::is_empty(&kid_vec)) {
+            let kid = vector::pop_back(&mut kid_vec);
+            let alg = vector::pop_back(&mut alg_vec);
+            let e = vector::pop_back(&mut e_vec);
+            let n = vector::pop_back(&mut n_vec);
+            let jwk = new_rsa_jwk(kid, alg, e, n);
+            let patch = new_patch_upsert_jwk(iss, jwk);
+            vector::push_back(&mut patches, patch)
+        };
+        patch_federated_jwks(jwk_owner, patches);
     }
 
     /// Get a JWK by issuer and key ID from the `PatchedJWKs`.
