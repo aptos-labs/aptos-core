@@ -3727,7 +3727,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         dotted: &EA::ExpDotted,
         expected_type: &Type,
-        index_mutate: bool,
+        index_mutate: bool, // type of reference for type checking of index expression
         context: &ErrorMessageContext,
     ) -> ExpData {
         match &dotted.value {
