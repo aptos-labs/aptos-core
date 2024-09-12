@@ -80,6 +80,8 @@
 //!
 //!     goto L
 //!
+//! We also remove unused labels.
+//!
 //! Side effects: removes all annotations.
 
 use itertools::Itertools;
@@ -206,7 +208,7 @@ impl ControlFlowGraphSimplifierTransformation {
 /// and all other blocks must have code.
 /// 4. Entry block has exactly one successor, which is not the exit block.
 /// 5. All blocks except for the exit block must have at least one successor.
-/// 6. All blocks with predecessors must start with a label, unless it's the first block (the successor of the entry block), or the exit block.
+/// 6. All non-trivial blocks with non-trivial predecessors must start with a label.
 /// 7. The entry and exit blocks are distinct.
 /// 8. The `successors` doesn't contain repeated successors for a block.
 /// 9. Code blocks are consistent with the successors and predecessors map：
