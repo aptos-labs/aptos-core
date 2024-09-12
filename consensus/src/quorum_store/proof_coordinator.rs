@@ -185,15 +185,23 @@ impl IncrementalProofState {
                             .verify(*account_address, &self.info, signature)
                             .is_ok()
                         {
-                            return Some((account_address, signature));
+                            return Some((*account_address, signature.clone()));
                         }
                         None
                     })
                     .collect::<Vec<_>>();
                 for (account_address, signature) in verified {
                     self.verified_signatures
-                        .add_signature(*account_address, signature.clone());
+                        .add_signature(account_address, signature.clone());
+                    self.unverified_signatures.remove_signature(account_address);
                 }
+                epoch_state.write().add_malicious_authors(
+                    self.unverified_signatures
+                        .signatures()
+                        .keys()
+                        .cloned()
+                        .collect(),
+                );
                 self.unverified_signatures = PartialSignatures::empty();
                 let aggregated_sig = epoch_state
                     .read()
