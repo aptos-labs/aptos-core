@@ -229,21 +229,21 @@ async fn test_keyless_groth16_verifies() {
 
 #[tokio::test]
 async fn federated_keyless_should_fail_when_feature_flag_is_unset() {
-    fedrate_keyless_scenario(false, true, false).await
+    federated_keyless_scenario(false, true, false).await
 }
 
 #[tokio::test]
 async fn federated_keyless_should_fail_when_fed_jwk_is_missing() {
-    fedrate_keyless_scenario(true, false, false).await
+    federated_keyless_scenario(true, false, false).await
 }
 
 #[tokio::test]
 async fn federated_keyless_should_work_otherwise() {
-    fedrate_keyless_scenario(true, true, true).await
+    federated_keyless_scenario(true, true, true).await
 }
 
 /// Config the chain, run a federated keyless txn, and assert txn result.
-async fn fedrate_keyless_scenario(
+async fn federated_keyless_scenario(
     set_feature_flag: bool,
     install_fed_jwk: bool,
     expect_txn_succeed: bool,
