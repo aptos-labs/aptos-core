@@ -207,6 +207,7 @@ module aptos_framework::jwks {
     ///
     /// The `iss` parameter is the value of the `iss` claim on the JWTs that are to be verified by the JWK set.
     /// `kid_vec`, `alg_vec`, `e_vec`, `n_vec` are String vectors of the JWK attributes `kid`, `alg`, `e` and `n` respectively.
+    /// See https://datatracker.ietf.org/doc/html/rfc7517#section-4 for more details about the JWK attributes aforementioned.
     ///
     /// For the example JWK set snapshot below containing 2 keys for Google found at https://www.googleapis.com/oauth2/v3/certs -
     /// ```
