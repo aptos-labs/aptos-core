@@ -51,7 +51,8 @@ impl InternalIndexerDBService {
                 .expect("Failed to open internal indexer db"),
         );
 
-        let internal_indexer_db_config = InternalIndexerDBConfig::new(false, false, true, 10_000);
+        let internal_indexer_db_config =
+            InternalIndexerDBConfig::new(false, false, false, true, 10_000);
         Some(InternalIndexerDB::new(arc_db, internal_indexer_db_config))
     }
 
