@@ -900,11 +900,12 @@ module aptos_framework::coin {
                 event::emit(
                     CoinDeposit { coin_type: type_name<CoinType>(), account: account_addr, amount: coin.value }
                 );
+            } else {
+                event::emit_event<DepositEvent>(
+                    &mut coin_store.deposit_events,
+                    DepositEvent { amount: coin.value },
+                );
             };
-            event::emit_event<DepositEvent>(
-                &mut coin_store.deposit_events,
-                DepositEvent { amount: coin.value },
-            );
             merge(&mut coin_store.coin, coin);
         } else {
             let metadata = paired_metadata<CoinType>();
