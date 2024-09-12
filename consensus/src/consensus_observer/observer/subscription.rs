@@ -58,10 +58,38 @@ impl ConsensusObserverSubscription {
         }
     }
 
+    /// Checks if the subscription is still healthy. If not, an error
+    /// is returned indicating the reason for the subscription failure.
+    pub fn check_subscription_health(
+        &mut self,
+        connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> Result<(), Error> {
+        // Verify the subscription peer is still connected
+        let peer_network_id = self.get_peer_network_id();
+        if !connected_peers_and_metadata.contains_key(&peer_network_id) {
+            return Err(Error::SubscriptionDisconnected(format!(
+                "The peer: {:?} is no longer connected!",
+                peer_network_id
+            )));
+        }
+
+        // Verify the subscription has not timed out
+        self.check_subscription_timeout()?;
+
+        // Verify that the DB is continuing to sync and commit new data
+        self.check_syncing_progress()?;
+
+        // Verify that the subscription peer is still optimal
+        self.check_subscription_peer_optimality(connected_peers_and_metadata)?;
+
+        // The subscription seems healthy
+        Ok(())
+    }
+
     /// Verifies that the peer currently selected for the subscription is
     /// optimal. This is only done if: (i) the peers have changed since the
     /// last check; or (ii) enough time has elapsed to force a refresh.
-    pub fn check_subscription_peer_optimality(
+    fn check_subscription_peer_optimality(
         &mut self,
         peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
     ) -> Result<(), Error> {
@@ -120,7 +148,7 @@ impl ConsensusObserverSubscription {
 
     /// Verifies that the subscription has not timed out based
     /// on the last received message time.
-    pub fn check_subscription_timeout(&self) -> Result<(), Error> {
+    fn check_subscription_timeout(&self) -> Result<(), Error> {
         // Calculate the duration since the last message
         let time_now = self.time_service.now();
         let duration_since_last_message = time_now.duration_since(self.last_message_receive_time);
@@ -139,7 +167,7 @@ impl ConsensusObserverSubscription {
     }
 
     /// Verifies that the DB is continuing to sync and commit new data
-    pub fn check_syncing_progress(&mut self) -> Result<(), Error> {
+    fn check_syncing_progress(&mut self) -> Result<(), Error> {
         // Get the current synced version from storage
         let current_synced_version =
             self.db_reader
@@ -210,6 +238,161 @@ mod test {
         impl DbReader for DatabaseReader {
             fn get_latest_ledger_info_version(&self) -> Result<Version>;
         }
+    }
+
+    #[test]
+    fn test_check_subscription_health_connected_and_timeout() {
+        // Create a consensus observer config
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_synced_version_timeout_ms: 100_000_000, // Use a large value so that we don't get DB progress errors
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Create a new observer subscription
+        let time_service = TimeService::mock();
+        let peer_network_id = PeerNetworkId::random();
+        let mut subscription = ConsensusObserverSubscription::new(
+            consensus_observer_config,
+            Arc::new(MockDatabaseReader::new()),
+            peer_network_id,
+            time_service.clone(),
+        );
+
+        // Verify that the subscription is unhealthy (the peer is not connected)
+        assert_matches!(
+            subscription.check_subscription_health(&HashMap::new()),
+            Err(Error::SubscriptionDisconnected(_))
+        );
+
+        // Create a peers and metadata map for the subscription
+        let mut peers_and_metadata = HashMap::new();
+        add_metadata_for_peer(&mut peers_and_metadata, peer_network_id, true, false);
+
+        // Elapse enough time to timeout the subscription
+        let mock_time_service = time_service.into_mock();
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.max_subscription_timeout_ms + 1,
+        ));
+
+        // Verify that the subscription has timed out
+        assert_matches!(
+            subscription.check_subscription_health(&peers_and_metadata),
+            Err(Error::SubscriptionTimeout(_))
+        );
+    }
+
+    #[test]
+    fn test_check_subscription_health_progress() {
+        // Create a consensus observer config with a large timeout
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_subscription_timeout_ms: 100_000_000, // Use a large value so that we don't time out
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Create a mock DB reader with expectations
+        let first_synced_version = 1;
+        let second_synced_version = 2;
+        let mut mock_db_reader = MockDatabaseReader::new();
+        mock_db_reader
+            .expect_get_latest_ledger_info_version()
+            .returning(move || Ok(first_synced_version))
+            .times(1); // Only allow one call for the first version
+        mock_db_reader
+            .expect_get_latest_ledger_info_version()
+            .returning(move || Ok(second_synced_version)); // Allow multiple calls for the second version
+
+        // Create a new observer subscription
+        let peer_network_id = PeerNetworkId::random();
+        let time_service = TimeService::mock();
+        let mut subscription = ConsensusObserverSubscription::new(
+            consensus_observer_config,
+            Arc::new(mock_db_reader),
+            peer_network_id,
+            time_service.clone(),
+        );
+
+        // Verify that the DB is making sync progress and that the highest synced version is updated
+        let mock_time_service = time_service.into_mock();
+        verify_subscription_syncing_progress(
+            &mut subscription,
+            first_synced_version,
+            mock_time_service.now(),
+        );
+
+        // Elapse enough time to timeout the subscription
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.max_synced_version_timeout_ms + 1,
+        ));
+
+        // Verify that the DB is still making sync progress (the next version is higher)
+        verify_subscription_syncing_progress(
+            &mut subscription,
+            second_synced_version,
+            mock_time_service.now(),
+        );
+
+        // Elapse enough time to timeout the subscription
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.max_synced_version_timeout_ms + 1,
+        ));
+
+        // Verify that the DB is not making sync progress and that the subscription has timed out
+        assert_matches!(
+            subscription.check_syncing_progress(),
+            Err(Error::SubscriptionProgressStopped(_))
+        );
+    }
+
+    #[test]
+    fn test_check_subscription_health_optimality() {
+        // Create a consensus observer config with a single subscription and large timeouts
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_concurrent_subscriptions: 1,
+            max_subscription_timeout_ms: 100_000_000, // Use a large value so that we don't time out
+            max_synced_version_timeout_ms: 100_000_000, // Use a large value so that we don't get DB progress errors
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Create a mock DB reader with expectations
+        let mut mock_db_reader = MockDatabaseReader::new();
+        mock_db_reader
+            .expect_get_latest_ledger_info_version()
+            .returning(move || Ok(1));
+
+        // Create a new observer subscription
+        let time_service = TimeService::mock();
+        let peer_network_id = PeerNetworkId::random();
+        let mut subscription = ConsensusObserverSubscription::new(
+            consensus_observer_config,
+            Arc::new(mock_db_reader),
+            peer_network_id,
+            time_service.clone(),
+        );
+
+        // Create a peers and metadata map for the subscription
+        let mut peers_and_metadata = HashMap::new();
+        add_metadata_for_peer(&mut peers_and_metadata, peer_network_id, true, false);
+
+        // Verify that the subscription is healthy
+        assert!(subscription
+            .check_subscription_health(&peers_and_metadata)
+            .is_ok());
+
+        // Add a more optimal peer to the set of peers
+        let new_optimal_peer = PeerNetworkId::random();
+        add_metadata_for_peer(&mut peers_and_metadata, new_optimal_peer, true, true);
+
+        // Elapse enough time for a peer optimality check
+        let mock_time_service = time_service.into_mock();
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_peer_change_interval_ms + 1,
+        ));
+
+        // Verify that the subscription is no longer optimal
+        assert_matches!(
+            subscription.check_subscription_health(&peers_and_metadata),
+            Err(Error::SubscriptionSuboptimal(_))
+        );
     }
 
     #[test]
@@ -344,7 +527,7 @@ mod test {
     }
 
     #[test]
-    fn test_check_subscription_peer_refresh() {
+    fn test_check_subscription_peer_optimality_refresh() {
         // Create a consensus observer config with a maximum of 1 subscription
         let consensus_observer_config = create_observer_config(1);
 
@@ -572,6 +755,23 @@ mod test {
             subscription.check_syncing_progress(),
             Err(Error::SubscriptionProgressStopped(_))
         );
+    }
+
+    #[test]
+    fn test_get_peer_network_id() {
+        // Create a new observer subscription
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let peer_network_id = PeerNetworkId::random();
+        let time_service = TimeService::mock();
+        let subscription = ConsensusObserverSubscription::new(
+            consensus_observer_config,
+            Arc::new(MockDatabaseReader::new()),
+            peer_network_id,
+            time_service.clone(),
+        );
+
+        // Verify that the peer network id matches the expected value
+        assert_eq!(subscription.get_peer_network_id(), peer_network_id);
     }
 
     #[test]
