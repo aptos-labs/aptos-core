@@ -245,6 +245,7 @@ transferred to A
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound">0x1::pool_u64_unbound</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
@@ -2782,6 +2783,7 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     operator_commission_percentage: u64,
     delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(owner);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pools_enabled">features::delegation_pools_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDELEGATION_POOLS_DISABLED">EDELEGATION_POOLS_DISABLED</a>));
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>assert</b>!(!<a href="delegation_pool.md#0x1_delegation_pool_owner_cap_exists">owner_cap_exists</a>(owner_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="delegation_pool.md#0x1_delegation_pool_EOWNER_CAP_ALREADY_EXISTS">EOWNER_CAP_ALREADY_EXISTS</a>));
@@ -2942,6 +2944,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
     voting_power: u64,
     should_pass: bool
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(voter);
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation.
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
@@ -3021,6 +3024,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
     metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     is_multi_step_proposal: bool,
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(voter);
     <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
 
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
@@ -3793,6 +3797,7 @@ Allows an owner to change the operator of the underlying stake pool.
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     new_operator: <b>address</b>
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(owner);
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
     // ensure the <b>old</b> operator is paid its uncommitted commission rewards
@@ -3828,6 +3833,7 @@ one for each pool.
     operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     new_beneficiary: <b>address</b>
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(operator);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operator_beneficiary_change_enabled">features::operator_beneficiary_change_enabled</a>(), std::error::invalid_state(
         <a href="delegation_pool.md#0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>
     ));
@@ -3873,6 +3879,7 @@ Allows an owner to update the commission percentage for the operator of the unde
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     new_commission_percentage: u64
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(owner);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_commission_change_delegation_pool_enabled">features::commission_change_delegation_pool_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(
         <a href="delegation_pool.md#0x1_delegation_pool_ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED">ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED</a>
     ));

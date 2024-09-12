@@ -124,6 +124,7 @@ module aptos_framework::delegation_pool {
     use aptos_framework::aptos_governance;
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle, emit};
+    use aptos_framework::permissioned_signer;
     use aptos_framework::stake;
     use aptos_framework::stake::get_operator;
     use aptos_framework::staking_config;
@@ -841,6 +842,7 @@ module aptos_framework::delegation_pool {
         operator_commission_percentage: u64,
         delegation_pool_creation_seed: vector<u8>,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        permissioned_signer::assert_master_signer(owner);
         assert!(features::delegation_pools_enabled(), error::invalid_state(EDELEGATION_POOLS_DISABLED));
         let owner_address = signer::address_of(owner);
         assert!(!owner_cap_exists(owner_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
@@ -941,6 +943,7 @@ module aptos_framework::delegation_pool {
         voting_power: u64,
         should_pass: bool
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        permissioned_signer::assert_master_signer(voter);
         assert_partial_governance_voting_enabled(pool_address);
         // synchronize delegation and stake pools before any user operation.
         synchronize_delegation_pool(pool_address);
@@ -1000,6 +1003,7 @@ module aptos_framework::delegation_pool {
         metadata_hash: vector<u8>,
         is_multi_step_proposal: bool,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        permissioned_signer::assert_master_signer(voter);
         assert_partial_governance_voting_enabled(pool_address);
 
         // synchronize delegation and stake pools before any user operation
@@ -1292,6 +1296,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         new_operator: address
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        permissioned_signer::assert_master_signer(owner);
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         // synchronize delegation and stake pools before any user operation
         // ensure the old operator is paid its uncommitted commission rewards
@@ -1307,6 +1312,7 @@ module aptos_framework::delegation_pool {
         operator: &signer,
         new_beneficiary: address
     ) acquires BeneficiaryForOperator {
+        permissioned_signer::assert_master_signer(operator);
         assert!(features::operator_beneficiary_change_enabled(), std::error::invalid_state(
             EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED
         ));
@@ -1332,6 +1338,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         new_commission_percentage: u64
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        permissioned_signer::assert_master_signer(owner);
         assert!(features::commission_change_delegation_pool_enabled(), error::invalid_state(
             ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED
         ));
