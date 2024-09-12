@@ -32,6 +32,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
     write_set::{WriteOp, WriteSetMut},
+    AptosCoinType,
 };
 use aptos_vm::AptosVM;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
@@ -167,7 +168,7 @@ fn get_aptos_coin_transfer_transaction(
 
 fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    CoinStoreResource::fetch_move_resource(&db_state_view, account)
+    CoinStoreResource::<AptosCoinType>::fetch_move_resource(&db_state_view, account)
         .unwrap()
         .unwrap()
         .coin()
@@ -227,9 +228,9 @@ fn test_new_genesis() {
                 ),
             ),
             (
-                StateKey::resource_typed::<CoinStoreResource>(&account1).unwrap(),
+                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&account1).unwrap(),
                 WriteOp::legacy_modification(
-                    bcs::to_bytes(&CoinStoreResource::new(
+                    bcs::to_bytes(&CoinStoreResource::<AptosCoinType>::new(
                         100_000_000,
                         false,
                         EventHandle::random(0),

@@ -3,10 +3,7 @@
 
 mod new_layer_impl;
 
-use crate::{
-    node::{NodeRef, NodeStrongRef},
-    Key, KeyHash, MapLayer, Value,
-};
+use crate::{iterator::DescendantIterator, node::NodeStrongRef, Key, KeyHash, MapLayer, Value};
 use aptos_drop_helper::ArcAsyncDrop;
 use std::marker::PhantomData;
 
@@ -49,18 +46,6 @@ where
     pub(crate) fn base_layer(&self) -> u64 {
         self.base_layer.layer()
     }
-
-    fn top_layer(&self) -> u64 {
-        self.top_layer.layer()
-    }
-
-    pub(crate) fn get_node_strong(&self, node_ref: &NodeRef<K, V>) -> NodeStrongRef<K, V> {
-        node_ref.get_strong(self.base_layer())
-    }
-
-    pub(crate) fn root(&self) -> NodeStrongRef<K, V> {
-        self.get_node_strong(self.top_layer.root())
-    }
 }
 
 impl<K, V, S> LayeredMap<K, V, S>
@@ -72,9 +57,26 @@ where
     where
         S: core::hash::BuildHasher,
     {
-        let mut cur_node = self.root();
         let key_hash = KeyHash(hash_builder.hash_one(key));
         let mut bits = key_hash.iter_bits();
+
+        let peak = self.top_layer.peak();
+        let mut foot = 0;
+        for _ in 0..peak.height() - 1 {
+            foot = foot << 1 | bits.next().expect("bits exhausted") as usize;
+        }
+
+        self.get_under_node(peak.expect_foot(foot, self.base_layer()), key, &mut bits)
+    }
+
+    fn get_under_node(
+        &self,
+        node: NodeStrongRef<K, V>,
+        key: &K,
+        remaining_key_bits: &mut impl Iterator<Item = bool>,
+    ) -> Option<V> {
+        let mut cur_node = node;
+        let bits = remaining_key_bits;
 
         loop {
             match cur_node {
@@ -88,9 +90,9 @@ where
                     },
                     Some(bit) => {
                         if bit {
-                            cur_node = self.get_node_strong(&internal.right);
+                            cur_node = internal.right.get_strong(self.base_layer());
                         } else {
-                            cur_node = self.get_node_strong(&internal.left);
+                            cur_node = internal.left.get_strong(self.base_layer());
                         }
                     },
                 },
@@ -106,6 +108,9 @@ where
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
-        crate::iterator::LayeredMapIterator::new(self)
+        self.top_layer
+            .peak()
+            .into_feet_iter()
+            .flat_map(|node| DescendantIterator::new(node, self.base_layer()))
     }
 }

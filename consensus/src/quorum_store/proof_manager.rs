@@ -77,8 +77,7 @@ impl ProofManager {
         batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
         self.batch_proof_queue.insert_batches(batch_summaries);
-        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.batch_proof_queue.remaining_txns_and_proofs();
+        self.update_remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_commit_notification(
@@ -270,18 +269,22 @@ impl ProofManager {
                         monitor!("proof_manager_handle_command", {
                         match msg {
                             ProofManagerCommand::Shutdown(ack_tx) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::shutdown"]).inc();
                                 ack_tx
                                     .send(())
                                     .expect("Failed to send shutdown ack to QuorumStore");
                                 break;
                             },
                             ProofManagerCommand::ReceiveProofs(proofs) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::receive_proofs"]).inc();
                                 self.receive_proofs(proofs.take());
                             },
                             ProofManagerCommand::ReceiveBatches(batches) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::receive_batches"]).inc();
                                 self.receive_batches(batches);
                             }
                             ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::commit_notification"]).inc();
                                 self.handle_commit_notification(
                                     block_timestamp,
                                     batches,
