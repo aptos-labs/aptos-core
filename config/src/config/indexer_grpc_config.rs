@@ -98,7 +98,7 @@ impl ConfigSanitizer for IndexerGrpcConfig {
         {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "storage.enable_indexer or indexer_table_info.enabled must be true if indexer_grpc.enabled is true".to_string(),
+                "storage.enable_indexer must be true or indexer_table_info.table_info_service_mode must be IndexingOnly if indexer_grpc.enabled is true".to_string(),
             ));
         }
         Ok(())
