@@ -23,7 +23,7 @@ use std::{
 
 mod bn254_circom;
 mod circuit_constants;
-pub mod circuit_testcases;
+mod circuit_testcases;
 mod configuration;
 mod groth16_sig;
 mod groth16_vk;

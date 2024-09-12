@@ -19,7 +19,6 @@ use aptos_types::{
         secure_test_rsa_jwk, AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
     },
     keyless::{
-        circuit_testcases::{SAMPLE_JWK, SAMPLE_TEST_ISS_VALUE},
         get_public_inputs_hash,
         test_utils::{
             self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_esk,
@@ -283,6 +282,7 @@ script {
             max_gas: Some(2000000),
             expiration_secs: 60,
         };
+        let sample_jwk = get_sample_jwk();
         let script = format!(
             r#"
 script {{
@@ -302,7 +302,11 @@ script {{
     }}
 }}
     "#,
-            SAMPLE_TEST_ISS_VALUE, SAMPLE_JWK.kid, SAMPLE_JWK.alg, SAMPLE_JWK.e, SAMPLE_JWK.n
+            get_sample_iss(),
+            sample_jwk.kid,
+            sample_jwk.alg,
+            sample_jwk.e,
+            sample_jwk.n
         );
         let txn_result = cli
             .run_script_with_gas_options(0, &script, Some(gas_options))
