@@ -9,6 +9,7 @@ use aptos_db_indexer_schemas::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
         indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema,
         transaction_by_account::TransactionByAccountSchema,
+        translated_v1_event::TranslatedV1EventSchema,
     },
     utils::{
         error_if_too_many_requested, get_first_seq_num_and_limit, AccountTransactionVersionIter,
@@ -17,22 +18,29 @@ use aptos_db_indexer_schemas::{
 };
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, Result,
+    db_ensure as ensure, db_other_bail as bail, state_view::LatestDbStateCheckpointView,
+    AptosDbError, DbReader, Result,
 };
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::{ContractEvent, EventWithVersion},
+    account_config::{CoinStoreResource, DepositEvent, DEPOSIT_EVENT_TYPE},
+    coin_deposit::{CoinDeposit, COIN_DEPOSIT_TYPE_STR},
+    contract_event::{ContractEvent, ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,
     indexer::indexer_db_reader::Order,
     state_store::{
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
+        TStateView,
     },
     transaction::{AccountTransactionsWithProof, Transaction, Version},
     write_set::{TransactionWrite, WriteSet},
+    DummyCoinType,
 };
+use move_core_types::language_storage::StructTag;
 use std::{
     cmp::min,
+    str::FromStr,
     sync::{
         mpsc::{self, Receiver, Sender},
         Arc,
@@ -186,6 +194,16 @@ impl InternalIndexerDB {
         ))
     }
 
+    pub fn get_next_sequence_number(&self, event_key: &EventKey) -> Result<u64> {
+        let mut iter = self.db.iter::<EventByKeySchema>()?;
+        iter.seek_for_prev(&(*event_key, u64::max_value()))?;
+
+        Ok(iter.next().transpose()?.map_or(
+            0,
+            |((key, seq), _)| if &key == event_key { seq + 1 } else { 0 },
+        ))
+    }
+
     /// Given `event_key` and `start_seq_num`, returns events identified by transaction version and
     /// index among all events emitted by the same transaction. Result won't contain records with a
     /// transaction version > `ledger_version` and is in ascending order.
@@ -272,6 +290,16 @@ impl InternalIndexerDB {
             .db
             .get::<InternalIndexerMetadataSchema>(key)?
             .map(|v| v.expect_version()))
+    }
+
+    pub fn get_translated_v1_event_by_version_and_index(
+        &self,
+        version: Version,
+        index: u64,
+    ) -> Result<ContractEventV1> {
+        self.db
+            .get::<TranslatedV1EventSchema>(&(version, index))?
+            .ok_or_else(|| AptosDbError::NotFound(format!("Event {} of Txn {}", index, version)))
     }
 }
 
@@ -392,6 +420,33 @@ impl DBIndexer {
                             )
                             .expect("Failed to put events by version to a batch");
                     }
+                    if let ContractEvent::V2(v2) = event {
+                        if let Some(translated_v1_event) = self
+                            .translate_event_v2_to_v1(v2)
+                            .expect("Failure in translating event")
+                        {
+                            let key = *translated_v1_event.key();
+                            let sequence_number = translated_v1_event.sequence_number();
+                            batch
+                                .put::<EventByKeySchema>(
+                                    &(key, sequence_number),
+                                    &(version, idx as u64),
+                                )
+                                .expect("Failed to put events by key to a batch");
+                            batch
+                                .put::<EventByVersionSchema>(
+                                    &(key, version, sequence_number),
+                                    &(idx as u64),
+                                )
+                                .expect("Failed to put events by version to a batch");
+                            batch
+                                .put::<TranslatedV1EventSchema>(
+                                    &(version, idx as u64),
+                                    &translated_v1_event,
+                                )
+                                .expect("Failed to put translated v1 events to a batch");
+                        }
+                    }
                 });
             }
 
@@ -434,6 +489,49 @@ impl DBIndexer {
             .send(Some(batch))
             .map_err(|e| AptosDbError::Other(e.to_string()))?;
         Ok(version)
+    }
+
+    fn get_resource(
+        &self,
+        address: &AccountAddress,
+        struct_tag_str: &str,
+    ) -> Result<Option<StateValue>> {
+        let state_view = self
+            .main_db_reader
+            .latest_state_checkpoint_view()
+            .expect("Failed to get state view");
+
+        let struct_tag = StructTag::from_str(struct_tag_str)?;
+        let state_key = StateKey::resource(address, &struct_tag)?;
+        let maybe_state_value = state_view.get_state_value(&state_key)?;
+        Ok(maybe_state_value)
+    }
+
+    fn translate_event_v2_to_v1(&self, v2: &ContractEventV2) -> Result<Option<ContractEventV1>> {
+        match v2.type_tag().to_canonical_string().as_str() {
+            COIN_DEPOSIT_TYPE_STR => {
+                let coin_deposit = CoinDeposit::try_from_bytes(v2.event_data())?;
+                let struct_tag_str = format!("0x1::coin::CoinStore<{}>", coin_deposit.coin_type());
+                // We can use `DummyCoinType` as it does not affect the correctness of deserialization.
+                let state_value = self
+                    .get_resource(coin_deposit.account(), &struct_tag_str)?
+                    .expect("Event handle resource not found");
+                let coin_store_resource: CoinStoreResource<DummyCoinType> =
+                    bcs::from_bytes(state_value.bytes())?;
+
+                let key = *coin_store_resource.deposit_events().key();
+                let sequence_number = self.indexer_db.get_next_sequence_number(&key)?;
+
+                let deposit_event = DepositEvent::new(coin_deposit.amount());
+                Ok(Some(ContractEventV1::new(
+                    key,
+                    sequence_number,
+                    DEPOSIT_EVENT_TYPE.clone(),
+                    bcs::to_bytes(&deposit_event)?,
+                )))
+            },
+            _ => Ok(None),
+        }
     }
 
     pub fn get_account_transactions(
@@ -545,9 +643,16 @@ impl DBIndexer {
         let mut events_with_version = event_indices
             .into_iter()
             .map(|(seq, ver, idx)| {
-                let event = self
+                let event = match self
                     .main_db_reader
-                    .get_event_by_version_and_index(ver, idx)?;
+                    .get_event_by_version_and_index(ver, idx)?
+                {
+                    event @ ContractEvent::V1(_) => event,
+                    ContractEvent::V2(_) => ContractEvent::V1(
+                        self.indexer_db
+                            .get_translated_v1_event_by_version_and_index(ver, idx)?,
+                    ),
+                };
                 let v0 = match &event {
                     ContractEvent::V1(event) => event,
                     ContractEvent::V2(_) => bail!("Unexpected module event"),
@@ -558,6 +663,7 @@ impl DBIndexer {
                     seq,
                     v0.sequence_number()
                 );
+
                 Ok(EventWithVersion::new(ver, event))
             })
             .collect::<Result<Vec<_>>>()?;
