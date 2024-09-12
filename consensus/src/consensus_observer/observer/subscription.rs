@@ -1,24 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_observer::common::{
-    error::Error,
-    logging::{LogEntry, LogSchema},
-};
+use crate::consensus_observer::{common::error::Error, observer::subscription_utils};
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_logger::{info, warn};
-use aptos_network::{application::metadata::PeerMetadata, ProtocolId};
+use aptos_network::application::metadata::PeerMetadata;
 use aptos_storage_interface::DbReader;
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use ordered_float::OrderedFloat;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     sync::Arc,
     time::{Duration, Instant},
 };
-
-// A useful constant for representing the maximum ping latency
-const MAX_PING_LATENCY_SECS: f64 = 10_000.0;
 
 /// A single consensus observer subscription
 pub struct ConsensusObserverSubscription {
@@ -106,7 +98,8 @@ impl ConsensusObserverSubscription {
         self.last_optimality_check_time_and_peers = (time_now, current_connected_peers);
 
         // Sort the peers by subscription optimality
-        let sorted_peers = sort_peers_by_subscription_optimality(peers_and_metadata);
+        let sorted_peers =
+            subscription_utils::sort_peers_by_subscription_optimality(peers_and_metadata);
 
         // Verify that this peer is one of the most optimal peers
         let max_concurrent_subscriptions =
@@ -184,140 +177,15 @@ impl ConsensusObserverSubscription {
         Ok(())
     }
 
+    /// Returns the peer network id of the subscription
+    pub fn get_peer_network_id(&self) -> PeerNetworkId {
+        self.peer_network_id
+    }
+
     /// Updates the last message receive time to the current time
     pub fn update_last_message_receive_time(&mut self) {
         self.last_message_receive_time = self.time_service.now();
     }
-}
-
-/// Gets the distance from the validators for the specified peer from the peer metadata
-fn get_distance_for_peer(
-    peer_network_id: &PeerNetworkId,
-    peer_metadata: &PeerMetadata,
-) -> Option<u64> {
-    // Get the distance for the peer
-    let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
-    let distance = peer_monitoring_metadata
-        .latest_network_info_response
-        .as_ref()
-        .map(|response| response.distance_from_validators);
-
-    // If the distance is missing, log a warning
-    if distance.is_none() {
-        warn!(
-            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Unable to get distance for peer! Peer: {:?}",
-                peer_network_id
-            ))
-        );
-    }
-
-    distance
-}
-
-/// Gets the latency for the specified peer from the peer metadata
-fn get_latency_for_peer(
-    peer_network_id: &PeerNetworkId,
-    peer_metadata: &PeerMetadata,
-) -> Option<f64> {
-    // Get the latency for the peer
-    let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
-    let latency = peer_monitoring_metadata.average_ping_latency_secs;
-
-    // If the latency is missing, log a warning
-    if latency.is_none() {
-        warn!(
-            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Unable to get latency for peer! Peer: {:?}",
-                peer_network_id
-            ))
-        );
-    }
-
-    latency
-}
-
-/// Sorts the peers by subscription optimality (in descending order of
-/// optimality). This requires: (i) sorting the peers by distance from the
-/// validator set and ping latency (lower values are more optimal); and (ii)
-/// filtering out peers that don't support consensus observer.
-///
-/// Note: we prioritize distance over latency as we want to avoid close
-/// but not up-to-date peers. If peers don't have sufficient metadata
-/// for sorting, they are given a lower priority.
-pub fn sort_peers_by_subscription_optimality(
-    peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
-) -> Vec<PeerNetworkId> {
-    // Group peers and latencies by validator distance, i.e., distance -> [(peer, latency)]
-    let mut unsupported_peers = Vec::new();
-    let mut peers_and_latencies_by_distance = BTreeMap::new();
-    for (peer_network_id, peer_metadata) in peers_and_metadata {
-        // Verify that the peer supports consensus observer
-        if !supports_consensus_observer(peer_metadata) {
-            unsupported_peers.push(*peer_network_id);
-            continue; // Skip the peer
-        }
-
-        // Get the distance and latency for the peer
-        let distance = get_distance_for_peer(peer_network_id, peer_metadata);
-        let latency = get_latency_for_peer(peer_network_id, peer_metadata);
-
-        // If the distance is not found, use the maximum distance
-        let distance =
-            distance.unwrap_or(aptos_peer_monitoring_service_types::MAX_DISTANCE_FROM_VALIDATORS);
-
-        // If the latency is not found, use a large latency
-        let latency = latency.unwrap_or(MAX_PING_LATENCY_SECS);
-
-        // Add the peer and latency to the distance group
-        peers_and_latencies_by_distance
-            .entry(distance)
-            .or_insert_with(Vec::new)
-            .push((*peer_network_id, OrderedFloat(latency)));
-    }
-
-    // If there are peers that don't support consensus observer, log them
-    if !unsupported_peers.is_empty() {
-        info!(
-            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Found {} peers that don't support consensus observer! Peers: {:?}",
-                unsupported_peers.len(),
-                unsupported_peers
-            ))
-        );
-    }
-
-    // Sort the peers by distance and latency. Note: BTreeMaps are
-    // sorted by key, so the entries will be sorted by distance in ascending order.
-    let mut sorted_peers = Vec::new();
-    for (_, mut peers_and_latencies) in peers_and_latencies_by_distance {
-        // Sort the peers by latency
-        peers_and_latencies.sort_by_key(|(_, latency)| *latency);
-
-        // Add the peers to the sorted list (in sorted order)
-        sorted_peers.extend(
-            peers_and_latencies
-                .into_iter()
-                .map(|(peer_network_id, _)| peer_network_id),
-        );
-    }
-
-    // Log the sorted peers
-    info!(
-        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-            "Sorted {} peers by subscription optimality! Peers: {:?}",
-            sorted_peers.len(),
-            sorted_peers
-        ))
-    );
-
-    sorted_peers
-}
-
-/// Returns true iff the peer metadata indicates support for consensus observer
-fn supports_consensus_observer(peer_metadata: &PeerMetadata) -> bool {
-    peer_metadata.supports_protocol(ProtocolId::ConsensusObserver)
-        && peer_metadata.supports_protocol(ProtocolId::ConsensusObserverRpc)
 }
 
 #[cfg(test)]
@@ -328,10 +196,9 @@ mod test {
     use aptos_network::{
         protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
         transport::{ConnectionId, ConnectionMetadata},
+        ProtocolId,
     };
-    use aptos_peer_monitoring_service_types::{
-        response::NetworkInformationResponse, PeerMonitoringMetadata,
-    };
+    use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
     use aptos_storage_interface::Result;
     use aptos_types::{network_address::NetworkAddress, transaction::Version};
     use claims::assert_matches;
@@ -735,117 +602,6 @@ mod test {
         assert_eq!(subscription.last_message_receive_time, current_time);
     }
 
-    #[test]
-    fn test_sort_peers_by_distance_and_latency() {
-        // Sort an empty list of peers
-        let peers_and_metadata = HashMap::new();
-        assert!(sort_peers_by_subscription_optimality(&peers_and_metadata).is_empty());
-
-        // Create a list of peers with empty metadata
-        let peers_and_metadata = create_peers_and_metadata(true, true, true, 10);
-
-        // Sort the peers and verify the results
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-        assert_eq!(sorted_peers.len(), 10);
-
-        // Create a list of peers with valid metadata
-        let peers_and_metadata = create_peers_and_metadata(false, false, true, 10);
-
-        // Sort the peers
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-
-        // Verify the order of the peers
-        verify_increasing_distance_latencies(&peers_and_metadata, &sorted_peers);
-        assert_eq!(sorted_peers.len(), 10);
-
-        // Create a list of peers with and without metadata
-        let mut peers_and_metadata = create_peers_and_metadata(false, false, true, 10);
-        peers_and_metadata.extend(create_peers_and_metadata(true, false, true, 10));
-        peers_and_metadata.extend(create_peers_and_metadata(false, true, true, 10));
-        peers_and_metadata.extend(create_peers_and_metadata(true, true, true, 10));
-
-        // Sort the peers
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-        assert_eq!(sorted_peers.len(), 40);
-
-        // Verify the order of the first 20 peers
-        let (first_20_peers, sorted_peers) = sorted_peers.split_at(20);
-        verify_increasing_distance_latencies(&peers_and_metadata, first_20_peers);
-
-        // Verify that the next 10 peers only have latency metadata
-        let (next_10_peers, sorted_peers) = sorted_peers.split_at(10);
-        for sorted_peer in next_10_peers {
-            let peer_metadata = peers_and_metadata.get(sorted_peer).unwrap();
-            assert!(get_distance_for_peer(sorted_peer, peer_metadata).is_none());
-            assert!(get_latency_for_peer(sorted_peer, peer_metadata).is_some());
-        }
-
-        // Verify that the last 10 peers have no metadata
-        let (last_10_peers, remaining_peers) = sorted_peers.split_at(10);
-        for sorted_peer in last_10_peers {
-            let peer_metadata = peers_and_metadata.get(sorted_peer).unwrap();
-            assert!(get_distance_for_peer(sorted_peer, peer_metadata).is_none());
-            assert!(get_latency_for_peer(sorted_peer, peer_metadata).is_none());
-        }
-        assert!(remaining_peers.is_empty());
-    }
-
-    #[test]
-    fn test_sort_peers_by_distance_and_latency_filter() {
-        // Sort an empty list of peers
-        let peers_and_metadata = HashMap::new();
-        assert!(sort_peers_by_subscription_optimality(&peers_and_metadata).is_empty());
-
-        // Create a list of peers with empty metadata (with consensus observer support)
-        let peers_and_metadata = create_peers_and_metadata(true, true, true, 10);
-
-        // Sort the peers and verify the results
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-        assert_eq!(sorted_peers.len(), 10);
-
-        // Create a list of peers with empty metadata (without consensus observer support)
-        let peers_and_metadata = create_peers_and_metadata(true, true, false, 10);
-
-        // Sort the peers and verify the results
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-        assert!(sorted_peers.is_empty());
-
-        // Create a list of peers with valid metadata (without consensus observer support)
-        let peers_and_metadata = create_peers_and_metadata(false, false, false, 10);
-
-        // Sort the peers and verify the results
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-        assert!(sorted_peers.is_empty());
-
-        // Create a list of peers with empty metadata (with and without consensus observer support)
-        let mut peers_and_metadata = create_peers_and_metadata(true, true, true, 5);
-        peers_and_metadata.extend(create_peers_and_metadata(true, true, false, 50));
-
-        // Sort the peers and verify the results (only the supported peers are sorted)
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-        assert_eq!(sorted_peers.len(), 5);
-
-        // Create a list of peers with valid metadata (with and without consensus observer support)
-        let mut peers_and_metadata = create_peers_and_metadata(false, false, true, 50);
-        peers_and_metadata.extend(create_peers_and_metadata(false, false, false, 10));
-
-        // Sort the peers and verify the results (only the supported peers are sorted)
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-        assert_eq!(sorted_peers.len(), 50);
-
-        // Create a list of peers with valid metadata (with and without consensus observer support)
-        let supported_peer_and_metadata = create_peers_and_metadata(false, false, true, 1);
-        let unsupported_peer_and_metadata = create_peers_and_metadata(false, false, false, 1);
-        let mut peers_and_metadata = HashMap::new();
-        peers_and_metadata.extend(supported_peer_and_metadata.clone());
-        peers_and_metadata.extend(unsupported_peer_and_metadata);
-
-        // Sort the peers and verify the results (only the supported peer is sorted)
-        let supported_peer = supported_peer_and_metadata.keys().next().unwrap();
-        let sorted_peers = sort_peers_by_subscription_optimality(&peers_and_metadata);
-        assert_eq!(sorted_peers, vec![*supported_peer]);
-    }
-
     /// Adds metadata for the specified peer to the map of peers and metadata
     fn add_metadata_for_peer(
         peers_and_metadata: &mut HashMap<PeerNetworkId, PeerMetadata>,
@@ -898,85 +654,6 @@ mod test {
         ConsensusObserverConfig {
             max_concurrent_subscriptions,
             ..ConsensusObserverConfig::default()
-        }
-    }
-
-    /// Creates a new peer and metadata for testing
-    fn create_peer_and_metadata(
-        latency: Option<f64>,
-        distance_from_validators: Option<u64>,
-        support_consensus_observer: bool,
-    ) -> (PeerNetworkId, PeerMetadata) {
-        // Create a random peer
-        let peer_network_id = PeerNetworkId::random();
-
-        // Create a new peer metadata with the given latency and distance
-        let connection_metadata =
-            create_connection_metadata(peer_network_id, support_consensus_observer);
-        let network_information_response =
-            distance_from_validators.map(|distance| NetworkInformationResponse {
-                connected_peers: BTreeMap::new(),
-                distance_from_validators: distance,
-            });
-        let peer_monitoring_metadata =
-            PeerMonitoringMetadata::new(latency, None, network_information_response, None, None);
-        let peer_metadata =
-            PeerMetadata::new_for_test(connection_metadata, peer_monitoring_metadata);
-
-        (peer_network_id, peer_metadata)
-    }
-
-    /// Creates a list of peers and metadata for testing
-    fn create_peers_and_metadata(
-        empty_latency: bool,
-        empty_distance: bool,
-        support_consensus_observer: bool,
-        num_peers: u64,
-    ) -> HashMap<PeerNetworkId, PeerMetadata> {
-        let mut peers_and_metadata = HashMap::new();
-        for i in 1..num_peers + 1 {
-            // Determine the distance for the peer
-            let distance = if empty_distance { None } else { Some(i) };
-
-            // Determine the latency for the peer
-            let latency = if empty_latency { None } else { Some(i as f64) };
-
-            // Create a new peer and metadata
-            let (peer_network_id, peer_metadata) =
-                create_peer_and_metadata(latency, distance, support_consensus_observer);
-            peers_and_metadata.insert(peer_network_id, peer_metadata);
-        }
-        peers_and_metadata
-    }
-
-    /// Verifies that the distance and latencies for the peers are in
-    /// increasing order (with the distance taking precedence over the latency).
-    fn verify_increasing_distance_latencies(
-        peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
-        sorted_peers: &[PeerNetworkId],
-    ) {
-        let mut previous_latency = None;
-        let mut previous_distance = 0;
-        for sorted_peer in sorted_peers {
-            // Get the distance and latency for the peer
-            let peer_metadata = peers_and_metadata.get(sorted_peer).unwrap();
-            let distance = get_distance_for_peer(sorted_peer, peer_metadata).unwrap();
-            let latency = get_latency_for_peer(sorted_peer, peer_metadata);
-
-            // Verify the order of the peers
-            if distance == previous_distance {
-                if let Some(latency) = latency {
-                    if let Some(previous_latency) = previous_latency {
-                        assert!(latency >= previous_latency);
-                    }
-                }
-            } else {
-                assert!(distance > previous_distance);
-            }
-
-            // Update the previous latency and distance
-            previous_latency = latency;
-            previous_distance = distance;
         }
     }
 

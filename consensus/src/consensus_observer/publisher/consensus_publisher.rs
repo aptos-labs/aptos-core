@@ -70,6 +70,26 @@ impl ConsensusPublisher {
         (consensus_publisher, outbound_message_receiver)
     }
 
+    #[cfg(test)]
+    /// Creates a new consensus publisher with the given active subscribers
+    pub fn new_with_active_subscribers(
+        consensus_observer_config: ConsensusObserverConfig,
+        consensus_observer_client: Arc<
+            ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+        >,
+        active_subscribers: HashSet<PeerNetworkId>,
+    ) -> Self {
+        // Create the consensus publisher
+        let (consensus_publisher, _) =
+            ConsensusPublisher::new(consensus_observer_config, consensus_observer_client);
+
+        // Update the active subscribers
+        *consensus_publisher.active_subscribers.write() = active_subscribers;
+
+        // Return the publisher
+        consensus_publisher
+    }
+
     /// Adds the given subscriber to the set of active subscribers
     fn add_active_subscriber(&self, peer_network_id: PeerNetworkId) {
         self.active_subscribers.write().insert(peer_network_id);
