@@ -27,7 +27,7 @@ use aptos_types::{
             get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk,
             get_sample_openid_sig_and_pk, get_upgraded_vk,
         },
-        Configuration, EphemeralCertificate, FederatedKeylessPublicKey, Groth16ProofAndStatement,
+        AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
         DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME,
     },
@@ -243,6 +243,7 @@ async fn federated_keyless_should_work_otherwise() {
     fedrate_keyless_scenario(true, true, true).await
 }
 
+/// Config the chain, run a federated keyless txn, and assert txn result.
 async fn fedrate_keyless_scenario(
     set_feature_flag: bool,
     install_fed_jwk: bool,
@@ -312,10 +313,10 @@ script {{
     // For simplicity we use the root account as the jwk owner.
     let (sig, pk) = get_sample_groth16_sig_and_fed_pk(root_addr);
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_federated_transaction(
+    let signed_txn = sign_transaction_any_keyless_pk(
         &mut info,
         sig.clone(),
-        pk.clone(),
+        AnyKeylessPublicKey::Federated(pk),
         &jwk,
         &config,
         Some(&tw_sk),
@@ -424,16 +425,19 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
     }
 }
 
-async fn sign_federated_transaction<'a>(
+async fn sign_transaction_any_keyless_pk<'a>(
     info: &mut AptosPublicInfo,
     mut sig: KeylessSignature,
-    pk: FederatedKeylessPublicKey,
+    any_keyless_pk: AnyKeylessPublicKey,
     jwk: &RSA_JWK,
     config: &Configuration,
     tw_sk: Option<&Ed25519PrivateKey>,
     seqno: usize,
 ) -> SignedTransaction {
-    let any_pk = AnyPublicKey::federated_keyless(pk.clone());
+    let any_pk = match &any_keyless_pk {
+        AnyKeylessPublicKey::Normal(normal) => AnyPublicKey::keyless(normal.clone()),
+        AnyKeylessPublicKey::Federated(fed) => AnyPublicKey::federated_keyless(fed.clone()),
+    };
     let addr = AuthenticationKey::any_key(any_pk.clone()).account_address();
 
     // If the account does not exist, create it.
@@ -479,11 +483,16 @@ async fn sign_federated_transaction<'a>(
 
     let esk = get_sample_esk();
 
+    let pk = match &any_keyless_pk {
+        AnyKeylessPublicKey::Normal(normal) => normal,
+        AnyKeylessPublicKey::Federated(fed) => &fed.pk,
+    };
+
     let public_inputs_hash: Option<[u8; 32]> =
         if let EphemeralCertificate::ZeroKnowledgeSig(_) = &sig.cert {
             // This will only calculate the hash if it's needed, avoiding unnecessary computation.
             Some(fr_to_bytes_le(
-                &get_public_inputs_hash(&sig, &pk.pk, jwk, config).unwrap(),
+                &get_public_inputs_hash(&sig, pk, jwk, config).unwrap(),
             ))
         } else {
             None
@@ -515,100 +524,33 @@ async fn sign_federated_transaction<'a>(
 
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
-    SignedTransaction::new_federated_keyless(raw_txn, pk, sig)
+    match any_keyless_pk {
+        AnyKeylessPublicKey::Normal(normal) => SignedTransaction::new_keyless(raw_txn, normal, sig),
+        AnyKeylessPublicKey::Federated(fed) => {
+            SignedTransaction::new_federated_keyless(raw_txn, fed, sig)
+        },
+    }
 }
 
 async fn sign_transaction<'a>(
     info: &mut AptosPublicInfo,
-    mut sig: KeylessSignature,
+    sig: KeylessSignature,
     pk: KeylessPublicKey,
     jwk: &RSA_JWK,
     config: &Configuration,
     tw_sk: Option<&Ed25519PrivateKey>,
     seqno: usize,
 ) -> SignedTransaction {
-    let any_pk = AnyPublicKey::keyless(pk.clone());
-    let addr = AuthenticationKey::any_key(any_pk.clone()).account_address();
-
-    // If the account does not exist, create it.
-    if info.account_exists(addr).await.is_err() {
-        info!(
-            "{} account does not exist. Creating...",
-            addr.to_hex_literal()
-        );
-        info.create_user_account_with_any_key(&any_pk)
-            .await
-            .unwrap();
-        info.mint(addr, 10_000_000_000).await.unwrap();
-    }
-
-    // TODO: No idea why, but these calls do not actually reflect the updated balance after a successful TXN.
-    info!(
-        "{} balance before TXN: {}",
-        addr.to_hex_literal(),
-        info.get_balance(addr).await.unwrap()
-    );
-    // TODO: No idea why, but these calls do not actually reflect the updated sequence number after a successful TXN.
-    info!(
-        "{} sequence number before TXN: {}",
-        addr.to_hex_literal(),
-        info.get_account_sequence_number(addr).await.unwrap()
-    );
-
-    let recipient = info
-        .create_and_fund_user_account(20_000_000_000)
-        .await
-        .unwrap();
-
-    let raw_txn = info
-        .transaction_factory()
-        .payload(aptos_stdlib::aptos_coin_transfer(
-            recipient.address(),
-            1_000_000,
-        ))
-        .sender(addr)
-        .sequence_number(seqno as u64)
-        .build();
-
-    let esk = get_sample_esk();
-
-    let public_inputs_hash: Option<[u8; 32]> =
-        if let EphemeralCertificate::ZeroKnowledgeSig(_) = &sig.cert {
-            // This will only calculate the hash if it's needed, avoiding unnecessary computation.
-            Some(fr_to_bytes_le(
-                &get_public_inputs_hash(&sig, &pk, jwk, config).unwrap(),
-            ))
-        } else {
-            None
-        };
-
-    let mut txn_and_zkp = TransactionAndProof {
-        message: raw_txn.clone(),
-        proof: None,
-    };
-
-    // Compute the training wheels signature if not present
-    match &mut sig.cert {
-        EphemeralCertificate::ZeroKnowledgeSig(proof) => {
-            let proof_and_statement = Groth16ProofAndStatement {
-                proof: proof.proof.into(),
-                public_inputs_hash: public_inputs_hash.unwrap(),
-            };
-
-            if let Some(tw_sk) = tw_sk {
-                proof.training_wheels_signature = Some(EphemeralSignature::ed25519(
-                    tw_sk.sign(&proof_and_statement).unwrap(),
-                ));
-            }
-
-            txn_and_zkp.proof = Some(proof.proof);
-        },
-        EphemeralCertificate::OpenIdSig(_) => {},
-    }
-
-    sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
-
-    SignedTransaction::new_keyless(raw_txn, pk, sig)
+    sign_transaction_any_keyless_pk(
+        info,
+        sig,
+        AnyKeylessPublicKey::Normal(pk),
+        jwk,
+        config,
+        tw_sk,
+        seqno,
+    )
+    .await
 }
 
 fn maul_groth16_zkp_signature(txn: SignedTransaction) -> SignedTransaction {
