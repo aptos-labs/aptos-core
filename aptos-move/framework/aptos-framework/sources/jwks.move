@@ -237,7 +237,7 @@ module aptos_framework::jwks {
     /// argument `kid_vec`, `alg_vec`, `e_vec`, `n_vec`, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
     /// the corresponding attribute in the second JWK as shown below.
     ///
-    /// ```
+    /// ```ignore
     /// use std::string::utf8;
     /// aptos_framework::jwks::update_federated_jwk_set(
     ///     jwk_owner,
