@@ -1,0 +1,10 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    struct Coin {
+        x: u256,
+    }
+    private fun inc_coin_4(coin: &mut test::Coin) {
+        select test::Coin.x<&mut test::Coin>(coin) = Add<u256>(select test::Coin.x<&mut test::Coin>(coin), 1);
+        Tuple()
+    }
+} // end 0x42::test
