@@ -80,6 +80,27 @@ module 0xc0ffee::m {
     public fun test8_no_warn() {
         make_S().y.a = 5;
     }
+
+    enum E has drop {
+        A(u64),
+        B(u64),
+    }
+
+    public fun test_9_warn(e: E): u64 {
+        (&e).0 + (&mut e).0
+    }
+
+    public fun test_9_no_warn(e: E): u64 {
+        e.0 + e.0
+    }
+
+    public fun test_10_warn(e: E) {
+        (&mut e).0 = 50;
+    }
+
+    public fun test_10_no_warn(e: E) {
+        e.0 = 50;
+    }
 }
 
 

@@ -32,6 +32,7 @@ use crate::{
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
+    AptosCoinType,
 };
 use aptos_crypto::{
     bls12381::{self, bls12381_keys},
@@ -660,8 +661,8 @@ pub struct CoinStoreResourceGen {
 }
 
 impl CoinStoreResourceGen {
-    pub fn materialize(self) -> CoinStoreResource {
-        CoinStoreResource::new(
+    pub fn materialize(self) -> CoinStoreResource<AptosCoinType> {
+        CoinStoreResource::<AptosCoinType>::new(
             self.coin,
             false,
             EventHandle::random(0),
@@ -693,7 +694,7 @@ impl AccountStateGen {
                 bcs::to_bytes(&account_resource).unwrap(),
             ),
             (
-                StateKey::resource_typed::<CoinStoreResource>(address).unwrap(),
+                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(address).unwrap(),
                 bcs::to_bytes(&balance_resource).unwrap(),
             ),
         ]
