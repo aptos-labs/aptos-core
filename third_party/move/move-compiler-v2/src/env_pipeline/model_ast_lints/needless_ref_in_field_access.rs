@@ -23,24 +23,42 @@ impl ExpressionLinter for NeedlessRefInFieldAccess {
 
     fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
         use ExpData::Call;
-        if let Call(_, Operation::Select(.., field_id), args) = expr {
-            debug_assert!(
-                args.len() == 1,
-                "there should be exactly one argument for field access"
-            );
-            if let Call(id, Operation::Borrow(kind), ..) = args[0].as_ref() {
-                let field_name = field_id.symbol().display(env.symbol_pool()).to_string();
-                let ref_kind = kind.to_string();
-                self.warning(
-                    env,
-                    &env.get_node_loc(*id),
-                    &format!(
-                        "Needless {} taken for field access: \
-                        consider removing {} and directly accessing the field `{}`",
-                        ref_kind, ref_kind, field_name
-                    ),
-                );
-            }
-        }
+        use Operation::{Borrow, Select, SelectVariants};
+        let Call(_, select @ (Select(..) | SelectVariants(..)), args) = expr else {
+            return;
+        };
+        debug_assert!(
+            args.len() == 1,
+            "there should be exactly one argument for field access"
+        );
+        let Call(id, Borrow(kind), ..) = args[0].as_ref() else {
+            return;
+        };
+        let (module_id, struct_id, field_id) = match select {
+            Select(module_id, struct_id, field_id) => (module_id, struct_id, field_id),
+            SelectVariants(module_id, struct_id, field_ids) => (
+                module_id,
+                struct_id,
+                field_ids.first().expect("non-empty field selection"),
+            ),
+            _ => unreachable!("select is limited to the two variants above"),
+        };
+        let field_name = env
+            .get_module(*module_id)
+            .into_struct(*struct_id)
+            .get_field(*field_id)
+            .get_name()
+            .display(env.symbol_pool())
+            .to_string();
+        let ref_kind = kind.to_string();
+        self.warning(
+            env,
+            &env.get_node_loc(*id),
+            &format!(
+                "Needless {} taken for field access: \
+                consider removing {} and directly accessing the field `{}`",
+                ref_kind, ref_kind, field_name
+            ),
+        );
     }
 }
