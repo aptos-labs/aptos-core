@@ -21,8 +21,9 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut}, sync::Arc,
 };
+use aptos_infallible::RwLock;
 
 /// This structure serves a dual purpose.
 ///
@@ -475,23 +476,20 @@ impl LedgerInfoWithMixedSignatures {
         verifier.check_voting_power(all_voters.iter().collect_vec().into_iter(), true)
     }
 
-    // Returns the aggregate signature of all the verified signatures.
-    // If any of the unverified signatures is invalid, returns the list of authors of the invalid signatures.
-    // For the future rounds, votes from these authors are verified beforehand.
+    // Aggregates all the signatures, verifies the aggregate signature, and returns the aggregate signature.
     pub fn aggregate_and_verify(
         &mut self,
-        verifier: &ValidatorVerifier,
-    ) -> Result<(LedgerInfoWithSignatures, Vec<AccountAddress>), VerifyError> {
-        self.check_voting_power(verifier)?;
+        epoch_state: Arc<RwLock<EpochState>>,
+    ) -> Result<LedgerInfoWithSignatures, VerifyError> {
+        self.check_voting_power(&epoch_state.read().verifier)?;
 
         let mut all_signatures = self.verified_signatures.clone();
         for (author, signature) in self.unverified_signatures.signatures() {
             all_signatures.add_signature(*author, signature.clone());
         }
 
-        let aggregated_sig = verifier.aggregate_signatures(&all_signatures)?;
-        let mut malicious_signers = vec![];
-        let verified_aggregate_signature = match verifier
+        let aggregated_sig = epoch_state.read().verifier.aggregate_signatures(&all_signatures)?;
+        let verified_aggregate_signature = match epoch_state.read().verifier
             .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
         {
             Ok(_) => aggregated_sig,
@@ -502,7 +500,7 @@ impl LedgerInfoWithMixedSignatures {
                     .signatures()
                     .into_par_iter()
                     .flat_map(|(account_address, signature)| {
-                        if verifier
+                        if epoch_state.read().verifier
                             .verify(*account_address, self.ledger_info(), signature)
                             .is_ok()
                         {
@@ -516,23 +514,21 @@ impl LedgerInfoWithMixedSignatures {
                         .add_signature(account_address, signature.clone());
                     self.unverified_signatures.remove_signature(account_address);
                 }
-                malicious_signers = self
+                epoch_state.write().add_malicious_authors(self
                     .unverified_signatures
                     .signatures()
                     .keys()
                     .cloned()
-                    .collect();
+                    .collect()
+                );
                 self.unverified_signatures = PartialSignatures::empty();
-                let aggregated_sig = verifier.aggregate_signatures(&self.verified_signatures)?;
-                verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig)?;
+                let aggregated_sig = epoch_state.read().verifier.aggregate_signatures(&self.verified_signatures)?;
+                epoch_state.read().verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig)?;
                 aggregated_sig
             },
         };
-        self.check_voting_power(verifier).map(|_| {
-            (
-                LedgerInfoWithSignatures::new(self.ledger_info.clone(), verified_aggregate_signature),
-                malicious_signers
-            )
+        self.check_voting_power(&epoch_state.read().verifier).map(|_| {
+            LedgerInfoWithSignatures::new(self.ledger_info.clone(), verified_aggregate_signature)
         })
     }
 

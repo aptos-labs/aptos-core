@@ -40,6 +40,7 @@ use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
 };
+use aptos_infallible::RwLock;
 use bytes::Bytes;
 use futures::{
     channel::{
@@ -140,7 +141,7 @@ pub struct BufferManager {
 
     stop: bool,
 
-    epoch_state: Arc<EpochState>,
+    epoch_state: Arc<RwLock<EpochState>>,
 
     ongoing_tasks: Arc<AtomicU64>,
     // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
@@ -186,7 +187,7 @@ impl BufferManager {
         persisting_phase_rx: Receiver<ExecutorResult<Round>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
-        epoch_state: Arc<EpochState>,
+        epoch_state: Arc<RwLock<EpochState>>,
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
@@ -222,7 +223,7 @@ impl BufferManager {
 
             reliable_broadcast: ReliableBroadcast::new(
                 author,
-                epoch_state.verifier.get_ordered_account_addresses(),
+                epoch_state.read().verifier.get_ordered_account_addresses(),
                 commit_msg_tx.clone(),
                 rb_backoff_policy,
                 TimeService::real(),
@@ -727,7 +728,7 @@ impl BufferManager {
                             if let Ok(bytes) = protocol.to_bytes(&response) {
                                 let _ = response_sender.send(Ok(bytes.into()));
                             }
-                            item.try_advance_to_aggregated(&self.epoch_state.verifier)
+                            item.try_advance_to_aggregated(self.epoch_state.clone())
                         },
                         Err(e) => {
                             error!(
@@ -897,7 +898,7 @@ impl BufferManager {
                         {
                             let _ = tx.unbounded_send(commit_msg);
                         } else {
-                            match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                            match commit_msg.req.verify(&epoch_state_clone.read().verifier) {
                                 Ok(_) => {
                                     let _ = tx.unbounded_send(commit_msg);
                                 },

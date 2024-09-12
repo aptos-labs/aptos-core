@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    account_address::AccountAddress,
     epoch_change::Verifier,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
@@ -32,6 +33,10 @@ impl EpochState {
             epoch: 0,
             verifier: ValidatorVerifier::new(vec![]),
         }
+    }
+
+    pub fn add_malicious_authors(&mut self, malicious_authors: Vec<AccountAddress>) {
+        self.verifier.add_malicious_authors(malicious_authors);
     }
 }
 

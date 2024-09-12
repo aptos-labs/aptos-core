@@ -141,6 +141,13 @@ pub struct ValidatorVerifier {
     /// In-memory index of account address to its index in the vector, does not go through serde.
     #[serde(skip)]
     address_to_validator_index: HashMap<AccountAddress, usize>,
+    /// With optimistic signature verification, we aggregate all the votes on a message and verify at once.
+    /// We use this optimization for votes, order votes, commit votes, signed batch info. If the verification fails,
+    /// we verify each vote individually, which is a time consuming process. These are the list of voters that have
+    /// submitted bad votes that has resulted in having to verify each vote individually. Further votes by these validators
+    /// will be verified individually bypassing the optimization.
+    #[serde(skip)]
+    malicious_authors: HashMap<AccountAddress, u64>,
 }
 
 /// Reconstruct fields from the raw data upon deserialization.
@@ -179,6 +186,7 @@ impl ValidatorVerifier {
             quorum_voting_power,
             total_voting_power,
             address_to_validator_index,
+            malicious_authors: HashMap::new(),
         }
     }
 
@@ -212,6 +220,13 @@ impl ValidatorVerifier {
             quorum_voting_power,
             total_voting_power,
         ))
+    }
+
+    pub fn add_malicious_authors(&mut self, malicious_authors: Vec<AccountAddress>) {
+        for author in malicious_authors {
+            let entry = self.malicious_authors.entry(author).or_default();
+            *entry += 1;
+        }
     }
 
     /// Helper method to initialize with a single author and public key with quorum voting power 1.

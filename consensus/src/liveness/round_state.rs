@@ -14,8 +14,9 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
 use aptos_types::{
-    ledger_info::LedgerInfoWithMixedSignatures, validator_verifier::ValidatorVerifier,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures,
 };
+use aptos_infallible::RwLock;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
@@ -275,11 +276,11 @@ impl RoundState {
     pub fn insert_vote(
         &mut self,
         vote: &Vote,
-        verifier: &ValidatorVerifier,
+        epoch_state: Arc<RwLock<EpochState>>,
         verified: bool,
     ) -> VoteReceptionResult {
         if vote.vote_data().proposed().round() == self.current_round {
-            self.pending_votes.insert_vote(vote, verifier, verified)
+            self.pending_votes.insert_vote(vote, epoch_state, verified)
         } else {
             VoteReceptionResult::UnexpectedRound(
                 vote.vote_data().proposed().round(),

@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
 use crate::{
     counters, pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType,
 };
@@ -16,11 +17,9 @@ use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
-    aggregate_signature::PartialSignatures,
-    block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
-    validator_verifier::ValidatorVerifier,
+    aggregate_signature::PartialSignatures, block_info::BlockInfo, epoch_state::EpochState, ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures}, validator_verifier::ValidatorVerifier
 };
+use aptos_infallible::RwLock;
 use futures::future::BoxFuture;
 use itertools::zip_eq;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -187,7 +186,7 @@ impl BufferItem {
     pub fn advance_to_executed_or_aggregated(
         self,
         executed_blocks: Vec<PipelinedBlock>,
-        validator: &ValidatorVerifier,
+        verifier: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
         order_vote_enabled: bool,
     ) -> Self {
@@ -238,14 +237,14 @@ impl BufferItem {
                     );
 
                     let verified_signatures =
-                        verify_signatures(unverified_signatures, validator, &commit_ledger_info);
-                    if (validator.check_voting_power(verified_signatures.signatures().keys(), true))
+                        verify_signatures(unverified_signatures, verifier, &commit_ledger_info);
+                    if (verifier.check_voting_power(verified_signatures.signatures().keys(), true))
                         .is_ok()
                     {
                         let commit_proof = aggregate_commit_proof(
                             &commit_ledger_info,
                             &verified_signatures,
-                            validator,
+                            verifier,
                         );
                         debug!(
                             "{} advance to aggregated from ordered",
@@ -371,12 +370,12 @@ impl BufferItem {
         }
     }
 
-    pub fn try_advance_to_aggregated(self, verifier: &ValidatorVerifier) -> Self {
+    pub fn try_advance_to_aggregated(self, epoch_state: Arc<RwLock<EpochState>>) -> Self {
         match self {
             Self::Signed(signed_item) => {
                 if signed_item
                     .partial_commit_proof
-                    .check_voting_power(verifier)
+                    .check_voting_power(&epoch_state.read().verifier)
                     .is_ok()
                 {
                     let _time = counters::VERIFY_MSG
@@ -385,7 +384,7 @@ impl BufferItem {
                     if let Ok(commit_proof) = signed_item
                         .partial_commit_proof
                         .clone()
-                        .aggregate_and_verify(verifier)
+                        .aggregate_and_verify(epoch_state.clone())
                     {
                         return Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks: signed_item.executed_blocks,
@@ -399,7 +398,7 @@ impl BufferItem {
             Self::Executed(executed_item) => {
                 if executed_item
                     .partial_commit_proof
-                    .check_voting_power(verifier)
+                    .check_voting_power(&epoch_state.read().verifier)
                     .is_ok()
                 {
                     let _time = counters::VERIFY_MSG
@@ -409,7 +408,7 @@ impl BufferItem {
                     if let Ok(commit_proof) = executed_item
                         .partial_commit_proof
                         .clone()
-                        .aggregate_and_verify(verifier)
+                        .aggregate_and_verify(epoch_state.clone())
                     {
                         return Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks: executed_item.executed_blocks,
