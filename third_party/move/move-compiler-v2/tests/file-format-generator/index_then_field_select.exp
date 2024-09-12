@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: expected `vector<struct{0}>` but found a value of type `&mut vector<Coin>`
+  ┌─ tests/file-format-generator/index_then_field_select.move:5:23
+  │
+5 │         let _p = &mut x[index].0;
+  │                       ^
+
+error: cannot mutably borrow from an immutable ref
+  ┌─ tests/file-format-generator/index_then_field_select.move:9:18
+  │
+9 │         let _p = &mut x[index].0;
+  │                  ^^^^^^^^^^^^^^^
+
+error: expected `vector<_>` but found a value of type `&vector<Coin>`
+   ┌─ tests/file-format-generator/index_then_field_select.move:13:18
+   │
+13 │         let _p = x[index];
+   │                  ^
