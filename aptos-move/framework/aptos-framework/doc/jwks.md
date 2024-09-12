@@ -832,6 +832,59 @@ need to be careful how we read it in Rust (but BCS serialization should be the s
 
 ## Function `update_federated_jwk_set`
 
+This can be called to install or update a set of JWKs for a federated OIDC provider.  This function should
+be invoked to intially install a set of JWKs or to update a set of JWKs when a keypair is rotated.
+
+The <code>iss</code> parameter is the value of the <code>iss</code> claim on the JWTs that are to be verified by the JWK set.
+<code>kid_vec</code>, <code>alg_vec</code>, <code>e_vec</code>, <code>n_vec</code> are String vectors of the JWK attributes <code>kid</code>, <code>alg</code>, <code>e</code> and <code>n</code> respectively.
+See https://datatracker.ietf.org/doc/html/rfc7517#section-4 for more details about the JWK attributes aforementioned.
+
+For the example JWK set snapshot below containing 2 keys for Google found at https://www.googleapis.com/oauth2/v3/certs -
+```
+{
+"keys": [
+{
+"alg": "RS256",
+"use": "sig",
+"kty": "RSA",
+"n": "wNHgGSG5B5xOEQNFPW2p_6ZxZbfPoAU5VceBUuNwQWLop0ohW0vpoZLU1tAsq_S9s5iwy27rJw4EZAOGBR9oTRq1Y6Li5pDVJfmzyRNtmWCWndR-bPqhs_dkJU7MbGwcvfLsN9FSHESFrS9sfGtUX-lZfLoGux23TKdYV9EE-H-NDASxrVFUk2GWc3rL6UEMWrMnOqV9-tghybDU3fcRdNTDuXUr9qDYmhmNegYjYu4REGjqeSyIG1tuQxYpOBH-tohtcfGY-oRTS09kgsSS9Q5BRM4qqCkGP28WhlSf4ui0-norS0gKMMI1P_ZAGEsLn9p2TlYMpewvIuhjJs1thw",
+"kid": "d7b939771a7800c413f90051012d975981916d71",
+"e": "AQAB"
+},
+{
+"kty": "RSA",
+"kid": "b2620d5e7f132b52afe8875cdf3776c064249d04",
+"alg": "RS256",
+"n": "pi22xDdK2fz5gclIbDIGghLDYiRO56eW2GUcboeVlhbAuhuT5mlEYIevkxdPOg5n6qICePZiQSxkwcYMIZyLkZhSJ2d2M6Szx2gDtnAmee6o_tWdroKu0DjqwG8pZU693oLaIjLku3IK20lTs6-2TeH-pUYMjEqiFMhn-hb7wnvH_FuPTjgz9i0rEdw_Hf3Wk6CMypaUHi31y6twrMWq1jEbdQNl50EwH-RQmQ9bs3Wm9V9t-2-_Jzg3AT0Ny4zEDU7WXgN2DevM8_FVje4IgztNy29XUkeUctHsr-431_Iu23JIy6U4Kxn36X3RlVUKEkOMpkDD3kd81JPW4Ger_w",
+"e": "AQAB",
+"use": "sig"
+}
+]
+}
+```
+
+We can call update_federated_jwk_set for Google's <code>iss</code> - "https://accounts.google.com" and for each vector
+argument <code>kid_vec</code>, <code>alg_vec</code>, <code>e_vec</code>, <code>n_vec</code>, we set in index 0 the corresponding attribute in the first JWK and we set in index 1 the
+the corresponding attribute in the second JWK as shown below.
+
+```
+use std::string::utf8;
+aptos_framework::jwks::update_federated_jwk_set(
+jwk_owner,
+b"https://accounts.google.com",
+vector[utf8(b"d7b939771a7800c413f90051012d975981916d71"), utf8(b"b2620d5e7f132b52afe8875cdf3776c064249d04")],
+vector[utf8(b"RS256"), utf8(b"RS256")],
+vector[utf8(b"AQAB"), utf8(b"AQAB")],
+vector[
+utf8(b"wNHgGSG5B5xOEQNFPW2p_6ZxZbfPoAU5VceBUuNwQWLop0ohW0vpoZLU1tAsq_S9s5iwy27rJw4EZAOGBR9oTRq1Y6Li5pDVJfmzyRNtmWCWndR-bPqhs_dkJU7MbGwcvfLsN9FSHESFrS9sfGtUX-lZfLoGux23TKdYV9EE-H-NDASxrVFUk2GWc3rL6UEMWrMnOqV9-tghybDU3fcRdNTDuXUr9qDYmhmNegYjYu4REGjqeSyIG1tuQxYpOBH-tohtcfGY-oRTS09kgsSS9Q5BRM4qqCkGP28WhlSf4ui0-norS0gKMMI1P_ZAGEsLn9p2TlYMpewvIuhjJs1thw"),
+utf8(b"pi22xDdK2fz5gclIbDIGghLDYiRO56eW2GUcboeVlhbAuhuT5mlEYIevkxdPOg5n6qICePZiQSxkwcYMIZyLkZhSJ2d2M6Szx2gDtnAmee6o_tWdroKu0DjqwG8pZU693oLaIjLku3IK20lTs6-2TeH-pUYMjEqiFMhn-hb7wnvH_FuPTjgz9i0rEdw_Hf3Wk6CMypaUHi31y6twrMWq1jEbdQNl50EwH-RQmQ9bs3Wm9V9t-2-_Jzg3AT0Ny4zEDU7WXgN2DevM8_FVje4IgztNy29XUkeUctHsr-431_Iu23JIy6U4Kxn36X3RlVUKEkOMpkDD3kd81JPW4Ger_w")
+]
+)
+```
+
+See AIP-96 for more details about federated keyless - https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-96.md
+
+NOTE: Currently only RSA keys are supported.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="jwks.md#0x1_jwks_update_federated_jwk_set">update_federated_jwk_set</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, iss: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, kid_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, alg_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, e_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, n_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;)
