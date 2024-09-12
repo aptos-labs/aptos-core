@@ -229,6 +229,10 @@ impl ValidatorVerifier {
         }
     }
 
+    pub fn is_malicious_author(&self, author: &AccountAddress) -> bool {
+        self.malicious_authors.contains_key(author)
+    }
+
     /// Helper method to initialize with a single author and public key with quorum voting power 1.
     pub fn new_single(author: AccountAddress, public_key: PublicKey) -> Self {
         let validator_infos = vec![ValidatorConsensusInfo::new(author, public_key, 1)];

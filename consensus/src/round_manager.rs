@@ -204,9 +204,12 @@ pub enum VerifiedEvent {
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
+    UnverifiedVoteMsg(Box<VoteMsg>),
+    UnverifiedOrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
+    UnverifiedSignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
     // local messages
     LocalTimeout(Round),
@@ -1452,10 +1455,6 @@ impl RoundManager {
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
-        mut unverified_event_rx: aptos_channel::Receiver<
-            (Author, Discriminant<UnverifiedEvent>),
-            (Author, UnverifiedEvent),
-        >,
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
@@ -1541,6 +1540,12 @@ impl RoundManager {
                         VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
                             monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg, true).await)
                         }
+                        VerifiedEvent::UnverifiedVoteMsg(vote_msg) => {
+                            monitor!("process_unverified_vote", self.process_vote_msg(*vote_msg, false).await)
+                        }
+                        VerifiedEvent::UnverifiedOrderVoteMsg(order_vote_msg) => {
+                            monitor!("process_unverified_order_vote", self.process_order_vote_msg(*order_vote_msg, false).await)
+                        }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_sync_info",
@@ -1552,27 +1557,6 @@ impl RoundManager {
                             self.process_local_timeout(round).await
                         ),
                         unexpected_event => unreachable!("Unexpected verified event: {:?}", unexpected_event),
-                    }
-                    .with_context(|| format!("from peer {}", peer_id));
-
-                    let round_state = self.round_state();
-                    match result {
-                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
-                        Err(e) => {
-                            counters::ERROR_COUNT.inc();
-                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
-                        }
-                    }
-                },
-                (peer_id, event) = unverified_event_rx.select_next_some() => {
-                    let result = match event {
-                        UnverifiedEvent::VoteMsg(vote_msg) => {
-                            monitor!("process_vote", self.process_vote_msg(*vote_msg, false).await)
-                        }
-                        UnverifiedEvent::OrderVoteMsg(order_vote_msg) => {
-                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg, false).await)
-                        }
-                        unexpected_event => unreachable!("Unexpected unverified event: {:?}", unexpected_event),
                     }
                     .with_context(|| format!("from peer {}", peer_id));
 

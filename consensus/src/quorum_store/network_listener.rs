@@ -7,7 +7,7 @@ use crate::{
         batch_coordinator::BatchCoordinatorCommand, counters,
         proof_coordinator::ProofCoordinatorCommand, proof_manager::ProofManagerCommand,
     },
-    round_manager::{UnverifiedEvent, VerifiedEvent},
+    round_manager::VerifiedEvent,
 };
 use aptos_channels::aptos_channel;
 use aptos_logger::prelude::*;
@@ -16,8 +16,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
-    verified_network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-    unverified_network_msg_rx: aptos_channel::Receiver<PeerId, UnverifiedEvent>,
+    network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
     remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
     proof_manager_tx: Sender<ProofManagerCommand>,
@@ -25,15 +24,13 @@ pub(crate) struct NetworkListener {
 
 impl NetworkListener {
     pub(crate) fn new(
-        verified_network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-        unverified_network_msg_rx: aptos_channel::Receiver<PeerId, UnverifiedEvent>,
+        network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
         remote_batch_coordinator_tx: Vec<Sender<BatchCoordinatorCommand>>,
         proof_manager_tx: Sender<ProofManagerCommand>,
     ) -> Self {
         Self {
-            verified_network_msg_rx,
-            unverified_network_msg_rx,
+            network_msg_rx,
             proof_coordinator_tx,
             remote_batch_coordinator_tx,
             proof_manager_tx,
@@ -44,7 +41,7 @@ impl NetworkListener {
         info!("QS: starting networking");
         loop {
             tokio::select! {
-                Some(msg) = self.verified_network_msg_rx.next() => monitor!("qs_network_listener_main_loop", {
+                Some(msg) = self.network_msg_rx.next() => monitor!("qs_network_listener_main_loop", {
                     match msg {
                         // TODO: does the assumption have to be that network listener is shutdown first?
                         VerifiedEvent::Shutdown(ack_tx) => {
@@ -62,6 +59,16 @@ impl NetworkListener {
                                 .with_label_values(&["NetworkListener::signedbatchinfo"])
                                 .inc();
                             let cmd = ProofCoordinatorCommand::AppendSignature((*signed_batch_infos, true));
+                            self.proof_coordinator_tx
+                                .send(cmd)
+                                .await
+                                .expect("Could not send signed_batch_info to proof_coordinator");
+                        },
+                        VerifiedEvent::UnverifiedSignedBatchInfo(signed_batch_infos) => {
+                            counters::QUORUM_STORE_MSG_COUNT
+                                .with_label_values(&["NetworkListener::signedbatchinfo"])
+                                .inc();
+                            let cmd = ProofCoordinatorCommand::AppendSignature((*signed_batch_infos, false));
                             self.proof_coordinator_tx
                                 .send(cmd)
                                 .await
@@ -94,20 +101,6 @@ impl NetworkListener {
                                 .send(cmd)
                                 .await
                                 .expect("could not push Proof proof_of_store");
-                        },
-                        _ => {
-                            unreachable!()
-                        },
-                    }
-                }),
-                Some(msg) = self.unverified_network_msg_rx.next() => monitor!("qs_unverified_network_listener_main_loop", {
-                    match msg {
-                        UnverifiedEvent::SignedBatchInfo(signed_batch_infos) => {
-                            let cmd = ProofCoordinatorCommand::AppendSignature((*signed_batch_infos, false));
-                            self.proof_coordinator_tx
-                                .send(cmd)
-                                .await
-                                .expect("Could not send signed_batch_info to proof_coordinator");
                         },
                         _ => {
                             unreachable!()
