@@ -943,7 +943,16 @@ impl AptosDB {
         let mut events_with_version = event_indices
             .into_iter()
             .map(|(seq, ver, idx)| {
-                let event = self.event_store.get_event_by_version_and_index(ver, idx)?;
+                let event = match self.event_store.get_event_by_version_and_index(ver, idx)? {
+                    event @ ContractEvent::V1(_) => event,
+                    ContractEvent::V2(_) => ContractEvent::V1(
+                        self.state_store
+                            .internal_indexer_db
+                            .as_ref()
+                            .expect("Indexer not enabled")
+                            .get_translated_v1_event_by_version_and_index(ver, idx)?,
+                    ),
+                };
                 let v0 = match &event {
                     ContractEvent::V1(event) => event,
                     ContractEvent::V2(_) => bail!("Unexpected module event"),
