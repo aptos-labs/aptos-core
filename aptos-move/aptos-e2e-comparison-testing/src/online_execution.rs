@@ -147,6 +147,7 @@ impl OnlineExecutor {
 
         let mut cur_version = begin;
         let mut module_registry_map = HashMap::new();
+        let mut filtered_vec = vec![];
         while cur_version < begin + limit {
             let batch = if cur_version + self.batch_size <= begin + limit {
                 self.batch_size
@@ -160,6 +161,7 @@ impl OnlineExecutor {
                     batch,
                     self.filter_condition,
                     &mut module_registry_map,
+                    &mut filtered_vec,
                 )
                 .await;
             // if error happens when collecting txns, log the version range
