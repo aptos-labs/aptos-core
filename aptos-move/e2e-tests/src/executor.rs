@@ -46,9 +46,8 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, EntryFunction, ExecutionStatus, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -667,6 +666,7 @@ impl FakeExecutor {
         onchain_config: BlockExecutorConfigFromOnchain,
         sequential: bool,
         state_view: &(impl StateView + Sync),
+        with_cache: bool,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
@@ -697,6 +697,7 @@ impl FakeExecutor {
             None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)
+
     }
 
     pub fn execute_transaction_block_with_state_view(
@@ -704,6 +705,7 @@ impl FakeExecutor {
         txn_block: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
         check_signature: bool,
+        with_cache: bool
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
 
@@ -737,7 +739,7 @@ impl FakeExecutor {
         });
 
         // TODO fetch values from state?
-        let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
+        let onchain_config: BlockExecutorConfigFromOnchain = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
@@ -745,6 +747,7 @@ impl FakeExecutor {
                 onchain_config.clone(),
                 true,
                 state_view,
+                with_cache
             ))
         } else {
             None
@@ -756,6 +759,7 @@ impl FakeExecutor {
                 onchain_config,
                 false,
                 state_view,
+                with_cache
             ))
         } else {
             None
@@ -810,7 +814,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        self.execute_transaction_block_with_state_view(txn_block, &self.data_store, true)
+        self.execute_transaction_block_with_state_view(txn_block, &self.data_store, true, false)
     }
 
     pub fn execute_transaction(&self, txn: SignedTransaction) -> TransactionOutput {

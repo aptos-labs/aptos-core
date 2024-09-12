@@ -14,7 +14,7 @@ use aptos_types::{
 use rocksdb::{DBWithThreadMode, SingleThreaded, DB};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Read, Write},
@@ -296,7 +296,7 @@ async fn download_aptos_packages(path: &Path) -> anyhow::Result<()> {
     let git_url = "https://github.com/aptos-labs/aptos-core";
     let tmp_dir = TempDir::new()?;
     Command::new("git")
-        .args(["clone", git_url, tmp_dir.path().to_str().unwrap()])
+        .args(["clone", "--branch", "igor/use_native_vector_move_range", git_url, tmp_dir.path().to_str().unwrap(), "--depth", "1"])
         .output()
         .map_err(|_| anyhow::anyhow!("Failed to clone Git repository"))?;
     let source_framework_path = PathBuf::from(tmp_dir.path()).join("aptos-move/framework");
@@ -443,6 +443,7 @@ fn compile_package(
 ) -> anyhow::Result<CompiledPackage> {
     let mut build_options = aptos_framework::BuildOptions {
         compiler_version,
+        bytecode_version: Some(6),
         ..Default::default()
     };
     build_options
@@ -504,6 +505,17 @@ fn dump_and_compile_from_package_metadata(
     let manifest_str = unzip_metadata_str(&manifest_u8).unwrap();
     let mut manifest =
         parse_source_manifest(parse_move_manifest_string(manifest_str.clone()).unwrap()).unwrap();
+    let mut updated_addresses_map = BTreeMap::new();
+    if manifest.addresses.is_some() {
+        for x in manifest.addresses.clone().unwrap() {
+            if x.1.is_some() || x.0 == package_info.package_name.clone().into() {
+                updated_addresses_map.insert(x.0, x.1);
+            } else {
+                updated_addresses_map.insert(x.0, Some(package_info.address));
+            }
+        }
+        manifest.addresses = Some(updated_addresses_map);
+    }
 
     let fix_manifest_dep = |dep: &mut Dependency, local_str: &str| {
         dep.git_info = None;
