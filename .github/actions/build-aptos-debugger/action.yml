@@ -13,6 +13,14 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: assert GIT_SHA provided
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.GIT_SHA }}" ]; then
+          echo "GIT_SHA is required"
+          exit 1
+        fi
+
     - uses: actions/checkout@v4
       with:
         ref: ${{ inputs.GIT_SHA }}

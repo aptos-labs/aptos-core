@@ -83,7 +83,7 @@ jobs:
       - uses: aptos-labs/aptos-core/.github/actions/get-aptos-debugger@0911-alden-cache-build
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          GIT_SHA: ${{ inputs.GIT_SHA }}
+          GIT_SHA: ${{ inputs.GIT_SHA || $GITHUB_SHA }}
 
   replay-verify:
     needs: build
