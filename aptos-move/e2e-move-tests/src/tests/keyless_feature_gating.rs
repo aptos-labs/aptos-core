@@ -6,6 +6,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{hash::CryptoHash, SigningKey};
 use aptos_language_e2e_tests::account::{Account, AccountPublicKey, TransactionBuilder};
 use aptos_types::{
+    account_config::CORE_CODE_ADDRESS,
     jwks::{rsa::RSA_JWK, secure_test_rsa_jwk},
     keyless::{
         test_utils::{
@@ -18,12 +19,15 @@ use aptos_types::{
     on_chain_config::FeatureFlag,
     transaction::{
         authenticator::{AnyPublicKey, AuthenticationKey, EphemeralSignature},
-        Script, SignedTransaction, Transaction, TransactionStatus,
+        EntryFunction, Script, SignedTransaction, Transaction, TransactionStatus,
     },
 };
 use move_core_types::{
     account_address::AccountAddress,
+    ident_str,
+    language_storage::ModuleId,
     transaction_argument::TransactionArgument,
+    value::{serialize_values, MoveValue},
     vm_status::{
         StatusCode,
         StatusCode::{FEATURE_UNDER_GATING, INVALID_SIGNATURE},
@@ -507,25 +511,19 @@ fn federated_keyless_install_jwk(
 ) {
     let jwk_owner_account = h.new_account_at(jwk_owner);
 
-    let package = build_package(
-        common::test_dir_path("federated_keyless_install_jwk.data/pack"),
-        aptos_framework::BuildOptions::default(),
-    )
-    .expect("building package must succeed");
-
-    let txn = h.create_publish_built_package(&jwk_owner_account, &package, |_| {});
-    assert_success!(h.run(txn));
-
-    let script = package.extract_script_code()[0].clone();
-
     let txn = TransactionBuilder::new(jwk_owner_account.clone())
-        .script(Script::new(script, vec![], vec![
-            TransactionArgument::U8Vector(iss.into_bytes()),
-            TransactionArgument::U8Vector(jwk.kid.into_bytes()),
-            TransactionArgument::U8Vector(jwk.alg.into_bytes()),
-            TransactionArgument::U8Vector(jwk.e.into_bytes()),
-            TransactionArgument::U8Vector(jwk.n.into_bytes()),
-        ]))
+        .entry_function(EntryFunction::new(
+            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("jwks").to_owned()),
+            ident_str!("update_federated_jwk_set").to_owned(),
+            vec![],
+            serialize_values(&vec![
+                MoveValue::vector_u8(iss.into_bytes()),
+                MoveValue::Vector(vec![MoveValue::vector_u8(jwk.kid.into_bytes())]),
+                MoveValue::Vector(vec![MoveValue::vector_u8(jwk.alg.into_bytes())]),
+                MoveValue::Vector(vec![MoveValue::vector_u8(jwk.e.into_bytes())]),
+                MoveValue::Vector(vec![MoveValue::vector_u8(jwk.n.into_bytes())]),
+            ]),
+        ))
         .sequence_number(h.sequence_number(jwk_owner_account.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
