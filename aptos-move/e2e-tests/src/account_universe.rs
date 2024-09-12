@@ -128,7 +128,7 @@ pub struct AccountCurrent {
 
 impl AccountCurrent {
     fn new(initial_data: AccountData) -> Self {
-        let balance = initial_data.balance();
+        let balance = initial_data.coin_balance().unwrap();
         let sequence_number = initial_data.sequence_number();
         let sent_events_count = initial_data.sent_events_count();
         let received_events_count = initial_data.received_events_count();
