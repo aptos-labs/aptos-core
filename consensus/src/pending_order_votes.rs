@@ -163,10 +163,13 @@ impl PendingOrderVotes {
 mod tests {
     use super::{OrderVoteReceptionResult, PendingOrderVotes};
     use aptos_consensus_types::order_vote::OrderVote;
-    use aptos_crypto::HashValue;
+    use aptos_crypto::{bls12381, HashValue};
     use aptos_types::{
-        block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
-        validator_verifier::random_validator_verifier,
+        aggregate_signature::PartialSignatures,
+        block_info::BlockInfo,
+        epoch_state::EpochState,
+        ledger_info::LedgerInfo,
+        validator_verifier::{random_validator_verifier, VerifyError},
     };
     use std::sync::Arc;
 
@@ -259,5 +262,108 @@ mod tests {
         pending_order_votes.garbage_collect(0);
         assert!(!pending_order_votes.has_enough_order_votes(&li1));
         assert!(!pending_order_votes.has_enough_order_votes(&li2));
+    }
+
+    #[test]
+    fn order_vote_aggregation_with_unverified_votes() {
+        ::aptos_logger::Logger::init_for_testing();
+
+        let (signers, verifier) = random_validator_verifier(5, Some(3), false);
+        let epoch_state = Arc::new(EpochState::new(1, verifier));
+
+        let mut pending_order_votes = PendingOrderVotes::new();
+        let mut partial_signatures = PartialSignatures::empty();
+
+        // create random vote from validator[0]
+        let li = random_ledger_info();
+        let vote_0 = OrderVote::new_with_signature(
+            signers[0].author(),
+            li.clone(),
+            signers[0].sign(&li).expect("Unable to sign ledger info"),
+        );
+        partial_signatures.add_signature(signers[0].author(), vote_0.signature().clone());
+
+        let vote_1 = OrderVote::new_with_signature(
+            signers[1].author(),
+            li.clone(),
+            signers[1].sign(&li).expect("Unable to sign ledger info"),
+        );
+        partial_signatures.add_signature(signers[1].author(), vote_1.signature().clone());
+
+        let vote_2 = OrderVote::new_with_signature(
+            signers[2].author(),
+            li.clone(),
+            bls12381::Signature::dummy_signature(),
+        );
+
+        let vote_3 = OrderVote::new_with_signature(
+            signers[3].author(),
+            li.clone(),
+            signers[3].sign(&li).expect("Unable to sign ledger info"),
+        );
+        partial_signatures.add_signature(signers[3].author(), vote_3.signature().clone());
+
+        let vote_4 = OrderVote::new_with_signature(
+            signers[4].author(),
+            li.clone(),
+            signers[4].sign(&li).expect("Unable to sign ledger info"),
+        );
+
+        assert_eq!(
+            pending_order_votes.insert_order_vote(&vote_0, epoch_state.clone(), false),
+            OrderVoteReceptionResult::VoteAdded(1)
+        );
+
+        assert_eq!(
+            pending_order_votes.insert_order_vote(&vote_0, epoch_state.clone(), true),
+            OrderVoteReceptionResult::VoteAdded(1)
+        );
+
+        assert_eq!(
+            pending_order_votes.insert_order_vote(&vote_1, epoch_state.clone(), true),
+            OrderVoteReceptionResult::VoteAdded(2)
+        );
+
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 0);
+        assert_eq!(
+            pending_order_votes.insert_order_vote(&vote_2, epoch_state.clone(), false),
+            OrderVoteReceptionResult::ErrorAggregatingSignature(
+                VerifyError::TooLittleVotingPower {
+                    voting_power: 2,
+                    expected_voting_power: 3
+                }
+            )
+        );
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+
+        let aggregate_sig = epoch_state
+            .verifier
+            .aggregate_signatures(&partial_signatures)
+            .unwrap();
+        match pending_order_votes.insert_order_vote(&vote_3, epoch_state.clone(), false) {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
+                assert!(li_with_sig
+                    .check_voting_power(&epoch_state.verifier)
+                    .is_ok());
+
+                assert_eq!(li_with_sig.signatures().clone(), aggregate_sig.clone());
+            },
+            _ => {
+                panic!("No QC formed.");
+            },
+        };
+
+        match pending_order_votes.insert_order_vote(&vote_4, epoch_state.clone(), false) {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
+                assert!(li_with_sig
+                    .check_voting_power(&epoch_state.verifier)
+                    .is_ok());
+
+                assert_eq!(li_with_sig.signatures().clone(), aggregate_sig.clone());
+            },
+            _ => {
+                panic!("No QC formed.");
+            },
+        };
     }
 }
