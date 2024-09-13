@@ -1,18 +1,4 @@
 
-Diagnostics:
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-  ┌─ tests/control-flow-simplification/jump-label.move:8:13
-  │
-8 │     fun bar<T>(x: bool): T {
-  │                ^
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/control-flow-simplification/jump-label.move:12:13
-   │
-12 │     fun baz<T>(x: vector<u8>): T {
-   │                ^
-
-
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.test {
