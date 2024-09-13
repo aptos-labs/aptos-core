@@ -59,7 +59,7 @@ pub trait TExecutionClient: Send + Sync {
     async fn start_epoch(
         &self,
         maybe_consensus_key: Option<Arc<PrivateKey>>,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
@@ -186,7 +186,7 @@ impl ExecutionProxyClient {
         &self,
         maybe_consensus_key: Option<Arc<PrivateKey>>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         onchain_consensus_config: &OnChainConsensusConfig,
@@ -200,7 +200,7 @@ impl ExecutionProxyClient {
             self.author,
             self.network_sender.clone(),
             self.self_sender.clone(),
-            epoch_state.read().verifier.clone(),
+            epoch_state.verifier.clone(),
         );
 
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
@@ -224,7 +224,7 @@ impl ExecutionProxyClient {
 
                 let rand_manager = RandManager::<Share, AugmentedData>::new(
                     self.author,
-                    Arc::new(epoch_state.read().clone()),
+                    epoch_state.clone(),
                     signer,
                     rand_config,
                     fast_rand_config,
@@ -299,7 +299,7 @@ impl TExecutionClient for ExecutionProxyClient {
     async fn start_epoch(
         &self,
         maybe_consensus_key: Option<Arc<PrivateKey>>,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
@@ -333,7 +333,7 @@ impl TExecutionClient for ExecutionProxyClient {
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled();
         self.execution_proxy.new_epoch(
-            &epoch_state.read().clone(),
+            &epoch_state.clone(),
             payload_manager,
             transaction_shuffler,
             block_executor_onchain_config,
@@ -493,7 +493,7 @@ impl TExecutionClient for DummyExecutionClient {
     async fn start_epoch(
         &self,
         _maybe_consensus_key: Option<Arc<PrivateKey>>,
-        _epoch_state: Arc<RwLock<EpochState>>,
+        _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,

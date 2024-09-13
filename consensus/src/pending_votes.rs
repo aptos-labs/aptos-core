@@ -16,7 +16,6 @@ use aptos_consensus_types::{
     vote::Vote,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures,
@@ -88,7 +87,7 @@ impl PendingVotes {
     pub fn insert_vote(
         &mut self,
         vote: &Vote,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         verified: bool,
     ) -> VoteReceptionResult {
         // derive data from vote
@@ -144,7 +143,7 @@ impl PendingVotes {
                 )
             });
 
-        let validator_voting_power = epoch_state.read().verifier.get_voting_power(&vote.author());
+        let validator_voting_power = epoch_state.verifier.get_voting_power(&vote.author());
 
         if validator_voting_power.is_none() {
             warn!("Received vote from an unknown author: {}", vote.author());
@@ -159,7 +158,7 @@ impl PendingVotes {
         let cur_epoch = vote.vote_data().proposed().epoch() as i64;
         let cur_round = vote.vote_data().proposed().round() as i64;
         counters::CONSENSUS_CURRENT_ROUND_QUORUM_VOTING_POWER
-            .set(epoch_state.read().verifier.quorum_voting_power() as f64);
+            .set(epoch_state.verifier.quorum_voting_power() as f64);
 
         if !vote.is_timeout() {
             counters::CONSENSUS_CURRENT_ROUND_VOTED_POWER
@@ -177,11 +176,11 @@ impl PendingVotes {
         li_with_sig.add_signature(vote.author(), vote.signature().clone(), verified);
 
         // check if we have enough signatures to create a QC
-        let voting_power = match li_with_sig.check_voting_power(&epoch_state.read().verifier) {
+        let voting_power = match li_with_sig.check_voting_power(&epoch_state.verifier) {
             // a quorum of signature was reached, a new QC is formed
             Ok(aggregated_voting_power) => {
                 assert!(
-                        aggregated_voting_power >= epoch_state.read().verifier.quorum_voting_power(),
+                        aggregated_voting_power >= epoch_state.verifier.quorum_voting_power(),
                         "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                     );
                 let verification_result = {
@@ -235,12 +234,11 @@ impl PendingVotes {
                 .get_or_insert_with(|| TwoChainTimeoutWithPartialSignatures::new(timeout.clone()));
             partial_tc.add(vote.author(), timeout.clone(), signature.clone());
             let tc_voting_power = match epoch_state
-                .read()
                 .verifier
                 .check_voting_power(partial_tc.signers(), true)
             {
                 Ok(_) => {
-                    return match partial_tc.aggregate_signatures(&epoch_state.read().verifier) {
+                    return match partial_tc.aggregate_signatures(&epoch_state.verifier) {
                         Ok(tc_with_sig) => {
                             VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
                         },
@@ -259,8 +257,8 @@ impl PendingVotes {
 
             // Echo timeout if receive f+1 timeout message.
             if !self.echo_timeout {
-                let f_plus_one = epoch_state.read().verifier.total_voting_power()
-                    - epoch_state.read().verifier.quorum_voting_power()
+                let f_plus_one = epoch_state.verifier.total_voting_power()
+                    - epoch_state.verifier.quorum_voting_power()
                     + 1;
                 if tc_voting_power >= f_plus_one {
                     self.echo_timeout = true;
@@ -369,7 +367,6 @@ mod tests {
         block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
     use aptos_crypto::HashValue;
-    use aptos_infallible::RwLock;
     use aptos_types::{
         block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
         validator_verifier::random_validator_verifier,
@@ -398,7 +395,7 @@ mod tests {
 
         // set up 4 validators
         let (signers, verifier) = random_validator_verifier(4, Some(2), false);
-        let epoch_state = Arc::new(RwLock::new(EpochState::new(5, verifier)));
+        let epoch_state = Arc::new(EpochState::new(5, verifier));
         let mut pending_votes = PendingVotes::new();
 
         // create random vote from validator[0]
@@ -454,7 +451,7 @@ mod tests {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc
                     .ledger_info()
-                    .check_voting_power(&epoch_state.read().verifier)
+                    .check_voting_power(&epoch_state.verifier)
                     .is_ok());
             },
             _ => {
@@ -469,7 +466,7 @@ mod tests {
 
         // set up 4 validators
         let (signers, verifier) = random_validator_verifier(7, Some(3), false);
-        let epoch_state = Arc::new(RwLock::new(EpochState::new(5, verifier)));
+        let epoch_state = Arc::new(EpochState::new(5, verifier));
         let mut pending_votes = PendingVotes::new();
 
         // create random vote from validator[0]
@@ -520,7 +517,7 @@ mod tests {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc
                     .ledger_info()
-                    .check_voting_power(&epoch_state.clone().read().verifier)
+                    .check_voting_power(&epoch_state.clone().verifier)
                     .is_ok());
             },
             _ => {
@@ -535,7 +532,7 @@ mod tests {
 
         // set up 4 validators
         let (signers, verifier) = random_validator_verifier(4, None, false);
-        let epoch_state = Arc::new(RwLock::new(EpochState::new(5, verifier)));
+        let epoch_state = Arc::new(EpochState::new(5, verifier));
         let mut pending_votes = PendingVotes::new();
 
         // submit a new vote from validator[0] -> VoteAdded
@@ -592,13 +589,11 @@ mod tests {
         match pending_votes.insert_vote(&vote2_author_2, epoch_state.clone(), true) {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 assert!(epoch_state
-                    .read()
                     .verifier
                     .check_voting_power(
                         tc.signatures_with_rounds()
                             .get_voters(
                                 &epoch_state
-                                    .read()
                                     .verifier
                                     .get_ordered_account_addresses_iter()
                                     .collect_vec()

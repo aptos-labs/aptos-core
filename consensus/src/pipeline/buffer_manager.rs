@@ -32,7 +32,6 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -141,7 +140,7 @@ pub struct BufferManager {
 
     stop: bool,
 
-    epoch_state: Arc<RwLock<EpochState>>,
+    epoch_state: Arc<EpochState>,
 
     ongoing_tasks: Arc<AtomicU64>,
     // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
@@ -187,7 +186,7 @@ impl BufferManager {
         persisting_phase_rx: Receiver<ExecutorResult<Round>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
@@ -205,7 +204,7 @@ impl BufferManager {
             .max_delay(Duration::from_secs(5));
 
         let (tx, rx) = unbounded();
-        let validators = epoch_state.read().verifier.get_ordered_account_addresses();
+        let validators = epoch_state.verifier.get_ordered_account_addresses();
         Self {
             author,
 
@@ -275,7 +274,6 @@ impl BufferManager {
             message,
             AckState::new(
                 self.epoch_state
-                    .read()
                     .verifier
                     .get_ordered_account_addresses_iter(),
             ),
@@ -899,7 +897,7 @@ impl BufferManager {
                         {
                             let _ = tx.unbounded_send(commit_msg);
                         } else {
-                            match commit_msg.req.verify(&epoch_state_clone.read().verifier) {
+                            match commit_msg.req.verify(&epoch_state_clone.verifier) {
                                 Ok(_) => {
                                     let _ = tx.unbounded_send(commit_msg);
                                 },

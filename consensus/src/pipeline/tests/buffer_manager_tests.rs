@@ -32,7 +32,7 @@ use aptos_consensus_types::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
@@ -151,10 +151,10 @@ pub fn prepare_buffer_manager(
         state_computer,
         block_rx,
         buffer_reset_rx,
-        Arc::new(RwLock::new(EpochState {
+        Arc::new(EpochState {
             epoch: 1,
             verifier: validators.clone(),
-        })),
+        }),
         bounded_executor,
         false,
         true,

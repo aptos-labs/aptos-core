@@ -29,7 +29,6 @@ use aptos_consensus_types::{
     common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
 };
 use aptos_global_constants::CONSENSUS_KEY;
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_secure_storage::{KVStorage, Storage};
@@ -118,7 +117,7 @@ impl DirectMempoolInnerBuilder {
 
 // TODO: push most things to config
 pub struct InnerBuilder {
-    epoch_state: Arc<RwLock<EpochState>>,
+    epoch_state: Arc<EpochState>,
     author: Author,
     config: QuorumStoreConfig,
     consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
@@ -150,7 +149,7 @@ pub struct InnerBuilder {
 
 impl InnerBuilder {
     pub(crate) fn new(
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         author: Author,
         config: QuorumStoreConfig,
         consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
@@ -246,7 +245,7 @@ impl InnerBuilder {
             self.epoch_state.clone(),
         );
         let batch_store = Arc::new(BatchStore::new(
-            self.epoch_state.read().epoch,
+            self.epoch_state.epoch,
             last_committed_timestamp,
             self.quorum_store_storage.clone(),
             self.config.memory_quota,
@@ -290,7 +289,7 @@ impl InnerBuilder {
         let batch_generator_cmd_rx = self.batch_generator_cmd_rx.take().unwrap();
         let back_pressure_rx = self.back_pressure_rx.take().unwrap();
         let batch_generator = BatchGenerator::new(
-            self.epoch_state.read().epoch,
+            self.epoch_state.epoch,
             self.author,
             self.config.clone(),
             self.quorum_store_storage.clone(),
@@ -356,7 +355,7 @@ impl InnerBuilder {
             self.config
                 .back_pressure
                 .backlog_per_validator_batch_limit_count
-                * self.epoch_state.read().verifier.len() as u64,
+                * self.epoch_state.verifier.len() as u64,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
             self.config.enable_opt_quorum_store,
@@ -379,7 +378,7 @@ impl InnerBuilder {
         spawn_named!("network_listener", net.start());
 
         let batch_store = self.batch_store.clone().unwrap();
-        let epoch = self.epoch_state.read().epoch;
+        let epoch = self.epoch_state.epoch;
         let (batch_retrieval_tx, mut batch_retrieval_rx) =
             aptos_channel::new::<AccountAddress, IncomingBatchRetrievalRequest>(
                 QueueStyle::LIFO,
@@ -438,10 +437,7 @@ impl InnerBuilder {
                 // TODO: remove after splitting out clean requests
                 self.coordinator_tx.clone(),
                 consensus_publisher,
-                self.epoch_state
-                    .read()
-                    .verifier
-                    .get_ordered_account_addresses(),
+                self.epoch_state.verifier.get_ordered_account_addresses(),
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

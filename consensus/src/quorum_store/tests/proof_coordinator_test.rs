@@ -13,7 +13,6 @@ use crate::{
 use aptos_consensus_types::proof_of_store::{BatchId, SignedBatchInfo, SignedBatchInfoMsg};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
-use aptos_infallible::RwLock;
 use aptos_types::{
     epoch_state::EpochState, transaction::SignedTransaction,
     validator_verifier::random_validator_verifier, PeerId,
@@ -49,7 +48,7 @@ impl BatchReader for MockBatchReader {
 async fn test_proof_coordinator_basic() {
     aptos_logger::Logger::init_for_testing();
     let (signers, verifier) = random_validator_verifier(4, None, true);
-    let epoch_state = Arc::new(RwLock::new(EpochState::new(5, verifier)));
+    let epoch_state = Arc::new(EpochState::new(5, verifier));
     let (tx, _rx) = channel(100);
     let proof_cache = Cache::builder().build();
     let proof_coordinator = ProofCoordinator::new(
@@ -94,7 +93,7 @@ async fn test_proof_coordinator_basic() {
     };
     // check normal path
     assert!(proof_msg
-        .verify(100, &epoch_state.read().verifier, &proof_cache)
+        .verify(100, &epoch_state.verifier, &proof_cache)
         .is_ok());
     let proofs = proof_msg.take();
     assert_eq!(proofs[0].digest(), digest);

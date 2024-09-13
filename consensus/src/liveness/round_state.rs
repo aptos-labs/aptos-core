@@ -12,7 +12,6 @@ use aptos_consensus_types::{
     vote::Vote,
 };
 use aptos_crypto::HashValue;
-use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Schema};
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures};
 use futures::future::AbortHandle;
@@ -274,7 +273,7 @@ impl RoundState {
     pub fn insert_vote(
         &mut self,
         vote: &Vote,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         verified: bool,
     ) -> VoteReceptionResult {
         if vote.vote_data().proposed().round() == self.current_round {

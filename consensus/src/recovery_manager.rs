@@ -17,7 +17,7 @@ use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
     common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::VoteMsg,
 };
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{FutureExt, StreamExt};
@@ -27,7 +27,7 @@ use std::{mem::Discriminant, process, sync::Arc};
 /// If the node can't recover corresponding blocks from local storage, RecoveryManager is responsible
 /// for processing the events carrying sync info and use the info to retrieve blocks from peers
 pub struct RecoveryManager {
-    epoch_state: Arc<RwLock<EpochState>>,
+    epoch_state: Arc<EpochState>,
     network: Arc<NetworkSender>,
     storage: Arc<dyn PersistentLivenessStorage>,
     execution_client: Arc<dyn TExecutionClient>,
@@ -40,7 +40,7 @@ pub struct RecoveryManager {
 
 impl RecoveryManager {
     pub fn new(
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         network: Arc<NetworkSender>,
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
@@ -79,20 +79,19 @@ impl RecoveryManager {
     }
 
     pub async fn sync_up(&mut self, sync_info: &SyncInfo, peer: Author) -> Result<RecoveryData> {
-        sync_info.verify(&self.epoch_state.read().verifier)?;
+        sync_info.verify(&self.epoch_state.verifier)?;
         ensure!(
             sync_info.highest_round() > self.last_committed_round,
             "[RecoveryManager] Received sync info has lower round number than committed block"
         );
         ensure!(
-            sync_info.epoch() == self.epoch_state.read().epoch,
+            sync_info.epoch() == self.epoch_state.epoch,
             "[RecoveryManager] Received sync info is in different epoch than committed block"
         );
         let mut retriever = BlockRetriever::new(
             self.network.clone(),
             peer,
             self.epoch_state
-                .read()
                 .verifier
                 .get_ordered_account_addresses_iter()
                 .collect(),
@@ -121,10 +120,7 @@ impl RecoveryManager {
         >,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        info!(
-            epoch = self.epoch_state.read().epoch,
-            "RecoveryManager started"
-        );
+        info!(epoch = self.epoch_state.epoch, "RecoveryManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
             futures::select! {
@@ -151,7 +147,7 @@ impl RecoveryManager {
 
                     match result {
                         Ok(_) => {
-                            info!("Recovery finishes for epoch {}, RecoveryManager stopped. Please restart the node", self.epoch_state.read().epoch);
+                            info!("Recovery finishes for epoch {}, RecoveryManager stopped. Please restart the node", self.epoch_state.epoch);
                             process::exit(0);
                         },
                         Err(e) => {
@@ -168,9 +164,6 @@ impl RecoveryManager {
                 }
             }
         }
-        info!(
-            epoch = self.epoch_state.read().epoch,
-            "RecoveryManager stopped"
-        );
+        info!(epoch = self.epoch_state.epoch, "RecoveryManager stopped");
     }
 }

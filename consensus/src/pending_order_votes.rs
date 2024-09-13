@@ -5,7 +5,6 @@
 use crate::counters;
 use aptos_consensus_types::{common::Author, order_vote::OrderVote};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
@@ -57,7 +56,7 @@ impl PendingOrderVotes {
     pub fn insert_order_vote(
         &mut self,
         order_vote: &OrderVote,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         verified: bool,
     ) -> OrderVoteReceptionResult {
         // derive data from order vote
@@ -78,10 +77,8 @@ impl PendingOrderVotes {
             },
             OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
                 // we don't have enough votes for this ledger info yet
-                let validator_voting_power = epoch_state
-                    .read()
-                    .verifier
-                    .get_voting_power(&order_vote.author());
+                let validator_voting_power =
+                    epoch_state.verifier.get_voting_power(&order_vote.author());
                 if validator_voting_power.is_none() {
                     warn!(
                         "Received order vote from an unknown author: {}",
@@ -103,10 +100,10 @@ impl PendingOrderVotes {
                     order_vote.signature().clone(),
                     verified,
                 );
-                match li_with_sig.check_voting_power(&epoch_state.read().verifier) {
+                match li_with_sig.check_voting_power(&epoch_state.verifier) {
                     Ok(aggregated_voting_power) => {
                         assert!(
-                            aggregated_voting_power >= epoch_state.read().verifier.quorum_voting_power(),
+                            aggregated_voting_power >= epoch_state.verifier.quorum_voting_power(),
                             "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                         );
                         let verification_result = {
@@ -167,7 +164,6 @@ mod tests {
     use super::{OrderVoteReceptionResult, PendingOrderVotes};
     use aptos_consensus_types::order_vote::OrderVote;
     use aptos_crypto::HashValue;
-    use aptos_infallible::RwLock;
     use aptos_types::{
         block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
         validator_verifier::random_validator_verifier,
@@ -187,7 +183,7 @@ mod tests {
         ::aptos_logger::Logger::init_for_testing();
         // set up 4 validators
         let (signers, verifier) = random_validator_verifier(4, Some(2), false);
-        let epoch_state = Arc::new(RwLock::new(EpochState::new(1, verifier)));
+        let epoch_state = Arc::new(EpochState::new(1, verifier));
 
         let mut pending_order_votes = PendingOrderVotes::new();
 
@@ -250,7 +246,7 @@ mod tests {
         ) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
                 assert!(li_with_sig
-                    .check_voting_power(&epoch_state.read().verifier)
+                    .check_voting_power(&epoch_state.verifier)
                     .is_ok());
             },
             _ => {

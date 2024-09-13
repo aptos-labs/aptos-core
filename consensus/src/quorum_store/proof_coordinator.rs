@@ -12,7 +12,6 @@ use crate::{
 use aptos_consensus_types::proof_of_store::{
     BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState,
@@ -80,7 +79,7 @@ impl IncrementalProofState {
     fn add_signature(
         &mut self,
         signed_batch_info: &SignedBatchInfo,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         verified: bool,
     ) -> Result<(), SignedBatchInfoError> {
         if signed_batch_info.batch_info() != &self.info {
@@ -91,7 +90,6 @@ impl IncrementalProofState {
         }
 
         match epoch_state
-            .read()
             .verifier
             .get_voting_power(&signed_batch_info.signer())
         {
@@ -129,10 +127,9 @@ impl IncrementalProofState {
         Ok(())
     }
 
-    fn ready(&self, epoch_state: Arc<RwLock<EpochState>>) -> bool {
+    fn ready(&self, epoch_state: Arc<EpochState>) -> bool {
         let all_voters = self.all_voters();
         epoch_state
-            .read()
             .verifier
             .check_voting_power(all_voters.iter(), true)
             .is_ok()
@@ -140,7 +137,7 @@ impl IncrementalProofState {
 
     fn aggregate_and_verify(
         &mut self,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
     ) -> Result<ProofOfStore, SignedBatchInfoError> {
         if !self.ready(epoch_state.clone()) {
             return Err(SignedBatchInfoError::LowVotingPower);
@@ -155,7 +152,6 @@ impl IncrementalProofState {
         }
 
         let aggregated_sig = epoch_state
-            .read()
             .verifier
             .aggregate_signatures(&all_signatures)
             .map_err(|e| {
@@ -167,7 +163,6 @@ impl IncrementalProofState {
             })?;
 
         let verified_aggregate_signature = match epoch_state
-            .read()
             .verifier
             .verify_multi_signatures(&self.info, &aggregated_sig)
         {
@@ -180,7 +175,6 @@ impl IncrementalProofState {
                     .into_par_iter()
                     .flat_map(|(account_address, signature)| {
                         if epoch_state
-                            .read()
                             .verifier
                             .verify(*account_address, &self.info, signature)
                             .is_ok()
@@ -195,7 +189,7 @@ impl IncrementalProofState {
                         .add_signature(account_address, signature.clone());
                     self.unverified_signatures.remove_signature(account_address);
                 }
-                epoch_state.write().add_malicious_authors(
+                epoch_state.add_malicious_authors(
                     self.unverified_signatures
                         .signatures()
                         .keys()
@@ -204,7 +198,6 @@ impl IncrementalProofState {
                 );
                 self.unverified_signatures = PartialSignatures::empty();
                 let aggregated_sig = epoch_state
-                    .read()
                     .verifier
                     .aggregate_signatures(&self.verified_signatures)
                     .map_err(|e| {
@@ -215,7 +208,6 @@ impl IncrementalProofState {
                         SignedBatchInfoError::UnableToAggregate
                     })?;
                 epoch_state
-                    .read()
                     .verifier
                     .verify_multi_signatures(&self.info, &aggregated_sig)
                     .map_err(|e| {
@@ -318,7 +310,7 @@ impl ProofCoordinator {
     fn add_signature(
         &mut self,
         signed_batch_info: SignedBatchInfo,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         verified: bool,
     ) -> Result<Option<ProofOfStore>, SignedBatchInfoError> {
         if !self
@@ -358,10 +350,7 @@ impl ProofCoordinator {
         Ok(None)
     }
 
-    fn update_counters_on_expire(
-        state: &IncrementalProofState,
-        epoch_state: Arc<RwLock<EpochState>>,
-    ) {
+    fn update_counters_on_expire(state: &IncrementalProofState, epoch_state: Arc<EpochState>) {
         // Count late votes separately
         if !state.completed && !state.self_voted {
             counters::BATCH_RECEIVED_LATE_REPLIES_COUNT.inc_by(state.voter_count());
@@ -370,13 +359,13 @@ impl ProofCoordinator {
 
         counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.voter_count() as f64);
         counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
-            .observe(state.aggregate_voting_power(&epoch_state.read().verifier) as f64);
+            .observe(state.aggregate_voting_power(&epoch_state.verifier) as f64);
         if !state.completed {
             counters::BATCH_SUCCESSFUL_CREATION.observe(0.0);
         }
     }
 
-    async fn expire(&mut self, epoch_state: Arc<RwLock<EpochState>>) {
+    async fn expire(&mut self, epoch_state: Arc<EpochState>) {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
             if let Some(state) = self.batch_info_to_proof.remove(&signed_batch_info_info) {
@@ -415,7 +404,7 @@ impl ProofCoordinator {
         mut self,
         mut rx: Receiver<ProofCoordinatorCommand>,
         mut network_sender: impl QuorumStoreSender,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));
         loop {

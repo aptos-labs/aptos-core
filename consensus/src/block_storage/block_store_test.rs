@@ -22,7 +22,6 @@ use aptos_consensus_types::{
     vote_data::VoteData,
 };
 use aptos_crypto::{HashValue, PrivateKey};
-use aptos_infallible::RwLock;
 use aptos_types::{
     epoch_state::EpochState, validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
@@ -276,7 +275,7 @@ async fn test_insert_vote() {
     ::aptos_logger::Logger::init_for_testing();
     // Set up enough different authors to support different votes for the same block.
     let (signers, validator_verifier) = random_validator_verifier(11, Some(10), false);
-    let epoch_state = Arc::new(RwLock::new(EpochState::new(5, validator_verifier)));
+    let epoch_state = Arc::new(EpochState::new(5, validator_verifier));
     let my_signer = signers[10].clone();
     let mut inserter = TreeInserter::new(my_signer);
     let block_store = inserter.block_store();

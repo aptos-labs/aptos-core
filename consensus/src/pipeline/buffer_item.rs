@@ -13,7 +13,6 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
@@ -45,7 +44,7 @@ fn generate_commit_ledger_info(
 
 fn verify_signatures(
     unverified_signatures: PartialSignatures,
-    epoch_state: Arc<RwLock<EpochState>>,
+    epoch_state: Arc<EpochState>,
     commit_ledger_info: &LedgerInfo,
 ) -> PartialSignatures {
     // Returns a valid partial signature from a set of unverified signatures.
@@ -55,12 +54,10 @@ fn verify_signatures(
     // (e.g., [LM07]: Finding Invalid Signatures in Pairing-Based Batches,
     // by Law, Laurie and Matt, Brian J., in Cryptography and Coding, 2007).
     if let Ok(aggregated_signature) = epoch_state
-        .read()
         .verifier
         .aggregate_signatures(&unverified_signatures)
     {
         if epoch_state
-            .read()
             .verifier
             .verify_multi_signatures(commit_ledger_info, &aggregated_signature)
             .is_ok()
@@ -79,7 +76,6 @@ fn verify_signatures(
                     .with_label_values(&["commit_votes_from_ordered_bufer_item"])
                     .start_timer();
                 if epoch_state
-                    .read()
                     .verifier
                     .verify(account_address, commit_ledger_info, &signature)
                     .is_ok()
@@ -121,10 +117,9 @@ fn generate_executed_item_from_ordered(
 fn aggregate_commit_proof(
     commit_ledger_info: &LedgerInfo,
     verified_signatures: &PartialSignatures,
-    epoch_state: Arc<RwLock<EpochState>>,
+    epoch_state: Arc<EpochState>,
 ) -> LedgerInfoWithSignatures {
     let aggregated_sig = epoch_state
-        .read()
         .verifier
         .aggregate_signatures(verified_signatures)
         .expect("Failed to generate aggregated signature");
@@ -199,7 +194,7 @@ impl BufferItem {
     pub fn advance_to_executed_or_aggregated(
         self,
         executed_blocks: Vec<PipelinedBlock>,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         epoch_end_timestamp: Option<u64>,
         order_vote_enabled: bool,
     ) -> Self {
@@ -255,7 +250,6 @@ impl BufferItem {
                         &commit_ledger_info,
                     );
                     if (epoch_state
-                        .read()
                         .verifier
                         .check_voting_power(verified_signatures.signatures().keys(), true))
                     .is_ok()
@@ -389,12 +383,12 @@ impl BufferItem {
         }
     }
 
-    pub fn try_advance_to_aggregated(self, epoch_state: Arc<RwLock<EpochState>>) -> Self {
+    pub fn try_advance_to_aggregated(self, epoch_state: Arc<EpochState>) -> Self {
         match self {
             Self::Signed(signed_item) => {
                 if signed_item
                     .partial_commit_proof
-                    .check_voting_power(&epoch_state.read().verifier)
+                    .check_voting_power(&epoch_state.verifier)
                     .is_ok()
                 {
                     let _time = counters::VERIFY_MSG
@@ -417,7 +411,7 @@ impl BufferItem {
             Self::Executed(executed_item) => {
                 if executed_item
                     .partial_commit_proof
-                    .check_voting_power(&epoch_state.read().verifier)
+                    .check_voting_power(&epoch_state.verifier)
                     .is_ok()
                 {
                     let _time = counters::VERIFY_MSG

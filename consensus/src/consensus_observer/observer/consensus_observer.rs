@@ -32,7 +32,6 @@ use aptos_config::config::{ConsensusObserverConfig, NodeConfig};
 use aptos_consensus_types::{pipeline, pipelined_block::PipelinedBlock};
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
-use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, info, warn};
 use aptos_network::{
     application::interface::NetworkClient, protocols::wire::handshake::v1::ProtocolId,
@@ -253,7 +252,7 @@ impl ConsensusObserver {
     }
 
     /// Returns the current epoch state, and panics if it is not set
-    fn get_epoch_state(&self) -> Arc<RwLock<EpochState>> {
+    fn get_epoch_state(&self) -> Arc<EpochState> {
         self.active_observer_state.epoch_state()
     }
 
@@ -314,7 +313,7 @@ impl ConsensusObserver {
 
         // If the payload is for the current epoch, verify the proof signatures
         let epoch_state = self.get_epoch_state();
-        let verified_payload = if block_epoch == epoch_state.read().epoch {
+        let verified_payload = if block_epoch == epoch_state.epoch {
             // Verify the block proof signatures
             if let Err(error) = block_payload.verify_payload_signatures(epoch_state) {
                 error!(
@@ -356,7 +355,7 @@ impl ConsensusObserver {
         // If the commit decision is for the current epoch, verify and process it
         let epoch_state = self.get_epoch_state();
         let commit_decision_epoch = commit_decision.epoch();
-        if commit_decision_epoch == epoch_state.read().epoch {
+        if commit_decision_epoch == epoch_state.epoch {
             // Verify the commit decision
             if let Err(error) = commit_decision.verify_commit_proof(epoch_state) {
                 error!(
@@ -563,7 +562,7 @@ impl ConsensusObserver {
     async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
         // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
-        if ordered_block.proof_block_info().epoch() == epoch_state.read().epoch {
+        if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
             if let Err(error) = ordered_block.verify_ordered_proof(epoch_state) {
                 warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -647,14 +646,14 @@ impl ConsensusObserver {
 
         // If the epoch has changed, end the current epoch and start the new one
         let current_epoch_state = self.get_epoch_state();
-        if epoch > current_epoch_state.read().epoch {
+        if epoch > current_epoch_state.epoch {
             // Wait for the next epoch to start
             self.execution_client.end_epoch().await;
             self.wait_for_epoch_start().await;
 
             // Verify the block payloads for the new epoch
             let new_epoch_state = self.get_epoch_state();
-            let new_epoch = new_epoch_state.read().epoch;
+            let new_epoch = new_epoch_state.epoch;
             let verified_payload_rounds = self
                 .block_payload_store
                 .verify_payload_signatures(new_epoch_state.clone());

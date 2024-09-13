@@ -52,7 +52,7 @@ use aptos_consensus_types::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
-use aptos_infallible::{checked, Mutex, RwLock};
+use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
 use aptos_safety_rules::ConsensusState;
@@ -231,7 +231,7 @@ pub mod round_manager_fuzzing;
 /// The caller is responsible for running the event loops and driving the execution via some
 /// executors.
 pub struct RoundManager {
-    epoch_state: Arc<RwLock<EpochState>>,
+    epoch_state: Arc<EpochState>,
     block_store: Arc<BlockStore>,
     round_state: RoundState,
     proposer_election: Arc<UnequivocalProposerElection>,
@@ -260,7 +260,7 @@ pub struct RoundManager {
 impl RoundManager {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         block_store: Arc<BlockStore>,
         round_state: RoundState,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
@@ -313,7 +313,6 @@ impl RoundManager {
             self.network.clone(),
             author,
             self.epoch_state
-                .read()
                 .verifier
                 .get_ordered_account_addresses_iter()
                 .collect(),
@@ -386,7 +385,7 @@ impl RoundManager {
     }
 
     async fn generate_and_send_proposal(
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         new_round_event: NewRoundEvent,
         network: Arc<NetworkSender>,
         sync_info: SyncInfo,
@@ -394,7 +393,7 @@ impl RoundManager {
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
     ) -> anyhow::Result<()> {
-        let epoch = epoch_state.read().epoch;
+        let epoch = epoch_state.epoch;
         Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
         let proposal_msg = Self::generate_proposal(
             epoch,
@@ -422,10 +421,7 @@ impl RoundManager {
         Ok(())
     }
 
-    fn log_collected_vote_stats(
-        epoch_state: Arc<RwLock<EpochState>>,
-        new_round_event: &NewRoundEvent,
-    ) {
+    fn log_collected_vote_stats(epoch_state: Arc<EpochState>, new_round_event: &NewRoundEvent) {
         let prev_round_votes_for_li = new_round_event
             .prev_round_votes
             .iter()
@@ -435,7 +431,6 @@ impl RoundManager {
                     .into_iter()
                     .map(|author| {
                         epoch_state
-                            .read()
                             .verifier
                             .get_voting_power(&author)
                             .map(|voting_power| (voting_power as u128, 1))
@@ -465,7 +460,6 @@ impl RoundManager {
                     .signers()
                     .map(|author| {
                         epoch_state
-                            .read()
                             .verifier
                             .get_voting_power(author)
                             .map(|voting_power| (voting_power as u128, 1))
@@ -483,9 +477,9 @@ impl RoundManager {
         counters::PROPOSER_COLLECTED_TIMEOUT_VOTING_POWER.inc_by(timeout_voting_power as f64);
 
         info!(
-            epoch = epoch_state.read().epoch,
+            epoch = epoch_state.epoch,
             round = new_round_event.round,
-            total_voting_power = ?epoch_state.read().verifier.total_voting_power(),
+            total_voting_power = ?epoch_state.verifier.total_voting_power(),
             max_voting_power = ?max_voting_power,
             max_num_votes = max_num_votes,
             conflicting_voting_power = ?conflicting_voting_power,
@@ -501,7 +495,7 @@ impl RoundManager {
         &self,
         new_round_event: NewRoundEvent,
     ) -> anyhow::Result<ProposalMsg> {
-        let epoch = self.epoch_state.read().epoch;
+        let epoch = self.epoch_state.epoch;
         Self::generate_proposal(
             epoch,
             new_round_event,
@@ -603,17 +597,15 @@ impl RoundManager {
             );
             // Some information in SyncInfo is ahead of what we have locally.
             // First verify the SyncInfo (didn't verify it in the yet).
-            sync_info
-                .verify(&self.epoch_state.read().verifier)
-                .map_err(|e| {
-                    error!(
-                        SecurityEvent::InvalidSyncInfoMsg,
-                        sync_info = sync_info,
-                        remote_peer = author,
-                        error = ?e,
-                    );
-                    VerifyError::from(e)
-                })?;
+            sync_info.verify(&self.epoch_state.verifier).map_err(|e| {
+                error!(
+                    SecurityEvent::InvalidSyncInfoMsg,
+                    sync_info = sync_info,
+                    remote_peer = author,
+                    error = ?e,
+                );
+                VerifyError::from(e)
+            })?;
             SYNC_INFO_RECEIVED_WITH_NEWER_CERT.inc();
             let result = self
                 .block_store
@@ -1352,7 +1344,7 @@ impl RoundManager {
         let start = Instant::now();
         order_vote_msg
             .quorum_cert()
-            .verify(&self.epoch_state.read().verifier)
+            .verify(&self.epoch_state.verifier)
             .context("[OrderVoteMsg QuorumCert verification failed")?;
         counters::VERIFY_MSG
             .with_label_values(&["order_vote_qc"])
@@ -1437,7 +1429,7 @@ impl RoundManager {
         Self::new_log_with_round_epoch(
             event,
             self.round_state().current_round(),
-            self.epoch_state.read().epoch,
+            self.epoch_state.epoch,
         )
     }
 
@@ -1456,10 +1448,7 @@ impl RoundManager {
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        info!(
-            epoch = self.epoch_state.read().epoch,
-            "RoundManager started"
-        );
+        info!(epoch = self.epoch_state.epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
             tokio::select! {
@@ -1569,10 +1558,7 @@ impl RoundManager {
                 },
             }
         }
-        info!(
-            epoch = self.epoch_state.read().epoch,
-            "RoundManager stopped"
-        );
+        info!(epoch = self.epoch_state.epoch, "RoundManager stopped");
     }
 
     #[cfg(feature = "failpoints")]
@@ -1588,7 +1574,7 @@ impl RoundManager {
     /// It's only enabled with fault injection (failpoints feature).
     #[cfg(feature = "failpoints")]
     async fn attempt_to_inject_reconfiguration_error(
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
         network: Arc<NetworkSender>,
         proposal_msg: &ProposalMsg,
     ) -> anyhow::Result<()> {
@@ -1603,7 +1589,6 @@ impl RoundManager {
         let should_inject = direct_suffix && continuous_round;
         if should_inject {
             let mut half_peers: Vec<_> = epoch_state
-                .read()
                 .verifier
                 .get_ordered_account_addresses_iter()
                 .collect();

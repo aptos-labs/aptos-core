@@ -12,7 +12,6 @@ use crate::{
 use aptos_consensus_types::proof_of_store::BatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{epoch_state::EpochState, transaction::SignedTransaction, PeerId};
 use futures::{stream::FuturesUnordered, StreamExt};
@@ -102,7 +101,7 @@ pub(crate) struct BatchRequester<T> {
     retry_interval_ms: usize,
     rpc_timeout_ms: usize,
     network_sender: T,
-    epoch_state: Arc<RwLock<EpochState>>,
+    epoch_state: Arc<EpochState>,
 }
 
 impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
@@ -113,7 +112,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         retry_interval_ms: usize,
         rpc_timeout_ms: usize,
         network_sender: T,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
     ) -> Self {
         Self {
             my_peer_id,
@@ -139,7 +138,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         let network_sender = self.network_sender.clone();
         let request_num_peers = self.request_num_peers;
         let my_peer_id = self.my_peer_id;
-        let epoch = self.epoch_state.read().epoch;
+        let epoch = self.epoch_state.epoch;
         let retry_interval = Duration::from_millis(self.retry_interval_ms as u64);
         let rpc_timeout = Duration::from_millis(self.rpc_timeout_ms as u64);
 
@@ -175,7 +174,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 counters::RECEIVED_BATCH_NOT_FOUND_COUNT.inc();
                                 if ledger_info.commit_info().epoch() == epoch
                                     && ledger_info.commit_info().timestamp_usecs() > expiration
-                                    && ledger_info.verify_signatures(&epoch_state.read().verifier).is_ok()
+                                    && ledger_info.verify_signatures(&epoch_state.verifier).is_ok()
                                 {
                                     counters::RECEIVED_BATCH_EXPIRED_COUNT.inc();
                                     debug!("QS: batch request expired, digest:{}", digest);

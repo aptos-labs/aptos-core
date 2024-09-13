@@ -22,7 +22,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{bls12381::PrivateKey, HashValue};
 use aptos_executor_types::ExecutorResult;
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
@@ -95,7 +95,7 @@ impl TExecutionClient for MockExecutionClient {
     async fn start_epoch(
         &self,
         _maybe_consensus_key: Option<Arc<PrivateKey>>,
-        _epoch_state: Arc<RwLock<EpochState>>,
+        _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,

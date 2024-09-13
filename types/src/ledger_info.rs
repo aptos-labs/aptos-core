@@ -14,7 +14,6 @@ use crate::{
 };
 use aptos_crypto::{bls12381, hash::HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_infallible::RwLock;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -480,22 +479,18 @@ impl LedgerInfoWithMixedSignatures {
     // Aggregates all the signatures, verifies the aggregate signature, and returns the aggregate signature.
     pub fn aggregate_and_verify(
         &mut self,
-        epoch_state: Arc<RwLock<EpochState>>,
+        epoch_state: Arc<EpochState>,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        self.check_voting_power(&epoch_state.read().verifier)?;
+        self.check_voting_power(&epoch_state.verifier)?;
 
         let mut all_signatures = self.verified_signatures.clone();
         for (author, signature) in self.unverified_signatures.signatures() {
             all_signatures.add_signature(*author, signature.clone());
         }
 
-        let aggregated_sig = epoch_state
-            .read()
-            .verifier
-            .aggregate_signatures(&all_signatures)?;
+        let aggregated_sig = epoch_state.verifier.aggregate_signatures(&all_signatures)?;
 
         let (verified_aggregate_signature, malicious_authors) = match epoch_state
-            .read()
             .verifier
             .clone()
             .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
@@ -516,7 +511,6 @@ impl LedgerInfoWithMixedSignatures {
                     .into_par_iter()
                     .flat_map(|(account_address, signature)| {
                         if epoch_state
-                            .read()
                             .verifier
                             .verify(*account_address, self.ledger_info(), signature)
                             .is_ok()
@@ -540,7 +534,6 @@ impl LedgerInfoWithMixedSignatures {
                 self.unverified_signatures = PartialSignatures::empty();
 
                 let aggregated_sig = epoch_state
-                    .read()
                     .verifier
                     .aggregate_signatures(&self.verified_signatures)?;
                 // epoch_state
@@ -550,14 +543,10 @@ impl LedgerInfoWithMixedSignatures {
                 (aggregated_sig, malicious_authors)
             },
         };
-        epoch_state.write().add_malicious_authors(malicious_authors);
-        self.check_voting_power(&epoch_state.read().verifier)
-            .map(|_| {
-                LedgerInfoWithSignatures::new(
-                    self.ledger_info.clone(),
-                    verified_aggregate_signature,
-                )
-            })
+        epoch_state.add_malicious_authors(malicious_authors);
+        self.check_voting_power(&epoch_state.verifier).map(|_| {
+            LedgerInfoWithSignatures::new(self.ledger_info.clone(), verified_aggregate_signature)
+        })
     }
 
     pub fn ledger_info(&self) -> &LedgerInfo {
@@ -688,7 +677,7 @@ mod tests {
         let validator_verifier =
             ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
                 .expect("Incorrect quorum size.");
-        let epoch_state = Arc::new(RwLock::new(EpochState::new(10, validator_verifier.clone())));
+        let epoch_state = Arc::new(EpochState::new(10, validator_verifier.clone()));
 
         let mut ledger_info_with_mixed_signatures =
             LedgerInfoWithMixedSignatures::new(ledger_info.clone());
@@ -807,7 +796,7 @@ mod tests {
             4
         );
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 4);
-        assert_eq!(epoch_state.read().verifier.malicious_authors().len(), 1);
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[5].author(),
@@ -866,7 +855,7 @@ mod tests {
                 .len(),
             5
         );
-        assert_eq!(epoch_state.read().verifier.malicious_authors().len(), 1);
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[6].author(),
@@ -902,6 +891,6 @@ mod tests {
             5
         );
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 5);
-        assert_eq!(epoch_state.read().verifier.malicious_authors().len(), 2);
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 2);
     }
 }
