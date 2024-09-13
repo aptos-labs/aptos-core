@@ -17,13 +17,15 @@ use aptos_crypto::{
     hash::CryptoHash,
     Signature, VerifyingKey,
 };
+use aptos_infallible::RwLock;
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt,
+    sync::Arc,
 };
 use thiserror::Error;
 
@@ -128,7 +130,7 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
 /// Supports validation of signatures for known authors with individual voting powers. This struct
 /// can be used for all signature verification operations including block and network signature
 /// verification, respectively.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ValidatorVerifier {
     /// A vector of each validator's on-chain account address to its pubkeys and voting power.
     validator_infos: Vec<ValidatorConsensusInfo>,
@@ -147,8 +149,20 @@ pub struct ValidatorVerifier {
     /// submitted bad votes that has resulted in having to verify each vote individually. Further votes by these validators
     /// will be verified individually bypassing the optimization.
     #[serde(skip)]
-    malicious_authors: HashMap<AccountAddress, u64>,
+    malicious_authors: Arc<RwLock<HashSet<AccountAddress>>>,
 }
+
+// Implement Eq and PartialEq for ValidatorVerifier. Skip malicious_authors field in the comparison.
+impl PartialEq for ValidatorVerifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.validator_infos == other.validator_infos
+            && self.quorum_voting_power == other.quorum_voting_power
+            && self.total_voting_power == other.total_voting_power
+            && self.address_to_validator_index == other.address_to_validator_index
+    }
+}
+
+impl Eq for ValidatorVerifier {}
 
 /// Reconstruct fields from the raw data upon deserialization.
 impl<'de> Deserialize<'de> for ValidatorVerifier {
@@ -186,7 +200,7 @@ impl ValidatorVerifier {
             quorum_voting_power,
             total_voting_power,
             address_to_validator_index,
-            malicious_authors: HashMap::new(),
+            malicious_authors: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 
@@ -222,19 +236,18 @@ impl ValidatorVerifier {
         ))
     }
 
-    pub fn add_malicious_authors(&mut self, malicious_authors: Vec<AccountAddress>) {
+    pub fn add_malicious_authors(&self, malicious_authors: Vec<AccountAddress>) {
         for author in malicious_authors {
-            let entry = self.malicious_authors.entry(author).or_default();
-            *entry += 1;
+            self.malicious_authors.write().insert(author);
         }
     }
 
-    pub fn malicious_authors(&self) -> HashMap<AccountAddress, u64> {
-        self.malicious_authors.clone()
+    pub fn malicious_authors(&self) -> HashSet<AccountAddress> {
+        self.malicious_authors.read().clone()
     }
 
     pub fn is_malicious_author(&self, author: &AccountAddress) -> bool {
-        self.malicious_authors.contains_key(author)
+        self.malicious_authors.read().contains(author)
     }
 
     /// Helper method to initialize with a single author and public key with quorum voting power 1.

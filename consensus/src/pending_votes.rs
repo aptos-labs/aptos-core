@@ -463,7 +463,6 @@ mod tests {
         };
     }
 
-
     #[test]
     fn test_qc_aggregation_with_unverified_votes() {
         ::aptos_logger::Logger::init_for_testing();
@@ -476,8 +475,13 @@ mod tests {
         // create random vote from validator[0]
         let li1 = random_ledger_info();
         let vote_data_1 = random_vote_data();
-        let vote_data_1_author_0 =
-            Vote::new(vote_data_1.clone(), signers[0].author(), li1.clone(), &signers[0]).unwrap();
+        let vote_data_1_author_0 = Vote::new(
+            vote_data_1.clone(),
+            signers[0].author(),
+            li1.clone(),
+            &signers[0],
+        )
+        .unwrap();
 
         // first time a new vote is added -> VoteAdded
         assert_eq!(
@@ -490,17 +494,27 @@ mod tests {
             pending_votes.insert_vote(&vote_data_1_author_0, epoch_state.clone(), true),
             VoteReceptionResult::DuplicateVote
         );
-        
-        let vote_data_1_author_1 =
-            Vote::new(vote_data_1.clone(), signers[1].author(), li1.clone(), &signers[1]).unwrap();
+
+        let vote_data_1_author_1 = Vote::new(
+            vote_data_1.clone(),
+            signers[1].author(),
+            li1.clone(),
+            &signers[1],
+        )
+        .unwrap();
 
         assert_eq!(
             pending_votes.insert_vote(&vote_data_1_author_1, epoch_state.clone(), false),
             VoteReceptionResult::VoteAdded(2)
         );
-        
-        let vote_data_1_author_2 =
-        Vote::new(vote_data_1.clone(), signers[2].author(), li1.clone(), &signers[2]).unwrap();
+
+        let vote_data_1_author_2 = Vote::new(
+            vote_data_1.clone(),
+            signers[2].author(),
+            li1.clone(),
+            &signers[2],
+        )
+        .unwrap();
 
         match pending_votes.insert_vote(&vote_data_1_author_2, epoch_state.clone(), true) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {

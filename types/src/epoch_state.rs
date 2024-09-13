@@ -35,7 +35,7 @@ impl EpochState {
         }
     }
 
-    pub fn add_malicious_authors(&mut self, malicious_authors: Vec<AccountAddress>) {
+    pub fn add_malicious_authors(&self, malicious_authors: Vec<AccountAddress>) {
         self.verifier.add_malicious_authors(malicious_authors);
     }
 }

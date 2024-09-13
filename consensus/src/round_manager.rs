@@ -1296,8 +1296,7 @@ impl RoundManager {
                 PROPOSAL_VOTE_ADDED.inc();
                 Ok(())
             },
-            | VoteReceptionResult::EchoTimeout(_)
-            | VoteReceptionResult::DuplicateVote => Ok(()),
+            VoteReceptionResult::EchoTimeout(_) | VoteReceptionResult::DuplicateVote => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),
         }
     }
