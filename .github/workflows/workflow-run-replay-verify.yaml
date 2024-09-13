@@ -34,7 +34,7 @@ on:
         description: "The runner to use for the job."
         type: string
         required: true
-        default: "runs-on,cpu=32,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false"
+        default: "runs-on,cpu=16,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false"
       TIMEOUT_MINUTES:
         description: "Github job timeout in minutes"
         type: number
@@ -74,7 +74,7 @@ on:
         description: "The runner to use for the job."
         type: string
         required: true
-        default: "runs-on,cpu=32,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false"
+        default: "runs-on,cpu=16,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false"
 
 jobs:
   prepare:
@@ -236,7 +236,7 @@ jobs:
               --enable-storage-sharding \
               --target-db-dir db \
               --concurrent-downloads 8 \
-              --replay-concurrency-level 8 \
+              --replay-concurrency-level 2 \
               \
               && exit 0 || true # exit 0 if successful, otherwise retry
           done
@@ -268,7 +268,7 @@ jobs:
               --enable-storage-sharding \
               --target-db-dir db \
               --concurrent-downloads 8 \
-              --replay-concurrency-level 8 \
+              --replay-concurrency-level 2 \
               \
               && exit 0 || true # exit 0 if successful, otherwise retry
           done
