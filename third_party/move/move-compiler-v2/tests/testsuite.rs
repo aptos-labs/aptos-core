@@ -697,7 +697,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .set_experiment(Experiment::CFG_SIMPLIFICATION, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
         },
     ];

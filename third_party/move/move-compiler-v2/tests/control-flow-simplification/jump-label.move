@@ -9,10 +9,6 @@ module 0x42::test {
 		abort 0
 	}
 
-	fun bar<T>(x: bool): T {
-		abort 0
-	}
-
 	fun test<T>(x: vector<u8>): T {
 		let y = foo<T>();
 		if (y == string::utf8(b"bool")) {
