@@ -37,7 +37,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
-    block_data::BlockType,
+    block_data::{BlockType, ProposalType},
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
     order_vote_msg::OrderVoteMsg,
@@ -345,6 +345,7 @@ impl RoundManager {
             NewRoundReason::Timeout => {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
             },
+            _ => (),
         };
         info!(
             self.new_log(LogEvent::NewRound),
@@ -372,6 +373,7 @@ impl RoundManager {
                     proposal_generator,
                     safety_rules,
                     proposer_election,
+                    ProposalType::Regular,
                 )
                 .await
                 {
@@ -390,6 +392,7 @@ impl RoundManager {
         proposal_generator: Arc<ProposalGenerator>,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        proposal_type: ProposalType,
     ) -> anyhow::Result<()> {
         let epoch = epoch_state.epoch;
         Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
@@ -401,6 +404,7 @@ impl RoundManager {
             proposal_generator,
             safety_rules,
             proposer_election,
+            proposal_type,
         )
         .await?;
         #[cfg(feature = "failpoints")]
@@ -501,6 +505,7 @@ impl RoundManager {
             self.proposal_generator.clone(),
             self.safety_rules.clone(),
             self.proposer_election.clone(),
+            ProposalType::Regular,
         )
         .await
     }
@@ -513,6 +518,7 @@ impl RoundManager {
         proposal_generator: Arc<ProposalGenerator>,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        proposal_type: ProposalType,
     ) -> anyhow::Result<ProposalMsg> {
         // Proposal generator will ensure that at most one proposal is generated per round
         let callback_sync_info = sync_info.clone();
@@ -521,15 +527,22 @@ impl RoundManager {
         }
         .boxed();
 
+        let event = match &proposal_type {
+            ProposalType::Regular => LogEvent::Propose,
+            ProposalType::Optimistic(_) => LogEvent::OptimisticPropose,
+        };
+
         let proposal = proposal_generator
-            .generate_proposal(new_round_event.round, proposer_election, callback)
+            .generate_proposal(epoch, new_round_event.round, proposer_election, callback, proposal_type)
             .await?;
+
         let signature = safety_rules.lock().sign_proposal(&proposal)?;
         let signed_proposal =
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
         observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);
+
         info!(
-            Self::new_log_with_round_epoch(LogEvent::Propose, new_round_event.round, epoch),
+            Self::new_log_with_round_epoch(event, new_round_event.round, epoch),
             "{}", signed_proposal
         );
         Ok(ProposalMsg::new(signed_proposal, sync_info))
@@ -547,12 +560,19 @@ impl RoundManager {
             proposal_msg.proposal().timestamp_usecs(),
             BlockStage::ROUND_MANAGER_RECEIVED,
         );
+
+        let (event, block_parent_hash) = match proposal_msg.proposal().proposal_type() {
+            ProposalType::Regular => (LogEvent::ReceiveProposal, proposal_msg.proposal().quorum_cert().certified_block().id()),
+            ProposalType::Optimistic(parent) => (LogEvent::ReceiveOptimisticProposal, parent.id()),
+        };
+
+
         info!(
-            self.new_log(LogEvent::ReceiveProposal)
+            self.new_log(event)
                 .remote_peer(proposal_msg.proposer()),
             block_round = proposal_msg.proposal().round(),
             block_hash = proposal_msg.proposal().id(),
-            block_parent_hash = proposal_msg.proposal().quorum_cert().certified_block().id(),
+            block_parent_hash = block_parent_hash,
         );
 
         ensure!(
@@ -715,7 +735,7 @@ impl RoundManager {
             bail!("[RoundManager] sync_only flag is set, broadcasting SyncInfo");
         }
 
-        let (is_nil_vote, mut timeout_vote) = match self.round_state.vote_sent() {
+        let (is_nil_vote, mut timeout_vote) = match self.round_state.vote_sent_regular() {
             Some(vote) if vote.vote_data().proposed().round() == round => {
                 (vote.vote_data().is_for_nil(), vote)
             },
@@ -748,7 +768,7 @@ impl RoundManager {
             timeout_vote.add_2chain_timeout(timeout, signature);
         }
 
-        self.round_state.record_vote(timeout_vote.clone());
+        self.round_state.record_vote_regular(timeout_vote.clone());
         let timeout_vote_msg = VoteMsg::new(timeout_vote, self.block_store.sync_info());
         self.network.broadcast_timeout_vote(timeout_vote_msg).await;
         warn!(
@@ -863,10 +883,15 @@ impl RoundManager {
             proposal,
         );
 
+        let previous_round = if proposal.is_optimistic_proposal() {
+            proposal.round() - 1
+        } else {
+            proposal.quorum_cert().certified_block().round()
+        };
         // Validate that failed_authors list is correctly specified in the block.
         let expected_failed_authors = self.proposal_generator.compute_failed_authors(
             proposal.round(),
-            proposal.quorum_cert().certified_block().round(),
+            previous_round,
             false,
             self.proposer_election.clone(),
         );
@@ -1004,12 +1029,50 @@ impl RoundManager {
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
+        let parent = proposal.clone();
         let vote = self
             .vote_block(proposal)
             .await
             .context("[RoundManager] Process proposal")?;
-        self.round_state.record_vote(vote.clone());
+        self.round_state.record_vote_regular(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
+
+        // generate optimistic proposal
+        if self
+            .proposer_election
+            .is_valid_proposer(self.proposal_generator.author(), proposal_round + 1)
+        {
+            let epoch_state = self.epoch_state.clone();
+            let network = self.network.clone();
+            let sync_info = self.block_store.sync_info();
+            let proposal_generator = self.proposal_generator.clone();
+            let safety_rules = self.safety_rules.clone();
+            let proposer_election = self.proposer_election.clone();
+            // fake new_round_event
+            let new_round_event = NewRoundEvent {
+                round: proposal_round + 1,
+                reason: NewRoundReason::Optimistic,
+                prev_round_votes: Vec::new(),
+                prev_round_timeout_votes: None,
+                timeout: Duration::from_millis(0),
+            };
+            tokio::spawn(async move {
+                if let Err(e) = Self::generate_and_send_proposal(
+                    epoch_state,
+                    new_round_event,
+                    network,
+                    sync_info,
+                    proposal_generator,
+                    safety_rules,
+                    proposer_election,
+                    ProposalType::Optimistic(Box::new(parent)),
+                )
+                .await
+                {
+                    warn!("Error generating and sending proposal: {}", e);
+                }
+            });
+        }
 
         self.broadcast_fast_shares(vote.ledger_info().commit_info())
             .await;
@@ -1045,7 +1108,7 @@ impl RoundManager {
 
         // Short circuit if already voted.
         ensure!(
-            self.round_state.vote_sent().is_none(),
+            self.round_state.vote_sent_regular().is_none(),
             "[RoundManager] Already vote on this round {}",
             self.round_state.current_round()
         );
@@ -1259,7 +1322,7 @@ impl RoundManager {
                 if self.onchain_config.order_vote_enabled() {
                     // This check is already done in safety rules. As printing the "failed to broadcast order vote"
                     // in humio logs could sometimes look scary, we are doing the same check again here.
-                    if let Some(last_sent_vote) = self.round_state.vote_sent() {
+                    if let Some(last_sent_vote) = self.round_state.vote_sent_regular() {
                         if let Some((two_chain_timeout, _)) = last_sent_vote.two_chain_timeout() {
                             if round <= two_chain_timeout.round() {
                                 return Ok(());
@@ -1406,7 +1469,7 @@ impl RoundManager {
             .process_certificates(self.block_store.sync_info())
             .expect("Can not jump start a round_state from existing certificates.");
         if let Some(vote) = last_vote_sent {
-            self.round_state.record_vote(vote);
+            self.round_state.record_vote_regular(vote);
         }
         if let Err(e) = self.process_new_round_event(new_round_event).await {
             warn!(error = ?e, "[RoundManager] Error during start");

@@ -4,16 +4,13 @@
 
 use super::proposer_election::ProposerElection;
 use crate::{
-    block_storage::BlockReader,
-    counters::{
+    block_storage::BlockReader, counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
         PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
         PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
         PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
-    },
-    payload_client::{PayloadClient, PayloadPullParameters},
-    util::time_service::TimeService,
+    }, payload_client::{PayloadClient, PayloadPullParameters}, util::time_service::TimeService
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{
@@ -21,7 +18,7 @@ use aptos_config::config::{
 };
 use aptos_consensus_types::{
     block::Block,
-    block_data::BlockData,
+    block_data::{BlockData, ProposalType},
     common::{Author, Payload, PayloadFilter, Round},
     pipelined_block::ExecutionSummary,
     quorum_cert::QuorumCert,
@@ -262,11 +259,14 @@ pub struct ProposalGenerator {
     chain_health_backoff_config: ChainHealthBackoffConfig,
 
     // Last round that a proposal was generated
-    last_round_generated: Mutex<Round>,
+    last_round_generated_regular: Mutex<Round>,
+    // Last round that an optimistic proposal was generated
+    last_round_generated_optimistic: Mutex<Round>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
 
     allow_batches_without_pos_in_proposal: bool,
+    optimistic_proposal_enabled: bool,
 }
 
 impl ProposalGenerator {
@@ -287,6 +287,7 @@ impl ProposalGenerator {
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
         allow_batches_without_pos_in_proposal: bool,
+        optimistic_proposal_enabled: bool,
     ) -> Self {
         Self {
             author,
@@ -301,10 +302,12 @@ impl ProposalGenerator {
             max_failed_authors_to_store,
             pipeline_backpressure_config,
             chain_health_backoff_config,
-            last_round_generated: Mutex::new(0),
+            last_round_generated_regular: Mutex::new(0),
+            last_round_generated_optimistic: Mutex::new(0),
             quorum_store_enabled,
             vtxn_config,
             allow_batches_without_pos_in_proposal,
+            optimistic_proposal_enabled,
         }
     }
 
@@ -341,16 +344,25 @@ impl ProposalGenerator {
     /// error.
     pub async fn generate_proposal(
         &self,
+        epoch: u64,
         round: Round,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         wait_callback: BoxFuture<'static, ()>,
+        proposal_type: ProposalType,
     ) -> anyhow::Result<BlockData> {
-        {
-            let mut last_round_generated = self.last_round_generated.lock();
-            if *last_round_generated < round {
-                *last_round_generated = round;
+        if proposal_type.is_optimistic_proposal() {
+            let mut last_round_generated_optimistic = self.last_round_generated_optimistic.lock();
+            if *last_round_generated_optimistic < round {
+                *last_round_generated_optimistic = round;
             } else {
-                bail!("Already proposed in the round {}", round);
+                bail!("Already proposed optimistically in the round {}", round);
+            }
+        } else {
+            let mut last_round_generated_regular = self.last_round_generated_regular.lock();
+            if *last_round_generated_regular < round {
+                *last_round_generated_regular = round;
+            } else {
+                bail!("Already proposed regularly in the round {}", round);
             }
         }
 
@@ -478,32 +490,64 @@ impl ProposalGenerator {
             (validator_txns, payload, timestamp.as_micros() as u64)
         };
 
-        let quorum_cert = hqc.as_ref().clone();
+        if !self.optimistic_proposal_enabled {
+            ensure!(
+                !proposal_type.is_optimistic_proposal(),
+                "Optimistic proposal is not enabled"
+            );
+        }
+
+        let (quorum_cert, previous_round) = if proposal_type.is_optimistic_proposal() {
+            (QuorumCert::empty(), round - 1)
+        } else {
+            let quorum_cert = hqc.as_ref().clone();
+            let previous_round = quorum_cert.certified_block().round();
+            (quorum_cert, previous_round)
+        };
         let failed_authors = self.compute_failed_authors(
             round,
-            quorum_cert.certified_block().round(),
+            previous_round,
             false,
             proposer_election,
         );
 
-        let block = if self.vtxn_config.enabled() {
-            BlockData::new_proposal_ext(
+        let block = if !self.optimistic_proposal_enabled {
+            if self.vtxn_config.enabled() {
+                BlockData::new_proposal_ext(
+                    validator_txns,
+                    payload,
+                    self.author,
+                    failed_authors,
+                    round,
+                    timestamp,
+                    quorum_cert,
+                )
+            } else {
+                BlockData::new_proposal(
+                    payload,
+                    self.author,
+                    failed_authors,
+                    round,
+                    timestamp,
+                    quorum_cert,
+                )
+            }
+        } else {
+            let validator_txns = if self.vtxn_config.enabled() {
+                validator_txns
+            } else {
+                vec![]
+            };
+            BlockData::new_opt_proposal_ext(
                 validator_txns,
                 payload,
                 self.author,
                 failed_authors,
+                epoch,
                 round,
                 timestamp,
                 quorum_cert,
-            )
-        } else {
-            BlockData::new_proposal(
-                payload,
-                self.author,
-                failed_authors,
-                round,
-                timestamp,
-                quorum_cert,
+                proposal_type,
             )
         };
 

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block::Block, vote_data::VoteData};
+use crate::{block::Block, block_data::ProposalType, vote_data::VoteData};
 use aptos_crypto::hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -59,13 +59,18 @@ impl VoteProposal {
 
     /// This function returns the vote data with a dummy executed_state_id and version
     fn vote_data_ordering_only(&self) -> VoteData {
+        let parent = match self.block.proposal_type() {
+            // daniel todo: double check
+            ProposalType::Optimistic(parent) => parent.gen_block_info(*ACCUMULATOR_PLACEHOLDER_HASH, 0, None),
+            ProposalType::Regular => self.block().quorum_cert().certified_block().clone(),
+        };
         VoteData::new(
             self.block().gen_block_info(
                 *ACCUMULATOR_PLACEHOLDER_HASH,
                 0,
                 self.next_epoch_state().cloned(),
             ),
-            self.block().quorum_cert().certified_block().clone(),
+            parent,
         )
     }
 
@@ -75,13 +80,18 @@ impl VoteProposal {
         &self,
         new_tree: &InMemoryTransactionAccumulator,
     ) -> VoteData {
+        let parent = match self.block.proposal_type() {
+            // daniel todo: double check
+            ProposalType::Optimistic(parent) => parent.gen_block_info(*ACCUMULATOR_PLACEHOLDER_HASH, 0, None),
+            ProposalType::Regular => self.block().quorum_cert().certified_block().clone(),
+        };
         VoteData::new(
             self.block().gen_block_info(
                 new_tree.root_hash(),
                 new_tree.version(),
                 self.next_epoch_state().cloned(),
             ),
-            self.block().quorum_cert().certified_block().clone(),
+            parent,
         )
     }
 

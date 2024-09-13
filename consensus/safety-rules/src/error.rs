@@ -47,6 +47,8 @@ pub enum Error {
     VoteProposalSignatureNotFound,
     #[error("Does not satisfy 2-chain voting rule. Round {0}, Quorum round {1}, TC round {2},  HQC round in TC {3}")]
     NotSafeToVote(u64, u64, u64, u64),
+    #[error("Does not satisfy optimistic voting rule. Round {0}, Parent round {1}, TC round {2},  HQC round in TC {3}")]
+    NotSafeToVoteOptimistic(u64, u64, u64, u64),
     #[error("Does not satisfy 2-chain timeout rule. Round {0}, Quorum round {1}, TC round {2}, one-chain round {3}")]
     NotSafeToTimeout(u64, u64, u64, u64),
     #[error("Invalid TC: {0}")]

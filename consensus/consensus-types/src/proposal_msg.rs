@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block::Block, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
+use crate::{block::Block, block_data::ProposalType, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
@@ -49,13 +49,7 @@ impl ProposalMsg {
             self.proposal.epoch() == self.sync_info.epoch(),
             "ProposalMsg has different epoch number from SyncInfo"
         );
-        ensure!(
-            self.proposal.parent_id()
-                == self.sync_info.highest_quorum_cert().certified_block().id(),
-            "Proposal HQC in SyncInfo certifies {}, but block parent id is {}",
-            self.sync_info.highest_quorum_cert().certified_block().id(),
-            self.proposal.parent_id(),
-        );
+
         let previous_round = self
             .proposal
             .round()
@@ -66,12 +60,35 @@ impl ProposalMsg {
             self.proposal.quorum_cert().certified_block().round(),
             self.sync_info.highest_timeout_round(),
         );
-        ensure!(
-            previous_round == highest_certified_round,
-            "Proposal {} does not have a certified round {}",
-            self.proposal,
-            previous_round
-        );
+        if let ProposalType::Optimistic(parent) = self.proposal().proposal_type() {
+            ensure!(parent.round() > self.sync_info.highest_quorum_cert().certified_block().round(),
+                "Optimistic proposal {} has a parent of round {} that is not higher than the highest certified block round {}",
+                self.proposal.id(),
+                parent.round(),
+                self.sync_info.highest_quorum_cert().certified_block().round(),
+            );
+            ensure!(parent.round() == previous_round,
+                "Optimistic proposal {} has a parent of round {} that is not equal to the previous round {}",
+                self.proposal.id(),
+                parent.round(),
+                previous_round,
+            );
+        } else {
+            ensure!(
+                self.proposal.parent_id()
+                    == self.sync_info.highest_quorum_cert().certified_block().id(),
+                "Proposal HQC in SyncInfo certifies {}, but block parent id is {}",
+                self.sync_info.highest_quorum_cert().certified_block().id(),
+                self.proposal.parent_id(),
+            );
+            ensure!(
+                previous_round == highest_certified_round,
+                "Proposal {} does not have a certified round {}",
+                self.proposal,
+                previous_round
+            );
+        }
+
         ensure!(
             self.proposal.author().is_some(),
             "Proposal {} does not define an author",

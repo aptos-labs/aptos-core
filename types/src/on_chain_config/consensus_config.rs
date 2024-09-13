@@ -20,14 +20,26 @@ pub enum ConsensusAlgorithmConfig {
         quorum_store_enabled: bool,
         order_vote_enabled: bool,
     },
+    JolteonV3 {
+        main: ConsensusConfigV1,
+        quorum_store_enabled: bool,
+        order_vote_enabled: bool,
+        optimistic_proposal_enabled: bool,
+    },
 }
 
 impl ConsensusAlgorithmConfig {
     pub fn default_for_genesis() -> Self {
-        Self::JolteonV2 {
+        // Self::JolteonV2 {
+        //     main: ConsensusConfigV1::default(),
+        //     quorum_store_enabled: true,
+        //     order_vote_enabled: true,
+        // }
+        Self::JolteonV3 {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
             order_vote_enabled: true,
+            optimistic_proposal_enabled: true,
         }
     }
 
@@ -56,6 +68,10 @@ impl ConsensusAlgorithmConfig {
             | ConsensusAlgorithmConfig::JolteonV2 {
                 quorum_store_enabled,
                 ..
+            }
+            | ConsensusAlgorithmConfig::JolteonV3 {
+                quorum_store_enabled,
+                ..
             } => *quorum_store_enabled,
             ConsensusAlgorithmConfig::DAG(_) => true,
         }
@@ -65,7 +81,7 @@ impl ConsensusAlgorithmConfig {
         match self {
             ConsensusAlgorithmConfig::JolteonV2 {
                 order_vote_enabled, ..
-            } => *order_vote_enabled,
+            } | ConsensusAlgorithmConfig::JolteonV3 { order_vote_enabled, ..} => *order_vote_enabled,
             _ => false,
         }
     }
@@ -73,23 +89,36 @@ impl ConsensusAlgorithmConfig {
     pub fn is_dag_enabled(&self) -> bool {
         match self {
             ConsensusAlgorithmConfig::Jolteon { .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { .. } => false,
+            | ConsensusAlgorithmConfig::JolteonV2 { .. }
+            | ConsensusAlgorithmConfig::JolteonV3 { .. } => false,
             ConsensusAlgorithmConfig::DAG(_) => true,
+        }
+    }
+
+    pub fn is_optimistic_proposal_enabled(&self) -> bool {
+        match self {
+            ConsensusAlgorithmConfig::JolteonV3 {
+                optimistic_proposal_enabled,
+                ..
+            } => *optimistic_proposal_enabled,
+            _ => false,
         }
     }
 
     pub fn leader_reputation_exclude_round(&self) -> u64 {
         match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.exclude_round,
+            ConsensusAlgorithmConfig::Jolteon { main, .. } => main.exclude_round,
+            ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.exclude_round,
+            ConsensusAlgorithmConfig::JolteonV3 { main, .. } => main.exclude_round,
             _ => unimplemented!("method not supported"),
         }
     }
 
     pub fn max_failed_authors_to_store(&self) -> usize {
         match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.max_failed_authors_to_store,
+            ConsensusAlgorithmConfig::Jolteon { main, .. } => main.max_failed_authors_to_store,
+            ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.max_failed_authors_to_store,
+            ConsensusAlgorithmConfig::JolteonV3 { main, .. } => main.max_failed_authors_to_store,
             _ => unimplemented!("method not supported"),
         }
     }
@@ -98,6 +127,7 @@ impl ConsensusAlgorithmConfig {
         match self {
             ConsensusAlgorithmConfig::Jolteon { main, .. } => &main.proposer_election_type,
             ConsensusAlgorithmConfig::JolteonV2 { main, .. } => &main.proposer_election_type,
+            ConsensusAlgorithmConfig::JolteonV3 { main, .. } => &main.proposer_election_type,
             _ => unimplemented!("method not supported"),
         }
     }
@@ -113,6 +143,7 @@ impl ConsensusAlgorithmConfig {
         match self {
             ConsensusAlgorithmConfig::Jolteon { main, .. } => main,
             ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main,
+            ConsensusAlgorithmConfig::JolteonV3 { main, .. } => main,
             _ => unreachable!("not a jolteon config"),
         }
     }
@@ -276,6 +307,13 @@ impl OnChainConsensusConfig {
                 ValidatorTxnConfig::default_disabled()
             },
             OnChainConsensusConfig::V3 { vtxn, .. } => vtxn.clone(),
+        }
+    }
+
+    pub fn is_optimistic_proposal_enabled(&self) -> bool {
+        match self {
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => false,
+            OnChainConsensusConfig::V3 { alg, .. } => alg.is_optimistic_proposal_enabled(),
         }
     }
 

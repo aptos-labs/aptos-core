@@ -4,13 +4,7 @@
 
 use crate::{error::Error, safety_rules::next_round, SafetyRules};
 use aptos_consensus_types::{
-    block::Block,
-    order_vote::OrderVote,
-    order_vote_proposal::OrderVoteProposal,
-    safety_data::SafetyData,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
-    vote::Vote,
-    vote_proposal::VoteProposal,
+    block::Block, block_data::ProposalType, order_vote::OrderVote, order_vote_proposal::OrderVoteProposal, safety_data::SafetyData, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate}, vote::Vote, vote_proposal::VoteProposal
 };
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
@@ -155,12 +149,24 @@ impl SafetyRules {
         let qc_round = block.quorum_cert().certified_block().round();
         let tc_round = maybe_tc.map_or(0, |tc| tc.round());
         let hqc_round = maybe_tc.map_or(0, |tc| tc.highest_hqc_round());
-        if round == next_round(qc_round)?
-            || (round == next_round(tc_round)? && qc_round >= hqc_round)
-        {
-            Ok(())
-        } else {
-            Err(Error::NotSafeToVote(round, qc_round, tc_round, hqc_round))
+        match block.proposal_type() {
+            ProposalType::Optimistic(parent) => {
+                let parent_round = parent.round();
+                if round == next_round(parent_round)? {
+                    Ok(())
+                } else {
+                    Err(Error::NotSafeToVoteOptimistic(round, parent_round, tc_round, hqc_round))
+                }
+            },
+            ProposalType::Regular => {
+                if round == next_round(qc_round)?
+                    || (round == next_round(tc_round)? && qc_round >= hqc_round)
+                {
+                    Ok(())
+                } else {
+                    Err(Error::NotSafeToVote(round, qc_round, tc_round, hqc_round))
+                }
+            }
         }
     }
 

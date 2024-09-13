@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_data::{BlockData, BlockType},
+    block_data::{BlockData, BlockType, ProposalType},
     common::{Author, Payload, Round},
     quorum_cert::QuorumCert,
 };
@@ -166,6 +166,14 @@ impl Block {
 
     pub fn is_nil_block(&self) -> bool {
         self.block_data.is_nil_block()
+    }
+
+    pub fn proposal_type(&self) -> &ProposalType {
+        self.block_data.proposal_type()
+    }
+
+    pub fn is_optimistic_proposal(&self) -> bool {
+        self.proposal_type().is_optimistic_proposal()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -332,7 +340,10 @@ impl Block {
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
                 validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
-                self.quorum_cert().verify(validator)
+                match self.proposal_type() {
+                    ProposalType::Optimistic(_) => Ok(()),
+                    ProposalType::Regular => self.quorum_cert().verify(validator),
+                }
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
         }
@@ -345,7 +356,12 @@ impl Block {
             !self.is_genesis_block(),
             "We must not accept genesis from others"
         );
-        let parent = self.quorum_cert().certified_block();
+        let parent = if let ProposalType::Optimistic(parent) = self.proposal_type() {
+            parent.gen_block_info(HashValue::zero(), 0, None)
+        } else {
+            self.quorum_cert().certified_block().clone()
+        };
+
         ensure!(
             parent.round() < self.round(),
             "Block must have a greater round than parent's block"
@@ -375,7 +391,7 @@ impl Block {
             );
             ensure!(
                 failed_authors.len() <= skipped_rounds.unwrap() as usize,
-                "Block has more failed authors than missed rounds"
+                "Block has more failed authors {} than missed rounds {}", failed_authors.len(), skipped_rounds.unwrap()
             );
             let mut bound = parent.round();
             for (round, _) in failed_authors {

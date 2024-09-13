@@ -66,7 +66,14 @@ impl SafetyRules {
 
         self.verify_epoch(proposed_block.epoch(), &safety_data)?;
 
-        self.verify_qc(proposed_block.quorum_cert())?;
+        if vote_proposal.block().is_optimistic_proposal() {
+            if !vote_proposal.block().quorum_cert().is_empty() {
+                return Err(Error::InvalidProposal("Optimistic proposal must have an empty QC".into()));
+            }
+        } else {
+            self.verify_qc(proposed_block.quorum_cert())?;
+        }
+
         proposed_block
             .validate_signature(&self.epoch_state()?.verifier)
             .map_err(|error| Error::InvalidProposal(error.to_string()))?;
@@ -357,9 +364,16 @@ impl SafetyRules {
             )));
         }
 
-        self.verify_qc(block_data.quorum_cert())?;
-        self.verify_and_update_preferred_round(block_data.quorum_cert(), &mut safety_data)?;
-        // we don't persist the updated preferred round to save latency (it'd be updated upon voting)
+        if block_data.is_optimistic_proposal() {
+            if !block_data.quorum_cert().is_empty() {
+                return Err(Error::InvalidProposal(format!("Optimistic proposal must have an empty QC")));
+            }
+        } else {
+            self.verify_qc(block_data.quorum_cert())?;
+
+            self.verify_and_update_preferred_round(block_data.quorum_cert(), &mut safety_data)?;
+            // we don't persist the updated preferred round to save latency (it'd be updated upon voting)
+        }
 
         let signature = self.sign(block_data)?;
         Ok(signature)

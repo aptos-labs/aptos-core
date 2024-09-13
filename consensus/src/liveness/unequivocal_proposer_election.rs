@@ -17,7 +17,8 @@ use std::{cmp::Ordering, sync::Arc};
 // the same leader proposes multiple blocks.
 pub struct UnequivocalProposerElection {
     proposer_election: Arc<dyn ProposerElection + Send + Sync>,
-    already_proposed: Mutex<(Round, HashValue)>,
+    already_proposed_regular: Mutex<(Round, HashValue)>,
+    already_proposed_optimistic: Mutex<(Round, HashValue)>,
 }
 
 impl ProposerElection for UnequivocalProposerElection {
@@ -35,7 +36,8 @@ impl UnequivocalProposerElection {
     pub fn new(proposer_election: Arc<dyn ProposerElection + Send + Sync>) -> Self {
         Self {
             proposer_election,
-            already_proposed: Mutex::new((0, HashValue::zero())),
+            already_proposed_regular: Mutex::new((0, HashValue::zero())),
+            already_proposed_optimistic: Mutex::new((0, HashValue::zero())),
         }
     }
 
@@ -58,30 +60,58 @@ impl UnequivocalProposerElection {
 
                 return false;
             }
-            let mut already_proposed = self.already_proposed.lock();
-            // detect if the leader proposes more than once in this round
-            match block.round().cmp(&already_proposed.0) {
-                Ordering::Greater => {
-                    already_proposed.0 = block.round();
-                    already_proposed.1 = block.id();
-                    true
-                },
-                Ordering::Equal => {
-                    if already_proposed.1 != block.id() {
-                        error!(
-                            SecurityEvent::InvalidConsensusProposal,
-                            "Multiple proposals from {} for round {}: {} and {}",
-                            author,
-                            block.round(),
-                            already_proposed.1,
-                            block.id()
-                        );
-                        false
-                    } else {
+            if block.is_optimistic_proposal() {
+                let mut already_proposed_optimistic = self.already_proposed_optimistic.lock();
+                // detect if the leader proposes more than once in this round
+                match block.round().cmp(&already_proposed_optimistic.0) {
+                    Ordering::Greater => {
+                        already_proposed_optimistic.0 = block.round();
+                        already_proposed_optimistic.1 = block.id();
                         true
-                    }
-                },
-                Ordering::Less => false,
+                    },
+                    Ordering::Equal => {
+                        if already_proposed_optimistic.1 != block.id() {
+                            error!(
+                                SecurityEvent::InvalidConsensusProposal,
+                                "Multiple optimistic proposals from {} for round {}: {} and {}",
+                                author,
+                                block.round(),
+                                already_proposed_optimistic.1,
+                                block.id()
+                            );
+                            false
+                        } else {
+                            true
+                        }
+                    },
+                    Ordering::Less => false,
+                }
+            } else {
+                let mut already_proposed_regular = self.already_proposed_regular.lock();
+                // detect if the leader proposes more than once in this round
+                match block.round().cmp(&already_proposed_regular.0) {
+                    Ordering::Greater => {
+                        already_proposed_regular.0 = block.round();
+                        already_proposed_regular.1 = block.id();
+                        true
+                    },
+                    Ordering::Equal => {
+                        if already_proposed_regular.1 != block.id() {
+                            error!(
+                                SecurityEvent::InvalidConsensusProposal,
+                                "Multiple regular proposals from {} for round {}: {} and {}",
+                                author,
+                                block.round(),
+                                already_proposed_regular.1,
+                                block.id()
+                            );
+                            false
+                        } else {
+                            true
+                        }
+                    },
+                    Ordering::Less => false,
+                }
             }
         })
     }

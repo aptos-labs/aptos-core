@@ -874,6 +874,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
+            onchain_consensus_config.is_optimistic_proposal_enabled(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,

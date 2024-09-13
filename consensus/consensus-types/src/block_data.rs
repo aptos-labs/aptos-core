@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{Author, Payload, Round},
-    proposal_ext::ProposalExt,
-    quorum_cert::QuorumCert,
-    vote_data::VoteData,
+    block::Block, common::{Author, Payload, Round}, proposal_ext::ProposalExt, quorum_cert::QuorumCert, vote_data::VoteData
 };
 use aptos_bitvec::BitVec;
 use aptos_crypto::hash::HashValue;
@@ -19,6 +16,19 @@ use aptos_types::{
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub enum ProposalType {
+    // Block is the parent block
+    Optimistic(Box<Block>),
+    Regular,
+}
+
+impl ProposalType {
+    pub fn is_optimistic_proposal(&self) -> bool {
+        matches!(self, ProposalType::Optimistic(_))
+    }
+}
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlockType {
@@ -122,7 +132,10 @@ impl BlockData {
         {
             *parent_block_id
         } else {
-            self.quorum_cert.certified_block().id()
+            match self.proposal_type() {
+                ProposalType::Regular => self.quorum_cert.certified_block().id(),
+                ProposalType::Optimistic(parent) => parent.id(),
+            }
         }
     }
 
@@ -174,6 +187,18 @@ impl BlockData {
 
     pub fn is_nil_block(&self) -> bool {
         matches!(self.block_type, BlockType::NilBlock { .. })
+    }
+
+    pub fn proposal_type(&self) -> &ProposalType {
+        if let BlockType::ProposalExt(p) = &self.block_type {
+            p.proposal_type()
+        } else {
+            &ProposalType::Regular
+        }
+    }
+
+    pub fn is_optimistic_proposal(&self) -> bool {
+        self.proposal_type().is_optimistic_proposal()
     }
 
     /// the list of consecutive proposers from the immediately preceeding
@@ -349,6 +374,32 @@ impl BlockData {
                 payload,
                 author,
                 failed_authors,
+            }),
+        }
+    }
+
+    pub fn new_opt_proposal_ext(
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+        proposal_type: ProposalType,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::ProposalExt(ProposalExt::V1 {
+                validator_txns,
+                payload,
+                author,
+                failed_authors,
+                proposal_type,
             }),
         }
     }

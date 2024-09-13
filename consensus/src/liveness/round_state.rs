@@ -27,6 +27,9 @@ use std::{fmt, sync::Arc, time::Duration};
 pub enum NewRoundReason {
     QCReady,
     Timeout,
+    // This is a dummy reason for supporting optimistic proposal.
+    // The validator does not enter a new round.
+    Optimistic,
 }
 
 impl fmt::Display for NewRoundReason {
@@ -34,6 +37,7 @@ impl fmt::Display for NewRoundReason {
         match self {
             NewRoundReason::QCReady => write!(f, "QCReady"),
             NewRoundReason::Timeout => write!(f, "TCReady"),
+            NewRoundReason::Optimistic => write!(f, "Optimistic"),
         }
     }
 }
@@ -160,7 +164,9 @@ pub struct RoundState {
     // Votes received for the current round.
     pending_votes: PendingVotes,
     // Vote sent locally for the current round.
-    vote_sent: Option<Vote>,
+    vote_sent_regular: Option<Vote>,
+    // Vote sent locally for the current round.
+    vote_sent_optimistic: Option<Vote>,
     // The handle to cancel previous timeout task when moving to next round.
     abort_handle: Option<AbortHandle>,
     // Self sender to send delayed QC aggregation events to the round manager.
@@ -175,7 +181,9 @@ pub struct RoundStateLogSchema<'a> {
     #[schema(display)]
     pending_votes: Option<&'a PendingVotes>,
     #[schema(display)]
-    self_vote: Option<&'a Vote>,
+    self_vote_regular: Option<&'a Vote>,
+    #[schema(display)]
+    self_vote_optimistic: Option<&'a Vote>,
 }
 
 impl<'a> RoundStateLogSchema<'a> {
@@ -184,7 +192,8 @@ impl<'a> RoundStateLogSchema<'a> {
             round: Some(state.current_round),
             highest_ordered_round: Some(state.highest_ordered_round),
             pending_votes: Some(&state.pending_votes),
-            self_vote: state.vote_sent.as_ref(),
+            self_vote_regular: state.vote_sent_regular.as_ref(),
+            self_vote_optimistic: state.vote_sent_optimistic.as_ref(),
         }
     }
 }
@@ -216,7 +225,8 @@ impl RoundState {
             time_service,
             timeout_sender,
             pending_votes,
-            vote_sent: None,
+            vote_sent_regular: None,
+            vote_sent_optimistic: None,
             abort_handle: None,
             delayed_qc_tx,
             qc_aggregator_type,
@@ -225,7 +235,7 @@ impl RoundState {
 
     /// Return if already voted for timeout
     pub fn is_vote_timeout(&self) -> bool {
-        self.vote_sent.as_ref().map_or(false, |v| v.is_timeout())
+        self.vote_sent_regular.as_ref().map_or(false, |v| v.is_timeout())
     }
 
     /// Return the current round.
@@ -267,7 +277,8 @@ impl RoundState {
                 self.delayed_qc_tx.clone(),
                 self.qc_aggregator_type.clone(),
             );
-            self.vote_sent = None;
+            self.vote_sent_regular = None;
+            self.vote_sent_optimistic = None;
             let timeout = self.setup_timeout(1);
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
             // it's Timeout and TC.round + 1 == new_round.
@@ -304,9 +315,15 @@ impl RoundState {
         }
     }
 
-    pub fn record_vote(&mut self, vote: Vote) {
+    pub fn record_vote_regular(&mut self, vote: Vote) {
         if vote.vote_data().proposed().round() == self.current_round {
-            self.vote_sent = Some(vote);
+            self.vote_sent_regular = Some(vote);
+        }
+    }
+
+    pub fn record_vote_optimistic(&mut self, vote: Vote) {
+        if vote.vote_data().proposed().round() == self.current_round {
+            self.vote_sent_optimistic = Some(vote);
         }
     }
 
@@ -320,8 +337,12 @@ impl RoundState {
             .process_delayed_qc(validator_verifier, vote)
     }
 
-    pub fn vote_sent(&self) -> Option<Vote> {
-        self.vote_sent.clone()
+    pub fn vote_sent_regular(&self) -> Option<Vote> {
+        self.vote_sent_regular.clone()
+    }
+
+    pub fn vote_sent_optimistic(&self) -> Option<Vote> {
+        self.vote_sent_optimistic.clone()
     }
 
     /// Setup the timeout task and return the duration of the current timeout

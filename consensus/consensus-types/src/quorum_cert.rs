@@ -52,6 +52,20 @@ impl QuorumCert {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            vote_data: VoteData::dummy(),
+            signed_ledger_info: LedgerInfoWithSignatures::new(
+                LedgerInfo::dummy(),
+                AggregateSignature::empty(),
+            ),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        *self == Self::empty()
+    }
+
     pub fn vote_data(&self) -> &VoteData {
         &self.vote_data
     }
