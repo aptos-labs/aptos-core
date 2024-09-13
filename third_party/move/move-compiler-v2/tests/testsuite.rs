@@ -127,7 +127,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
-            stop_after: StopAfter::AstPipeline,
+            stop_after: StopAfter::BytecodeGen,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,

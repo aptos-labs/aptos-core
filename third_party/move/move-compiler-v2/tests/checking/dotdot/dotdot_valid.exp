@@ -299,3 +299,21 @@ module 0x42::test {
         }
     }
 } // end 0x42::test
+
+
+Diagnostics:
+error: match not exhaustive
+    ┌─ tests/checking/dotdot/dotdot_valid.move:142:16
+    │
+142 │         match (x) {
+    │                ^
+    │
+    = missing `E1::C{..}`
+
+error: match not exhaustive
+    ┌─ tests/checking/dotdot/dotdot_valid.move:153:16
+    │
+153 │         match (x) {
+    │                ^
+    │
+    = missing `E1::C{..}`

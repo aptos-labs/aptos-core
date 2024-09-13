@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unsupported language construct
+  ┌─ tests/checking-lang-v1/struct_without_fields.move:3:13
+  │
+3 │     struct S;
+  │             ^ Move 2 language construct is not enabled: struct declaration without field list
