@@ -26,7 +26,7 @@ use crate::{
     network::NetworkSender,
     network_interface::ConsensusMsg,
     pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
-    pending_votes::VoteReceptionResult,
+    pending_votes::{VoteReceptionResult, VoteStatus},
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
     rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
@@ -425,9 +425,14 @@ impl RoundManager {
         let prev_round_votes_for_li = new_round_event
             .prev_round_votes
             .iter()
-            .map(|(_, li_with_sig)| {
-                let (voting_power, votes): (Vec<_>, Vec<_>) = li_with_sig
-                    .all_voters()
+            .map(|(_, vote_status)| {
+                let all_voters = match vote_status {
+                    VoteStatus::EnoughVotes(li_with_sig) => epoch_state
+                        .verifier
+                        .agg_signature_authors(li_with_sig.signatures()),
+                    VoteStatus::NotEnoughVotes(li_with_sig) => li_with_sig.all_voters(),
+                };
+                let (voting_power, votes): (Vec<_>, Vec<_>) = all_voters
                     .into_iter()
                     .map(|author| {
                         epoch_state

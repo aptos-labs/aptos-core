@@ -4,7 +4,7 @@
 
 use crate::{
     counters,
-    pending_votes::{PendingVotes, VoteReceptionResult},
+    pending_votes::{PendingVotes, VoteReceptionResult, VoteStatus},
     util::time_service::{SendTask, TimeService},
 };
 use aptos_consensus_types::{
@@ -13,7 +13,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures};
+use aptos_types::epoch_state::EpochState;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
@@ -43,7 +43,7 @@ pub struct NewRoundEvent {
     pub round: Round,
     pub reason: NewRoundReason,
     pub timeout: Duration,
-    pub prev_round_votes: Vec<(HashValue, LedgerInfoWithMixedSignatures)>,
+    pub prev_round_votes: Vec<(HashValue, VoteStatus)>,
     pub prev_round_timeout_votes: Option<TwoChainTimeoutWithPartialSignatures>,
 }
 

@@ -38,7 +38,7 @@ enum OrderVoteStatus {
 
 /// A PendingVotes structure keep track of order votes for the last few rounds
 pub struct PendingOrderVotes {
-    /// Maps LedgerInfo digest to associated signatures (contained in a partial LedgerInfoWithSignatures).
+    /// Maps LedgerInfo digest to associated signatures.
     /// Order vote status stores caches the information on whether the votes are enough to form a QC.
     li_digest_to_votes: HashMap<HashValue /* LedgerInfo digest */, OrderVoteStatus>,
 }

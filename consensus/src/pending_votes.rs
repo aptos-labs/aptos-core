@@ -18,14 +18,11 @@ use aptos_consensus_types::{
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithMixedSignatures,
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
     validator_verifier::VerifyError,
 };
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-    sync::Arc,
-};
+use std::{collections::HashMap, fmt, sync::Arc};
 
 /// Result of the vote processing. The failure case (Verification error) is returned
 /// as the Error part of the result.
@@ -56,13 +53,18 @@ pub enum VoteReceptionResult {
     UnknownAuthor(Author),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum VoteStatus {
+    EnoughVotes(LedgerInfoWithSignatures),
+    NotEnoughVotes(LedgerInfoWithMixedSignatures),
+}
+
 /// A PendingVotes structure keep track of votes
 pub struct PendingVotes {
-    /// Maps LedgerInfo digest to associated signatures (contained in a partial LedgerInfoWithSignatures).
+    /// Maps LedgerInfo digest to associated signatures.
     /// This might keep multiple LedgerInfos for the current round: either due to different proposals (byzantine behavior)
     /// or due to different NIL proposals (clients can have a different view of what block to extend).
-    li_digest_to_votes:
-        HashMap<HashValue /* LedgerInfo digest */, (usize, LedgerInfoWithMixedSignatures)>,
+    li_digest_to_votes: HashMap<HashValue /* LedgerInfo digest */, (usize, VoteStatus)>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
     maybe_partial_2chain_tc: Option<TwoChainTimeoutWithPartialSignatures>,
     /// Map of Author to (vote, li_digest). This is useful to discard multiple votes.
@@ -134,14 +136,14 @@ impl PendingVotes {
 
         let len = self.li_digest_to_votes.len() + 1;
         // obtain the ledger info with signatures associated to the vote's ledger info
-        let (hash_index, li_with_sig) =
-            self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
-                // if the ledger info with signatures doesn't exist yet, create it
-                (
-                    len,
-                    LedgerInfoWithMixedSignatures::new(vote.ledger_info().clone()),
-                )
-            });
+        let (hash_index, status) = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
+            (
+                len,
+                VoteStatus::NotEnoughVotes(LedgerInfoWithMixedSignatures::new(
+                    vote.ledger_info().clone(),
+                )),
+            )
+        });
 
         let validator_voting_power = epoch_state.verifier.get_voting_power(&vote.author());
 
@@ -172,45 +174,55 @@ impl PendingVotes {
                 .set(cur_round);
         }
 
-        // add this vote to the ledger info with signatures
-        li_with_sig.add_signature(vote.author(), vote.signature().clone(), verified);
-
-        // check if we have enough signatures to create a QC
-        let voting_power = match li_with_sig.check_voting_power(&epoch_state.verifier) {
-            // a quorum of signature was reached, a new QC is formed
-            Ok(aggregated_voting_power) => {
-                assert!(
-                        aggregated_voting_power >= epoch_state.verifier.quorum_voting_power(),
-                        "QC aggregation should not be triggered if we don't have enough votes to form a QC"
-                    );
-                let verification_result = {
-                    let _timer = counters::VERIFY_MSG
-                        .with_label_values(&["vote_aggregate_and_verify"])
-                        .start_timer();
-
-                    li_with_sig.aggregate_and_verify(epoch_state.clone())
-                };
-                return match verification_result {
-                    Ok(ledger_info_with_sig) => {
-                        VoteReceptionResult::NewQuorumCertificate(Arc::new(QuorumCert::new(
-                            vote.vote_data().clone(),
-                            ledger_info_with_sig,
-                        )))
-                    },
-                    Err(e) => VoteReceptionResult::ErrorAggregatingSignature(e),
-                };
+        let voting_power = match status {
+            VoteStatus::EnoughVotes(li_with_sig) => {
+                return VoteReceptionResult::NewQuorumCertificate(Arc::new(QuorumCert::new(
+                    vote.vote_data().clone(),
+                    li_with_sig.clone(),
+                )));
             },
+            VoteStatus::NotEnoughVotes(li_with_sig) => {
+                // add this vote to the ledger info with signatures
+                li_with_sig.add_signature(vote.author(), vote.signature().clone(), verified);
 
-            // not enough votes
-            Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
+                // check if we have enough signatures to create a QC
+                match li_with_sig.check_voting_power(&epoch_state.verifier) {
+                    // a quorum of signature was reached, a new QC is formed
+                    Ok(aggregated_voting_power) => {
+                        assert!(
+                                aggregated_voting_power >= epoch_state.verifier.quorum_voting_power(),
+                                "QC aggregation should not be triggered if we don't have enough votes to form a QC"
+                            );
+                        let verification_result = {
+                            let _timer = counters::VERIFY_MSG
+                                .with_label_values(&["vote_aggregate_and_verify"])
+                                .start_timer();
 
-            // error
-            Err(error) => {
-                error!(
-                    "MUST_FIX: vote received could not be added: {}, vote: {}",
-                    error, vote
-                );
-                return VoteReceptionResult::ErrorAddingVote(error);
+                            li_with_sig.aggregate_and_verify(epoch_state.clone())
+                        };
+                        return match verification_result {
+                            Ok(ledger_info_with_sig) => {
+                                *status = VoteStatus::EnoughVotes(ledger_info_with_sig.clone());
+                                VoteReceptionResult::NewQuorumCertificate(Arc::new(
+                                    QuorumCert::new(vote.vote_data().clone(), ledger_info_with_sig),
+                                ))
+                            },
+                            Err(e) => VoteReceptionResult::ErrorAggregatingSignature(e),
+                        };
+                    },
+
+                    // not enough votes
+                    Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
+
+                    // error
+                    Err(error) => {
+                        error!(
+                            "MUST_FIX: vote received could not be added: {}, vote: {}",
+                            error, vote
+                        );
+                        return VoteReceptionResult::ErrorAddingVote(error);
+                    },
+                }
             },
         };
 
@@ -277,7 +289,7 @@ impl PendingVotes {
     pub fn drain_votes(
         &mut self,
     ) -> (
-        Vec<(HashValue, LedgerInfoWithMixedSignatures)>,
+        Vec<(HashValue, VoteStatus)>,
         Option<TwoChainTimeoutWithPartialSignatures>,
     ) {
         for (hash_index, _) in self.li_digest_to_votes.values() {
@@ -299,7 +311,7 @@ impl PendingVotes {
         (
             self.li_digest_to_votes
                 .drain()
-                .map(|(key, (_, li))| (key, li))
+                .map(|(key, (_, vote_status))| (key, vote_status))
                 .collect(),
             self.maybe_partial_2chain_tc.take(),
         )
@@ -320,33 +332,32 @@ fn hash_index_to_str(hash_index: usize) -> String {
 
 impl fmt::Display for PendingVotes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // collect votes per ledger info
-        let votes = self
-            .li_digest_to_votes
-            .iter()
-            .map(|(li_digest, (_, li))| (li_digest, (li.verified_voters(), li.unverified_voters())))
-            .collect::<BTreeMap<_, _>>();
+        write!(f, "PendingVotes: [")?;
+
+        for (li_digest, (_, status)) in self.li_digest_to_votes.iter() {
+            match status {
+                VoteStatus::EnoughVotes(_li) => {
+                    write!(f, "LI {} has aggregated QC", li_digest)?;
+                },
+                VoteStatus::NotEnoughVotes(li) => {
+                    write!(
+                        f,
+                        "LI {} has {} verified votes {:?}, {} unverified votes {:?}",
+                        li_digest,
+                        li.verified_voters().len(),
+                        li.verified_voters(),
+                        li.unverified_voters().len(),
+                        li.unverified_voters()
+                    )?;
+                },
+            }
+        }
 
         // collect timeout votes
         let timeout_votes = self
             .maybe_partial_2chain_tc
             .as_ref()
             .map(|partial_tc| partial_tc.signers().collect::<Vec<_>>());
-
-        // write
-        write!(f, "PendingVotes: [")?;
-
-        for (hash, (verified_authors, unverified_authors)) in votes {
-            write!(
-                f,
-                "LI {} has {} verified votes {:?}, {} unverified votes {:?}",
-                hash,
-                verified_authors.len(),
-                verified_authors,
-                unverified_authors.len(),
-                unverified_authors
-            )?;
-        }
 
         if let Some(authors) = timeout_votes {
             write!(f, "{} timeout {:?}", authors.len(), authors)?;
@@ -366,10 +377,13 @@ mod tests {
     use aptos_consensus_types::{
         block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
-    use aptos_crypto::HashValue;
+    use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
     use aptos_types::{
-        block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
-        validator_verifier::random_validator_verifier,
+        aggregate_signature::PartialSignatures,
+        block_info::BlockInfo,
+        epoch_state::EpochState,
+        ledger_info::LedgerInfo,
+        validator_verifier::{random_validator_verifier, VerifyError},
     };
     use itertools::Itertools;
     use std::sync::Arc;
@@ -470,60 +484,120 @@ mod tests {
         let mut pending_votes = PendingVotes::new();
 
         // create random vote from validator[0]
-        let li1 = random_ledger_info();
-        let vote_data_1 = random_vote_data();
-        let vote_data_1_author_0 = Vote::new(
-            vote_data_1.clone(),
+        let mut li = random_ledger_info();
+        let vote_data = random_vote_data();
+        li.set_consensus_data_hash(vote_data.hash());
+
+        let mut partial_sigs = PartialSignatures::empty();
+
+        let vote_0 = Vote::new(
+            vote_data.clone(),
             signers[0].author(),
-            li1.clone(),
+            li.clone(),
             &signers[0],
+        )
+        .unwrap();
+
+        let vote_1 = Vote::new(
+            vote_data.clone(),
+            signers[1].author(),
+            li.clone(),
+            &signers[1],
+        )
+        .unwrap();
+
+        let vote_2 = Vote::new_with_signature(
+            vote_data.clone(),
+            signers[2].author(),
+            li.clone(),
+            bls12381::Signature::dummy_signature(),
+        );
+
+        let vote_3 = Vote::new(
+            vote_data.clone(),
+            signers[3].author(),
+            li.clone(),
+            &signers[3],
+        )
+        .unwrap();
+
+        let vote_4 = Vote::new(
+            vote_data.clone(),
+            signers[4].author(),
+            li.clone(),
+            &signers[4],
         )
         .unwrap();
 
         // first time a new vote is added -> VoteAdded
         assert_eq!(
-            pending_votes.insert_vote(&vote_data_1_author_0, epoch_state.clone(), false),
+            pending_votes.insert_vote(&vote_0, epoch_state.clone(), false),
             VoteReceptionResult::VoteAdded(1)
         );
+        partial_sigs.add_signature(signers[0].author(), vote_0.signature().clone());
 
         // same author voting for the same thing -> DuplicateVote
         assert_eq!(
-            pending_votes.insert_vote(&vote_data_1_author_0, epoch_state.clone(), true),
+            pending_votes.insert_vote(&vote_0, epoch_state.clone(), true),
             VoteReceptionResult::DuplicateVote
         );
 
-        let vote_data_1_author_1 = Vote::new(
-            vote_data_1.clone(),
-            signers[1].author(),
-            li1.clone(),
-            &signers[1],
-        )
-        .unwrap();
-
         assert_eq!(
-            pending_votes.insert_vote(&vote_data_1_author_1, epoch_state.clone(), false),
+            pending_votes.insert_vote(&vote_1, epoch_state.clone(), false),
             VoteReceptionResult::VoteAdded(2)
         );
+        partial_sigs.add_signature(signers[1].author(), vote_1.signature().clone());
 
-        let vote_data_1_author_2 = Vote::new(
-            vote_data_1.clone(),
-            signers[2].author(),
-            li1.clone(),
-            &signers[2],
-        )
-        .unwrap();
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 0);
 
-        match pending_votes.insert_vote(&vote_data_1_author_2, epoch_state.clone(), true) {
+        assert_eq!(
+            pending_votes.insert_vote(&vote_2, epoch_state.clone(), false),
+            VoteReceptionResult::ErrorAggregatingSignature(VerifyError::TooLittleVotingPower {
+                voting_power: 2,
+                expected_voting_power: 3
+            })
+        );
+
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+
+        partial_sigs.add_signature(signers[3].author(), vote_3.signature().clone());
+        let aggregated_sig = epoch_state
+            .verifier
+            .aggregate_signatures(&partial_sigs)
+            .unwrap();
+        match pending_votes.insert_vote(&vote_3, epoch_state.clone(), false) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 assert!(qc
                     .ledger_info()
                     .check_voting_power(&epoch_state.clone().verifier)
                     .is_ok());
+                assert_eq!(
+                    qc.ledger_info().signatures().clone(),
+                    aggregated_sig.clone()
+                );
             },
             _ => {
                 panic!("No QC formed.");
             },
         };
+
+        match pending_votes.insert_vote(&vote_4, epoch_state.clone(), false) {
+            VoteReceptionResult::NewQuorumCertificate(qc) => {
+                assert!(qc
+                    .ledger_info()
+                    .check_voting_power(&epoch_state.clone().verifier)
+                    .is_ok());
+                assert_eq!(
+                    qc.ledger_info().signatures().clone(),
+                    aggregated_sig.clone()
+                );
+            },
+            _ => {
+                panic!("No QC formed.");
+            },
+        };
+
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
     }
 
     #[test]

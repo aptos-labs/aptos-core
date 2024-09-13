@@ -218,7 +218,7 @@ async fn test_batch_request_not_exists_expired() {
     // Batch has expired according to the ledger info that will be returned
     let (ledger_info_with_signatures, validator_verifier) =
         create_ledger_info_with_timestamp(expiration + 1);
-    let epoch_state = Arc::new(EpochState::new(5, validator_verifier));
+    let epoch_state = Arc::new(EpochState::new(1, validator_verifier));
     let batch = Batch::new(
         BatchId::new_for_test(1),
         vec![],
