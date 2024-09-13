@@ -57,6 +57,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::Instant,
 };
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -598,9 +599,11 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         mut event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()> {
+        let started = Instant::now();
+        let num_txns = transactions.len();
         let mut latest_view = self.commit_queue.lock().expect_latest_view()?;
         let chunk_begin = latest_view.num_transactions() as Version;
-        let chunk_end = chunk_begin + transactions.len() as Version; // right-exclusive
+        let chunk_end = chunk_begin + num_txns as Version; // right-exclusive
 
         // Find epoch boundaries.
         let mut epochs = Vec::new();
@@ -636,11 +639,28 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
         self.commit_queue
             .lock()
-            .enqueue_chunk_to_commit_directly(executed_chunk.expect("Nothing to commit."))
+            .enqueue_chunk_to_commit_directly(executed_chunk.expect("Nothing to commit."))?;
+        info!(
+            num_txns = num_txns,
+            tps = num_txns as f64 / started.elapsed().as_secs_f64(),
+            "TransactionReplayer::replay() OK"
+        );
+
+        Ok(())
     }
 
     fn commit(&self) -> Result<ExecutedChunk> {
-        self.commit_chunk_impl()
+        let started = Instant::now();
+
+        let chunk = self.commit_chunk_impl()?;
+
+        let num_committed = chunk.transactions_to_commit().len();
+        info!(
+            num_committed = num_committed,
+            tps = num_committed as f64 / started.elapsed().as_secs_f64(),
+            "TransactionReplayer::commit() OK"
+        );
+        Ok(chunk)
     }
 }
 
