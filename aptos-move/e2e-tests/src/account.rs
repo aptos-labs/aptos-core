@@ -17,7 +17,7 @@ use aptos_types::{
     },
     chain_id::ChainId,
     event::{EventHandle, EventKey},
-    keyless::KeylessPublicKey,
+    keyless::AnyKeylessPublicKey,
     state_store::state_key::StateKey,
     transaction::{
         authenticator::{AnyPublicKey, AuthenticationKey},
@@ -35,27 +35,38 @@ pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum AccountPublicKey {
     Ed25519(Ed25519PublicKey),
-    Keyless(KeylessPublicKey),
+    AnyPublicKey(AnyPublicKey),
 }
 
 impl AccountPublicKey {
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
             AccountPublicKey::Ed25519(pk) => pk.to_bytes().to_vec(),
-            AccountPublicKey::Keyless(pk) => pk.to_bytes(),
+            AccountPublicKey::AnyPublicKey(pk) => pk.to_bytes().to_vec(),
         }
     }
 
     pub fn as_ed25519(&self) -> Option<Ed25519PublicKey> {
         match self {
             AccountPublicKey::Ed25519(pk) => Some(pk.clone()),
-            AccountPublicKey::Keyless(_) => None,
+            AccountPublicKey::AnyPublicKey(pk) => match pk {
+                AnyPublicKey::Ed25519 { public_key } => Some(public_key.clone()),
+                _ => None,
+            },
         }
     }
 
-    pub fn as_keyless(&self) -> Option<KeylessPublicKey> {
+    pub fn as_keyless(&self) -> Option<AnyKeylessPublicKey> {
         match self {
-            AccountPublicKey::Keyless(pk) => Some(pk.clone()),
+            AccountPublicKey::AnyPublicKey(pk) => match pk {
+                AnyPublicKey::Keyless { public_key } => {
+                    Some(AnyKeylessPublicKey::Normal(public_key.clone()))
+                },
+                AnyPublicKey::FederatedKeyless { public_key } => {
+                    Some(AnyKeylessPublicKey::Federated(public_key.clone()))
+                },
+                _ => None,
+            },
             AccountPublicKey::Ed25519(_) => None,
         }
     }
@@ -71,7 +82,8 @@ impl AccountPublicKey {
 pub struct Account {
     addr: AccountAddress,
     /// The current private key for this account.
-    /// TODO: When `pubkey` is of type `AccountPublicKey::Keyless`, this will be undefined.
+    /// TODO: Refactor appropriately since, for example, when `pubkey` is of type
+    /// `AccountPublicKey::AnyPublicKey::Keyless`, this `privkey` field will be undefined.
     pub privkey: Ed25519PrivateKey,
     /// The current public key for this account.
     pub pubkey: AccountPublicKey,
@@ -195,9 +207,7 @@ impl Account {
     pub fn auth_key(&self) -> Vec<u8> {
         match &self.pubkey {
             AccountPublicKey::Ed25519(pk) => AuthenticationKey::ed25519(pk),
-            AccountPublicKey::Keyless(pk) => {
-                AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone()))
-            },
+            AccountPublicKey::AnyPublicKey(pk) => AuthenticationKey::any_key(pk.clone()),
         }
         .to_vec()
     }
