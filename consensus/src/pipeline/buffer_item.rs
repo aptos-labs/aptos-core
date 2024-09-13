@@ -19,6 +19,7 @@ use aptos_types::{
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
@@ -50,7 +51,7 @@ fn verify_signatures(
     PartialSignatures::new(
         unverified_signatures
             .signatures()
-            .iter()
+            .par_iter()
             .filter(|(author, sig)| validator.verify(**author, commit_ledger_info, sig).is_ok())
             .map(|(author, sig)| (*author, sig.clone()))
             .collect(),
@@ -144,9 +145,10 @@ impl BufferItem {
         ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
+        unverified_signatures: PartialSignatures,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
-            unverified_signatures: PartialSignatures::empty(),
+            unverified_signatures,
             commit_proof: None,
             callback,
             ordered_blocks,

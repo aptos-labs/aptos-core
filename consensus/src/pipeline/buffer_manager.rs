@@ -18,15 +18,16 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    common::{Author, Round}, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock
+};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress, aggregate_signature::PartialSignatures, epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures
 };
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -143,7 +144,9 @@ pub struct BufferManager {
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 
-    buffered_commit_votes: Arc<DashMap<HashValue, HashMap<Author, IncomingCommitRequest>>>,
+    pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
+
+    buffered_commit_votes: HashMap<Round, HashMap<Author, CommitVote>>,
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
@@ -323,24 +326,22 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
-        let block_ids = ordered_blocks.iter().map(|b| b.id()).collect::<Vec<_>>();
 
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
-        self.buffer.push_back(item);
-
-        for block_id in block_ids {
-            self.process_buffered_commit_votes(block_id).await;
-        }
-    }
-
-    async fn process_buffered_commit_votes(&mut self, block_id: HashValue) {
-        let mut commit_votes = self.buffered_commit_votes.remove(&block_id);
-        if let Some((_, commit_votes)) = commit_votes.take() {
-            info!("[PreExecution] process {} buffered commit votes for block id {}", commit_votes.len(), block_id);
-            for (_, commit_msg) in commit_votes {
-                self.process_commit_message(commit_msg);
+        let mut unverified_signatures = PartialSignatures::empty();
+        if let Some(block) = ordered_blocks.last() {
+            if let Some(commit_votes) = self.buffered_commit_votes.remove(&block.round()) {
+                info!("[PreExecution] process {} buffered commit votes for round {}", commit_votes.len(), block.round());
+                commit_votes
+                    .values()
+                    .filter(|vote| vote.commit_info().id() == block.id())
+                    .for_each(|vote| {
+                        unverified_signatures.add_signature(vote.author(), vote.signature().clone())
+                    });
             }
         }
+
+        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback, unverified_signatures);
+        self.buffer.push_back(item);
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
@@ -683,14 +684,8 @@ impl BufferManager {
                         return None;
                     }
                 } else {
-                    let author = vote.author();
-                    let commit_msg = IncomingCommitRequest {
-                        req: CommitMessage::Vote(vote),
-                        protocol,
-                        response_sender: response_sender,
-                    };
-                    let mut commit_votes = self.buffered_commit_votes.entry(target_block_id).or_default();
-                    commit_votes.insert(author, commit_msg);
+                    self.buffered_commit_votes.entry(vote.round()).or_default().insert(vote.author(), vote);
+                    reply_ack(protocol, response_sender);
 
                     // reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
