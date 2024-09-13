@@ -229,6 +229,10 @@ impl ValidatorVerifier {
         }
     }
 
+    pub fn malicious_authors(&self) -> HashMap<AccountAddress, u64> {
+        self.malicious_authors.clone()
+    }
+
     pub fn is_malicious_author(&self, author: &AccountAddress) -> bool {
         self.malicious_authors.contains_key(author)
     }
