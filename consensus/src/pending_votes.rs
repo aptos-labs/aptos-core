@@ -35,9 +35,6 @@ pub enum VoteReceptionResult {
     /// The vote has been added but QC has not been formed yet. Return the amount of voting power
     /// QC currently has.
     VoteAdded(u128),
-    /// The vote has been added and we have gather enough voting power to form the QC but we have
-    /// delayed the QC to aggregate as many signatures as possible.
-    VoteAddedQCDelayed(u128),
     /// The very same vote message has been processed in past.
     DuplicateVote,
     /// The very same author has already voted for another proposal in this round (equivocation).
@@ -458,6 +455,58 @@ mod tests {
                 assert!(qc
                     .ledger_info()
                     .check_voting_power(&epoch_state.read().verifier)
+                    .is_ok());
+            },
+            _ => {
+                panic!("No QC formed.");
+            },
+        };
+    }
+
+
+    #[test]
+    fn test_qc_aggregation_with_unverified_votes() {
+        ::aptos_logger::Logger::init_for_testing();
+
+        // set up 4 validators
+        let (signers, verifier) = random_validator_verifier(7, Some(3), false);
+        let epoch_state = Arc::new(RwLock::new(EpochState::new(5, verifier)));
+        let mut pending_votes = PendingVotes::new();
+
+        // create random vote from validator[0]
+        let li1 = random_ledger_info();
+        let vote_data_1 = random_vote_data();
+        let vote_data_1_author_0 =
+            Vote::new(vote_data_1.clone(), signers[0].author(), li1.clone(), &signers[0]).unwrap();
+
+        // first time a new vote is added -> VoteAdded
+        assert_eq!(
+            pending_votes.insert_vote(&vote_data_1_author_0, epoch_state.clone(), false),
+            VoteReceptionResult::VoteAdded(1)
+        );
+
+        // same author voting for the same thing -> DuplicateVote
+        assert_eq!(
+            pending_votes.insert_vote(&vote_data_1_author_0, epoch_state.clone(), true),
+            VoteReceptionResult::DuplicateVote
+        );
+        
+        let vote_data_1_author_1 =
+            Vote::new(vote_data_1.clone(), signers[1].author(), li1.clone(), &signers[1]).unwrap();
+
+        assert_eq!(
+            pending_votes.insert_vote(&vote_data_1_author_1, epoch_state.clone(), false),
+            VoteReceptionResult::VoteAdded(2)
+        );
+        
+        let vote_data_1_author_2 =
+        Vote::new(vote_data_1.clone(), signers[2].author(), li1.clone(), &signers[2]).unwrap();
+
+        match pending_votes.insert_vote(&vote_data_1_author_2, epoch_state.clone(), true) {
+            VoteReceptionResult::NewQuorumCertificate(qc) => {
+                assert!(qc
+                    .ledger_info()
+                    .check_voting_power(&epoch_state.clone().read().verifier)
                     .is_ok());
             },
             _ => {

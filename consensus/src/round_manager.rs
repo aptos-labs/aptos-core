@@ -1296,7 +1296,6 @@ impl RoundManager {
                 PROPOSAL_VOTE_ADDED.inc();
                 Ok(())
             },
-            VoteReceptionResult::VoteAddedQCDelayed(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),
