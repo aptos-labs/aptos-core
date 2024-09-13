@@ -166,8 +166,9 @@ pub struct BufferManager {
 
     pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
 
+    max_pending_commit_votes_in_cache: u64,
     // If the buffer manager receives a commit vote for a block that is not in buffer items, then
-    // the vote will be cached. We can cache upto 100 blocks, and upto 150 commit votes per block.
+    // the vote will be cached. We can cache upto max_pending_commit_votes_in_cache (100) blocks.
     pending_commit_votes: BTreeMap<Round, HashMap<AccountAddress, CommitVote>>,
 }
 
@@ -199,6 +200,7 @@ impl BufferManager {
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        max_pending_commit_votes_in_cache: u64,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -262,6 +264,8 @@ impl BufferManager {
             consensus_publisher,
 
             pending_commit_proofs: BTreeMap::new(),
+
+            max_pending_commit_votes_in_cache,
             pending_commit_votes: BTreeMap::new(),
         }
     }
@@ -349,24 +353,18 @@ impl BufferManager {
         // for the next epoch.
         if epoch == self.epoch_state.epoch
             && round > self.highest_committed_round
-            && self.highest_committed_round + 100 > round
+            && self.highest_committed_round + self.max_pending_commit_votes_in_cache > round
         {
             if let Some(votes) = self.pending_commit_votes.get_mut(&round) {
-                if votes.len() < 150
-                    && self
-                        .epoch_state
-                        .verifier
-                        .get_voting_power(&vote.author())
-                        .is_some()
+                if self
+                    .epoch_state
+                    .verifier
+                    .get_voting_power(&vote.author())
+                    .is_some()
                 {
                     votes.insert(vote.author(), vote);
                     true
                 } else {
-                    warn!(
-                        round = round,
-                        block_id = block_id,
-                        "Too many pending commit votes, ignored caching commit vote."
-                    );
                     false
                 }
             } else {
