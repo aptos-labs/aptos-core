@@ -6,7 +6,7 @@ use crate::{
         fetch_error_metrics, fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice,
         SystemMetrics,
     },
-    Swarm, SwarmExt, TestReport,
+    ForgeError, Swarm, SwarmExt, TestReport,
 };
 use anyhow::{bail, Context};
 use aptos::node::analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata};
@@ -526,7 +526,7 @@ impl SuccessCriteriaChecker {
         latency_thresholds: &[(Duration, LatencyType)],
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), ForgeError> {
         let mut failures = Vec::new();
         for (latency_threshold, latency_type) in latency_thresholds {
             let latency = Duration::from_millis(match latency_type {
@@ -559,7 +559,10 @@ impl SuccessCriteriaChecker {
             }
         }
         if !failures.is_empty() {
-            bail!("Failed latency check, for {:?}", failures);
+            return Err(ForgeError::ValidationError(format!(
+                "Failed latency check, for {:?}",
+                failures
+            )));
         } else {
             Ok(())
         }

@@ -29,8 +29,8 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt,
-    Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
+    wrap_non_forge_error, EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer,
+    NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
@@ -320,7 +320,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 end_version,
             )
             .await
-            .context("check for success")?;
+            .map_err(|e| wrap_non_forge_error(e, "check for success"))?;
         }
 
         Ok(())
