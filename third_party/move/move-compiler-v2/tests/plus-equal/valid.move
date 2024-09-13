@@ -3,7 +3,7 @@ module 0x42::test {
 
 	struct Coin(u256) has drop;
 
-	struct Wrapper<T>(T);
+	struct Wrapper<T>(T) has drop;
 
 	fun add1_old(x: u256): u256 {
 		x = x + 1;
@@ -63,5 +63,13 @@ module 0x42::test {
 
 	fun inc_vec_coin_old(x: vector<Coin>, index: u64) {
 		x[index].0 = x[index].0 + 1;
+	}
+
+	fun inc_vec_wrapped_coin_new(x: vector<Wrapper<Coin>>, index: u64) {
+		x[index].0.0 += 1;
+	}
+
+	fun inc_vec_wrapped_coin_old(x: vector<Wrapper<Coin>>, index: u64) {
+		x[index].0.0 = x[index].0.0 + 1;
 	}
 }
