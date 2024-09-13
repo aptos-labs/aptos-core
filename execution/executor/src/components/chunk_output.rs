@@ -80,6 +80,7 @@ impl ChunkOutput {
         let (transaction_outputs, block_end_info) = block_output.into_inner();
         Ok(Self {
             transactions: txn_provider
+                .txns
                 .into_iter()
                 .map(|t| Arc::into_inner(t).unwrap().into_inner())
                 .collect(),

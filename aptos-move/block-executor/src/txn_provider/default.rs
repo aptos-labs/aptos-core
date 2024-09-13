@@ -7,7 +7,7 @@ use aptos_types::transaction::BlockExecutableTransaction as Transaction;
 use std::sync::Arc;
 
 pub struct DefaultTxnProvider<T: Transaction> {
-    txns: Vec<Arc<T>>,
+    pub txns: Vec<Arc<T>>,
 }
 
 impl<T: Transaction> DefaultTxnProvider<T> {
