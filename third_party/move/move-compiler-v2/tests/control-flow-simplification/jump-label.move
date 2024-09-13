@@ -5,7 +5,11 @@ module 0x42::test {
 		abort 0
 	}
 
-	fun bar<T>(): T {
+	fun bar<T>(x: bool): T {
+		abort 0
+	}
+
+	fun baz<T>(x: vector<u8>): T {
 		abort 0
 	}
 
