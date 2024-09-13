@@ -174,6 +174,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 // also turned off for now since they mess up baseline.
                 .set_experiment(Experiment::CHECKS, false)
                 .set_experiment(Experiment::OPTIMIZE, false)
+                .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, false)
                 .set_experiment(Experiment::INLINING, false)
                 .set_experiment(Experiment::RECURSIVE_TYPE_CHECK, false)
                 .set_experiment(Experiment::SPEC_REWRITE, false)
@@ -324,6 +325,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // known without optimizations, so we need to have a different exp file
             exp_suffix: Some("no-opt.exp"),
             options: opts.clone().set_experiment(Experiment::OPTIMIZE, false)
+                .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, false)
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
@@ -556,6 +558,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::OPTIMIZE, false)
+                .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, false)
                 .set_experiment(Experiment::AST_SIMPLIFY, true),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,

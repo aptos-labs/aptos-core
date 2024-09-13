@@ -74,6 +74,7 @@ error: abort not covered by any of the `aborts_if` clauses
     =         common = <redacted>
     =     at tests/sources/functional/enum_abort.move:98: test_get_field_abort
     =         <redacted> = <redacted>
+    =     at tests/sources/functional/enum_abort.move:98: test_get_field_abort
     =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
@@ -91,14 +92,15 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/enum_abort.move:114: test_match_abort
     =     at tests/sources/functional/enum_abort.move:115: test_match_abort
     =     at tests/sources/functional/enum_abort.move:112: test_match_abort
+    =         common = <redacted>
     =     at tests/sources/functional/enum_abort.move:118: test_match_abort
     =     at tests/sources/functional/enum_abort.move:117: test_match_abort
-    =         <redacted> = <redacted>
-    =         common = <redacted>
     =         _common_vector_2 = <redacted>
-    =     at tests/sources/functional/enum_abort.move:122: test_match_abort
+    =     at tests/sources/functional/enum_abort.move:121: test_match_abort
     =         <redacted> = <redacted>
+    =     at tests/sources/functional/enum_abort.move:122: test_match_abort
     =         _x = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/enum_abort.move:122: test_match_abort
     =         _z = <redacted>
     =         <redacted> = <redacted>
