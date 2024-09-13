@@ -78,8 +78,8 @@ error: post-condition does not hold
     =     at ../move-stdlib/sources/fixed_point32.move:150: get_raw_value
     =         result = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:151: get_raw_value
-    =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =         y_raw_val = <redacted>
+    =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =         y = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:107: mul_div_incorrect
@@ -102,8 +102,8 @@ error: post-condition does not hold
     =     at ../move-stdlib/sources/fixed_point32.move:150: get_raw_value
     =         result = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:151: get_raw_value
-    =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =         y_raw_val = <redacted>
+    =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =         y = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:107: mul_div_incorrect
