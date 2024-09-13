@@ -74,8 +74,8 @@ jobs:
       TXNS_TO_SKIP: 0
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
-      RUNS_ON: "runs-on,cpu=16,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
-      TIMEOUT_MINUTES: 480
+      RUNS_ON: "runs-on,cpu=32,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
+      TIMEOUT_MINUTES: 180
 
   replay-mainnet:
     if: |
@@ -94,8 +94,8 @@ jobs:
       TXNS_TO_SKIP: 12253479 12277499 148358668
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
-      RUNS_ON: "runs-on,cpu=16,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
-      TIMEOUT_MINUTES: 480
+      RUNS_ON: "runs-on,cpu=32,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
+      TIMEOUT_MINUTES: 180
 
   test-replay:
     if: ${{ (github.event_name == 'pull_request') && contains(github.event.pull_request.labels.*.name, 'CICD:test-replay')}}

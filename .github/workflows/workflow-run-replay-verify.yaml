@@ -39,7 +39,7 @@ on:
         description: "Github job timeout in minutes"
         type: number
         required: true
-        default: 720
+        default: 180
   # This allows the workflow to be triggered manually from the Github UI or CLI
   # NOTE: because the "number" type is not supported, we default to 720 minute timeout
   workflow_dispatch:
@@ -159,7 +159,7 @@ jobs:
 
   replay-verify:
     needs: prepare
-    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 720 }}
+    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 180 }}
     runs-on: ${{ inputs.RUNS_ON }}
     strategy:
       fail-fast: false
