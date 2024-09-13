@@ -442,20 +442,20 @@ impl Default for DagConsensusConfigV1 {
     fn default() -> Self {
         Self {
             dag_ordering_causal_history_window: 10,
-            anchor_election_mode: AnchorElectionMode::RoundRobin,
-            // anchor_election_mode: AnchorElectionMode::LeaderReputation(
-            //     LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
-            //         active_weight: 1000,
-            //         inactive_weight: 10,
-            //         failed_weight: 1,
-            //         failure_threshold_percent: 10,
-            //         proposer_window_num_validators_multiplier: 10,
-            //         voter_window_num_validators_multiplier: 1,
-            //         weight_by_voting_power: true,
-            //         use_history_from_previous_epoch_max_count: 5,
-            //         proposers_per_round: 1,
-            //     }),
-            // ),
+            // anchor_election_mode: AnchorElectionMode::RoundRobin,
+            anchor_election_mode: AnchorElectionMode::LeaderReputation(
+                LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
+                    active_weight: 1000,
+                    inactive_weight: 10,
+                    failed_weight: 1,
+                    failure_threshold_percent: 10,
+                    proposer_window_num_validators_multiplier: 10,
+                    voter_window_num_validators_multiplier: 1,
+                    weight_by_voting_power: true,
+                    use_history_from_previous_epoch_max_count: 5,
+                    proposers_per_round: 1,
+                }),
+            ),
             quorum_store_enabled: false,
         }
     }
