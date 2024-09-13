@@ -233,6 +233,7 @@ jobs:
               --end-version ${{ steps.parse-job.outputs.begin }} \
               \
               --lazy-quit \
+              --enable-storage-sharding \
               --target-db-dir db \
               --concurrent-downloads 8 \
               --replay-concurrency-level 8 \
@@ -264,6 +265,7 @@ jobs:
               --end-version ${{ steps.parse-job.outputs.end }} \
               \
               --lazy-quit \
+              --enable-storage-sharding \
               --target-db-dir db \
               --concurrent-downloads 8 \
               --replay-concurrency-level 8 \
