@@ -1893,7 +1893,8 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                         // { let t = *e1; *t = *t + e2 }
                         Exp_::Dereference(lhs_inner) => {
                             let lhs_inner_loc = lhs_inner.loc;
-                            let tmp_name = Symbol::from("__t");
+                            // TODO: make compiler generated names
+                            let tmp_name = Symbol::from("__");
                             // let t = *e1;
                             let bind_var = sp(lhs_loc, Bind_::Var(Var(sp(lhs_loc, tmp_name))));
                             let bind_ls = sp(lhs_loc, vec![bind_var]);
@@ -1947,7 +1948,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                         // =>
                         // { let t = e1; t = t + e2 }
                         _ => {
-                            let tmp_name = Symbol::from("__t");
+                            let tmp_name = Symbol::from("__");
                             let bind_var = Bind_::Var(Var(sp(lhs_loc, tmp_name)));
                             let bind_ls = sp(lhs_loc, vec![sp(lhs_loc, bind_var)]);
                             // &mut e1
