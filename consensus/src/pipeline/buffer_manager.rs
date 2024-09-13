@@ -699,7 +699,11 @@ impl BufferManager {
     /// process the commit vote messages
     /// it scans the whole buffer for a matching blockinfo
     /// if found, try advancing the item to be aggregated
-    fn process_commit_message(&mut self, commit_msg: IncomingCommitRequest) -> Option<HashValue> {
+    fn process_commit_message(
+        &mut self,
+        commit_msg: IncomingCommitRequest,
+        verified: bool,
+    ) -> Option<HashValue> {
         let IncomingCommitRequest {
             req,
             protocol,
@@ -717,10 +721,7 @@ impl BufferManager {
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
                 if current_cursor.is_some() {
                     let mut item = self.buffer.take(&current_cursor);
-                    let new_item = match item.add_signature_if_matched(
-                        vote,
-                        self.optimistic_sig_verification_for_commit_votes,
-                    ) {
+                    let new_item = match item.add_signature_if_matched(vote, verified) {
                         Ok(()) => {
                             let response =
                                 ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
@@ -893,16 +894,22 @@ impl BufferManager {
                     .spawn(async move {
                         // When this flag is enabled, we skip verification of commit vote for now.
                         // Once enough commit votes are received, we will aggregate and verifyt them optimistically.
-                        if optimistic_sig_verification_for_commit_votes && commit_msg.req.is_vote()
-                        {
-                            let _ = tx.unbounded_send(commit_msg);
-                        } else {
-                            match commit_msg.req.verify(&epoch_state_clone.verifier) {
-                                Ok(_) => {
-                                    let _ = tx.unbounded_send(commit_msg);
-                                },
-                                Err(e) => warn!("Invalid commit message: {}", e),
+                        if optimistic_sig_verification_for_commit_votes {
+                            if let CommitMessage::Vote(vote) = &commit_msg.req {
+                                if !epoch_state_clone
+                                    .verifier
+                                    .is_malicious_author(&vote.author())
+                                {
+                                    let _ = tx.unbounded_send((commit_msg, false));
+                                    return;
+                                }
                             }
+                        }
+                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                            Ok(_) => {
+                                let _ = tx.unbounded_send((commit_msg, true));
+                            },
+                            Err(e) => warn!("Invalid commit message: {}", e),
                         }
                     })
                     .await;
@@ -960,9 +967,9 @@ impl BufferManager {
                     // see where `need_backpressure()` is called.
                     self.highest_committed_round = round
                 },
-                Some(rpc_request) = verified_commit_msg_rx.next() => {
+                Some((rpc_request, verified)) = verified_commit_msg_rx.next() => {
                     monitor!("buffer_manager_process_commit_message",
-                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
+                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request, verified) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
                             self.advance_execution_root();
