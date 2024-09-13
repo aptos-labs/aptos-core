@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: cannot mutably borrow from an immutable ref
+   ┌─ tests/plus-equal/invalid0.move:17:3
+   │
+17 │         self.0 += 1;
+   │         ^^^^^^
+
+error: expected `&mut` but `&` was provided
+   ┌─ tests/plus-equal/invalid0.move:29:3
+   │
+29 │         x[index] += 1;
+   │         ^
+
+error: expected `&mut` but `&` was provided
+   ┌─ tests/plus-equal/invalid0.move:33:3
+   │
+33 │         x[index].0.0 += 1;
+   │         ^
