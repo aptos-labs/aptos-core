@@ -350,19 +350,29 @@ impl ProposalGenerator {
         wait_callback: BoxFuture<'static, ()>,
         proposal_type: ProposalType,
     ) -> anyhow::Result<BlockData> {
-        if proposal_type.is_optimistic_proposal() {
-            let mut last_round_generated_optimistic = self.last_round_generated_optimistic.lock();
-            if *last_round_generated_optimistic < round {
-                *last_round_generated_optimistic = round;
-            } else {
-                bail!("Already proposed optimistically in the round {}", round);
-            }
-        } else {
+        // if proposal_type.is_optimistic_proposal() {
+        //     let mut last_round_generated_optimistic = self.last_round_generated_optimistic.lock();
+        //     if *last_round_generated_optimistic < round {
+        //         *last_round_generated_optimistic = round;
+        //     } else {
+        //         bail!("Already proposed optimistically in the round {}", round);
+        //     }
+        // } else {
+        //     let mut last_round_generated_regular = self.last_round_generated_regular.lock();
+        //     if *last_round_generated_regular < round {
+        //         *last_round_generated_regular = round;
+        //     } else {
+        //         bail!("Already proposed regularly in the round {}", round);
+        //     }
+        // }
+
+        {
+            // daniel todo: hack
             let mut last_round_generated_regular = self.last_round_generated_regular.lock();
             if *last_round_generated_regular < round {
                 *last_round_generated_regular = round;
             } else {
-                bail!("Already proposed regularly in the round {}", round);
+                bail!("Already proposed in the round {}", round);
             }
         }
 
