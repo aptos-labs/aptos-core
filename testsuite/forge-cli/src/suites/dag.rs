@@ -374,7 +374,7 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 /// !!!!This one has no chaos!!!!
 pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(67).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 20_000 })
