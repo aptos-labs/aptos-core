@@ -109,16 +109,6 @@ impl BitVec {
         (self.inner[bucket] & (0b1000_0000 >> bucket_pos as u8)) != 0
     }
 
-    pub fn or(&mut self, other: &BitVec) {
-        let len = std::cmp::max(self.inner.len(), other.inner.len());
-        self.inner.resize(len, 0);
-        for i in 0..len {
-            let a = self.inner.get(i).copied().unwrap_or(0);
-            let b = other.inner.get(i).copied().unwrap_or(0);
-            self.inner[i] = a | b;
-        }
-    }
-
     /// Return true if the BitVec is all zeros.
     pub fn all_zeros(&self) -> bool {
         self.inner.iter().all(|byte| *byte == 0)
