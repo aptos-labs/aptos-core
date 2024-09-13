@@ -432,6 +432,8 @@ impl BufferItem {
                         .unverified_signatures
                         .add_signature(author, signature);
                     return Ok(());
+                } else {
+                    return Err(anyhow!("Inconsistent commit info ordered {} vs {}", ordered.ordered_proof.commit_info(), target_commit_info));
                 }
             },
             Self::Executed(executed) => {
@@ -440,12 +442,16 @@ impl BufferItem {
                         .partial_commit_proof
                         .add_signature(author, signature);
                     return Ok(());
+                } else {
+                    return Err(anyhow!("Inconsistent commit info executed {} vs {}", executed.commit_info, target_commit_info));
                 }
             },
             Self::Signed(signed) => {
                 if signed.partial_commit_proof.commit_info() == target_commit_info {
                     signed.partial_commit_proof.add_signature(author, signature);
                     return Ok(());
+                } else {
+                    return Err(anyhow!("Inconsistent commit info signed {} vs {}", signed.partial_commit_proof.commit_info(), target_commit_info));
                 }
             },
             Self::Aggregated(aggregated) => {
@@ -453,10 +459,12 @@ impl BufferItem {
                 // but return true is helpful to stop the outer loop early
                 if aggregated.commit_proof.commit_info() == target_commit_info {
                     return Ok(());
+                } else {
+                    return Err(anyhow!("Inconsistent commit info aggregated {} vs {}", aggregated.commit_proof.commit_info(), target_commit_info));
                 }
             },
         }
-        Err(anyhow!("Inconsistent commit info."))
+        // Err(anyhow!("Inconsistent commit info."))
     }
 
     pub fn is_ordered(&self) -> bool {

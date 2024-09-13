@@ -588,7 +588,7 @@ async fn process_payload(
                 debug!(
                     "QSE: waiting for data on {} receivers, block_round {}",
                     receivers.len(),
-                    block.round()
+                    block.block_data().round()
                 );
             }
             for (digest, rx) in receivers {

@@ -10,11 +10,11 @@ use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
+    request_response::{GetPayloadCommand, GetPayloadResponse, PayloadTxns},
     utils::PayloadTxnsSize,
 };
 use aptos_logger::prelude::*;
-use aptos_types::PeerId;
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
 use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
@@ -115,6 +115,7 @@ impl ProofManager {
                     txns_with_proof_size,
                     cur_unique_txns,
                     proof_queue_fully_utilized,
+                    qs_transactions,
                 ) = self.batch_proof_queue.pull_proofs(
                     &excluded_batches,
                     max_txns_with_proof,
@@ -122,6 +123,7 @@ impl ProofManager {
                     request.soft_max_txns_after_filtering,
                     request.return_non_full,
                     request.block_timestamp,
+                    request.return_all_txns,
                 );
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
@@ -129,10 +131,10 @@ impl ProofManager {
                 counters::PROOF_QUEUE_FULLY_UTILIZED
                     .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-                let (opt_batches, opt_batch_txns_size) = if self.enable_opt_quorum_store {
+                let (opt_batches, opt_batch_txns_size, opt_batch_txns) = if self.enable_opt_quorum_store {
                     // TODO(ibalajiarun): Support unique txn calculation
                     let max_opt_batch_txns_size = request.max_txns - txns_with_proof_size;
-                    let (opt_batches, opt_payload_size, _) = self.batch_proof_queue.pull_batches(
+                    let (opt_batches, opt_payload_size, _, opt_batch_txns) = self.batch_proof_queue.pull_batches(
                         &excluded_batches
                             .iter()
                             .cloned()
@@ -143,11 +145,12 @@ impl ProofManager {
                         request.soft_max_txns_after_filtering,
                         request.return_non_full,
                         request.block_timestamp,
+                        request.return_all_txns,
                     );
 
-                    (opt_batches, opt_payload_size)
+                    (opt_batches , opt_payload_size, opt_batch_txns)
                 } else {
-                    (Vec::new(), PayloadTxnsSize::zero())
+                    (Vec::new(), PayloadTxnsSize::zero(), Vec::new())
                 };
 
                 let cur_txns = txns_with_proof_size + opt_batch_txns_size;
@@ -183,6 +186,12 @@ impl ProofManager {
                 counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
                 counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
+                let inline_transactions = inline_block
+                    .clone()
+                    .into_iter()
+                    .flat_map(|(_, txns)| txns)
+                    .collect::<Vec<SignedTransaction>>();
+
                 let response = if self.enable_opt_quorum_store {
                     let inline_batches = inline_block.into();
                     Payload::OptQuorumStore(OptQuorumStorePayload::new(
@@ -207,7 +216,15 @@ impl ProofManager {
                     )
                 };
 
-                let res = GetPayloadResponse::GetPayloadResponse(response);
+                let mut ref_txns = qs_transactions
+                    .into_iter()
+                    .chain(opt_batch_txns.into_iter())
+                    .collect::<Vec<Arc<Option<Vec<SignedTransaction>>>>>();
+                let payload_txns = PayloadTxns {
+                    ref_txns,
+                    inline_txns: inline_transactions,
+                };
+                let res = GetPayloadResponse::GetPayloadResponse((response, payload_txns));
                 match request.callback.send(Ok(res)) {
                     Ok(_) => (),
                     Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),

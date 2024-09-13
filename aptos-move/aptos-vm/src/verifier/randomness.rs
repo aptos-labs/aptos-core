@@ -8,12 +8,12 @@ use move_binary_format::errors::VMResult;
 
 pub(crate) fn get_randomness_annotation(
     resolver: &impl AptosMoveResolver,
-    session: &mut SessionExt,
+    session: & SessionExt,
     entry_fn: &EntryFunction,
 ) -> VMResult<Option<RandomnessAnnotation>> {
     let module = session
         .get_move_vm()
-        .load_module(entry_fn.module(), resolver)?;
+        .load_module_no_dependency(entry_fn.module(), resolver)?;
     let metadata = aptos_framework::get_metadata_from_compiled_module(&module);
     if let Some(metadata) = metadata {
         let maybe_annotation = metadata

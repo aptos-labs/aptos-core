@@ -4,41 +4,45 @@
 
 use super::proposer_election::ProposerElection;
 use crate::{
-    block_storage::BlockReader,
-    counters::{
+    block_storage::{tracing::{observe_block, BlockStage}, BlockReader}, counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
         PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
         PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
         PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
-    },
-    payload_client::{PayloadClient, PayloadPullParameters},
-    util::time_service::TimeService,
+    }, payload_client::{PayloadClient, PayloadPullParameters}, util::time_service::TimeService
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{
     ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
 };
 use aptos_consensus_types::{
-    block::Block,
-    block_data::BlockData,
-    common::{Author, Payload, PayloadFilter, Round},
-    pipelined_block::ExecutionSummary,
-    quorum_cert::QuorumCert,
-    utils::PayloadTxnsSize,
+    block::Block, block_data::BlockData, common::{Author, Payload, PayloadFilter, Round}, pipelined_block::ExecutionSummary, quorum_cert::QuorumCert, request_response::PayloadTxns, utils::PayloadTxnsSize
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_infallible::Mutex;
+use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue};
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
-use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
+use aptos_storage_interface::DbReader;
+use aptos_types::{on_chain_config::{OnChainRandomnessConfig, ValidatorTxnConfig}, transaction::Transaction, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_vm::AptosVM;
+use aptos_vm_validator::vm_validator::PooledVMValidator;
 use futures::future::BoxFuture;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
     time::Duration,
 };
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::time::Instant;
+use aptos_types::transaction::{EntryFunction, SignedTransaction, TransactionPayload};
+use move_core_types::language_storage::ModuleId;
+use crate::network_interface::CommitMessage::Decision;
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -265,8 +269,15 @@ pub struct ProposalGenerator {
     last_round_generated: Mutex<Round>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
+    onchain_randomness_config: OnChainRandomnessConfig,
 
     allow_batches_without_pos_in_proposal: bool,
+
+    // For checking randomness
+    validator: Arc<RwLock<PooledVMValidator>>,
+
+    // randomness info
+    randomness_info: Arc<Mutex<HashSet<EntryFunction>>>,
 }
 
 impl ProposalGenerator {
@@ -286,7 +297,9 @@ impl ProposalGenerator {
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
+        onchain_randomness_config: OnChainRandomnessConfig,
         allow_batches_without_pos_in_proposal: bool,
+        validator: Arc<RwLock<PooledVMValidator>>,
     ) -> Self {
         Self {
             author,
@@ -304,7 +317,10 @@ impl ProposalGenerator {
             last_round_generated: Mutex::new(0),
             quorum_store_enabled,
             vtxn_config,
+            onchain_randomness_config,
             allow_batches_without_pos_in_proposal,
+            validator,
+            randomness_info: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -356,7 +372,9 @@ impl ProposalGenerator {
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
-        let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+        let skip_non_rand_blocks = self.onchain_randomness_config.skip_non_rand_blocks();
+
+        let (validator_txns, payload, payload_txns, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
             (
@@ -365,6 +383,7 @@ impl ProposalGenerator {
                     self.quorum_store_enabled,
                     self.allow_batches_without_pos_in_proposal,
                 ),
+                PayloadTxns::empty(),
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
@@ -446,7 +465,7 @@ impl ProposalGenerator {
             let validator_txn_filter =
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
 
-            let (validator_txns, mut payload) = self
+            let (validator_txns, mut payload, payload_txns) = self
                 .payload_client
                 .pull_payload(
                     PayloadPullParameters {
@@ -462,6 +481,7 @@ impl ProposalGenerator {
                         pending_uncommitted_blocks: pending_blocks.len(),
                         recent_max_fill_fraction: max_fill_fraction,
                         block_timestamp: timestamp,
+                        return_payload_txns: skip_non_rand_blocks,
                     },
                     validator_txn_filter,
                     wait_callback,
@@ -475,8 +495,16 @@ impl ProposalGenerator {
             {
                 payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
             }
-            (validator_txns, payload, timestamp.as_micros() as u64)
+
+            (validator_txns, payload, payload_txns, timestamp.as_micros() as u64)
         };
+
+        let PayloadTxns {
+            ref_txns,
+            inline_txns,
+        } = payload_txns;
+
+        observe_block(timestamp, BlockStage::PULLED_PAYLOAD);
 
         let quorum_cert = hqc.as_ref().clone();
         let failed_authors = self.compute_failed_authors(
@@ -485,6 +513,138 @@ impl ProposalGenerator {
             false,
             proposer_election,
         );
+
+        // daniel todo: deal with max_txns_from_block_to_execute in check_randomness
+        // Check if the block contains any randomness transaction
+        let maybe_require_randomness = if skip_non_rand_blocks {
+            let now = Instant::now();
+            let mut duration1: Duration = Default::default();
+            let mut duration2: Duration = Default::default();
+
+            let now = Instant::now();
+            let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns), &HashSet::new());
+            duration2 = now.elapsed();
+            info!("Check randomness inline txns: {:.3?}", duration2);
+            // for entry in entry_map {
+            //     if !self.randomness_info.lock().contains(&entry) {
+            //         info!("add entry:{:?}", entry.function());
+            //         self.randomness_info.lock().insert(entry);
+            //     }
+            // }
+            let mut x = result;
+            if !x {
+                x = ref_txns.par_iter().any(|txns| {
+                    // if let Some(txns) = txns.as_ref() {
+                    //     for txn in txns {
+                    //         let entry_fn = match txn.payload() {
+                    //             TransactionPayload::EntryFunction(entry) => Some(entry),
+                    //             TransactionPayload::Multisig(_) => None,
+                    //             _ => None,
+                    //         };
+                    //         if let Some(entry) = entry_fn {
+                    //             if self.randomness_info.lock().contains(entry) {
+                    //                 return true;
+                    //                 // if *self.randomness_info.lock().get(entry).unwrap() {
+                    //                 //     return true;
+                    //                 // }
+                    //             }
+                    //         }
+                    //     }
+                    // } else {
+                    //     return false;
+                    // }
+                    // let b = <std::option::Option<Vec<SignedTransaction>> as Clone>::clone(&txns.as_ref()).map(|t| t.iter().any(|txn| {
+                    //     let entry_fn = match txn.payload() {
+                    //         TransactionPayload::EntryFunction(entry) => Some(entry),
+                    //         TransactionPayload::Multisig(_) => None,
+                    //         _ => None,
+                    //     };
+                    //     if let Some(entry) = entry_fn {
+                    //         if self.randomness_info.lock().contains_key(entry) {
+                    //             *self.randomness_info.lock().get(entry).unwrap()
+                    //         } else {
+                    //             false
+                    //         }
+                    //     } else {
+                    //         false
+                    //     }
+                    // }));
+                    let now = Instant::now();
+                    let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref(), &HashSet::new());
+                    // for entry in entry_map {
+                    //     if !self.randomness_info.lock().contains(&entry) {
+                    //         info!("add entry:{:?}", entry.function());
+                    //         self.randomness_info.lock().insert(entry);
+                    //     }
+                    // }
+                    result
+                    // if !b.is_some_and(|b| b) {
+                    //     let (result, entry_map) = self.validator.read().check_randomness_in_batch(txns.as_ref());
+                    //     for (entry, val) in entry_map {
+                    //         if !self.randomness_info.lock().contains_key(&entry) {
+                    //             self.randomness_info.lock().insert(entry, val);
+                    //         }
+                    //     }
+                    //     result
+                    // } else {
+                    //     true
+                    // }
+                });
+                duration1 = now.elapsed();
+                info!("Check randomness ref_txns: {:.3?}", duration1);
+            }
+                    // for txn in &inline_txns {
+                    //     let entry_fn = match txn.payload() {
+                    //         TransactionPayload::EntryFunction(entry) => Some(entry),
+                    //         TransactionPayload::Multisig(_) => None,
+                    //         _ => None,
+                    //     };
+                    //     if let Some(entry) = entry_fn {
+                    //         if self.randomness_info.lock().contains(entry) {
+                    //             return true;
+                    //         }
+                    //     }
+                    // }
+
+                    // let b = inline_txns.iter().any(|txn| {
+                    //     let entry_fn = match txn.payload() {
+                    //         TransactionPayload::EntryFunction(entry) => Some(entry),
+                    //         TransactionPayload::Multisig(_) => None,
+                    //         _ => None,
+                    //     };
+                    //     if let Some(entry) = entry_fn {
+                    //         if self.randomness_info.lock().contains_key(entry) {
+                    //             *self.randomness_info.lock().get(entry).unwrap()
+                    //         } else {
+                    //             false
+                    //         }
+                    //     } else {
+                    //         false
+                    //     }
+                    // });
+                    //if !b {
+                    // let now = Instant::now();
+                    // let (result, entry_map) = self.validator.read().check_randomness_in_batch(&Some(inline_txns), &HashSet::new());
+                    // duration2 = now.elapsed();
+                    // info!("Check randomness inline txns: {:.3?}", duration2);
+                        // for entry in entry_map {
+                        //     if !self.randomness_info.lock().contains(&entry) {
+                        //         self.randomness_info.lock().insert(entry);
+                        //     }
+                        // }
+                    //x = result;
+                    // } else {
+                    //     true
+                    // }
+                //}
+            let elapsed = now.elapsed();
+            info!("Check randomness: {:.3?}, duration 1:{:.3?}, duration 2:{:.3?}", elapsed, duration1, duration2);
+            Some(x)
+        } else {
+            None
+        };
+
+        observe_block(timestamp, BlockStage::CHECKED_RAND);
 
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(
@@ -495,6 +655,7 @@ impl ProposalGenerator {
                 round,
                 timestamp,
                 quorum_cert,
+                maybe_require_randomness,
             )
         } else {
             BlockData::new_proposal(

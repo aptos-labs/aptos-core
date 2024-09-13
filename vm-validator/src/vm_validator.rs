@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use anyhow::Result;
 use aptos_logger::info;
 use aptos_storage_interface::{
@@ -20,6 +21,8 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
+use aptos_types::transaction::EntryFunction;
+use aptos_vm::move_vm_ext::SessionId;
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -71,6 +74,18 @@ impl VMValidator {
             vm,
         }
     }
+
+    pub fn check_randomness(&self, txn: &SignedTransaction) -> bool {
+        let resolver = self.vm.as_move_resolver(&self.state_view);
+        let mut session = self.vm.new_session(&resolver, SessionId::Void, None);
+        self.vm.check_randomness(txn, &resolver, &mut session, &HashSet::new()).0
+    }
+
+    pub fn check_randomness_in_batch(&self, txn: &Vec<SignedTransaction>, entry_sets: &HashSet<EntryFunction>) -> (bool, Option<EntryFunction>) {
+        let resolver = self.vm.as_move_resolver(&self.state_view);
+        self.vm.check_randomness_in_batch(txn, &resolver, entry_sets)
+    }
+
 }
 
 impl TransactionValidation for VMValidator {
@@ -141,6 +156,47 @@ impl PooledVMValidator {
         let random_index = rng.gen_range(0, self.vm_validators.len()); // Generate random index
         self.vm_validators[random_index].clone() // Return the VM at the random index
     }
+
+    pub fn check_randomness(&self, txn: &SignedTransaction) -> bool {
+        self.get_next_vm().lock().unwrap().check_randomness(txn)
+    }
+
+    pub fn check_randomness_for_batch_txns(&self, txn: &Vec<SignedTransaction>, entry_sets: &HashSet<EntryFunction>) -> (bool, Option<EntryFunction>) {
+        self.get_next_vm().lock().unwrap().check_randomness_in_batch(txn, entry_sets)
+    }
+
+    pub fn check_randomness_in_batch(&self, txns: &Option<Vec<SignedTransaction>>, entry_sets: &HashSet<EntryFunction>) -> (bool, HashSet<EntryFunction>) {
+        txns.as_ref()
+            .map_or((false, HashSet::new()), |txns| {
+                let (res, entry_opt) = self.check_randomness_for_batch_txns(txns, entry_sets);
+                let mut entry_set = HashSet::new();
+                //for entry_opt in entries.iter() {
+                    if let Some(entry) = entry_opt {
+                        if !entry_set.contains(&entry) {
+                            entry_set.insert(entry.clone());
+                        }
+                    }
+                //}
+                (res, entry_set)
+            })
+    }
+
+    // pub fn check_randomness_in_batch(&self, txns: &Option<Vec<SignedTransaction>>) -> (bool, HashSet<EntryFunction>) {
+    //     txns.as_ref()
+    //         .map_or((false, HashSet::new()), |txns| {
+    //             let (res, entry_opt) = self.check_randomness_for_batch_txns(txns);
+    //             let mut entry_set = HashSet::new();
+    //             //for entry_opt in entries.iter() {
+    //             if let Some(entry) = entry_opt {
+    //                 if !entry_set.contains(&entry) {
+    //                     entry_set.insert(entry.clone());
+    //                 }
+    //             }
+    //             //}
+    //             (res, entry_set)
+    //         })
+    // }
+
 }
 
 impl TransactionValidation for PooledVMValidator {

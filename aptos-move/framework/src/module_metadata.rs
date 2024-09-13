@@ -708,7 +708,7 @@ fn check_budget(meter: usize) -> Result<(), MetaDataValidationError> {
 
 /// The randomness consuming options specified by developers for their entry function.
 /// Examples: `#[randomness(max_gas = 99999)]`, `#[randomness]`.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RandomnessAnnotation {
     pub max_gas: Option<u64>,
 }

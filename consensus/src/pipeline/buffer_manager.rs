@@ -3,16 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::tracing::{observe_block, BlockStage},
-    consensus_observer::{
+    block_storage::tracing::{observe_block, BlockStage}, consensus_observer::{
         network::observer_message::ConsensusObserverMessage,
         publisher::consensus_publisher::ConsensusPublisher,
-    },
-    counters::{self, log_executor_error_occurred},
-    monitor,
-    network::{IncomingCommitRequest, NetworkSender},
-    network_interface::ConsensusMsg,
-    pipeline::{
+    }, counters::{self, log_executor_error_occurred}, monitor, network::{IncomingCommitRequest, NetworkSender}, network_interface::ConsensusMsg, pipeline::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
         commit_reliable_broadcast::{AckState, CommitMessage},
@@ -21,8 +15,7 @@ use crate::{
         persisting_phase::PersistingRequest,
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
-    },
-    state_replication::StateComputerCommitCallBackType,
+    }, state_computer::SyncStateComputeResultFut, state_replication::StateComputerCommitCallBackType
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
@@ -41,6 +34,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
+use dashmap::DashMap;
 use futures::{
     channel::{
         mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
@@ -52,13 +46,15 @@ use futures::{
 use once_cell::sync::OnceCell;
 use std::{
     collections::BTreeMap,
-    sync::{
+    {collections::HashMap, sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
-};
+}};
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
+
+use super::pre_execution_phase::PreExecutionRequest;
 
 pub const COMMIT_VOTE_BROADCAST_INTERVAL_MS: u64 = 1500;
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 30000;
@@ -111,6 +107,7 @@ pub struct BufferManager {
     // the roots point to the first *unprocessed* item.
     // None means no items ready to be processed (either all processed or no item finishes previous stage)
     execution_root: BufferItemRootType,
+
     execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
     execution_schedule_phase_rx: Receiver<ExecutionWaitRequest>,
     execution_wait_phase_tx: Sender<CountedRequest<ExecutionWaitRequest>>,
@@ -130,6 +127,9 @@ pub struct BufferManager {
 
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
     persisting_phase_rx: Receiver<ExecutorResult<Round>>,
+
+    pre_execute_block_rx: UnboundedReceiver<PipelinedBlock>,
+    pre_execution_phase_tx: Option<Sender<CountedRequest<PreExecutionRequest>>>,
 
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
@@ -164,6 +164,9 @@ pub struct BufferManager {
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 
     pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
+
+    buffered_commit_votes: HashMap<HashValue, HashMap<Author, IncomingCommitRequest>>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl BufferManager {
@@ -183,6 +186,8 @@ impl BufferManager {
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         persisting_phase_rx: Receiver<ExecutorResult<Round>>,
+        pre_execute_block_rx: UnboundedReceiver<PipelinedBlock>,
+        pre_execution_phase_tx: Option<Sender<CountedRequest<PreExecutionRequest>>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
         epoch_state: Arc<EpochState>,
@@ -194,6 +199,7 @@ impl BufferManager {
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -234,6 +240,9 @@ impl BufferManager {
             persisting_phase_tx,
             persisting_phase_rx,
 
+            pre_execute_block_rx,
+            pre_execution_phase_tx,
+
             block_rx,
             reset_rx,
 
@@ -257,6 +266,9 @@ impl BufferManager {
             consensus_publisher,
 
             pending_commit_proofs: BTreeMap::new(),
+
+            buffered_commit_votes: HashMap::new(),
+            execution_futures,
         }
     }
 
@@ -350,6 +362,19 @@ impl BufferManager {
             .map(|(_round, commit_proof)| commit_proof)
     }
 
+    async fn process_pre_execute_block(&mut self, block: PipelinedBlock) {
+        let request = self.create_new_request(PreExecutionRequest {
+            block,
+            lifetime_guard: self.create_new_request(()),
+        });
+        if let Some(pre_execution_phase_tx) = self.pre_execution_phase_tx.as_mut() {
+            pre_execution_phase_tx
+                .send(request)
+                .await
+                .expect("[PreExecution] Failed to send pre-execution request");
+        }
+    }
+
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
     async fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
@@ -381,8 +406,23 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
+        let block_ids = ordered_blocks.iter().map(|b| b.id()).collect::<Vec<_>>();
+
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
+
+        for block_id in block_ids {
+            self.process_buffered_commit_votes(block_id).await;
+        }
+    }
+
+    async fn process_buffered_commit_votes(&mut self, block_id: HashValue) {
+        if let Some(commit_votes) = self.buffered_commit_votes.remove(&block_id) {
+            info!("[PreExecution] process {} buffered commit votes for block id {}", commit_votes.len(), block_id);
+            for (_, commit_msg) in commit_votes {
+                self.process_commit_message(commit_msg);
+            }
+        }
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
@@ -742,7 +782,15 @@ impl BufferManager {
                         return None;
                     }
                 } else {
-                    reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
+                    let author = vote.author();
+                    let commit_msg = IncomingCommitRequest {
+                        req: CommitMessage::Vote(vote),
+                        protocol,
+                        response_sender: response_sender,
+                    };
+                    self.buffered_commit_votes.entry(target_block_id).or_default().insert(author, commit_msg);
+
+                    // reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
             },
             CommitMessage::Decision(commit_proof) => {
@@ -897,6 +945,10 @@ impl BufferManager {
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             ::tokio::select! {
+                Some(block) = self.pre_execute_block_rx.next() => {
+                    monitor!("buffer_manager_process_pre_execute_block",
+                    self.process_pre_execute_block(block).await);
+                },
                 Some(blocks) = self.block_rx.next(), if !self.need_back_pressure() => {
                     self.latest_round = blocks.latest_round();
                     monitor!("buffer_manager_process_ordered", {

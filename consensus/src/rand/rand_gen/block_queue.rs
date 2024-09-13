@@ -15,13 +15,16 @@ pub struct QueueItem {
     ordered_blocks: OrderedBlocks,
     offsets_by_round: HashMap<Round, usize>,
     num_undecided_blocks: usize,
-    broadcast_handle: Option<Vec<DropGuard>>,
+    broadcast_handle: Option<Vec<Option<DropGuard>>>,
 }
 
 impl QueueItem {
-    pub fn new(ordered_blocks: OrderedBlocks, broadcast_handle: Option<Vec<DropGuard>>) -> Self {
-        let len = ordered_blocks.ordered_blocks.len();
-        assert!(len > 0);
+    pub fn new(ordered_blocks: OrderedBlocks, broadcast_handle: Option<Vec<Option<DropGuard>>>) -> Self {
+        let rand_block_len = ordered_blocks
+            .ordered_blocks
+            .iter()
+            .filter(|block| block.require_randomness())
+            .count();
         let offsets_by_round: HashMap<Round, usize> = ordered_blocks
             .ordered_blocks
             .iter()
@@ -31,7 +34,7 @@ impl QueueItem {
         Self {
             ordered_blocks,
             offsets_by_round,
-            num_undecided_blocks: len,
+            num_undecided_blocks: rand_block_len,
             broadcast_handle,
         }
     }
@@ -65,7 +68,7 @@ impl QueueItem {
 
     pub fn set_randomness(&mut self, round: Round, rand: Randomness) -> bool {
         let offset = self.offset(round);
-        if !self.blocks()[offset].has_randomness() {
+        if !self.blocks()[offset].has_randomness() && self.blocks()[offset].require_randomness() {
             observe_block(
                 self.blocks()[offset].timestamp_usecs(),
                 BlockStage::RAND_ADD_DECISION,
@@ -124,7 +127,7 @@ impl BlockQueue {
                 debug_assert!(ordered_blocks
                     .ordered_blocks
                     .iter()
-                    .all(|block| block.has_randomness()));
+                    .all(|block| block.has_randomness() || !block.require_randomness()));
                 rand_ready_prefix.push(ordered_blocks);
             } else {
                 break;

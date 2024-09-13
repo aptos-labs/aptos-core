@@ -85,6 +85,7 @@ pub struct BlockStore {
     back_pressure_for_test: AtomicBool,
     order_vote_enabled: bool,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
+    skip_non_rand_blocks: bool,
 }
 
 impl BlockStore {
@@ -98,6 +99,7 @@ impl BlockStore {
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
+        skip_non_rand_blocks: bool,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -115,6 +117,7 @@ impl BlockStore {
             payload_manager,
             order_vote_enabled,
             pending_blocks,
+            skip_non_rand_blocks,
         ));
         block_on(block_store.try_send_for_execution());
         block_store
@@ -153,6 +156,7 @@ impl BlockStore {
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
+        skip_non_rand_blocks: bool,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -214,6 +218,7 @@ impl BlockStore {
             back_pressure_for_test: AtomicBool::new(false),
             order_vote_enabled,
             pending_blocks,
+            skip_non_rand_blocks,
         };
 
         for block in blocks {
@@ -325,6 +330,7 @@ impl BlockStore {
             self.payload_manager.clone(),
             self.order_vote_enabled,
             self.pending_blocks.clone(),
+            self.skip_non_rand_blocks,
         )
         .await;
 
@@ -483,6 +489,10 @@ impl BlockStore {
 
     pub fn check_payload(&self, proposal: &Block) -> bool {
         self.payload_manager.check_payload_availability(proposal)
+    }
+
+    pub fn execution_client(&self) -> Arc<dyn TExecutionClient> {
+        self.execution_client.clone()
     }
 }
 

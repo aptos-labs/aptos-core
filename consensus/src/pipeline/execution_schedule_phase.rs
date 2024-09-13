@@ -2,21 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    pipeline::{
+    counters::{NUM_NON_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS, NUM_RE_EXECUTED_BLOCKS}, pipeline::{
         execution_wait_phase::ExecutionWaitRequest,
         pipeline_phase::{CountedRequest, StatelessPipeline},
-    },
-    state_replication::StateComputer,
+    }, state_computer::{StateComputeResultFut, SyncStateComputeResultFut}, state_replication::StateComputer
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
-use aptos_logger::debug;
+use aptos_executor_types::{ExecutorError, ExecutorResult};
+use aptos_logger::{debug, info};
 use async_trait::async_trait;
+use dashmap::DashMap;
 use futures::TryFutureExt;
 use std::{
-    fmt::{Debug, Display, Formatter},
-    sync::Arc,
+    collections::HashMap, fmt::{Debug, Display, Formatter}, pin::Pin, sync::Arc
 };
 
 /// [ This class is used when consensus.decoupled = true ]
@@ -44,11 +43,15 @@ impl Display for ExecutionRequest {
 
 pub struct ExecutionSchedulePhase {
     execution_proxy: Arc<dyn StateComputer>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl ExecutionSchedulePhase {
-    pub fn new(execution_proxy: Arc<dyn StateComputer>) -> Self {
-        Self { execution_proxy }
+    pub fn new(execution_proxy: Arc<dyn StateComputer>, execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
+        Self {
+            execution_proxy,
+            execution_futures,
+        }
     }
 }
 
@@ -77,27 +80,65 @@ impl StatelessPipeline for ExecutionSchedulePhase {
 
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.
-        let mut futs = vec![];
-        for b in &ordered_blocks {
-            let fut = self
-                .execution_proxy
-                .schedule_compute(
-                    b.block(),
-                    b.parent_id(),
-                    b.randomness().cloned(),
-                    lifetime_guard.spawn(()),
-                )
-                .await;
-            futs.push(fut)
+        for block in &ordered_blocks {
+            match self.execution_futures.entry(block.id()) {
+                dashmap::mapref::entry::Entry::Occupied(_) => {
+                    info!("[PreExecution] block was pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                    NUM_PREEXECUTED_BLOCKS.inc();
+                }
+                dashmap::mapref::entry::Entry::Vacant(entry) => {
+                    info!("[PreExecution] block was not pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                    let fut = self
+                        .execution_proxy
+                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
+                        .await;
+                    entry.insert(fut);
+                    NUM_NON_PREEXECUTED_BLOCKS.inc();
+                }
+            }
         }
+
+        let execution_futures = self.execution_futures.clone();
+        let execution_proxy = self.execution_proxy.clone();
 
         // In the future being returned, wait for the compute results in order.
         let fut = tokio::task::spawn(async move {
             let mut results = vec![];
-            for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
-                debug!("try to receive compute result for block {}", block.id());
-                results.push(block.set_execution_result(fut.await?));
+            // wait for all futs so that lifetime_guard is guaranteed to be dropped only
+            // after all executor calls are over
+            for block in &ordered_blocks {
+                debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                match execution_futures.entry(block.id()) {
+                    dashmap::mapref::entry::Entry::Occupied(mut entry) => {
+                        let fut = entry.get().clone();
+                        let result = match fut.await {
+                            Ok(result) => Ok(result),
+                            Err(e) => {
+                                info!("[Execution] block is re-executed due to error {:?}, epoch {} round {} id {}", e, block.epoch(), block.round(), block.id());
+                                let fut = execution_proxy
+                                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
+                                    .await;
+                                entry.insert(fut.clone());
+                                NUM_RE_EXECUTED_BLOCKS.inc();
+                                fut.await
+                            }
+                        };
+                        results.push(result);
+                    }
+                    dashmap::mapref::entry::Entry::Vacant(_) => {
+                        return Err(ExecutorError::internal_err(format!(
+                            "Failed to find compute result for block {}",
+                            block.id()
+                        )));
+                    }
+                }
             }
+            let results = itertools::zip_eq(ordered_blocks, results)
+                .map(|(block, res)| {
+                    Ok(block.set_execution_result(res?))
+                })
+                .collect::<ExecutorResult<Vec<_>>>()?;
+            drop(lifetime_guard);
             Ok(results)
         })
         .map_err(ExecutorError::internal_err)

@@ -8,7 +8,7 @@ use crate::{
     counters::{self, log_executor_error_occurred},
     monitor,
     pipeline::pipeline_phase::CountedRequest,
-    state_computer::StateComputeResultFut,
+    state_computer::{StateComputeResultFut, SyncBoxFuture, SyncStateComputeResultFut},
 };
 use aptos_consensus_types::{block::Block, pipeline_execution_result::PipelineExecutionResult};
 use aptos_crypto::HashValue;
@@ -27,6 +27,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::future::BoxFuture;
+use futures::FutureExt;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
@@ -89,7 +90,7 @@ impl ExecutionPipeline {
         txn_generator: BlockPreparer,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         lifetime_guard: CountedRequest<()>,
-    ) -> StateComputeResultFut {
+    ) -> SyncStateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         let block_id = block.id();
         self.prepare_block_tx
@@ -105,7 +106,7 @@ impl ExecutionPipeline {
             })
             .expect("Failed to send block to execution pipeline.");
 
-        Box::pin(async move {
+        async move {
             result_rx
                 .await
                 .map_err(|err| ExecutorError::InternalError {
@@ -114,7 +115,7 @@ impl ExecutionPipeline {
                         block_id, err
                     ),
                 })?
-        })
+        }.boxed().shared()
     }
 
     async fn prepare_block(
@@ -274,19 +275,19 @@ impl ExecutionPipeline {
             }
             .await;
             let pipeline_res = res.map(|(output, execution_duration)| {
-                let pre_commit_fut: BoxFuture<'static, ExecutorResult<()>> =
+                let pre_commit_fut: SyncBoxFuture<'static, ExecutorResult<()>> =
                     if output.epoch_state().is_some() || !enable_pre_commit {
                         // hack: it causes issue if pre-commit is finished at an epoch ending, and
                         // we switch to state sync, so we do the pre-commit only after we actually
                         // decide to commit (in the commit phase)
                         let executor = executor.clone();
-                        Box::pin(async move {
+                        async move {
                             tokio::task::spawn_blocking(move || {
                                 executor.pre_commit_block(block_id, parent_block_id)
                             })
                             .await
                             .expect("failed to spawn_blocking")
-                        })
+                        }.boxed().shared()
                     } else {
                         // kick off pre-commit right away
                         let (pre_commit_result_tx, pre_commit_result_rx) = oneshot::channel();
@@ -299,11 +300,11 @@ impl ExecutionPipeline {
                                 lifetime_guard,
                             })
                             .expect("Failed to send block to pre_commit stage.");
-                        Box::pin(async {
+                        async {
                             pre_commit_result_rx
                                 .await
                                 .map_err(ExecutorError::internal_err)?
-                        })
+                        }.boxed().shared()
                     };
 
                 PipelineExecutionResult::new(input_txns, output, execution_duration, pre_commit_fut)

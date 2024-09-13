@@ -3,13 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
-    counters::*,
-    data_cache::{AsMoveResolver, StorageAdapter},
-    errors::{discarded_output, expect_only_successful_execution},
-    gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter},
-    keyless_validation,
-    move_vm_ext::{
+    block_executor::{AptosTransactionOutput, BlockAptosVM}, counters::*, data_cache::{AsMoveResolver, StorageAdapter}, errors::{discarded_output, expect_only_successful_execution}, gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter}, keyless_validation, move_vm_ext::{
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession,
             epilogue::EpilogueSession,
@@ -18,13 +12,7 @@ use crate::{
             user::UserSession,
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
-    },
-    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    system_module_names::*,
-    transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier,
-    verifier::randomness::get_randomness_annotation,
-    VMExecutor, VMValidator,
+    }, sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor}, system_module_names::*, transaction_metadata::TransactionMetadata, transaction_validation, verifier::{self, randomness::get_randomness_annotation}, VMExecutor, VMValidator
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -116,6 +104,8 @@ use std::{
     marker::Sync,
     sync::Arc,
 };
+use std::collections::HashSet;
+use std::time::Instant;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -2544,6 +2534,53 @@ impl AptosVM {
             },
         })
     }
+
+    pub fn check_randomness(
+        &self,
+        signed_transaction: &SignedTransaction,
+        resolver: &impl AptosMoveResolver,
+        session: & SessionExt,
+        entry_sets: &HashSet<EntryFunction>
+    ) -> (bool, Option<EntryFunction>) {
+        let entry_fn = match signed_transaction.payload() {
+            TransactionPayload::EntryFunction(entry) => entry,
+            TransactionPayload::Multisig(_) => return (false, None), // daniel todo fix
+            _ => return (false, None),
+        };
+        if entry_sets.contains(entry_fn) {
+            return (true, None);
+        }
+        match get_randomness_annotation(resolver, session, entry_fn) {
+            Ok(annotation) => (annotation.is_some(), Some(entry_fn.clone())),
+            Err(_) => (false, None),
+        }
+    }
+
+    pub fn check_randomness_in_batch(
+        &self,
+        signed_transactions: &Vec<SignedTransaction>,
+        resolver: &impl AptosMoveResolver,
+        entry_sets: &HashSet<EntryFunction>
+    ) -> (bool, Option<EntryFunction>) {
+        let now = Instant::now();
+        let mut session = self.new_session(resolver, SessionId::Void, None);
+        //let mut res = vec![];
+        //let mut entry_funs = vec![];
+        for txn in signed_transactions {
+            let (result, entry_opt) = self.check_randomness(txn, resolver, & session, entry_sets);
+            // res.push(result);
+            if result {
+                let elapsed = now.elapsed();
+                info!("VM randomness early return: {:.3?}", elapsed);
+                // entry_funs.push(entry_opt);
+                return (true, entry_opt)
+            }
+        }
+        let elapsed = now.elapsed();
+        info!("VM randomness: {:.3?}, num txns:{}", elapsed, signed_transactions.len());
+        (false, None)
+    }
+
 }
 
 // Executor external API
@@ -2587,6 +2624,11 @@ impl VMExecutor for AptosVM {
                 onchain: onchain_config,
             },
             None,
+        );
+        info!(
+            log_context,
+            "Finish Executing block, transaction count: {}",
+            transactions.len()
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

@@ -138,6 +138,28 @@ impl MoveVM {
             .map(|arc_module| arc_module.arc_module())
     }
 
+    pub fn load_module_no_dependency(
+        &self,
+        module_id: &ModuleId,
+        remote: &impl MoveResolver,
+    ) -> VMResult<Arc<CompiledModule>> {
+        self.runtime
+            .loader()
+            .load_module_no_dependency(
+                module_id,
+                &mut TransactionDataCache::new(
+                    self.runtime
+                        .loader()
+                        .vm_config()
+                        .deserializer_config
+                        .clone(),
+                    remote,
+                ),
+                &ModuleStorageAdapter::new(self.runtime.module_storage()),
+            )
+            .map(|arc_module| arc_module.arc_module())
+    }
+
     /// Allows the adapter to announce to the VM that the code loading cache should be considered
     /// outdated. This can happen if the adapter executed a particular code publishing transaction
     /// but decided to not commit the result to the data store. Because the code cache currently

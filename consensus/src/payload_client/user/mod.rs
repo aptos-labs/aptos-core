@@ -4,7 +4,7 @@
 use super::PayloadPullParameters;
 use crate::error::QuorumStoreError;
 use aptos_consensus_types::common::Payload;
-#[cfg(test)]
+use aptos_consensus_types::request_response::PayloadTxns;
 use aptos_types::transaction::SignedTransaction;
 use futures::future::BoxFuture;
 #[cfg(test)]
@@ -20,7 +20,7 @@ pub trait UserPayloadClient: Send + Sync {
         &self,
         params: PayloadPullParameters,
         wait_callback: BoxFuture<'static, ()>,
-    ) -> anyhow::Result<Payload, QuorumStoreError>;
+    ) -> anyhow::Result<(Payload, PayloadTxns), QuorumStoreError>;
 }
 
 /// A dummy user payload client that pull hardcoded txns one by one.
