@@ -31,7 +31,10 @@ use std::{
     time::Instant,
 };
 mod utils;
-use utils::*;
+use utils::{
+    check_for_invariant_violation, publish_group, sort_by_deps, Authenticator, ExecVariant,
+    RunnableState,
+};
 
 // genesis write set generated once for each fuzzing session
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());

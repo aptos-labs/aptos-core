@@ -7,16 +7,17 @@ use crate::quorum_store::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
+    request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
+    utils::PayloadTxnsSize,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
 use futures::channel::oneshot;
-use std::collections::HashSet;
+use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true)
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, false)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
@@ -53,17 +54,17 @@ async fn get_proposal(
 ) -> Payload {
     let (callback_tx, callback_rx) = oneshot::channel();
     let filter_set = HashSet::from_iter(filter.iter().cloned());
-    let req = GetPayloadCommand::GetPayloadRequest(
-        max_txns,
-        max_txns,
-        1000000,
-        max_txns / 2,
-        100000,
-        true,
-        PayloadFilter::InQuorumStore(filter_set),
-        callback_tx,
-        aptos_infallible::duration_since_epoch(),
-    );
+    let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
+        max_txns: PayloadTxnsSize::new(max_txns, 1000000),
+        max_txns_after_filtering: max_txns,
+        soft_max_txns_after_filtering: max_txns,
+        max_inline_txns: PayloadTxnsSize::new(max(max_txns / 2, 1), 100000),
+        filter: PayloadFilter::InQuorumStore(filter_set),
+        callback: callback_tx,
+        block_timestamp: aptos_infallible::duration_since_epoch(),
+        opt_batch_txns_pct: 0,
+        return_non_full: true,
+    });
     proof_manager.handle_proposal_request(req);
     let GetPayloadResponse::GetPayloadResponse(payload) = callback_rx.await.unwrap().unwrap();
     payload

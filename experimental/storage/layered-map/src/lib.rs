@@ -7,14 +7,16 @@ pub use map::LayeredMap;
 use std::hash::Hash;
 
 mod dropper;
+mod flatten_perfect_tree;
+pub mod iterator;
 mod layer;
 mod map;
 mod metrics;
 mod node;
 pub(crate) mod r#ref;
-
 #[cfg(test)]
 mod tests;
+mod utils;
 
 /// When recursively creating a new `MapLayer` (a crit bit tree overlay), partitioning and passing
 /// down `Vec<(K, Option<V>)>` would mean a lot of memory allocation. That's why we require

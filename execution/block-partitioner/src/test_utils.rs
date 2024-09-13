@@ -30,7 +30,7 @@ use aptos_types::{
         analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction,
         SignedTransaction, Transaction, TransactionPayload,
     },
-    utility_coin::APTOS_COIN_TYPE,
+    AptosCoinType, CoinType,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
@@ -84,7 +84,7 @@ pub fn create_signed_p2p_transaction(
         let transaction_payload = TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
             Identifier::new("transfer").unwrap(),
-            vec![APTOS_COIN_TYPE.clone()],
+            vec![AptosCoinType::type_tag()],
             vec![
                 bcs::to_bytes(&receiver.account_address).unwrap(),
                 bcs::to_bytes(&1u64).unwrap(),

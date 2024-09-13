@@ -335,8 +335,15 @@ fn function_acquires(context: &mut Context, acqs: &[E::ModuleAccess]) {
 //**************************************************************************************************
 
 fn struct_def(context: &mut Context, sdef: &E::StructDefinition) {
-    if let E::StructLayout::Singleton(fields) = &sdef.layout {
+    if let E::StructLayout::Singleton(fields, _) = &sdef.layout {
         fields.iter().for_each(|(_, _, (_, bt))| type_(context, bt));
+    } else if let E::StructLayout::Variants(variants) = &sdef.layout {
+        for variant in variants {
+            variant
+                .fields
+                .iter()
+                .for_each(|(_, _, (_, bt))| type_(context, bt));
+        }
     }
 }
 
@@ -414,7 +421,7 @@ fn lvalues_with_range(context: &mut Context, sp!(_, ll): &E::LValueWithRangeList
 
 fn lvalue(context: &mut Context, sp!(_loc, a_): &E::LValue) {
     use E::LValue_ as L;
-    if let L::Unpack(m, bs_opt, f) = a_ {
+    if let L::Unpack(m, bs_opt, f, _) = a_ {
         module_access(context, m);
         types_opt(context, bs_opt);
         lvalues(context, f.iter().map(|(_, _, (_, b))| b));
@@ -499,6 +506,10 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         E::Cast(e, ty) | E::Annotate(e, ty) => {
             exp(context, e);
             type_(context, ty)
+        },
+        E::Test(e, tys) => {
+            exp(context, e);
+            tys.iter().for_each(|ty| type_(context, ty))
         },
 
         E::Lambda(ll, e) => {

@@ -9,22 +9,25 @@ use crate::{
     Swarm, SwarmExt, TestReport,
 };
 use anyhow::{bail, Context};
-use aptos::node::analyze::fetch_metadata::FetchMetadata;
-use aptos_sdk::types::PeerId;
+use aptos::node::analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata};
+use aptos_logger::info;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
 use prometheus_http_query::response::Sample;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
-    pub max_no_progress_secs: f32,
-    pub max_round_gap: u64,
+    pub max_non_epoch_no_progress_secs: f32,
+    pub max_epoch_no_progress_secs: f32,
+    pub max_non_epoch_round_gap: u64,
+    pub max_epoch_round_gap: u64,
 }
 
 #[derive(Clone, Debug)]
 pub enum LatencyType {
     Average,
     P50,
+    P70,
     P90,
     P99,
 }
@@ -283,7 +286,7 @@ impl SuccessCriteriaChecker {
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<()> {
-        println!(
+        info!(
             "End to end duration: {}s, performance measured for: {}s",
             window.as_secs(),
             stats.lasted.as_secs()
@@ -381,82 +384,62 @@ impl SuccessCriteriaChecker {
             .await
             .unwrap();
 
-        let mut max_round_gap = 0;
-        let mut max_round_gap_version = 0;
-        let mut max_time_gap = 0;
-        let mut max_time_gap_version = 0;
-
-        let mut prev_block = None;
-        let mut prev_ts = 0;
-        let mut failed_from_nil = 0;
-        let mut previous_epooch = 0;
-        let mut previous_round = 0;
-        for block in epochs
-            .iter()
-            .flat_map(|epoch| epoch.blocks.iter())
-            .filter(|b| b.version > start_version && b.version < end_version)
-        {
-            let is_nil = block.event.proposer() == PeerId::ZERO;
-
-            let current_gap = if previous_epooch == block.event.epoch() {
-                block.event.round() - previous_round - 1
-            } else {
-                u64::from(!is_nil) + block.event.failed_proposer_indices().len() as u64
-            };
-
-            if is_nil {
-                failed_from_nil += current_gap;
-            } else {
-                if prev_ts > 0 {
-                    let round_gap = current_gap + failed_from_nil;
-                    let time_gap = block.event.proposed_time() as i64 - prev_ts as i64;
-
-                    if time_gap < 0 {
-                        println!(
-                            "Clock went backwards? {}, {:?}, {:?}",
-                            time_gap, block, prev_block
-                        );
-                    }
-
-                    if round_gap > max_round_gap {
-                        max_round_gap = round_gap;
-                        max_round_gap_version = block.version;
-                    }
-                    if time_gap > max_time_gap as i64 {
-                        max_time_gap = time_gap as u64;
-                        max_time_gap_version = block.version;
-                    }
-                }
-
-                failed_from_nil = 0;
-                prev_ts = block.event.proposed_time();
-                prev_block = Some(block);
-            }
-
-            previous_epooch = block.event.epoch();
-            previous_round = block.event.round();
-        }
-
-        let max_time_gap_secs = Duration::from_micros(max_time_gap).as_secs_f32();
-
-        let gap_text = format!(
-            "Max round gap was {} [limit {}] at version {}. Max no progress secs was {} [limit {}] at version {}.",
-            max_round_gap,
-            chain_progress_threshold.max_round_gap,
-            max_round_gap_version,
-            max_time_gap_secs,
-            chain_progress_threshold.max_no_progress_secs,
-            max_time_gap_version,
+        let gap_info = AnalyzeValidators::analyze_gap(
+            epochs
+                .iter()
+                .flat_map(|epoch| epoch.blocks.iter())
+                .filter(|b| b.version > start_version && b.version < end_version),
         );
 
-        if max_round_gap > chain_progress_threshold.max_round_gap
-            || max_time_gap_secs > chain_progress_threshold.max_no_progress_secs
+        let gap_text = format!(
+            "Max non-epoch-change gap was: {} [limit {}], {} [limit {}].",
+            gap_info.non_epoch_round_gap.to_string_as_round(),
+            chain_progress_threshold.max_non_epoch_round_gap,
+            gap_info.non_epoch_time_gap.to_string_as_time(),
+            chain_progress_threshold.max_non_epoch_no_progress_secs,
+        );
+
+        let epoch_gap_text = format!(
+            "Max epoch-change gap was: {} [limit {}], {} [limit {}].",
+            gap_info.epoch_round_gap.to_string_as_round(),
+            chain_progress_threshold.max_epoch_round_gap,
+            gap_info.epoch_time_gap.to_string_as_time(),
+            chain_progress_threshold.max_epoch_no_progress_secs,
+        );
+
+        info!(
+            max_non_epoch_round_gap = gap_info.non_epoch_round_gap.max_gap,
+            max_epoch_round_gap = gap_info.epoch_round_gap.max_gap,
+            max_non_epoch_time_gap = gap_info.non_epoch_time_gap.max_gap,
+            max_epoch_time_gap = gap_info.epoch_time_gap.max_gap,
+            "Max gap values",
+        );
+
+        report.report_text(gap_text.clone());
+        report.report_text(epoch_gap_text.clone());
+
+        if gap_info.non_epoch_round_gap.max_gap.round() as u64
+            > chain_progress_threshold.max_non_epoch_round_gap
+            || gap_info.non_epoch_time_gap.max_gap
+                > chain_progress_threshold.max_non_epoch_no_progress_secs
         {
-            bail!("Failed chain progress check. {}", gap_text);
-        } else {
-            println!("Passed progress check. {}", gap_text);
-            report.report_text(gap_text);
+            bail!(
+                "Failed non-epoch-change chain progress check. {}",
+                &gap_text
+            );
         }
+        info!("Passed non-epoch-change progress check. {}", gap_text);
+
+        if gap_info.epoch_round_gap.max_gap.round() as u64
+            > chain_progress_threshold.max_epoch_round_gap
+            || gap_info.epoch_time_gap.max_gap > chain_progress_threshold.max_epoch_no_progress_secs
+        {
+            bail!(
+                "Failed epoch-change chain progress check. {}",
+                &epoch_gap_text
+            );
+        }
+        info!("Passed epoch-change progress check. {}", epoch_gap_text);
 
         Ok(())
     }
@@ -476,7 +459,7 @@ impl SuccessCriteriaChecker {
                 stats_rate,
             )
         } else {
-            println!(
+            info!(
                 "TPS is {} and is within limit of {}",
                 stats_rate.committed, min_avg_tps
             );
@@ -503,7 +486,7 @@ impl SuccessCriteriaChecker {
                     stats_rate,
                 )
             } else {
-                println!(
+                info!(
                     "{} TPS is {} and is below max limit of {}",
                     value_desc, value, max
                 );
@@ -549,6 +532,7 @@ impl SuccessCriteriaChecker {
             let latency = Duration::from_millis(match latency_type {
                 LatencyType::Average => stats_rate.latency as u64,
                 LatencyType::P50 => stats_rate.p50_latency,
+                LatencyType::P70 => stats_rate.p70_latency,
                 LatencyType::P90 => stats_rate.p90_latency,
                 LatencyType::P99 => stats_rate.p99_latency,
             });
@@ -565,7 +549,7 @@ impl SuccessCriteriaChecker {
                     .to_string(),
                 );
             } else {
-                println!(
+                info!(
                     "{:?} latency{} is {}s and is within limit of {}s",
                     latency_type,
                     traffic_name_addition,
@@ -591,7 +575,7 @@ impl SuccessCriteriaChecker {
                 error_count
             );
         } else {
-            println!("No error!() found in validator logs");
+            info!("No error!() found in validator logs");
             Ok(())
         }
     }

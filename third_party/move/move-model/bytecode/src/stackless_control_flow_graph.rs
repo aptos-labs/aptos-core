@@ -204,6 +204,14 @@ impl StacklessControlFlowGraph {
         &self.blocks[&block_id].successors
     }
 
+    /// Returns a map from a block to a vector of its successors
+    pub fn get_successors_map(&self) -> BTreeMap<BlockId, Vec<BlockId>> {
+        self.blocks
+            .iter()
+            .map(|(block_id, block)| (*block_id, block.successors.clone()))
+            .collect()
+    }
+
     pub fn content(&self, block_id: BlockId) -> &BlockContent {
         &self.blocks[&block_id].content
     }
@@ -234,6 +242,13 @@ impl StacklessControlFlowGraph {
         }
     }
 
+    pub fn instr_offset_bounds(&self, block_id: BlockId) -> Option<(CodeOffset, CodeOffset)> {
+        match self.blocks[&block_id].content {
+            BlockContent::Basic { lower, upper } => Some((lower, upper)),
+            BlockContent::Dummy => None,
+        }
+    }
+
     pub fn num_blocks(&self) -> u16 {
         self.blocks.len() as u16
     }
@@ -248,6 +263,87 @@ impl StacklessControlFlowGraph {
         println!("blocks = {:?}", self.blocks);
         println!("is_backward = {}", self.backward);
         println!("+=======================+");
+    }
+}
+
+/// Iterator over blocks of a control flow graph in DFS order
+/// (always choosing the left-most child to visit first).
+pub struct DFSLeft<'a> {
+    successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
+    // blocks scheduled to visit
+    to_visit: Vec<BlockId>,
+    // blocks visited
+    visited: BTreeSet<BlockId>,
+    // blocks unvisited, used only when iterating over all blocks
+    unvisited: Option<BTreeSet<BlockId>>,
+}
+
+impl<'a> DFSLeft<'a> {
+    /// Create DFSLeft iterator starting from a specified start block
+    /// `successors`: should have all blocks as keys, even if they have no successors
+    /// `visit_all`: whether to visit all blocks or just blocks reachable from the start block
+    pub fn new(
+        successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
+        start: BlockId,
+        visit_all: bool,
+    ) -> Self {
+        let to_visit = vec![start];
+        Self {
+            successors,
+            to_visit,
+            visited: BTreeSet::new(),
+            unvisited: if visit_all {
+                Some(successors.keys().cloned().collect())
+            } else {
+                None
+            },
+        }
+    }
+
+    /// Gets the next block scheduled, but it may have been visited when scheduled by multiple predecessors
+    fn get_next_to_visit(&mut self) -> Option<BlockId> {
+        if let Some(to_visit) = self.to_visit.pop() {
+            Some(to_visit)
+        } else if let Some(unvisited_blocks) = &mut self.unvisited {
+            unvisited_blocks.pop_first()
+        } else {
+            return None;
+        }
+    }
+
+    /// Gets the next block to visit
+    fn get_next_unvisited(&mut self) -> Option<BlockId> {
+        let next_to_visit = self.get_next_to_visit()?;
+        if self.visited.contains(&next_to_visit) {
+            // we won't run into a infinite loop
+            // because eventually we will run out of scheduled blocks or unvisited blocks
+            // by calling `get_next_to_visit`
+            self.get_next_unvisited()
+        } else {
+            Some(next_to_visit)
+        }
+    }
+}
+
+impl<'a> Iterator for DFSLeft<'a> {
+    type Item = BlockId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let visiting = self.get_next_unvisited()?;
+        self.visited.insert(visiting);
+        if let Some(unvisited) = &mut self.unvisited {
+            unvisited.remove(&visiting);
+        }
+        for suc_block in self
+            .successors
+            .get(&visiting)
+            .expect("successors")
+            .iter()
+            .rev()
+        {
+            self.to_visit.push(*suc_block);
+        }
+        Some(visiting)
     }
 }
 

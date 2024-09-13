@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.5.1"
+version = "4.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -306,6 +306,7 @@ dependencies = [
  "chrono",
  "clap 4.4.14",
  "clap_complete",
+ "colored",
  "dashmap",
  "diesel",
  "diesel-async",
@@ -320,6 +321,7 @@ dependencies = [
  "move-cli",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-core-types",
  "move-coverage",
  "move-disassembler",
@@ -333,6 +335,7 @@ dependencies = [
  "poem",
  "processor",
  "rand 0.7.3",
+ "regex",
  "reqwest 0.11.23",
  "self_update",
  "serde",
@@ -796,6 +799,7 @@ dependencies = [
  "clap 4.4.14",
  "futures",
  "itertools 0.13.0",
+ "move-binary-format",
  "move-compiler",
  "move-core-types",
  "move-model",
@@ -882,6 +886,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-netcore",
  "aptos-network",
  "aptos-peer-monitoring-service-types",
  "aptos-reliable-broadcast",
@@ -968,6 +973,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4",
+ "derivative",
  "fail",
  "futures",
  "itertools 0.13.0",
@@ -1308,6 +1314,7 @@ dependencies = [
  "aptos-network",
  "aptos-reliable-broadcast",
  "aptos-runtimes",
+ "aptos-safety-rules",
  "aptos-time-service",
  "aptos-types",
  "aptos-validator-transaction-pool",
@@ -1542,6 +1549,23 @@ dependencies = [
  "once_cell",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-experimental-hexy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-experimental-layered-map",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "criterion",
+ "itertools 0.13.0",
+ "jemallocator",
+ "once_cell",
+ "proptest",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -1811,6 +1835,7 @@ dependencies = [
  "move-cli",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-core-types",
  "move-docgen",
  "move-model",
@@ -2174,30 +2199,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-integration-tests"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-indexer-grpc-cache-worker",
- "aptos-indexer-grpc-file-store",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-logger",
- "aptos-transaction-emitter-lib",
- "aptos-transaction-generator-lib",
- "aptos-types",
- "once_cell",
- "redis",
- "regex",
- "reqwest 0.11.23",
- "tempfile",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-server-framework"
 version = "1.0.0"
 dependencies = [
@@ -2238,6 +2239,7 @@ dependencies = [
  "futures",
  "google-cloud-storage",
  "hyper 0.14.28",
+ "itertools 0.13.0",
  "rocksdb",
  "serde",
  "serde_json",
@@ -2246,7 +2248,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.10",
- "tonic 0.11.0",
 ]
 
 [[package]]
@@ -2277,6 +2278,34 @@ dependencies = [
  "tokio-util 0.7.10",
  "tonic 0.11.0",
  "tracing",
+ "url",
+]
+
+[[package]]
+name = "aptos-indexer-test-transactions"
+version = "1.0.0"
+dependencies = [
+ "aptos-protos 1.3.1",
+ "serde_json",
+]
+
+[[package]]
+name = "aptos-indexer-transaction-generator"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-utils",
+ "aptos-protos 1.3.1",
+ "clap 4.4.14",
+ "futures",
+ "itertools 0.13.0",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tonic 0.11.0",
  "url",
 ]
 
@@ -2360,6 +2389,7 @@ dependencies = [
  "aptos-network",
  "aptos-reliable-broadcast",
  "aptos-runtimes",
+ "aptos-safety-rules",
  "aptos-time-service",
  "aptos-types",
  "aptos-validator-transaction-pool",
@@ -3052,7 +3082,6 @@ dependencies = [
  "aptos-peer-monitoring-service-server",
  "aptos-peer-monitoring-service-types",
  "aptos-runtimes",
- "aptos-safety-rules",
  "aptos-state-sync-driver",
  "aptos-storage-interface",
  "aptos-storage-service-client",
@@ -3521,7 +3550,6 @@ dependencies = [
 name = "aptos-safety-rules"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-config",
  "aptos-consensus-types",
  "aptos-crypto",
@@ -3536,6 +3564,7 @@ dependencies = [
  "aptos-vault-client",
  "claims",
  "criterion",
+ "hex",
  "once_cell",
  "proptest",
  "rand 0.7.3",
@@ -6056,6 +6085,7 @@ dependencies = [
  "anstyle",
  "clap_lex 0.6.0",
  "strsim 0.10.0",
+ "terminal_size",
 ]
 
 [[package]]
@@ -10798,6 +10828,7 @@ dependencies = [
  "move-stdlib",
  "move-symbol-pool",
  "once_cell",
+ "pathdiff",
  "petgraph 0.5.1",
  "regex",
  "sha3 0.9.1",
@@ -10828,6 +10859,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "move-binary-format",
+ "move-borrow-graph",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
  "move-command-line-common",
@@ -10843,6 +10875,8 @@ dependencies = [
  "num 0.4.1",
  "once_cell",
  "petgraph 0.5.1",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
  "walkdir",
 ]
 
@@ -11396,6 +11430,7 @@ dependencies = [
  "move-to-yul",
  "move-vm-runtime",
  "move-vm-test-utils",
+ "move-vm-types",
  "once_cell",
  "primitive-types 0.10.1",
  "rayon",
@@ -13456,6 +13491,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "move-compiler",
+ "move-compiler-v2",
  "move-model",
  "move-prover",
  "move-prover-boogie-backend",
@@ -15820,6 +15856,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
+dependencies = [
+ "rustix 0.38.28",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

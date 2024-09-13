@@ -3686,7 +3686,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_TotalAccumulatedRewardsAbortsIf">TotalAccumulatedRewardsAbortsIf</a> {
     vesting_contract_address: <b>address</b>;
-    <b>requires</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &lt;= 100;
     <b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
     <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
     <b>let</b> staker = vesting_contract_address;
@@ -3892,7 +3891,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> len(contract_addresses) == 0;
-<b>include</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a>;
 </code></pre>
 
 
@@ -3927,7 +3925,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> len(contract_addresses) == 0;
-<b>include</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a>;
 </code></pre>
 
 

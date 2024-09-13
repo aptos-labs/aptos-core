@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: local `x` of type `M::X` does not have the `drop` ability
+  ┌─ tests/ability-check/v1-borrow-tests/no_drop.move:6:9
+  │
+6 │         &x;
+  │         ^^ implicitly dropped here since it is no longer used

@@ -55,66 +55,26 @@ warning: Unused assignment to `i`. Consider removing or prefixing with an unders
 
 [variant baseline]
 fun m::test($t0: bool, $t1: bool) {
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-     var $t7: u64
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
      # maybe
-  0: label L0
+  0: if ($t0) goto 1 else goto 5
      # maybe
-  1: if ($t0) goto 2 else goto 21
+  1: label L2
      # maybe
-  2: label L2
+  2: if ($t1) goto 3 else goto 5
      # maybe
-  3: if ($t1) goto 4 else goto 13
+  3: label L8
      # maybe
-  4: label L5
+  4: goto 3
      # maybe
-  5: label L8
+  5: label L1
      # maybe
-  6: goto 5
-     # no
-  7: label L9
-     # no
-  8: $t2 := 0
-     # no
-  9: $t4 := 1
-     # no
- 10: $t3 := +($t2, $t4)
-     # no
- 11: $t2 := move($t3)
-     # no
- 12: goto 15
-     # maybe
- 13: label L6
-     # maybe
- 14: goto 25
-     # no
- 15: label L7
-     # no
- 16: $t5 := 0
-     # no
- 17: $t7 := 1
-     # no
- 18: $t6 := +($t5, $t7)
-     # no
- 19: $t5 := move($t6)
-     # no
- 20: goto 23
-     # maybe
- 21: label L3
-     # maybe
- 22: goto 25
-     # no
- 23: label L4
-     # no
- 24: goto 0
-     # maybe
- 25: label L1
-     # maybe
- 26: return ()
+  6: return ()
 }
 
 ============ after UnreachableCodeRemover: ================
@@ -127,19 +87,13 @@ fun m::test($t0: bool, $t1: bool) {
      var $t5: u64 [unused]
      var $t6: u64 [unused]
      var $t7: u64 [unused]
-  0: label L0
-  1: if ($t0) goto 2 else goto 9
-  2: label L2
-  3: if ($t1) goto 4 else goto 7
-  4: label L5
-  5: label L8
-  6: goto 5
-  7: label L6
-  8: goto 11
-  9: label L3
- 10: goto 11
- 11: label L1
- 12: return ()
+  0: if ($t0) goto 1 else goto 5
+  1: label L2
+  2: if ($t1) goto 3 else goto 5
+  3: label L8
+  4: goto 3
+  5: label L1
+  6: return ()
 }
 
 

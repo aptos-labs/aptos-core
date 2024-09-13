@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: local `_x` of type `Module0::S` does not have the `drop` ability
+  ┌─ tests/ability-check/bug_14223_unused_non_droppable_no_abort.move:5:18
+  │
+5 │         let _x = S {};
+  │                  ^^^^ implicitly dropped here since it is no longer used

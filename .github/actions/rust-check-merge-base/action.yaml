@@ -1,0 +1,19 @@
+name: Rust Check Merge Base
+description: Runs the rust merge base freshness check
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # The source code must be checked out by the workflow that invokes this action.
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    # Check the freshness of the merge base
+    - name: Check the freshness of the merge base
+      run: cargo x check-merge-base -vvv
+      shell: bash

@@ -225,6 +225,12 @@ impl ConfigOptimizer for MempoolConfig {
                 mempool_config.num_sender_buckets = 1;
                 modified_config = true;
             }
+
+            // Set the include_ready_time_in_broadcast to true (default is false)
+            if local_mempool_config_yaml["include_ready_time_in_broadcast"].is_null() {
+                mempool_config.include_ready_time_in_broadcast = true;
+                modified_config = true;
+            }
         }
 
         Ok(modified_config)

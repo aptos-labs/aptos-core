@@ -36,7 +36,10 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt::Display,
     ops::Add,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{Duration, Instant, SystemTime},
 };
 use thiserror::Error;
@@ -109,7 +112,8 @@ pub(crate) struct MempoolNetworkInterface<NetworkClient> {
     node_type: NodeType,
     mempool_config: MempoolConfig,
     prioritized_peers_state: PrioritizedPeersState,
-    pub num_txns_received_since_peers_updated: u64,
+    pub num_mempool_txns_received_since_peers_updated: u64,
+    pub num_committed_txns_received_since_peers_updated: Arc<AtomicU64>,
 }
 
 impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterface<NetworkClient> {
@@ -126,7 +130,8 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             node_type,
             mempool_config,
             prioritized_peers_state,
-            num_txns_received_since_peers_updated: 0,
+            num_mempool_txns_received_since_peers_updated: 0,
+            num_committed_txns_received_since_peers_updated: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -189,11 +194,15 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
         // Get the upstream peers to add or disable, using a read lock
         let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
-        info!(
-            "Mempool peers added: {:?}, Mempool peers disabled: {:?}",
-            to_add.iter().map(|(peer, _)| peer).collect::<Vec<_>>(),
-            to_disable
-        );
+
+        if !to_add.is_empty() || !to_disable.is_empty() {
+            info!(
+                "Mempool peers added: {:?}, Mempool peers disabled: {:?}",
+                to_add.iter().map(|(peer, _)| peer).collect::<Vec<_>>(),
+                to_disable
+            );
+        }
+
         // If there are updates, apply using a write lock
         self.add_and_disable_upstream_peers(&to_add, &to_disable);
 
@@ -240,10 +249,14 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         // Update the prioritized peers list
         self.prioritized_peers_state.update_prioritized_peers(
             peers_and_metadata,
-            self.num_txns_received_since_peers_updated,
+            self.num_mempool_txns_received_since_peers_updated,
+            self.num_committed_txns_received_since_peers_updated
+                .load(Ordering::Relaxed),
         );
         // Resetting the counter
-        self.num_txns_received_since_peers_updated = 0;
+        self.num_mempool_txns_received_since_peers_updated = 0;
+        self.num_committed_txns_received_since_peers_updated
+            .store(0, Ordering::SeqCst);
     }
 
     pub fn is_validator(&self) -> bool {

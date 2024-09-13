@@ -598,7 +598,8 @@ impl From<&EmitJobRequest> for BulkAccountCreationConfig {
             seed: req.account_minter_seed,
             mint_to_root: req.mint_to_root,
             prompt_before_spending: req.prompt_before_spending,
-            create_secondary_source_account: !req.coordination_delay_between_instances.is_zero(),
+            create_secondary_source_account: req.mint_to_root
+                || !req.coordination_delay_between_instances.is_zero(),
             expected_gas_per_transfer: req.get_expected_gas_per_transfer(),
             expected_gas_per_account_create: req.get_expected_gas_per_account_create(),
         }

@@ -118,7 +118,7 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
 
 const TXN_CONSENSUS_PULLED_BUCKETS: &[f64] = &[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 25.0, 50.0, 100.0];
 
-static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+static TXN_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
         /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
     )
@@ -140,6 +140,15 @@ pub fn core_mempool_index_size(label: &'static str, size: usize) {
         .with_label_values(&[label])
         .set(size as i64)
 }
+
+pub static SENDER_BUCKET_FREQUENCIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_core_mempool_sender_bucket_frequencies",
+        "Frequency of each sender bucket in core mempool",
+        &["sender_bucket"]
+    )
+    .unwrap()
+});
 
 /// Counter tracking size of each bucket in timeline index
 static CORE_MEMPOOL_TIMELINE_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -297,11 +306,39 @@ pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_core_mempool_txn_consensus_pulled",
+pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED_BY_BUCKET: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_core_mempool_txn_consensus_pulled_by_bucket",
         "Number of times a txn was pulled from core mempool by consensus",
+        &["bucket"],
         TXN_CONSENSUS_PULLED_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_count",
+        "Number of txns evicted from parking lot",
+        TXN_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_BYTES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_bytes",
+        "Bytes of txns evicted from parking lot",
+        exponential_buckets(/*start=*/ 500.0, /*factor=*/ 1.4, /*count=*/ 32).unwrap()
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_LATENCY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_latency",
+        "Latency of evicting for each transaction from parking lot",
+        MEMPOOL_LATENCY_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -323,7 +360,7 @@ static MEMPOOL_SERVICE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_mempool_service_transactions",
         "Number of transactions handled in one request/response between mempool and consensus/state sync",
         &["type"],
-        TRANSACTION_COUNT_BUCKETS.clone()
+        TXN_COUNT_BUCKETS.clone()
     )
     .unwrap()
 });

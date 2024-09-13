@@ -31,10 +31,18 @@ pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
 pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESS: &str = "commit_post_process";
 pub const STORAGE_SYNCHRONIZER_STATE_VALUE_CHUNK: &str = "state_value_chunk";
 
+/// Storage synchronizer pipeline channel labels
+pub const STORAGE_SYNCHRONIZER_EXECUTOR: &str = "executor";
+pub const STORAGE_SYNCHRONIZER_LEDGER_UPDATER: &str = "ledger_updater";
+pub const STORAGE_SYNCHRONIZER_COMMITTER: &str = "committer";
+pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESSOR: &str = "commit_post_processor";
+pub const STORAGE_SYNCHRONIZER_STATE_SNAPSHOT_RECEIVER: &str = "state_snapshot_receiver";
+
 /// An enum representing the component currently executing
 pub enum ExecutingComponent {
     Bootstrapper,
     Consensus,
+    ConsensusObserver,
     ContinuousSyncer,
 }
 
@@ -43,6 +51,7 @@ impl ExecutingComponent {
         match self {
             ExecutingComponent::Bootstrapper => "bootstrapper",
             ExecutingComponent::Consensus => "consensus",
+            ExecutingComponent::ConsensusObserver => "consensus_observer",
             ExecutingComponent::ContinuousSyncer => "continuous_syncer",
         }
     }
@@ -189,6 +198,17 @@ pub static STORAGE_SYNCHRONIZER_OPERATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Gauges for tracking the storage synchronizer pipeline channel backpressure
+pub static STORAGE_SYNCHRONIZER_PIPELINE_CHANNEL_BACKPRESSURE: Lazy<IntGaugeVec> =
+    Lazy::new(|| {
+        register_int_gauge_vec!(
+            "aptos_state_sync_storage_synchronizer_pipeline_channel_backpressure",
+            "Gauges for tracking the storage synchronizer pipeline channel backpressure",
+            &["channel"]
+        )
+        .unwrap()
+    });
 
 /// Increments the given counter with the provided label values.
 pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: &str) {

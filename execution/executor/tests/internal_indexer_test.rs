@@ -53,7 +53,7 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
         validators[0].data.owner_address,
-        validators[0].consensus_key.clone(),
+        Arc::new(validators[0].consensus_key.clone()),
     );
     let account1 = LocalAccount::generate(&mut rng);
     let account2 = LocalAccount::generate(&mut rng);
@@ -136,7 +136,7 @@ fn test_db_indexer_data() {
     use std::{thread, time::Duration};
     // create test db
     let (aptos_db, core_account) = create_test_db();
-    let total_version = aptos_db.get_synced_version().unwrap();
+    let total_version = aptos_db.expect_synced_version();
     assert_eq!(total_version, 11);
     let temp_path = TempPath::new();
     let mut node_config = aptos_config::config::NodeConfig::default();

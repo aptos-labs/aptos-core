@@ -14,6 +14,7 @@ abstract-domain-derive = { path = "../move-model/bytecode/abstract_domain_derive
 anyhow = { workspace = true }
 bcs = { workspace = true }
 move-binary-format = { path = "../move-binary-format" }
+move-borrow-graph = { path = "../move-borrow-graph" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
 move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 move-command-line-common = { path = "../move-command-line-common" }
@@ -36,6 +37,8 @@ num = { workspace = true }
 once_cell = { workspace = true }
 #paste = "1.0.5"
 petgraph = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -53,3 +56,6 @@ doctest = false
 name = "testsuite"
 harness = false
 doctest = false
+
+[package.metadata.cargo-machete]
+ignored = ["strum"]
