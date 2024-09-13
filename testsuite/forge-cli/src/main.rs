@@ -631,7 +631,7 @@ fn k8s_test_suite() -> ForgeConfig {
 fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
-    _test_cmd: &TestCommand,
+    test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
