@@ -523,20 +523,18 @@ impl ControlFlowGraphCodeGenerator {
         }
         // check invariant 6
         for (block, preds) in self.predecessors.iter() {
-            if *block == self.exit_block
-                || *block == self.get_the_non_trivial_successor(self.entry_block)
-                || preds.is_empty()
+            if !self.is_trivial_block(*block)
+                && preds.iter().any(|pred| !self.is_trivial_block(*pred))
             {
-                continue;
+                assert!(matches!(
+                    self.code_blocks
+                        .get(block)
+                        .expect("code block")
+                        .first()
+                        .expect("first instruction"),
+                    Bytecode::Label(..)
+                ));
             }
-            assert!(matches!(
-                self.code_blocks
-                    .get(block)
-                    .expect("code block")
-                    .first()
-                    .expect("first instruction"),
-                Bytecode::Label(..)
-            ));
         }
         // check invariant 7
         assert!(self.entry_block != self.exit_block);
