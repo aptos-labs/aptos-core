@@ -342,11 +342,9 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             },
             Err(err) => {
                 warn!(
-                    NetworkSchema::new(&self.network_context)
-                        .remote_peer(&peer_id),
-                    error = ?err,
+                    NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                     round = round,
-                    "{} Ping failed for peer: {} round: {} with error: {:?}",
+                    "{} Ping failed for peer: {} round: {} with error: {:#}",
                     self.network_context,
                     peer_id.short_str(),
                     round,
