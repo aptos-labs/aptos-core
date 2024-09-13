@@ -34,8 +34,12 @@ const RELEVANT_FILE_PATHS_FOR_EXECUTION_PERFORMANCE_TESTS: [&str; 5] = [
     "execution/aptos-executor-benchmark",
     "testsuite/single_node_performance.py",
 ];
-const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
-    ["aptos-move/aptos-release-builder", "aptos-move/framework"];
+const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 4] = [
+    ".github",
+    "testsuite",
+    "aptos-move/aptos-release-builder",
+    "aptos-move/framework",
+];
 
 // Relevant packages to monitor when deciding to run the targeted tests
 const RELEVANT_PACKAGES_FOR_COMPILER_V2: [&str; 2] = ["aptos-framework", "e2e-move-tests"];
