@@ -467,7 +467,7 @@ impl ControlFlowGraphCodeGenerator {
                 *block = new;
             }
         }
-        let blocks_dedup = blocks.to_vec().into_iter().unique().collect();
+        let blocks_dedup = blocks.iter().copied().unique().collect();
         *blocks = blocks_dedup;
     }
 
@@ -564,8 +564,8 @@ impl ControlFlowGraphCodeGenerator {
                             }
                         }
                     );
-                    assert!(succs_labels.contains(&l0));
-                    assert!(succs_labels.contains(&l1));
+                    assert!(succs_labels.contains(l0));
+                    assert!(succs_labels.contains(l1));
                 },
                 Bytecode::Jump(_, l) => {
                     let suc_block = self.get_the_non_trivial_successor(*block);
