@@ -31,7 +31,7 @@ pub struct Opt {
     #[clap(
         long,
         help = "Target number of transactions for each job to replay",
-        default_value = "10000000"
+        default_value = "20000000"
     )]
     target_job_size: u64,
     #[clap(
@@ -40,9 +40,13 @@ pub struct Opt {
         default_value = "4000"
     )]
     max_epochs: u64,
+    #[clap(long, help = "version ranges to skip. 123-2456")]
+    ranges_to_skip: Vec<String>,
     #[clap(long, help = "Output job ranges")]
     output_json_file: PathBuf,
 }
+
+const MAX_EPOCHS_IN_ONE_JOB: u64 = 32;
 
 impl Opt {
     pub async fn run(self) -> anyhow::Result<()> {
@@ -53,6 +57,22 @@ impl Opt {
             self.concurrent_downloads.get(),
         )
         .await?;
+
+        let mut ranges_to_skip = self
+            .ranges_to_skip
+            .iter()
+            .map(|range| {
+                let (begin, end) = range
+                    .split('-')
+                    .map(|v| v.parse::<Version>().expect("Malformed range."))
+                    .collect_tuple()
+                    .expect("Malformed range.");
+                assert!(begin <= end, "Malformed Range.");
+                (begin, end)
+            })
+            .sorted()
+            .rev()
+            .peekable();
 
         let storage_state = metadata_view.get_storage_state()?;
         let global_end_version = storage_state
@@ -87,6 +107,13 @@ impl Opt {
                 job_idx += 1;
                 match it.next() {
                     Some((end, mut begin)) => {
+                        while let Some((skip_begin, _skip_end)) = ranges_to_skip.peek() {
+                            if *skip_begin > end.version {
+                                let _ = ranges_to_skip.next();
+                            } else {
+                                break;
+                            }
+                        }
                         if end.version - begin.version >= self.target_job_size {
                             // cut big range short, this hopefully automatically skips load tests
                             let msg = if end.epoch - begin.epoch > 15 {
@@ -119,7 +146,7 @@ impl Opt {
                             ))
                         } else {
                             while let Some((_prev_end, prev_begin)) = it.peek() {
-                                if end.version - prev_begin.version > self.target_job_size {
+                                if end.version - prev_begin.version > self.target_job_size || end.epoch - prev_begin.epoch > MAX_EPOCHS_IN_ONE_JOB {
                                     break;
                                 }
                                 begin = prev_begin;

@@ -236,7 +236,7 @@ jobs:
               --enable-storage-sharding \
               --target-db-dir db \
               --concurrent-downloads 8 \
-              --replay-concurrency-level 2 \
+              --replay-concurrency-level 8 \
               \
               && exit 0 || true # exit 0 if successful, otherwise retry
           done
@@ -268,7 +268,7 @@ jobs:
               --enable-storage-sharding \
               --target-db-dir db \
               --concurrent-downloads 8 \
-              --replay-concurrency-level 2 \
+              --replay-concurrency-level 8 \
               \
               && exit 0 || true # exit 0 if successful, otherwise retry
           done

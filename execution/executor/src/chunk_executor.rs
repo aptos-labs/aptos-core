@@ -642,7 +642,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
             .enqueue_chunk_to_commit_directly(executed_chunk.expect("Nothing to commit."))?;
         info!(
             num_txns = num_txns,
-            tps = num_txns as f64 / started.elapsed().as_secs_f64(),
+            tps = (num_txns as f64 / started.elapsed().as_secs_f64()),
             "TransactionReplayer::replay() OK"
         );
 
