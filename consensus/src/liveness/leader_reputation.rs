@@ -382,12 +382,12 @@ impl NewBlockEventAggregation {
                         }
                     },
                     Err(msg) => {
-                        error!(
-                            "Voter conversion from bitmap failed at epoch {}, round {}: {}",
-                            meta.epoch(),
-                            meta.round(),
-                            msg
-                        )
+                        // error!(
+                        //     "Voter conversion from bitmap failed at epoch {}, round {}: {}",
+                        //     meta.epoch(),
+                        //     meta.round(),
+                        //     msg
+                        // )
                     },
                 }
                 map
