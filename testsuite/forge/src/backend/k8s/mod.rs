@@ -6,7 +6,8 @@ use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm
 use anyhow::bail;
 use aptos_logger::info;
 use rand::rngs::StdRng;
-use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
+use serde_json::json;
+use std::{convert::TryInto, num::NonZeroUsize, sync::Arc, time::Duration};
 
 pub mod chaos;
 pub mod chaos_schema;
@@ -14,14 +15,13 @@ mod cluster_helper;
 pub mod constants;
 mod fullnode;
 pub mod kube_api;
+pub mod macros;
 pub mod node;
 pub mod prometheus;
 mod stateful_set;
 mod swarm;
 
-use super::{
-    ForgeDeployerManager, ForgeDeployerType, ForgeDeployerValues, DEFAULT_FORGE_DEPLOYER_PROFILE,
-};
+use super::{ForgeBackendManager, DEFAULT_FORGE_DEPLOYER_PROFILE};
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
@@ -185,21 +185,17 @@ impl Factory for K8sFactory {
             // add an indexer too!
             if self.enable_indexer {
                 // NOTE: by default, use a deploy profile and no additional configuration values
-                let values = ForgeDeployerValues {
-                    profile: DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
-                    era: new_era.clone().expect("Era not set in created testnet"),
-                    namespace: self.kube_namespace.clone(),
-                    indexer_grpc_values: None,
-                    indexer_processor_values: None,
-                };
+                let values = json!({
+                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE,
+                    "era": new_era.clone().expect("Era not set in created testnet"),
+                });
 
-                let forge_deployer_manager =
-                    ForgeDeployerManager::from_k8s_client(kube_client.clone(), values);
-
-                forge_deployer_manager.ensure_namespace_prepared().await?;
-                forge_deployer_manager
-                    .start(ForgeDeployerType::Indexer)
-                    .await?;
+                let manager = ForgeBackendManager::new();
+                let client = Arc::new(ForgeKubeClient::new(
+                    kube_client,
+                    self.kube_namespace.clone(),
+                ));
+                manager.start(client, values).await?;
             }
 
             (new_era, validators, fullnodes)

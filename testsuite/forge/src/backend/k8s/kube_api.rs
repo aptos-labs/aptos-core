@@ -1,14 +1,59 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::kube_api;
 use async_trait::async_trait;
+use k8s_openapi::{api::core::v1::Namespace, Resource};
 use kube::{
-    api::{Api, PostParams},
+    api::{Api, DynamicObject, GroupVersionKind, PostParams, TypeMeta},
     client::Client as K8sClient,
     Error as KubeError, Resource as ApiResource,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
+
+#[async_trait]
+pub trait KubeClientApi: Send + Sync {
+    async fn create(&self, object: &DynamicObject) -> Result<DynamicObject, KubeError>;
+    async fn get(&self, kind: &str, name: &str) -> Result<DynamicObject, KubeError>;
+    fn get_namespace(&self) -> String;
+}
+
+pub struct ForgeKubeClient {
+    client: K8sClient,
+    namespace: String,
+}
+
+impl ForgeKubeClient {
+    pub fn new(client: K8sClient, namespace: String) -> Self {
+        ForgeKubeClient { client, namespace }
+    }
+
+    fn get_api(&self, kind: &str) -> Api<DynamicObject> {
+        if kind == Namespace::KIND {
+            kube_api!(self.client, kind)
+        } else {
+            kube_api!(self.client, kind, self.namespace)
+        }
+    }
+}
+
+#[async_trait]
+impl KubeClientApi for ForgeKubeClient {
+    async fn create(&self, object: &DynamicObject) -> Result<DynamicObject, KubeError> {
+        let api = self.get_api(&object.types.as_ref().unwrap().kind);
+        api.create(&Default::default(), object).await
+    }
+
+    async fn get(&self, kind: &str, name: &str) -> Result<DynamicObject, KubeError> {
+        let api = self.get_api(kind);
+        api.get(name).await
+    }
+
+    fn get_namespace(&self) -> String {
+        self.namespace.clone()
+    }
+}
 
 // Create kube API wrapper traits such that they are testable
 
@@ -61,8 +106,7 @@ where
 
 #[cfg(test)]
 pub mod mocks {
-    use super::ReadWrite;
-    use crate::Result;
+    use super::*;
     use aptos_infallible::Mutex;
     use async_trait::async_trait;
     use hyper::StatusCode;
@@ -73,6 +117,32 @@ pub mod mocks {
         Error as KubeError,
     };
     use std::{collections::BTreeMap, sync::Arc};
+
+    pub struct FakeKubeClient {}
+
+    impl FakeKubeClient {
+        pub fn new() -> Self {
+            FakeKubeClient {}
+        }
+    }
+
+    #[async_trait]
+    impl KubeClientApi for FakeKubeClient {
+        async fn create(&self, object: &DynamicObject) -> Result<DynamicObject, KubeError> {
+            Ok(object.clone())
+        }
+
+        async fn get(&self, kind: &str, name: &str) -> Result<DynamicObject, KubeError> {
+            Ok(
+                serde_json::from_str(r#"{ "kind": "kind", "metadata": { "name": "name" } }"#)
+                    .unwrap(),
+            )
+        }
+
+        fn get_namespace(&self) -> String {
+            "default".into()
+        }
+    }
 
     /// Generic k8s resource mock API where resource names are unique. Use it to mock namespaced resources or cluster-wide resources, but
     /// not resources across multiple namespaces.
