@@ -1353,6 +1353,14 @@ impl RoundManager {
             .with_label_values(&["order_vote_qc"])
             .observe(start.elapsed().as_secs_f64());
 
+        self.block_store
+            .sync_to_highest_quorum_cert(
+                order_vote_msg.quorum_cert().clone(),
+                self.block_store.sync_info().highest_commit_cert().clone(),
+                &mut self.create_block_retriever(order_vote_msg.order_vote().author()),
+            )
+            .await?;
+
         let result = self
             .block_store
             .insert_quorum_cert(
