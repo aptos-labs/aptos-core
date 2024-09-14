@@ -22,13 +22,15 @@ use aptos_types::{
         get_public_inputs_hash,
         test_utils::{
             self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_esk,
-            get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field,
-            get_sample_iss, get_sample_jwk, get_sample_openid_sig_and_pk, get_upgraded_vk,
+            get_sample_groth16_sig_and_fed_pk, get_sample_groth16_sig_and_pk,
+            get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk,
+            get_sample_openid_sig_and_pk, get_upgraded_vk,
         },
-        Configuration, EphemeralCertificate, Groth16ProofAndStatement, Groth16VerificationKey,
-        KeylessPublicKey, KeylessSignature, TransactionAndProof, DEVNET_VERIFICATION_KEY,
-        KEYLESS_ACCOUNT_MODULE_NAME,
+        AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
+        Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
+        DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME,
     },
+    on_chain_config::{FeatureFlag, Features},
     transaction::{
         authenticator::{
             AccountAuthenticator, AnyPublicKey, AnySignature, AuthenticationKey,
@@ -40,7 +42,7 @@ use aptos_types::{
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use serde::de::DeserializeOwned;
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 // TODO(keyless): Test the override aud_val path
 
 #[tokio::test]
@@ -226,6 +228,119 @@ async fn test_keyless_groth16_verifies() {
 }
 
 #[tokio::test]
+async fn federated_keyless_should_fail_when_feature_flag_is_unset() {
+    federated_keyless_scenario(false, true, false).await
+}
+
+#[tokio::test]
+async fn federated_keyless_should_fail_when_fed_jwk_is_missing() {
+    federated_keyless_scenario(true, false, false).await
+}
+
+#[tokio::test]
+async fn federated_keyless_should_work_otherwise() {
+    federated_keyless_scenario(true, true, true).await
+}
+
+/// Config the chain, run a federated keyless txn, and assert txn result.
+async fn federated_keyless_scenario(
+    set_feature_flag: bool,
+    install_fed_jwk: bool,
+    expect_txn_succeed: bool,
+) {
+    let (tw_sk, config, jwk, swarm, mut cli, _) = setup_local_net_inner(set_feature_flag).await;
+    let root_addr = swarm.chain_info().root_account().address();
+    let _root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
+
+    info!("Clean up the default patch in 0x1 which will be installed as a fed jwk later.");
+    {
+        let gas_options = GasOptions {
+            gas_unit_price: Some(100),
+            max_gas: Some(2000000),
+            expiration_secs: 60,
+        };
+        let script = r#"
+script {
+    use aptos_framework::jwks;
+    use aptos_framework::aptos_governance;
+    fun main(core_resources: &signer) {
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        jwks::set_patches(&framework, vector[]);
+    }
+}
+    "#;
+        let txn_result = cli
+            .run_script_with_gas_options(0, script, Some(gas_options))
+            .await;
+        assert_eq!(Some(true), txn_result.unwrap().success);
+    }
+
+    if install_fed_jwk {
+        info!("Installing federated jwks.");
+        let gas_options = GasOptions {
+            gas_unit_price: Some(100),
+            max_gas: Some(2000000),
+            expiration_secs: 60,
+        };
+        let sample_jwk = get_sample_jwk();
+        let script = format!(
+            r#"
+script {{
+    use aptos_framework::jwks;
+    use std::string::utf8;
+    fun main(account: &signer) {{
+        let iss = b"{}";
+        let kid = utf8(b"{}");
+        let alg = utf8(b"{}");
+        let e = utf8(b"{}");
+        let n = utf8(b"{}");
+        jwks::update_federated_jwk_set(
+            account,
+            iss,
+            vector[kid],
+            vector[alg],
+            vector[e],
+            vector[n]
+        );
+    }}
+}}
+    "#,
+            get_sample_iss(),
+            sample_jwk.kid,
+            sample_jwk.alg,
+            sample_jwk.e,
+            sample_jwk.n
+        );
+        let txn_result = cli
+            .run_script_with_gas_options(0, &script, Some(gas_options))
+            .await;
+        assert_eq!(Some(true), txn_result.unwrap().success);
+    }
+
+    // For simplicity we use the root account as the jwk owner.
+    let (sig, pk) = get_sample_groth16_sig_and_fed_pk(root_addr);
+    let mut info = swarm.aptos_public_info();
+    let signed_txn = sign_transaction_any_keyless_pk(
+        &mut info,
+        sig.clone(),
+        AnyKeylessPublicKey::Federated(pk),
+        &jwk,
+        &config,
+        Some(&tw_sk),
+        1,
+    )
+    .await;
+
+    let result = swarm
+        .aptos_public_info()
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await;
+    debug!("result={:?}", result);
+    assert_eq!(expect_txn_succeed, result.is_ok());
+}
+
+#[tokio::test]
 async fn test_keyless_no_extra_field_groth16_verifies() {
     let (_, _, swarm, signed_txn) =
         get_transaction(get_sample_groth16_sig_and_pk_no_extra_field).await;
@@ -317,16 +432,19 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
     }
 }
 
-async fn sign_transaction<'a>(
+async fn sign_transaction_any_keyless_pk<'a>(
     info: &mut AptosPublicInfo,
     mut sig: KeylessSignature,
-    pk: KeylessPublicKey,
+    any_keyless_pk: AnyKeylessPublicKey,
     jwk: &RSA_JWK,
     config: &Configuration,
     tw_sk: Option<&Ed25519PrivateKey>,
     seqno: usize,
 ) -> SignedTransaction {
-    let any_pk = AnyPublicKey::keyless(pk.clone());
+    let any_pk = match &any_keyless_pk {
+        AnyKeylessPublicKey::Normal(normal) => AnyPublicKey::keyless(normal.clone()),
+        AnyKeylessPublicKey::Federated(fed) => AnyPublicKey::federated_keyless(fed.clone()),
+    };
     let addr = AuthenticationKey::any_key(any_pk.clone()).account_address();
 
     // If the account does not exist, create it.
@@ -335,6 +453,7 @@ async fn sign_transaction<'a>(
             "{} account does not exist. Creating...",
             addr.to_hex_literal()
         );
+        info.sync_root_account_sequence_number().await;
         info.create_user_account_with_any_key(&any_pk)
             .await
             .unwrap();
@@ -353,7 +472,7 @@ async fn sign_transaction<'a>(
         addr.to_hex_literal(),
         info.get_account_sequence_number(addr).await.unwrap()
     );
-
+    info.sync_root_account_sequence_number().await;
     let recipient = info
         .create_and_fund_user_account(20_000_000_000)
         .await
@@ -371,11 +490,16 @@ async fn sign_transaction<'a>(
 
     let esk = get_sample_esk();
 
+    let pk = match &any_keyless_pk {
+        AnyKeylessPublicKey::Normal(normal) => normal,
+        AnyKeylessPublicKey::Federated(fed) => &fed.pk,
+    };
+
     let public_inputs_hash: Option<[u8; 32]> =
         if let EphemeralCertificate::ZeroKnowledgeSig(_) = &sig.cert {
             // This will only calculate the hash if it's needed, avoiding unnecessary computation.
             Some(fr_to_bytes_le(
-                &get_public_inputs_hash(&sig, &pk, jwk, config).unwrap(),
+                &get_public_inputs_hash(&sig, pk, jwk, config).unwrap(),
             ))
         } else {
             None
@@ -407,7 +531,33 @@ async fn sign_transaction<'a>(
 
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
-    SignedTransaction::new_keyless(raw_txn, pk, sig)
+    match any_keyless_pk {
+        AnyKeylessPublicKey::Normal(normal) => SignedTransaction::new_keyless(raw_txn, normal, sig),
+        AnyKeylessPublicKey::Federated(fed) => {
+            SignedTransaction::new_federated_keyless(raw_txn, fed, sig)
+        },
+    }
+}
+
+async fn sign_transaction<'a>(
+    info: &mut AptosPublicInfo,
+    sig: KeylessSignature,
+    pk: KeylessPublicKey,
+    jwk: &RSA_JWK,
+    config: &Configuration,
+    tw_sk: Option<&Ed25519PrivateKey>,
+    seqno: usize,
+) -> SignedTransaction {
+    sign_transaction_any_keyless_pk(
+        info,
+        sig,
+        AnyKeylessPublicKey::Normal(pk),
+        jwk,
+        config,
+        tw_sk,
+        seqno,
+    )
+    .await
 }
 
 fn maul_groth16_zkp_signature(txn: SignedTransaction) -> SignedTransaction {
@@ -465,7 +615,29 @@ async fn setup_local_net() -> (
     CliTestFramework,
     usize,
 ) {
+    setup_local_net_inner(true).await
+}
+
+async fn setup_local_net_inner(
+    enable_fed_keyless_in_genesis: bool,
+) -> (
+    Ed25519PrivateKey,
+    Configuration,
+    RSA_JWK,
+    LocalSwarm,
+    CliTestFramework,
+    usize,
+) {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_init_genesis_config(Arc::new(move |conf| {
+            let mut features = Features::default();
+            if enable_fed_keyless_in_genesis {
+                features.enable(FeatureFlag::FEDERATED_KEYLESS);
+            } else {
+                features.disable(FeatureFlag::FEDERATED_KEYLESS);
+            }
+            conf.initial_features_override = Some(features);
+        }))
         .with_aptos()
         .build_with_cli(0)
         .await;
