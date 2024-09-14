@@ -31,7 +31,7 @@ pub struct Opt {
     #[clap(
         long,
         help = "Target number of transactions for each job to replay",
-        default_value = "2000000"
+        default_value = "1500000"
     )]
     target_job_size: u64,
     #[clap(
@@ -145,14 +145,17 @@ impl Opt {
         let mut ranges_to_skip = self
             .ranges_to_skip
             .iter()
-            .map(|range| {
+            .flat_map(|range| {
+                if range.is_empty() {
+                    return None;
+                }
                 let (begin, end) = range
                     .split('-')
                     .map(|v| v.parse::<Version>().expect("Malformed range."))
                     .collect_tuple()
                     .expect("Malformed range.");
                 assert!(begin <= end, "Malformed Range.");
-                (begin, end)
+                Some((begin, end))
             })
             .sorted()
             .rev()
@@ -176,20 +179,23 @@ impl Opt {
         let ranges_per_output =
             (job_ranges.len() as f32 / self.output_json_files.len() as f32).ceil() as usize;
         let iter = job_ranges.chunks(ranges_per_output);
-        zip_eq(self.output_json_files.iter(), iter).try_for_each(|(path, ranges)| {
-            let ranges = ranges
-                .iter()
-                .enumerate()
-                .map(|(idx, (partial, first, last, desc))| {
-                    let suffix = if *partial { "partial" } else { "" };
-                    format!("{idx}{suffix} {first} {last} {desc}")
-                })
-                .collect_vec();
+        let mut job_idx = -1;
+        zip_eq(self.output_json_files.iter(), iter)
+            .enumerate()
+            .try_for_each(|(batch, (path, ranges))| {
+                let ranges = ranges
+                    .iter()
+                    .map(|(partial, first, last, desc)| {
+                        job_idx += 1;
+                        let suffix = if *partial { "-partial" } else { "" };
+                        format!("{batch}-{job_idx}{suffix} {first} {last} {desc}")
+                    })
+                    .collect_vec();
 
-            info!("Writing to {:?}", path);
-            info!("{}", serde_json::to_string_pretty(&ranges)?);
-            std::fs::File::create(path)?.write_all(&serde_json::to_vec(&ranges)?)
-        })?;
+                info!("Writing to {:?}", path);
+                info!("{}", serde_json::to_string_pretty(&ranges)?);
+                std::fs::File::create(path)?.write_all(&serde_json::to_vec(&ranges)?)
+            })?;
 
         Ok(())
     }

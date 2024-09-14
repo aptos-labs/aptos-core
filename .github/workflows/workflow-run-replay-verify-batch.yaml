@@ -1,0 +1,152 @@
+name: "*run replay-verify batch"
+
+on:
+  # This allows the workflow to be triggered from another workflow
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+        description: The git SHA1 to test.
+      # replay-verify config
+      BUCKET:
+        required: true
+        type: string
+        description: The bucket to use for the backup. If not specified, it will use the default bucket.
+      SUB_DIR:
+        required: true
+        type: string
+        description: The subdirectory to use for the backup. If not specified, it will use the default subdirectory.
+      TXNS_TO_SKIP:
+        required: false
+        type: string
+        description: The list of transaction versions to skip. If not specified, it will use the default list.
+      BACKUP_CONFIG_TEMPLATE_PATH:
+        description: "The path to the backup config template to use."
+        type: string
+        required: true
+      # GHA job config
+      RUNS_ON:
+        description: "The runner to use for the job."
+        type: string
+        required: true
+        default: "runs-on,cpu=8,family=m6id,hdd=100,image=aptos-ubuntu-x64,spot=false"
+      TIMEOUT_MINUTES:
+        description: "Github job timeout in minutes"
+        type: number
+        required: true
+        default: 180
+      RANGES_JSON:
+        description: "The ranges to use for the job."
+        type: string
+        required: true
+
+jobs:
+  replay-verify:
+    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 180 }}
+    runs-on: ${{ inputs.RUNS_ON }}
+    strategy:
+      fail-fast: false
+      max-parallel: 100
+      matrix:
+        range: ${{ fromJson(inputs.RANGES_JSON) }}
+    steps:
+      - name: Parse job - ${{ matrix.range }}
+        id: parse-job
+        shell: bash
+        run: |
+          read name begin end sesc <<< "${{ matrix.range }}"
+          echo name=$name >> $GITHUB_OUTPUT
+          echo begin=$begin >> $GITHUB_OUTPUT
+          echo end=$end>> $GITHUB_OUTPUT
+          echo desc=$desc>> $GITHUB_OUTPUT
+
+      - name: Load cached aptos-debugger binary
+        uses: actions/cache/restore@v4
+        with:
+          path: aptos-debugger
+          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Load cached backup storage metadata cache dir
+        uses: actions/cache/restore@v4
+        with:
+          path: metadata_cache
+          key: metadata-cache-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-
+          fail-on-cache-miss: true
+
+      - name: Load cached backup storage config
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+          key: backup-config-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      - id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Install GCloud SDK
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          version: ">= 418.0.0"
+          install_components: "kubectl,gke-gcloud-auth-plugin"
+
+      - name: phase 1 - restore snapshot, with retries
+        env:
+          BUCKET: ${{ inputs.BUCKET }}
+          SUB_DIR: ${{ inputs.SUB_DIR }}
+        run: |
+          for try in {0..3}
+          do
+            if [ $try -gt 0 ]; then
+              SLEEP=$((10 * $try))
+              echo "sleeping for $SLEEP seconds before retry #$try" >&2
+              sleep $SLEEP
+            fi
+            ./aptos-debugger aptos-db replay-verify \
+              --metadata-cache-dir ./metadata_cache \
+              --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
+              --start-version ${{ steps.parse-job.outputs.begin }} \
+              --end-version ${{ steps.parse-job.outputs.begin }} \
+              \
+              --lazy-quit \
+              --enable-storage-sharding \
+              --target-db-dir db \
+              --concurrent-downloads 8 \
+              --replay-concurrency-level 8 \
+              \
+              && exit 0 || true # exit 0 if successful, otherwise retry
+          done
+          exit(1)
+
+      - name: phase 2 - replay-verify transactions, with retries
+        env:
+          BUCKET: ${{ inputs.BUCKET }}
+          SUB_DIR: ${{ inputs.SUB_DIR }}
+        run: |
+          for try in {0..3}
+          do
+            if [ $try -gt 0 ]; then
+              SLEEP=$((10 * $try))
+              echo "sleeping for $SLEEP seconds before retry #$try" >&2
+              sleep $SLEEP
+            fi
+            ./aptos-debugger aptos-db replay-verify \
+              --metadata-cache-dir ./metadata_cache \
+              --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
+              --txns-to-skip "${{ inputs.TXNS_TO_SKIP || '0' }}" \
+              --start-version ${{ steps.parse-job.outputs.begin }} \
+              --end-version ${{ steps.parse-job.outputs.end }} \
+              \
+              --lazy-quit \
+              --enable-storage-sharding \
+              --target-db-dir db \
+              --concurrent-downloads 8 \
+              --replay-concurrency-level 8 \
+              \
+              && exit 0 || true # exit 0 if successful, otherwise retry
+          done
+          exit(1)

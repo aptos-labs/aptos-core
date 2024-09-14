@@ -25,6 +25,10 @@ on:
         required: false
         type: string
         description: The list of transaction versions to skip. If not specified, it will use the default list.
+      RANGES_TO_SKIP:
+        required: false
+        type: string
+        description: The optional list of transaction ranges to skip..
       BACKUP_CONFIG_TEMPLATE_PATH:
         description: "The path to the backup config template to use."
         type: string
@@ -34,7 +38,7 @@ on:
         description: "The runner to use for the job."
         type: string
         required: true
-        default: "runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,spot=false"
+        default: "runs-on,cpu=8,family=m6id,hdd=100,image=aptos-ubuntu-x64,spot=false"
       TIMEOUT_MINUTES:
         description: "Github job timeout in minutes"
         type: number
@@ -65,6 +69,10 @@ on:
         required: false
         type: string
         description: The list of transaction versions to skip. If not specified, it will use the default list.
+      RANGES_TO_SKIP:
+        required: false
+        type: string
+        description: The optional list of transaction ranges to skip..
       BACKUP_CONFIG_TEMPLATE_PATH:
         description: "The path to the backup config template to use."
         type: string
@@ -74,13 +82,16 @@ on:
         description: "The runner to use for the job."
         type: string
         required: true
-        default: "runs-on,cpu=16,family=m6id,hdd=100,image=aptos-ubuntu-x64,spot=false"
+        default: "runs-on,cpu=8,family=m6id,hdd=100,image=aptos-ubuntu-x64,spot=false"
 
 jobs:
   prepare:
-    runs-on: ${{ inputs.RUNS_ON }}
+    runs-on: "runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,spot=false"
     outputs:
-      ranges: ${{ steps.gen-jobs.outputs.ranges }}
+      ranges0: ${{ steps.gen-jobs.outputs.ranges0 }}
+      ranges1: ${{ steps.gen-jobs.outputs.ranges1 }}
+      ranges2: ${{ steps.gen-jobs.outputs.ranges2 }}
+      ranges3: ${{ steps.gen-jobs.outputs.ranges3 }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -138,138 +149,74 @@ jobs:
         env:
           BUCKET: ${{ inputs.BUCKET }}
           SUB_DIR: ${{ inputs.SUB_DIR }}
-          HISTORY_START: ${{ inputs.HISTORY_START || '0' }}
-          BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
         run: |
           ./aptos-debugger aptos-db gen-replay-verify-jobs  \
             --metadata-cache-dir ./metadata_cache \
-            --command-adapter-config $BACKUP_CONFIG_TEMPLATE_PATH \
-            --output-json-file job_ranges.json \
-            --start-version $HISTORY_START
+            --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
+            --start-version ${{ inputs.HISTORY_START }} \
+            --ranges-to-skip "${{ inputs.RANGES_TO_SKIP }}" \
+            --output-json-files job_ranges.0.json \
+            --output-json-files job_ranges.1.json \
+            --output-json-files job_ranges.2.json \
+            --output-json-files job_ranges.3.json \
 
-          echo "ranges=$(cat job_ranges.json)" >> $GITHUB_OUTPUT
 
-          cat job_ranges.json | jq || true
+          echo "ranges0=$(cat job_ranges.0.json)" >> $GITHUB_OUTPUT
+          echo "ranges1=$(cat job_ranges.1.json)" >> $GITHUB_OUTPUT
+          echo "ranges2=$(cat job_ranges.2.json)" >> $GITHUB_OUTPUT
+          echo "ranges3=$(cat job_ranges.3.json)" >> $GITHUB_OUTPUT
 
       - name: Cache backup storage config so the replay jobs don't need to checkout entire repo
         uses: actions/cache/save@v4
         with:
           path: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
-          key: backup-config-${{ github.run_id }}
+          key: backup-config-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-${{ github.run_id }}
 
-  replay-verify:
+  replay-verify-batch0:
     needs: prepare
-    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 180 }}
-    runs-on: ${{ inputs.RUNS_ON }}
-    strategy:
-      fail-fast: false
-      max-parallel: 200
-      matrix:
-        range: ${{ fromJson(needs.prepare.outputs.ranges) }}
-    steps:
-      - name: Parse job - ${{ matrix.range }}
-        id: parse-job
-        shell: bash
-        run: |
-          read name begin end sesc <<< "${{ matrix.range }}"
-          echo name=$name >> $GITHUB_OUTPUT
-          echo begin=$begin >> $GITHUB_OUTPUT
-          echo end=$end>> $GITHUB_OUTPUT
-          echo desc=$desc>> $GITHUB_OUTPUT
-
-      - name: Load cached aptos-debugger binary
-        uses: actions/cache/restore@v4
-        with:
-          path: aptos-debugger
-          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Load cached backup storage metadata cache dir
-        uses: actions/cache/restore@v4
-        with:
-          path: metadata_cache
-          key: metadata-cache-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-
-          fail-on-cache-miss: true
-
-      - name: Load cached backup storage config
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
-          key: backup-config-${{ github.run_id }}
-          fail-on-cache-miss: true
-
-      - id: auth
-        uses: "google-github-actions/auth@v2"
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Install GCloud SDK
-        uses: "google-github-actions/setup-gcloud@v2"
-        with:
-          version: ">= 418.0.0"
-          install_components: "kubectl,gke-gcloud-auth-plugin"
-
-      - name: phase 1 - restore snapshot, with retries
-        env:
-          BUCKET: ${{ inputs.BUCKET }}
-          SUB_DIR: ${{ inputs.SUB_DIR }}
-          HISTORY_START: ${{ inputs.HISTORY_START || '0' }}
-          TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP }}
-          BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
-        run: |
-          for try in {0..3}
-          do
-            if [ $try -gt 0 ]; then
-              SLEEP=$((10 * $try))
-              echo "sleeping for $SLEEP seconds before retry #$try" >&2
-              sleep $SLEEP
-            fi
-            ./aptos-debugger aptos-db replay-verify \
-              --metadata-cache-dir ./metadata_cache \
-              --command-adapter-config $BACKUP_CONFIG_TEMPLATE_PATH \
-              --txns-to-skip $TXNS_TO_SKIP \
-              --start-version ${{ steps.parse-job.outputs.begin }} \
-              --end-version ${{ steps.parse-job.outputs.begin }} \
-              \
-              --lazy-quit \
-              --enable-storage-sharding \
-              --target-db-dir db \
-              --concurrent-downloads 8 \
-              --replay-concurrency-level 8 \
-              \
-              && exit 0 || true # exit 0 if successful, otherwise retry
-          done
-          exit(1)
-
-      - name: phase 2 - replay-verify transactions, with retries
-        env:
-          BUCKET: ${{ inputs.BUCKET }}
-          SUB_DIR: ${{ inputs.SUB_DIR }}
-          HISTORY_START: ${{ inputs.HISTORY_START || '0' }}
-          TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP }}
-          BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
-        run: |
-          for try in {0..3}
-          do
-            if [ $try -gt 0 ]; then
-              SLEEP=$((10 * $try))
-              echo "sleeping for $SLEEP seconds before retry #$try" >&2
-              sleep $SLEEP
-            fi
-            ./aptos-debugger aptos-db replay-verify \
-              --metadata-cache-dir ./metadata_cache \
-              --command-adapter-config $BACKUP_CONFIG_TEMPLATE_PATH \
-              --txns-to-skip $TXNS_TO_SKIP \
-              --start-version ${{ steps.parse-job.outputs.begin }} \
-              --end-version ${{ steps.parse-job.outputs.end }} \
-              \
-              --lazy-quit \
-              --enable-storage-sharding \
-              --target-db-dir db \
-              --concurrent-downloads 8 \
-              --replay-concurrency-level 8 \
-              \
-              && exit 0 || true # exit 0 if successful, otherwise retry
-          done
-          exit(1)
+    uses: ./.github/workflows/workflow-run-replay-verify-batch.yaml
+    secrets: inherit
+    with:
+      RANGES_JSON: ${{ needs.prepare.outputs.ranges0 }}
+      GIT_SHA: ${{ inputs.GIT_SHA }}
+      BUCKET: ${{ inputs.BUCKET }}
+      SUB_DIR: ${{ inputs.SUB_DIR }}
+      BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+      RUNS_ON: ${{ inputs.RUNS_ON }}
+      TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
+  replay-verify-batch1:
+    needs: prepare
+    uses: ./.github/workflows/workflow-run-replay-verify-batch.yaml
+    secrets: inherit
+    with:
+      RANGES_JSON: ${{ needs.prepare.outputs.ranges1 }}
+      GIT_SHA: ${{ inputs.GIT_SHA }}
+      BUCKET: ${{ inputs.BUCKET }}
+      SUB_DIR: ${{ inputs.SUB_DIR }}
+      BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+      RUNS_ON: ${{ inputs.RUNS_ON }}
+      TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
+  replay-verify-batch2:
+    needs: prepare
+    uses: ./.github/workflows/workflow-run-replay-verify-batch.yaml
+    secrets: inherit
+    with:
+      RANGES_JSON: ${{ needs.prepare.outputs.ranges2 }}
+      GIT_SHA: ${{ inputs.GIT_SHA }}
+      BUCKET: ${{ inputs.BUCKET }}
+      SUB_DIR: ${{ inputs.SUB_DIR }}
+      BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+      RUNS_ON: ${{ inputs.RUNS_ON }}
+      TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
+  replay-verify-batch3:
+    needs: prepare
+    uses: ./.github/workflows/workflow-run-replay-verify-batch.yaml
+    secrets: inherit
+    with:
+      RANGES_JSON: ${{ needs.prepare.outputs.ranges3 }}
+      GIT_SHA: ${{ inputs.GIT_SHA }}
+      BUCKET: ${{ inputs.BUCKET }}
+      SUB_DIR: ${{ inputs.SUB_DIR }}
+      BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+      RUNS_ON: ${{ inputs.RUNS_ON }}
+      TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
