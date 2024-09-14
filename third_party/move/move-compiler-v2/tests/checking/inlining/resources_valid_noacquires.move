@@ -4,8 +4,12 @@ module 0x42::objects {
         addr: address
     }
 
+    public fun get_addr<T: key>(ref: &ReaderRef<T>): address {
+        ref.addr
+    }
+
     public inline fun reader<T: key>(ref: &ReaderRef<T>): &T {
-        borrow_global<T>(ref.addr)
+        borrow_global<T>(get_addr(ref))
     }
 }
 
@@ -14,7 +18,7 @@ module 0x42::token {
 
     struct Token has key { val: u64 }
 
-    public fun get_value(ref: &obj::ReaderRef<Token>): u64 acquires Token {
+    public fun get_value(ref: &obj::ReaderRef<Token>): u64 {
         obj::reader(ref).val
     }
 }
