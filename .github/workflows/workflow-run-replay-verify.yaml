@@ -74,7 +74,7 @@ on:
         description: "The runner to use for the job."
         type: string
         required: true
-        default: "runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,spot=false"
+        default: "runs-on,cpu=16,family=m6id,hdd=100,image=aptos-ubuntu-x64,spot=false"
 
 jobs:
   prepare:
