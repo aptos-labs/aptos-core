@@ -163,7 +163,7 @@ jobs:
     runs-on: ${{ inputs.RUNS_ON }}
     strategy:
       fail-fast: false
-      max-parallel: 100
+      max-parallel: 200
       matrix:
         range: ${{ fromJson(needs.prepare.outputs.ranges) }}
     steps:

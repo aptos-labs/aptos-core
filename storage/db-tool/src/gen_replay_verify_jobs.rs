@@ -9,7 +9,6 @@ use aptos_backup_cli::{
     storage::DBToolStorageOpt,
     utils::ConcurrentDownloadsOpt,
 };
-use aptos_logger::warn;
 use aptos_types::transaction::Version;
 use clap::Parser;
 use itertools::Itertools;
@@ -36,17 +35,25 @@ pub struct Opt {
     target_job_size: u64,
     #[clap(
         long,
+        help = "Max number of transactions for each job to replay",
+        default_value = "32"
+    )]
+    max_epochs_per_job: u64,
+    #[clap(
+        long,
         help = "Determines the oldest epoch to replay, relative to the latest",
         default_value = "4000"
     )]
     max_epochs: u64,
-    #[clap(long, help = "version ranges to skip. 123-2456")]
+    #[clap(
+        long,
+        help = "version ranges to skip. 123-2456",
+        value_delimiter = ' ',
+    )]
     ranges_to_skip: Vec<String>,
     #[clap(long, help = "Output job ranges")]
     output_json_file: PathBuf,
 }
-
-const MAX_EPOCHS_IN_ONE_JOB: u64 = 32;
 
 impl Opt {
     pub async fn run(self) -> anyhow::Result<()> {
@@ -57,22 +64,6 @@ impl Opt {
             self.concurrent_downloads.get(),
         )
         .await?;
-
-        let mut ranges_to_skip = self
-            .ranges_to_skip
-            .iter()
-            .map(|range| {
-                let (begin, end) = range
-                    .split('-')
-                    .map(|v| v.parse::<Version>().expect("Malformed range."))
-                    .collect_tuple()
-                    .expect("Malformed range.");
-                assert!(begin <= end, "Malformed Range.");
-                (begin, end)
-            })
-            .sorted()
-            .rev()
-            .peekable();
 
         let storage_state = metadata_view.get_storage_state()?;
         let global_end_version = storage_state
@@ -90,7 +81,6 @@ impl Opt {
             version: global_end_version,
             manifest: "".to_string(),
         };
-        let mut job_idx = 0;
         let job_ranges = metadata_view
             .all_state_snapshots()
             .iter()
@@ -104,16 +94,8 @@ impl Opt {
             .take_while(|(_end, begin)| begin.version >= self.start_version.unwrap_or(0))
             .peekable()
             .batching(|it| {
-                job_idx += 1;
                 match it.next() {
                     Some((end, mut begin)) => {
-                        while let Some((skip_begin, _skip_end)) = ranges_to_skip.peek() {
-                            if *skip_begin > end.version {
-                                let _ = ranges_to_skip.next();
-                            } else {
-                                break;
-                            }
-                        }
                         if end.version - begin.version >= self.target_job_size {
                             // cut big range short, this hopefully automatically skips load tests
                             let msg = if end.epoch - begin.epoch > 15 {
@@ -121,18 +103,10 @@ impl Opt {
                             } else {
                                 ""
                             };
-                            warn!(
-                                begin = begin,
-                                end = end,
-                                "Big gap between snapshots. {} versions in {} epochs. {}",
-                                end.version - begin.version,
-                                end.epoch - begin.epoch,
-                                msg,
-                            );
                             Some((
-                                format!("{job_idx}-Partial"),
+                                true,
                                 begin.version,
-                                begin.version + self.target_job_size,
+                                begin.version + self.target_job_size - 1,
                                 format!(
                                     "Partial replay epoch {} - {}, {} txns starting from version {}, another {} versions omitted, until {}. {}",
                                     begin.epoch,
@@ -146,16 +120,16 @@ impl Opt {
                             ))
                         } else {
                             while let Some((_prev_end, prev_begin)) = it.peek() {
-                                if end.version - prev_begin.version > self.target_job_size || end.epoch - prev_begin.epoch > MAX_EPOCHS_IN_ONE_JOB {
+                                if end.version - prev_begin.version > self.target_job_size || end.epoch - prev_begin.epoch > self .max_epochs_per_job {
                                     break;
                                 }
                                 begin = prev_begin;
                                 let _ = it.next();
                             }
                             Some((
-                                format!("{job_idx}"),
+                                false,
                                 begin.version,
-                                end.version,
+                                end.version - 1,
                                 format!(
                                     "Replay epoch {} - {}, {} txns starting from version {}.",
                                     begin.epoch,
@@ -168,8 +142,42 @@ impl Opt {
                     },
                     None => None,
                 }
+            }).collect_vec();
+
+        // Deal with ranges_to_skip: to simplify things, we skip entire jobs instead of trimming them
+        let mut ranges_to_skip = self
+            .ranges_to_skip
+            .iter()
+            .map(|range| {
+                let (begin, end) = range
+                    .split('-')
+                    .map(|v| v.parse::<Version>().expect("Malformed range."))
+                    .collect_tuple()
+                    .expect("Malformed range.");
+                assert!(begin <= end, "Malformed Range.");
+                (begin, end)
             })
-            .map(|(name, begin, end, desc)| format!("{name} {begin} {end} {desc}"))
+            .sorted()
+            .rev()
+            .peekable();
+
+        let job_ranges = job_ranges
+            .into_iter()
+            .filter(|(_, first, last, _)| {
+                while let Some((skip_first, skip_last)) = ranges_to_skip.peek() {
+                    if *skip_first > *last {
+                        let _ = ranges_to_skip.next();
+                    } else {
+                        return *skip_last < *first;
+                    }
+                }
+                true
+            })
+            .enumerate()
+            .map(|(idx, (partial, begin, end, desc))| {
+                let suffix = if partial { "partial" } else { "" };
+                format!("{idx}{suffix} {begin} {end} {desc}")
+            })
             .collect_vec();
 
         std::fs::File::create(&self.output_json_file)?
