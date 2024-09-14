@@ -36,7 +36,7 @@ pub struct Opt {
     #[clap(
         long,
         help = "Max number of transactions for each job to replay",
-        default_value = "32"
+        default_value = "24"
     )]
     max_epochs_per_job: u64,
     #[clap(

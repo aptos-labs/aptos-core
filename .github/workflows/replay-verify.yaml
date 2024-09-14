@@ -74,7 +74,7 @@ jobs:
       TXNS_TO_SKIP: 0
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
-      RUNS_ON: "runs-on,cpu=16,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
+      RUNS_ON: "runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
       TIMEOUT_MINUTES: 180
 
   replay-mainnet:
@@ -94,7 +94,7 @@ jobs:
       TXNS_TO_SKIP: 12253479 12277499 148358668
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
-      RUNS_ON: "runs-on,cpu=16,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
+      RUNS_ON: "runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
       TIMEOUT_MINUTES: 180
 
   test-replay:
@@ -112,5 +112,5 @@ jobs:
       TXNS_TO_SKIP: 0
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
-      RUNS_ON: "runs-on,cpu=16,family=m6id,hdd=900,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
+      RUNS_ON: "runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
       TIMEOUT_MINUTES: 120 # increase test replay timeout to capture more flaky errors
