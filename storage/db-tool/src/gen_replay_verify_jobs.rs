@@ -9,9 +9,10 @@ use aptos_backup_cli::{
     storage::DBToolStorageOpt,
     utils::ConcurrentDownloadsOpt,
 };
+use aptos_logger::info;
 use aptos_types::transaction::Version;
 use clap::Parser;
-use itertools::Itertools;
+use itertools::{zip_eq, Itertools};
 use std::{io::Write, iter::once, path::PathBuf};
 
 #[derive(Parser)]
@@ -30,15 +31,9 @@ pub struct Opt {
     #[clap(
         long,
         help = "Target number of transactions for each job to replay",
-        default_value = "10000000"
+        default_value = "2000000"
     )]
     target_job_size: u64,
-    #[clap(
-        long,
-        help = "Max number of transactions for each job to replay",
-        default_value = "12"
-    )]
-    max_epochs_per_job: u64,
     #[clap(
         long,
         help = "Determines the oldest epoch to replay, relative to the latest",
@@ -47,16 +42,18 @@ pub struct Opt {
     max_epochs: u64,
     #[clap(
         long,
-        help = "version ranges to skip. 123-2456",
-        value_delimiter = ' ',
+        help = "Version ranges to skip. e.g. 123-2456",
+        value_delimiter = ' '
     )]
     ranges_to_skip: Vec<String>,
-    #[clap(long, help = "Output job ranges")]
-    output_json_file: PathBuf,
+    #[clap(long, help = "Output job ranges to json files, evenly distributed.")]
+    output_json_files: Vec<PathBuf>,
 }
 
 impl Opt {
     pub async fn run(self) -> anyhow::Result<()> {
+        assert!(!self.output_json_files.is_empty());
+
         let storage = self.storage.init_storage().await?;
         let metadata_view = sync_and_load(
             &self.metadata_cache_opt,
@@ -120,7 +117,7 @@ impl Opt {
                             ))
                         } else {
                             while let Some((_prev_end, prev_begin)) = it.peek() {
-                                if end.version - prev_begin.version > self.target_job_size || end.epoch - prev_begin.epoch > self .max_epochs_per_job {
+                                if end.version - prev_begin.version > self.target_job_size {
                                     break;
                                 }
                                 begin = prev_begin;
@@ -173,15 +170,26 @@ impl Opt {
                 }
                 true
             })
-            .enumerate()
-            .map(|(idx, (partial, begin, end, desc))| {
-                let suffix = if partial { "partial" } else { "" };
-                format!("{idx}{suffix} {begin} {end} {desc}")
-            })
             .collect_vec();
 
-        std::fs::File::create(&self.output_json_file)?
-            .write_all(&serde_json::to_vec(&job_ranges)?)?;
+        info!("Generated {} jobs.", job_ranges.len());
+        let ranges_per_output =
+            (job_ranges.len() as f32 / self.output_json_files.len() as f32).ceil() as usize;
+        let iter = job_ranges.chunks(ranges_per_output);
+        zip_eq(self.output_json_files.iter(), iter).try_for_each(|(path, ranges)| {
+            let ranges = ranges
+                .iter()
+                .enumerate()
+                .map(|(idx, (partial, first, last, desc))| {
+                    let suffix = if *partial { "partial" } else { "" };
+                    format!("{idx}{suffix} {first} {last} {desc}")
+                })
+                .collect_vec();
+
+            info!("Writing to {:?}", path);
+            info!("{}", serde_json::to_string_pretty(&ranges)?);
+            std::fs::File::create(path)?.write_all(&serde_json::to_vec(&ranges)?)
+        })?;
 
         Ok(())
     }
