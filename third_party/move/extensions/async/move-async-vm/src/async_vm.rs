@@ -22,7 +22,7 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
     session::{SerializedReturnValues, Session},
-    UnreachableCodeStorage,
+    unreachable_code_storage::UnreachableCodeStorage,
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
 use move_vm_types::{

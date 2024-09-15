@@ -13,7 +13,6 @@ use aptos_vm_types::{
     module_and_script_storage::AsAptosCodeStorage, output::VMOutput, resolver::StateStorageView,
 };
 use move_core_types::vm_status::VMStatus;
-use move_vm_runtime::WithRuntimeEnvironment;
 use std::{path::Path, time::Instant};
 
 pub fn run_transaction_using_debugger(
