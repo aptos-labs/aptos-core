@@ -69,19 +69,12 @@ impl AsyncVM {
                 })
             })
             .collect();
-        let move_vm = MoveVM::new(
-            natives
-                .into_iter()
-                .chain(natives::actor_natives(async_lib_addr, actor_gas_parameters)),
-        );
-        if move_vm.vm_config().use_loader_v2 {
-            return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
-                .with_message("AsyncVM does not support loader V2 implementation".to_string())
-                .finish(Location::Undefined));
-        }
-
         Ok(AsyncVM {
-            move_vm,
+            move_vm: MoveVM::new(
+                natives
+                    .into_iter()
+                    .chain(natives::actor_natives(async_lib_addr, actor_gas_parameters)),
+            ),
             actor_metadata,
             message_table,
         })
@@ -119,14 +112,9 @@ impl AsyncVM {
         }
     }
 
-    /// Get the mutable reference to the underlying Move VM.
-    pub fn get_move_vm_mut(&mut self) -> &mut MoveVM {
+    /// Get the underlying Move VM.
+    pub fn get_move_vm(&mut self) -> &mut MoveVM {
         &mut self.move_vm
-    }
-
-    /// Get the reference to the underlying Move VM.
-    pub fn get_move_vm(&self) -> &MoveVM {
-        &self.move_vm
     }
 
     /// Resolve the message hash into module and handler function.
