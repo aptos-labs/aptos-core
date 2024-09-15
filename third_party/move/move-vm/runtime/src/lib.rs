@@ -33,13 +33,14 @@ mod access_control;
 mod storage;
 
 pub use loader::{LoadedFunction, Module, Script};
+#[cfg(any(test, feature = "testing"))]
+pub use storage::implementations::unreachable_code_storage;
 pub use storage::{
     code_storage::{ambassador_impl_CodeStorage, script_hash, CodeStorage},
     environment::{
         ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
     },
     implementations::{
-        unreachable_code_storage::UnreachableCodeStorage,
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
     },

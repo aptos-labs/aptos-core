@@ -5,12 +5,12 @@ use claims::assert_none;
 use move_core_types::language_storage::{StructTag, TypeTag};
 use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
 use parking_lot::RwLock;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, thread};
 
 #[derive(Clone)]
 struct IndexMap<T: Clone + Ord> {
     forward_map: BTreeMap<T, usize>,
-    backward_map: Vec<Arc<T>>,
+    backward_map: Vec<(Arc<T>, thread::ThreadId)>,
 }
 
 /// A data structure to cache struct identifiers (address, module name, struct name) and use
@@ -49,7 +49,9 @@ impl StructNameIndexMap {
         // to the cache and return the corresponding index.
         let idx = index_map.backward_map.len();
         let prev_idx = index_map.forward_map.insert(struct_name.clone(), idx);
-        index_map.backward_map.push(Arc::new(struct_name));
+        index_map
+            .backward_map
+            .push((Arc::new(struct_name), thread::current().id()));
 
         // Unlock the cache.
         drop(index_map);
@@ -61,13 +63,23 @@ impl StructNameIndexMap {
     /// Returns the reference of the struct name corresponding to the index. Here, we wrap the
     /// name into an [Arc] to ensure that the lock is released.
     pub(crate) fn idx_to_struct_name_ref(&self, idx: StructNameIndex) -> Arc<StructIdentifier> {
+        self.0.read().backward_map[idx.0].0.clone()
+    }
+
+    /// Returns the reference of the struct name corresponding to the index, along with the thread
+    /// ID that put it there. Can be used by callers to ensure that the same thread does not see
+    /// cyclic structs.
+    pub(crate) fn idx_to_struct_name_ref_with_thread_id(
+        &self,
+        idx: StructNameIndex,
+    ) -> (Arc<StructIdentifier>, thread::ThreadId) {
         self.0.read().backward_map[idx.0].clone()
     }
 
     /// Returns the clone of the struct name corresponding to the index. The clone ensures that
     /// the lock is released before the control returns to the caller.
     pub(crate) fn idx_to_struct_name(&self, idx: StructNameIndex) -> StructIdentifier {
-        self.0.read().backward_map[idx.0].as_ref().clone()
+        self.0.read().backward_map[idx.0].0.as_ref().clone()
     }
 
     /// Returns the struct tag corresponding to the struct name and the provided type arguments.
@@ -77,7 +89,7 @@ impl StructNameIndexMap {
         ty_args: Vec<TypeTag>,
     ) -> StructTag {
         let index_map = self.0.read();
-        let struct_name = index_map.backward_map[idx.0].as_ref();
+        let struct_name = index_map.backward_map[idx.0].0.as_ref();
         StructTag {
             address: *struct_name.module.address(),
             module: struct_name.module.name().to_owned(),

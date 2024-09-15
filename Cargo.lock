@@ -1621,7 +1621,6 @@ dependencies = [
  "aptos-vm-types",
  "hashbrown 0.14.3",
  "move-core-types",
- "move-vm-runtime",
  "once_cell",
  "rayon",
 ]
