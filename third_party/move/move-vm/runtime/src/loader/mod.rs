@@ -41,6 +41,7 @@ use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     hash::Hash,
     sync::Arc,
+    thread,
 };
 use typed_arena::Arena;
 
@@ -298,7 +299,6 @@ impl Loader {
             Self::V1(loader) => loader.load_type(ty_tag, data_store, module_store),
             Self::V2(loader) => loader
                 .load_ty(module_storage, ty_tag)
-                // TODO(loader_v2): Revisit errors...
                 .map_err(|e| e.finish(Location::Undefined)),
         }
     }
@@ -2242,36 +2242,25 @@ impl Loader {
             .depth_formula
             .insert(struct_name_idx, formula.clone());
         if let Some(f) = prev {
-            // TODO: If the VM is not shared across threads, this error means that there is a
-            //       recursive type. But in case it is shared, the current implementation is not
-            //       correct because some other thread can cache depth formula before we reach
-            //       this line, and result in an invariant violation. We need to ensure correct
-            //       behavior, e.g., make the cache available per thread.
             let struct_name_index_map = match self {
                 Self::V1(loader) => &loader.name_cache,
                 Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
             };
-            let struct_name = struct_name_index_map.idx_to_struct_name_ref(struct_name_idx);
-
-            // TODO(loader_v2): Revisit this, because now we do share the VM...
-            println!(
-                "ERROR: Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached: {:?}",
-                struct_name.as_ref(),
-                formula,
-                struct_type.as_ref(),
-                f
-            );
-            // return Err(
-            //     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-            //         format!(
-            //             "Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached: {:?}",
-            //             struct_name,
-            //             formula,
-            //             struct_type.as_ref(),
-            //             f
-            //         ),
-            //     ),
-            // );
+            let (struct_name, thread_id) =
+                struct_name_index_map.idx_to_struct_name_ref_with_thread_id(struct_name_idx);
+            if thread_id == thread::current().id() {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                        format!(
+                            "Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached by the same thread (recursive type?): {:?}",
+                            struct_name,
+                            formula,
+                            struct_type.as_ref(),
+                            f
+                        ),
+                    ),
+                );
+            }
         }
         Ok(formula)
     }
