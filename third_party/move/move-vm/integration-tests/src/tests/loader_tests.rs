@@ -19,7 +19,8 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use move_vm_runtime::{
-    config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, ModuleStorage,
+    config::VMConfig, module_traversal::*, move_vm::MoveVM,
+    unreachable_code_storage::UnreachableCodeStorage, AsUnsyncModuleStorage, ModuleStorage,
     RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -110,11 +111,8 @@ impl Adapter {
                 .unwrap_or_else(|_| panic!("failure publishing module: {:#?}", module));
         }
 
-        let module_storage = self
-            .store
-            .as_unsync_module_storage(&self.runtime_environment);
         let changeset = session
-            .finish(&module_storage)
+            .finish(&UnreachableCodeStorage)
             .expect("failure getting write set");
         self.store
             .apply(changeset)
@@ -169,8 +167,6 @@ impl Adapter {
                     scope.spawn(move || {
                         // It is fine to share the VM: we do not publish modules anyway.
                         let mut session = self.vm.as_ref().new_session(&storage);
-                        let module_storage =
-                            storage.as_unsync_module_storage(&self.runtime_environment);
                         let traversal_storage = TraversalStorage::new();
                         session
                             .execute_function_bypass_visibility(
@@ -180,7 +176,7 @@ impl Adapter {
                                 Vec::<Vec<u8>>::new(),
                                 &mut UnmeteredGasMeter,
                                 &mut TraversalContext::new(&traversal_storage),
-                                &module_storage,
+                                &UnreachableCodeStorage,
                             )
                             .unwrap_or_else(|e| {
                                 panic!("Failure executing {}::{}: {:?}", module_id, name, e)
@@ -226,14 +222,14 @@ fn load() {
     let modules = get_modules();
 
     // calls all functions sequentially
-    let module_storage =
-        InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
     if adapter.vm.vm_config().use_loader_v2 {
+        let module_storage =
+            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.call_functions(&module_storage);
     } else {
         adapter.publish_modules(modules);
-        adapter.call_functions(&module_storage);
+        adapter.call_functions(&UnreachableCodeStorage);
     }
 }
 
