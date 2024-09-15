@@ -26,7 +26,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     AptosVM,
 };
-use aptos_vm_environment::environment::Environment;
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use itertools::Itertools;
@@ -120,8 +120,8 @@ impl AptosDebugger {
             bail!("Module bundle payload has been removed")
         }
 
-        let env = Arc::new(Environment::new(&state_view, false, None));
-        let vm = AptosVM::new_with_environment(env.clone(), &state_view);
+        let env = AptosEnvironment::new(&state_view);
+        let vm = AptosVM::new(env.clone(), &state_view);
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 

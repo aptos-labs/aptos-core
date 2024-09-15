@@ -1,11 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{gas::get_gas_parameters, natives::aptos_natives_with_builder};
-use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_15, AptosGasParameters, MiscGasParameters, NativeGasParameters,
+use crate::{
+    gas::get_gas_parameters,
+    natives::aptos_natives_with_builder,
+    prod_configs::{
+        aptos_default_ty_builder, aptos_prod_ty_builder, aptos_prod_vm_config,
+        get_timed_feature_override,
+    },
 };
+use aptos_gas_algebra::DynamicExpression;
+use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
@@ -14,55 +19,146 @@ use aptos_types::{
         TimedFeaturesBuilder,
     },
     state_store::StateView,
-    vm::configs::{aptos_prod_vm_config, get_timed_feature_override},
 };
 use aptos_vm_types::storage::StorageGasParameters;
 use move_vm_runtime::{
     config::VMConfig, use_loader_v1_based_on_env, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 use std::sync::Arc;
 
-// TODO(George): move configs here from types crate.
-pub fn aptos_prod_ty_builder(
-    gas_feature_version: u64,
-    gas_params: &AptosGasParameters,
-) -> TypeBuilder {
-    if gas_feature_version >= RELEASE_V1_15 {
-        let max_ty_size = gas_params.vm.txn.max_ty_size;
-        let max_ty_depth = gas_params.vm.txn.max_ty_depth;
-        TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
-    } else {
-        aptos_default_ty_builder()
+/// A runtime environment which can be used for VM initialization and more. Contains features
+/// used by execution, gas parameters, VM configs and global caches. Note that it is the user's
+/// responsibility to make sure the environment is consistent, for now it should only be used per
+/// block of transactions because all features or configs are updated only on per-block basis.
+pub struct AptosEnvironment(Arc<Environment>);
+
+impl AptosEnvironment {
+    /// Returns new execution environment based on the current state.
+    pub fn new(state_view: &impl StateView) -> Self {
+        Self(Arc::new(Environment::new(state_view, false, None)))
+    }
+
+    /// Returns new execution environment based on the current state, also using the provided gas
+    /// hook for native functions for gas calibration.
+    pub fn new_with_gas_hook(
+        state_view: &impl StateView,
+        gas_hook: Arc<dyn Fn(DynamicExpression) + Send + Sync>,
+    ) -> Self {
+        Self(Arc::new(Environment::new(
+            state_view,
+            false,
+            Some(gas_hook),
+        )))
+    }
+
+    /// Returns new execution environment based on the current state, also injecting create signer
+    /// native for government proposal simulation. Should not be used for regular execution.
+    pub fn new_with_injected_create_signer_for_gov_sim(state_view: &impl StateView) -> Self {
+        Self(Arc::new(Environment::new(state_view, true, None)))
+    }
+
+    /// Returns new environment but with delayed field optimization enabled. Should only be used by
+    /// block executor where this optimization is needed. Note: whether the optimization will be
+    /// enabled or not depends on the feature flag.
+    pub fn new_with_delayed_field_optimization_enabled(state_view: &impl StateView) -> Self {
+        let env = Environment::new(state_view, true, None).try_enable_delayed_field_optimization();
+        Self(Arc::new(env))
+    }
+
+    /// Returns the [ChainId] used by this environment.
+    #[inline]
+    pub fn chain_id(&self) -> ChainId {
+        self.0.chain_id
+    }
+
+    /// Returns the [Features] used by this environment.
+    #[inline]
+    pub fn features(&self) -> &Features {
+        &self.0.features
+    }
+
+    /// Returns the [TimedFeatures] used by this environment.
+    #[inline]
+    pub fn timed_features(&self) -> &TimedFeatures {
+        &self.0.timed_features
+    }
+
+    /// Returns the [VMConfig] used by this environment.
+    #[inline]
+    pub fn vm_config(&self) -> &VMConfig {
+        self.0.runtime_environment.vm_config()
+    }
+
+    /// Returns the gas feature used by this environment.
+    #[inline]
+    pub fn gas_feature_version(&self) -> u64 {
+        self.0.gas_feature_version
+    }
+
+    /// Returns the gas parameters used by this environment, and an error if they were not found
+    /// on-chain.
+    #[inline]
+    pub fn gas_params(&self) -> &Result<AptosGasParameters, String> {
+        &self.0.gas_params
+    }
+
+    /// Returns the storage gas parameters used by this environment, and an error if they were not
+    /// found on-chain.
+    #[inline]
+    pub fn storage_gas_params(&self) -> &Result<StorageGasParameters, String> {
+        &self.0.storage_gas_params
+    }
+
+    /// Returns true if create_signer native was injected for the government proposal simulation.
+    /// Deprecated, and should not be used.
+    #[inline]
+    #[deprecated]
+    pub fn inject_create_signer_for_gov_sim(&self) -> bool {
+        #[allow(deprecated)]
+        self.0.inject_create_signer_for_gov_sim
     }
 }
 
-pub fn aptos_default_ty_builder() -> TypeBuilder {
-    // Type builder to use when:
-    //   1. Type size gas parameters are not yet in gas schedule (before 1.15).
-    //   2. No gas parameters are found on-chain.
-    TypeBuilder::with_limits(128, 20)
+impl Clone for AptosEnvironment {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
-/// A runtime environment which can be used for VM initialization and more.
-#[derive(Clone)]
-pub struct Environment {
+impl WithRuntimeEnvironment for AptosEnvironment {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        &self.0.runtime_environment
+    }
+}
+
+struct Environment {
+    /// Specifies the chain, i.e., testnet, mainnet, etc.
     chain_id: ChainId,
 
+    /// Set of features enabled in this environment.
     features: Features,
+    /// Set of timed features enabled in this environment.
     timed_features: TimedFeatures,
 
+    /// Gas feature version used in this environment.
     gas_feature_version: u64,
+    /// Gas parameters used in this environment. Error is stored if gas parameters were not found
+    /// on-chain.
     gas_params: Result<AptosGasParameters, String>,
+    /// Storage gas parameters used in this environment. Error is stored if gas parameters were not
+    /// found on-chain.
     storage_gas_params: Result<StorageGasParameters, String>,
 
     runtime_environment: RuntimeEnvironment,
 
+    /// True if we need to inject create signer native for government proposal simulation.
+    /// Deprecated, and will be removed in the future.
+    #[deprecated]
     inject_create_signer_for_gov_sim: bool,
 }
 
 impl Environment {
-    pub fn new(
+    fn new(
         state_view: &impl StateView,
         inject_create_signer_for_gov_sim: bool,
         gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
@@ -88,10 +184,11 @@ impl Environment {
         }
         let timed_features = timed_features_builder.build();
 
-        // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
-        //            This only happens in a edge case that is probably related to write set transactions or genesis,
-        //            which logically speaking, shouldn't be handled by the VM at all.
-        //            We should clean up the logic here once we get that refactored.
+        // TODO(Gas):
+        //   Right now, we have to use some dummy values for gas parameters if they are not found
+        //   on-chain. This only happens in a edge case that is probably related to write set
+        //   transactions or genesis, which logically speaking, shouldn't be handled by the VM at
+        //   all. We should clean up the logic here once we get that refactored.
         let (gas_params, storage_gas_params, gas_feature_version) =
             get_gas_parameters(&features, state_view);
         let (native_gas_params, misc_gas_params, ty_builder) = match &gas_params {
@@ -125,6 +222,7 @@ impl Environment {
         let vm_config = aptos_prod_vm_config(&features, &timed_features, ty_builder);
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
+        #[allow(deprecated)]
         Self {
             chain_id,
             features,
@@ -137,71 +235,11 @@ impl Environment {
         }
     }
 
-    pub fn try_enable_delayed_field_optimization(mut self) -> Self {
+    fn try_enable_delayed_field_optimization(mut self) -> Self {
         if self.features.is_aggregator_v2_delayed_fields_enabled() {
             self.runtime_environment.enable_delayed_field_optimization();
         }
         self
-    }
-
-    #[inline]
-    pub fn chain_id(&self) -> ChainId {
-        self.chain_id
-    }
-
-    #[inline]
-    pub fn features(&self) -> &Features {
-        &self.features
-    }
-
-    #[inline]
-    pub fn timed_features(&self) -> &TimedFeatures {
-        &self.timed_features
-    }
-
-    #[inline]
-    pub fn vm_config(&self) -> &VMConfig {
-        self.runtime_environment.vm_config()
-    }
-
-    #[inline]
-    pub fn gas_feature_version(&self) -> u64 {
-        self.gas_feature_version
-    }
-
-    #[inline(always)]
-    pub fn gas_params(&self) -> &Result<AptosGasParameters, String> {
-        &self.gas_params
-    }
-
-    #[inline(always)]
-    pub fn storage_gas_params(&self) -> &Result<StorageGasParameters, String> {
-        &self.storage_gas_params
-    }
-
-    #[inline(always)]
-    pub fn inject_create_signer_for_gov_sim(&self) -> bool {
-        self.inject_create_signer_for_gov_sim
-    }
-}
-
-impl WithRuntimeEnvironment for Environment {
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        &self.runtime_environment
-    }
-}
-
-pub struct SharedEnvironment(pub Arc<Environment>);
-
-impl Clone for SharedEnvironment {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl WithRuntimeEnvironment for SharedEnvironment {
-    fn runtime_environment(&self) -> &RuntimeEnvironment {
-        &self.0.runtime_environment
     }
 }
 
@@ -219,24 +257,17 @@ pub mod test {
         // Check default values.
         assert_eq!(&env.features, &Features::default());
         assert_eq!(env.chain_id.id(), ChainId::test().id());
-        assert!(!env.vm_config().delayed_field_optimization_enabled);
+        assert!(
+            !env.runtime_environment
+                .vm_config()
+                .delayed_field_optimization_enabled
+        );
 
         let env = env.try_enable_delayed_field_optimization();
-        assert!(env.vm_config().delayed_field_optimization_enabled);
+        assert!(
+            env.runtime_environment
+                .vm_config()
+                .delayed_field_optimization_enabled
+        );
     }
-
-    // TODO(loader_v2): Re-activate?
-    // #[test]
-    // fn test_environment_for_testing() {
-    //     let env = Environment::testing(ChainId::new(55));
-    //
-    //     assert_eq!(&env.features, &Features::default());
-    //     assert_eq!(env.chain_id.id(), 55);
-    //     assert!(!env.vm_config().delayed_field_optimization_enabled);
-    //
-    //     let expected_timed_features = TimedFeaturesBuilder::enable_all()
-    //         .with_override_profile(TimedFeatureOverride::Testing)
-    //         .build();
-    //     assert_eq!(&env.timed_features, &expected_timed_features);
-    // }
 }

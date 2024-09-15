@@ -383,7 +383,7 @@ mod tests {
         },
         write_set::TransactionWrite,
     };
-    use aptos_vm_environment::environment::Environment;
+    use aptos_vm_environment::environment::AptosEnvironment;
     use aptos_vm_types::{
         module_and_script_storage::AsAptosCodeStorage,
         resource_group_adapter::{group_size_as_sum, GroupSizeKind},
@@ -503,7 +503,7 @@ mod tests {
             (c_state_key.clone(), c_state_value.clone()),
         ]));
         let resolver = state_view.as_move_resolver();
-        let env = Environment::new(&state_view, false, None);
+        let env = AptosEnvironment::new(&state_view);
         let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
         // Storage slot metadata is enabled on the mainnet.
         let woc = WriteOpConverter::new(&resolver, true);

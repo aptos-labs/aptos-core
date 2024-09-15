@@ -1,10 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::on_chain_config::{
-    randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
-    ConfigStorage, FeatureFlag, Features, OnChainConfig, TimedFeatureFlag, TimedFeatureOverride,
-    TimedFeatures,
+use aptos_gas_schedule::{gas_feature_versions::RELEASE_V1_15, AptosGasParameters};
+use aptos_types::{
+    on_chain_config::{
+        randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
+        FeatureFlag, Features, OnChainConfig, TimedFeatureFlag, TimedFeatureOverride,
+        TimedFeatures,
+    },
+    state_store::StateView,
 };
 use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
@@ -15,23 +19,48 @@ use once_cell::sync::OnceCell;
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
+/// Set the paranoid type check flag.
 pub fn set_paranoid_type_checks(enable: bool) {
     PARANOID_TYPE_CHECKS.set(enable).ok();
 }
 
-/// Get the paranoid type check flag if already set, otherwise default to true.
+/// Returns the paranoid type check flag if already set, and true otherwise.
 pub fn get_paranoid_type_checks() -> bool {
     PARANOID_TYPE_CHECKS.get().cloned().unwrap_or(true)
 }
 
+/// Set the timed feature override.
 pub fn set_timed_feature_override(profile: TimedFeatureOverride) {
     TIMED_FEATURE_OVERRIDE.set(profile).ok();
 }
 
+/// Returns the timed feature override, and [None] if not set.
 pub fn get_timed_feature_override() -> Option<TimedFeatureOverride> {
     TIMED_FEATURE_OVERRIDE.get().cloned()
 }
 
+/// Returns [TypeBuilder] used by the Aptos blockchain in production.
+pub fn aptos_prod_ty_builder(
+    gas_feature_version: u64,
+    gas_params: &AptosGasParameters,
+) -> TypeBuilder {
+    if gas_feature_version >= RELEASE_V1_15 {
+        let max_ty_size = gas_params.vm.txn.max_ty_size;
+        let max_ty_depth = gas_params.vm.txn.max_ty_depth;
+        TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
+    } else {
+        aptos_default_ty_builder()
+    }
+}
+
+/// Returns default [TypeBuilder], used only when:
+///  1. Type size gas parameters are not yet in gas schedule (before 1.15).
+///   2. No gas parameters are found on-chain.
+pub fn aptos_default_ty_builder() -> TypeBuilder {
+    TypeBuilder::with_limits(128, 20)
+}
+
+/// Returns [DeserializerConfig] used by the Aptos blockchain in production.
 pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig {
     DeserializerConfig::new(
         features.get_max_binary_format_version(),
@@ -39,6 +68,7 @@ pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig
     )
 }
 
+/// Returns [VerifierConfig] used by the Aptos blockchain in production.
 pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
     let use_signature_checker_v2 = features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2);
     let sig_checker_v2_fix_script_ty_param_count =
@@ -71,6 +101,8 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
     }
 }
 
+/// Returns [VMConfig] used by the Aptos blockchain in production, based on the set of feature
+/// flags.
 pub fn aptos_prod_vm_config(
     features: &Features,
     timed_features: &TimedFeatures,
@@ -123,11 +155,12 @@ pub struct RandomnessConfig {
 }
 
 impl RandomnessConfig {
-    pub fn fetch(storage: &impl ConfigStorage) -> Self {
-        let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(storage)
+    /// Returns randomness config based on the current state.
+    pub fn fetch(state_view: &impl StateView) -> Self {
+        let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(state_view)
             .unwrap_or_else(RequiredGasDeposit::default_if_missing)
             .gas_amount;
-        let allow_rand_contract_custom_max_gas = AllowCustomMaxGasFlag::fetch_config(storage)
+        let allow_rand_contract_custom_max_gas = AllowCustomMaxGasFlag::fetch_config(state_view)
             .unwrap_or_else(AllowCustomMaxGasFlag::default_if_missing)
             .value;
         Self {
