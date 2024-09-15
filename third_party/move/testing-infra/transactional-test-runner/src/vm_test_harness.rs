@@ -43,7 +43,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
     AsUnsyncCodeStorage, AsUnsyncModuleStorage, ModuleStorage, RuntimeEnvironment,
-    StagingModuleStorage, UnreachableCodeStorage,
+    StagingModuleStorage,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -169,6 +169,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             storage: InMemoryStorage::new(),
         };
 
+        let (_, runtime_environment) = adapter.vm_and_runtime_environment();
+        let module_storage = adapter
+            .storage
+            .clone()
+            .into_unsync_module_storage(runtime_environment.as_ref());
+
         if vm_config.use_loader_v2 {
             let addresses = either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
                 .iter()
@@ -192,12 +198,6 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 })
                 .collect();
 
-            let (_, runtime_environment) = adapter.vm_and_runtime_environment();
-            let module_storage = adapter
-                .storage
-                .clone()
-                .into_unsync_module_storage(runtime_environment.as_ref());
-
             StagingModuleStorage::create(&sender, &module_storage, module_bundle)
                 .expect("All modules should publish")
                 .release_verified_module_bundle()
@@ -206,7 +206,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 });
         } else {
             adapter
-                .perform_session_action(None, &UnreachableCodeStorage, |session, gas_status| {
+                .perform_session_action(None, &module_storage, |session, gas_status| {
                     for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
                         .into_iter()
                         .map(|tmod| &tmod.named_module.module)
@@ -299,10 +299,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             }
             Ok((None, module))
         } else {
-            let result = self.perform_session_action(
-                gas_budget,
-                &UnreachableCodeStorage,
-                |session, gas_status| {
+            let result =
+                self.perform_session_action(gas_budget, &module_storage, |session, gas_status| {
                     #[allow(deprecated)]
                     session.publish_module_bundle_with_compat_config(
                         vec![module_bytes],
@@ -310,8 +308,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                         gas_status,
                         compat,
                     )
-                },
-            );
+                });
             match result {
                 Ok(_) => Ok((None, module)),
                 Err(err) => Err(anyhow!(

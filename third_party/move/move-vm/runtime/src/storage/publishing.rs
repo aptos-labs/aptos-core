@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_linker_error, AsUnsyncModuleStorage, Module, ModuleStorage, RuntimeEnvironment,
-    UnsyncModuleStorage, WithRuntimeEnvironment,
+    AsUnsyncModuleStorage, Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
+    WithRuntimeEnvironment,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -18,7 +18,7 @@ use move_core_types::{
     metadata::Metadata,
     vm_status::StatusCode,
 };
-use move_vm_types::code_storage::ModuleBytesStorage;
+use move_vm_types::{code_storage::ModuleBytesStorage, module_linker_error};
 use std::{
     collections::{btree_map, BTreeMap},
     sync::Arc,
@@ -49,8 +49,8 @@ impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, 
 }
 
 /// A [ModuleStorage] implementation which can stage published modules temporarily, without
-/// leaking them into the underlying module storage. When modules are staged, multiple
-/// checks are performed to ensure that:
+/// leaking them into the underlying module storage. When modules are staged, multiple checks are
+/// performed to ensure that:
 ///   1) Published modules are published to correct address of the sender.
 ///   2) Published modules satisfy compatibility constraints.
 ///   3) Published modules are verifiable and can link to existing modules without breaking

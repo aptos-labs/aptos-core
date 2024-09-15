@@ -146,7 +146,6 @@ pub trait AptosGasMeter: MoveGasMeter {
         gas_unit_price: FeePerGasUnit,
         executor_view: &dyn ExecutorView,
         module_storage: &impl AptosModuleStorage,
-        is_loader_v2_enabled: bool,
     ) -> VMResult<Fee> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
@@ -166,9 +165,7 @@ pub trait AptosGasMeter: MoveGasMeter {
         // Write set
         let mut write_fee = Fee::new(0);
         let mut total_refund = Fee::new(0);
-        for res in
-            change_set.write_op_info_iter_mut(executor_view, module_storage, is_loader_v2_enabled)
-        {
+        for res in change_set.write_op_info_iter_mut(executor_view, module_storage) {
             let ChargeAndRefund { charge, refund } = pricing.charge_refund_write_op(
                 params,
                 res.map_err(|err| err.finish(Location::Undefined))?,

@@ -38,8 +38,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_linker_error, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    session::Session, ModuleStorage,
+    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session, ModuleStorage,
 };
 use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use std::{
@@ -67,7 +66,6 @@ pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
     resolver: &'r dyn AptosMoveResolver,
     is_storage_slot_metadata_enabled: bool,
-    is_loader_v2_enabled: bool,
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
@@ -112,12 +110,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         move_vm.flush_loader_cache_if_invalidated();
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
-        let is_loader_v2_enabled = features.is_loader_v2_enabled();
         Self {
             inner: move_vm.new_session_with_extensions(resolver, extensions),
             resolver,
             is_storage_slot_metadata_enabled,
-            is_loader_v2_enabled,
         }
     }
 
@@ -159,7 +155,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             move_vm,
             self.resolver,
             module_storage,
-            self.is_loader_v2_enabled,
             change_set,
         )
         .map_err(|e| e.finish(Location::Undefined))?;
@@ -275,7 +270,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         vm: &MoveVM,
         resolver: &dyn AptosMoveResolver,
         module_storage: &impl ModuleStorage,
-        is_loader_v2_enabled: bool,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -305,15 +299,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group_tag = if is_loader_v2_enabled {
-                    let struct_tag_addr = &struct_tag.address;
-                    let struct_tag_name = &struct_tag.module;
+                let resource_group_tag = if module_storage.is_enabled() {
                     let metadata = module_storage
-                        .fetch_module_metadata(struct_tag_addr, struct_tag_name)
-                        .map_err(|e| e.to_partial())?
-                        .ok_or_else(|| {
-                            module_linker_error!(struct_tag_addr, struct_tag_name).to_partial()
-                        })?;
+                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .map_err(|e| e.to_partial())?;
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 } else {
                     #[allow(deprecated)]
