@@ -344,7 +344,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 };
 
                 let epoch_to_proposers = self.extract_epoch_proposers(
-                    epoch_state.epoch,
+                    epoch_state.clone(),
                     use_history_from_previous_epoch_max_count,
                     proposers,
                     (window_size + seek_len) as u64,
@@ -393,7 +393,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn extract_epoch_proposers(
         &self,
-        epoch: u64,
+        epoch_state: Arc<EpochState>,
         use_history_from_previous_epoch_max_count: u32,
         proposers: Vec<AccountAddress>,
         needed_rounds: u64,
@@ -403,31 +403,33 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // It has no votes, so we skip it unless we are in epoch 1, as otherwise it will
         // skew leader elections for exclude_round number of rounds.
         let first_epoch_to_consider = std::cmp::max(
-            if epoch == 1 { 1 } else { 2 },
-            epoch.saturating_sub(use_history_from_previous_epoch_max_count as u64),
+            if epoch_state.epoch == 1 { 1 } else { 2 },
+            epoch_state
+                .epoch
+                .saturating_sub(use_history_from_previous_epoch_max_count as u64),
         );
         // If we are considering beyond the current epoch, we need to fetch validators for those epochs
-        if epoch > first_epoch_to_consider {
+        if epoch_state.epoch > first_epoch_to_consider {
             self.storage
                 .aptos_db()
-                .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch)
+                .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
                 .map_err(Into::into)
                 .and_then(|proof| {
                     ensure!(
                         proof.ledger_info_with_sigs.len() as u64
-                            == (epoch - (first_epoch_to_consider - 1))
+                            == (epoch_state.epoch - (first_epoch_to_consider - 1))
                     );
-                    extract_epoch_to_proposers(proof, epoch, &proposers, needed_rounds)
+                    extract_epoch_to_proposers(proof, epoch_state.epoch, &proposers, needed_rounds)
                 })
                 .unwrap_or_else(|err| {
                     error!(
                         "Couldn't create leader reputation with history across epochs, {:?}",
                         err
                     );
-                    HashMap::from([(epoch, proposers)])
+                    HashMap::from([(epoch_state.epoch, proposers)])
                 })
         } else {
-            HashMap::from([(epoch, proposers)])
+            HashMap::from([(epoch_state.epoch, proposers)])
         }
     }
 
@@ -525,9 +527,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn initiate_new_epoch(&mut self, proof: EpochChangeProof) -> anyhow::Result<()> {
-        let epoch_state = self.epoch_state();
         let ledger_info = proof
-            .verify(epoch_state.as_ref())
+            .verify(self.epoch_state().as_ref())
             .context("[EpochManager] Invalid EpochChangeProof")?;
         info!(
             LogSchema::new(LogEvent::NewEpoch).epoch(ledger_info.ledger_info().next_block_epoch()),
@@ -1338,7 +1339,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_dag_consensus_config = onchain_consensus_config.unwrap_dag_config_v1();
         let epoch_to_validators = self.extract_epoch_proposers(
-            epoch,
+            epoch_state.clone(),
             onchain_dag_consensus_config.dag_ordering_causal_history_window as u32,
             epoch_state.verifier.get_ordered_account_addresses(),
             onchain_dag_consensus_config.dag_ordering_causal_history_window as u64,
