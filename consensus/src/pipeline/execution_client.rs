@@ -282,6 +282,8 @@ impl ExecutionProxyClient {
             highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
+            self.consensus_config
+                .optimistic_sig_verification_for_commit_votes,
         );
 
         tokio::spawn(execution_schedule_phase.start());
@@ -331,7 +333,7 @@ impl TExecutionClient for ExecutionProxyClient {
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled();
         self.execution_proxy.new_epoch(
-            &epoch_state,
+            &epoch_state.clone(),
             payload_manager,
             transaction_shuffler,
             block_executor_onchain_config,

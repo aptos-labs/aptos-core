@@ -92,6 +92,7 @@ pub struct ConsensusConfig {
     pub enable_pre_commit: bool,
     pub optimistic_sig_verification_for_votes: bool,
     pub optimistic_sig_verification_for_order_votes: bool,
+    pub optimistic_sig_verification_for_commit_votes: bool,
 }
 
 /// Deprecated
@@ -321,6 +322,7 @@ impl Default for ConsensusConfig {
             enable_pre_commit: true,
             optimistic_sig_verification_for_votes: true,
             optimistic_sig_verification_for_order_votes: true,
+            optimistic_sig_verification_for_commit_votes: true,
         }
     }
 }
