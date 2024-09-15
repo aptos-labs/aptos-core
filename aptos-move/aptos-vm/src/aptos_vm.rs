@@ -68,7 +68,7 @@ use aptos_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::aptos_try;
-use aptos_vm_environment::environment::Environment;
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
@@ -222,10 +222,11 @@ pub struct AptosVM {
 }
 
 impl AptosVM {
-    /// Creates a new VM instance based on the runtime environment, and used by block
-    /// executor to create multiple tasks sharing the same execution configurations.
+    /// Creates a new VM instance based on the runtime environment. The VM can then be used by
+    /// block executor to create multiple tasks sharing the same execution configurations extracted
+    /// from the environment.
     // TODO: Passing `state_view` is not needed once we move keyless configs to the environment.
-    pub fn new_with_environment(env: Arc<Environment>, state_view: &impl StateView) -> Self {
+    pub fn new(env: AptosEnvironment, state_view: &impl StateView) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let resolver = state_view.as_move_resolver();
@@ -2446,8 +2447,8 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
-        let env = Arc::new(Environment::new(state_view, false, None));
-        let vm = AptosVM::new_with_environment(env.clone(), state_view);
+        let env = AptosEnvironment::new(state_view);
+        let vm = AptosVM::new(env.clone(), state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -2911,7 +2912,7 @@ impl VMValidator for AptosVM {
 
         let resolver = self.as_move_resolver(&state_view);
 
-        let env = Arc::new(Environment::new(state_view, false, None));
+        let env = AptosEnvironment::new(state_view);
         let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
@@ -2957,8 +2958,8 @@ impl VMValidator for AptosVM {
 pub struct AptosSimulationVM(AptosVM);
 
 impl AptosSimulationVM {
-    pub fn new(env: Arc<Environment>, state_view: &impl StateView) -> Self {
-        let mut vm = AptosVM::new_with_environment(env, state_view);
+    pub fn new(env: AptosEnvironment, state_view: &impl StateView) -> Self {
+        let mut vm = AptosVM::new(env, state_view);
         vm.is_simulation = true;
         Self(vm)
     }
@@ -2975,7 +2976,7 @@ impl AptosSimulationVM {
             "Simulated transaction should not have a valid signature"
         );
 
-        let env = Arc::new(Environment::new(state_view, false, None));
+        let env = AptosEnvironment::new(state_view);
         let vm = Self::new(env.clone(), state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 

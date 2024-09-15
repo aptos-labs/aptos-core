@@ -40,7 +40,6 @@ use aptos_types::{
         Result as StateStoreResult, StateView, TStateView,
     },
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
-    vm::configs::aptos_prod_deserializer_config,
     write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm::{
@@ -48,7 +47,9 @@ use aptos_vm::{
     move_vm_ext::{flush_warm_vm_cache, SessionId},
     AptosVM,
 };
-use aptos_vm_environment::environment::Environment;
+use aptos_vm_environment::{
+    environment::AptosEnvironment, prod_configs::aptos_prod_deserializer_config,
+};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::AsAptosCodeStorage, storage::change_set_configs::ChangeSetConfigs,
@@ -81,7 +82,6 @@ use std::{
     collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 use url::Url;
 use walkdir::WalkDir;
@@ -468,8 +468,8 @@ fn add_script_execution_hash(
  **************************************************************************************************/
 fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<()> {
     flush_warm_vm_cache();
-    let env = Arc::new(Environment::new(&state_view, true, None));
-    let vm = AptosVM::new_with_environment(env.clone(), &state_view);
+    let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
+    let vm = AptosVM::new(env.clone(), &state_view);
     let resolver = state_view.as_move_resolver();
     let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
 
@@ -622,8 +622,8 @@ pub async fn simulate_multistep_proposal(
         // The warm vm cache also needs to be explicitly flushed as it cannot detect the
         // patches we performed.
         flush_warm_vm_cache();
-        let env = Arc::new(Environment::new(&state_view, true, None));
-        let vm = AptosVM::new_with_environment(env.clone(), &state_view);
+        let env = AptosEnvironment::new_with_injected_create_signer_for_gov_sim(&state_view);
+        let vm = AptosVM::new(env.clone(), &state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();

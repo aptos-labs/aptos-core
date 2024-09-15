@@ -13,7 +13,7 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, OnChainConfig},
     state_store::state_key::StateKey,
 };
-use aptos_vm_environment::environment::Environment;
+use aptos_vm_environment::environment::AptosEnvironment;
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
@@ -41,13 +41,13 @@ pub fn flush_warm_vm_cache() {
 
 impl WarmVmCache {
     pub(crate) fn get_warm_vm(
-        env: &Environment,
+        env: &AptosEnvironment,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
         WARM_VM_CACHE.get(env, resolver)
     }
 
-    fn get(&self, env: &Environment, resolver: &impl AptosMoveResolver) -> VMResult<MoveVM> {
+    fn get(&self, env: &AptosEnvironment, resolver: &impl AptosMoveResolver) -> VMResult<MoveVM> {
         let _timer = TIMER.timer_with(&["warm_vm_get"]);
         let id = {
             let _timer = TIMER.timer_with(&["get_warm_vm_id"]);
@@ -107,7 +107,7 @@ struct WarmVmId {
 }
 
 impl WarmVmId {
-    fn new(env: &Environment, resolver: &impl AptosMoveResolver) -> VMResult<Self> {
+    fn new(env: &AptosEnvironment, resolver: &impl AptosMoveResolver) -> VMResult<Self> {
         let natives = {
             // Create native builder just in case, even though the environment has more info now.
             let _timer = TIMER.timer_with(&["serialize_native_builder"]);
@@ -126,12 +126,16 @@ impl WarmVmId {
             )
             .id_bytes()
         };
+
+        #[allow(deprecated)]
+        let inject_create_signer_for_gov_sim = env.inject_create_signer_for_gov_sim();
+
         Ok(Self {
             natives,
             vm_config: Self::vm_config_bytes(env.vm_config()),
             core_packages_registry: Self::core_packages_id_bytes(resolver)?,
             bin_v7_enabled: env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
-            inject_create_signer_for_gov_sim: env.inject_create_signer_for_gov_sim(),
+            inject_create_signer_for_gov_sim,
         })
     }
 
