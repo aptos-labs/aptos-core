@@ -15,8 +15,9 @@ macro_rules! module_storage_error {
     };
 }
 
-// TODO(loader_v2): The error message is formatted in the same way as V1, to
-//                  make tests pass, but ideally we should improve this.
+// TODO(loader_v2):
+//   The error message is formatted in the same way as V1, to ensure that replay and tests work in
+//   the same way, but ideally we should use proper formatting here.
 #[macro_export]
 macro_rules! module_linker_error {
     ($addr:ident, $name:ident) => {

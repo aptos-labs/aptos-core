@@ -1,24 +1,36 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata};
+use aptos_types::{
+    executable::ModulePath,
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
+};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 use move_vm_runtime::ModuleStorage;
+use std::fmt::Debug;
 
 /// Represents module storage used by the Aptos blockchain.
-pub trait AptosModuleStorage: ModuleStorage {
-    /// Returns the state value metadata of an associated with this module. The
-    /// error is returned if there is a storage error. If the module does not exist,
-    /// `None` is returned.
+pub trait AptosModuleStorage: TAptosModuleStorage<Key = StateKey> {}
+
+impl<M: TAptosModuleStorage<Key = StateKey>> AptosModuleStorage for M {}
+
+/// Represents module storage used by the Aptos blockchain, with generic keys. This allows generic
+/// implementations in block executor.
+pub trait TAptosModuleStorage: ModuleStorage {
+    type Key: Debug + ModulePath;
+
+    /// Returns the state value metadata associated with this module. The error is returned if
+    /// there is a storage error. If the module does not exist, [None] is returned.
     fn fetch_state_value_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>>;
 
+    /// Returns module size in bytes if it exists, and [None] otherwise.
     fn fetch_module_size_by_state_key(
         &self,
-        state_key: &StateKey,
+        state_key: &Self::Key,
     ) -> PartialVMResult<Option<usize>>;
 }

@@ -15,7 +15,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::{
-    module_and_script_storage::code_storage::AptosCodeStorage,
+    module_and_script_storage::code_storage::TAptosCodeStorage,
     resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
@@ -87,7 +87,7 @@ pub trait ExecutorTask: Sync {
             ResourceTag = <Self::Txn as Transaction>::Tag,
             Layout = MoveTypeLayout,
         >),
-        code_storage: &impl AptosCodeStorage,
+        code_storage: &impl TAptosCodeStorage<<Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;

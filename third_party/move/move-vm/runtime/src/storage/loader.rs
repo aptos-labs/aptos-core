@@ -5,7 +5,6 @@ use crate::{
     config::VMConfig,
     loader::{Function, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
-    module_linker_error,
     module_traversal::TraversalContext,
     storage::module_storage::ModuleStorage,
     CodeStorage, LoadedFunction,
@@ -25,13 +24,13 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{StructType, Type, TypeBuilder},
+    module_linker_error,
 };
 use std::{collections::BTreeMap, sync::Arc};
 use typed_arena::Arena;
 
-/// V2 implementation of loader, which is stateless - i.e., it does not contain
-/// module or script cache. Instead, module and script storages are passed to all
-/// APIs by reference.
+/// V2 implementation of loader, which is stateless - i.e., it does not contain module or script
+/// cache. Instead, module and script storages are passed to all APIs by reference.
 pub(crate) struct LoaderV2 {
     vm_config: VMConfig,
 }

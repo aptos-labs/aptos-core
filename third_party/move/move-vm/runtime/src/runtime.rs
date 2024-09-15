@@ -515,7 +515,7 @@ impl VMRuntime {
         &self.loader
     }
 
-    pub(crate) fn module_storage(&self) -> Arc<dyn ModuleStorage> {
+    pub(crate) fn module_storage_v1(&self) -> Arc<dyn ModuleStorage> {
         self.module_cache.clone() as Arc<dyn ModuleStorage>
     }
 }

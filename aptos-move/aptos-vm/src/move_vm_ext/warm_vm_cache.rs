@@ -122,6 +122,9 @@ impl WarmVmId {
                 vm.misc,
                 env.timed_features().clone(),
                 env.features().clone(),
+                // TODO(loader_v2):
+                //   Is this correct? We do not pass gas hook anymore. Probably it is ok because we
+                //   will roll out loader V2 and this should not affect gas calibrations.
                 None,
             )
             .id_bytes()

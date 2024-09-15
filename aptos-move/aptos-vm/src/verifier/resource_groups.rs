@@ -13,7 +13,6 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::module_linker_error;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
@@ -40,7 +39,6 @@ pub(crate) fn validate_resource_groups(
     module_storage: &impl AptosModuleStorage,
     modules: &[CompiledModule],
     safer_resource_groups: bool,
-    use_loader_v2: bool,
 ) -> Result<(), VMError> {
     let mut groups = BTreeMap::new();
     let mut members = BTreeMap::new();
@@ -51,7 +49,6 @@ pub(crate) fn validate_resource_groups(
             module_storage,
             module,
             safer_resource_groups,
-            use_loader_v2,
         )?;
         groups.insert(module.self_id(), new_groups);
         members.insert(module.self_id(), new_members);
@@ -65,7 +62,6 @@ pub(crate) fn validate_resource_groups(
                     session,
                     module_storage,
                     &value_module_id,
-                    use_loader_v2,
                 )?;
                 groups.insert(value.module_id(), inner_groups);
             }
@@ -96,7 +92,6 @@ pub(crate) fn validate_module_and_extract_new_entries(
     module_storage: &impl AptosModuleStorage,
     module: &CompiledModule,
     safer_resource_groups: bool,
-    use_loader_v2: bool,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
@@ -109,12 +104,7 @@ pub(crate) fn validate_module_and_extract_new_entries(
         };
 
     let (original_groups, original_members, mut structs) =
-        extract_resource_group_metadata_from_module(
-            session,
-            module_storage,
-            &module.self_id(),
-            use_loader_v2,
-        )?;
+        extract_resource_group_metadata_from_module(session, module_storage, &module.self_id())?;
 
     for (member, value) in original_members {
         // We don't need to re-validate new_members above.
@@ -169,13 +159,12 @@ pub(crate) fn extract_resource_group_metadata_from_module(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
     module_id: &ModuleId,
-    use_loader_v2: bool,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
     BTreeSet<String>,
 )> {
-    let module = fetch_module(session, module_storage, module_id, use_loader_v2);
+    let module = fetch_module(session, module_storage, module_id);
     let (metadata, module) = if let Ok(module) = module {
         (
             aptos_framework::get_metadata_from_compiled_module(&module),
@@ -207,15 +196,9 @@ fn fetch_module(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
     module_id: &ModuleId,
-    use_loader_v2: bool,
 ) -> VMResult<Arc<CompiledModule>> {
-    if use_loader_v2 {
-        let addr = module_id.address();
-        let name = module_id.name();
-        let module = module_storage
-            .fetch_deserialized_module(addr, name)?
-            .ok_or_else(|| module_linker_error!(addr, name))?;
-        Ok(module)
+    if module_storage.is_enabled() {
+        module_storage.fetch_existing_deserialized_module(module_id.address(), module_id.name())
     } else {
         #[allow(deprecated)]
         let bytes = session.fetch_module_from_data_store(module_id)?;
