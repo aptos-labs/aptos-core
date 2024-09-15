@@ -73,17 +73,16 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedCodeStorage<K> {
         }
     }
 
-    /// Writes multiple published modules to the storage, which is also visible for
-    /// the transactions with higher indices. This function invalidates and flushes
-    /// the script cache.
+    /// Writes multiple published modules to the storage, making them visible for the transactions
+    /// with higher indices. Also flushes the script cache.
     pub fn write_published_modules<V: TransactionWrite>(
         &self,
         idx_to_publish: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
         writes: impl Iterator<Item = (K, V)>,
     ) -> Result<(), PanicError> {
-        // In case of module publishing, flush script cache. This is the simplest thing
-        // to do for now and can be improved if needed.
+        // In case of module publishing, flush script cache. This is the simplest thing to do for
+        // now and can be improved if needed.
         self.script_cache.clear();
 
         for (key, write) in writes {
