@@ -251,7 +251,7 @@ pub(crate) mod test {
     use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
         executable::ModulePath,
-        state_store::{state_key::StateKey, state_value::StateValue},
+        state_store::state_value::StateValue,
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
@@ -268,10 +268,6 @@ pub(crate) mod test {
     impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
         fn is_module_path(&self) -> bool {
             false
-        }
-
-        fn from_state_key(_state_key: StateKey) -> Self {
-            unreachable!("Irrelevant for test")
         }
 
         fn from_address_and_module_name(

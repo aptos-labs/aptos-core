@@ -6,23 +6,19 @@ use aptos_framework::{KnownAttribute, RandomnessAnnotation};
 use aptos_types::transaction::EntryFunction;
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::errors::VMResult;
-use move_vm_runtime::module_linker_error;
 
 pub(crate) fn get_randomness_annotation(
     resolver: &impl AptosMoveResolver,
     module_storage: &impl AptosModuleStorage,
     session: &mut SessionExt,
     entry_fn: &EntryFunction,
-    use_loader_v2: bool,
 ) -> VMResult<Option<RandomnessAnnotation>> {
-    let module = if use_loader_v2 {
-        let addr = entry_fn.module().address();
-        let name = entry_fn.module().name();
-
+    let module = if module_storage.is_enabled() {
         // TODO(loader_v2): Enhance this further by querying RuntimeModuleMetadataV1 directly.
-        module_storage
-            .fetch_deserialized_module(addr, name)?
-            .ok_or_else(|| module_linker_error!(addr, name))?
+        module_storage.fetch_existing_deserialized_module(
+            entry_fn.module().address(),
+            entry_fn.module().name(),
+        )?
     } else {
         #[allow(deprecated)]
         session

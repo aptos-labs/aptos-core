@@ -106,7 +106,7 @@ impl MoveVM {
                     .clone(),
                 remote,
             ),
-            module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
+            module_store: ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
             native_extensions,
         }
     }
@@ -133,7 +133,7 @@ impl MoveVM {
                             .clone(),
                         remote,
                     ),
-                    &ModuleStorageAdapter::new(self.runtime.module_storage()),
+                    &ModuleStorageAdapter::new(self.runtime.module_storage_v1()),
                 )?;
                 Ok(module.as_compiled_module())
             },

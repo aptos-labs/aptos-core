@@ -239,7 +239,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         let env = AptosEnvironment::new(&self.base_view);
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new(env.clone(), &self.base_view)
+            AptosVM::new(env, &self.base_view)
         };
 
         loop {
@@ -264,7 +264,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
 
-                    let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
+                    let code_storage = state_view.as_aptos_code_storage(vm.runtime_environment());
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(

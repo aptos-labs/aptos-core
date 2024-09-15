@@ -81,6 +81,7 @@ fn runtime_reentrancy_check() {
             public fun foo1() {{ Self::dispatch(0); return }}
             public fun foo2() {{ Self::load_c(); Self::dispatch_c(0); return }}
             public fun foo3() {{ Self::dispatch_d(0); return }}
+
             native fun dispatch(_f: u64);
             native fun dispatch_c(_f: u64);
             native fun dispatch_d(_f: u64);
@@ -99,12 +100,14 @@ fn runtime_reentrancy_check() {
         public fun foo1() {{ B::foo1(); return }}
         public fun foo2() {{ B::foo2(); return }}
         public fun foo3() {{ B::foo3(); return }}
+
         public fun foo() {{ return }}
     }}
     module 0x{0}::B {{
         public fun foo1() {{ Self::dispatch(0); return }}
         public fun foo2() {{ Self::load_c(); Self::dispatch_c(0); return }}
         public fun foo3() {{ Self::dispatch_d(0); return }}
+
         native fun dispatch(_f: u64);
         native fun dispatch_c(_f: u64);
         native fun dispatch_d(_f: u64);

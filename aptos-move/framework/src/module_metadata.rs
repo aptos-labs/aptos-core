@@ -231,10 +231,9 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
 pub fn get_vm_metadata(
     vm: &MoveVM,
     module_storage: &impl AptosModuleStorage,
-    features: &Features,
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if features.is_loader_v2_enabled() {
+    if module_storage.is_enabled() {
         let metadata = module_storage
             .fetch_module_metadata(module_id.address(), module_id.name())
             .ok()??;
@@ -249,10 +248,9 @@ pub fn get_vm_metadata(
 pub fn get_vm_metadata_v0(
     vm: &MoveVM,
     module_storage: &impl AptosModuleStorage,
-    features: &Features,
     module_id: &ModuleId,
 ) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    if features.is_loader_v2_enabled() {
+    if module_storage.is_enabled() {
         let metadata = module_storage
             .fetch_module_metadata(module_id.address(), module_id.name())
             .ok()??;

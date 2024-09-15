@@ -16,7 +16,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, session::Session, AsUnsyncCodeStorage, ModuleStorage,
-    RuntimeEnvironment, StagingModuleStorage, UnreachableCodeStorage,
+    RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -132,9 +132,10 @@ fn instantiation_err() {
         }));
     }
 
+    let module_storage = storage.as_unsync_code_storage(&runtime_environment);
+
     // Publish (must succeed!) and then load the function.
     if vm.vm_config().use_loader_v2 {
-        let module_storage = storage.as_unsync_code_storage(&runtime_environment);
         let new_module_storage =
             StagingModuleStorage::create(&addr, &module_storage, vec![mod_bytes.into()])
                 .expect("Module must publish");
@@ -144,9 +145,7 @@ fn instantiation_err() {
         session
             .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
             .expect("Module must publish");
-        load_function(&mut session, &UnreachableCodeStorage, &cm.self_id(), &[
-            ty_arg,
-        ])
+        load_function(&mut session, &module_storage, &cm.self_id(), &[ty_arg])
     }
 }
 

@@ -70,9 +70,8 @@ impl<'r, 'l> UserSession<'r, 'l> {
         UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)
     }
 
-    /// Finishes the session while also processing the publish request, and running
-    /// module initialization if necessary. This function is used by the new loader
-    /// and code cache implementations.
+    /// Finishes the session while also processing the publish request, and running module
+    /// initialization if necessary. This function is used by the new loader and code cache.
     pub fn finish_with_module_publishing_and_initialization(
         mut self,
         resolver: &impl AptosMoveResolver,
