@@ -4,7 +4,7 @@
 
 use crate::{
     counters,
-    pending_votes::{PendingVotes, VoteReceptionResult},
+    pending_votes::{PendingVotes, VoteReceptionResult, VoteStatus},
     util::time_service::{SendTask, TimeService},
 };
 use aptos_consensus_types::{
@@ -13,9 +13,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
-use aptos_types::{
-    ledger_info::LedgerInfoWithPartialSignatures, validator_verifier::ValidatorVerifier,
-};
+use aptos_types::epoch_state::EpochState;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
@@ -45,7 +43,7 @@ pub struct NewRoundEvent {
     pub round: Round,
     pub reason: NewRoundReason,
     pub timeout: Duration,
-    pub prev_round_votes: Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
+    pub prev_round_votes: Vec<(HashValue, VoteStatus)>,
     pub prev_round_timeout_votes: Option<TwoChainTimeoutWithPartialSignatures>,
 }
 
@@ -275,10 +273,11 @@ impl RoundState {
     pub fn insert_vote(
         &mut self,
         vote: &Vote,
-        verifier: &ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
+        verified: bool,
     ) -> VoteReceptionResult {
         if vote.vote_data().proposed().round() == self.current_round {
-            self.pending_votes.insert_vote(vote, verifier)
+            self.pending_votes.insert_vote(vote, epoch_state, verified)
         } else {
             VoteReceptionResult::UnexpectedRound(
                 vote.vote_data().proposed().round(),

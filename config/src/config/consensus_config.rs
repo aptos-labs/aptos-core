@@ -78,6 +78,7 @@ pub struct ConsensusConfig {
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
+    // Deprecated
     pub qc_aggregator_type: QcAggregatorType,
     // Max blocks allowed for block retrieval requests
     pub max_blocks_per_sending_request: u64,
@@ -89,6 +90,8 @@ pub struct ConsensusConfig {
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
     pub enable_pre_commit: bool,
+    pub optimistic_sig_verification_for_votes: bool,
+    pub optimistic_sig_verification_for_order_votes: bool,
 }
 
 /// Deprecated
@@ -299,7 +302,6 @@ impl Default for ConsensusConfig {
                     backoff_proposal_delay_ms: 300,
                 },
             ],
-
             qc_aggregator_type: QcAggregatorType::default(),
             // This needs to fit into the network message size, so with quorum store it can be much bigger
             max_blocks_per_sending_request: 10,
@@ -317,6 +319,8 @@ impl Default for ConsensusConfig {
             },
             num_bounded_executor_tasks: 16,
             enable_pre_commit: true,
+            optimistic_sig_verification_for_votes: true,
+            optimistic_sig_verification_for_order_votes: true,
         }
     }
 }

@@ -440,6 +440,19 @@ impl ValidatorVerifier {
         Ok(aggregated_voting_power)
     }
 
+    pub fn agg_signature_authors(
+        &self,
+        aggregated_signature: &AggregateSignature,
+    ) -> Vec<AccountAddress> {
+        let mut authors = vec![];
+        for index in aggregated_signature.get_signers_bitvec().iter_ones() {
+            if let Some(validator) = self.validator_infos.get(index) {
+                authors.push(validator.address);
+            }
+        }
+        authors
+    }
+
     /// Returns the public key for this address.
     pub fn get_public_key(&self, author: &AccountAddress) -> Option<PublicKey> {
         self.address_to_validator_index

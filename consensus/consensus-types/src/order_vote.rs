@@ -68,16 +68,27 @@ impl OrderVote {
         self.ledger_info.epoch()
     }
 
-    /// Verifies the signature on LedgerInfo.
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    /// Performs basic checks, excluding the signature verification.
+    pub fn partial_verify(&self) -> anyhow::Result<()> {
         ensure!(
             self.ledger_info.consensus_data_hash() == HashValue::zero(),
             "Failed to verify OrderVote. Consensus data hash is not Zero"
         );
+        Ok(())
+    }
+
+    /// Verifies the signature on the LedgerInfo.
+    pub fn signature_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
             .verify(self.author(), &self.ledger_info, &self.signature)
             .context("Failed to verify OrderVote")?;
+        Ok(())
+    }
 
+    /// Performs full verification including the signature verification.
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.partial_verify()?;
+        self.signature_verify(validator)?;
         Ok(())
     }
 }

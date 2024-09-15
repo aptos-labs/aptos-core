@@ -105,7 +105,7 @@ use std::{
     hash::Hash,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -244,10 +244,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn epoch_state(&self) -> &EpochState {
+    fn epoch_state(&self) -> Arc<EpochState> {
         self.epoch_state
             .as_ref()
             .expect("EpochManager not started yet")
+            .clone()
     }
 
     fn epoch(&self) -> u64 {
@@ -270,7 +271,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     /// Create a proposer election handler based on proposers
     fn create_proposer_election(
         &self,
-        epoch_state: &EpochState,
+        epoch_state: Arc<EpochState>,
         onchain_config: &OnChainConsensusConfig,
     ) -> Arc<dyn ProposerElection + Send + Sync> {
         let proposers = epoch_state
@@ -343,7 +344,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 };
 
                 let epoch_to_proposers = self.extract_epoch_proposers(
-                    epoch_state,
+                    epoch_state.epoch,
                     use_history_from_previous_epoch_max_count,
                     proposers,
                     (window_size + seek_len) as u64,
@@ -392,7 +393,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn extract_epoch_proposers(
         &self,
-        epoch_state: &EpochState,
+        epoch: u64,
         use_history_from_previous_epoch_max_count: u32,
         proposers: Vec<AccountAddress>,
         needed_rounds: u64,
@@ -402,33 +403,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // It has no votes, so we skip it unless we are in epoch 1, as otherwise it will
         // skew leader elections for exclude_round number of rounds.
         let first_epoch_to_consider = std::cmp::max(
-            if epoch_state.epoch == 1 { 1 } else { 2 },
-            epoch_state
-                .epoch
-                .saturating_sub(use_history_from_previous_epoch_max_count as u64),
+            if epoch == 1 { 1 } else { 2 },
+            epoch.saturating_sub(use_history_from_previous_epoch_max_count as u64),
         );
         // If we are considering beyond the current epoch, we need to fetch validators for those epochs
-        if epoch_state.epoch > first_epoch_to_consider {
+        if epoch > first_epoch_to_consider {
             self.storage
                 .aptos_db()
-                .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
+                .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch)
                 .map_err(Into::into)
                 .and_then(|proof| {
                     ensure!(
                         proof.ledger_info_with_sigs.len() as u64
-                            == (epoch_state.epoch - (first_epoch_to_consider - 1))
+                            == (epoch - (first_epoch_to_consider - 1))
                     );
-                    extract_epoch_to_proposers(proof, epoch_state.epoch, &proposers, needed_rounds)
+                    extract_epoch_to_proposers(proof, epoch, &proposers, needed_rounds)
                 })
                 .unwrap_or_else(|err| {
                     error!(
                         "Couldn't create leader reputation with history across epochs, {:?}",
                         err
                     );
-                    HashMap::from([(epoch_state.epoch, proposers)])
+                    HashMap::from([(epoch, proposers)])
                 })
         } else {
-            HashMap::from([(epoch_state.epoch, proposers)])
+            HashMap::from([(epoch, proposers)])
         }
     }
 
@@ -526,8 +525,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn initiate_new_epoch(&mut self, proof: EpochChangeProof) -> anyhow::Result<()> {
+        let epoch_state = self.epoch_state();
         let ledger_info = proof
-            .verify(self.epoch_state())
+            .verify(epoch_state.as_ref())
             .context("[EpochManager] Invalid EpochChangeProof")?;
         info!(
             LogSchema::new(LogEvent::NewEpoch).epoch(ledger_info.ledger_info().next_block_epoch()),
@@ -663,7 +663,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn init_payload_provider(
         &mut self,
-        epoch_state: &EpochState,
+        epoch_state: Arc<EpochState>,
         network_sender: NetworkSender,
         consensus_config: &OnChainConsensusConfig,
     ) -> (
@@ -722,7 +722,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         (payload_manager, payload_client, quorum_store_builder)
     }
 
-    fn set_epoch_start_metrics(&self, epoch_state: &EpochState) {
+    fn set_epoch_start_metrics(&self, epoch_state: Arc<EpochState>) {
         counters::EPOCH.set(epoch_state.epoch as i64);
         counters::CURRENT_EPOCH_VALIDATORS.set(epoch_state.verifier.len() as i64);
 
@@ -761,7 +761,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let epoch = epoch_state.epoch;
         info!(
-            epoch = epoch_state.epoch,
+            epoch = epoch,
             validators = epoch_state.verifier.to_string(),
             root_block = %recovery_data.root_block(),
             "Starting new epoch",
@@ -785,7 +785,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(epoch = epoch, "Create ProposerElection");
         let proposer_election =
-            self.create_proposer_election(&epoch_state, &onchain_consensus_config);
+            self.create_proposer_election(epoch_state.clone(), &onchain_consensus_config);
         let chain_health_backoff_config =
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
         let pipeline_backpressure_config = PipelineBackpressureConfig::new(
@@ -907,7 +907,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn create_network_sender(&mut self, epoch_state: &EpochState) -> NetworkSender {
+    fn create_network_sender(&mut self, epoch_state: Arc<EpochState>) -> NetworkSender {
         NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -919,7 +919,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn try_get_rand_config_for_new_epoch(
         &self,
         maybe_consensus_key: Option<Arc<PrivateKey>>,
-        new_epoch_state: &EpochState,
+        new_epoch_state: Arc<EpochState>,
         onchain_randomness_config: &OnChainRandomnessConfig,
         maybe_dkg_state: anyhow::Result<DKGState>,
         consensus_config: &OnChainConsensusConfig,
@@ -1091,8 +1091,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             error!("Failed to read on-chain randomness config {}", error);
         }
 
-        self.epoch_state = Some(epoch_state.clone());
-
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
@@ -1130,7 +1128,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let rand_configs = self.try_get_rand_config_for_new_epoch(
             loaded_consensus_key.clone(),
-            &epoch_state,
+            epoch_state.clone(),
             &onchain_randomness_config,
             dkg_state,
             &consensus_config,
@@ -1162,7 +1160,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
 
         let (network_sender, payload_client, payload_manager) = self
-            .initialize_shared_component(&epoch_state, &consensus_config)
+            .initialize_shared_component(epoch_state.clone(), &consensus_config)
             .await;
 
         let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
@@ -1175,7 +1173,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
-                epoch_state,
+                epoch_state.clone(),
                 loaded_consensus_key.clone(),
                 consensus_config,
                 execution_config,
@@ -1210,16 +1208,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn initialize_shared_component(
         &mut self,
-        epoch_state: &EpochState,
+        epoch_state: Arc<EpochState>,
         consensus_config: &OnChainConsensusConfig,
     ) -> (
         NetworkSender,
         Arc<dyn PayloadClient>,
         Arc<dyn TPayloadManager>,
     ) {
-        self.set_epoch_start_metrics(epoch_state);
+        self.set_epoch_start_metrics(epoch_state.clone());
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
-        let network_sender = self.create_network_sender(epoch_state);
+        let network_sender = self.create_network_sender(epoch_state.clone());
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
             .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
@@ -1340,7 +1338,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_dag_consensus_config = onchain_consensus_config.unwrap_dag_config_v1();
         let epoch_to_validators = self.extract_epoch_proposers(
-            &epoch_state,
+            epoch,
             onchain_dag_consensus_config.dag_ordering_causal_history_window as u32,
             epoch_state.verifier.get_ordered_account_addresses(),
             onchain_dag_consensus_config.dag_ordering_causal_history_window as u64,
@@ -1435,6 +1433,73 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
+            let malicious_sender = self.epoch_state().verifier.is_malicious_author(&peer_id);
+
+            if self.config.optimistic_sig_verification_for_order_votes && !malicious_sender {
+                if let UnverifiedEvent::OrderVoteMsg(order_vote) = &unverified_event {
+                    order_vote.partial_verify()?;
+                    Self::forward_event_to(
+                        round_manager_tx,
+                        (
+                            peer_id,
+                            discriminant(&VerifiedEvent::UnverifiedOrderVoteMsg(
+                                order_vote.clone(),
+                            )),
+                        ),
+                        (
+                            peer_id,
+                            VerifiedEvent::UnverifiedOrderVoteMsg(order_vote.clone()),
+                        ),
+                    )
+                    .context("round manager sending unverified order vote to round manager")?;
+                    return Ok(());
+                }
+            }
+
+            if self.config.optimistic_sig_verification_for_votes && !malicious_sender {
+                if let UnverifiedEvent::VoteMsg(vote) = unverified_event.clone() {
+                    self.bounded_executor
+                        .spawn(async move {
+                            // The partial_verify function will potentially verify the signature of timeout.
+                            // So, we need to spawn it in a separate task to avoid blocking the main task.
+                            let start_time = Instant::now();
+                            let result = vote.partial_verify(&epoch_state.verifier);
+                            counters::VERIFY_MSG
+                                .with_label_values(&["vote_partial_verify"])
+                                .observe(start_time.elapsed().as_secs_f64());
+                            match result {
+                                Ok(()) => {
+                                    if let Err(e) = Self::forward_event_to(
+                                        round_manager_tx,
+                                        (
+                                            peer_id,
+                                            discriminant(&VerifiedEvent::UnverifiedVoteMsg(
+                                                vote.clone(),
+                                            )),
+                                        ),
+                                        (peer_id, VerifiedEvent::UnverifiedVoteMsg(vote.clone())),
+                                    )
+                                    .context(
+                                        "round manager sending unverified vote to round manager",
+                                    ) {
+                                        warn!("Failed to forward unverified event: {}", e);
+                                    };
+                                },
+                                Err(e) => {
+                                    error!(
+                                        SecurityEvent::ConsensusInvalidMessage,
+                                        remote_peer = peer_id,
+                                        error = ?e,
+                                        unverified_event = unverified_event
+                                    );
+                                },
+                            }
+                        })
+                        .await;
+                    return Ok(());
+                }
+            }
+
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -1450,7 +1515,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         )
                     ) {
                         Ok(verified_event) => {
-                            Self::forward_event(
+                            Self::forward_verified_event(
                                 quorum_store_msg_tx,
                                 round_manager_tx,
                                 buffered_proposal_tx,
@@ -1576,7 +1641,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn forward_event(
+    fn forward_verified_event(
         quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
