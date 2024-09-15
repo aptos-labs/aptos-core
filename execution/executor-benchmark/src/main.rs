@@ -23,11 +23,9 @@ use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
-use aptos_types::{
-    on_chain_config::{FeatureFlag, Features},
-    vm::configs::set_paranoid_type_checks,
-};
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_vm::AptosVM;
+use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
 use std::{

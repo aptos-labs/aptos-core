@@ -7,10 +7,9 @@ use aptos_types::{
     state_store::state_key::StateKey, transaction::ExecutionStatus, write_set::WriteOp,
 };
 use aptos_vm::AptosVM;
-use aptos_vm_environment::environment::Environment;
+use aptos_vm_environment::environment::AptosEnvironment;
 use claims::{assert_ok_eq, assert_some};
 use move_core_types::vm_status::{StatusCode, VMStatus};
-use std::sync::Arc;
 use test_case::test_case;
 
 // Make sure verification and invariant violation errors are kept.
@@ -30,8 +29,8 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
         .sign();
 
     let state_view = h.executor.get_state_view();
-    let env = Arc::new(Environment::new(state_view, false, None));
-    let vm = AptosVM::new_with_environment(env, state_view);
+    let env = AptosEnvironment::new(&state_view);
+    let vm = AptosVM::new(env, state_view);
 
     let balance = 10_000;
     let output = vm

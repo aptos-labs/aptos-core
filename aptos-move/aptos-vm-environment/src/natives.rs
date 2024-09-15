@@ -5,6 +5,7 @@ use aptos_native_interface::SafeNativeBuilder;
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
+/// Builds and returns all Aptos native functions.
 pub fn aptos_natives_with_builder(
     builder: &mut SafeNativeBuilder,
     inject_create_signer_for_gov_sim: bool,

@@ -20,15 +20,12 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm::AptosVM;
-use aptos_vm_environment::environment::Environment;
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use move_vm_runtime::WithRuntimeEnvironment;
 use rayon::Scope;
-use std::sync::{
-    mpsc::{channel, Receiver, Sender},
-    Arc,
-};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub(crate) struct PtxRunner;
 
@@ -239,10 +236,10 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "block_total"]);
         // Share a VM in the same thread.
         // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
-        let env = Arc::new(Environment::new(&self.base_view, false, None));
+        let env = AptosEnvironment::new(&self.base_view);
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new_with_environment(env.clone(), &self.base_view)
+            AptosVM::new(env.clone(), &self.base_view)
         };
 
         loop {

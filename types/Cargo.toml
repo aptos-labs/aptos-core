@@ -40,7 +40,6 @@ hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
-move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
