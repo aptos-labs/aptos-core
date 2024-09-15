@@ -7,6 +7,7 @@
 use crate::account::AccountData;
 use aptos_types::{
     account_config::CoinInfoResource,
+    chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig},
     state_store::{
         errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
@@ -118,6 +119,14 @@ impl FakeDataStore {
         self.set(
             StateKey::module_id(module_id),
             StateValue::new_legacy(blob.into()),
+        );
+    }
+
+    pub fn set_chain_id(&mut self, chain_id: ChainId) {
+        let bytes = bcs::to_bytes(&chain_id).expect("Chain id should always be serializable");
+        self.set(
+            StateKey::resource(ChainId::address(), &ChainId::struct_tag()).unwrap(),
+            StateValue::new_legacy(bytes.into()),
         );
     }
 

@@ -11,7 +11,6 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
     session::Session, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
-    UnreachableCodeStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
@@ -76,8 +75,8 @@ fn test_publish_module_with_nested_loops() {
         let vm = MoveVM::new_with_config(natives, vm_config);
 
         let mut sess = vm.new_session(&storage);
+        let module_storage = storage.as_unsync_code_storage(&runtime_environment);
         if vm.vm_config().use_loader_v2 {
-            let module_storage = storage.as_unsync_code_storage(&runtime_environment);
             let new_module_storage =
                 StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
                     .clone()
@@ -93,12 +92,7 @@ fn test_publish_module_with_nested_loops() {
             #[allow(deprecated)]
             sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
                 .unwrap();
-            load_and_run_functions(
-                &mut sess,
-                &UnreachableCodeStorage,
-                &traversal_storage,
-                &m.self_id(),
-            );
+            load_and_run_functions(&mut sess, &module_storage, &traversal_storage, &m.self_id());
         };
     }
 }

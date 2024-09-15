@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_cyclic_dependency_error, module_linker_error,
     storage::{
         environment::{RuntimeEnvironment, WithRuntimeEnvironment},
         module_storage::ModuleStorage,
@@ -19,7 +18,9 @@ use move_core_types::{
     language_storage::ModuleId,
     metadata::Metadata,
 };
-use move_vm_types::code_storage::ModuleBytesStorage;
+use move_vm_types::{
+    code_storage::ModuleBytesStorage, module_cyclic_dependency_error, module_linker_error,
+};
 use std::{
     borrow::Borrow,
     cell::RefCell,

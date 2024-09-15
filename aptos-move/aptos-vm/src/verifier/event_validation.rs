@@ -38,7 +38,6 @@ pub(crate) fn validate_module_events(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
     modules: &[CompiledModule],
-    use_loader_v2: bool,
 ) -> VMResult<()> {
     for module in modules {
         let mut new_event_structs =
@@ -51,12 +50,8 @@ pub(crate) fn validate_module_events(
         // Check all the emit calls have the correct struct with event attribute.
         validate_emit_calls(&new_event_structs, module)?;
 
-        let original_event_structs = extract_event_metadata_from_module(
-            session,
-            module_storage,
-            &module.self_id(),
-            use_loader_v2,
-        )?;
+        let original_event_structs =
+            extract_event_metadata_from_module(session, module_storage, &module.self_id())?;
 
         for member in original_event_structs {
             // Fail if we see a removal of an event attribute.
@@ -127,9 +122,8 @@ pub(crate) fn extract_event_metadata_from_module(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
     module_id: &ModuleId,
-    use_loader_v2: bool,
 ) -> VMResult<HashSet<String>> {
-    if use_loader_v2 {
+    if module_storage.is_enabled() {
         // TODO(loader_v2): We can optimize metadata calls as well.
         let metadata = module_storage
             .fetch_deserialized_module(module_id.address(), module_id.name())?

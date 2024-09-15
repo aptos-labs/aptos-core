@@ -29,30 +29,6 @@ use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
-/// Wrapper around partially verified compiled module, i.e., one that passed local bytecode
-/// verification, but not the dependency checks yet. Also carries module size in bytes.
-pub struct PartiallyVerifiedModule(Arc<CompiledModule>, usize);
-
-impl PartiallyVerifiedModule {
-    pub fn immediate_dependencies_iter(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
-        self.0.immediate_dependencies_iter()
-    }
-}
-
-/// Wrapper around partially verified compiled script, i.e., one that passed local bytecode
-/// verification, but not the dependency checks yet.
-pub struct PartiallyVerifiedScript(Arc<CompiledScript>);
-
-impl PartiallyVerifiedScript {
-    pub fn immediate_dependencies_iter(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
-        self.0.immediate_dependencies_iter()
-    }
-}
-
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
 /// the code cache, possibly across multiple threads.
 pub struct RuntimeEnvironment {
@@ -75,6 +51,8 @@ pub struct RuntimeEnvironment {
 }
 
 impl RuntimeEnvironment {
+    /// Creates a new runtime environment with native functions and default VM configurations. If
+    /// there are duplicated natives, panics.
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
     ) -> Self {
@@ -106,23 +84,6 @@ impl RuntimeEnvironment {
     /// Returns the config currently used by this runtime environment.
     pub fn vm_config(&self) -> &VMConfig {
         &self.vm_config
-    }
-
-    /// Returns native functions available to this runtime.
-    pub(crate) fn natives(&self) -> &NativeFunctions {
-        &self.natives
-    }
-
-    /// Returns the re-indexing map currently used by this runtime environment to remap struct
-    /// identifiers into indices.
-    pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
-        &self.struct_name_index_map
-    }
-
-    /// Returns the type cache owned by this runtime environment which stores information about
-    /// struct layouts, tags and depth formulae.
-    pub(crate) fn ty_cache(&self) -> &RwLock<TypeCache> {
-        &self.ty_cache
     }
 
     /// Enables delayed field optimization for this environment.
@@ -236,6 +197,20 @@ impl RuntimeEnvironment {
         Ok((compiled_module, bytes.len(), module_hash))
     }
 
+    /// Deserializes bytes into a compiled script.
+    pub fn deserialize_into_script(&self, serialized_script: &[u8]) -> VMResult<CompiledScript> {
+        CompiledScript::deserialize_with_config(
+            serialized_script,
+            &self.vm_config().deserializer_config,
+        )
+        .map_err(|err| {
+            let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+            PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                .with_message(msg)
+                .finish(Location::Script)
+        })
+    }
+
     /// Returns an error is module's address and name do not match the expected values.
     #[inline]
     pub fn paranoid_check_module_address_and_name(
@@ -262,6 +237,23 @@ impl RuntimeEnvironment {
         }
         Ok(())
     }
+
+    /// Returns native functions available to this runtime.
+    pub(crate) fn natives(&self) -> &NativeFunctions {
+        &self.natives
+    }
+
+    /// Returns the re-indexing map currently used by this runtime environment to remap struct
+    /// identifiers into indices.
+    pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
+        &self.struct_name_index_map
+    }
+
+    /// Returns the type cache owned by this runtime environment which stores information about
+    /// struct layouts, tags and depth formulae.
+    pub(crate) fn ty_cache(&self) -> &RwLock<TypeCache> {
+        &self.ty_cache
+    }
 }
 
 impl Clone for RuntimeEnvironment {
@@ -283,4 +275,28 @@ impl Clone for RuntimeEnvironment {
 #[delegatable_trait]
 pub trait WithRuntimeEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment;
+}
+
+/// Wrapper around partially verified compiled module, i.e., one that passed local bytecode
+/// verification, but not the dependency checks yet. Also carries module size in bytes.
+pub struct PartiallyVerifiedModule(Arc<CompiledModule>, usize);
+
+impl PartiallyVerifiedModule {
+    pub fn immediate_dependencies_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.0.immediate_dependencies_iter()
+    }
+}
+
+/// Wrapper around partially verified compiled script, i.e., one that passed local bytecode
+/// verification, but not the dependency checks yet.
+pub struct PartiallyVerifiedScript(Arc<CompiledScript>);
+
+impl PartiallyVerifiedScript {
+    pub fn immediate_dependencies_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.0.immediate_dependencies_iter()
+    }
 }

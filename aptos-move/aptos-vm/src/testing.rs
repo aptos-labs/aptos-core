@@ -11,16 +11,12 @@ use crate::{
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::{state_store::StateView, transaction::SignedTransaction};
 #[cfg(any(test, feature = "testing"))]
-use aptos_vm_environment::environment::AptosEnvironment;
-#[cfg(any(test, feature = "testing"))]
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 #[cfg(any(test, feature = "testing"))]
 use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use move_binary_format::errors::VMResult;
 #[cfg(any(test, feature = "testing"))]
 use move_core_types::vm_status::VMStatus;
-#[cfg(any(test, feature = "testing"))]
-use move_vm_runtime::WithRuntimeEnvironment;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum InjectedError {
@@ -106,8 +102,7 @@ impl AptosVM {
             .change_set_configs;
 
         let resolver = state_view.as_move_resolver();
-        let env = AptosEnvironment::new(&state_view);
-        let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
+        let module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
 
         let traversal_storage = TraversalStorage::new();
         self.failed_transaction_cleanup(
