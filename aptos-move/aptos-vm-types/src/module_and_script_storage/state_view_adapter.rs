@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::module_and_script_storage::{
-    code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
+    code_storage::TAptosCodeStorage, module_storage::TAptosModuleStorage,
 };
 use ambassador::Delegate;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView};
@@ -15,15 +15,14 @@ use move_binary_format::{
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
-    ambassador_impl_WithRuntimeEnvironment, module_storage_error, AsUnsyncCodeStorage, CodeStorage,
-    Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
+    ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, CodeStorage, Module,
+    ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
     WithRuntimeEnvironment,
 };
-use move_vm_types::code_storage::ModuleBytesStorage;
+use move_vm_types::{code_storage::ModuleBytesStorage, module_storage_error};
 use std::sync::Arc;
 
-/// Same as [module_storage_error], but works with state keys and is kept
-/// as a partial VM error.
+/// Same as [module_storage_error], but works with state keys and is kept as a partial VM error.
 macro_rules! aptos_module_storage_error {
     ($state_key:ident, $err:ident) => {
         move_binary_format::errors::PartialVMError::new(
@@ -54,9 +53,9 @@ impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
     }
 }
 
-/// A (not thread-safe) implementation of code storage on top of a state view.
-/// It is never built directly by clients - only via [AsAptosCodeStorage] trait.
-/// Can be used to resolve both modules and scripts.
+/// A (not thread-safe) implementation of code storage on top of a state view. It is never built
+/// directly by clients - only via [AsAptosCodeStorage] trait. Can be used to resolve both modules
+/// and cached scripts.
 #[derive(Delegate)]
 #[delegate(WithRuntimeEnvironment, where = "S: StateView")]
 #[delegate(ModuleStorage, where = "S: StateView")]
@@ -77,7 +76,9 @@ impl<'s, S: StateView> AptosCodeStorageAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
+impl<'s, S: StateView> TAptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
+    type Key = StateKey;
+
     fn fetch_state_value_metadata(
         &self,
         address: &AccountAddress,
@@ -93,7 +94,7 @@ impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
 
     fn fetch_module_size_by_state_key(
         &self,
-        state_key: &StateKey,
+        state_key: &Self::Key,
     ) -> PartialVMResult<Option<usize>> {
         Ok(self
             .state_view()
@@ -103,12 +104,11 @@ impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> AptosCodeStorage for AptosCodeStorageAdapter<'s, S> {}
+impl<'s, S: StateView> TAptosCodeStorage<StateKey> for AptosCodeStorageAdapter<'s, S> {}
 
-/// Allows to treat a state view as a code storage with scripts and modules. The
-/// main use case is when transaction or a Move function has to be executed outside
-/// the long-living environment or block executor, e.g., for single transaction
-/// simulation, Aptos debugger, etc.
+/// Allows to treat the state view as a code storage with scripts and modules. The main use case is
+/// when a transaction or a Move function has to be executed outside the long-living environment or
+/// block executor, e.g., for single transaction simulation, in Aptos debugger, etc.
 pub trait AsAptosCodeStorage<'s, S> {
     fn as_aptos_code_storage(
         &'s self,

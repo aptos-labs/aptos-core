@@ -5,8 +5,6 @@
 use crate::{
     loader::{Loader, ModuleStorageAdapter},
     logging::expect_no_verification_errors,
-    module_linker_error,
-    storage::code_storage::deserialize_script,
     ModuleStorage,
 };
 use bytes::Bytes;
@@ -256,11 +254,8 @@ impl<'r> TransactionDataCache<'r> {
                     let module_addr = &ty_tag.address;
                     let module_name = ty_tag.module.as_ident_str();
                     let metadata = module_storage
-                        .fetch_module_metadata(module_addr, module_name)
-                        .map_err(|e| e.to_partial())?
-                        .ok_or_else(|| {
-                            module_linker_error!(module_addr, module_name).to_partial()
-                        })?;
+                        .fetch_existing_module_metadata(module_addr, module_name)
+                        .map_err(|e| e.to_partial())?;
 
                     // If we need to process aggregator lifting, we pass type layout to remote.
                     // Remote, in turn ensures that all aggregator values are lifted if the resolved
@@ -326,7 +321,18 @@ impl<'r> TransactionDataCache<'r> {
         match cache.entry(hash_value) {
             btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
             btree_map::Entry::Vacant(entry) => {
-                let script = deserialize_script(script_blob, &self.deserializer_config)?;
+                let script = match CompiledScript::deserialize_with_config(
+                    script_blob,
+                    &self.deserializer_config,
+                ) {
+                    Ok(script) => script,
+                    Err(err) => {
+                        let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                        return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                            .with_message(msg)
+                            .finish(Location::Script));
+                    },
+                };
                 Ok(entry.insert(Arc::new(script)).clone())
             },
         }

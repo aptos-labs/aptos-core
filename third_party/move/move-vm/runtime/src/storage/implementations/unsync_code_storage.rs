@@ -3,9 +3,8 @@
 
 use crate::{
     logging::expect_no_verification_errors,
-    module_linker_error, script_hash,
+    script_hash,
     storage::{
-        code_storage::deserialize_script,
         environment::{ambassador_impl_WithRuntimeEnvironment, WithRuntimeEnvironment},
         implementations::unsync_module_storage::AsUnsyncModuleStorage,
         module_storage::ambassador_impl_ModuleStorage,
@@ -18,7 +17,7 @@ use move_binary_format::{
     access::ScriptAccess, errors::VMResult, file_format::CompiledScript, CompiledModule,
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
-use move_vm_types::code_storage::ModuleBytesStorage;
+use move_vm_types::{code_storage::ModuleBytesStorage, module_linker_error};
 #[cfg(test)]
 use std::collections::BTreeSet;
 use std::{
@@ -93,12 +92,10 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
     /// Deserializes the script into its compiled representation. The deserialization is based on
     /// the current environment configurations.
     fn deserialize_script(&self, serialized_script: &[u8]) -> VMResult<Arc<CompiledScript>> {
-        let deserializer_config = &self
+        let compiled_script = self
             .module_storage
             .runtime_environment()
-            .vm_config()
-            .deserializer_config;
-        let compiled_script = deserialize_script(serialized_script, deserializer_config)?;
+            .deserialize_into_script(serialized_script)?;
         Ok(Arc::new(compiled_script))
     }
 

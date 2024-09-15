@@ -61,10 +61,13 @@ impl ModuleWriteSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
-        is_loader_v2_enabled: bool,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         self.write_ops.iter_mut().map(move |(key, op)| {
-            let prev_size = if is_loader_v2_enabled {
+            let prev_size = if module_storage
+                .runtime_environment()
+                .vm_config()
+                .use_loader_v2
+            {
                 module_storage
                     .fetch_module_size_by_state_key(key)?
                     .unwrap_or(0) as u64
