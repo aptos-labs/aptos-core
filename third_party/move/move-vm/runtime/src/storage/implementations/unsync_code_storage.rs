@@ -101,9 +101,9 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
 
     /// Given a deserialized script, verifies it. The verification consists of three steps:
     ///   1. Verify the script locally, e.g., using bytecode verifier.
-    ///   2. Load dependencies used by this script. How the dependencies are loaded is
-    ///      opaque to this code storage, and up to the module storage it uses. In any
-    ///      case, loading returns a vector of verified dependencies.
+    ///   2. Load dependencies used by this script. How the dependencies are loaded is opaque to
+    ///      this code storage, and up to the module storage it uses. In any case, loading returns
+    ///      a vector of verified dependencies.
     ///   3. Verify the script correctly imports its dependencies.
     /// If any of this steps fail, an error is returned.
     fn verify_deserialized_script(

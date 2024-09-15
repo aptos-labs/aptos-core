@@ -29,9 +29,8 @@ use std::{
     sync::Arc,
 };
 
-/// An entry in [UnsyncModuleStorage]. As modules are accessed, entries can be
-/// "promoted", e.g., a deserialized representation can be converted into the
-/// verified one.
+/// An entry in [UnsyncModuleStorage]. As modules are accessed, entries can be "promoted", e.g., a
+/// deserialized representation can be converted into the verified one.
 #[derive(Debug, Clone)]
 pub(crate) enum ModuleStorageEntry {
     Deserialized {
@@ -54,8 +53,7 @@ impl ModuleStorageEntry {
     }
 }
 
-/// Implementation of (not thread-safe) module storage used for Move unit tests,
-/// and externally.
+/// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
 pub struct UnsyncModuleStorage<'a, S> {
     /// Environment where this module storage is defined in.
     runtime_environment: &'a RuntimeEnvironment,
@@ -170,20 +168,19 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
         Ok(get_module_entry_or_panic(&module_storage, address, module_name).clone())
     }
 
-    /// Visits the dependencies of the given module. If dependencies form a cycle (which
-    /// should not be the case as we check this when modules are added to the module
-    /// storage), an error is returned.
+    /// Visits the dependencies of the given module. If dependencies form a cycle (which should not
+    /// be the case as we check this when modules are added to the module storage), an error is
+    /// returned.
     ///
-    /// Important: this implementation **does not** load transitive friends. While it is
-    /// possible to view friends as `used-by` relation, it cannot be checked fully. For
-    /// example, consider the case when we have four modules A, B, C, D and let `X --> Y`
-    /// be a dependency relation (Y is a dependency of X) and `X ==> Y ` a friend relation
-    /// (X declares Y a friend). Then consider the case `A --> B <== C --> D <== A`. Here,
-    /// if we opt for `used-by` semantics, there is a cycle. But it cannot be checked,
-    /// since, A only sees B and D, and C sees B and D, but both B and D do not see any
-    /// dependencies or friends. Hence, A cannot discover C and vice-versa, making detection
-    /// of such corner cases only possible if **all existing modules are checked**, which
-    /// is clearly infeasible.
+    /// Important: this implementation **does not** load transitive friends. While it is possible
+    /// to view friends as `used-by` relation, it cannot be checked fully. For example, consider
+    /// the case when we have four modules A, B, C, D and let `X --> Y` be a dependency relation
+    /// (Y is a dependency of X) and `X ==> Y ` a friend relation (X declares Y a friend). Then
+    /// consider the case `A --> B <== C --> D <== A`. Here, if we opt for `used-by` semantics,
+    /// there is a cycle. But it cannot be checked, since, A only sees B and D, and C sees B and D,
+    /// but both B and D do not see any dependencies or friends. Hence, A cannot discover C and
+    /// vice-versa, making detection of such corner cases only possible if **all existing modules
+    /// are checked**, which is clearly infeasible.
     fn fetch_verified_module_and_visit_all_transitive_dependencies(
         &self,
         address: &AccountAddress,
@@ -410,7 +407,6 @@ impl<'e, B: ModuleBytesStorage> UnsyncModuleStorage<'e, B> {
     }
 }
 
-// TODO(loader_v2): Go over all tests, and consider different corner cases.
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
