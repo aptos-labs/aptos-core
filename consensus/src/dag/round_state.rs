@@ -187,11 +187,14 @@ impl AdaptiveResponsive {
 
     fn kill_if_necessary(&self, round: Round) {
         let self_idx = self.self_idx;
-        if round > 800 && self_idx > 70 {
-            exit(123);
-        } else if round > 600 && self_idx > 80 {
-            exit(123);
-        } else if round > 400 && self_idx > 90 {
+        // if round > 800 && self_idx > 70 {
+        //     exit(123);
+        // } else if round > 600 && self_idx > 80 {
+        //     exit(123);
+        // } else if round > 400 && self_idx > 90 {
+        //     exit(123);
+        // }
+        if round > 400 && self_idx > 90 {
             exit(123);
         }
     }
@@ -232,11 +235,16 @@ impl ResponsiveCheck for AdaptiveResponsive {
             (self.minimal_wait_time, false)
         };
 
-        let wait_voting_power = if new_round > 800 {
-            self.wait_voting_power.saturating_mul(7).saturating_div(100)
-        } else if new_round > 600 {
-            self.wait_voting_power.saturating_mul(8).saturating_div(100)
-        } else if new_round > 400 {
+        // let wait_voting_power = if new_round > 800 {
+        //     self.wait_voting_power.saturating_mul(7).saturating_div(100)
+        // } else if new_round > 600 {
+        //     self.wait_voting_power.saturating_mul(8).saturating_div(100)
+        // } else if new_round > 400 {
+        //     self.wait_voting_power.saturating_mul(9).saturating_div(100)
+        // } else {
+        //     self.wait_voting_power
+        // };
+        let wait_voting_power = if new_round > 400 {
             self.wait_voting_power.saturating_mul(9).saturating_div(100)
         } else {
             self.wait_voting_power

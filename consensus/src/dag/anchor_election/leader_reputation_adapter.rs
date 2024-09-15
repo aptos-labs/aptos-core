@@ -223,14 +223,16 @@ impl AnchorElection for CachedLeaderReputation {
 
     fn get_anchor_at_round_instance(&self, round: Round, instance: usize) -> Author {
         let mut recent_elections = self.recent_elections.lock();
-        monitor!(
+        let anchors = monitor!(
             "dag_get_multiple_anchors",
-            *self
-                .get_or_compute_entry(&mut recent_elections, round)
-                .2
-                .get(instance)
-                .expect("vector must support instance")
-        )
+            &self.get_or_compute_entry(&mut recent_elections, round).2
+        );
+        let anchor = if let Some(anchor) = anchors.get(instance) {
+            *anchor
+        } else {
+            *anchors.get(0).expect("at least one should exist")
+        };
+        anchor
     }
 
     fn get_max_instances(&self) -> usize {
