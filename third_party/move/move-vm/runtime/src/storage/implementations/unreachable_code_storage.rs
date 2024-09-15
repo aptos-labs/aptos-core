@@ -5,42 +5,17 @@ use crate::{
     CodeStorage, Module, ModuleStorage, RuntimeEnvironment, Script, WithRuntimeEnvironment,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
-    file_format::CompiledScript,
-    CompiledModule,
-};
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, metadata::Metadata,
-    vm_status::StatusCode,
-};
+use move_binary_format::{errors::VMResult, file_format::CompiledScript, CompiledModule};
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
 use std::sync::Arc;
 
-/// An error which is returned in case unreachable code is reached. This is just a safety
-/// precaution to avoid panics in case we forget some gating.
-macro_rules! unreachable_error {
-    () => {
-        Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message(
-                    "Loader V1 implementation should never use module or script storage"
-                        .to_string(),
-                )
-                .finish(Location::Undefined),
-        )
-    };
-}
-
-/// Implementation of code storage (for modules and scripts) traits, to be used in case VM
-/// is using V1 loader implementation. For example [Session::execute_entry_function] has
-/// to take a reference to loader V2 storage interfaces, even if VM uses V1 loader. In this
-/// case, they would be just unreachable.
+/// Implementation of code storage (for modules and scripts) traits, to be used in case VM uses
+/// V1 loader implementation in tests.
 pub struct UnreachableCodeStorage;
 
 impl WithRuntimeEnvironment for UnreachableCodeStorage {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
-        // TODO(loader_v2): Double check this can never be called.
-        unreachable!("Should not be called for unreachable storage")
+        unreachable!()
     }
 }
 
@@ -50,7 +25,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> VMResult<bool> {
-        unreachable_error!()
+        unreachable!()
     }
 
     fn fetch_module_bytes(
@@ -58,7 +33,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        unreachable_error!()
+        unreachable!()
     }
 
     fn fetch_module_size_in_bytes(
@@ -66,7 +41,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
-        unreachable_error!()
+        unreachable!()
     }
 
     fn fetch_module_metadata(
@@ -74,7 +49,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> VMResult<Option<Vec<Metadata>>> {
-        unreachable_error!()
+        unreachable!()
     }
 
     fn fetch_deserialized_module(
@@ -82,7 +57,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
-        unreachable_error!()
+        unreachable!()
     }
 
     fn fetch_verified_module(
@@ -90,7 +65,7 @@ impl ModuleStorage for UnreachableCodeStorage {
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
-        unreachable_error!()
+        unreachable!()
     }
 }
 
@@ -99,10 +74,10 @@ impl CodeStorage for UnreachableCodeStorage {
         &self,
         _serialized_script: &[u8],
     ) -> VMResult<Arc<CompiledScript>> {
-        unreachable_error!()
+        unreachable!()
     }
 
     fn verify_and_cache_script(&self, _serialized_script: &[u8]) -> VMResult<Arc<Script>> {
-        unreachable_error!()
+        unreachable!()
     }
 }

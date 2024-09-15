@@ -23,7 +23,6 @@ use aptos_vm::AptosVM;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
-use move_vm_runtime::WithRuntimeEnvironment;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Receiver, Sender};
 

@@ -26,7 +26,6 @@ aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 move-core-types = { workspace = true }
-move-vm-runtime = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }
 
