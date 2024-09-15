@@ -16,11 +16,13 @@ use aptos_crypto::{bls12381, hash::HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
     ops::{Deref, DerefMut},
+    sync::Arc,
 };
 
 /// This structure serves a dual purpose.
@@ -373,6 +375,187 @@ impl LedgerInfoWithPartialSignatures {
     }
 }
 
+/// Contains the ledger info and partially aggregated signature from a set of validators, this data
+/// is only used during the aggregating the votes from different validators and is not persisted in DB.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LedgerInfoWithMixedSignatures {
+    ledger_info: LedgerInfo,
+    // These signatures are not yet verified. For efficiency, once enough unverified signatures are collected,
+    // they will be aggregated and verified.
+    unverified_signatures: PartialSignatures,
+    verified_signatures: PartialSignatures,
+}
+
+impl Display for LedgerInfoWithMixedSignatures {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.ledger_info)
+    }
+}
+
+impl LedgerInfoWithMixedSignatures {
+    pub fn new(ledger_info: LedgerInfo) -> Self {
+        Self {
+            ledger_info,
+            unverified_signatures: PartialSignatures::empty(),
+            verified_signatures: PartialSignatures::empty(),
+        }
+    }
+
+    pub fn commit_info(&self) -> &BlockInfo {
+        self.ledger_info.commit_info()
+    }
+
+    fn add_verified_signature(
+        &mut self,
+        validator: AccountAddress,
+        signature: bls12381::Signature,
+    ) {
+        self.verified_signatures.add_signature(validator, signature);
+        self.unverified_signatures.remove_signature(validator);
+    }
+
+    fn add_unverified_signature(
+        &mut self,
+        validator: AccountAddress,
+        signature: bls12381::Signature,
+    ) {
+        if self.verified_signatures.contains_voter(&validator) {
+            return;
+        }
+        if self.unverified_signatures.contains_voter(&validator) {
+            self.unverified_signatures.remove_signature(validator);
+        }
+        self.unverified_signatures
+            .add_signature(validator, signature);
+    }
+
+    pub fn add_signature(
+        &mut self,
+        validator: AccountAddress,
+        signature: bls12381::Signature,
+        verified: bool,
+    ) {
+        if verified {
+            self.add_verified_signature(validator, signature);
+        } else {
+            self.add_unverified_signature(validator, signature);
+        }
+    }
+
+    pub fn verified_voters(&self) -> Vec<&AccountAddress> {
+        self.verified_signatures
+            .signatures()
+            .keys()
+            .collect_vec()
+            .clone()
+    }
+
+    pub fn unverified_voters(&self) -> Vec<&AccountAddress> {
+        self.unverified_signatures
+            .signatures()
+            .keys()
+            .collect_vec()
+            .clone()
+    }
+
+    // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
+    pub fn all_voters(&self) -> Vec<AccountAddress> {
+        self.verified_signatures
+            .signatures()
+            .keys()
+            .chain(self.unverified_signatures.signatures().keys())
+            .cloned()
+            .collect()
+    }
+
+    pub fn check_voting_power(
+        &self,
+        verifier: &ValidatorVerifier,
+    ) -> std::result::Result<u128, VerifyError> {
+        let all_voters = self.all_voters();
+        verifier.check_voting_power(all_voters.iter().collect_vec().into_iter(), true)
+    }
+
+    // Aggregates all the signatures, verifies the aggregate signature, and returns the aggregate signature.
+    pub fn aggregate_and_verify(
+        &mut self,
+        epoch_state: Arc<EpochState>,
+    ) -> Result<LedgerInfoWithSignatures, VerifyError> {
+        self.check_voting_power(&epoch_state.verifier)?;
+
+        let mut all_signatures = self.verified_signatures.clone();
+        for (author, signature) in self.unverified_signatures.signatures() {
+            all_signatures.add_signature(*author, signature.clone());
+        }
+
+        let aggregated_sig = epoch_state.verifier.aggregate_signatures(&all_signatures)?;
+
+        let (verified_aggregate_signature, malicious_authors) = match epoch_state
+            .verifier
+            .clone()
+            .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
+        {
+            Ok(_) => {
+                for (account_address, signature) in self.unverified_signatures.signatures() {
+                    self.verified_signatures
+                        .add_signature(*account_address, signature.clone());
+                }
+                self.unverified_signatures = PartialSignatures::empty();
+                (aggregated_sig, vec![])
+            },
+            Err(_) => {
+                // Question: Should we assign min tasks per thread here for into_par_iter()?
+                let verified = self
+                    .unverified_signatures
+                    .signatures()
+                    .into_par_iter()
+                    .flat_map(|(account_address, signature)| {
+                        if epoch_state
+                            .verifier
+                            .verify(*account_address, self.ledger_info(), signature)
+                            .is_ok()
+                        {
+                            return Some((*account_address, signature.clone()));
+                        }
+                        None
+                    })
+                    .collect::<Vec<_>>();
+                for (account_address, signature) in verified {
+                    self.verified_signatures
+                        .add_signature(account_address, signature.clone());
+                    self.unverified_signatures.remove_signature(account_address);
+                }
+                let malicious_authors = self
+                    .unverified_signatures
+                    .signatures()
+                    .keys()
+                    .cloned()
+                    .collect();
+                self.unverified_signatures = PartialSignatures::empty();
+
+                let aggregated_sig = epoch_state
+                    .verifier
+                    .aggregate_signatures(&self.verified_signatures)?;
+                // epoch_state
+                //     .read()
+                //     .verifier
+                //     .verify_multi_signatures(self.ledger_info(), &aggregated_sig)?;
+                (aggregated_sig, malicious_authors)
+            },
+        };
+        epoch_state
+            .verifier
+            .add_malicious_authors(malicious_authors);
+        self.check_voting_power(&epoch_state.verifier).map(|_| {
+            LedgerInfoWithSignatures::new(self.ledger_info.clone(), verified_aggregate_signature)
+        })
+    }
+
+    pub fn ledger_info(&self) -> &LedgerInfo {
+        &self.ledger_info
+    }
+}
+
 //
 // Arbitrary implementation of LedgerInfoWithV0 (for fuzzing)
 //
@@ -473,5 +656,243 @@ mod tests {
             ledger_info_with_signatures_bytes,
             ledger_info_with_signatures_reversed_bytes
         );
+    }
+
+    #[test]
+    fn test_ledger_info_with_mixed_signatures() {
+        let ledger_info = LedgerInfo::new(BlockInfo::empty(), HashValue::random());
+        const NUM_SIGNERS: u8 = 7;
+        // Generate NUM_SIGNERS random signers.
+        let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
+            .map(|i| ValidatorSigner::random([i; 32]))
+            .collect();
+        let mut validator_infos = vec![];
+
+        for validator in validator_signers.iter() {
+            validator_infos.push(ValidatorConsensusInfo::new(
+                validator.author(),
+                validator.public_key(),
+                1,
+            ));
+        }
+
+        let validator_verifier =
+            ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
+                .expect("Incorrect quorum size.");
+        let epoch_state = Arc::new(EpochState::new(10, validator_verifier.clone()));
+
+        let mut ledger_info_with_mixed_signatures =
+            LedgerInfoWithMixedSignatures::new(ledger_info.clone());
+
+        let mut partial_sig = PartialSignatures::empty();
+
+        ledger_info_with_mixed_signatures.add_signature(
+            validator_signers[0].author(),
+            validator_signers[0].sign(&ledger_info).unwrap(),
+            true,
+        );
+        partial_sig.add_signature(
+            validator_signers[0].author(),
+            validator_signers[0].sign(&ledger_info).unwrap(),
+        );
+
+        ledger_info_with_mixed_signatures.add_signature(
+            validator_signers[1].author(),
+            validator_signers[1].sign(&ledger_info).unwrap(),
+            false,
+        );
+        partial_sig.add_signature(
+            validator_signers[1].author(),
+            validator_signers[1].sign(&ledger_info).unwrap(),
+        );
+
+        ledger_info_with_mixed_signatures.add_signature(
+            validator_signers[2].author(),
+            validator_signers[2].sign(&ledger_info).unwrap(),
+            true,
+        );
+        partial_sig.add_signature(
+            validator_signers[2].author(),
+            validator_signers[2].sign(&ledger_info).unwrap(),
+        );
+
+        ledger_info_with_mixed_signatures.add_signature(
+            validator_signers[3].author(),
+            validator_signers[3].sign(&ledger_info).unwrap(),
+            false,
+        );
+        partial_sig.add_signature(
+            validator_signers[3].author(),
+            validator_signers[3].sign(&ledger_info).unwrap(),
+        );
+
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 4);
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .unverified_signatures
+                .signatures()
+                .len(),
+            2
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .verified_signatures
+                .signatures()
+                .len(),
+            2
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures.check_voting_power(&validator_verifier),
+            Err(VerifyError::TooLittleVotingPower {
+                voting_power: 4,
+                expected_voting_power: 5
+            })
+        );
+
+        ledger_info_with_mixed_signatures.add_signature(
+            validator_signers[4].author(),
+            bls12381::Signature::dummy_signature(),
+            false,
+        );
+
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 5);
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .unverified_signatures
+                .signatures()
+                .len(),
+            3
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .verified_signatures
+                .signatures()
+                .len(),
+            2
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .check_voting_power(&validator_verifier)
+                .unwrap(),
+            5
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures.aggregate_and_verify(epoch_state.clone()),
+            Err(VerifyError::TooLittleVotingPower {
+                voting_power: 4,
+                expected_voting_power: 5
+            })
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .unverified_signatures
+                .signatures()
+                .len(),
+            0
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .verified_signatures
+                .signatures()
+                .len(),
+            4
+        );
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 4);
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+
+        ledger_info_with_mixed_signatures.add_signature(
+            validator_signers[5].author(),
+            validator_signers[5].sign(&ledger_info).unwrap(),
+            false,
+        );
+        partial_sig.add_signature(
+            validator_signers[5].author(),
+            validator_signers[5].sign(&ledger_info).unwrap(),
+        );
+
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 5);
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .unverified_signatures
+                .signatures()
+                .len(),
+            1
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .verified_signatures
+                .signatures()
+                .len(),
+            4
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .check_voting_power(&validator_verifier)
+                .unwrap(),
+            5
+        );
+        let aggregate_sig = LedgerInfoWithSignatures::new(
+            ledger_info.clone(),
+            validator_verifier
+                .aggregate_signatures(&partial_sig)
+                .unwrap(),
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .aggregate_and_verify(epoch_state.clone())
+                .unwrap(),
+            aggregate_sig
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .unverified_signatures
+                .signatures()
+                .len(),
+            0
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .verified_signatures
+                .signatures()
+                .len(),
+            5
+        );
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+
+        ledger_info_with_mixed_signatures.add_signature(
+            validator_signers[6].author(),
+            bls12381::Signature::dummy_signature(),
+            false,
+        );
+
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 6);
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .check_voting_power(&validator_verifier)
+                .unwrap(),
+            6
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .aggregate_and_verify(epoch_state.clone())
+                .unwrap(),
+            aggregate_sig
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .unverified_signatures
+                .signatures()
+                .len(),
+            0
+        );
+        assert_eq!(
+            ledger_info_with_mixed_signatures
+                .verified_signatures
+                .signatures()
+                .len(),
+            5
+        );
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 5);
+        assert_eq!(epoch_state.verifier.malicious_authors().len(), 2);
     }
 }
