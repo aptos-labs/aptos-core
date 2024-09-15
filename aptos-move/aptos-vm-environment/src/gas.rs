@@ -9,6 +9,8 @@ use aptos_types::{
 use aptos_vm_types::storage::{io_pricing::IoPricing, StorageGasParameters};
 use move_core_types::gas_algebra::NumArgs;
 
+/// Returns the gas parameters and the gas feature version from the state. If no gas parameters are
+/// found, returns an error.
 pub fn get_gas_config_from_storage(
     state_view: &impl StateView,
 ) -> (Result<AptosGasParameters, String>, u64) {
@@ -31,6 +33,8 @@ pub fn get_gas_config_from_storage(
     }
 }
 
+/// Returns gas and storage gas parameters, as well as the gas feature version, from the state. In
+/// case parameters are not found on-chain, errors are returned.
 pub fn get_gas_parameters(
     features: &Features,
     state_view: &impl StateView,

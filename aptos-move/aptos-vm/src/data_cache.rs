@@ -23,9 +23,10 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
-    vm::configs::aptos_prod_deserializer_config,
 };
-use aptos_vm_environment::gas::get_gas_config_from_storage;
+use aptos_vm_environment::{
+    gas::get_gas_config_from_storage, prod_configs::aptos_prod_deserializer_config,
+};
 use aptos_vm_types::{
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
