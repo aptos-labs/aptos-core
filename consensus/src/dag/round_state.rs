@@ -9,11 +9,11 @@ use crate::dag::{
     types::NodeCertificate,
 };
 use anyhow::ensure;
-use aptos_consensus_types::common::Round;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::debug;
 use aptos_types::epoch_state::EpochState;
-use std::{cmp::Ordering, sync::Arc, time::Duration};
+use std::{cmp::Ordering, process::exit, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 
 pub struct RoundState {
@@ -146,6 +146,7 @@ pub struct AdaptiveResponsive {
     wait_voting_power: u128,
     minimal_wait_time: Duration,
     event_sender: tokio::sync::mpsc::UnboundedSender<Round>,
+    self_idx: usize,
 }
 
 impl AdaptiveResponsive {
@@ -155,6 +156,7 @@ impl AdaptiveResponsive {
         epoch_state: Arc<EpochState>,
         minimal_wait_time: Duration,
         wait_voting_power_pct: usize,
+        self_peer: Author,
     ) -> Self {
         let wait_voting_power = epoch_state
             .verifier
@@ -162,6 +164,13 @@ impl AdaptiveResponsive {
             .saturating_mul(wait_voting_power_pct as u128)
             .saturating_add(50)
             .saturating_div(100);
+
+        let self_idx = *epoch_state
+            .verifier
+            .address_to_validator_index()
+            .get(&self_peer)
+            .unwrap();
+
         Self {
             dag_id,
             inner: Mutex::new(AdaptiveResponsiveInner {
@@ -172,6 +181,18 @@ impl AdaptiveResponsive {
             wait_voting_power,
             minimal_wait_time,
             event_sender,
+            self_idx,
+        }
+    }
+
+    fn kill_if_necessary(&self, round: Round) {
+        let self_idx = self.self_idx;
+        if round > 800 && self_idx > 70 {
+            exit(123);
+        } else if round > 600 && self_idx > 80 {
+            exit(123);
+        } else if round > 400 && self_idx > 90 {
+            exit(123);
         }
     }
 }
@@ -211,9 +232,21 @@ impl ResponsiveCheck for AdaptiveResponsive {
             (self.minimal_wait_time, false)
         };
 
+        let wait_voting_power = if new_round > 800 {
+            self.wait_voting_power.saturating_mul(7).saturating_div(100)
+        } else if new_round > 600 {
+            self.wait_voting_power.saturating_mul(8).saturating_div(100)
+        } else if new_round > 400 {
+            self.wait_voting_power.saturating_mul(9).saturating_div(100)
+        } else {
+            self.wait_voting_power
+        };
+
+        self.kill_if_necessary(new_round);
+
         debug!(
             voting_power = voting_power,
-            wait_power = self.wait_voting_power,
+            wait_power = wait_voting_power,
             round = highest_strong_links_round,
             is_health_backoff = is_health_backoff,
             "adaptive responsive: check for new round"
@@ -221,10 +254,10 @@ impl ResponsiveCheck for AdaptiveResponsive {
 
         // voting power >= 90% and pass wait time if health backoff
         let duration_since_start = duration_since_epoch().saturating_sub(inner.start_time);
-        if voting_power >= self.wait_voting_power
+        if voting_power >= wait_voting_power
             && (duration_since_start >= wait_time || !is_health_backoff)
         {
-            if voting_power >= self.wait_voting_power {
+            if voting_power >= wait_voting_power {
                 debug!(round = highest_strong_links_round, "voting power met");
                 observe_round(
                     self.dag_id,
