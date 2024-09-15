@@ -189,6 +189,7 @@ jobs:
         uses: ./.github/actions/rust-unit-tests
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
 
   # Run the cached packages build. This is a PR required job.
   rust-build-cached-packages:

@@ -175,11 +175,8 @@ module aptos_framework::jwks {
     //
 
     /// Called by a federated keyless dapp owner to install the JWKs for the federated OIDC provider (e.g., Auth0, AWS
-    /// Cognito, etc).
-    ///
-    /// For type-safety, we explicitly use a `struct FederatedJWKs { jwks: AllProviderJWKs }` instead of
-    /// reusing `PatchedJWKs { jwks: AllProviderJWKs }`, which is a JWK-consensus-specific struct. We'd
-    /// need to be careful how we read it in Rust (but BCS serialization should be the same).
+    /// Cognito, etc). For type-safety, we explicitly use a `struct FederatedJWKs { jwks: AllProviderJWKs }` instead of
+    /// reusing `PatchedJWKs { jwks: AllProviderJWKs }`, which is a JWK-consensus-specific struct.
     public fun patch_federated_jwks(jwk_owner: &signer, patches: vector<Patch>) acquires FederatedJWKs {
         // Prevents accidental calls in 0x1::jwks that install federated JWKs at the Aptos framework address.
         assert!(!system_addresses::is_aptos_framework_address(signer::address_of(jwk_owner)),

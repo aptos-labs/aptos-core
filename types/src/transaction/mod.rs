@@ -58,8 +58,9 @@ pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
     block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
-    fee_statement::FeeStatement, proof::accumulator::InMemoryEventAccumulator,
-    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
+    fee_statement::FeeStatement, keyless::FederatedKeylessPublicKey,
+    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
+    write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -620,6 +621,18 @@ impl SignedTransaction {
     ) -> SignedTransaction {
         let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
             AnyPublicKey::keyless(public_key),
+            AnySignature::keyless(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
+    }
+
+    pub fn new_federated_keyless(
+        raw_txn: RawTransaction,
+        public_key: FederatedKeylessPublicKey,
+        signature: KeylessSignature,
+    ) -> SignedTransaction {
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::federated_keyless(public_key),
             AnySignature::keyless(signature),
         ));
         Self::new_single_sender(raw_txn, authenticator)
