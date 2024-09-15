@@ -192,8 +192,6 @@ where
                     needs_suffix_validation = true;
                 }
                 if runtime_environment.vm_config().use_loader_v2 {
-                    // TODO(loader_v2): We do not need to clone out all module writes in V2 design
-                    //                  since we do not store them anymore.
                     versioned_cache
                         .code_storage()
                         .module_storage()
@@ -549,9 +547,9 @@ where
                     ),
                 )?;
 
-                // TODO(loader_v2): Remove duplication here.
                 // Make sure we publish modules here before we wake up subsequent dependent
-                // transactions and decrease the validation index.
+                // transactions and decrease the validation index so that they observe new module
+                // writes as well.
                 if runtime_environment.vm_config().use_loader_v2 {
                     if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
                         executed_at_commit = true;
@@ -581,7 +579,7 @@ where
 
             // If transaction was committed without delayed fields failing, i.e., without
             // re-execution, we make the published modules visible here. As a result, we need to
-            // decrease the validation index.
+            // decrease the validation index to make sure the subsequent transactions see changes.
             if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
                 if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
                     versioned_cache.code_storage().write_published_modules(
