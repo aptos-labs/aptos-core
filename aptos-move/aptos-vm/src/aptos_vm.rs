@@ -109,9 +109,8 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
-    module_linker_error,
     module_traversal::{TraversalContext, TraversalStorage},
-    UnreachableCodeStorage, WithRuntimeEnvironment,
+    RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -230,18 +229,14 @@ impl AptosVM {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let resolver = state_view.as_move_resolver();
-        let move_vm = MoveVmExt::new(env.clone(), &resolver);
+        let move_vm = MoveVmExt::new(env, &resolver);
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
-        let pvk = keyless_validation::get_groth16_vk_onchain(
-            move_vm.env.features(),
-            &resolver,
-            &module_storage,
-        )
-        .ok()
-        .and_then(|vk| vk.try_into().ok());
+        let module_storage = state_view.as_aptos_code_storage(move_vm.env.runtime_environment());
+        let pvk = keyless_validation::get_groth16_vk_onchain(&resolver, &module_storage)
+            .ok()
+            .and_then(|vk| vk.try_into().ok());
 
         Self {
             is_simulation: false,
@@ -299,6 +294,11 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
     ) -> Result<&StorageGasParameters, VMStatus> {
         get_or_vm_startup_failure(self.move_vm.env.storage_gas_params(), log_context)
+    }
+
+    #[inline(always)]
+    pub fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.move_vm.env.runtime_environment()
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -866,14 +866,7 @@ impl AptosVM {
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
         if function.is_friend_or_private()
-            && get_randomness_annotation(
-                resolver,
-                module_storage,
-                session,
-                entry_fn,
-                self.features().is_loader_v2_enabled(),
-            )?
-            .is_some()
+            && get_randomness_annotation(resolver, module_storage, session, entry_fn)?.is_some()
         {
             let txn_context = session
                 .get_native_extensions()
@@ -1014,7 +1007,6 @@ impl AptosVM {
             txn_data.gas_unit_price,
             resolver.as_executor_view(),
             module_storage,
-            self.features().is_loader_v2_enabled(),
         )?;
         if !self.features().is_storage_deletion_refund_enabled() {
             storage_refund = 0.into();
@@ -1438,6 +1430,7 @@ impl AptosVM {
         &self,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
+        module_storage: &impl AptosModuleStorage,
         modules: &[CompiledModule],
         exists: BTreeSet<ModuleId>,
         senders: &[AccountAddress],
@@ -1451,12 +1444,8 @@ impl AptosVM {
                 continue;
             }
             *new_published_modules_loaded = true;
-            let init_function = session.load_function(
-                &UnreachableCodeStorage,
-                &module.self_id(),
-                init_func_name,
-                &[],
-            );
+            let init_function =
+                session.load_function(module_storage, &module.self_id(), init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
             // Note that for historic reasons, verification here is treated
@@ -1475,7 +1464,7 @@ impl AptosVM {
                         args,
                         gas_meter,
                         traversal_context,
-                        &UnreachableCodeStorage,
+                        module_storage,
                     )?;
                 } else {
                     return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
@@ -1694,6 +1683,7 @@ impl AptosVM {
                 self.execute_module_initialization(
                     session,
                     gas_meter,
+                    module_storage,
                     modules,
                     exists,
                     &[destination],
@@ -1756,21 +1746,14 @@ impl AptosVM {
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
 
-        let use_loader_v2 = self.features().is_enabled(FeatureFlag::ENABLE_LOADER_V2);
         verifier::resource_groups::validate_resource_groups(
             session,
             module_storage,
             modules,
             self.features()
                 .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
-            use_loader_v2,
         )?;
-        verifier::event_validation::validate_module_events(
-            session,
-            module_storage,
-            modules,
-            use_loader_v2,
-        )?;
+        verifier::event_validation::validate_module_events(session, module_storage, modules)?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
@@ -2181,11 +2164,21 @@ impl AptosVM {
                 let change_set_configs =
                     ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version());
 
-                // TODO(loader_v2): This session should not publish modules, and should be using native
-                //                  code context instead.
-                let (change_set, module_write_set) =
+                // While scripts should be able to publish modules, this should be done through
+                // native context, and so the module write set must always be empty.
+                let (change_set, empty_module_write_set) =
                     tmp_session.finish(&change_set_configs, code_storage)?;
-                Ok((change_set, module_write_set))
+                empty_module_write_set
+                    .is_empty_or_invariant_violation()
+                    .map_err(|e| {
+                        e.with_message(
+                            "Scripts in write set payload cannot publish modules".to_string(),
+                        )
+                        .finish(Location::Undefined)
+                        .into_vm_status()
+                    })?;
+
+                Ok((change_set, empty_module_write_set))
             },
         }
     }
@@ -2423,19 +2416,9 @@ impl AptosVM {
         module_id: &ModuleId,
     ) -> Option<Arc<RuntimeModuleMetadataV1>> {
         if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            aptos_framework::get_vm_metadata(
-                &self.move_vm,
-                module_storage,
-                self.features(),
-                module_id,
-            )
+            aptos_framework::get_vm_metadata(&self.move_vm, module_storage, module_id)
         } else {
-            aptos_framework::get_vm_metadata_v0(
-                &self.move_vm,
-                module_storage,
-                self.features(),
-                module_id,
-            )
+            aptos_framework::get_vm_metadata_v0(&self.move_vm, module_storage, module_id)
         }
     }
 
@@ -2448,7 +2431,7 @@ impl AptosVM {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(env.clone(), state_view);
+        let vm = AptosVM::new(env, state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -2474,7 +2457,7 @@ impl AptosVM {
         );
 
         let resolver = state_view.as_move_resolver();
-        let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
+        let module_storage = state_view.as_aptos_code_storage(vm.runtime_environment());
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
@@ -2911,9 +2894,7 @@ impl VMValidator for AptosVM {
         let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
-
-        let env = AptosEnvironment::new(state_view);
-        let module_storage = state_view.as_aptos_code_storage(env.runtime_environment());
+        let module_storage = state_view.as_aptos_code_storage(self.runtime_environment());
 
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
 
@@ -2977,11 +2958,11 @@ impl AptosSimulationVM {
         );
 
         let env = AptosEnvironment::new(state_view);
-        let vm = Self::new(env.clone(), state_view);
+        let vm = Self::new(env, state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let resolver = state_view.as_move_resolver();
-        let code_storage = state_view.as_aptos_code_storage(env.runtime_environment());
+        let code_storage = state_view.as_aptos_code_storage(vm.0.runtime_environment());
 
         let (vm_status, vm_output) =
             vm.0.execute_user_transaction(&resolver, &code_storage, transaction, &log_context);
@@ -3030,7 +3011,6 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
     {
         let metadata = fetch_module_metadata_for_struct_tag(
             &AccountResource::struct_tag(),
-            features,
             resolver,
             module_storage,
         )?;
@@ -3049,16 +3029,11 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
 
 pub(crate) fn fetch_module_metadata_for_struct_tag(
     struct_tag: &StructTag,
-    features: &Features,
     resolver: &impl AptosMoveResolver,
     module_storage: &impl AptosModuleStorage,
 ) -> VMResult<Vec<Metadata>> {
-    if features.is_loader_v2_enabled() {
-        let addr = &struct_tag.address;
-        let name = &struct_tag.module;
-        module_storage
-            .fetch_module_metadata(addr, name)?
-            .ok_or_else(|| module_linker_error!(addr, name))
+    if module_storage.is_enabled() {
+        module_storage.fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
     } else {
         Ok(resolver.get_module_metadata(&struct_tag.module_id()))
     }

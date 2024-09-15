@@ -20,7 +20,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig, module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, ModuleStorage,
-    RuntimeEnvironment, StagingModuleStorage, UnreachableCodeStorage,
+    RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -29,14 +29,14 @@ use std::{path::PathBuf, sync::Arc, thread};
 const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
 
 struct Adapter {
-    resource_storage: InMemoryStorage,
+    store: InMemoryStorage,
     vm: Arc<MoveVM>,
     runtime_environment: RuntimeEnvironment,
     functions: Vec<(ModuleId, Identifier)>,
 }
 
 impl Adapter {
-    fn new(resource_storage: InMemoryStorage) -> Self {
+    fn new(store: InMemoryStorage) -> Self {
         let functions = vec![
             (
                 ModuleId::new(WORKING_ACCOUNT, Identifier::new("A").unwrap()),
@@ -70,7 +70,7 @@ impl Adapter {
         let vm = Arc::new(MoveVM::new_with_config(vec![], config));
 
         Self {
-            resource_storage,
+            store,
             vm,
             runtime_environment,
             functions,
@@ -88,7 +88,7 @@ impl Adapter {
         let vm = Arc::new(MoveVM::new_with_config(vec![], config));
 
         Self {
-            resource_storage: self.resource_storage,
+            store: self.store,
             vm,
             runtime_environment,
             functions: self.functions,
@@ -96,7 +96,7 @@ impl Adapter {
     }
 
     fn publish_modules(&mut self, modules: Vec<CompiledModule>) {
-        let mut session = self.vm.new_session(&self.resource_storage);
+        let mut session = self.vm.new_session(&self.store);
 
         for module in modules {
             let mut binary = vec![];
@@ -109,10 +109,14 @@ impl Adapter {
                 .publish_module(binary, WORKING_ACCOUNT, &mut UnmeteredGasMeter)
                 .unwrap_or_else(|_| panic!("failure publishing module: {:#?}", module));
         }
+
+        let module_storage = self
+            .store
+            .as_unsync_module_storage(&self.runtime_environment);
         let changeset = session
-            .finish(&UnreachableCodeStorage)
+            .finish(&module_storage)
             .expect("failure getting write set");
-        self.resource_storage
+        self.store
             .apply(changeset)
             .expect("failure applying write set");
     }
@@ -137,7 +141,7 @@ impl Adapter {
     }
 
     fn publish_modules_with_error(&mut self, modules: Vec<CompiledModule>) {
-        let mut session = self.vm.new_session(&self.resource_storage);
+        let mut session = self.vm.new_session(&self.store);
 
         for module in modules {
             let mut binary = vec![];
@@ -161,10 +165,12 @@ impl Adapter {
         thread::scope(|scope| {
             for _ in 0..reps {
                 for (module_id, name) in self.functions.clone() {
-                    let resource_storage = self.resource_storage.clone();
+                    let storage = self.store.clone();
                     scope.spawn(move || {
                         // It is fine to share the VM: we do not publish modules anyway.
-                        let mut session = self.vm.as_ref().new_session(&resource_storage);
+                        let mut session = self.vm.as_ref().new_session(&storage);
+                        let module_storage =
+                            storage.as_unsync_module_storage(&self.runtime_environment);
                         let traversal_storage = TraversalStorage::new();
                         session
                             .execute_function_bypass_visibility(
@@ -174,7 +180,7 @@ impl Adapter {
                                 Vec::<Vec<u8>>::new(),
                                 &mut UnmeteredGasMeter,
                                 &mut TraversalContext::new(&traversal_storage),
-                                &UnreachableCodeStorage,
+                                &module_storage,
                             )
                             .unwrap_or_else(|e| {
                                 panic!("Failure executing {}::{}: {:?}", module_id, name, e)
@@ -191,7 +197,7 @@ impl Adapter {
         name: &IdentStr,
         module_storage: &impl ModuleStorage,
     ) {
-        let mut session = self.vm.new_session(&self.resource_storage);
+        let mut session = self.vm.new_session(&self.store);
         let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
@@ -220,14 +226,14 @@ fn load() {
     let modules = get_modules();
 
     // calls all functions sequentially
+    let module_storage =
+        InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
     if adapter.vm.vm_config().use_loader_v2 {
-        let module_storage =
-            InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
         adapter.call_functions(&module_storage);
     } else {
         adapter.publish_modules(modules);
-        adapter.call_functions(&UnreachableCodeStorage);
+        adapter.call_functions(&module_storage);
     }
 }
 
@@ -314,17 +320,14 @@ fn load_phantom_module() {
             InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
-        let mut session = adapter.vm.new_session(&adapter.resource_storage);
+        let mut session = adapter.vm.new_session(&adapter.store);
         let _ = session
             .load_function(&new_module_storage, &module_id, ident_str!("foo"), &[])
             .unwrap();
     } else {
         adapter.publish_modules(modules);
         #[allow(deprecated)]
-        adapter
-            .vm
-            .load_module(&module_id, &adapter.resource_storage)
-            .unwrap();
+        adapter.vm.load_module(&module_id, &adapter.store).unwrap();
     }
 }
 
@@ -384,17 +387,14 @@ fn load_with_extra_ability() {
             InMemoryStorage::new().into_unsync_module_storage(&adapter.runtime_environment);
         let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
-        let mut session = adapter.vm.new_session(&adapter.resource_storage);
+        let mut session = adapter.vm.new_session(&adapter.store);
         let _ = session
             .load_function(&new_module_storage, &module_id, ident_str!("foo"), &[])
             .unwrap();
     } else {
         adapter.publish_modules(modules);
         #[allow(deprecated)]
-        adapter
-            .vm
-            .load_module(&module_id, &adapter.resource_storage)
-            .unwrap();
+        adapter.vm.load_module(&module_id, &adapter.store).unwrap();
     }
 }
 

@@ -34,7 +34,7 @@ mod storage;
 
 pub use loader::{LoadedFunction, Module, Script};
 pub use storage::{
-    code_storage::{ambassador_impl_CodeStorage, deserialize_script, script_hash, CodeStorage},
+    code_storage::{ambassador_impl_CodeStorage, script_hash, CodeStorage},
     environment::{
         ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
     },

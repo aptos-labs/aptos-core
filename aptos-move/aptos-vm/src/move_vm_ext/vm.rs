@@ -60,17 +60,6 @@ impl GenesisRuntimeBuilder {
         }
     }
 
-    /// Returns the set of features used by genesis sessions.
-    pub fn genesis_features(&self) -> &Features {
-        &self.features
-    }
-
-    /// Returns change set configs used by genesis sessions. Because genesis sessions are not
-    /// metered, there are no change set (storage) costs.
-    pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {
-        ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
-    }
-
     /// Returns the runtime environment used for any genesis sessions.
     pub fn build_genesis_runtime_environment(&self) -> RuntimeEnvironment {
         RuntimeEnvironment::new_with_config(self.natives.clone(), self.vm_config.clone())
@@ -112,9 +101,19 @@ impl GenesisMoveVM {
             resolver,
         )
     }
+
+    /// Returns the set of features used by genesis VM.
+    pub fn genesis_features(&self) -> &Features {
+        &self.features
+    }
+
+    /// Returns change set configs used by genesis VM sessions. Because genesis sessions are not
+    /// metered, there are no change set (storage) costs.
+    pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {
+        ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
+    }
 }
 
-#[derive(Clone)]
 pub struct MoveVmExt {
     inner: MoveVM,
     pub(crate) env: AptosEnvironment,

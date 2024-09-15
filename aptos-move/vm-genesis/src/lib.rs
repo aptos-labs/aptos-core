@@ -50,7 +50,6 @@ use aptos_vm_types::{
     change_set::VMChangeSet,
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
     module_write_set::ModuleWriteSet,
-    storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -63,7 +62,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage, RuntimeEnvironment, StagingModuleStorage, UnreachableCodeStorage,
+    ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
@@ -145,13 +144,12 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     let genesis_runtime_builder = GenesisRuntimeBuilder::new(chain_id);
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
-    let genesis_features = genesis_runtime_builder.genesis_features();
-    let genesis_change_set_configs = genesis_runtime_builder.genesis_change_set_configs();
 
     let module_storage = state_view.as_aptos_code_storage(&genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
+    let genesis_change_set_configs = genesis_vm.genesis_change_set_configs();
     let mut session = genesis_vm.new_genesis_session(&resolver, HashValue::zero());
 
     // On-chain genesis process.
@@ -200,8 +198,6 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let (additional_change_set, module_write_set) = publish_framework(
         &genesis_vm,
         &genesis_runtime_environment,
-        genesis_features,
-        &genesis_change_set_configs,
         HashValue::new(new_id),
         framework,
     );
@@ -255,13 +251,12 @@ pub fn encode_genesis_change_set(
 
     let genesis_runtime_builder = GenesisRuntimeBuilder::new(chain_id);
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
-    let genesis_features = genesis_runtime_builder.genesis_features();
-    let genesis_change_set_configs = genesis_runtime_builder.genesis_change_set_configs();
 
     let module_storage = state_view.as_aptos_code_storage(&genesis_runtime_environment);
     let resolver = state_view.as_move_resolver();
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
+    let genesis_change_set_configs = genesis_vm.genesis_change_set_configs();
     let mut session = genesis_vm.new_genesis_session(&resolver, HashValue::zero());
 
     // On-chain genesis process.
@@ -329,8 +324,6 @@ pub fn encode_genesis_change_set(
     let (additional_change_set, module_write_set) = publish_framework(
         &genesis_vm,
         &genesis_runtime_environment,
-        genesis_features,
-        &genesis_change_set_configs,
         HashValue::new(new_id),
         framework,
     );
@@ -854,8 +847,6 @@ fn initialize_package(
 fn publish_framework(
     genesis_vm: &GenesisMoveVM,
     genesis_runtime_environment: &RuntimeEnvironment,
-    genesis_features: &Features,
-    genesis_change_set_configs: &ChangeSetConfigs,
     hash_value: HashValue,
     framework: &ReleaseBundle,
 ) -> (VMChangeSet, ModuleWriteSet) {
@@ -863,8 +854,6 @@ fn publish_framework(
         publish_framework_with_loader_v2(
             genesis_vm,
             genesis_runtime_environment,
-            genesis_features,
-            genesis_change_set_configs,
             hash_value,
             framework,
         )
@@ -872,7 +861,6 @@ fn publish_framework(
         publish_framework_with_loader_v1(
             genesis_vm,
             genesis_runtime_environment,
-            genesis_change_set_configs,
             hash_value,
             framework,
         )
@@ -906,8 +894,6 @@ fn code_to_write_ops_for_loader_v2_publishing(
 fn publish_framework_with_loader_v2(
     genesis_vm: &GenesisMoveVM,
     genesis_runtime_environment: &RuntimeEnvironment,
-    genesis_features: &Features,
-    genesis_change_set_configs: &ChangeSetConfigs,
     hash_value: HashValue,
     framework: &ReleaseBundle,
 ) -> (VMChangeSet, ModuleWriteSet) {
@@ -929,7 +915,7 @@ fn publish_framework_with_loader_v2(
 
         let package_write_ops = code_to_write_ops_for_loader_v2_publishing(
             genesis_runtime_environment,
-            genesis_features,
+            genesis_vm.genesis_features(),
             &state_view,
             addr,
             code,
@@ -970,7 +956,7 @@ fn publish_framework_with_loader_v2(
     }
 
     let (change_set, empty_module_write_set) =
-        assert_ok!(session.finish(genesis_change_set_configs, &module_storage));
+        assert_ok!(session.finish(&genesis_vm.genesis_change_set_configs(), &module_storage));
 
     // We use loader V2, so modules are published outside the session and so the module write set
     // returned when finishing the session should be empty.
@@ -981,7 +967,6 @@ fn publish_framework_with_loader_v2(
 fn publish_framework_with_loader_v1(
     genesis_vm: &GenesisMoveVM,
     genesis_runtime_environment: &RuntimeEnvironment,
-    genesis_change_set_configs: &ChangeSetConfigs,
     hash_value: HashValue,
     framework: &ReleaseBundle,
 ) -> (VMChangeSet, ModuleWriteSet) {
@@ -990,6 +975,7 @@ fn publish_framework_with_loader_v1(
     // Here, we set the state view to be empty. Hence, publishing module bundle will always create
     // new write ops.
     let state_view = GenesisStateView::new();
+    let module_storage = state_view.as_aptos_code_storage(genesis_runtime_environment);
 
     let resolver = state_view.as_move_resolver();
     let mut session = genesis_vm.new_genesis_session(&resolver, hash_value);
@@ -1024,10 +1010,10 @@ fn publish_framework_with_loader_v1(
         //   packages. This means that the loader cache actually contains all modules at this point
         //   and so the initialization succeeds. We still create a new write op though, because the
         //   state view is empty. Beautiful!
-        initialize_package(&mut session, &UnreachableCodeStorage, addr, pack);
+        initialize_package(&mut session, &module_storage, addr, pack);
     }
 
-    assert_ok!(session.finish(genesis_change_set_configs, &UnreachableCodeStorage))
+    assert_ok!(session.finish(&genesis_vm.genesis_change_set_configs(), &module_storage))
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
@@ -1325,8 +1311,6 @@ pub fn test_genesis_module_publishing() {
 
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
-    let genesis_features = genesis_runtime_builder.genesis_features();
-    let genesis_change_set_configs = genesis_runtime_builder.genesis_change_set_configs();
 
     // We only test loader V2 flow here because V1 flow does not make sense. V1 relies on modules
     // being cached in loader prior to publishing, which happens to be the case when resources are
@@ -1340,8 +1324,6 @@ pub fn test_genesis_module_publishing() {
         let (change_set, module_write_set) = publish_framework(
             &genesis_vm,
             &genesis_runtime_environment,
-            genesis_features,
-            &genesis_change_set_configs,
             HashValue::zero(),
             aptos_cached_packages::head_release_bundle(),
         );

@@ -29,7 +29,7 @@ pub fn verify_module_init_function(module: &CompiledModule) -> PartialVMResult<(
 
     if fdef.visibility != Visibility::Private {
         return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-            .with_message("init_function is not private".to_string()));
+            .with_message("'init_module' is not private".to_string()));
     }
 
     let fhandle = module.function_handle_at(fdef.function);
@@ -39,7 +39,7 @@ pub fn verify_module_init_function(module: &CompiledModule) -> PartialVMResult<(
 
     if !return_.0.is_empty() {
         return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-            .with_message("init_function should not return".to_string()));
+            .with_message("'init_module' should not return".to_string()));
     }
 
     let non_signer_tokens = parameters
@@ -48,7 +48,7 @@ pub fn verify_module_init_function(module: &CompiledModule) -> PartialVMResult<(
         .any(|e| !is_signer_or_signer_reference(e));
     if non_signer_tokens {
         return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-            .with_message("init_function should not have no-signer arguments".to_string()));
+            .with_message("'init_module' should not have no-signer arguments".to_string()));
     }
     Ok(())
 }

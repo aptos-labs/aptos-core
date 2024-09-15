@@ -146,15 +146,19 @@ pub enum ExecFuncTimerDynamicArgs {
 
 impl FakeExecutor {
     /// Creates an executor from a genesis [`WriteSet`].
-    pub fn from_genesis(write_set: &WriteSet, _chain_id: ChainId) -> Self {
+    pub fn from_genesis(write_set: &WriteSet, chain_id: ChainId) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .num_threads(num_cpus::get())
                 .build()
                 .unwrap(),
         );
+
+        let mut data_store = FakeDataStore::default();
+        data_store.set_chain_id(chain_id);
+
         let mut executor = FakeExecutor {
-            data_store: FakeDataStore::default(),
+            data_store,
             event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,
@@ -171,11 +175,14 @@ impl FakeExecutor {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn from_genesis_with_existing_thread_pool(
         write_set: &WriteSet,
-        _chain_id: ChainId,
+        chain_id: ChainId,
         executor_thread_pool: Arc<rayon::ThreadPool>,
     ) -> Self {
+        let mut data_store = FakeDataStore::default();
+        data_store.set_chain_id(chain_id);
+
         let mut executor = FakeExecutor {
-            data_store: FakeDataStore::default(),
+            data_store,
             event_store: Vec::new(),
             executor_thread_pool,
             block_time: 0,

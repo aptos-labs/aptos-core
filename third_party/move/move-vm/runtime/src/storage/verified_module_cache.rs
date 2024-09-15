@@ -4,16 +4,14 @@
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 
-/// Cache for already verified modules. Since loader V1 uses such a cache
-/// to not perform repeated verifications, possibly even across blocks, for
-/// comparative performance we need to have it as well. For now, we keep it
-/// as a separate cache to make sure there is no interference between V1
+/// Cache for already verified modules. Since loader V1 uses such a cache to not perform repeated
+/// verifications, possibly even across blocks, for comparative performance we need to have it as
+/// well. For now, we keep it as a separate cache to make sure there is no interference between V1
 /// and V2 implementations.
 pub(crate) struct VerifiedModuleCache(Mutex<lru::LruCache<[u8; 32], ()>>);
 
 impl VerifiedModuleCache {
-    /// Maximum size of the cache. When modules are cached, they can skip
-    /// re-verification.
+    /// Maximum size of the cache. When modules are cached, they can skip re-verification.
     const VERIFIED_CACHE_SIZE: usize = 100_000;
 
     /// Returns new empty verified module cache.
