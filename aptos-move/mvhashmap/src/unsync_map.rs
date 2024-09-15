@@ -102,8 +102,7 @@ impl<
             num_resources: self.resource_map.borrow().len(),
             num_resource_groups: self.group_cache.borrow().len(),
             num_delayed_fields: self.delayed_field_map.borrow().len(),
-            // TODO(loader_v2): Fix this, should be based on the feature flag.
-            num_modules: self.module_map.borrow().len(),
+            num_modules: self.module_map.borrow().len() + self.module_storage.borrow().len(),
             base_resources_size: self.total_base_resource_size.load(Ordering::Relaxed),
             base_delayed_fields_size: self.total_base_delayed_field_size.load(Ordering::Relaxed),
         }
