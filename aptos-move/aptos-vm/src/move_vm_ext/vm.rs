@@ -9,18 +9,18 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{Features, TimedFeaturesBuilder},
     transaction::user_transaction_context::UserTransactionContext,
-    vm::configs::aptos_prod_vm_config,
 };
 use aptos_vm_environment::{
-    environment::{aptos_default_ty_builder, Environment},
+    environment::AptosEnvironment,
     natives::aptos_natives_with_builder,
+    prod_configs::{aptos_default_ty_builder, aptos_prod_vm_config},
 };
 use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_functions::NativeFunctionTable, RuntimeEnvironment,
     WithRuntimeEnvironment,
 };
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
 
 /// Used by genesis to create runtime environment and VM ([GenesisMoveVM]), encapsulating all
 /// configs.
@@ -117,15 +117,15 @@ impl GenesisMoveVM {
 #[derive(Clone)]
 pub struct MoveVmExt {
     inner: MoveVM,
-    pub(crate) env: Arc<Environment>,
+    pub(crate) env: AptosEnvironment,
 }
 
 impl MoveVmExt {
-    pub fn new(env: Arc<Environment>, resolver: &impl AptosMoveResolver) -> Self {
+    pub fn new(env: AptosEnvironment, resolver: &impl AptosMoveResolver) -> Self {
         let vm = if env.features().is_loader_v2_enabled() {
             MoveVM::new_with_runtime_environment(env.runtime_environment())
         } else {
-            WarmVmCache::get_warm_vm(env.as_ref(), resolver)
+            WarmVmCache::get_warm_vm(&env, resolver)
                 .expect("should be able to create Move VM; check if there are duplicated natives")
         };
 
