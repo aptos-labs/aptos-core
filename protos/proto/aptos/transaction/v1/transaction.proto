@@ -380,6 +380,7 @@ message MoveFunction {
 message MoveStruct {
   string name = 1;
   bool is_native = 2;
+  bool is_event = 6;
   repeated MoveAbility abilities = 3;
   repeated MoveStructGenericTypeParam generic_type_params = 4;
   repeated MoveStructField fields = 5;
@@ -517,6 +518,7 @@ message AnyPublicKey {
     TYPE_SECP256K1_ECDSA = 2;
     TYPE_SECP256R1_ECDSA = 3;
     TYPE_KEYLESS = 4;
+    TYPE_FEDERATED_KEYLESS = 5;
   }
 
   Type type = 1;

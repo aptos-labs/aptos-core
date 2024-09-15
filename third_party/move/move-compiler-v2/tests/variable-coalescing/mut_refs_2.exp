@@ -149,8 +149,7 @@ struct S has copy, drop {
 test(Arg0: S): u64 /* def_idx: 0 */ {
 L1:	loc0: S
 L2:	loc1: S
-L3:	loc2: u64
-L4:	loc3: &mut u64
+L3:	loc2: &mut u64
 B0:
 	0: MoveLoc[0](Arg0: S)
 	1: StLoc[1](loc0: S)
@@ -158,16 +157,14 @@ B0:
 	3: StLoc[2](loc1: S)
 	4: MutBorrowLoc[1](loc0: S)
 	5: MutBorrowField[0](S.a: u64)
-	6: LdU64(0)
-	7: StLoc[3](loc2: u64)
-	8: StLoc[4](loc3: &mut u64)
-	9: MoveLoc[3](loc2: u64)
-	10: MoveLoc[4](loc3: &mut u64)
-	11: WriteRef
-	12: ImmBorrowLoc[2](loc1: S)
-	13: ImmBorrowField[0](S.a: u64)
-	14: ReadRef
-	15: Ret
+	6: StLoc[3](loc2: &mut u64)
+	7: LdU64(0)
+	8: MoveLoc[3](loc2: &mut u64)
+	9: WriteRef
+	10: ImmBorrowLoc[2](loc1: S)
+	11: ImmBorrowField[0](S.a: u64)
+	12: ReadRef
+	13: Ret
 }
 }
 ============ bytecode verification succeeded ========

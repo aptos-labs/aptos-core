@@ -13,6 +13,7 @@
 //! It's used to compress mostly indexes into the main binary tables.
 use crate::file_format::Bytecode;
 use anyhow::{bail, Result};
+use move_core_types::value;
 use std::{
     io::{Cursor, Read},
     mem::size_of,
@@ -76,7 +77,7 @@ pub const ACQUIRES_COUNT_MAX: u64 = 255;
 
 pub const FIELD_COUNT_MAX: u64 = 255;
 pub const FIELD_OFFSET_MAX: u64 = 255;
-pub const VARIANT_COUNT_MAX: u64 = 127;
+pub const VARIANT_COUNT_MAX: u64 = value::VARIANT_COUNT_MAX;
 pub const VARIANT_OFFSET_MAX: u64 = 127;
 
 pub const TYPE_PARAMETER_COUNT_MAX: u64 = 255;

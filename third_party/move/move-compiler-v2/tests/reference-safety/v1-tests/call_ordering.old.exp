@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: cannot immutably borrow since mutable references exist
+  ┌─ tests/reference-safety/v1-tests/call_ordering.move:7:13
+  │
+6 │         let f = &mut s.f;
+  │                 -------- previous mutable field borrow
+7 │         foo(freeze(s), { *f = 0; 1 })
+  │             ^^^^^^^^^    ------ requirement enforced here
+  │             │
+  │             immutable borrow attempted here
+
+error: cannot freeze local `s` since other mutable usages for this reference exist
+  ┌─ tests/reference-safety/v1-tests/call_ordering.move:7:13
+  │
+7 │         foo(freeze(s), { *f = 0; 1 })
+  │             ^^^^^^^^^    ------ used here
+  │             │
+  │             frozen here

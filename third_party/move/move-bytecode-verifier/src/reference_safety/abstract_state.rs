@@ -200,69 +200,31 @@ impl AbstractState {
     // Core Predicates
     //**********************************************************************************************
 
-    /// checks if `id` is borrowed, but ignores field borrows
     fn has_full_borrows(&self, id: RefID) -> bool {
-        let (full_borrows, _field_borrows) = self.borrow_graph.borrowed_by(id);
-        !full_borrows.is_empty()
+        self.borrow_graph.has_full_borrows(id)
     }
 
-    /// Checks if `id` is borrowed
-    /// - All full/epsilon borrows are considered
-    /// - Only field borrows the specified label (or all if one isn't specified) are considered
     fn has_consistent_borrows(&self, id: RefID, label_opt: Option<Label>) -> bool {
-        let (full_borrows, field_borrows) = self.borrow_graph.borrowed_by(id);
-        !full_borrows.is_empty() || {
-            match label_opt {
-                None => field_borrows.values().any(|borrows| !borrows.is_empty()),
-                Some(label) => field_borrows
-                    .get(&label)
-                    .map(|borrows| !borrows.is_empty())
-                    .unwrap_or(false),
-            }
-        }
+        self.borrow_graph.has_consistent_borrows(id, label_opt)
     }
 
-    /// Checks if `id` is mutable borrowed
-    /// - All full/epsilon mutable borrows are considered
-    /// - Only field mutable borrows the specified label (or all if one isn't specified) are
-    ///   considered
     fn has_consistent_mutable_borrows(&self, id: RefID, label_opt: Option<Label>) -> bool {
-        let (full_borrows, field_borrows) = self.borrow_graph.borrowed_by(id);
-        !self.all_immutable(&full_borrows) || {
-            match label_opt {
-                None => field_borrows
-                    .values()
-                    .any(|borrows| !self.all_immutable(borrows)),
-                Some(label) => field_borrows
-                    .get(&label)
-                    .map(|borrows| !self.all_immutable(borrows))
-                    .unwrap_or(false),
-            }
-        }
+        self.borrow_graph
+            .has_consistent_mutable_borrows(id, label_opt)
     }
 
-    /// checks if `id` is writable
-    /// - Mutable references are writable if there are no consistent borrows
-    /// - Immutable references are not writable by the typing rules
     fn is_writable(&self, id: RefID) -> bool {
-        assert!(self.borrow_graph.is_mutable(id));
-        !self.has_consistent_borrows(id, None)
+        self.borrow_graph.is_writable(id)
     }
 
-    /// checks if `id` is freezable
-    /// - Mutable references are freezable if there are no consistent mutable borrows
-    /// - Immutable references are not freezable by the typing rules
     fn is_freezable(&self, id: RefID, at_field_opt: Option<FieldOrVariantIndex>) -> bool {
-        assert!(self.borrow_graph.is_mutable(id));
-        !self.has_consistent_mutable_borrows(id, at_field_opt.map(Label::Field))
+        self.borrow_graph
+            .is_freezable(id, at_field_opt.map(Label::Field))
     }
 
-    /// checks if `id` is readable
-    /// - Mutable references are readable if they are freezable
-    /// - Immutable references are always readable
     fn is_readable(&self, id: RefID, at_field_opt: Option<FieldOrVariantIndex>) -> bool {
-        let is_mutable = self.borrow_graph.is_mutable(id);
-        !is_mutable || self.is_freezable(id, at_field_opt)
+        self.borrow_graph
+            .is_readable(id, at_field_opt.map(Label::Field))
     }
 
     /// checks if local@idx is borrowed
@@ -656,10 +618,6 @@ impl AbstractState {
         };
         assert!(canonical_state.is_canonical());
         canonical_state
-    }
-
-    fn all_immutable(&self, borrows: &BTreeMap<RefID, ()>) -> bool {
-        !borrows.keys().any(|x| self.borrow_graph.is_mutable(*x))
     }
 
     fn is_canonical(&self) -> bool {

@@ -288,7 +288,7 @@ mock! {
 
         fn get_latest_ledger_info(&self) -> aptos_storage_interface::Result<LedgerInfoWithSignatures>;
 
-        fn get_synced_version(&self) -> aptos_storage_interface::Result<Version>;
+        fn get_synced_version(&self) -> aptos_storage_interface::Result<Option<Version>>;
 
         fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version>;
 
@@ -342,7 +342,7 @@ mock! {
             ledger_version: Version,
         ) -> aptos_storage_interface::Result<TransactionAccumulatorSummary>;
 
-        fn get_state_leaf_count(&self, version: Version) -> aptos_storage_interface::Result<usize>;
+        fn get_state_item_count(&self, version: Version) -> aptos_storage_interface::Result<usize>;
 
         fn get_state_value_chunk_with_proof(
             &self,

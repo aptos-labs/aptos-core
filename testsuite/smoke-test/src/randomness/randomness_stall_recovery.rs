@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    genesis::enable_sync_only_mode, randomness::get_on_chain_resource,
-    smoke_test_environment::SwarmBuilder,
+    genesis::enable_sync_only_mode, smoke_test_environment::SwarmBuilder,
+    utils::get_on_chain_resource,
 };
 use aptos::common::types::GasOptions;
 use aptos_config::config::{OverrideNodeConfig, PersistableConfig};

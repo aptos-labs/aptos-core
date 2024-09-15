@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
+use super::types::MempoolMessageId;
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     counters,
@@ -10,8 +11,8 @@ use crate::{
     network::{BroadcastError, BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{
         types::{
-            notify_subscribers, MultiBatchId, ScheduledBroadcast, SharedMempool,
-            SharedMempoolNotification, SubmissionStatusBundle,
+            notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
+            SubmissionStatusBundle,
         },
         use_case_history::UseCaseHistory,
     },
@@ -133,10 +134,9 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     let statuses: Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))> =
         process_incoming_transactions(
             &smp,
-            vec![(transaction, None)],
+            vec![(transaction, None, Some(BroadcastPeerPriority::Primary))],
             timeline_state,
             true,
-            BroadcastPeerPriority::Primary,
         );
     log_txn_process_results(&statuses, None);
 
@@ -178,25 +178,27 @@ pub(crate) async fn process_client_get_transaction<NetworkClient, TransactionVal
 pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionValidator>(
     smp: SharedMempool<NetworkClient, TransactionValidator>,
     // The sender of the transactions can send the time at which the transactions were inserted
-    // in the sender's mempool.
-    transactions: Vec<(SignedTransaction, Option<u64>)>,
-    request_id: MultiBatchId,
+    // in the sender's mempool. The sender can also send the priority of this node for the sender
+    // of the transactions.
+    transactions: Vec<(
+        SignedTransaction,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
+    message_id: MempoolMessageId,
     timeline_state: TimelineState,
     peer: PeerNetworkId,
     timer: HistogramTimer,
-    // The priority of this node for the sender of the transactions
-    priority: BroadcastPeerPriority,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
-    let results =
-        process_incoming_transactions(&smp, transactions, timeline_state, false, priority);
+    let results = process_incoming_transactions(&smp, transactions, timeline_state, false);
     log_txn_process_results(&results, Some(peer));
 
-    let ack_response = gen_ack_response(request_id, results, &peer);
+    let ack_response = gen_ack_response(message_id, results, &peer);
 
     // Respond to the peer with an ack. Note: ack response messages should be
     // small enough that they always fit within the maximum network message
@@ -218,7 +220,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
 
 /// If `MempoolIsFull` on any of the transactions, provide backpressure to the downstream peer.
 fn gen_ack_response(
-    request_id: MultiBatchId,
+    message_id: MempoolMessageId,
     results: Vec<SubmissionStatusBundle>,
     peer: &PeerNetworkId,
 ) -> MempoolSyncMsg {
@@ -237,7 +239,7 @@ fn gen_ack_response(
         backoff_and_retry,
     );
     MempoolSyncMsg::BroadcastTransactionsResponse {
-        request_id,
+        message_id,
         retry: backoff_and_retry,
         backoff: backoff_and_retry,
     }
@@ -269,11 +271,13 @@ pub(crate) fn update_ack_counter(
 /// and returns a vector containing [SubmissionStatusBundle].
 pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>(
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
-    transactions: Vec<(SignedTransaction, Option<u64>)>,
+    transactions: Vec<(
+        SignedTransaction,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
     timeline_state: TimelineState,
     client_submitted: bool,
-    // The priority of this node for the sender of the transactions
-    priority: BroadcastPeerPriority,
 ) -> Vec<SubmissionStatusBundle>
 where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
@@ -291,7 +295,7 @@ where
     let seq_numbers = IO_POOL.install(|| {
         transactions
             .par_iter()
-            .map(|(t, _)| {
+            .map(|(t, _, _)| {
                 get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
                     error!(LogSchema::new(LogEntry::DBError).error(&e));
                     counters::DB_ERROR.inc();
@@ -309,10 +313,10 @@ where
     let transactions: Vec<_> = transactions
         .into_iter()
         .enumerate()
-        .filter_map(|(idx, (t, ready_time_at_sender))| {
+        .filter_map(|(idx, (t, ready_time_at_sender, priority))| {
             if let Ok(sequence_num) = seq_numbers[idx] {
                 if t.sequence_number() >= sequence_num {
-                    return Some((t, sequence_num, ready_time_at_sender));
+                    return Some((t, sequence_num, ready_time_at_sender, priority));
                 } else {
                     statuses.push((
                         t,
@@ -342,7 +346,6 @@ where
         timeline_state,
         &mut statuses,
         client_submitted,
-        priority,
     );
     notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
     statuses
@@ -352,12 +355,16 @@ where
 /// validation into the mempool.
 #[cfg(not(feature = "consensus-only-perf-test"))]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, u64, Option<u64>)>,
+    transactions: Vec<(
+        SignedTransaction,
+        u64,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
     client_submitted: bool,
-    priority: BroadcastPeerPriority,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
@@ -368,12 +375,20 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
         .start_timer();
     let validation_results = transactions
         .par_iter()
-        .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
+        .map(|t| {
+            let result = smp.validator.read().validate_transaction(t.0.clone());
+            // Pre-compute the hash and length if the transaction is valid, before locking mempool
+            if result.is_ok() {
+                t.0.committed_hash();
+                t.0.txn_bytes_len();
+            }
+            result
+        })
         .collect::<Vec<_>>();
     vm_validation_timer.stop_and_record();
     {
         let mut mempool = smp.mempool.lock();
-        for (idx, (transaction, sequence_info, ready_time_at_sender)) in
+        for (idx, (transaction, sequence_info, ready_time_at_sender, priority)) in
             transactions.into_iter().enumerate()
         {
             if let Ok(validation_result) = &validation_results[idx] {
@@ -426,9 +441,15 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     transactions: Vec<(SignedTransaction, u64, Option<u64>)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
-    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
+    statuses: &mut Vec<(
+        SignedTransaction,
+        (
+            MempoolStatus,
+            Option<StatusCode>,
+            Option<BroadcastPeerPriority>,
+        ),
+    )>,
     client_submitted: bool,
-    priority: BroadcastPeerPriority,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
@@ -436,13 +457,14 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     use super::priority;
 
     let mut mempool = smp.mempool.lock();
-    for (transaction, sequence_info, _ready_time_at_sender) in transactions.into_iter() {
+    for (transaction, sequence_info, ready_time_at_sender, priority) in transactions.into_iter() {
         let mempool_status = mempool.add_txn(
             transaction.clone(),
             0,
             sequence_info,
             timeline_state,
             client_submitted,
+            read_time_at_sender,
             priority,
         );
         statuses.push((transaction, (mempool_status, None)));
@@ -557,7 +579,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
     };
     // Send back to callback
     let result = if callback.send(Ok(resp)).is_err() {
-        error!(LogSchema::event_log(
+        debug!(LogSchema::event_log(
             LogEntry::QuorumStore,
             LogEvent::CallbackFail
         ));

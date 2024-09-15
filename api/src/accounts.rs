@@ -483,7 +483,7 @@ impl Account {
             })?;
 
         // Find the resource and retrieve the struct field
-        let resource = self.find_resource(&struct_tag)?;
+        let (_, resource) = self.find_resource(&struct_tag)?;
         let (_id, value) = resource
             .into_iter()
             .find(|(id, _)| id == &field_name)
@@ -523,11 +523,18 @@ impl Account {
         Ok(*event_handle.key())
     }
 
-    /// Find a resource associated with an account
+    /// Find a resource associated with an account. If the resource is an enum variant,
+    /// returns the variant name in the option.
     fn find_resource(
         &self,
         resource_type: &StructTag,
-    ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
+    ) -> Result<
+        (
+            Option<Identifier>,
+            Vec<(Identifier, move_core_types::value::MoveValue)>,
+        ),
+        BasicErrorWith404,
+    > {
         let (ledger_info, requested_ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
 

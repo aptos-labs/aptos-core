@@ -37,10 +37,12 @@ pub struct ConsensusObserverConfig {
     /// Maximum timeout (in milliseconds) we'll wait for the synced version to
     /// increase before terminating the active subscription.
     pub max_synced_version_timeout_ms: u64,
-    /// Interval (in milliseconds) to check the optimality of the subscribed peers
-    pub peer_optimality_check_interval_ms: u64,
     /// Interval (in milliseconds) to check progress of the consensus observer
     pub progress_check_interval_ms: u64,
+    /// Interval (in milliseconds) to check for subscription related peer changes
+    pub subscription_peer_change_interval_ms: u64,
+    /// Interval (in milliseconds) to refresh the subscription
+    pub subscription_refresh_interval_ms: u64,
 }
 
 impl Default for ConsensusObserverConfig {
@@ -55,8 +57,9 @@ impl Default for ConsensusObserverConfig {
             max_num_pending_blocks: 100,                       // 100 blocks
             max_subscription_timeout_ms: 30_000,               // 30 seconds
             max_synced_version_timeout_ms: 60_000,             // 60 seconds
-            peer_optimality_check_interval_ms: 60_000,         // 60 seconds
             progress_check_interval_ms: 5_000,                 // 5 seconds
+            subscription_peer_change_interval_ms: 60_000,      // 1 minute
+            subscription_refresh_interval_ms: 300_000,         // 5 minutes
         }
     }
 }
@@ -105,7 +108,7 @@ impl ConfigOptimizer for ConsensusObserverConfig {
                 }
             },
             NodeType::PublicFullnode => {
-                if ENABLE_ON_PUBLIC_FULLNODES && !observer_manually_set {
+                if ENABLE_ON_PUBLIC_FULLNODES && !observer_manually_set && !publisher_manually_set {
                     // Enable both the observer and the publisher for PFNs
                     consensus_observer_config.observer_enabled = true;
                     consensus_observer_config.publisher_enabled = true;

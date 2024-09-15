@@ -12,8 +12,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/strong_edges.move:48: glob_and_field_edges_incorrect
    =     at tests/sources/functional/strong_edges.move:49: glob_and_field_edges_incorrect
    =         <redacted> = <redacted>
-   =         s = <redacted>
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/strong_edges.move:50: glob_and_field_edges_incorrect
    =     at tests/sources/functional/strong_edges.move:55: glob_and_field_edges_incorrect (spec)
    =     at tests/sources/functional/strong_edges.move:54: glob_and_field_edges_incorrect (spec)
@@ -27,8 +25,7 @@ error: unknown assertion failed
    =     at tests/sources/functional/strong_edges.move:60: loc__edge_incorrect
    =         r = <redacted>
    =     at tests/sources/functional/strong_edges.move:61: loc__edge_incorrect
-   =     at tests/sources/functional/strong_edges.move:62: loc__edge_incorrect
-   =         <redacted> = <redacted>
    =         r_ref = <redacted>
+   =     at tests/sources/functional/strong_edges.move:62: loc__edge_incorrect
    =         r = <redacted>
    =     at tests/sources/functional/strong_edges.move:64: loc__edge_incorrect

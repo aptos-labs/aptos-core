@@ -120,7 +120,7 @@ impl Default for Options {
             skip_attribute_checks: false,
             compiler_v2: match CompilerVersion::default() {
                 CompilerVersion::V1 => false,
-                CompilerVersion::V2_0 => true,
+                CompilerVersion::V2_0 | CompilerVersion::V2_1 => true,
             },
             language_version: None,
         }
