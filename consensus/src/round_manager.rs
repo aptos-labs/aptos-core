@@ -1445,7 +1445,7 @@ impl RoundManager {
     #[allow(clippy::unwrap_used)]
     pub async fn start(
         mut self,
-        mut verified_event_rx: aptos_channel::Receiver<
+        mut event_rx: aptos_channel::Receiver<
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
@@ -1523,7 +1523,7 @@ impl RoundManager {
                         },
                     };
                 },
-                (peer_id, event) = verified_event_rx.select_next_some() => {
+                (peer_id, event) = event_rx.select_next_some() => {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg, true).await)
@@ -1547,7 +1547,7 @@ impl RoundManager {
                             "process_local_timeout",
                             self.process_local_timeout(round).await
                         ),
-                        unexpected_event => unreachable!("Unexpected verified event: {:?}", unexpected_event),
+                        unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
                     }
                     .with_context(|| format!("from peer {}", peer_id));
 

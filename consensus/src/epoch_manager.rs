@@ -1516,7 +1516,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         )
                     ) {
                         Ok(verified_event) => {
-                            Self::forward_verified_event(
+                            Self::forward_event(
                                 quorum_store_msg_tx,
                                 round_manager_tx,
                                 buffered_proposal_tx,
@@ -1642,7 +1642,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn forward_verified_event(
+    fn forward_event(
         quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
