@@ -38,6 +38,7 @@ use aptos_types::{
     contract_event::EventWithVersion,
     state_store::state_key::StateKey,
     transaction::SignedTransaction,
+    CoinType,
 };
 use move_core_types::language_storage::StructTag;
 use reqwest::{
@@ -220,16 +221,12 @@ impl Client {
         })
     }
 
-    pub async fn get_account_balance_bcs(
+    pub async fn get_account_balance_bcs<C: CoinType>(
         &self,
         address: AccountAddress,
-        coin_type: &str,
     ) -> AptosResult<Response<u64>> {
         let resp = self
-            .get_account_resource_bcs::<CoinStoreResource>(
-                address,
-                &format!("0x1::coin::CoinStore<{}>", coin_type),
-            )
+            .get_account_resource_bcs::<CoinStoreResource<C>>(address, &C::type_tag().to_string())
             .await?;
         resp.and_then(|resource| Ok(resource.coin()))
     }

@@ -222,7 +222,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::FLUSH_WRITES_OPTIMIZATION.to_string(),
             description: "Whether to run flush writes processor and optimization".to_string(),
-            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+            default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
             name: Experiment::STOP_BEFORE_STACKLESS_BYTECODE.to_string(),

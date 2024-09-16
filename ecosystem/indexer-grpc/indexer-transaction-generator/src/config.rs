@@ -129,7 +129,8 @@ pub struct TransactionImporterPerNetworkConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScriptTransactionGeneratorConfig {
     /// List of scripts to run to generate transactions.
-    pub scripted_transactions: Vec<ScriptTransactions>,
+    /// Note, each run will be executed in sequence.
+    pub runs: Vec<ScriptTransactions>,
 }
 
 /// Configuration for generating transactions from a script.
@@ -137,12 +138,12 @@ pub struct ScriptTransactionGeneratorConfig {
 /// A managed-node will be used to execute the scripts in sequence.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScriptTransactions {
-    pub steps: Vec<ScriptStep>,
+    pub transactions: Vec<ScriptTransaction>,
 }
 
 /// A step that can optionally output one transaction.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ScriptStep {
+pub struct ScriptTransaction {
     pub script_path: PathBuf,
     pub output_name: Option<String>,
     // Optional address to fund the account; if not provided, the default profile address will be used.
@@ -174,7 +175,8 @@ mod tests {
                     }
                 },
                 "script_transaction_generator_config": {
-                    "scripted_transactions": []
+                    "runs": [
+                    ]
                 }
             }
         "#;

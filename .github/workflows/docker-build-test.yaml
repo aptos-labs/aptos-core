@@ -312,7 +312,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: d1bf834728a0cf166d993f4728dfca54f3086fb0 #aptos-node-v1.18.0
+      IMAGE_TAG: 70806ff543496aa6de7807feff49e7e1370efd20 #aptos-node-v1.19.1
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
@@ -340,7 +340,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: d1bf834728a0cf166d993f4728dfca54f3086fb0 #aptos-node-v1.18.0
+      IMAGE_TAG: 70806ff543496aa6de7807feff49e7e1370efd20 #aptos-node-v1.19.1
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}

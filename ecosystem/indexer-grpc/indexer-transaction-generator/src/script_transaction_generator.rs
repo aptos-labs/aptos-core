@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{ScriptStep, ScriptTransactionGeneratorConfig},
+    config::{ScriptTransaction, ScriptTransactionGeneratorConfig},
     managed_node::ManagedNode,
 };
 use anyhow::{Context, Result};
@@ -31,13 +31,20 @@ impl ScriptTransactionGeneratorConfig {
         // Validate the script transactions.
         // 1. No output file names are duplicated.
         let mut output_files = std::collections::HashSet::new();
-        for script_transactions in &self.scripted_transactions {
-            for step in &script_transactions.steps {
-                if let Some(output_name) = &step.output_name {
+        for (idx, run) in self.runs.iter().enumerate() {
+            // Each run should have at least one transaction.
+            if run.transactions.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "[Script Transaction Generator] No transactions in the run."
+                ));
+            }
+            for transaction in &run.transactions {
+                if let Some(output_name) = &transaction.output_name {
                     if !output_files.insert(output_name) {
                         return Err(anyhow::anyhow!(
-                            "[Script Transaction Generator] Output file name {} is duplicated",
-                            output_name
+                            "[Script Transaction Generator] Duplicated output file name `{}` found at run {}. ",
+                            output_name,
+                            idx
                         ));
                     }
                 }
@@ -47,21 +54,23 @@ impl ScriptTransactionGeneratorConfig {
         Ok(())
     }
 
+    /// Run the script transaction generator using a localnode.
     pub async fn run(&self, output_path: &Path) -> anyhow::Result<()> {
         // Validate the configuration.
         self.validate()?;
 
         // Submit and capture the transactions.
-        for script_transactions in &self.scripted_transactions {
+        for run in &self.runs {
             // Start the localnet.
-            // TODO: refresh the localnet for each script transaction.
+            // TODO: currently we seperate the submission by runs because some scripts may have dependencies on each other.
+            //   If possible, we can submit all transactions in one run.
             let mut managed_node = ManagedNode::start(None, None).await?;
 
             let mut versions_to_capture = vec![];
 
-            for step in &script_transactions.steps {
-                let version = self.execute_script_step(step).await?;
-                if let Some(output_name) = &step.output_name {
+            for transaction in &run.transactions {
+                let version = self.execute_script_transaction(transaction).await?;
+                if let Some(output_name) = &transaction.output_name {
                     versions_to_capture.push((version, output_name.clone()));
                 }
             }
@@ -74,37 +83,54 @@ impl ScriptTransactionGeneratorConfig {
         Ok(())
     }
 
-    /// Prepare the script
-    async fn prepare_script_step(&self, step: &ScriptStep) -> anyhow::Result<()> {
+    /// Prepare the script transaction run, including:
+    ///  - Validate the script.
+    ///  - Fund the account.
+    async fn prepare_script_transaction(
+        &self,
+        transaction: &ScriptTransaction,
+    ) -> anyhow::Result<()> {
         // Set the current folder to the script folder.
-        std::env::set_current_dir(&step.script_path)
-            .context("Failed to set the current directory to the script folder.")?;
+        // std::env::set_current_dir(&transaction.script_path)
+        // .context("Failed to set the current directory to the script folder.")?;
 
-        let fund_address = step.fund_address.clone();
+        let fund_address = transaction.fund_address.clone();
         let fund_cmd = create_fund_cmd(DEFAULT_FUND_AMOUNT_IN_OCTA, fund_address);
         let _ = fund_cmd.execute().await.context(format!(
             "Failed to fund the account for account: {}.",
-            step.fund_address
+            transaction
+                .fund_address
                 .clone()
                 .unwrap_or("Default profile".to_string())
         ))?;
         Ok(())
     }
 
-    async fn execute_script_step(&self, step: &ScriptStep) -> anyhow::Result<u64> {
-        self.prepare_script_step(step).await?;
+    /// Execute a script transaction run and return the version of the transaction:
+    /// - Compile the script.
+    /// - Run the script.
+    async fn execute_script_transaction(
+        &self,
+        transaction: &ScriptTransaction,
+    ) -> anyhow::Result<u64> {
+        // Remember the current directory.
+        let current_dir = std::env::current_dir().unwrap();
+        // Change the current directory to the script directory.
+        std::env::set_current_dir(&transaction.script_path)
+            .context("Failed to set the current directory to the script folder.")?;
 
-        let path = step.script_path.to_path_buf();
+        self.prepare_script_transaction(transaction).await?;
         // Compile the setup script.
-        let cmd = create_compile_script_cmd(path.clone());
-        let _ = cmd
-            .execute()
-            .await
-            .context(format!("Failed to compile the script: {:?}", path))?;
+        let script_current_dir = std::env::current_dir().unwrap();
+        let cmd = create_compile_script_cmd(script_current_dir.clone());
+        let _ = cmd.execute().await.context(format!(
+            "Failed to compile the script: {:?}",
+            &script_current_dir
+        ))?;
 
         // Read the content of the TOML file. This is to get the package name.
-        let content =
-            std::fs::read_to_string(path.join("Move.toml")).expect("Failed to read TOML file");
+        let content = std::fs::read_to_string(script_current_dir.join("Move.toml"))
+            .expect("Failed to read TOML file");
         let value = content
             .parse::<toml::Value>()
             .expect("Failed to parse TOML");
@@ -117,24 +143,27 @@ impl ScriptTransactionGeneratorConfig {
             .context("Malformed package name.")?;
 
         // Run the compiled script.
-        let compiled_build_path = path
+        let compiled_build_path = script_current_dir
             .join("build")
             .join(package_name)
             .join("bytecode_scripts")
             .join("main.mv");
 
         let cmd = create_run_script_cmd(compiled_build_path);
-        let transaction_summary = cmd
-            .execute()
-            .await
-            .context(format!("Failed to run the script: {:?}", path))?;
+        let transaction_summary = cmd.execute().await.context(format!(
+            "Failed to run the script: {:?}",
+            &script_current_dir
+        ))?;
         if let Some(true) = transaction_summary.success {
+            std::env::set_current_dir(current_dir)
+                .context("Failed to set the current directory back to the original.")?;
             Ok(transaction_summary.version.unwrap())
         } else {
-            anyhow::bail!("Failed to execute the script: {:?}", path);
+            anyhow::bail!("Failed to execute the script: {:?}", &script_current_dir);
         }
     }
 
+    /// Capture the transactions based on input versions and write them to the output files.
     async fn capture_transaction(
         &self,
         output_path: &Path,
@@ -143,7 +172,10 @@ impl ScriptTransactionGeneratorConfig {
         if versions_to_capture.is_empty() {
             anyhow::bail!("No transaction versions provided to capture.");
         }
-
+        println!(
+            "Capturing transactions at versions: {:?}",
+            versions_to_capture
+        );
         // Build the request.
         let first_version = versions_to_capture.first().unwrap().0;
         let last_version = versions_to_capture.last().unwrap().0;
@@ -240,9 +272,9 @@ mod tests {
     #[test]
     fn test_script_transaction_generator_config_duplicate_failure() {
         let raw_script_transaction_generator_config = r#"{
-            "scripted_transactions": [
+            "runs": [
                 {
-                    "steps": [
+                    "transactions": [
                         {
                             "output_name": "output1",
                             "script_path": "path/to/script1"
