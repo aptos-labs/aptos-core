@@ -2153,6 +2153,7 @@ async fn transfer_and_wait(
                 sequence_number,
                 max_gas,
                 gas_unit_price,
+                native_coin(),
             )
         },
     )

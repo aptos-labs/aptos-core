@@ -163,7 +163,8 @@ pub struct CurrencyMetadata {
     pub fa_address: Option<String>,
 }
 
-/// Various signing curves supported by Rosetta.  We only use [`CurveType::Edwards25519`]
+/// Various signing curves supngit p
+/// ported by Rosetta.  We only use [`CurveType::Edwards25519`]
 /// [API Spec](https://www.rosetta-api.org/docs/models/CurveType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
