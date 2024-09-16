@@ -1,0 +1,27 @@
+{
+  "timestamp": {
+    "seconds": "1724829402",
+    "nanos": 696187000
+  },
+  "version": "1000",
+  "info": {
+    "hash": "od5Gg2JNuutcEKdeZHHl+w3CITJzF9T6lY9ZRaf2zzs=",
+    "stateChangeHash": "r7bhT+R9hQ/Qpzlbz7mX/6z0cV4PiVzBYsIY5KdWS8Y=",
+    "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
+    "stateCheckpointHash": "wAM5SlhEIdEbi/YVBKbUtErhCUuChzOwJi6OxBr59gw=",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "aJB4QbnuLBJFz5CGzG1LPR/f9dYU7TnJpIbvOmuVAfE="
+  },
+  "epoch": "2",
+  "blockHeight": "496",
+  "type": "TRANSACTION_TYPE_BLOCK_EPILOGUE",
+  "sizeInfo": {
+    "transactionBytes": 53
+  },
+  "blockEpilogue": {
+    "blockEndInfo": {
+      "blockApproxOutputSize": "1244"
+    }
+  }
+}
