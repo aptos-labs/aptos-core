@@ -118,7 +118,7 @@ jobs:
               --concurrent-downloads 8 \
               --replay-concurrency-level 8 \
               \
-              && exit 0 || true # exit 0 if successful, otherwise retry
+              && exit 0 || [[ $? -eq 2 ]] && exit 2 || true # exit on return code 0 or 2, otherwise retry
           done
           exit(1)
 
@@ -147,6 +147,6 @@ jobs:
               --concurrent-downloads 8 \
               --replay-concurrency-level 8 \
               \
-              && exit 0 || true # exit 0 if successful, otherwise retry
+              && exit 0 || [[ $? -eq 2 ]] && exit 2 || true # exit on return code 0 or 2, otherwise retry
           done
           exit(1)
