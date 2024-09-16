@@ -151,9 +151,7 @@ where
     fn maybe_remove(&self, key1: &Key1, key2: &Key2) {
         let mut locked = self.inner.write();
         if let Some(map2) = locked.get_mut(key1) {
-            if map2.contains_key(key2) {
-                map2.remove(key2);
-            }
+            map2.remove(key2);
             if map2.is_empty() {
                 locked.remove(key1);
             }
