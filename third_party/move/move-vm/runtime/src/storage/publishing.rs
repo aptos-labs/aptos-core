@@ -86,7 +86,12 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         existing_module_storage: &'a M,
         module_bundle: Vec<Bytes>,
     ) -> VMResult<Self> {
-        // Create a new runtime environment, so that it is not shared with the existing one.
+        // Create a new runtime environment, so that it is not shared with the existing one. This
+        // is extremely important for correctness of module publishing: we need to make sure that
+        // no speculative information is cached! By cloning the environment, we ensure that when
+        // using this new module storage with changes, global caches are not accessed. Only when
+        // the published module is committed, and its structs are accessed, their information will
+        // be cached in the global runtime environment.
         let runtime_environment = existing_module_storage.runtime_environment().clone();
         let deserializer_config = &runtime_environment.vm_config().deserializer_config;
 
