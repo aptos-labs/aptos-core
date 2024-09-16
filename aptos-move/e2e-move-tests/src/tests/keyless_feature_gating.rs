@@ -8,8 +8,7 @@ use aptos_language_e2e_tests::account::{Account, AccountPublicKey, TransactionBu
 use aptos_types::{
     keyless::{
         test_utils::{
-            get_groth16_sig_and_pk_for_upgraded_vk, get_sample_esk, get_sample_groth16_sig_and_pk,
-            get_sample_iss, get_sample_jwk, get_sample_openid_sig_and_pk, get_upgraded_vk,
+            get_groth16_sig_and_pk_for_upgraded_vk, get_random_simulated_groth16_sig_and_pk, get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk, get_sample_openid_sig_and_pk, get_upgraded_vk
         },
         Configuration, EphemeralCertificate, Groth16VerificationKey, KeylessPublicKey,
         KeylessSignature, TransactionAndProof,
@@ -88,7 +87,8 @@ fn test_rotate_vk() {
     );
 
     // Old proof for old VK
-    let (old_sig, pk) = get_sample_groth16_sig_and_pk();
+    //let (old_sig, pk) = get_sample_groth16_sig_and_pk();
+    let (old_sig, pk) = get_random_simulated_groth16_sig_and_pk();
     let account = create_keyless_account(&mut h, pk.clone());
     let transaction =
         spend_keyless_account(&mut h, old_sig.clone(), &account, *recipient.address());

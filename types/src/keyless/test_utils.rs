@@ -97,17 +97,19 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
-// TODO: Finish this
-// TODO: Edit this to make up fake public parameters and get fake public input hash
-// as in `bn254-circom.rs`:
-/*pub fn get_public_inputs_hash(
-    sig: &KeylessSignature,
-    pk: &KeylessPublicKey,
-    jwk: &RSA_JWK,
-    config: &Configuration,
-) -> anyhow::Result<Fr> {*/
-pub fn get_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
-    let sig = KeylessSignature {
+pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
+    // We need a ZeroKnowledgeSig inside of a KeylessSignature to derive a public input hash. The Groth16 proof
+    // is not used to actually derive the hash so we can temporarily give a dummy
+    // proof before later replacing it with a simulated proof
+    let dummy_proof = *SAMPLE_PROOF;
+    let mut zks = ZeroKnowledgeSig {
+        proof: ZKP::Groth16(dummy_proof),
+        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
+    };
+    let mut sig = KeylessSignature {
         cert: EphemeralCertificate::ZeroKnowledgeSig(zks.clone()),
         jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
         exp_date_secs: SAMPLE_EXP_DATE,
@@ -119,17 +121,13 @@ pub fn get_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey
     let config = Configuration::new_for_testing();
     let pih = get_public_inputs_hash(&sig, &pk, &rsa_jwk, &config).unwrap();
 
-    let rng = rand::thread_rng();
-    let (sim_pk, vk) = Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
-    let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(pih, &sim_pk, &mut rng).unwrap();
+    let mut rng = rand::thread_rng();
+    let (sim_pk, _vk) = Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+    let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[pih], &sim_pk, &mut rng).unwrap();
 
-    let zks = ZeroKnowledgeSig {
-        proof: ZKP::Groth16(proof),
-        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
-        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
-        override_aud_val: None,
-        training_wheels_signature: None,
-    };
+    // Replace dummy proof with the simulated proof
+    zks.proof = ZKP::Groth16(proof);
+    sig.cert = EphemeralCertificate::ZeroKnowledgeSig(zks.clone());
 
     (sig, pk)
 }
