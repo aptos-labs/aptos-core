@@ -41,7 +41,6 @@ use std::{
     collections::{btree_map, BTreeMap, BTreeSet},
     hash::Hash,
     sync::Arc,
-    thread,
 };
 use typed_arena::Arena;
 
@@ -1644,7 +1643,7 @@ impl StructInfoCache {
 #[derive(Clone)]
 pub(crate) struct TypeCache {
     structs: hashbrown::HashMap<StructNameIndex, hashbrown::HashMap<Vec<Type>, StructInfoCache>>,
-    depth_formula: hashbrown::HashMap<StructNameIndex, DepthFormula>,
+    depth_formula: hashbrown::HashMap<StructNameIndex, (DepthFormula, std::thread::ThreadId)>,
 }
 
 impl TypeCache {
@@ -2215,7 +2214,7 @@ impl Loader {
         };
 
         if let Some(depth_formula) = ty_cache.read().depth_formula.get(&struct_name_idx) {
-            return Ok(depth_formula.clone());
+            return Ok(depth_formula.0.clone());
         }
 
         let struct_type =
@@ -2237,26 +2236,24 @@ impl Loader {
         };
 
         let formula = DepthFormula::normalize(formulas);
-        let prev = ty_cache
-            .write()
-            .depth_formula
-            .insert(struct_name_idx, formula.clone());
-        if let Some(f) = prev {
-            let struct_name_index_map = match self {
-                Self::V1(loader) => &loader.name_cache,
-                Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
-            };
-            let (struct_name, thread_id) =
-                struct_name_index_map.idx_to_struct_name_ref_with_thread_id(struct_name_idx);
-            if thread_id == thread::current().id() {
+        let prev = ty_cache.write().depth_formula.insert(
+            struct_name_idx,
+            (formula.clone(), std::thread::current().id()),
+        );
+        if let Some((_, thread_id)) = prev {
+            // Same thread has put this entry previously, which means there is a recursion (as
+            // otherwise we would have exited early when reading the cached formula).
+            if thread_id == std::thread::current().id() {
+                let struct_name_index_map = match self {
+                    Self::V1(loader) => &loader.name_cache,
+                    Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+                };
+                let struct_name = struct_name_index_map.idx_to_struct_name_ref(struct_name_idx);
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                         format!(
-                            "Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached by the same thread (recursive type?): {:?}",
-                            struct_name,
-                            formula,
-                            struct_type.as_ref(),
-                            f
+                            "Depth formula for struct '{}' is already cached by the same thread (recursive type?)",
+                            struct_name.as_ref(),
                         ),
                     ),
                 );
