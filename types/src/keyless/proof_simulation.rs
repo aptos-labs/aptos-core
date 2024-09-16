@@ -1,8 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(test)]
-mod proof_simulation {
     use crate::keyless::ZeroKnowledgeSig;
     use crate::keyless::{Bn254, G1Bytes, G2Bytes};
     use crate::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine};
@@ -74,7 +72,7 @@ mod proof_simulation {
             elem.unwrap()
         }
 
-        fn circuit_agnostic_setup_with_trapdoor<R: RngCore>(
+        pub fn circuit_agnostic_setup_with_trapdoor<R: RngCore>(
             rng: &mut R,
             num_public_inputs: u32,
         ) -> Result<(Trapdoor<E>, VerifyingKey<E>), SynthesisError> {
@@ -270,6 +268,7 @@ mod proof_simulation {
             println!("on iteration: {}", i);
 
 
+            // TODO: Make public input optional and use default value if not specified. Also make an equivalent function for simulated proof verification
             let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(
                 &[public_input],
                 &pk,
@@ -300,4 +299,3 @@ mod proof_simulation {
     fn prove_and_verify_circuit_agnostic() {
         test_prove_and_verify_circuit_agnostic(25);
     }
-}

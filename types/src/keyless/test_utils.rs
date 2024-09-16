@@ -15,6 +15,7 @@ use crate::{
         },
         get_public_inputs_hash,
         zkp_sig::ZKP,
+        proof_simulation::Groth16SimulatorBn254,
         Configuration, EphemeralCertificate, Groth16Proof, KeylessPublicKey, KeylessSignature,
         OpenIdSig, ZeroKnowledgeSig,
     },
@@ -96,6 +97,45 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
+// TODO: Finish this
+// TODO: Edit this to make up fake public parameters and get fake public input hash
+// as in `bn254-circom.rs`:
+/*pub fn get_public_inputs_hash(
+    sig: &KeylessSignature,
+    pk: &KeylessPublicKey,
+    jwk: &RSA_JWK,
+    config: &Configuration,
+) -> anyhow::Result<Fr> {*/
+pub fn get_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
+    let sig = KeylessSignature {
+        cert: EphemeralCertificate::ZeroKnowledgeSig(zks.clone()),
+        jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
+        exp_date_secs: SAMPLE_EXP_DATE,
+        ephemeral_pubkey: SAMPLE_EPK.clone(),
+        ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
+    };
+    let pk = SAMPLE_PK.clone();
+    let rsa_jwk = RSA_JWK::secure_test_jwk();
+    let config = Configuration::new_for_testing();
+    let pih = get_public_inputs_hash(&sig, &pk, &rsa_jwk, &config).unwrap();
+
+    let rng = rand::thread_rng();
+    let (sim_pk, vk) = Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+    let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(pih, &sim_pk, &mut rng).unwrap();
+
+    let zks = ZeroKnowledgeSig {
+        proof: ZKP::Groth16(proof),
+        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
+    };
+
+    (sig, pk)
+}
+
+/// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
+/// desired TXN.
 pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     let proof = *SAMPLE_PROOF;
 
@@ -114,6 +154,7 @@ pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
         ephemeral_pubkey: SAMPLE_EPK.clone(),
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
     };
+
 
     (sig, SAMPLE_PK.clone())
 }
