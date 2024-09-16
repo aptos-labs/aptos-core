@@ -555,20 +555,28 @@ impl RoundManager {
             block_parent_hash = proposal_msg.proposal().quorum_cert().certified_block().id(),
         );
 
-        ensure!(
-            self.ensure_round_and_sync_up(
+        let in_correct_round = self
+            .ensure_round_and_sync_up(
                 proposal_msg.proposal().round(),
                 proposal_msg.sync_info(),
                 proposal_msg.proposer(),
             )
             .await
-            .context("[RoundManager] Process proposal")?,
-            "Stale proposal {}, current round {}",
-            proposal_msg.proposal(),
-            self.round_state.current_round()
-        );
-
-        self.process_proposal(proposal_msg.take_proposal()).await
+            .context("[RoundManager] Process proposal")?;
+        if in_correct_round {
+            self.process_proposal(proposal_msg.take_proposal()).await
+        } else {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(30)),
+                warn!(
+                    "[sampled] Stale proposal {}, current round {}",
+                    proposal_msg.proposal(),
+                    self.round_state.current_round()
+                )
+            );
+            counters::ERROR_COUNT.inc();
+            Ok(())
+        }
     }
 
     pub async fn process_delayed_proposal_msg(&mut self, proposal: Block) -> anyhow::Result<()> {
