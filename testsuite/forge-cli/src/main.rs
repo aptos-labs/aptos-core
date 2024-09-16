@@ -1192,6 +1192,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                             ordered_to_commit,
                         ),
                     ]))
+                    .add_latency_threshold(0.1, LatencyType::P50)   // REMOVEME: This should fail latency checks
             },
         )
         .collect(),
