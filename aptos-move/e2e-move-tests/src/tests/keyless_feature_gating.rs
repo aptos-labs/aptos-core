@@ -93,6 +93,7 @@ fn test_rotate_vk() {
     let transaction =
         spend_keyless_account(&mut h, old_sig.clone(), &account, *recipient.address());
     let output = h.run_raw(transaction);
+    println!("output: {:?}", output);
     assert_success!(output.status().clone());
 
     // New proof for old VK
