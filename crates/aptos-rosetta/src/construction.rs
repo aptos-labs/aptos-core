@@ -774,9 +774,9 @@ fn parse_primary_fa_transfer_operation(
     args: &[Vec<u8>],
 ) -> ApiResult<Vec<Operation>> {
     // There should be one type arg
-    if type_args.len() == 1 {
+    if type_args.len() != 1 {
         return Err(ApiError::TransactionParseError(Some(format!(
-            "Primary fungible store transfer should not have one type argument: {:?}",
+            "Primary fungible store transfer should have one type argument: {:?}",
             type_args
         ))));
     }
@@ -840,7 +840,7 @@ fn parse_fa_transfer_operation(
     args: &[Vec<u8>],
 ) -> ApiResult<Vec<Operation>> {
     // There is one type arg for the object
-    if type_args.len() == 1 {
+    if type_args.len() != 1 {
         return Err(ApiError::TransactionParseError(Some(format!(
             "Fungible asset transfer should have one type argument: {:?}",
             type_args
