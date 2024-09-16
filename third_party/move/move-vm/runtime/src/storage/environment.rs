@@ -46,7 +46,20 @@ pub struct RuntimeEnvironment {
     /// consumption. Used by all struct type creations in the VM and in code cache.
     struct_name_index_map: StructNameIndexMap,
 
-    /// Type cache for struct layouts, tags and depths.
+    /// Type cache for struct layouts, tags and depths, shared across multiple threads.
+    ///
+    /// SAFETY:
+    /// Here we informally show that it is safe to share type cache across multiple threads. Same
+    /// argument applies to struct name indexing map.
+    ///   1) Struct has been already published.
+    ///      In this case, it is fine to have multiple transactions concurrently accessing and
+    ///      caching struct names, layouts and depth formulas. Even if transaction failed due to
+    ///      speculation, and is re-executed later, the speculative aborted execution cached a non-
+    ///      speculative existing struct information. It is safe for other threads to access it.
+    ///  2) Struct is being published with a module.
+    ///     The design of V2 loader ensures that when modules are published, i.e., staged on top of
+    ///     the existing module storage, the runtime environment is cloned. Hence, it is not even
+    ///     possible to mutate this global cache speculatively.
     ty_cache: RwLock<TypeCache>,
 }
 
