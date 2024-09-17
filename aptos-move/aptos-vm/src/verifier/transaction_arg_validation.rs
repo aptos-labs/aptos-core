@@ -17,7 +17,6 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
-    value::MoveValue,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
@@ -103,7 +102,7 @@ pub(crate) fn get_allowed_structs(
 /// after validation, add senders and non-signer arguments to generate the final args
 pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
-    senders: Vec<AccountAddress>,
+    serialized_signers: Vec<Vec<u8>>,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
     are_struct_constructors_enabled: bool,
@@ -156,7 +155,7 @@ pub fn validate_combine_signer_and_txn_args(
     // signers actually passed is matching first to maintain backward compatibility before
     // moving on to the validation of non-signer args.
     // the number of txn senders should be the same number of signers
-    if signer_param_cnt > 0 && senders.len() != signer_param_cnt {
+    if signer_param_cnt > 0 && serialized_signers.len() != signer_param_cnt {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
             None,
@@ -179,11 +178,7 @@ pub fn validate_combine_signer_and_txn_args(
     let combined_args = if signer_param_cnt == 0 {
         args
     } else {
-        senders
-            .into_iter()
-            .map(|s| MoveValue::Signer(s).simple_serialize().unwrap())
-            .chain(args)
-            .collect()
+        serialized_signers.into_iter().chain(args).collect()
     };
     Ok(combined_args)
 }

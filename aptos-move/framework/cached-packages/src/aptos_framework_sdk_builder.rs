@@ -291,6 +291,12 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
+    /// Deserializes a `u256` value from the stream.
+    BcsStreamDeserializeU256Entry {
+        data: Vec<u8>,
+        cursor: u64,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
@@ -442,6 +448,24 @@ pub enum EntryFunctionCall {
         pool_address: AccountAddress,
         amount: u64,
     },
+
+    /// Update dispatchable authenticator that enables account abstraction.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    LiteAccountAddDispatchableAuthenticationFunction {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    LiteAccountRemoveDispatchableAuthenticationFunciton {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    /// Update dispatchable authenticator that disables account abstraction.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    LiteAccountRemoveDispatchableAuthenticator {},
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
@@ -1180,6 +1204,9 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
+            BcsStreamDeserializeU256Entry { data, cursor } => {
+                bcs_stream_deserialize_u256_entry(data, cursor)
+            },
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -1272,6 +1299,27 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
+            LiteAccountAddDispatchableAuthenticationFunction {
+                module_address,
+                module_name,
+                function_name,
+            } => lite_account_add_dispatchable_authentication_function(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            LiteAccountRemoveDispatchableAuthenticationFunciton {
+                module_address,
+                module_name,
+                function_name,
+            } => lite_account_remove_dispatchable_authentication_funciton(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            LiteAccountRemoveDispatchableAuthenticator {} => {
+                lite_account_remove_dispatchable_authenticator()
+            },
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -2335,6 +2383,25 @@ pub fn aptos_governance_vote(
     ))
 }
 
+/// Deserializes a `u256` value from the stream.
+pub fn bcs_stream_deserialize_u256_entry(data: Vec<u8>, cursor: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("bcs_stream").to_owned(),
+        ),
+        ident_str!("deserialize_u256_entry").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&data).unwrap(),
+            bcs::to_bytes(&cursor).unwrap(),
+        ],
+    ))
+}
+
 /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
 /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
 pub fn code_publish_package_txn(
@@ -2816,6 +2883,71 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// Update dispatchable authenticator that enables account abstraction.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn lite_account_add_dispatchable_authentication_function(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lite_account").to_owned(),
+        ),
+        ident_str!("add_dispatchable_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+pub fn lite_account_remove_dispatchable_authentication_funciton(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lite_account").to_owned(),
+        ),
+        ident_str!("remove_dispatchable_authentication_funciton").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+/// Update dispatchable authenticator that disables account abstraction.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn lite_account_remove_dispatchable_authenticator() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("lite_account").to_owned(),
+        ),
+        ident_str!("remove_dispatchable_authenticator").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -5025,6 +5157,19 @@ mod decoder {
         }
     }
 
+    pub fn bcs_stream_deserialize_u256_entry(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::BcsStreamDeserializeU256Entry {
+                data: bcs::from_bytes(script.args().get(0)?).ok()?,
+                cursor: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
@@ -5318,6 +5463,48 @@ mod decoder {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn lite_account_add_dispatchable_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::LiteAccountAddDispatchableAuthenticationFunction {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn lite_account_remove_dispatchable_authentication_funciton(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::LiteAccountRemoveDispatchableAuthenticationFunciton {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn lite_account_remove_dispatchable_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::LiteAccountRemoveDispatchableAuthenticator {})
         } else {
             None
         }
@@ -6530,6 +6717,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::aptos_governance_vote),
         );
         map.insert(
+            "bcs_stream_deserialize_u256_entry".to_string(),
+            Box::new(decoder::bcs_stream_deserialize_u256_entry),
+        );
+        map.insert(
             "code_publish_package_txn".to_string(),
             Box::new(decoder::code_publish_package_txn),
         );
@@ -6628,6 +6819,18 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
+        );
+        map.insert(
+            "lite_account_add_dispatchable_authentication_function".to_string(),
+            Box::new(decoder::lite_account_add_dispatchable_authentication_function),
+        );
+        map.insert(
+            "lite_account_remove_dispatchable_authentication_funciton".to_string(),
+            Box::new(decoder::lite_account_remove_dispatchable_authentication_funciton),
+        );
+        map.insert(
+            "lite_account_remove_dispatchable_authenticator".to_string(),
+            Box::new(decoder::lite_account_remove_dispatchable_authenticator),
         );
         map.insert(
             "managed_coin_burn".to_string(),

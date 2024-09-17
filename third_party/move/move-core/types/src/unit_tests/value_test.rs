@@ -142,5 +142,8 @@ fn nested_typed_struct_deserialization() {
 fn signer_deserialization() {
     let v = MoveValue::Signer(AccountAddress::ZERO);
     let bytes = v.simple_serialize().unwrap();
-    assert_eq!(MoveValue::simple_deserialize(&bytes, &crate::value::MoveTypeLayout::Signer).unwrap(), v);
+    assert_eq!(
+        MoveValue::simple_deserialize(&bytes, &crate::value::MoveTypeLayout::Signer).unwrap(),
+        v
+    );
 }

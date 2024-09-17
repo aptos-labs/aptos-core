@@ -58,8 +58,9 @@ pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
     block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
-    fee_statement::FeeStatement, proof::accumulator::InMemoryEventAccumulator,
-    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
+    fee_statement::FeeStatement, function_info::FunctionInfo,
+    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
+    write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -80,6 +81,12 @@ use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Auth<'a> {
+    Ed25519(&'a Ed25519PrivateKey),
+    Abstraction(FunctionInfo, Vec<u8>),
+}
 
 /// RawTransaction is the portion of a transaction that a client signs.
 #[derive(
@@ -317,6 +324,89 @@ impl RawTransaction {
                 fee_payer_authenticator,
             ),
         ))
+    }
+
+    pub fn sign_aa_transaction(
+        self,
+        sender_auth: &Auth,
+        secondary_signers: Vec<AccountAddress>,
+        secondary_auths: Vec<Auth>,
+        fee_payer: Option<(AccountAddress, Auth)>,
+    ) -> Result<SignatureCheckedTransaction> {
+        let message = if fee_payer.is_some() {
+            RawTransactionWithData::new_fee_payer(
+                self.clone(),
+                secondary_signers.clone(),
+                fee_payer.clone().unwrap().0,
+            )
+        } else {
+            RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone())
+        };
+        let sender_authenticator = match sender_auth {
+            Auth::Ed25519(sender_private_key) => {
+                let sender_signature = sender_private_key.sign(&message)?;
+                AccountAuthenticator::ed25519(
+                    Ed25519PublicKey::from(*sender_private_key),
+                    sender_signature,
+                )
+            },
+            Auth::Abstraction(func, sig) => {
+                AccountAuthenticator::abstraction(func.clone(), sig.clone())
+            },
+        };
+
+        if secondary_auths.len() != secondary_signers.len() {
+            return Err(format_err!(
+                "number of secondary private keys and number of secondary signers don't match"
+            ));
+        }
+        let mut secondary_authenticators = vec![];
+        for auth in secondary_auths {
+            let secondary_authenticator = match auth {
+                Auth::Ed25519(private_key) => {
+                    let signature = private_key.sign(&message)?;
+                    AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), signature)
+                },
+                Auth::Abstraction(func, sig) => {
+                    AccountAuthenticator::abstraction(func.clone(), sig.clone())
+                },
+            };
+            secondary_authenticators.push(secondary_authenticator);
+        }
+
+        if let Some((fee_payer_address, fee_payer_auth)) = fee_payer {
+            let fee_payer_authenticator = match fee_payer_auth {
+                Auth::Ed25519(fee_payer_private_key) => {
+                    let sender_signature = fee_payer_private_key.sign(&message)?;
+                    AccountAuthenticator::ed25519(
+                        Ed25519PublicKey::from(fee_payer_private_key),
+                        sender_signature,
+                    )
+                },
+                Auth::Abstraction(func, sig) => {
+                    AccountAuthenticator::abstraction(func.clone(), sig.clone())
+                },
+            };
+            Ok(SignatureCheckedTransaction(
+                SignedTransaction::new_fee_payer(
+                    self,
+                    sender_authenticator,
+                    secondary_signers,
+                    secondary_authenticators,
+                    fee_payer_address,
+                    fee_payer_authenticator,
+                ),
+            ))
+        } else {
+            Ok(SignatureCheckedTransaction(
+                SignedTransaction::new_multi_agent(
+                    self,
+                    sender_authenticator,
+                    secondary_signers,
+                    secondary_authenticators,
+                ),
+            ))
+        }
     }
 
     /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
@@ -969,6 +1059,7 @@ impl TransactionStatus {
         charge_invariant_violation: bool,
         features: &Features,
     ) -> (Self, TransactionAuxiliaryData) {
+        println!("{:?}", vm_status);
         let status_code = vm_status.status_code();
         let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.

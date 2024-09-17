@@ -31,7 +31,6 @@ fn native_is_permissioned_signer(
     // context.charge()?;
     let result = s_arg.is_permissioned()?;
 
-
     Ok(smallvec![Value::bool(result)])
 }
 
@@ -42,7 +41,7 @@ fn native_is_permissioned_signer(
  *   gas cost: base_cost
  *
  **************************************************************************************************/
- fn native_permission_signer(
+fn native_permission_signer(
     _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -66,7 +65,7 @@ fn native_is_permissioned_signer(
  *   gas cost: base_cost
  *
  **************************************************************************************************/
- fn native_signer_from_permissioned(
+fn native_signer_from_permissioned(
     _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -93,13 +92,10 @@ pub fn make_all(
             "is_permissioned_signer",
             native_is_permissioned_signer as RawSafeNative,
         ),
-        (
-            "permission_signer",
-            native_permission_signer
-        ),
+        ("permission_signer", native_permission_signer),
         (
             "signer_from_permissioned_impl",
-            native_signer_from_permissioned
+            native_signer_from_permissioned,
         ),
     ];
 

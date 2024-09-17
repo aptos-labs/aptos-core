@@ -283,7 +283,10 @@ impl Container {
     }
 
     fn signer(x: AccountAddress) -> Self {
-        Container::Struct(Rc::new(RefCell::new(vec![ValueImpl::U16(0), ValueImpl::Address(x)])))
+        Container::Struct(Rc::new(RefCell::new(vec![
+            ValueImpl::U16(0),
+            ValueImpl::Address(x),
+        ])))
     }
 }
 
@@ -1065,23 +1068,23 @@ impl SignerRef {
         match &self.0 {
             ContainerRef::Local(Container::Struct(s)) => {
                 Ok(*s.borrow()[0].as_value_ref::<u16>()? == 1)
-            }
+            },
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!("unexpected signer value: {:?}", self)),
-            )
+            ),
         }
     }
 
     pub fn permissioned_signer(&self) -> PartialVMResult<Value> {
         match &self.0 {
-            ContainerRef::Local(Container::Struct(s)) => {
-                Ok(Value::signer(*s.borrow()[1].as_value_ref::<AccountAddress>()?))
-            }
+            ContainerRef::Local(Container::Struct(s)) => Ok(Value::signer(
+                *s.borrow()[1].as_value_ref::<AccountAddress>()?,
+            )),
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!("unexpected signer value: {:?}", self)),
-            )
+            ),
         }
     }
 }
@@ -3247,14 +3250,12 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
             },
 
             // Signer.
-            (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
-                (SerializationReadyValue {
-                    custom_serializer: self.custom_serializer,
-                    layout: &MoveStructLayout::signer(),
-                    value: &*r.borrow(),
-                })
-                .serialize(serializer)
-            },
+            (L::Signer, ValueImpl::Container(Container::Struct(r))) => (SerializationReadyValue {
+                custom_serializer: self.custom_serializer,
+                layout: &MoveStructLayout::signer(),
+                value: &*r.borrow(),
+            })
+            .serialize(serializer),
 
             // Delayed values. For their serialization, we must have custom
             // serialization available, otherwise an error is returned.

@@ -454,7 +454,11 @@ impl MoveStructLayout {
     }
 
     pub fn signer() -> Self {
-        MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::Address], vec![MoveTypeLayout::Address, MoveTypeLayout::Address, MoveTypeLayout::U64]])
+        MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::Address], vec![
+            MoveTypeLayout::Address,
+            MoveTypeLayout::Address,
+            MoveTypeLayout::U64,
+        ]])
     }
 }
 
@@ -477,7 +481,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
                 AccountAddress::deserialize(deserializer).map(MoveValue::Address)
             },
             MoveTypeLayout::Signer => {
-                let (_, fields) = MoveStructLayout::signer().deserialize(deserializer)?.into_optional_variant_and_fields();
+                let (_, fields) = MoveStructLayout::signer()
+                    .deserialize(deserializer)?
+                    .into_optional_variant_and_fields();
                 Ok(MoveValue::Signer(match fields[0] {
                     MoveValue::Address(addr) => addr,
                     _ => return Err(D::Error::custom("signer deserialization error")),

@@ -51,6 +51,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
+    function_info::FunctionInfo,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
@@ -59,7 +60,8 @@ use aptos_types::{
     randomness::Randomness,
     state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
-        authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
+        authenticator::{AnySignature, AuthenticationProof},
+        signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
@@ -145,6 +147,12 @@ macro_rules! unwrap_or_discard {
             },
         }
     };
+}
+
+fn serialized_signer(account_address: &AccountAddress) -> Vec<u8> {
+    MoveValue::Signer(*account_address)
+        .simple_serialize()
+        .unwrap()
 }
 
 pub(crate) fn get_system_transaction_output(
@@ -712,7 +720,7 @@ impl AptosVM {
         //       UnmeteredGasMeter.
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        senders: Vec<AccountAddress>,
+        serialized_signers: Vec<Vec<u8>>,
         script: &Script,
     ) -> Result<(), VMStatus> {
         if !self
@@ -768,7 +776,7 @@ impl AptosVM {
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
-            senders,
+            serialized_signers,
             convert_txn_args(script.args()),
             &func,
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
@@ -790,7 +798,7 @@ impl AptosVM {
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
-        senders: Vec<AccountAddress>,
+        serialized_signers: Vec<Vec<u8>>,
         entry_fn: &EntryFunction,
         _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
@@ -840,7 +848,7 @@ impl AptosVM {
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
-            senders,
+            serialized_signers,
             entry_fn.args().to_vec(),
             &function,
             struct_constructors_enabled,
@@ -856,6 +864,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
         txn_data: &TransactionMetadata,
+        serialized_signers: Vec<Vec<u8>>,
         payload: &'a TransactionPayload,
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
@@ -881,7 +890,7 @@ impl AptosVM {
                         session,
                         gas_meter,
                         traversal_context,
-                        txn_data.senders(),
+                        serialized_signers,
                         script,
                     )
                 })?;
@@ -893,7 +902,7 @@ impl AptosVM {
                         session,
                         gas_meter,
                         traversal_context,
-                        txn_data.senders(),
+                        serialized_signers,
                         entry_fn,
                         txn_data,
                     )
@@ -922,6 +931,8 @@ impl AptosVM {
             gas_meter,
             txn_data,
         )?;
+
+        // ============= Gas fee cannot change after this line =============
 
         self.success_transaction_cleanup(
             epilogue_session,
@@ -1289,7 +1300,7 @@ impl AptosVM {
                 session,
                 gas_meter,
                 traversal_context,
-                vec![multisig_address],
+                vec![serialized_signer(&multisig_address)],
                 payload,
                 txn_data,
             )
@@ -1373,10 +1384,7 @@ impl AptosVM {
             // with the general verify_module above.
             if init_function.is_ok() {
                 if verifier::module_init::verify_module_init_function(module).is_ok() {
-                    let args: Vec<Vec<u8>> = senders
-                        .iter()
-                        .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
-                        .collect();
+                    let args: Vec<Vec<u8>> = senders.iter().map(serialized_signer).collect();
                     session.execute_function_bypass_visibility(
                         &module.self_id(),
                         init_func_name,
@@ -1806,6 +1814,38 @@ impl AptosVM {
             );
         }
 
+        // Account Abstraction dispatchable authentication.
+        let senders = txn_data.senders();
+        let proofs = txn_data.authentication_proofs();
+        // Add fee payer.
+        if let (Some(fee_payer), Some(AuthenticationProof::Abstraction(function_info, data))) =
+            (txn_data.fee_payer, &txn_data.fee_payer_authentication_proof)
+        {
+            unwrap_or_discard!(user_session.execute(|session| dispatchable_authenticate(
+                session,
+                gas_meter,
+                fee_payer,
+                function_info.clone(),
+                data.clone(),
+                &mut traversal_context,
+            )));
+        }
+        let serialized_signers = unwrap_or_discard!(itertools::zip_eq(senders, proofs)
+            .map(|(sender, proof)| match proof {
+                AuthenticationProof::Abstraction(function_info, data) =>
+                    user_session.execute(|session| dispatchable_authenticate(
+                        session,
+                        gas_meter,
+                        sender,
+                        function_info.clone(),
+                        data.clone(),
+                        &mut traversal_context,
+                    )),
+                AuthenticationProof::Key(_) | AuthenticationProof::None =>
+                    Ok(serialized_signer(&sender)),
+            })
+            .collect::<Result<_, _>>());
+
         // We keep track of whether any newly published modules are loaded into the Vm's loader
         // cache as part of executing transactions. This would allow us to decide whether the cache
         // should be flushed later.
@@ -1819,6 +1859,7 @@ impl AptosVM {
                     gas_meter,
                     &mut traversal_context,
                     &txn_data,
+                    serialized_signers,
                     payload,
                     log_context,
                     &mut new_published_modules_loaded,
@@ -1994,8 +2035,8 @@ impl AptosVM {
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id, None);
                 let senders = match txn_sender {
-                    None => vec![*execute_as],
-                    Some(sender) => vec![sender, *execute_as],
+                    None => vec![serialized_signer(execute_as)],
+                    Some(sender) => vec![serialized_signer(&sender), serialized_signer(execute_as)],
                 };
 
                 let traversal_storage = TraversalStorage::new();
@@ -2778,6 +2819,43 @@ fn create_account_if_does_not_exist(
             traversal_context,
         )
         .map(|_return_vals| ())
+}
+
+fn dispatchable_authenticate(
+    session: &mut SessionExt,
+    gas_meter: &mut impl GasMeter,
+    account: AccountAddress,
+    function_info: FunctionInfo,
+    authenticator: Vec<u8>,
+    traversal_context: &mut TraversalContext,
+) -> VMResult<Vec<u8>> {
+    session
+        .execute_function_bypass_visibility(
+            &LITE_ACCOUNT_MODULE,
+            AUTHENTICATE,
+            vec![],
+            serialize_values(&vec![
+                MoveValue::Signer(account),
+                function_info.as_move_value(),
+                MoveValue::vector_u8(authenticator),
+            ]),
+            gas_meter,
+            traversal_context,
+        )
+        .map(|mut return_vals| {
+            assert!(
+                return_vals.mutable_reference_outputs.is_empty()
+                    && return_vals.return_values.len() == 1,
+                "Abstraction authentication function must only have 1 return value"
+            );
+            let (signer_data, signer_layout) = return_vals.return_values.pop().expect("Must exist");
+            assert_eq!(
+                signer_layout,
+                MoveTypeLayout::Signer,
+                "Abstraction authentication function returned non-signer."
+            );
+            signer_data
+        })
 }
 
 /// Signals that the transaction should trigger the flow for creating an account as part of a

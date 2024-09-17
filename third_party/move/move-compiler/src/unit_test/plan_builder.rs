@@ -163,16 +163,14 @@ fn build_test_info<'func>(
     for (var, ty) in &function.signature.parameters {
         match test_annotation_params.get(&var.value()) {
             Some(MoveValue::Address(addr)) => match &ty.value {
-                SingleType_::Base(ty) => {
-                    arguments.push(if ty == &BaseType_::address(ty.loc) {
+                SingleType_::Base(ty) => arguments.push(
+                    if ty == &BaseType_::address(ty.loc) {
                         MoveValue::Address(*addr)
                     } else {
                         MoveValue::Signer(*addr)
-                    })
-                },
-                SingleType_::Ref(_, _) => {
-                    arguments.push(MoveValue::Signer(*addr))
-                },
+                    },
+                ),
+                SingleType_::Ref(_, _) => arguments.push(MoveValue::Signer(*addr)),
             },
             _ => {
                 let missing_param_msg = "Missing test parameter assignment in test. Expected a \
