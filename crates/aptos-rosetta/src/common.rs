@@ -200,7 +200,7 @@ pub fn find_fa_currency(
     if is_native_coin(metadata_address) {
         Some(native_coin())
     } else {
-        currencies
+        let val = currencies
             .iter()
             .find(|currency| {
                 if let Some(CurrencyMetadata {
@@ -216,7 +216,8 @@ pub fn find_fa_currency(
                     false
                 }
             })
-            .cloned()
+            .cloned();
+        val
     }
 }
 

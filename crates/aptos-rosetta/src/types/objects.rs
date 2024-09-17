@@ -25,8 +25,9 @@ use anyhow::anyhow;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::{TransactionOnChainData, U64};
+use aptos_rest_client::aptos_api_types::{ResourceGroup, TransactionOnChainData, U64};
 use aptos_types::{
+    access_path::Path,
     account_address::AccountAddress,
     account_config::{
         fungible_store::FungibleStoreResource, AccountResource, CoinStoreResource, WithdrawEvent,
@@ -917,21 +918,37 @@ impl Transaction {
         let mut operations = vec![];
         let mut operation_index: u64 = 0;
         if successful {
-            let mut owner_map = BTreeMap::new();
-
-            // Parse all operations from the writeset changes in a success
+            let mut object_to_owner = HashMap::new();
+            let mut store_to_currency = HashMap::new();
+            let mut framework_changes = vec![];
+            // Not the most efficient, parse all store owners, and assets associated with stores
             for (state_key, write_op) in &txn.changes {
-                let mut ops = parse_operations_from_write_set(
+                let new_changes = preprocess_write_set(
                     server_context,
                     state_key,
                     write_op,
-                    &events,
-                    maybe_user_txn.map(|inner| inner.sender()),
                     maybe_user_txn.map(|inner| inner.payload()),
                     txn.version,
+                    &mut object_to_owner,
+                    &mut store_to_currency,
+                );
+                framework_changes.extend(new_changes);
+            }
+
+            // Parse all operations from the writeset changes in a success
+            for (struct_tag, account_address, data) in &framework_changes {
+                let mut ops = parse_operations_from_write_set(
+                    server_context,
+                    struct_tag,
+                    *account_address,
+                    data,
+                    &events, // TODO: Filter events down to framework events only
+                    maybe_user_txn.map(|inner| inner.sender()),
+                    txn.version,
                     operation_index,
-                    &txn.changes,
-                    &mut owner_map,
+                    &txn.changes, // TODO: Move to parsed framework_changes
+                    &mut object_to_owner,
+                    &mut store_to_currency,
                 )
                 .await?;
                 operation_index += ops.len() as u64;
@@ -1292,36 +1309,17 @@ fn build_transfer_operations(
 /// It is more accurate because untracked scripts are included in balance operations
 async fn parse_operations_from_write_set(
     server_context: &RosettaContext,
-    state_key: &StateKey,
-    write_op: &WriteOp,
+    struct_tag: &StructTag,
+    address: AccountAddress,
+    data: &[u8],
     events: &[ContractEvent],
     maybe_sender: Option<AccountAddress>,
-    _maybe_payload: Option<&TransactionPayload>,
     version: u64,
     operation_index: u64,
     changes: &WriteSet,
-    owner_map: &mut BTreeMap<AccountAddress, AccountAddress>,
+    object_to_owner: &mut HashMap<AccountAddress, AccountAddress>,
+    store_to_currency: &mut HashMap<AccountAddress, Currency>,
 ) -> ApiResult<Vec<Operation>> {
-    let (struct_tag, address) = match state_key.inner() {
-        StateKeyInner::AccessPath(path) => {
-            if let Some(struct_tag) = path.get_struct_tag() {
-                (struct_tag, path.address)
-            } else {
-                return Ok(vec![]);
-            }
-        },
-        _ => {
-            // Ignore all but access path
-            return Ok(vec![]);
-        },
-    };
-
-    let bytes = match write_op.bytes() {
-        Some(bytes) => bytes,
-        None => return Ok(vec![]),
-    };
-    let data = &bytes;
-
     // Determine operation
     match (
         struct_tag.address,
@@ -1329,10 +1327,7 @@ async fn parse_operations_from_write_set(
         struct_tag.name.as_str(),
         struct_tag.type_args.len(),
     ) {
-        (AccountAddress::ONE, OBJECT_MODULE, OBJECT_CORE_RESOURCE, 0) => {
-            parse_object_owner(address, data, owner_map);
-            Ok(vec![])
-        },
+        // TODO: Handle object transfer for transfer of fungible asset stores
         (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE, 0) => {
             parse_account_resource_changes(version, address, data, maybe_sender, operation_index)
         },
@@ -1374,7 +1369,6 @@ async fn parse_operations_from_write_set(
                         events,
                         operation_index,
                     )
-                    .await
                 } else {
                     Ok(vec![])
                 }
@@ -1386,17 +1380,14 @@ async fn parse_operations_from_write_set(
                 Ok(vec![])
             }
         },
-        (AccountAddress::ONE, FUNGIBLE_ASSET_MODULE, STORE_RESOURCE, 0) => {
+        (AccountAddress::ONE, FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE, 0) => {
             parse_fungible_store_changes(
-                owner_map,
-                &server_context.currencies,
-                version,
+                object_to_owner,
+                store_to_currency,
                 address,
-                data,
                 events,
                 operation_index,
             )
-            .await
         },
         _ => {
             // Any unknown type will just skip the operations
@@ -1405,13 +1396,109 @@ async fn parse_operations_from_write_set(
     }
 }
 
+fn parse_write_set<'a>(
+    state_key: &'a StateKey,
+    write_op: &'a WriteOp,
+) -> Option<(StructTag, AccountAddress, &'a [u8])> {
+    let (struct_tag, address) = match state_key.inner() {
+        StateKeyInner::AccessPath(path) => match path.get_path() {
+            Path::Resource(struct_tag) => (struct_tag, path.address),
+            Path::ResourceGroup(group_tag) => (group_tag, path.address),
+            _ => return None,
+        },
+        _ => {
+            // Ignore all but access path
+            return None;
+        },
+    };
+
+    let bytes = match write_op.bytes() {
+        Some(bytes) => bytes,
+        None => return None,
+    };
+
+    Some((struct_tag, address, bytes))
+}
+
+fn preprocess_write_set<'a>(
+    server_context: &RosettaContext,
+    state_key: &'a StateKey,
+    write_op: &'a WriteOp,
+    _maybe_payload: Option<&TransactionPayload>,
+    version: u64,
+    object_to_owner: &mut HashMap<AccountAddress, AccountAddress>,
+    store_to_currency: &mut HashMap<AccountAddress, Currency>,
+) -> Vec<(StructTag, AccountAddress, Vec<u8>)> {
+    let write_set_data = parse_write_set(state_key, write_op);
+    if write_set_data.is_none() {
+        return vec![];
+    }
+    let (struct_tag, address, data) = write_set_data.unwrap();
+
+    // Determine owners of stores, and metadata addresses for stores
+    let mut resources = vec![];
+    match (
+        struct_tag.address,
+        struct_tag.module.as_str(),
+        struct_tag.name.as_str(),
+    ) {
+        (AccountAddress::ONE, OBJECT_MODULE, OBJECT_RESOURCE_GROUP) => {
+            // Parse the underlying resources in the group
+            let maybe_resource_group = bcs::from_bytes::<ResourceGroup>(data);
+            if maybe_resource_group.is_err() {
+                warn!(
+                    "Failed to parse object resource group in version {}",
+                    version
+                );
+                return vec![];
+            }
+
+            let resource_group = maybe_resource_group.unwrap();
+            for (struct_tag, bytes) in resource_group.iter() {
+                match (
+                    struct_tag.address,
+                    struct_tag.module.as_str(),
+                    struct_tag.name.as_str(),
+                ) {
+                    (AccountAddress::ONE, OBJECT_MODULE, OBJECT_CORE_RESOURCE) => {
+                        parse_object_owner(address, bytes, object_to_owner);
+                    },
+                    (AccountAddress::ONE, FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE) => {
+                        parse_fungible_store_metadata(
+                            &server_context.currencies,
+                            version,
+                            address,
+                            bytes,
+                            store_to_currency,
+                        );
+                    },
+                    _ => {},
+                }
+
+                // Filter out transactions that are not framework
+                if struct_tag.address == AccountAddress::ONE {
+                    resources.push((struct_tag.clone(), address, bytes.clone()));
+                }
+            }
+        },
+        (AccountAddress::ONE, ..) => {
+            // Filter out transactions that are not framework
+            // TODO: maybe be more strict on what we filter
+            resources.push((struct_tag.clone(), address, data.to_vec()));
+        },
+        _ => {},
+    }
+
+    resources
+}
+
 fn parse_object_owner(
     object_address: AccountAddress,
     data: &[u8],
-    owner_map: &mut BTreeMap<AccountAddress, AccountAddress>,
+    object_to_owner: &mut HashMap<AccountAddress, AccountAddress>,
 ) {
     if let Ok(object_core) = bcs::from_bytes::<ObjectCore>(data) {
-        owner_map.insert(object_address, object_core.owner);
+        object_to_owner.insert(object_address, object_core.owner);
     }
 }
 
@@ -1902,7 +1989,7 @@ async fn parse_delegation_pool_resource_changes(
 }
 
 /// Parses coin store direct changes, for withdraws and deposits
-async fn parse_coinstore_changes(
+fn parse_coinstore_changes(
     currency: Currency,
     version: u64,
     address: AccountAddress,
@@ -1952,69 +2039,91 @@ async fn parse_coinstore_changes(
     Ok(operations)
 }
 
-/// Parses fungible store direct changes, for withdraws and deposits
-///
-/// Note that, we don't know until we introspect the change, which fa it is
-async fn parse_fungible_store_changes(
-    owner_map: &mut BTreeMap<AccountAddress, AccountAddress>,
+fn parse_fungible_store_metadata(
     currencies: &HashSet<Currency>,
     version: u64,
     address: AccountAddress,
     data: &[u8],
-    events: &[ContractEvent],
-    mut operation_index: u64,
-) -> ApiResult<Vec<Operation>> {
-    let mut operations = vec![];
+    store_to_currency: &mut HashMap<AccountAddress, Currency>,
+) {
     let fungible_store: FungibleStoreResource = if let Ok(fungible_store) = bcs::from_bytes(data) {
         fungible_store
     } else {
         warn!(
-            "Fungible store failed to parse for address {} at version {}",
-            address, version
+            "Fungible store failed to parse for address {} at version {} : {}",
+            address,
+            version,
+            hex::encode(data)
         );
-        return Ok(operations);
+        return;
     };
 
-    // Find the fungible asset currency association
     let metadata_address = fungible_store.metadata();
     let maybe_currency = find_fa_currency(currencies, metadata_address);
+    if let Some(currency) = maybe_currency {
+        store_to_currency.insert(address, currency);
+    }
+}
+
+/// Parses fungible store direct changes, for withdraws and deposits
+///
+/// Note that, we don't know until we introspect the change, which fa it is
+fn parse_fungible_store_changes(
+    object_to_owner: &HashMap<AccountAddress, AccountAddress>,
+    store_to_currency: &HashMap<AccountAddress, Currency>,
+    address: AccountAddress,
+    events: &[ContractEvent],
+    mut operation_index: u64,
+) -> ApiResult<Vec<Operation>> {
+    let mut operations = vec![];
+
+    // Find the fungible asset currency association
+    let maybe_currency = store_to_currency.get(&address);
+    if maybe_currency.is_none() {
+        return Ok(operations);
+    }
+    let currency = maybe_currency.unwrap();
 
     // If there's a currency, let's fill in operations
-    if let Some(currency) = maybe_currency {
-        static WITHDRAW_TYPE_TAG: Lazy<TypeTag> =
-            Lazy::new(|| parse_type_tag("0x1::fungible_asset::Withdraw").unwrap());
-        static DEPOSIT_TYPE_TAG: Lazy<TypeTag> =
-            Lazy::new(|| parse_type_tag("0x1::fungible_asset::Deposit").unwrap());
+    static WITHDRAW_TYPE_TAG: Lazy<TypeTag> =
+        Lazy::new(|| parse_type_tag("0x1::fungible_asset::Withdraw").unwrap());
+    static DEPOSIT_TYPE_TAG: Lazy<TypeTag> =
+        Lazy::new(|| parse_type_tag("0x1::fungible_asset::Deposit").unwrap());
 
-        // TODO:, this defaults to zero, we will need to do a second pass after all to fix them accordingly...
-        let owner = owner_map
-            .get(&address)
-            .copied()
-            .unwrap_or(AccountAddress::ZERO);
+    // If we don't have an owner here, there's missing data on the writeset
+    let maybe_owner = object_to_owner.get(&address);
+    if maybe_owner.is_none() {
+        warn!(
+            "First pass did not catch owner for fungible store \"{}\", returning no operations",
+            address
+        );
+        return Ok(operations);
+    }
 
-        let withdraw_amounts = get_amount_from_fa_event(events, &WITHDRAW_TYPE_TAG, address);
-        for amount in withdraw_amounts {
-            operations.push(Operation::withdraw(
-                operation_index,
-                Some(OperationStatusType::Success),
-                AccountIdentifier::base_account(owner),
-                currency.clone(),
-                amount,
-            ));
-            operation_index += 1;
-        }
+    let owner = maybe_owner.copied().unwrap();
 
-        let deposit_amounts = get_amount_from_fa_event(events, &DEPOSIT_TYPE_TAG, address);
-        for amount in deposit_amounts {
-            operations.push(Operation::deposit(
-                operation_index,
-                Some(OperationStatusType::Success),
-                AccountIdentifier::base_account(owner),
-                currency.clone(),
-                amount,
-            ));
-            operation_index += 1;
-        }
+    let withdraw_amounts = get_amount_from_fa_event(events, &WITHDRAW_TYPE_TAG, address);
+    for amount in withdraw_amounts {
+        operations.push(Operation::withdraw(
+            operation_index,
+            Some(OperationStatusType::Success),
+            AccountIdentifier::base_account(owner),
+            currency.clone(),
+            amount,
+        ));
+        operation_index += 1;
+    }
+
+    let deposit_amounts = get_amount_from_fa_event(events, &DEPOSIT_TYPE_TAG, address);
+    for amount in deposit_amounts {
+        operations.push(Operation::deposit(
+            operation_index,
+            Some(OperationStatusType::Success),
+            AccountIdentifier::base_account(owner),
+            currency.clone(),
+            amount,
+        ));
+        operation_index += 1;
     }
 
     Ok(operations)
