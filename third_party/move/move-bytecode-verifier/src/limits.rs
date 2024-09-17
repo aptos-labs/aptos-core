@@ -97,10 +97,20 @@ impl<'a> LimitsVerifier<'a> {
         }
         if let Some(sdefs) = self.resolver.struct_defs() {
             for sdef in sdefs {
-                if let StructFieldInformation::Declared(fdefs) = &sdef.field_information {
-                    for fdef in fdefs {
-                        self.verify_type_node(config, &fdef.signature.0)?
-                    }
+                match &sdef.field_information {
+                    StructFieldInformation::Native => {},
+                    StructFieldInformation::Declared(fdefs) => {
+                        for fdef in fdefs {
+                            self.verify_type_node(config, &fdef.signature.0)?
+                        }
+                    },
+                    StructFieldInformation::DeclaredVariants(variants) => {
+                        for variant in variants {
+                            for fdef in &variant.fields {
+                                self.verify_type_node(config, &fdef.signature.0)?
+                            }
+                        }
+                    },
                 }
             }
         }
