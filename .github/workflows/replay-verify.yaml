@@ -95,7 +95,8 @@ jobs:
       HISTORY_START: 518000000
       #TXNS_TO_SKIP: 12253479 12277499 148358668
       TXNS_TO_SKIP: "0"
-      RANGES_TO_SKIP: ""
+      # 586666680-586864610: seems to cause runner to OOM
+      RANGES_TO_SKIP: "586666680-586864610"
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "runs-on,cpu=8,family=m6id,hdd=100,image=aptos-ubuntu-x64,spot=false,run-id=${{ github.run_id }}"
