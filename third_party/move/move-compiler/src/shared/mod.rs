@@ -629,13 +629,13 @@ impl Flags {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
 pub enum LanguageVersion {
-    #[value(name="1")]
+    #[value(name = "1")]
     V1,
-    #[value(name="2")]
+    #[value(name = "2")]
     V2,
-    #[value(name="2.0")]
+    #[value(name = "2.0")]
     V2_0,
-    #[value(name="2.1")]
+    #[value(name = "2.1")]
     V2_1,
 }
 

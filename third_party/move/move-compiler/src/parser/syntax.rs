@@ -96,13 +96,21 @@ fn require_move_2(context: &mut Context, loc: Loc, description: &str) -> bool {
     }
 }
 
-fn require_language_version(context: &mut Context, loc: Loc, min_language_version: LanguageVersion, description: &str) -> bool {
+fn require_language_version(
+    context: &mut Context,
+    loc: Loc,
+    min_language_version: LanguageVersion,
+    description: &str,
+) -> bool {
     if context.env.flags().language_version() < min_language_version {
         context.env.add_diag(diag!(
             Syntax::UnsupportedLanguageItem,
             (
                 loc,
-                format!("Move {} language construct is not enabled: {}", min_language_version, description)
+                format!(
+                    "Move {} language construct is not enabled: {}",
+                    min_language_version, description
+                )
             )
         ));
         false
@@ -1906,7 +1914,12 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                     Exp_::Assign(Box::new(lhs), rhs)
                 },
                 Tok::PlusEqual => {
-                    require_language_version(context, current_token_loc(context.tokens), LanguageVersion::V2_1, "+=");
+                    require_language_version(
+                        context,
+                        current_token_loc(context.tokens),
+                        LanguageVersion::V2_1,
+                        "+=",
+                    );
                     let op_loc = context.tokens.advance_with_loc()?; // consume the "+="
                     let rhs = Box::new(parse_exp(context)?);
                     let end_loc = context.tokens.previous_end_loc();
@@ -1969,7 +1982,10 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                         // x = x + e
                         x_ @ Exp_::Name(sp!(_, NameAccessChain_::One(_)), _) => {
                             let x = sp(lhs_loc, x_);
-                            let rhs_expanded = sp(block_loc, Exp_::BinopExp(Box::new(x.clone()), sp(op_loc, BinOp_::Add), rhs));
+                            let rhs_expanded = sp(
+                                block_loc,
+                                Exp_::BinopExp(Box::new(x.clone()), sp(op_loc, BinOp_::Add), rhs),
+                            );
                             Exp_::Assign(Box::new(x), Box::new(rhs_expanded))
                         },
                         // e1 += e2
