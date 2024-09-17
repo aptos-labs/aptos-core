@@ -65,7 +65,7 @@ use aptos_secure_storage::Storage;
 use aptos_types::{
     epoch_state::EpochState,
     jwks::QuorumCertifiedUpdate,
-    ledger_info::LedgerInfo,
+    ledger_info::{LedgerInfo, VerificationStatus},
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
@@ -638,7 +638,9 @@ fn process_and_vote_on_proposal(
         for vote_msg in votes {
             timed_block_on(
                 runtime,
-                proposer_node.round_manager.process_vote_msg(vote_msg, true),
+                proposer_node
+                    .round_manager
+                    .process_vote_msg(vote_msg, VerificationStatus::Verified),
             )
             .unwrap();
         }
@@ -689,7 +691,7 @@ fn new_round_on_quorum_cert() {
         let vote_msg = node.next_vote().await;
         // Adding vote to form a QC
         node.round_manager
-            .process_vote_msg(vote_msg, true)
+            .process_vote_msg(vote_msg, VerificationStatus::Verified)
             .await
             .unwrap();
 
@@ -1558,7 +1560,7 @@ fn sync_on_partial_newer_sync_info() {
             let vote_msg = node.next_vote().await;
             // Adding vote to form a QC
             node.round_manager
-                .process_vote_msg(vote_msg, true)
+                .process_vote_msg(vote_msg, VerificationStatus::Verified)
                 .await
                 .unwrap();
         }
@@ -1656,7 +1658,7 @@ fn safety_rules_crash() {
             // sign proposal
             reset_safety_rules(&mut node);
             node.round_manager
-                .process_vote_msg(vote_msg, true)
+                .process_vote_msg(vote_msg, VerificationStatus::Verified)
                 .await
                 .unwrap();
         }
@@ -1699,7 +1701,7 @@ fn echo_timeout() {
             let timeout_vote = node_0.next_vote().await;
             let result = node_0
                 .round_manager
-                .process_vote_msg(timeout_vote, true)
+                .process_vote_msg(timeout_vote, VerificationStatus::Verified)
                 .await;
             // first and third message should not timeout
             if i == 0 || i == 2 {
@@ -1717,7 +1719,7 @@ fn echo_timeout() {
             let timeout_vote = node_1.next_vote().await;
             node_1
                 .round_manager
-                .process_vote_msg(timeout_vote, true)
+                .process_vote_msg(timeout_vote, VerificationStatus::Verified)
                 .await
                 .unwrap();
         }
@@ -2040,7 +2042,7 @@ pub fn forking_retrieval_test() {
                 if node.id != behind_node {
                     let result = node
                         .round_manager
-                        .process_vote_msg(vote_msg_on_timeout, true)
+                        .process_vote_msg(vote_msg_on_timeout, VerificationStatus::Verified)
                         .await;
 
                     if node.id == forking_node && i == 2 {
