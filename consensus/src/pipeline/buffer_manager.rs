@@ -40,7 +40,7 @@ use futures::{
     FutureExt, SinkExt, StreamExt,
 };
 use once_cell::sync::OnceCell;
-use std::{collections::HashMap, sync::{
+use std::{collections::{BTreeMap, HashMap}, sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 }};
@@ -144,8 +144,6 @@ pub struct BufferManager {
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 
-    pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
-
     buffered_commit_votes: HashMap<Round, HashMap<Author, CommitVote>>,
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
@@ -239,7 +237,7 @@ impl BufferManager {
             consensus_observer_config,
             consensus_publisher,
 
-            buffered_commit_votes: Arc::new(DashMap::new()),
+            buffered_commit_votes: HashMap::new(),
             execution_futures,
         }
     }
@@ -911,6 +909,13 @@ impl BufferManager {
 
 fn reply_nack(protocol: ProtocolId, response_sender: oneshot::Sender<Result<Bytes, RpcError>>) {
     let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Nack));
+    if let Ok(bytes) = protocol.to_bytes(&response) {
+        let _ = response_sender.send(Ok(bytes.into()));
+    }
+}
+
+fn reply_ack(protocol: ProtocolId, response_sender: oneshot::Sender<Result<Bytes, RpcError>>) {
+    let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
     if let Ok(bytes) = protocol.to_bytes(&response) {
         let _ = response_sender.send(Ok(bytes.into()));
     }
