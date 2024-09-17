@@ -17,13 +17,13 @@ use aptos_crypto::{
     hash::CryptoHash,
     Signature, VerifyingKey,
 };
-use aptos_infallible::RwLock;
+use dashmap::DashSet;
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     fmt,
     sync::Arc,
 };
@@ -149,7 +149,7 @@ pub struct ValidatorVerifier {
     /// submitted bad votes that has resulted in having to verify each vote individually. Further votes by these validators
     /// will be verified individually bypassing the optimization.
     #[serde(skip)]
-    malicious_authors: Arc<RwLock<HashSet<AccountAddress>>>,
+    malicious_authors: Arc<DashSet<AccountAddress>>,
 }
 
 // Implement Eq and PartialEq for ValidatorVerifier. Skip malicious_authors field in the comparison.
@@ -200,7 +200,7 @@ impl ValidatorVerifier {
             quorum_voting_power,
             total_voting_power,
             address_to_validator_index,
-            malicious_authors: Arc::new(RwLock::new(HashSet::new())),
+            malicious_authors: Arc::new(DashSet::new()),
         }
     }
 
@@ -238,16 +238,16 @@ impl ValidatorVerifier {
 
     pub fn add_malicious_authors(&self, malicious_authors: Vec<AccountAddress>) {
         for author in malicious_authors {
-            self.malicious_authors.write().insert(author);
+            self.malicious_authors.insert(author);
         }
     }
 
-    pub fn malicious_authors(&self) -> HashSet<AccountAddress> {
-        self.malicious_authors.read().clone()
+    pub fn malicious_authors(&self) -> Arc<DashSet<AccountAddress>> {
+        self.malicious_authors.clone()
     }
 
     pub fn is_malicious_author(&self, author: &AccountAddress) -> bool {
-        self.malicious_authors.read().contains(author)
+        self.malicious_authors.contains(author)
     }
 
     /// Helper method to initialize with a single author and public key with quorum voting power 1.

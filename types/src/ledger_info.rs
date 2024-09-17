@@ -475,9 +475,13 @@ impl LedgerInfoWithMixedSignatures {
     pub fn check_voting_power(
         &self,
         verifier: &ValidatorVerifier,
+        check_super_majority: bool,
     ) -> std::result::Result<u128, VerifyError> {
         let all_voters = self.all_voters();
-        verifier.check_voting_power(all_voters.iter().collect_vec().into_iter(), true)
+        verifier.check_voting_power(
+            all_voters.iter().collect_vec().into_iter(),
+            check_super_majority,
+        )
     }
 
     // Aggregates all the signatures, verifies the aggregate signature, and returns the aggregate signature.
@@ -485,7 +489,7 @@ impl LedgerInfoWithMixedSignatures {
         &mut self,
         epoch_state: Arc<EpochState>,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        self.check_voting_power(&epoch_state.verifier)?;
+        self.check_voting_power(&epoch_state.verifier, true)?;
 
         let mut all_signatures = self.verified_signatures.clone();
         for (author, signature) in self.unverified_signatures.signatures() {
@@ -494,7 +498,7 @@ impl LedgerInfoWithMixedSignatures {
 
         let aggregated_sig = epoch_state.verifier.aggregate_signatures(&all_signatures)?;
 
-        let (verified_aggregate_signature, malicious_authors) = match epoch_state
+        match epoch_state
             .verifier
             .clone()
             .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
@@ -505,7 +509,10 @@ impl LedgerInfoWithMixedSignatures {
                         .add_signature(*account_address, signature.clone());
                 }
                 self.unverified_signatures = PartialSignatures::empty();
-                (aggregated_sig, vec![])
+                Ok(LedgerInfoWithSignatures::new(
+                    self.ledger_info.clone(),
+                    aggregated_sig,
+                ))
             },
             Err(_) => {
                 // Question: Should we assign min tasks per thread here for into_par_iter()?
@@ -537,22 +544,21 @@ impl LedgerInfoWithMixedSignatures {
                     .collect();
                 self.unverified_signatures = PartialSignatures::empty();
 
-                let aggregated_sig = epoch_state
+                epoch_state
                     .verifier
-                    .aggregate_signatures(&self.verified_signatures)?;
-                // epoch_state
-                //     .read()
-                //     .verifier
-                //     .verify_multi_signatures(self.ledger_info(), &aggregated_sig)?;
-                (aggregated_sig, malicious_authors)
+                    .add_malicious_authors(malicious_authors);
+
+                match self.check_voting_power(&epoch_state.verifier, true) {
+                    Ok(_) => Ok(LedgerInfoWithSignatures::new(
+                        self.ledger_info.clone(),
+                        epoch_state
+                            .verifier
+                            .aggregate_signatures(&self.verified_signatures)?,
+                    )),
+                    Err(e) => Err(e),
+                }
             },
-        };
-        epoch_state
-            .verifier
-            .add_malicious_authors(malicious_authors);
-        self.check_voting_power(&epoch_state.verifier).map(|_| {
-            LedgerInfoWithSignatures::new(self.ledger_info.clone(), verified_aggregate_signature)
-        })
+        }
     }
 
     pub fn ledger_info(&self) -> &LedgerInfo {
@@ -746,7 +752,7 @@ mod tests {
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.check_voting_power(&validator_verifier),
+            ledger_info_with_mixed_signatures.check_voting_power(&validator_verifier, true),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
@@ -776,7 +782,7 @@ mod tests {
         );
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&validator_verifier)
+                .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             5
         );
@@ -831,7 +837,7 @@ mod tests {
         );
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&validator_verifier)
+                .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             5
         );
@@ -872,7 +878,7 @@ mod tests {
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 6);
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&validator_verifier)
+                .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             6
         );
