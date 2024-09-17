@@ -312,8 +312,8 @@ impl CommitDecision {
 /// The transaction payload and proof of each block
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PayloadWithProof {
-    pub transactions: Vec<SignedTransaction>,
-    pub proofs: Vec<ProofOfStore>,
+    transactions: Vec<SignedTransaction>,
+    proofs: Vec<ProofOfStore>,
 }
 
 impl PayloadWithProof {
@@ -337,8 +337,8 @@ impl PayloadWithProof {
 /// The transaction payload and proof of each block with a transaction limit
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PayloadWithProofAndLimit {
-    pub payload_with_proof: PayloadWithProof,
-    pub transaction_limit: Option<u64>,
+    payload_with_proof: PayloadWithProof,
+    transaction_limit: Option<u64>,
 }
 
 impl PayloadWithProofAndLimit {
@@ -629,8 +629,8 @@ impl BlockTransactionPayload {
 /// Payload message contains the block and transaction payload
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockPayload {
-    pub block: BlockInfo,
-    pub transaction_payload: BlockTransactionPayload,
+    block: BlockInfo,
+    transaction_payload: BlockTransactionPayload,
 }
 
 impl BlockPayload {
@@ -639,6 +639,26 @@ impl BlockPayload {
             block,
             transaction_payload,
         }
+    }
+
+    /// Returns a reference to the block info
+    pub fn block(&self) -> &BlockInfo {
+        &self.block
+    }
+
+    /// Returns the epoch of the block info
+    pub fn epoch(&self) -> u64 {
+        self.block.epoch()
+    }
+
+    /// Returns the round of the block info
+    pub fn round(&self) -> Round {
+        self.block.round()
+    }
+
+    /// Returns a reference to the block transaction payload
+    pub fn transaction_payload(&self) -> &BlockTransactionPayload {
+        &self.transaction_payload
     }
 
     /// Verifies the block payload digests and returns an error if the data is invalid

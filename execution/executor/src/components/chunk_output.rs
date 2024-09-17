@@ -301,13 +301,6 @@ pub fn update_counters_for_processed_chunk<T, O>(
                 ),
             },
             TransactionStatus::Discard(discard_status_code) => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(15)),
-                    warn!(
-                        "Txn being discarded is {:?} with status code {:?}",
-                        txn, discard_status_code
-                    )
-                );
                 (
                     // Specialize duplicate txns for alerts
                     if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_OLD {
@@ -317,6 +310,14 @@ pub fn update_counters_for_processed_chunk<T, O>(
                     } else if *discard_status_code == StatusCode::TRANSACTION_EXPIRED {
                         "discard_transaction_expired"
                     } else {
+                        // Only log if it is an interesting discard
+                        sample!(
+                            SampleRate::Duration(Duration::from_secs(15)),
+                            warn!(
+                                "[sampled] Txn being discarded is {:?} with status code {:?}",
+                                txn, discard_status_code
+                            )
+                        );
                         "discard"
                     },
                     "error_code",

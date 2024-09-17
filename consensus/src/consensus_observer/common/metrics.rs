@@ -5,17 +5,18 @@
 
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramVec,
-    IntCounterVec, IntGaugeVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
+    HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
 // Useful metric labels
 pub const BLOCK_PAYLOAD_LABEL: &str = "block_payload";
 pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
+pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
-pub const ORDERED_BLOCKS_LABEL: &str = "ordered_blocks";
+pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
@@ -26,6 +27,34 @@ pub static OBSERVER_CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
         "consensus_observer_created_subscriptions",
         "Counters for created subscriptions for consensus observer",
         &["creation_label", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking the number of times the block state was cleared by the consensus observer
+pub static OBSERVER_CLEARED_BLOCK_STATE: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "consensus_observer_cleared_block_state",
+        "Counter for tracking the number of times the block state was cleared by the consensus observer",
+    ).unwrap()
+});
+
+/// Counter for tracking dropped (direct send) messages by the consensus observer
+pub static OBSERVER_DROPPED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_dropped_messages",
+        "Counters related to dropped (direct send) messages by the consensus observer",
+        &["message_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking rejected (direct send) messages by the consensus observer
+pub static OBSERVER_REJECTED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_rejected_messages",
+        "Counters related to rejected (direct send) messages by the consensus observer",
+        &["message_type", "network_id"]
     )
     .unwrap()
 });
@@ -180,8 +209,8 @@ pub static PUBLISHER_SENT_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Increments the given request counter with the provided values
-pub fn increment_request_counter(
+/// Increments the given counter with the provided values
+pub fn increment_counter(
     counter: &Lazy<IntCounterVec>,
     label: &str,
     peer_network_id: &PeerNetworkId,
@@ -190,6 +219,11 @@ pub fn increment_request_counter(
     counter
         .with_label_values(&[label, network_id.as_str()])
         .inc();
+}
+
+/// Increments the given counter without labels
+pub fn increment_counter_without_labels(counter: &Lazy<IntCounter>) {
+    counter.inc();
 }
 
 /// Observes the value for the provided histogram and label
