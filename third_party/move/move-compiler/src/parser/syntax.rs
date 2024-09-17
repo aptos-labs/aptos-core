@@ -96,6 +96,21 @@ fn require_move_2(context: &mut Context, loc: Loc, description: &str) -> bool {
     }
 }
 
+fn require_language_version(context: &mut Context, loc: Loc, min_language_version: LanguageVersion, description: &str) -> bool {
+    if context.env.flags().language_version() < min_language_version {
+        context.env.add_diag(diag!(
+            Syntax::UnsupportedLanguageItem,
+            (
+                loc,
+                format!("Move {} language construct is not enabled: {}", min_language_version, description)
+            )
+        ));
+        false
+    } else {
+        true
+    }
+}
+
 fn require_move_2_and_advance(
     context: &mut Context,
     description: &str,
@@ -104,6 +119,17 @@ fn require_move_2_and_advance(
     context.tokens.advance()?;
     Ok(require_move_2(context, loc, description))
 }
+
+// fn require_language_version_and_advance(
+//     context: &mut Context,
+//     min_language_version: LanguageVersion,
+//     description: &str,
+// ) -> Result<bool, Box<Diagnostic>> {
+//     let loc = current_token_loc(context.tokens);
+//     context.tokens.advance()?;
+//     require_language_version(context, loc, min_language_version, description)?;
+
+// }
 
 pub fn make_loc(file_hash: FileHash, start: usize, end: usize) -> Loc {
     Loc::new(file_hash, start as u32, end as u32)
@@ -1880,6 +1906,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                     Exp_::Assign(Box::new(lhs), rhs)
                 },
                 Tok::PlusEqual => {
+                    require_language_version(context, current_token_loc(context.tokens), LanguageVersion::V2_1, "+=");
                     let op_loc = context.tokens.advance_with_loc()?; // consume the "+="
                     let rhs = Box::new(parse_exp(context)?);
                     let end_loc = context.tokens.previous_end_loc();

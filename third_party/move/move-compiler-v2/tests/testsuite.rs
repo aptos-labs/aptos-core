@@ -724,7 +724,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/plus-equal/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone(),
+            options: opts.clone().set_language_version(LanguageVersion::V2_1),
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,

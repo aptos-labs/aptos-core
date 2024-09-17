@@ -34,7 +34,7 @@ use move_compiler::{
     parser::ast::{self as P, CallKind, ModuleName as ParserModuleName},
     shared::{
         parse_named_address, unique_map::UniqueMap, CompilationEnv, Identifier as IdentifierTrait,
-        NumericalAddress, PackagePaths,
+        LanguageVersion as CompilerLanguageVersion, NumericalAddress, PackagePaths,
     },
     typing::ast as T,
     Compiler, Flags, PASS_COMPILATION, PASS_EXPANSION, PASS_INLINING, PASS_PARSER,
@@ -119,6 +119,11 @@ pub fn run_model_builder_in_compiler_mode(
             .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)
             .set_lang_v2(language_version != LanguageVersion::V1)
+            .set_language_version(match language_version {
+                LanguageVersion::V1 => CompilerLanguageVersion::V1,
+                LanguageVersion::V2_0 => CompilerLanguageVersion::V2_0,
+                LanguageVersion::V2_1 => CompilerLanguageVersion::V2_1,
+            })
             .set_compiler_v2(true),
         known_attributes,
     )

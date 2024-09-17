@@ -414,6 +414,9 @@ pub struct Flags {
     #[clap(long = cli::COMPILER_V2_FLAG)]
     compiler_v2: bool,
 
+    /// Language version
+    language_version: LanguageVersion,
+
     /// Block v1 runs past expansion phase
     #[clap(long = MOVE_COMPILER_BLOCK_V1_FLAG, default_value=bool_to_str(get_move_compiler_block_v1_from_env()))]
     block_v1_compiler: bool,
@@ -435,6 +438,7 @@ impl Flags {
             warn_unused: false,
             lang_v2: false,
             compiler_v2: false,
+            language_version: LanguageVersion::V1,
             block_v1_compiler: get_move_compiler_block_v1_from_env(),
         }
     }
@@ -600,6 +604,17 @@ impl Flags {
         }
     }
 
+    pub fn language_version(&self) -> LanguageVersion {
+        self.language_version
+    }
+
+    pub fn set_language_version(self, language_version: LanguageVersion) -> Self {
+        Self {
+            language_version,
+            ..self
+        }
+    }
+
     pub fn compiler_v2(&self) -> bool {
         self.compiler_v2
     }
@@ -609,6 +624,29 @@ impl Flags {
             compiler_v2: v2,
             ..self
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
+pub enum LanguageVersion {
+    #[value(name="1")]
+    V1,
+    #[value(name="2")]
+    V2,
+    #[value(name="2.0")]
+    V2_0,
+    #[value(name="2.1")]
+    V2_1,
+}
+
+impl std::fmt::Display for LanguageVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            LanguageVersion::V1 => "1",
+            LanguageVersion::V2 => "2",
+            LanguageVersion::V2_0 => "2.0",
+            LanguageVersion::V2_1 => "2.1",
+        })
     }
 }
 
