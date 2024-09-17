@@ -117,7 +117,7 @@ pub fn prepare_buffer_manager(
     let network = NetworkSender::new(
         author,
         consensus_network_client,
-        self_loop_tx,
+        Some(self_loop_tx),
         validators.clone(),
     );
 

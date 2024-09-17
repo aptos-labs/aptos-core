@@ -90,7 +90,7 @@ pub fn start_consensus(
         node_config.consensus.clone(),
         Arc::new(execution_proxy),
         node_config.validator_network.as_ref().unwrap().peer_id(),
-        self_sender.clone(),
+        Some(self_sender.clone()),
         consensus_network_client.clone(),
         bounded_executor.clone(),
         rand_storage.clone(),
@@ -101,7 +101,7 @@ pub fn start_consensus(
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
-        self_sender,
+        Some(self_sender),
         consensus_network_client,
         timeout_sender,
         consensus_to_mempool_sender,
@@ -140,8 +140,6 @@ pub fn start_consensus_observer(
     reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
 ) {
     // Create the (dummy) consensus network client
-    let (self_sender, _self_receiver) =
-        aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(NetworkClient::new(
         vec![],
         vec![],
@@ -174,7 +172,7 @@ pub fn start_consensus_observer(
             node_config.consensus.clone(),
             Arc::new(execution_proxy),
             AccountAddress::ONE,
-            self_sender.clone(),
+            None,
             consensus_network_client,
             bounded_executor,
             rand_storage.clone(),

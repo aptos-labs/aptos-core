@@ -146,7 +146,7 @@ pub struct ExecutionProxyClient {
     consensus_config: ConsensusConfig,
     execution_proxy: Arc<ExecutionProxy>,
     author: Author,
-    self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
+    self_sender: Option<aptos_channels::UnboundedSender<Event<ConsensusMsg>>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     bounded_executor: BoundedExecutor,
     // channels to buffer manager
@@ -161,7 +161,7 @@ impl ExecutionProxyClient {
         consensus_config: ConsensusConfig,
         execution_proxy: Arc<ExecutionProxy>,
         author: Author,
-        self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
+        self_sender: Option<aptos_channels::UnboundedSender<Event<ConsensusMsg>>>,
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,

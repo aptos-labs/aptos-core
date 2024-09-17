@@ -197,7 +197,7 @@ pub struct NetworkSender {
     pub(crate) consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
-    self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
+    self_sender: Option<aptos_channels::UnboundedSender<Event<ConsensusMsg>>>,
     validators: ValidatorVerifier,
     time_service: aptos_time_service::TimeService,
 }
@@ -206,7 +206,7 @@ impl NetworkSender {
     pub fn new(
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
-        self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
+        self_sender: Option<aptos_channels::UnboundedSender<Event<ConsensusMsg>>>,
         validators: ValidatorVerifier,
     ) -> Self {
         NetworkSender {
@@ -216,6 +216,14 @@ impl NetworkSender {
             validators,
             time_service: aptos_time_service::TimeService::real(),
         }
+    }
+
+    /// Sends the given event to ourselves
+    async fn send_event_to_self(&self, event: Event<ConsensusMsg>) -> anyhow::Result<()> {
+        if let Some(mut self_sender) = self.self_sender.clone() {
+            self_sender.send(event).await?;
+        }
+        Ok(())
     }
 
     /// Tries to retrieve num of blocks backwards starting from id from the given peer: the function
@@ -265,7 +273,7 @@ impl NetworkSender {
         let (tx, rx) = oneshot::channel();
         let protocol = RPC[0];
         let self_msg = Event::RpcRequest(self.author, msg.clone(), RPC[0], tx);
-        self.self_sender.clone().send(self_msg).await?;
+        self.send_event_to_self(self_msg).await?;
         if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
             let response_msg =
                 tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
@@ -308,8 +316,7 @@ impl NetworkSender {
         fail_point!("consensus::send::any", |_| ());
         // Directly send the message to ourself without going through network.
         let self_msg = Event::Message(self.author, msg.clone());
-        let mut self_sender = self.self_sender.clone();
-        if let Err(err) = self_sender.send(self_msg).await {
+        if let Err(err) = self.send_event_to_self(self_msg).await {
             error!("Error broadcasting to self: {:?}", err);
         }
 
@@ -341,12 +348,11 @@ impl NetworkSender {
     async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::any", |_| ());
         let network_sender = self.consensus_network_client.clone();
-        let mut self_sender = self.self_sender.clone();
         for peer in recipients {
             if self.author == peer {
                 let self_msg = Event::Message(self.author, msg.clone());
-                if let Err(err) = self_sender.send(self_msg).await {
-                    error!(error = ?err, "Error delivering a self msg");
+                if let Err(error) = self.send_event_to_self(self_msg).await {
+                    error!(error = ?error, "Error delivering a self msg");
                 }
                 continue;
             }

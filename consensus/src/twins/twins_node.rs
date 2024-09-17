@@ -151,7 +151,7 @@ impl SMRNode {
         let epoch_mgr = EpochManager::new(
             &config,
             time_service,
-            self_sender,
+            Some(self_sender),
             consensus_network_client,
             timeout_sender,
             quorum_store_to_mempool_sender,
