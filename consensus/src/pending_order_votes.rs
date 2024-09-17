@@ -50,6 +50,10 @@ impl PendingOrderVotes {
         }
     }
 
+    pub fn exists(&self, li_digest: &HashValue) -> bool {
+        self.li_digest_to_votes.contains_key(li_digest)
+    }
+
     /// Add a vote to the pending votes
     // TODO: Should we add any counters here?
     pub fn insert_order_vote(

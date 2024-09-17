@@ -9,8 +9,8 @@ use crate::{
     },
     counters::{
         self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED,
-        ORDER_VOTE_BROADCASTED, ORDER_VOTE_OTHER_ERRORS, ORDER_VOTE_VERY_OLD, PROPOSAL_VOTE_ADDED,
-        PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
+        ORDER_VOTE_BROADCASTED, ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS,
+        PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
         QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
     },
     error::{error_kind, VerifyError},
@@ -51,7 +51,7 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
@@ -1097,9 +1097,26 @@ impl RoundManager {
                 return Ok(());
             }
 
-            if order_vote_msg.order_vote().ledger_info().round()
-                > self.block_store.sync_info().highest_ordered_round()
+            let highest_ordered_round = self.block_store.sync_info().highest_ordered_round();
+            let highest_ordered_epoch = self.block_store.sync_info().highest_ordered_cert().epoch();
+            let order_vote_round = order_vote_msg.order_vote().ledger_info().round();
+            if order_vote_round > highest_ordered_round
+                && order_vote_round < highest_ordered_round + 100
+                && order_vote_msg.epoch() >= highest_ordered_epoch
             {
+                if !self
+                    .pending_order_votes
+                    .exists(&order_vote_msg.order_vote().ledger_info().hash())
+                {
+                    let start = Instant::now();
+                    order_vote_msg
+                        .quorum_cert()
+                        .verify(&self.epoch_state().verifier)
+                        .context("[OrderVoteMsg QuorumCert verification failed")?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["order_vote_qc"])
+                        .observe(start.elapsed().as_secs_f64());
+                }
                 let vote_reception_result = self
                     .pending_order_votes
                     .insert_order_vote(order_vote_msg.order_vote(), &self.epoch_state.verifier);
@@ -1110,7 +1127,7 @@ impl RoundManager {
                 )
                 .await?;
             } else {
-                ORDER_VOTE_VERY_OLD.inc();
+                ORDER_VOTE_NOT_IN_RANGE.inc();
                 info!(
                     "Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
                     order_vote_msg.order_vote().ledger_info().round(),
@@ -1380,7 +1397,7 @@ impl RoundManager {
             .is_none()
         {
             ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE.inc();
-            warn!(
+            info!(
                 "Ordered certificate created without block in block store: {:?}",
                 ordered_cert
             );
