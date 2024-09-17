@@ -1948,6 +1948,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                         // =>
                         // { let t = e1; t = t + e2 }
                         _ => {
+                            // TODO: make compiler generated names
                             let tmp_name = Symbol::from("__");
                             let bind_var = Bind_::Var(Var(sp(lhs_loc, tmp_name)));
                             let bind_ls = sp(lhs_loc, vec![sp(lhs_loc, bind_var)]);
