@@ -15,7 +15,7 @@ use move_binary_format::{
     file_format::{
         CompiledModule, CompiledScript, Constant, FieldDefinition, FunctionHandle,
         FunctionHandleIndex, FunctionInstantiation, ModuleHandle, Signature,
-        StructFieldInformation, StructHandle, StructHandleIndex, TableIndex,
+        StructFieldInformation, StructHandle, StructHandleIndex, TableIndex, VariantDefinition,
     },
     IndexKind,
 };
@@ -52,6 +52,10 @@ impl<'a> DuplicationChecker<'a> {
         let checker = Self { module };
         checker.check_field_handles()?;
         checker.check_field_instantiations()?;
+        checker.check_variant_field_handles()?;
+        checker.check_variant_field_instantiations()?;
+        checker.check_struct_variant_handles()?;
+        checker.check_struct_variant_instantiations()?;
         checker.check_function_definitions()?;
         checker.check_struct_definitions()?;
         checker.check_struct_instantiations()
@@ -201,6 +205,50 @@ impl<'a> DuplicationChecker<'a> {
         Ok(())
     }
 
+    fn check_variant_field_handles(&self) -> PartialVMResult<()> {
+        match Self::first_duplicate_element(self.module.variant_field_handles()) {
+            Some(idx) => Err(verification_error(
+                StatusCode::DUPLICATE_ELEMENT,
+                IndexKind::VariantFieldHandle,
+                idx,
+            )),
+            None => Ok(()),
+        }
+    }
+
+    fn check_variant_field_instantiations(&self) -> PartialVMResult<()> {
+        match Self::first_duplicate_element(self.module.variant_field_instantiations()) {
+            Some(idx) => Err(verification_error(
+                StatusCode::DUPLICATE_ELEMENT,
+                IndexKind::VariantFieldInstantiation,
+                idx,
+            )),
+            None => Ok(()),
+        }
+    }
+
+    fn check_struct_variant_handles(&self) -> PartialVMResult<()> {
+        match Self::first_duplicate_element(self.module.struct_variant_handles()) {
+            Some(idx) => Err(verification_error(
+                StatusCode::DUPLICATE_ELEMENT,
+                IndexKind::StructVariantHandle,
+                idx,
+            )),
+            None => Ok(()),
+        }
+    }
+
+    fn check_struct_variant_instantiations(&self) -> PartialVMResult<()> {
+        match Self::first_duplicate_element(self.module.struct_variant_instantiations()) {
+            Some(idx) => Err(verification_error(
+                StatusCode::DUPLICATE_ELEMENT,
+                IndexKind::StructVariantInstantiation,
+                idx,
+            )),
+            None => Ok(()),
+        }
+    }
+
     fn check_struct_definitions(&self) -> PartialVMResult<()> {
         // StructDefinition - contained StructHandle defines uniqueness
         if let Some(idx) =
@@ -212,7 +260,7 @@ impl<'a> DuplicationChecker<'a> {
                 idx,
             ));
         }
-        // Field names in structs must be unique
+        // Field names in variants and structs must be unique
         for (struct_idx, struct_def) in self.module.struct_defs().iter().enumerate() {
             match &struct_def.field_information {
                 StructFieldInformation::Native => continue,
@@ -227,6 +275,7 @@ impl<'a> DuplicationChecker<'a> {
                     Self::check_duplicate_fields(fields.iter())?
                 },
                 StructFieldInformation::DeclaredVariants(variants) => {
+                    Self::check_duplicate_variants(variants.iter())?;
                     for variant in variants {
                         Self::check_duplicate_fields(variant.fields.iter())?
                     }
@@ -271,6 +320,20 @@ impl<'a> DuplicationChecker<'a> {
             Err(verification_error(
                 StatusCode::DUPLICATE_ELEMENT,
                 IndexKind::FieldDefinition,
+                idx,
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn check_duplicate_variants<'l>(
+        variants: impl Iterator<Item = &'l VariantDefinition>,
+    ) -> PartialVMResult<()> {
+        if let Some(idx) = Self::first_duplicate_element(variants.map(|x| x.name)) {
+            Err(verification_error(
+                StatusCode::DUPLICATE_ELEMENT,
+                IndexKind::VariantDefinition,
                 idx,
             ))
         } else {
