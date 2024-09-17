@@ -1370,6 +1370,10 @@ impl RoundManager {
         qc: &QuorumCert,
         order_vote_author: Author,
     ) -> anyhow::Result<()> {
+        // If the block doesn't exist, we could ideally do sync up based on the qc.
+        // But this could trigger fetching a lot of past blocks in case the node is lagging behind.
+        // So, we just log a warning here to avoid a long sequence of block fetchs.
+        // One of the subsequence syncinfo messages will trigger the block fetch or state sync if required.
         if self
             .block_store
             .get_block(ordered_cert.commit_info().id())
@@ -1384,12 +1388,10 @@ impl RoundManager {
         }
 
         // If the block is already in the block store, but QC isn't available in the block store, insert QC.
-        if NeedFetchResult::QCAlreadyExist != self.block_store.need_fetch_for_quorum_cert(qc) {
-            self.new_qc_from_order_vote_msg(qc, order_vote_author)
-                .await?;
-        }
+        self.new_qc_from_order_vote_msg(qc, order_vote_author)
+            .await?;
 
-        // If block exists in the quorum store
+        // If the block and qc now exist in the quorum store, insert the ordered cert
         let result = self
             .block_store
             .insert_ordered_cert(&ordered_cert)

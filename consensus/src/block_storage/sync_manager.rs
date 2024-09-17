@@ -250,7 +250,7 @@ impl BlockStore {
     /// 2. We persist the gap blocks to storage before start sync to ensure we could restart if we
     /// crash in the middle of the sync.
     /// 3. We prune the old tree and replace with a new tree built with the 3-chain.
-    pub async fn sync_to_highest_quorum_cert(
+    async fn sync_to_highest_quorum_cert(
         &self,
         highest_quorum_cert: QuorumCert,
         highest_commit_cert: WrappedLedgerInfo,
