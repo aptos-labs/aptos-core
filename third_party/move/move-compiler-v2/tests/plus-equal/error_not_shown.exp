@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot mutably borrow from an immutable ref
+  ┌─ tests/plus-equal/error_not_shown.move:9:17
+  │
+9 │         let p = &mut self.0;
+  │                 ^^^^^^^^^^^
