@@ -270,7 +270,7 @@ impl NodeSetup {
         let network = Arc::new(NetworkSender::new(
             author,
             consensus_network_client,
-            self_sender,
+            Some(self_sender),
             validators,
         ));
 

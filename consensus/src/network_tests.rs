@@ -662,7 +662,7 @@ mod tests {
             let node = NetworkSender::new(
                 *peer,
                 consensus_network_client,
-                self_sender,
+                Some(self_sender),
                 validator_verifier.clone(),
             );
 
@@ -778,7 +778,7 @@ mod tests {
             let node = NetworkSender::new(
                 *peer,
                 consensus_network_client.clone(),
-                self_sender,
+                Some(self_sender),
                 validator_verifier.clone(),
             );
 

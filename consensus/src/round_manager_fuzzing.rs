@@ -157,8 +157,6 @@ fn create_node_for_fuzzing() -> RoundManager {
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
 
-    let (self_sender, _self_receiver) = aptos_channels::new_unbounded_test();
-
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: storage.get_validator_set().into(),
@@ -166,7 +164,7 @@ fn create_node_for_fuzzing() -> RoundManager {
     let network = Arc::new(NetworkSender::new(
         signer.author(),
         consensus_network_client,
-        self_sender,
+        None,
         epoch_state.verifier.clone(),
     ));
 
