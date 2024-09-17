@@ -28,11 +28,14 @@ pub const COIN_STORE_RESOURCE: &str = "CoinStore";
 pub const STAKE_POOL_RESOURCE: &str = "StakePool";
 pub const STAKING_CONTRACT_RESOURCE: &str = "StakingContract";
 pub const STORE_RESOURCE: &str = "Store";
+pub const FUNGIBLE_STORE_RESOURCE: &str = "FungibleStore";
 pub const STAKING_GROUP_UPDATE_COMMISSION_RESOURCE: &str = "StakingGroupUpdateCommissionEvent";
 pub const VESTING_RESOURCE: &str = "Vesting";
 pub const DELEGATION_POOL_RESOURCE: &str = "DelegationPool";
 pub const WITHDRAW_STAKE_EVENT: &str = "WithdrawStakeEvent";
 pub const OBJECT_CORE_RESOURCE: &str = "ObjectCore";
+
+pub const OBJECT_RESOURCE_GROUP: &str = "ObjectGroup";
 
 pub const CREATE_ACCOUNT_FUNCTION: &str = "create_account";
 pub const TRANSFER_FUNCTION: &str = "transfer";
