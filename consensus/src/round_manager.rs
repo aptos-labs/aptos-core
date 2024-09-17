@@ -1106,12 +1106,10 @@ impl RoundManager {
             }
 
             let highest_ordered_round = self.block_store.sync_info().highest_ordered_round();
-            let highest_ordered_epoch = self.block_store.sync_info().highest_ordered_cert().epoch();
             let order_vote_round = order_vote_msg.order_vote().ledger_info().round();
             let li_digest = order_vote_msg.order_vote().ledger_info().hash();
             if order_vote_round > highest_ordered_round
                 && order_vote_round < highest_ordered_round + 100
-                && order_vote_msg.epoch() >= highest_ordered_epoch
             {
                 // If it is the first order vote received for the block, verify the QC and insert along with QC.
                 // For the subsequent order votes for the same block, we don't have to verify the QC. Just inserting the
