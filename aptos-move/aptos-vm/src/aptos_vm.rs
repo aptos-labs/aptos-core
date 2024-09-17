@@ -40,19 +40,35 @@ use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
-use aptos_types::{account_config::{self, new_block_event_key, AccountResource}, block_executor::{
-    config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
-    partitioner::PartitionedTransactions,
-}, block_metadata::BlockMetadata, block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness}, chain_id::ChainId, contract_event::ContractEvent, fee_statement::FeeStatement, move_utils::as_move_value::AsMoveValue, on_chain_config::{
-    new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
-    OnChainConfig, TimedFeatureFlag, TimedFeatures,
-}, randomness::Randomness, state_store::{state_key::StateKey, StateView, TStateView}, transaction::{
-    authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
-    BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-    MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
-    TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
-    VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
-}, vm_status::{AbortLocation, StatusCode, VMStatus}};
+use aptos_types::{
+    account_config::{self, new_block_event_key, AccountResource},
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        partitioner::PartitionedTransactions,
+    },
+    block_metadata::BlockMetadata,
+    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
+    chain_id::ChainId,
+    contract_event::ContractEvent,
+    fee_statement::FeeStatement,
+    function_info::FunctionInfo,
+    move_utils::as_move_value::AsMoveValue,
+    on_chain_config::{
+        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
+        OnChainConfig, TimedFeatureFlag, TimedFeatures,
+    },
+    randomness::Randomness,
+    state_store::{state_key::StateKey, StateView, TStateView},
+    transaction::{
+        authenticator::{AnySignature, AuthenticationProof},
+        signature_verified_transaction::SignatureVerifiedTransaction,
+        BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
+        MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
+        TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
+        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+    },
+    vm_status::{AbortLocation, StatusCode, VMStatus},
+};
 use aptos_utils::aptos_try;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
@@ -102,10 +118,6 @@ use std::{
     marker::Sync,
     sync::Arc,
 };
-use aptos_native_interface::SafeNativeError;
-use aptos_types::function_info::FunctionInfo;
-use aptos_types::transaction::authenticator::AuthenticationProof;
-use move_vm_types::values::Value;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -135,6 +147,12 @@ macro_rules! unwrap_or_discard {
             },
         }
     };
+}
+
+fn serialized_signer(account_address: &AccountAddress) -> Vec<u8> {
+    MoveValue::Signer(*account_address)
+        .simple_serialize()
+        .unwrap()
 }
 
 pub(crate) fn get_system_transaction_output(
@@ -914,7 +932,6 @@ impl AptosVM {
             txn_data,
         )?;
 
-
         // ============= Gas fee cannot change after this line =============
 
         self.success_transaction_cleanup(
@@ -1283,7 +1300,7 @@ impl AptosVM {
                 session,
                 gas_meter,
                 traversal_context,
-                vec![MoveValue::Signer(multisig_address).simple_serialize().unwrap()],
+                vec![serialized_signer(&multisig_address)],
                 payload,
                 txn_data,
             )
@@ -1367,10 +1384,7 @@ impl AptosVM {
             // with the general verify_module above.
             if init_function.is_ok() {
                 if verifier::module_init::verify_module_init_function(module).is_ok() {
-                    let args: Vec<Vec<u8>> = senders
-                        .iter()
-                        .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
-                        .collect();
+                    let args: Vec<Vec<u8>> = senders.iter().map(serialized_signer).collect();
                     session.execute_function_bypass_visibility(
                         &module.self_id(),
                         init_func_name,
@@ -1804,7 +1818,9 @@ impl AptosVM {
         let senders = txn_data.senders();
         let proofs = txn_data.authentication_proofs();
         // Add fee payer.
-        if let (Some(fee_payer), Some(AuthenticationProof::Abstraction(function_info, data))) = (txn_data.fee_payer, &txn_data.fee_payer_authentication_proof) {
+        if let (Some(fee_payer), Some(AuthenticationProof::Abstraction(function_info, data))) =
+            (txn_data.fee_payer, &txn_data.fee_payer_authentication_proof)
+        {
             unwrap_or_discard!(user_session.execute(|session| dispatchable_authenticate(
                 session,
                 gas_meter,
@@ -1814,9 +1830,8 @@ impl AptosVM {
                 &mut traversal_context,
             )));
         }
-        let serialized_signers = unwrap_or_discard!(itertools::zip_eq(senders, proofs).map(
-            |(sender, proof)|
-            match proof {
+        let serialized_signers = unwrap_or_discard!(itertools::zip_eq(senders, proofs)
+            .map(|(sender, proof)| match proof {
                 AuthenticationProof::Abstraction(function_info, data) =>
                     user_session.execute(|session| dispatchable_authenticate(
                         session,
@@ -1826,10 +1841,10 @@ impl AptosVM {
                         data.clone(),
                         &mut traversal_context,
                     )),
-                AuthenticationProof::Key(_) | AuthenticationProof::None => Ok(MoveValue::Signer(sender).simple_serialize().unwrap()),
-
-            }
-        ).collect::<Result<_, _>>());
+                AuthenticationProof::Key(_) | AuthenticationProof::None =>
+                    Ok(serialized_signer(&sender)),
+            })
+            .collect::<Result<_, _>>());
 
         // We keep track of whether any newly published modules are loaded into the Vm's loader
         // cache as part of executing transactions. This would allow us to decide whether the cache
@@ -1869,7 +1884,6 @@ impl AptosVM {
                 unwrap_or_discard!(Err(deprecated_module_bundle!()))
             },
         };
-
 
         let gas_usage = txn_data
             .max_gas_amount()
@@ -2021,8 +2035,8 @@ impl AptosVM {
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id, None);
                 let senders = match txn_sender {
-                    None => vec![*execute_as],
-                    Some(sender) => vec![sender, *execute_as],
+                    None => vec![serialized_signer(execute_as)],
+                    Some(sender) => vec![serialized_signer(&sender), serialized_signer(execute_as)],
                 };
 
                 let traversal_storage = TraversalStorage::new();
@@ -2820,17 +2834,26 @@ fn dispatchable_authenticate(
             &LITE_ACCOUNT_MODULE,
             AUTHENTICATE,
             vec![],
-            serialize_values(&vec![MoveValue::Signer(account), function_info.as_move_value(), MoveValue::vector_u8(authenticator)]),
+            serialize_values(&vec![
+                MoveValue::Signer(account),
+                function_info.as_move_value(),
+                MoveValue::vector_u8(authenticator),
+            ]),
             gas_meter,
             traversal_context,
         )
         .map(|mut return_vals| {
             assert!(
-                return_vals.mutable_reference_outputs.is_empty() && return_vals.return_values.len() == 1,
+                return_vals.mutable_reference_outputs.is_empty()
+                    && return_vals.return_values.len() == 1,
                 "Abstraction authentication function must only have 1 return value"
             );
             let (signer_data, signer_layout) = return_vals.return_values.pop().expect("Must exist");
-            assert_eq!(signer_layout, MoveTypeLayout::Signer, "Abstraction authentication function returned non-signer.");
+            assert_eq!(
+                signer_layout,
+                MoveTypeLayout::Signer,
+                "Abstraction authentication function returned non-signer."
+            );
             signer_data
         })
 }

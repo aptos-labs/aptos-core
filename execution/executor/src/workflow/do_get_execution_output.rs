@@ -349,7 +349,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
                             metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
                                 .with_label_values(&[process_type, "Abstraction"])
                                 .inc();
-                        }
+                        },
                     };
                 }
 

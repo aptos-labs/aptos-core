@@ -4,17 +4,19 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
-use move_core_types::{
-    identifier::Identifier,
-    language_storage::ModuleId,
+use aptos_crypto::{
+    bls12381::{PrivateKey, PublicKey},
+    test_utils::KeyPair,
+    SigningKey, Uniform,
 };
-use std::path::PathBuf;
+use aptos_types::{
+    function_info::FunctionInfo,
+    transaction::{EntryFunction, TransactionStatus},
+};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use rand::rngs::OsRng;
 use serde_json::json;
-use aptos_crypto::{bls12381::{PrivateKey, PublicKey}, Uniform, SigningKey, test_utils::KeyPair};
-use aptos_types::function_info::FunctionInfo;
-use aptos_types::transaction::{TransactionStatus, EntryFunction};
-use move_core_types::vm_status::StatusCode;
+use std::path::PathBuf;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_account_abstraction_single_signer() {
@@ -46,8 +48,14 @@ async fn test_account_abstraction_single_signer() {
         )
         .await;
 
-    let func_info = FunctionInfo::new(user_addr, "single_key".to_string(), "authenticate".to_string());
-    let txn3 = context.add_dispatchable_authentication_function(&account, func_info.clone()).await;
+    let func_info = FunctionInfo::new(
+        user_addr,
+        "single_key".to_string(),
+        "authenticate".to_string(),
+    );
+    let txn3 = context
+        .add_dispatchable_authentication_function(&account, func_info.clone())
+        .await;
     context.commit_block(&vec![txn3]).await;
 
     let factory = context.transaction_factory();
@@ -63,12 +71,19 @@ async fn test_account_abstraction_single_signer() {
     );
 
     let txn_status = context.try_commit_block(&vec![aa_txn]).await;
-    assert!(matches!(txn_status.last(), Some(TransactionStatus::Discard(StatusCode::ABORTED))));
+    assert!(matches!(
+        txn_status.last(),
+        Some(TransactionStatus::Discard(StatusCode::ABORTED))
+    ));
     // decrement seq num for aborted txn.
     account.decrement_sequence_number();
 
     // Set the correct AA signature from now on.
-    let aa_signature = key_pair.private_key.sign_arbitrary_message(user_addr.as_ref()).to_bytes().to_vec();
+    let aa_signature = key_pair
+        .private_key
+        .sign_arbitrary_message(user_addr.as_ref())
+        .to_bytes()
+        .to_vec();
     account.set_abstraction_signature(func_info.clone(), aa_signature);
 
     // case 2: successful AA txn.
@@ -112,9 +127,15 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
     });
     context.publish_package(&mut a, txn).await;
 
-    context.commit_block(&vec![context.mint_user_account(&a).await]).await;
-    context.commit_block(&vec![context.mint_user_account(&b).await]).await;
-    context.commit_block(&vec![context.mint_user_account(&c).await]).await;
+    context
+        .commit_block(&vec![context.mint_user_account(&a).await])
+        .await;
+    context
+        .commit_block(&vec![context.mint_user_account(&b).await])
+        .await;
+    context
+        .commit_block(&vec![context.mint_user_account(&c).await])
+        .await;
 
     // Convert a and c to aa
     context
@@ -134,12 +155,30 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
         )
         .await;
     let func_info = FunctionInfo::new(a_addr, "single_key".to_string(), "authenticate".to_string());
-    let txn1 = context.add_dispatchable_authentication_function(&a, func_info.clone()).await;
-    let txn2 = context.add_dispatchable_authentication_function(&c, func_info.clone()).await;
+    let txn1 = context
+        .add_dispatchable_authentication_function(&a, func_info.clone())
+        .await;
+    let txn2 = context
+        .add_dispatchable_authentication_function(&c, func_info.clone())
+        .await;
     context.commit_block(&vec![txn1, txn2]).await;
 
-    a.set_abstraction_signature(func_info.clone(), key_pair.private_key.sign_arbitrary_message(a_addr.as_ref()).to_bytes().to_vec());
-    c.set_abstraction_signature(func_info, key_pair.private_key.sign_arbitrary_message(c.address().as_ref()).to_bytes().to_vec());
+    a.set_abstraction_signature(
+        func_info.clone(),
+        key_pair
+            .private_key
+            .sign_arbitrary_message(a_addr.as_ref())
+            .to_bytes()
+            .to_vec(),
+    );
+    c.set_abstraction_signature(
+        func_info,
+        key_pair
+            .private_key
+            .sign_arbitrary_message(c.address().as_ref())
+            .to_bytes()
+            .to_vec(),
+    );
 
     let factory = context.transaction_factory();
     let balance_start = context.get_apt_balance(d.address()).await;
@@ -148,10 +187,7 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
         None,
         factory
             .entry_function(EntryFunction::new(
-                ModuleId::new(
-                    a_addr,
-                    Identifier::new("test_functions").unwrap(),
-                ),
+                ModuleId::new(a_addr, Identifier::new("test_functions").unwrap()),
                 Identifier::new("transfer_to_the_last").unwrap(),
                 vec![],
                 vec![bcs::to_bytes(&d.address()).unwrap()],

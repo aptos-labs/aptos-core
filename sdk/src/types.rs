@@ -21,11 +21,15 @@ use aptos_ledger::AptosLedgerError;
 pub use aptos_types::*;
 use aptos_types::{
     event::EventKey,
+    function_info::FunctionInfo,
     keyless::{
         Claims, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
         KeylessSignature, OpenIdSig, Pepper, TransactionAndProof, ZeroKnowledgeSig,
     },
-    transaction::authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
+    transaction::{
+        authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
+        Auth,
+    },
 };
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
@@ -36,15 +40,13 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use aptos_types::function_info::FunctionInfo;
-use aptos_types::transaction::Auth;
 
 #[derive(Debug)]
 enum LocalAccountAuthenticator {
     PrivateKey(AccountKey),
     Keyless(KeylessAccount),
     FederatedKeyless(FederatedKeylessAccount),
-    Abstraction(FunctionInfo, Vec<u8>)
+    Abstraction(FunctionInfo, Vec<u8>), // TODO: Add support for keyless authentication
 }
 
 impl LocalAccountAuthenticator {
@@ -277,10 +279,7 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.address())
             .collect();
-        let secondary_signer_auths = secondary_signers
-            .iter()
-            .map(|a| a.auth())
-            .collect();
+        let secondary_signer_auths = secondary_signers.iter().map(|a| a.auth()).collect();
         let raw_txn = builder
             .sender(self.address())
             .sequence_number(self.increment_sequence_number())

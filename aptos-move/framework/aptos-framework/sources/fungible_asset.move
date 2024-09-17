@@ -802,7 +802,7 @@ module aptos_framework::fungible_asset {
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         withdraw_sanity_check_impl(permissioned_signer::address_of(perm), store, true);
         assert!(
-            permissioned_signer::consume_permission(perm, amount as u256, WithdrawPermission {
+            permissioned_signer::consume_permission(perm, (amount as u256), WithdrawPermission {
                 metadata_address: object::object_address(&borrow_store_resource(&store).metadata)
             }),
             error::permission_denied(EWITHDRAW_PERMISSION_DENIED)
@@ -816,7 +816,7 @@ module aptos_framework::fungible_asset {
         store: Object<T>,
         amount: u64,
     ) acquires FungibleStore {
-        assert!(permissioned_signer::check_permission_consume(owner, amount as u256, WithdrawPermission {
+        assert!(permissioned_signer::check_permission_consume(owner, (amount as u256), WithdrawPermission {
             metadata_address: object::object_address(&borrow_store_resource(&store).metadata)
         }), error::permission_denied(EWITHDRAW_PERMISSION_DENIED));
     }
@@ -827,7 +827,7 @@ module aptos_framework::fungible_asset {
         metadata_address: address,
         amount: u64,
     ) {
-        assert!(permissioned_signer::check_permission_consume(owner, amount as u256, WithdrawPermission {
+        assert!(permissioned_signer::check_permission_consume(owner, (amount as u256), WithdrawPermission {
             metadata_address,
         }), error::permission_denied(EWITHDRAW_PERMISSION_DENIED));
     }
@@ -1257,7 +1257,7 @@ module aptos_framework::fungible_asset {
         permissioned_signer::authorize(
             master,
             permissioned,
-            amount as u256,
+            (amount as u256),
             WithdrawPermission {
                 metadata_address: object::object_address(&token_type),
             }

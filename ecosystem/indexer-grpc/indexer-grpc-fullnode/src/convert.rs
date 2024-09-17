@@ -681,9 +681,9 @@ pub fn convert_account_signature(
                 transaction::AbstractionSignature {
                     function_info: s.function_info.to_owned(),
                     signature: s.signature.inner().to_owned(),
-                }
-            )
-        )
+                },
+            ),
+        ),
     };
 
     transaction::AccountSignature {

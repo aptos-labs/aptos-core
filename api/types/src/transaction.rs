@@ -22,6 +22,7 @@ use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{DKGTranscript, DKGTranscriptMetadata},
+    function_info::FunctionInfo,
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
     keyless,
     transaction::{
@@ -43,7 +44,6 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
-use aptos_types::function_info::FunctionInfo;
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
     creation_number: U64::from(0u64),
@@ -1970,7 +1970,7 @@ pub enum AccountSignature {
     SingleKeySignature(SingleKeySignature),
     MultiKeySignature(MultiKeySignature),
     NoAccountSignature(NoAccountSignature),
-    AbstractionSignature(AbstractionSignature)
+    AbstractionSignature(AbstractionSignature),
 }
 
 impl VerifyInput for AccountSignature {
@@ -2158,12 +2158,13 @@ impl From<&AccountAuthenticator> for AccountSignature {
                 })
             },
             NoAccountAuthenticator => AccountSignature::NoAccountSignature(NoAccountSignature),
-            Abstraction { function_info, authenticator } => Self::AbstractionSignature(
-                AbstractionSignature {
-                    function_info: function_info.to_string(),
-                    signature: authenticator.clone().into(),
-                }
-            )
+            Abstraction {
+                function_info,
+                authenticator,
+            } => Self::AbstractionSignature(AbstractionSignature {
+                function_info: function_info.to_string(),
+                signature: authenticator.clone().into(),
+            }),
         }
     }
 }

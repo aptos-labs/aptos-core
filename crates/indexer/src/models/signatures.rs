@@ -5,11 +5,12 @@
 use crate::{models::transactions::Transaction, schema::signatures, util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_api_types::{
-    AccountSignature as APIAccountSignature, Ed25519Signature as APIEd25519Signature,
-    FeePayerSignature as APIFeePayerSignature, MultiAgentSignature as APIMultiAgentSignature,
+    AbstractionSignature as APIAbstractionSignature, AccountSignature as APIAccountSignature,
+    Ed25519Signature as APIEd25519Signature, FeePayerSignature as APIFeePayerSignature,
+    MultiAgentSignature as APIMultiAgentSignature,
     MultiEd25519Signature as APIMultiEd25519Signature, MultiKeySignature as APIMultiKeySignature,
     NoAccountSignature as APINoAccountSignature, SingleKeySignature as APISingleKeySignature,
-    TransactionSignature as APITransactionSignature, AbstractionSignature as APIAbstractionSignature
+    TransactionSignature as APITransactionSignature,
 };
 use aptos_bitvec::BitVec;
 use field_count::FieldCount;
@@ -311,15 +312,17 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             )],
-            APIAccountSignature::AbstractionSignature(sig) => vec![Self::parse_abstraction_signature(
-                sig,
-                sender,
-                transaction_version,
-                transaction_block_height,
-                is_sender_primary,
-                multi_agent_index,
-                override_address,
-            )],
+            APIAccountSignature::AbstractionSignature(sig) => {
+                vec![Self::parse_abstraction_signature(
+                    sig,
+                    sender,
+                    transaction_version,
+                    transaction_block_height,
+                    is_sender_primary,
+                    multi_agent_index,
+                    override_address,
+                )]
+            },
         }
     }
 

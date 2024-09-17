@@ -6,8 +6,9 @@ use crate::{
     account_address::AccountAddress,
     block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
+    function_info::FunctionInfo,
     transaction::{
-        authenticator::AccountAuthenticator,
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
@@ -16,8 +17,6 @@ use crate::{
     },
 };
 use aptos_crypto::{ed25519::*, traits::*};
-use crate::function_info::FunctionInfo;
-use crate::transaction::authenticator::TransactionAuthenticator;
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 100;
@@ -271,9 +270,10 @@ pub fn get_test_signed_aa_transaction(
         ChainId::test(),
     );
 
-    let authenticator = TransactionAuthenticator::single_sender(AccountAuthenticator::Abstraction { function_info: FunctionInfo::new(AccountAddress::ONE, String::new(), String::new()), authenticator: vec![] });
-    SignedTransaction::new_signed_transaction(
-        raw_txn,
-        authenticator,
-    )
+    let authenticator =
+        TransactionAuthenticator::single_sender(AccountAuthenticator::Abstraction {
+            function_info: FunctionInfo::new(AccountAddress::ONE, String::new(), String::new()),
+            authenticator: vec![],
+        });
+    SignedTransaction::new_signed_transaction(raw_txn, authenticator)
 }

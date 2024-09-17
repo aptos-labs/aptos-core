@@ -38,7 +38,7 @@ module aa::single_key {
             bls12381::verify_normal_signature(
                 &bls12381::signature_from_bytes(signature),
                 pubkey,
-                bcs::to_bytes(&account)
+                bcs::to_bytes(&addr)
             ),
             EINVALID_SIGNATURE
         );

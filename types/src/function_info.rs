@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_utils::as_move_value::AsMoveValue;
+use crate::move_utils::{as_move_value::AsMoveValue, MemberId};
 use move_core_types::{
     account_address::AccountAddress,
     value::{MoveStruct, MoveValue},
@@ -9,9 +9,10 @@ use move_core_types::{
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
-use crate::move_utils::MemberId;
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 /// Reflection of aptos_framework::function_info::FunctionInfo
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug, Clone, Hash)]
@@ -47,7 +48,11 @@ impl Display for FunctionInfo {
 
 impl From<MemberId> for FunctionInfo {
     fn from(value: MemberId) -> Self {
-        Self::new(value.module_id.address, value.module_id.name.into_string(), value.member_id.into_string())
+        Self::new(
+            value.module_id.address,
+            value.module_id.name.into_string(),
+            value.member_id.into_string(),
+        )
     }
 }
 
