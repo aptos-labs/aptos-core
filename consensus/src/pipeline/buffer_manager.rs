@@ -166,9 +166,9 @@ pub struct BufferManager {
 
     pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
 
-    max_pending_commit_votes_in_cache: u64,
+    max_pending_rounds_in_commit_vote_cache: u64,
     // If the buffer manager receives a commit vote for a block that is not in buffer items, then
-    // the vote will be cached. We can cache upto max_pending_commit_votes_in_cache (100) blocks.
+    // the vote will be cached. We can cache upto max_pending_rounds_in_commit_vote_cache (100) blocks.
     pending_commit_votes: BTreeMap<Round, HashMap<AccountAddress, CommitVote>>,
 }
 
@@ -200,7 +200,7 @@ impl BufferManager {
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
-        max_pending_commit_votes_in_cache: u64,
+        max_pending_rounds_in_commit_vote_cache: u64,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -265,7 +265,7 @@ impl BufferManager {
 
             pending_commit_proofs: BTreeMap::new(),
 
-            max_pending_commit_votes_in_cache,
+            max_pending_rounds_in_commit_vote_cache,
             pending_commit_votes: BTreeMap::new(),
         }
     }
@@ -353,7 +353,7 @@ impl BufferManager {
         // for the next epoch.
         if epoch == self.epoch_state.epoch
             && round > self.highest_committed_round
-            && self.highest_committed_round + self.max_pending_commit_votes_in_cache > round
+            && self.highest_committed_round + self.max_pending_rounds_in_commit_vote_cache > round
         {
             if let Some(votes) = self.pending_commit_votes.get_mut(&round) {
                 if self
