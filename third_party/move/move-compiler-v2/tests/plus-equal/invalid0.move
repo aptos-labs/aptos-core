@@ -1,6 +1,4 @@
 module 0x42::test {
-
-
 	struct Coin(u256) has drop;
 
 	struct Wrapper<T>(T) has drop;

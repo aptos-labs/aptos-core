@@ -1882,7 +1882,6 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                 Tok::PlusEqual => {
                     let op_loc = context.tokens.advance_with_loc()?; // consume the "+="
                     let rhs = Box::new(parse_exp(context)?);
-                    let rhs_loc = rhs.loc;
                     let end_loc = context.tokens.previous_end_loc();
                     // locaion of the entire lhs += rhs
                     let block_loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
