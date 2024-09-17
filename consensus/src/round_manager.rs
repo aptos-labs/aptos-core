@@ -357,6 +357,7 @@ impl RoundManager {
         if self
             .proposer_election
             .is_valid_proposer(self.proposal_generator.author(), new_round_event.round)
+            && new_round_event.round <= 2
         {
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
@@ -673,14 +674,14 @@ impl RoundManager {
             return Ok(false);
         }
         self.sync_up(sync_info, author).await?;
-        ensure!(
-            message_round == self.round_state.current_round(),
-            "After sync, round {} doesn't match local {}. Local Sync Info: {}. Remote Sync Info: {}",
-            message_round,
-            self.round_state.current_round(),
-            self.block_store.sync_info(),
-            sync_info,
-        );
+        // ensure!(
+        //     message_round == self.round_state.current_round(),
+        //     "After sync, round {} doesn't match local {}. Local Sync Info: {}. Remote Sync Info: {}",
+        //     message_round,
+        //     self.round_state.current_round(),
+        //     self.block_store.sync_info(),
+        //     sync_info,
+        // );
         Ok(true)
     }
 
@@ -693,10 +694,10 @@ impl RoundManager {
         fail_point!("consensus::process_sync_info_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_sync_info_msg"))
         });
-        info!(
-            self.new_log(LogEvent::ReceiveSyncInfo).remote_peer(peer),
-            "{}", sync_info
-        );
+        // info!(
+        //     self.new_log(LogEvent::ReceiveSyncInfo).remote_peer(peer),
+        //     "{}", sync_info
+        // );
         self.ensure_round_and_sync_up(checked!((sync_info.highest_round()) + 1)?, &sync_info, peer)
             .await
             .context("[RoundManager] Failed to process sync info msg")?;
