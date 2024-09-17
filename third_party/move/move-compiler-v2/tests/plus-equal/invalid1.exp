@@ -47,12 +47,12 @@ fun test::test() {
 
 Diagnostics:
 error: cannot copy local `x` which is still mutably borrowed
-  ┌─ tests/plus-equal/invalid1.move:5:8
+  ┌─ tests/plus-equal/invalid1.move:5:3
   │
 4 │         let p = &mut x;
   │                 ------ local `x` previously mutably borrowed here
 5 │         x += 1;
-  │              ^ copy attempted here
+  │         ^^^^^^ copy attempted here
 6 │         *p += 1;
   │          - conflicting reference `p` used here
 

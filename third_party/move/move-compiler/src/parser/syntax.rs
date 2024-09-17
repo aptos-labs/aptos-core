@@ -1914,7 +1914,9 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                             let deref_tmp = sp(lhs_loc, Exp_::Dereference(Box::new(tmp)));
                             // *t + e2
                             let rhs_expanded = sp(
-                                rhs_loc,
+                                // we use the location of the whole assignment
+                                // since *t is from the lhs and e2 from the rhs
+                                block_loc,
                                 Exp_::BinopExp(
                                     Box::new(deref_tmp.clone()),
                                     sp(op_loc, BinOp_::Add),
@@ -1941,7 +1943,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                         // x = x + e
                         x_ @ Exp_::Name(sp!(_, NameAccessChain_::One(_)), _) => {
                             let x = sp(lhs_loc, x_);
-                            let rhs_expanded = sp(rhs_loc, Exp_::BinopExp(Box::new(x.clone()), sp(op_loc, BinOp_::Add), rhs));
+                            let rhs_expanded = sp(block_loc, Exp_::BinopExp(Box::new(x.clone()), sp(op_loc, BinOp_::Add), rhs));
                             Exp_::Assign(Box::new(x), Box::new(rhs_expanded))
                         },
                         // e1 += e2
@@ -1976,7 +1978,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                                 sp(op_loc, BinOp_::Add),
                                 rhs,
                             );
-                            let rhs_expanded = sp(rhs_loc, rhs_expanded_);
+                            let rhs_expanded = sp(block_loc, rhs_expanded_);
                             // *t = *t + e2
                             let exp_ = Exp_::Assign(Box::new(deref_tmp), Box::new(rhs_expanded));
                             let exp = sp(block_loc, exp_);
