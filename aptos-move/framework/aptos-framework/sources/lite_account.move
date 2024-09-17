@@ -10,6 +10,7 @@ module aptos_framework::lite_account {
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object;
+    use aptos_framework::permissioned_signer::is_permissioned_signer;
     #[test_only]
     use aptos_framework::account::create_account_for_test;
 
@@ -20,6 +21,7 @@ module aptos_framework::lite_account {
     const EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED: u64 = 1;
     const EFUNCTION_INFO_EXISTENCE: u64 = 2;
     const EAUTH_FUNCTION_SIGNATURE_MISMATCH: u64 = 3;
+    const ENOT_MASTER_SIGNER: u64 = 4;
 
     const MAX_U64: u128 = 18446744073709551615;
 
@@ -50,6 +52,7 @@ module aptos_framework::lite_account {
         module_name: String,
         function_name: String,
     ) acquires DispatchableAuthenticator {
+        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
             account,
             function_info::new_function_info_from_address(module_address, module_name, function_name),
@@ -63,6 +66,7 @@ module aptos_framework::lite_account {
         module_name: String,
         function_name: String,
     ) acquires DispatchableAuthenticator {
+        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         update_dispatchable_authenticator_impl(
             account,
             function_info::new_function_info_from_address(module_address, module_name, function_name),
@@ -75,6 +79,7 @@ module aptos_framework::lite_account {
     entry fun remove_dispatchable_authenticator(
         account: &signer,
     ) acquires DispatchableAuthenticator {
+        assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(account);
         let resource_addr = resource_addr(addr);
         if (exists<DispatchableAuthenticator>(resource_addr)) {
@@ -168,7 +173,7 @@ module aptos_framework::lite_account {
 
     /// The native function to dispatch customized move authentication function.
     native fun dispatchable_authenticate(
-        account_address: signer,
+        account: signer,
         signature: vector<u8>,
         function: &FunctionInfo
     ): signer;

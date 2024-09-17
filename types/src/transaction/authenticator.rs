@@ -4,6 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
+    function_info::FunctionInfo,
     keyless::{
         EphemeralCertificate, FederatedKeylessPublicKey, KeylessPublicKey, KeylessSignature,
         TransactionAndProof,
@@ -28,7 +29,6 @@ use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
-use crate::function_info::FunctionInfo;
 
 /// Maximum number of signatures supported in `TransactionAuthenticator`,
 /// across all `AccountAuthenticator`s included.
@@ -41,7 +41,6 @@ pub enum AuthenticationError {
     /// The number of signatures exceeds the maximum supported.
     MaxSignaturesExceeded,
 }
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthenticationProof {
@@ -387,7 +386,7 @@ impl TransactionAuthenticator {
                 AccountAuthenticator::NoAccountAuthenticator => {
                     //  This case adds no single key authenticators to the vector.
                 },
-                AccountAuthenticator::Abstraction { .. } => {}
+                AccountAuthenticator::Abstraction { .. } => {},
             };
         }
         Ok(single_key_authenticators)
@@ -540,8 +539,7 @@ pub enum AccountAuthenticator {
     Abstraction {
         function_info: FunctionInfo,
         authenticator: Vec<u8>,
-    }
-    // ... add more schemes here
+    }, // ... add more schemes here
 }
 
 impl AccountAuthenticator {
@@ -553,7 +551,7 @@ impl AccountAuthenticator {
             Self::SingleKey { .. } => Scheme::SingleKey,
             Self::MultiKey { .. } => Scheme::MultiKey,
             Self::NoAccountAuthenticator => Scheme::NoScheme,
-            Self::Abstraction { .. } => Scheme::Abstraction
+            Self::Abstraction { .. } => Scheme::Abstraction,
         }
     }
 
@@ -588,7 +586,10 @@ impl AccountAuthenticator {
 
     /// Create a abstracted authenticator
     pub fn abstraction(function_info: FunctionInfo, authenticator: Vec<u8>) -> Self {
-        Self::Abstraction { function_info, authenticator }
+        Self::Abstraction {
+            function_info,
+            authenticator,
+        }
     }
 
     pub fn is_abstracted(&self) -> bool {
@@ -610,7 +611,7 @@ impl AccountAuthenticator {
             Self::MultiKey { authenticator } => authenticator.verify(message),
             Self::NoAccountAuthenticator => bail!("No signature to verify."),
             // Abstraction delayed the authentication after prologue.
-            Self::Abstraction { .. } => Ok(())
+            Self::Abstraction { .. } => Ok(()),
         }
     }
 
@@ -642,8 +643,13 @@ impl AccountAuthenticator {
     pub fn authentication_proof(&self) -> AuthenticationProof {
         match self {
             Self::NoAccountAuthenticator => AuthenticationProof::None,
-            Self::Abstraction { function_info, authenticator } => AuthenticationProof::Abstraction(function_info.clone(), authenticator.clone()),
-            _ => AuthenticationProof::Key(AuthenticationKey::from_preimage(self.public_key_bytes(), self.scheme()).to_vec())
+            Self::Abstraction {
+                function_info,
+                authenticator,
+            } => AuthenticationProof::Abstraction(function_info.clone(), authenticator.clone()),
+            _ => AuthenticationProof::Key(
+                AuthenticationKey::from_preimage(self.public_key_bytes(), self.scheme()).to_vec(),
+            ),
         }
     }
 
@@ -1380,14 +1386,15 @@ mod tests {
 
     #[test]
     fn verify_abstracted_key_auth() {
-        let signed_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_aa_transaction(
-            AccountAddress::ONE,
-            0,
-            None,
-            None,
-            None,
-            None,
-        );
+        let signed_txn =
+            crate::test_helpers::transaction_test_helpers::get_test_signed_aa_transaction(
+                AccountAddress::ONE,
+                0,
+                None,
+                None,
+                None,
+                None,
+            );
         signed_txn.verify_signature().unwrap();
     }
 

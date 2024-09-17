@@ -41,6 +41,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     indexer::indexer_db_reader::IndexerReader,
+    function_info::FunctionInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction,
@@ -57,7 +58,6 @@ use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration}
 use tokio::sync::watch::channel;
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
-use aptos_types::function_info::FunctionInfo;
 
 const TRANSFER_AMOUNT: u64 = 200_000_000;
 
@@ -411,7 +411,11 @@ impl TestContext {
         )
     }
 
-    pub async fn add_dispatchable_authentication_function(&self, account: &LocalAccount, func: FunctionInfo) -> SignedTransaction {
+    pub async fn add_dispatchable_authentication_function(
+        &self,
+        account: &LocalAccount,
+        func: FunctionInfo,
+    ) -> SignedTransaction {
         let factory = self.transaction_factory();
         account.sign_with_transaction_builder(
             factory
@@ -685,7 +689,10 @@ impl TestContext {
         }
     }
 
-    pub async fn try_commit_block(&mut self, signed_txns: &[SignedTransaction]) -> Vec<TransactionStatus> {
+    pub async fn try_commit_block(
+        &mut self,
+        signed_txns: &[SignedTransaction],
+    ) -> Vec<TransactionStatus> {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usecs();
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
@@ -709,7 +716,10 @@ impl TestContext {
             .unwrap();
         let compute_status = result.compute_status_for_input_txns().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
-        if !compute_status.iter().any(|s| !matches!(&s, TransactionStatus::Keep(_))) {
+        if !compute_status
+            .iter()
+            .any(|s| !matches!(&s, TransactionStatus::Keep(_)))
+        {
             self.executor
                 .commit_blocks(
                     vec![metadata.id()],

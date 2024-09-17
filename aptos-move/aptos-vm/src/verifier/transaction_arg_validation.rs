@@ -17,7 +17,6 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
-    value::MoveValue,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
@@ -179,9 +178,7 @@ pub fn validate_combine_signer_and_txn_args(
     let combined_args = if signer_param_cnt == 0 {
         args
     } else {
-        serialized_signers
-            .chain(args)
-            .collect()
+        serialized_signers.into_iter().chain(args).collect()
     };
     Ok(combined_args)
 }

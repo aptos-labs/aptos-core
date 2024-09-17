@@ -8,11 +8,10 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        user_transaction_context::UserTransactionContext, EntryFunction, Multisig,
-        SignedTransaction, TransactionPayload,
+        authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
+        EntryFunction, Multisig, SignedTransaction, TransactionPayload,
     },
 };
-use aptos_types::transaction::authenticator::AuthenticationProof;
 
 pub struct TransactionMetadata {
     pub sender: AccountAddress,

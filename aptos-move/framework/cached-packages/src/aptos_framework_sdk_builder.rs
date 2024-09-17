@@ -291,6 +291,12 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
+    /// Deserializes a `u256` value from the stream.
+    BcsStreamDeserializeU256Entry {
+        data: Vec<u8>,
+        cursor: u64,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
@@ -1291,6 +1297,9 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
+            BcsStreamDeserializeU256Entry { data, cursor } => {
+                bcs_stream_deserialize_u256_entry(data, cursor)
+            },
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -2493,6 +2502,25 @@ pub fn aptos_governance_vote(
             bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Deserializes a `u256` value from the stream.
+pub fn bcs_stream_deserialize_u256_entry(data: Vec<u8>, cursor: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("bcs_stream").to_owned(),
+        ),
+        ident_str!("deserialize_u256_entry").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&data).unwrap(),
+            bcs::to_bytes(&cursor).unwrap(),
         ],
     ))
 }
@@ -5411,6 +5439,19 @@ mod decoder {
         }
     }
 
+    pub fn bcs_stream_deserialize_u256_entry(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::BcsStreamDeserializeU256Entry {
+                data: bcs::from_bytes(script.args().get(0)?).ok()?,
+                cursor: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
@@ -7016,6 +7057,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
+        );
+        map.insert(
+            "bcs_stream_deserialize_u256_entry".to_string(),
+            Box::new(decoder::bcs_stream_deserialize_u256_entry),
         );
         map.insert(
             "code_publish_package_txn".to_string(),

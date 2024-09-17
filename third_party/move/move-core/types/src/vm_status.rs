@@ -229,14 +229,12 @@ impl VMStatus {
                 code_offset,
                 message,
                 ..
-            } => {
-                Ok(KeptVMStatus::ExecutionFailure {
+            } => Ok(KeptVMStatus::ExecutionFailure {
                 location,
                 function,
                 code_offset,
                 message,
-                })
-            }
+            }),
             VMStatus::Error {
                 status_code: code,
                 message,

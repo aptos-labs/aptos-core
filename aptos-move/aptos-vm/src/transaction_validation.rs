@@ -14,8 +14,7 @@ use crate::{
 use aptos_gas_algebra::Gas;
 use aptos_types::{
     account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
-    on_chain_config::Features, transaction::Multisig,
-    move_utils::as_move_value::AsMoveValue,
+    move_utils::as_move_value::AsMoveValue, on_chain_config::Features, transaction::Multisig,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -105,7 +104,10 @@ pub(crate) fn run_script_prologue(
         .collect();
     let (prologue_function_name, args) = if let (Some(fee_payer), Some(fee_payer_auth_key)) = (
         txn_data.fee_payer(),
-        txn_data.fee_payer_authentication_proof.as_ref().map(|proof| proof.optional_auth_key()),
+        txn_data
+            .fee_payer_authentication_proof
+            .as_ref()
+            .map(|proof| proof.optional_auth_key()),
     ) {
         if features.is_transaction_simulation_enhancement_enabled() {
             let args = vec![
