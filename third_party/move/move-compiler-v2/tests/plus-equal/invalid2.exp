@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot use `bool` with an operator which expects a value of type `integer`
+  ┌─ tests/plus-equal/invalid2.move:4:9
+  │
+4 │         x += 1;
+  │         ^
+
+error: cannot use `bool` with an operator which expects a value of type `integer`
+  ┌─ tests/plus-equal/invalid2.move:9:9
+  │
+9 │         x += true;
+  │         ^

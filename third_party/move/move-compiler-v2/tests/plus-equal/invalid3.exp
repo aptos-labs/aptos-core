@@ -1,0 +1,78 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    private fun test() {
+        {
+          let __: &mut u64 = Borrow(Mutable)(1);
+          __ = Add<u64>(Deref(__), 1)
+        };
+        Tuple()
+    }
+} // end 0x42::test
+
+============ initial bytecode ================
+
+[variant baseline]
+fun test::test() {
+     var $t0: &mut u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t1 := 1
+  1: $t0 := borrow_local($t1)
+  2: $t3 := read_ref($t0)
+  3: $t4 := 1
+  4: $t2 := +($t3, $t4)
+  5: write_ref($t0, $t2)
+  6: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::test() {
+     var $t0: &mut u64
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t0 := borrow_local($t1)
+     # live vars: $t0
+  2: $t3 := read_ref($t0)
+     # live vars: $t0, $t3
+  3: $t4 := 1
+     # live vars: $t0, $t3, $t4
+  4: $t3 := +($t3, $t4)
+     # live vars: $t0, $t3
+  5: write_ref($t0, $t3)
+     # live vars:
+  6: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.test {
+
+
+test() /* def_idx: 0 */ {
+L0:	loc0: u64
+L1:	loc1: &mut u64
+B0:
+	0: LdU64(1)
+	1: StLoc[0](loc0: u64)
+	2: MutBorrowLoc[0](loc0: u64)
+	3: StLoc[1](loc1: &mut u64)
+	4: CopyLoc[1](loc1: &mut u64)
+	5: ReadRef
+	6: LdU64(1)
+	7: Add
+	8: MoveLoc[1](loc1: &mut u64)
+	9: WriteRef
+	10: Ret
+}
+}
+============ bytecode verification succeeded ========
