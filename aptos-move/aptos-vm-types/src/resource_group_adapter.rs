@@ -3,7 +3,8 @@
 
 use crate::resolver::{ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView};
 use aptos_types::{
-    serde_helper::bcs_utils::bcs_size_of_byte_array, state_store::state_key::StateKey,
+    error::code_invariant_error, serde_helper::bcs_utils::bcs_size_of_byte_array,
+    state_store::state_key::StateKey,
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -282,17 +283,19 @@ fn group_size_arithmetics_error() -> PartialVMError {
         .with_message("Group size arithmetics error while applying updates".to_string())
 }
 
+// Updates a given ResourceGroupSize (an abstract representation allowing the computation
+// of bcs serialized size) size, to reflect the state after removing a resource in a group
+// with size old_tagged_resource_size.
 pub fn decrement_size_for_remove_tag(
     size: &mut ResourceGroupSize,
     old_tagged_resource_size: u64,
 ) -> PartialVMResult<()> {
     match size {
-        ResourceGroupSize::Concrete(_) => Err(PartialVMError::new(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-        )
-        .with_message(
-            "Unexpected ResourceGroupSize::Concrete in increment_size_for_add_tag".to_string(),
-        )),
+        ResourceGroupSize::Concrete(_) => Err(code_invariant_error(format!(
+            "Unexpected ResourceGroupSize::Concrete in decrement_size_for_add_tag \
+	     (removing resource w. size = {old_tagged_resource_size})"
+        ))
+        .into()),
         ResourceGroupSize::Combined {
             num_tagged_resources,
             all_tagged_resources_size,
@@ -308,17 +311,19 @@ pub fn decrement_size_for_remove_tag(
     }
 }
 
+// Updates a given ResourceGroupSize (an abstract representation allowing the computation
+// of bcs serialized size) size, to reflect the state after adding a resource in a group
+// with size new_tagged_resource_size.
 pub fn increment_size_for_add_tag(
     size: &mut ResourceGroupSize,
     new_tagged_resource_size: u64,
 ) -> PartialVMResult<()> {
     match size {
-        ResourceGroupSize::Concrete(_) => Err(PartialVMError::new(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-        )
-        .with_message(
-            "Unexpected ResourceGroupSize::Concrete in increment_size_for_add_tag".to_string(),
-        )),
+        ResourceGroupSize::Concrete(_) => Err(code_invariant_error(format!(
+            "Unexpected ResourceGroupSize::Concrete in increment_size_for_add_tag \
+		     (adding resource w. size = {new_tagged_resource_size})"
+        ))
+        .into()),
         ResourceGroupSize::Combined {
             num_tagged_resources,
             all_tagged_resources_size,
@@ -334,6 +339,7 @@ pub fn increment_size_for_add_tag(
     }
 }
 
+// Checks an invariant that iff a resource group exists, it must have a > 0 size.
 pub fn check_size_and_existence_match(
     size: &ResourceGroupSize,
     exists: bool,

@@ -977,8 +977,15 @@ where
                                     view.resource_size_in_group(key, tag).unwrap();
                                 let old_size =
                                     group_tagged_resource_size(tag, old_tagged_value_size).unwrap();
-                                let _ =
-                                    decrement_size_for_remove_tag(&mut new_group_size, old_size);
+                                // let _ =
+                                // decrement_size_for_remove_tag(&mut new_group_size, old_size);
+                                if decrement_size_for_remove_tag(&mut new_group_size, old_size)
+                                    .is_err()
+                                {
+                                    // Check it only happens for speculative executions that may not
+                                    // commit by returning incorrect (empty) output.
+                                    return ExecutionStatus::Success(MockOutput::skip_output());
+                                }
                             }
                             if !new_inner_op.is_deletion() {
                                 let new_size = group_tagged_resource_size(
@@ -986,7 +993,13 @@ where
                                     inner_op.bytes.as_ref().unwrap().len(),
                                 )
                                 .unwrap();
-                                let _ = increment_size_for_add_tag(&mut new_group_size, new_size);
+                                if increment_size_for_add_tag(&mut new_group_size, new_size)
+                                    .is_err()
+                                {
+                                    // Check it only happens for speculative executions that may not
+                                    // commit by returning incorrect (empty) output.
+                                    return ExecutionStatus::Success(MockOutput::skip_output());
+                                }
                             }
 
                             new_inner_ops.insert(*tag, new_inner_op);
@@ -1207,14 +1220,14 @@ where
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        _patched_resource_write_set: Vec<(
+        patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         )>,
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) -> Result<(), PanicError> {
         let resources: HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value> =
-            _patched_resource_write_set.clone().into_iter().collect();
+            patched_resource_write_set.clone().into_iter().collect();
         for (key, _, size, _) in &self.group_writes {
             let v = resources.get(key).unwrap();
             if v.is_deletion() {

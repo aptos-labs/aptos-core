@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    types::{GroupReadResult, MVGroupError, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
+    types::{GroupReadResult, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
     utils::module_hash,
     BlockStateStats,
 };
+use anyhow::anyhow;
 use aptos_aggregator::types::DelayedFieldValue;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
@@ -101,7 +102,7 @@ impl<
         &self,
         group_key: K,
         base_values: impl IntoIterator<Item = (T, V)>,
-    ) -> Result<(), MVGroupError> {
+    ) -> anyhow::Result<()> {
         let base_map: HashMap<T, ValueWithLayout<V>> = base_values
             .into_iter()
             .map(|(t, v)| (t, ValueWithLayout::RawFromStorage(Arc::new(v))))
@@ -111,7 +112,13 @@ impl<
                 .iter()
                 .flat_map(|(t, v)| v.bytes_len().map(|s| (t, s))),
         )
-        .map_err(MVGroupError::TagSerializationError)?;
+        .map_err(|e| {
+            anyhow!(
+                "Tag serialization error in resource group at {:?}: {:?}",
+                group_key.clone(),
+                e
+            )
+        })?;
         assert!(
             self.group_cache
                 .borrow_mut()
@@ -140,7 +147,7 @@ impl<
 
     pub fn get_group_size(&self, group_key: &K) -> GroupReadResult {
         match self.group_cache.borrow().get(group_key) {
-            Some(entry) => GroupReadResult::Size(entry.borrow_mut().1),
+            Some(entry) => GroupReadResult::Size(entry.borrow().1),
             None => GroupReadResult::Uninitialized,
         }
     }
@@ -227,11 +234,12 @@ impl<
                 entry.insert(ValueWithLayout::Exchanged(Arc::new(v), maybe_layout));
             },
             (l, r) => {
-                println!("WriteOp kind {:?} not consistent with previous value at tag {:?}. l: {:?}, r: {:?}", v.write_op_kind(), value_tag, l, r);
                 return Err(code_invariant_error(format!(
-                    "WriteOp kind {:?} not consistent with previous value at tag {:?}",
+                    "WriteOp kind {:?} not consistent with previous value at tag {:?}. Existing: {:?}, new: {:?}",
                     v.write_op_kind(),
-                    value_tag
+                    value_tag,
+		    l,
+		    r,
                 )));
             },
         }
@@ -454,14 +462,14 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
-        let _ = map.set_group_base_values(
+        assert_ok!(map.set_group_base_values(
             ap.clone(),
             (1..4).map(|i| (i, TestValue::with_kind(i, true))),
-        );
-        let _ = map.set_group_base_values(
+        ));
+        assert_ok!(map.set_group_base_values(
             ap.clone(),
             (1..4).map(|i| (i, TestValue::with_kind(i, true))),
-        );
+        ));
     }
 
     #[should_panic]
@@ -548,8 +556,6 @@ mod test {
             ],
             exp_size
         ));
-        // assert_ok!(map.insert_group_op(&ap, 4, TestValue::modification_with_len(3), None));
-        // assert_ok!(map.insert_group_op(&ap, 5, TestValue::creation_with_len(3), None));
         assert_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
 
         let exp_size = group_size_as_sum(

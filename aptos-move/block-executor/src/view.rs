@@ -516,9 +516,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                         .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError(e)) => {
-                    return Err(e);
-                },
             }
         }
     }
@@ -672,23 +669,14 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
         group_key: T::Key,
         base_values: Vec<(T::Tag, T::Value)>,
     ) -> PartialVMResult<()> {
-        if self
-            .versioned_map
+        self.versioned_map
             .group_data()
             .set_raw_base_values(group_key.clone(), base_values)
-            .is_err()
-        {
-            self.captured_reads.borrow_mut().mark_incorrect_use();
-            return Err(
-                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR).with_message(
-                    format!(
-                        "Tag serialization error in resource group at {:? }",
-                        group_key
-                    ),
-                ),
-            );
-        }
-        Ok(())
+            .map_err(|e| {
+                self.captured_reads.borrow_mut().mark_incorrect_use();
+                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                    .with_message(e.to_string())
+            })
     }
 
     fn read_cached_group_tagged_data(
@@ -779,9 +767,6 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                         .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError(_)) => {
-                    unreachable!("Reading a resource does not require tag serialization");
-                },
             }
         }
     }
@@ -792,6 +777,7 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
+    // TODO: Move to UnsyncMap.
     pub(crate) incorrect_use: RefCell<bool>,
 }
 
@@ -894,22 +880,13 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
         group_key: T::Key,
         base_values: Vec<(T::Tag, T::Value)>,
     ) -> PartialVMResult<()> {
-        if self
-            .unsync_map
+        self.unsync_map
             .set_group_base_values(group_key.clone(), base_values)
-            .is_err()
-        {
-            *self.incorrect_use.borrow_mut() = true;
-            return Err(
-                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR).with_message(
-                    format!(
-                        "Tag serialization error in resource group at {:? }",
-                        group_key
-                    ),
-                ),
-            );
-        }
-        Ok(())
+            .map_err(|e| {
+                *self.incorrect_use.borrow_mut() = true;
+                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                    .with_message(e.to_string())
+            })
     }
 
     fn read_cached_group_tagged_data(
@@ -1053,7 +1030,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     pub fn is_incorrect_use(&self) -> bool {
         match &self.latest_view {
-            ViewState::Sync(state) => state.captured_reads.borrow().is_incorrect_use(),
+            ViewState::Sync(_) => {
+                // Parallel executor accesses captured reads directly and does not use this API.
+                true
+            },
+            // TODO: store incorrect use in UnsyncMap and eliminate this API.
             ViewState::Unsync(state) => *state.incorrect_use.borrow(),
         }
     }
@@ -1392,7 +1373,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     bcs::from_bytes(state_value.bytes()).map_err(|e| {
                         PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
                             .with_message(format!(
-                                "Failed to deserialize the resource group at {:? }: {:?}",
+                                "Failed to deserialize the resource group at {:?}: {:?}",
                                 group_key, e
                             ))
                     })?,

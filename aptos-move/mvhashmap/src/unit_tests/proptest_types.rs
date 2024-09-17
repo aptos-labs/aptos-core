@@ -18,7 +18,7 @@ use bytes::Bytes;
 use claims::assert_none;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
     sync::{
@@ -241,14 +241,21 @@ where
         let value = Value::new(None);
         let idx = idx as TxnIndex;
         if test_group {
-            map.group_data().write(
-                key.clone(),
-                idx,
-                0,
-                vec![(5, (value, None))],
-                ResourceGroupSize::zero_combined(),
-            );
-            map.group_data().mark_estimate(&key, idx);
+            map.group_data
+                .set_raw_base_values(key.clone(), vec![])
+                .unwrap();
+            map.group_data()
+                .write(
+                    key.clone(),
+                    idx,
+                    0,
+                    vec![(5, (value, None))],
+                    ResourceGroupSize::zero_combined(),
+                    HashSet::new(),
+                )
+                .unwrap();
+            map.group_data()
+                .mark_estimate(&key, idx, [5usize].into_iter().collect());
         } else {
             map.data().write(key.clone(), idx, 0, Arc::new(value), None);
             map.data().mark_estimate(&key, idx);
@@ -299,12 +306,12 @@ where
                                         assert_value(v);
                                         break;
                                     },
-                                    Err(MVGroupError::Uninitialized) => {
+                                    Err(MVGroupError::Uninitialized)
+                                    | Err(MVGroupError::TagNotFound) => {
                                         assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
                                         break;
                                     },
                                     Err(MVGroupError::Dependency(_i)) => (),
-                                    Err(_) => unreachable!("Unreachable error cases for test"),
                                 }
                             } else {
                                 match map
@@ -355,13 +362,16 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(None);
                         if test_group {
-                            map.group_data().write(
-                                key,
-                                idx as TxnIndex,
-                                1,
-                                vec![(5, (value, None))],
-                                ResourceGroupSize::zero_combined(),
-                            );
+                            map.group_data()
+                                .write(
+                                    key,
+                                    idx as TxnIndex,
+                                    1,
+                                    vec![(5, (value, None))],
+                                    ResourceGroupSize::zero_combined(),
+                                    HashSet::new(),
+                                )
+                                .unwrap();
                         } else {
                             map.data()
                                 .write(key, idx as TxnIndex, 1, Arc::new(value), None);
@@ -371,13 +381,16 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(Some(v.clone()));
                         if test_group {
-                            map.group_data().write(
-                                key,
-                                idx as TxnIndex,
-                                1,
-                                vec![(5, (value, None))],
-                                ResourceGroupSize::zero_combined(),
-                            );
+                            map.group_data()
+                                .write(
+                                    key,
+                                    idx as TxnIndex,
+                                    1,
+                                    vec![(5, (value, None))],
+                                    ResourceGroupSize::zero_combined(),
+                                    HashSet::new(),
+                                )
+                                .unwrap();
                         } else {
                             map.data()
                                 .write(key, idx as TxnIndex, 1, Arc::new(value), None);
