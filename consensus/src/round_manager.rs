@@ -1394,7 +1394,7 @@ impl RoundManager {
             .context("[RoundManager] Failed to process the QC from order vote msg");
         self.process_certificates().await?;
         self.order_vote_qc_cache
-            .remove(&order_vote_msg.order_vote().ledger_info().hash());
+            .pop(&order_vote_msg.order_vote().ledger_info().hash());
         result
     }
 
