@@ -317,6 +317,11 @@ impl LedgerInfoWithV0 {
     }
 }
 
+pub enum VerificationStatus {
+    Verified,
+    Unverified,
+}
+
 /// Contains the ledger info and partially aggregated signature from a set of validators, this data
 /// is only used during the aggregating the votes from different validators and is not persisted in DB.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -433,13 +438,12 @@ impl LedgerInfoWithMixedSignatures {
         &mut self,
         validator: AccountAddress,
         signature: bls12381::Signature,
-        verified: bool,
+        verification_status: VerificationStatus,
     ) {
-        if verified {
-            self.add_verified_signature(validator, signature);
-        } else {
-            self.add_unverified_signature(validator, signature);
-        }
+        match verification_status {
+            VerificationStatus::Verified => self.add_verified_signature(validator, signature),
+            VerificationStatus::Unverified => self.add_unverified_signature(validator, signature),
+        };
     }
 
     pub fn verified_voters(&self) -> Vec<&AccountAddress> {
@@ -689,7 +693,7 @@ mod tests {
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[0].author(),
             validator_signers[0].sign(&ledger_info).unwrap(),
-            true,
+            VerificationStatus::Verified,
         );
         partial_sig.add_signature(
             validator_signers[0].author(),
@@ -699,7 +703,7 @@ mod tests {
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[1].author(),
             validator_signers[1].sign(&ledger_info).unwrap(),
-            false,
+            VerificationStatus::Unverified,
         );
         partial_sig.add_signature(
             validator_signers[1].author(),
@@ -709,7 +713,7 @@ mod tests {
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[2].author(),
             validator_signers[2].sign(&ledger_info).unwrap(),
-            true,
+            VerificationStatus::Verified,
         );
         partial_sig.add_signature(
             validator_signers[2].author(),
@@ -719,7 +723,7 @@ mod tests {
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[3].author(),
             validator_signers[3].sign(&ledger_info).unwrap(),
-            false,
+            VerificationStatus::Unverified,
         );
         partial_sig.add_signature(
             validator_signers[3].author(),
@@ -752,7 +756,7 @@ mod tests {
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[4].author(),
             bls12381::Signature::dummy_signature(),
-            false,
+            VerificationStatus::Unverified,
         );
 
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 5);
@@ -803,7 +807,7 @@ mod tests {
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[5].author(),
             validator_signers[5].sign(&ledger_info).unwrap(),
-            false,
+            VerificationStatus::Unverified,
         );
         partial_sig.add_signature(
             validator_signers[5].author(),
@@ -862,7 +866,7 @@ mod tests {
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[6].author(),
             bls12381::Signature::dummy_signature(),
-            false,
+            VerificationStatus::Unverified,
         );
 
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 6);
