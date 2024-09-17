@@ -253,9 +253,6 @@ pub struct RoundManager {
     futures: FuturesUnordered<
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
-    // Caches the verified QC for order votes.
-    // Maps from ledger info hash to the quorum cert.
-    order_vote_qc_cache: LruCache<HashValue, QuorumCert>,
 }
 
 impl RoundManager {
@@ -305,7 +302,6 @@ impl RoundManager {
             pending_order_votes: PendingOrderVotes::new(),
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
-            order_vote_qc_cache: LruCache::new(10),
         }
     }
 
@@ -1117,7 +1113,10 @@ impl RoundManager {
                 && order_vote_round < highest_ordered_round + 100
                 && order_vote_msg.epoch() >= highest_ordered_epoch
             {
-                if !self.pending_order_votes.exists(&li_digest) {
+                // If it is the first order vote received for the block, verify the QC and insert along with QC.
+                // For the subsequent order votes for the same block, we don't have to verify the QC. Just inserting the
+                // order vote is enough.
+                let vote_reception_result = if !self.pending_order_votes.exists(&li_digest) {
                     let start = Instant::now();
                     order_vote_msg
                         .quorum_cert()
@@ -1126,14 +1125,23 @@ impl RoundManager {
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote_qc"])
                         .observe(start.elapsed().as_secs_f64());
-                    self.order_vote_qc_cache
-                        .put(li_digest, order_vote_msg.quorum_cert().clone());
-                }
-                let vote_reception_result = self
-                    .pending_order_votes
-                    .insert_order_vote(order_vote_msg.order_vote(), &self.epoch_state.verifier);
-                self.process_order_vote_reception_result(vote_reception_result, &order_vote_msg)
-                    .await?;
+                    self.pending_order_votes.insert_order_vote(
+                        order_vote_msg.order_vote(),
+                        &self.epoch_state.verifier,
+                        Some(order_vote_msg.quorum_cert().clone()),
+                    )
+                } else {
+                    self.pending_order_votes.insert_order_vote(
+                        order_vote_msg.order_vote(),
+                        &self.epoch_state.verifier,
+                        None,
+                    )
+                };
+                self.process_order_vote_reception_result(
+                    vote_reception_result,
+                    order_vote_msg.order_vote().author(),
+                )
+                .await?;
             } else {
                 ORDER_VOTE_NOT_IN_RANGE.inc();
                 info!(
@@ -1334,13 +1342,17 @@ impl RoundManager {
     async fn process_order_vote_reception_result(
         &mut self,
         result: OrderVoteReceptionResult,
-        order_vote_msg: &OrderVoteMsg,
+        preferred_peer: Author,
     ) -> anyhow::Result<()> {
         match result {
-            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(ledger_info_with_signatures) => {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures((
+                verified_qc,
+                ledger_info_with_signatures,
+            )) => {
                 self.new_ordered_cert(
                     WrappedLedgerInfo::new(VoteData::dummy(), ledger_info_with_signatures),
-                    order_vote_msg,
+                    verified_qc,
+                    preferred_peer,
                 )
                 .await
             },
@@ -1371,54 +1383,8 @@ impl RoundManager {
 
     async fn new_qc_from_order_vote_msg(
         &mut self,
-        order_vote_msg: &OrderVoteMsg,
-    ) -> anyhow::Result<()> {
-        if let NeedFetchResult::QCAlreadyExist = self
-            .block_store
-            .need_fetch_for_quorum_cert(order_vote_msg.quorum_cert())
-        {
-            return Ok(());
-        }
-
-        // If a verified QC already exists in the cache, use it.
-        // Otherwise verify the QC from the order vote msg and then use it.
-        let verified_qc = match self
-            .order_vote_qc_cache
-            .get(&order_vote_msg.order_vote().ledger_info().hash())
-        {
-            Some(verified_qc) => verified_qc.clone(),
-            None => {
-                let start = Instant::now();
-                order_vote_msg
-                    .quorum_cert()
-                    .verify(&self.epoch_state().verifier)
-                    .context("[OrderVoteMsg QuorumCert verification failed")?;
-                counters::VERIFY_MSG
-                    .with_label_values(&["order_vote_qc"])
-                    .observe(start.elapsed().as_secs_f64());
-                order_vote_msg.quorum_cert().clone()
-            },
-        };
-
-        let result = self
-            .block_store
-            .insert_quorum_cert(
-                &verified_qc,
-                &mut self.create_block_retriever(order_vote_msg.order_vote().author()),
-            )
-            .await
-            .context("[RoundManager] Failed to process the QC from order vote msg");
-        self.process_certificates().await?;
-        self.order_vote_qc_cache
-            .pop(&order_vote_msg.order_vote().ledger_info().hash());
-        result
-    }
-
-    // Insert ordered certificate formed by aggregating order votes
-    async fn new_ordered_cert(
-        &mut self,
-        ordered_cert: WrappedLedgerInfo,
-        order_vote_msg: &OrderVoteMsg,
+        verified_qc: Arc<QuorumCert>,
+        preferred_peer: Author,
     ) -> anyhow::Result<()> {
         // If the block doesn't exist, we could ideally do sync up based on the qc.
         // But this could trigger fetching a lot of past blocks in case the node is lagging behind.
@@ -1426,7 +1392,7 @@ impl RoundManager {
         // One of the subsequence syncinfo messages will trigger the block fetch or state sync if required.
         if self
             .block_store
-            .get_block(ordered_cert.commit_info().id())
+            .get_block(verified_qc.certified_block().id())
             .is_none()
         {
             ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE.inc();
@@ -1434,14 +1400,43 @@ impl RoundManager {
                 SampleRate::Duration(Duration::from_millis(200)),
                 info!(
                     "Ordered certificate created without block in block store: {:?}",
-                    ordered_cert
+                    verified_qc.certified_block()
                 );
             );
+            return Err(anyhow::anyhow!(
+                "Ordered certificate created without block in block store"
+            ));
+        }
+
+        if let NeedFetchResult::QCAlreadyExist = self
+            .block_store
+            .need_fetch_for_quorum_cert(verified_qc.as_ref())
+        {
             return Ok(());
         }
 
         // If the block is already in the block store, but QC isn't available in the block store, insert QC.
-        self.new_qc_from_order_vote_msg(order_vote_msg).await?;
+        let result = self
+            .block_store
+            .insert_quorum_cert(
+                verified_qc.as_ref(),
+                &mut self.create_block_retriever(preferred_peer),
+            )
+            .await
+            .context("[RoundManager] Failed to process the QC from order vote msg");
+        self.process_certificates().await?;
+        result
+    }
+
+    // Insert ordered certificate formed by aggregating order votes
+    async fn new_ordered_cert(
+        &mut self,
+        ordered_cert: WrappedLedgerInfo,
+        verified_qc: Arc<QuorumCert>,
+        preferred_peer: Author,
+    ) -> anyhow::Result<()> {
+        self.new_qc_from_order_vote_msg(verified_qc, preferred_peer)
+            .await?;
 
         // If the block and qc now exist in the quorum store, insert the ordered cert
         let result = self
