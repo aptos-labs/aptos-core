@@ -40,7 +40,7 @@ comparison between v1 and v2 failed:
 +   │         Invalid call to MoveFrom<T>.
 = 
 = 
-+ Exiting: code generation errors
++ Exiting with code generation errors
 = 
 + 
 = task 1 'publish'. lines 10-22:
@@ -73,7 +73,7 @@ comparison between v1 and v2 failed:
 - 18 │         my_borrow().f;
 -    │         ^^^^^^^^^^^^^ Unbound field 'f'
 = 
-+ Exiting: checking errors
++ Exiting with checking errors
 = 
 = 
 = task 2 'run'. lines 24-30:
@@ -93,6 +93,6 @@ comparison between v1 and v2 failed:
 =    │         ^ Unbound module or type alias 'M'
 = 
 = 
-+ Exiting: checking errors
++ Exiting with checking errors
 = 
 + 

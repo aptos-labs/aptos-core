@@ -23,6 +23,7 @@ use move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::move_compiler_warnings_are_errors_env_var,
 };
+use move_compiler_v2::{Experiment, Options};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -106,8 +107,6 @@ pub struct BuildOptions {
     /// Select bytecode, language, compiler for Move 2
     #[clap(long)]
     pub move_2: bool,
-    #[clap(long = WARN_UNUSED_FLAG, default_value="false")]
-    pub warn_unused: bool,
     #[clap(long = MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG, default_value=bool_to_str(move_compiler_warnings_are_errors_env_var()))]
     pub warnings_are_errors: bool,
 }

@@ -12,7 +12,7 @@ Error: compilation errors:
    = missing `E::V2{..}`
 
 
-Exiting: code generation errors
+Exiting with code generation errors
 
 
 task 1 'run'. lines 53-53:
