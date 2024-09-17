@@ -1438,7 +1438,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             if self.config.optimistic_sig_verification_for_order_votes && !malicious_sender {
                 if let UnverifiedEvent::OrderVoteMsg(order_vote) = &unverified_event {
-                    order_vote.partial_verify()?;
+                    order_vote.verify_metadata()?;
                     Self::forward_event_to(
                         round_manager_tx,
                         (
@@ -1461,12 +1461,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 if let UnverifiedEvent::VoteMsg(vote) = unverified_event.clone() {
                     self.bounded_executor
                         .spawn(async move {
-                            // The partial_verify function will potentially verify the signature of timeout.
+                            // The verify_metadata function will potentially verify the signature of timeout.
                             // So, we need to spawn it in a separate task to avoid blocking the main task.
                             let start_time = Instant::now();
-                            let result = vote.partial_verify(&epoch_state.verifier);
+                            let result = vote.verify_metadata(&epoch_state.verifier);
                             counters::VERIFY_MSG
-                                .with_label_values(&["vote_partial_verify"])
+                                .with_label_values(&["vote_verify_metadata"])
                                 .observe(start_time.elapsed().as_secs_f64());
                             match result {
                                 Ok(()) => {
