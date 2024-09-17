@@ -135,6 +135,9 @@ impl RecoveryManager {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_recovery", self.process_vote_msg(*vote_msg).await)
                         }
+                        VerifiedEvent::UnverifiedVoteMsg(vote_msg) => {
+                            monitor!("process_recovery", self.process_vote_msg(*vote_msg).await)
+                        }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_recovery",

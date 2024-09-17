@@ -8,7 +8,9 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
+    ledger_info::{
+        LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures, VerificationStatus,
+    },
     validator_verifier::VerifyError,
 };
 use std::{collections::HashMap, sync::Arc};
@@ -57,7 +59,7 @@ impl PendingOrderVotes {
         &mut self,
         order_vote: &OrderVote,
         epoch_state: Arc<EpochState>,
-        verified: bool,
+        verification_status: VerificationStatus,
     ) -> OrderVoteReceptionResult {
         // derive data from order vote
         let li_digest = order_vote.ledger_info().hash();
@@ -98,7 +100,7 @@ impl PendingOrderVotes {
                 li_with_sig.add_signature(
                     order_vote.author(),
                     order_vote.signature().clone(),
-                    verified,
+                    verification_status,
                 );
                 match li_with_sig.check_voting_power(&epoch_state.verifier) {
                     Ok(aggregated_voting_power) => {
@@ -168,7 +170,7 @@ mod tests {
         aggregate_signature::PartialSignatures,
         block_info::BlockInfo,
         epoch_state::EpochState,
-        ledger_info::LedgerInfo,
+        ledger_info::{LedgerInfo, VerificationStatus},
         validator_verifier::{random_validator_verifier, VerifyError},
     };
     use std::sync::Arc;
@@ -203,7 +205,7 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &order_vote_1_author_0,
                 epoch_state.clone(),
-                true
+                VerificationStatus::Verified
             ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
@@ -213,7 +215,7 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &order_vote_1_author_0,
                 epoch_state.clone(),
-                true
+                VerificationStatus::Verified
             ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
@@ -229,7 +231,7 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &order_vote_2_author_1,
                 epoch_state.clone(),
-                true
+                VerificationStatus::Verified
             ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
@@ -245,7 +247,7 @@ mod tests {
         match pending_order_votes.insert_order_vote(
             &order_vote_2_author_2,
             epoch_state.clone(),
-            true,
+            VerificationStatus::Verified,
         ) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
                 assert!(li_with_sig
@@ -310,23 +312,39 @@ mod tests {
         );
 
         assert_eq!(
-            pending_order_votes.insert_order_vote(&vote_0, epoch_state.clone(), false),
+            pending_order_votes.insert_order_vote(
+                &vote_0,
+                epoch_state.clone(),
+                VerificationStatus::Unverified
+            ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
         assert_eq!(
-            pending_order_votes.insert_order_vote(&vote_0, epoch_state.clone(), true),
+            pending_order_votes.insert_order_vote(
+                &vote_0,
+                epoch_state.clone(),
+                VerificationStatus::Verified
+            ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
         assert_eq!(
-            pending_order_votes.insert_order_vote(&vote_1, epoch_state.clone(), true),
+            pending_order_votes.insert_order_vote(
+                &vote_1,
+                epoch_state.clone(),
+                VerificationStatus::Verified
+            ),
             OrderVoteReceptionResult::VoteAdded(2)
         );
 
         assert_eq!(epoch_state.verifier.malicious_authors().len(), 0);
         assert_eq!(
-            pending_order_votes.insert_order_vote(&vote_2, epoch_state.clone(), false),
+            pending_order_votes.insert_order_vote(
+                &vote_2,
+                epoch_state.clone(),
+                VerificationStatus::Unverified
+            ),
             OrderVoteReceptionResult::ErrorAggregatingSignature(
                 VerifyError::TooLittleVotingPower {
                     voting_power: 2,
@@ -340,7 +358,11 @@ mod tests {
             .verifier
             .aggregate_signatures(&partial_signatures)
             .unwrap();
-        match pending_order_votes.insert_order_vote(&vote_3, epoch_state.clone(), false) {
+        match pending_order_votes.insert_order_vote(
+            &vote_3,
+            epoch_state.clone(),
+            VerificationStatus::Unverified,
+        ) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
                 assert!(li_with_sig
                     .check_voting_power(&epoch_state.verifier)
@@ -353,7 +375,11 @@ mod tests {
             },
         };
 
-        match pending_order_votes.insert_order_vote(&vote_4, epoch_state.clone(), false) {
+        match pending_order_votes.insert_order_vote(
+            &vote_4,
+            epoch_state.clone(),
+            VerificationStatus::Unverified,
+        ) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
                 assert!(li_with_sig
                     .check_voting_power(&epoch_state.verifier)

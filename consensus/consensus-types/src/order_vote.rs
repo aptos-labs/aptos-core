@@ -69,7 +69,7 @@ impl OrderVote {
     }
 
     /// Performs basic checks, excluding the signature verification.
-    pub fn partial_verify(&self) -> anyhow::Result<()> {
+    pub fn verify_metadata(&self) -> anyhow::Result<()> {
         ensure!(
             self.ledger_info.consensus_data_hash() == HashValue::zero(),
             "Failed to verify OrderVote. Consensus data hash is not Zero"
@@ -87,7 +87,7 @@ impl OrderVote {
 
     /// Performs full verification including the signature verification.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        self.partial_verify()?;
+        self.verify_metadata()?;
         self.signature_verify(validator)?;
         Ok(())
     }
