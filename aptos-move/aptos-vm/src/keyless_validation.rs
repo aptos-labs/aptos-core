@@ -309,6 +309,8 @@ pub(crate) fn validate_authenticators(
                                 }
                             }
 
+                            println!("zksig in validation is: {:?}", zksig.clone());
+                            println!("pvk in validation is: {:?}", pvk.clone());
                             let result = zksig
                                 .verify_groth16_proof(public_inputs_hash, pvk.as_ref().unwrap());
 

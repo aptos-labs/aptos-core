@@ -265,8 +265,6 @@
         let (pk, vk) = Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
         let pvk = prepare_verifying_key(&vk);
         for i in 0..n_iters {
-            println!("on iteration: {}", i);
-
 
             // TODO: Make public input optional and use default value if not specified. Also make an equivalent function for simulated proof verification
             let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(
