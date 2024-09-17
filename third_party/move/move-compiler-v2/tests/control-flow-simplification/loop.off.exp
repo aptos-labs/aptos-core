@@ -1,20 +1,12 @@
 
 ============ disassembled file-format ==================
 // Move bytecode v7
-script {
+module 42.test {
 
 
-main() /* def_idx: 0 */ {
+test() /* def_idx: 0 */ {
 B0:
-	0: LdTrue
-	1: BrFalse(3)
-B1:
-	2: Branch(5)
-B2:
-	3: LdU64(1)
-	4: Abort
-B3:
-	5: Ret
+	0: Branch(0)
 }
 }
 ============ bytecode verification succeeded ========

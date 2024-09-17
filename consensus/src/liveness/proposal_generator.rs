@@ -22,7 +22,7 @@ use aptos_consensus_types::{
 use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{error, sample, sample::SampleRate, warn};
 use aptos_storage_interface::DbReader;
 use aptos_types::{on_chain_config::{OnChainRandomnessConfig, ValidatorTxnConfig}, transaction::Transaction, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -201,7 +201,7 @@ impl PipelineBackpressureConfig {
                 PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS.observe(calibrated_block_size as f64);
                 // Check if calibrated block size is reduction in size, to turn on backpressure.
                 if max_block_txns > calibrated_block_size {
-                    info!(
+                    warn!(
                         block_execution_times = format!("{:?}", block_execution_times),
                         estimated_calibrated_block_sizes = format!("{:?}", sizes),
                         calibrated_block_size = calibrated_block_size,
