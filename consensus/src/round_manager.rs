@@ -1144,16 +1144,16 @@ impl RoundManager {
                 .await?;
             } else {
                 ORDER_VOTE_NOT_IN_RANGE.inc();
-                info!(
+                sample!(
                     SampleRate::Duration(Duration::from_secs(1)),
                     info!(
-                        "[sampled] Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
+                        "[sampled] Received an order vote not in the 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
                         order_vote_msg.order_vote().ledger_info().round(),
                         self.block_store.sync_info().highest_ordered_round()
                     )
                 );
                 debug!(
-                    "Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
+                    "Received an order vote not in the next 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
                     order_vote_msg.order_vote().ledger_info().round(),
                     self.block_store.sync_info().highest_ordered_round()
                 )
@@ -1386,46 +1386,45 @@ impl RoundManager {
         verified_qc: Arc<QuorumCert>,
         preferred_peer: Author,
     ) -> anyhow::Result<()> {
-        // If the block doesn't exist, we could ideally do sync up based on the qc.
-        // But this could trigger fetching a lot of past blocks in case the node is lagging behind.
-        // So, we just log a warning here to avoid a long sequence of block fetchs.
-        // One of the subsequence syncinfo messages will trigger the block fetch or state sync if required.
-        if self
-            .block_store
-            .get_block(verified_qc.certified_block().id())
-            .is_none()
-        {
-            ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE.inc();
-            sample!(
-                SampleRate::Duration(Duration::from_millis(200)),
-                info!(
-                    "Ordered certificate created without block in block store: {:?}",
-                    verified_qc.certified_block()
-                );
-            );
-            return Err(anyhow::anyhow!(
-                "Ordered certificate created without block in block store"
-            ));
-        }
-
-        if let NeedFetchResult::QCAlreadyExist = self
+        match self
             .block_store
             .need_fetch_for_quorum_cert(verified_qc.as_ref())
         {
-            return Ok(());
+            NeedFetchResult::QCAlreadyExist => Ok(()),
+            NeedFetchResult::QCBlockExist => {
+                // If the block is already in the block store, but QC isn't available in the block store, insert QC.
+                let result = self
+                    .block_store
+                    .insert_quorum_cert(
+                        verified_qc.as_ref(),
+                        &mut self.create_block_retriever(preferred_peer),
+                    )
+                    .await
+                    .context("[RoundManager] Failed to process the QC from order vote msg");
+                self.process_certificates().await?;
+                result
+            },
+            NeedFetchResult::NeedFetch => {
+                // If the block doesn't exist, we could ideally do sync up based on the qc.
+                // But this could trigger fetching a lot of past blocks in case the node is lagging behind.
+                // So, we just log a warning here to avoid a long sequence of block fetchs.
+                // One of the subsequence syncinfo messages will trigger the block fetch or state sync if required.
+                ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE.inc();
+                sample!(
+                    SampleRate::Duration(Duration::from_millis(200)),
+                    info!(
+                        "Ordered certificate created without block in block store: {:?}",
+                        verified_qc.certified_block()
+                    );
+                );
+                Err(anyhow::anyhow!(
+                    "Ordered certificate created without block in block store"
+                ))
+            },
+            NeedFetchResult::QCRoundBeforeRoot => {
+                Err(anyhow::anyhow!("Ordered certificate is old"))
+            },
         }
-
-        // If the block is already in the block store, but QC isn't available in the block store, insert QC.
-        let result = self
-            .block_store
-            .insert_quorum_cert(
-                verified_qc.as_ref(),
-                &mut self.create_block_retriever(preferred_peer),
-            )
-            .await
-            .context("[RoundManager] Failed to process the QC from order vote msg");
-        self.process_certificates().await?;
-        result
     }
 
     // Insert ordered certificate formed by aggregating order votes
