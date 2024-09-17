@@ -19,7 +19,9 @@ use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures},
+    ledger_info::{
+        LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures, VerificationStatus,
+    },
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
@@ -103,7 +105,7 @@ fn generate_executed_item_from_ordered(
         order_vote_enabled,
     ));
     for (author, sig) in verified_signatures.signatures() {
-        partial_commit_proof.add_signature(*author, sig.clone(), true);
+        partial_commit_proof.add_signature(*author, sig.clone(), VerificationStatus::Verified);
     }
     BufferItem::Executed(Box::new(ExecutedItem {
         executed_blocks,
@@ -463,7 +465,7 @@ impl BufferItem {
     pub fn add_signature_if_matched(
         &mut self,
         vote: CommitVote,
-        verified: bool,
+        verification_status: VerificationStatus,
     ) -> anyhow::Result<()> {
         let target_commit_info = vote.commit_info();
         let author = vote.author();
@@ -487,17 +489,21 @@ impl BufferItem {
             },
             Self::Executed(executed) => {
                 if executed.commit_info == *target_commit_info {
-                    executed
-                        .partial_commit_proof
-                        .add_signature(author, signature, verified);
+                    executed.partial_commit_proof.add_signature(
+                        author,
+                        signature,
+                        verification_status,
+                    );
                     return Ok(());
                 }
             },
             Self::Signed(signed) => {
                 if signed.partial_commit_proof.commit_info() == target_commit_info {
-                    signed
-                        .partial_commit_proof
-                        .add_signature(author, signature, verified);
+                    signed.partial_commit_proof.add_signature(
+                        author,
+                        signature,
+                        verification_status,
+                    );
                     return Ok(());
                 }
             },

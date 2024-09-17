@@ -37,8 +37,10 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress,
+    epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfoWithSignatures, VerificationStatus},
 };
 use bytes::Bytes;
 use futures::{
@@ -702,7 +704,7 @@ impl BufferManager {
     fn process_commit_message(
         &mut self,
         commit_msg: IncomingCommitRequest,
-        verified: bool,
+        verification_status: VerificationStatus,
     ) -> Option<HashValue> {
         let IncomingCommitRequest {
             req,
@@ -721,7 +723,7 @@ impl BufferManager {
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
                 if current_cursor.is_some() {
                     let mut item = self.buffer.take(&current_cursor);
-                    let new_item = match item.add_signature_if_matched(vote, verified) {
+                    let new_item = match item.add_signature_if_matched(vote, verification_status) {
                         Ok(()) => {
                             let response =
                                 ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
@@ -900,14 +902,18 @@ impl BufferManager {
                                     .verifier
                                     .is_malicious_author(&vote.author())
                                 {
-                                    let _ = tx.unbounded_send((commit_msg, false));
+                                    let _ = tx.unbounded_send((
+                                        commit_msg,
+                                        VerificationStatus::Unverified,
+                                    ));
                                     return;
                                 }
                             }
                         }
                         match commit_msg.req.verify(&epoch_state_clone.verifier) {
                             Ok(_) => {
-                                let _ = tx.unbounded_send((commit_msg, true));
+                                let _ =
+                                    tx.unbounded_send((commit_msg, VerificationStatus::Verified));
                             },
                             Err(e) => warn!("Invalid commit message: {}", e),
                         }
@@ -967,9 +973,9 @@ impl BufferManager {
                     // see where `need_backpressure()` is called.
                     self.highest_committed_round = round
                 },
-                Some((rpc_request, verified)) = verified_commit_msg_rx.next() => {
+                Some((rpc_request, verification_status)) = verified_commit_msg_rx.next() => {
                     monitor!("buffer_manager_process_commit_message",
-                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request, verified) {
+                    if let Some(aggregated_block_id) = self.process_commit_message(rpc_request, verification_status) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
                             self.advance_execution_root();
