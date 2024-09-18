@@ -1,0 +1,6 @@
+error[E01001]: invalid character
+  ┌─ tests/move_check/parser/constants_single_quote.move:4:22
+  │
+4 │     const C13: u64 = ";
+  │                      ^ Invalid character: '"'
+
