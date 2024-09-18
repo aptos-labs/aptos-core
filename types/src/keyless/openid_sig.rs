@@ -60,9 +60,16 @@ impl OpenIdSig {
     ) -> anyhow::Result<()> {
         let claims: Claims = serde_json::from_str(&self.jwt_payload_json)?;
 
-        let max_expiration_date =
-            seconds_from_epoch(claims.oidc_claims.iat + config.max_exp_horizon_secs);
-        let expiration_date = seconds_from_epoch(exp_timestamp_secs);
+        let max_expiration_date = seconds_from_epoch(
+            claims
+                .oidc_claims
+                .iat
+                .checked_add(config.max_exp_horizon_secs)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Overflow when adding iat and max_exp_horizon_secs")
+                })?,
+        )?;
+        let expiration_date = seconds_from_epoch(exp_timestamp_secs)?;
 
         ensure!(
             expiration_date < max_expiration_date,
