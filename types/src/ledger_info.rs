@@ -463,13 +463,11 @@ impl LedgerInfoWithMixedSignatures {
     }
 
     // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
-    pub fn all_voters(&self) -> Vec<AccountAddress> {
+    pub fn all_voters(&self) -> impl Iterator<Item = &AccountAddress> {
         self.verified_signatures
             .signatures()
             .keys()
             .chain(self.unverified_signatures.signatures().keys())
-            .cloned()
-            .collect()
     }
 
     pub fn check_voting_power(
@@ -478,10 +476,7 @@ impl LedgerInfoWithMixedSignatures {
         check_super_majority: bool,
     ) -> std::result::Result<u128, VerifyError> {
         let all_voters = self.all_voters();
-        verifier.check_voting_power(
-            all_voters.iter().collect_vec().into_iter(),
-            check_super_majority,
-        )
+        verifier.check_voting_power(all_voters, check_super_majority)
     }
 
     // Aggregates all the signatures, verifies the aggregate signature, and returns the aggregate signature.
@@ -500,7 +495,6 @@ impl LedgerInfoWithMixedSignatures {
 
         match epoch_state
             .verifier
-            .clone()
             .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
         {
             Ok(_) => {
@@ -515,7 +509,7 @@ impl LedgerInfoWithMixedSignatures {
                 ))
             },
             Err(_) => {
-                // Question: Should we assign min tasks per thread here for into_par_iter()?
+                // Question: How to add counters to keep track of the total time spent in the parallel threads?
                 let verified = self
                     .unverified_signatures
                     .signatures()
@@ -536,17 +530,14 @@ impl LedgerInfoWithMixedSignatures {
                         .add_signature(account_address, signature.clone());
                     self.unverified_signatures.remove_signature(account_address);
                 }
-                let malicious_authors = self
-                    .unverified_signatures
-                    .signatures()
-                    .keys()
-                    .cloned()
-                    .collect();
-                self.unverified_signatures = PartialSignatures::empty();
 
+                // For these authors, we will not use optimistic signature verification in the future.
+                let pessimistic_authors = self.unverified_signatures.signatures().keys().cloned();
                 epoch_state
                     .verifier
-                    .add_malicious_authors(malicious_authors);
+                    .add_pessimistic_verify_set(pessimistic_authors);
+
+                self.unverified_signatures = PartialSignatures::empty();
 
                 match self.check_voting_power(&epoch_state.verifier, true) {
                     Ok(_) => Ok(LedgerInfoWithSignatures::new(
@@ -736,7 +727,7 @@ mod tests {
             validator_signers[3].sign(&ledger_info).unwrap(),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 4);
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 4);
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
@@ -765,7 +756,7 @@ mod tests {
             VerificationStatus::Unverified,
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 5);
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
@@ -807,8 +798,8 @@ mod tests {
                 .len(),
             4
         );
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 4);
-        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 4);
+        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[5].author(),
@@ -820,7 +811,7 @@ mod tests {
             validator_signers[5].sign(&ledger_info).unwrap(),
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 5);
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
@@ -867,7 +858,7 @@ mod tests {
                 .len(),
             5
         );
-        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[6].author(),
@@ -875,7 +866,7 @@ mod tests {
             VerificationStatus::Unverified,
         );
 
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 6);
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 6);
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .check_voting_power(&validator_verifier, true)
@@ -902,7 +893,7 @@ mod tests {
                 .len(),
             5
         );
-        assert_eq!(ledger_info_with_mixed_signatures.all_voters().len(), 5);
-        assert_eq!(epoch_state.verifier.malicious_authors().len(), 2);
+        assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
+        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 2);
     }
 }
