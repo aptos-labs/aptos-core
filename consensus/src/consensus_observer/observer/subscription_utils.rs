@@ -175,7 +175,7 @@ async fn create_single_subscription(
             },
             Err(error) => {
                 // We encountered an error while sending the request
-                error!(
+                warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Failed to send subscription request to peer: {}! Error: {:?}",
                         potential_peer, error
