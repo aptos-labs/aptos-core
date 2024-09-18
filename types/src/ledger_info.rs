@@ -326,18 +326,18 @@ pub enum VerificationStatus {
 /// Contains the ledger info and partially aggregated signature from a set of validators, this data
 /// is only used during the aggregating the votes from different validators and is not persisted in DB.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct LedgerInfoWithPartialSignatures {
+pub struct LedgerInfoWithVerifiedSignatures {
     ledger_info: LedgerInfo,
     partial_sigs: PartialSignatures,
 }
 
-impl Display for LedgerInfoWithPartialSignatures {
+impl Display for LedgerInfoWithVerifiedSignatures {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self.ledger_info)
     }
 }
 
-impl LedgerInfoWithPartialSignatures {
+impl LedgerInfoWithVerifiedSignatures {
     pub fn new(ledger_info: LedgerInfo, signatures: PartialSignatures) -> Self {
         Self {
             ledger_info,
@@ -393,7 +393,7 @@ pub enum SignatureWithStatus {
 /// verify the aggregated signature at once. If the aggregated signature is invalid, then we verify each individual
 /// unverified signature and remove the invalid signatures.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct LedgerInfoWithMixedSignatures {
+pub struct LedgerInfoWithUnverifiedSignatures {
     ledger_info: LedgerInfo,
     // These signatures are not yet verified. For efficiency, once enough unverified signatures are collected,
     // they will be aggregated and verified.
@@ -401,13 +401,13 @@ pub struct LedgerInfoWithMixedSignatures {
     verified_signatures: PartialSignatures,
 }
 
-impl Display for LedgerInfoWithMixedSignatures {
+impl Display for LedgerInfoWithUnverifiedSignatures {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self.ledger_info)
     }
 }
 
-impl LedgerInfoWithMixedSignatures {
+impl LedgerInfoWithUnverifiedSignatures {
     pub fn new(ledger_info: LedgerInfo) -> Self {
         Self {
             ledger_info,
@@ -691,7 +691,7 @@ mod tests {
         let epoch_state = Arc::new(EpochState::new(10, validator_verifier.clone()));
 
         let mut ledger_info_with_mixed_signatures =
-            LedgerInfoWithMixedSignatures::new(ledger_info.clone());
+            LedgerInfoWithUnverifiedSignatures::new(ledger_info.clone());
 
         let mut partial_sig = PartialSignatures::empty();
 

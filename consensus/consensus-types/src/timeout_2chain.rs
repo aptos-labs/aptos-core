@@ -406,7 +406,7 @@ mod tests {
         use aptos_types::{
             aggregate_signature::PartialSignatures,
             block_info::BlockInfo,
-            ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
+            ledger_info::{LedgerInfo, LedgerInfoWithVerifiedSignatures},
             validator_verifier::random_validator_verifier,
         };
 
@@ -415,7 +415,7 @@ mod tests {
         let quorum_size = validators.quorum_voting_power() as usize;
         let generate_quorum = |round, num_of_signature| {
             let vote_data = VoteData::new(BlockInfo::random(round), BlockInfo::random(0));
-            let mut ledger_info = LedgerInfoWithPartialSignatures::new(
+            let mut ledger_info = LedgerInfoWithVerifiedSignatures::new(
                 LedgerInfo::new(BlockInfo::empty(), vote_data.hash()),
                 PartialSignatures::empty(),
             );
