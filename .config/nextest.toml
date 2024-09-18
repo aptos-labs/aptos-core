@@ -20,7 +20,7 @@ period = "900s"
 terminate-after = 1
 
 [[profile.default.overrides]]
-filter = 'test(test_gas) + test(test_compilation_metadata) + test(test_fee_collection_and_distribution_for_burn_percentages) + test(verify_resource_group_upgrades) + test(test_fee_collection_and_distribution_for_burn_percentages)'
+filter = 'test(test_gas) + test(test_compilation_metadata) + test(test_fee_collection_and_distribution_for_burn_percentages) + test(verify_resource_group_upgrades) + test(test_fee_collection_and_distribution_for_burn_percentages) + test(test_multiple_aggregators_and_collocation)'
 slow-timeout = { period = "2100s", terminate-after = 1 }
 
 [profile.smoke-test]
