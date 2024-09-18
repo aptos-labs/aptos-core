@@ -1,0 +1,333 @@
+{
+  "timestamp": {
+    "seconds": "1670166570",
+    "nanos": 788884000
+  },
+  "version": "375358416",
+  "info": {
+    "hash": "WdKULT1MSfn9SuU4/qabf1uymsD5Me5z71iP2E8ZWOQ=",
+    "stateChangeHash": "YE14uYIzDMnFa1d4Fb4Byffvg+0OrkFylG7XtUIglJ0=",
+    "eventRootHash": "ttLsqggzK/Xw6fPmpFCetiTT69sEjkvO0myWGDkXndU=",
+    "gasUsed": "1337",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "IM2crrUL/12f8PdTpVNLqACco1OkX0b/uHYzvDakob8=",
+    "changes": [
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3",
+          "stateKeyHash": "jw1J32/iGmkYQJQfHaFcFavAY5uOolaihIzJRir9z60=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinInfo",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3",
+                  "module": "vault",
+                  "name": "MagicCoin",
+                  "genericTypeParams": [
+                    {
+                      "type": "MOVE_TYPES_STRUCT",
+                      "struct": {
+                        "address": "0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723",
+                        "module": "coins",
+                        "name": "USDC"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinInfo<0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3::vault::MagicCoin<0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723::coins::USDC>>",
+          "data": "{\"decimals\":6,\"name\":\"Magic USDC\",\"supply\":{\"vec\":[{\"aggregator\":{\"vec\":[]},\"integer\":{\"vec\":[{\"limit\":\"340282366920938463463374607431768211455\",\"value\":\"133000000\"}]}}]},\"symbol\":\"mUSDC\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3",
+          "stateKeyHash": "bz8Hcy+r9PRLh5C7fymMyrTpLvF93sfXxY5FJyzT3PA=",
+          "type": {
+            "address": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3",
+            "module": "vault",
+            "name": "VaultInfo",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723",
+                  "module": "coins",
+                  "name": "USDC"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3::vault::VaultInfo<0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723::coins::USDC>",
+          "data": "{\"coin\":{\"value\":\"133000000\"},\"config_addr\":\"0x89c8ad561ac679c80cf71f4ae03e0c3155c8096fa745934bfc3dad0148b6dae0\",\"deposit_events\":{\"counter\":\"7\",\"guid\":{\"id\":{\"addr\":\"0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3\",\"creation_num\":\"26\"}}},\"last_accrue_time\":\"1670166570\",\"reserve_pool\":\"0\",\"vault_debt_share\":\"0\",\"vault_debt_val\":\"0\",\"withdraw_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3\",\"creation_num\":\"27\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b",
+          "stateKeyHash": "Qhn2Yzb3aRvJyqO7Rjmhip7byaIEuuSfQJ53axmwy94=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"58714900\"},\"deposit_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b",
+          "stateKeyHash": "wMvxg/umhdyQTGGp0S4ikUHJNWy7MNFM+8Tu6MjgCNo=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3",
+                  "module": "vault",
+                  "name": "MagicCoin",
+                  "genericTypeParams": [
+                    {
+                      "type": "MOVE_TYPES_STRUCT",
+                      "struct": {
+                        "address": "0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723",
+                        "module": "coins",
+                        "name": "USDC"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3::vault::MagicCoin<0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723::coins::USDC>>",
+          "data": "{\"coin\":{\"value\":\"1000000\"},\"deposit_events\":{\"counter\":\"7\",\"guid\":{\"id\":{\"addr\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"creation_num\":\"78\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"4\",\"guid\":{\"id\":{\"addr\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"creation_num\":\"79\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b",
+          "stateKeyHash": "8Nv4E0TZtqHKGuQ37gL92hdRrXZdnP8NiAsI6n8G0YA=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723",
+                  "module": "coins",
+                  "name": "USDC"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723::coins::USDC>",
+          "data": "{\"coin\":{\"value\":\"19842000000\"},\"deposit_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"creation_num\":\"70\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"10\",\"guid\":{\"id\":{\"addr\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"creation_num\":\"71\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b",
+          "stateKeyHash": "e4YL9yJe4ivg/ktoLX0zoVkFq/LYxcNagsyaxh64p5Y=",
+          "type": {
+            "address": "0x1",
+            "module": "account",
+            "name": "Account"
+          },
+          "typeStr": "0x1::account::Account",
+          "data": "{\"authentication_key\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"coin_register_events\":{\"counter\":\"42\",\"guid\":{\"id\":{\"addr\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"creation_num\":\"0\"}}},\"guid_creation_num\":\"86\",\"key_rotation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"creation_num\":\"1\"}}},\"rotation_capability_offer\":{\"for\":{\"vec\":[]}},\"sequence_number\":\"191\",\"signer_capability_offer\":{\"for\":{\"vec\":[]}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_TABLE_ITEM",
+        "writeTableItem": {
+          "stateKeyHash": "bkso1A+YoQamUWNTCSTA3LQME0nTqpFdEItNbPwd2xk=",
+          "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+          "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+          "data": {
+            "key": "\"0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935\"",
+            "keyType": "address",
+            "value": "\"18558400680718257338\"",
+            "valueType": "u128"
+          }
+        }
+      }
+    ]
+  },
+  "epoch": "2009",
+  "blockHeight": "39044933",
+  "type": "TRANSACTION_TYPE_USER",
+  "sizeInfo": {
+    "transactionBytes": 268,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 53,
+        "totalBytes": 109
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 53,
+        "totalBytes": 149
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 178,
+        "valueBytes": 53
+      },
+      {
+        "keyBytes": 129,
+        "valueBytes": 168
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 179,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 128,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 147
+      },
+      {
+        "keyBytes": 66,
+        "valueBytes": 16
+      }
+    ]
+  },
+  "user": {
+    "request": {
+      "sender": "0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b",
+      "sequenceNumber": "190",
+      "maxGasAmount": "2000",
+      "gasUnitPrice": "100",
+      "expirationTimestampSecs": {
+        "seconds": "1670166689"
+      },
+      "payload": {
+        "type": "TYPE_ENTRY_FUNCTION_PAYLOAD",
+        "entryFunctionPayload": {
+          "function": {
+            "module": {
+              "address": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3",
+              "name": "vault"
+            },
+            "name": "deposit"
+          },
+          "typeArguments": [
+            {
+              "type": "MOVE_TYPES_STRUCT",
+              "struct": {
+                "address": "0x9dd6f3f9dcfbc61aa0ad48c967409ebf7a3f170feb35fcacf0077f55b1703723",
+                "module": "coins",
+                "name": "USDC"
+              }
+            }
+          ],
+          "arguments": [
+            "\"1000000\""
+          ],
+          "entryFunctionIdStr": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3::vault::deposit"
+        }
+      },
+      "signature": {
+        "type": "TYPE_ED25519",
+        "ed25519": {
+          "publicKey": "ETW7Rwe4J1YuRmBklFVmz6me7qzxz8tGWw84DRuCWNA=",
+          "signature": "oMRtbDFvYfIgQU1VzCR9QcgM8KjyJ2KO0VZ39Wm24lh2NDXOP7q+0Hf6iGU0g36ZZqMVWTL90IQ6fCdhZkh/Dw=="
+        }
+      }
+    },
+    "events": [
+      {
+        "key": {
+          "creationNumber": "71",
+          "accountAddress": "0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b"
+        },
+        "sequenceNumber": "9",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "WithdrawEvent"
+          }
+        },
+        "typeStr": "0x1::coin::WithdrawEvent",
+        "data": "{\"amount\":\"1000000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "78",
+          "accountAddress": "0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b"
+        },
+        "sequenceNumber": "6",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"1000000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "26",
+          "accountAddress": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3"
+        },
+        "sequenceNumber": "6",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3",
+            "module": "vault",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x3212c178eaadb3e72ea8a771950bb210bb3546f9d440dda48239181a8d57d5b3::vault::DepositEvent",
+        "data": "{\"account\":\"0xb001aa61349b022ed7f123af2cee293e38c2559dbbcebe0061f436ab6e79c66b\",\"amount\":\"1000000\",\"share\":\"1000000\"}"
+      }
+    ]
+  }
+}
