@@ -37,7 +37,7 @@ use aptos_types::{
         RawTransactionWithData, SignedTransaction, TransactionPayload,
     },
     vm_status::StatusCode,
-    APTOS_COIN_TYPE,
+    AptosCoinType, CoinType,
 };
 use aptos_vm::{AptosSimulationVM, AptosVM};
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
@@ -568,7 +568,7 @@ impl TransactionsApi {
                     &state_view,
                     ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
                     ident_str!("balance").into(),
-                    vec![APTOS_COIN_TYPE.clone()],
+                    vec![AptosCoinType::type_tag()],
                     vec![signed_transaction.sender().to_vec()],
                     context.node_config.api.max_gas_view_function,
                 );
@@ -986,7 +986,7 @@ impl TransactionsApi {
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
         // Verify the account exists
-        let account = Account::new(self.context.clone(), address, None, None, None, true)?;
+        let account = Account::new(self.context.clone(), address, None, None, None)?;
         account.get_account_resource()?;
 
         let latest_ledger_info = account.latest_ledger_info;

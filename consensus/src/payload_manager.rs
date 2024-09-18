@@ -471,7 +471,7 @@ async fn get_transactions_for_observer(
     };
 
     // If the payload is valid, publish it to any downstream observers
-    let transaction_payload = block_payload.transaction_payload;
+    let transaction_payload = block_payload.transaction_payload();
     if let Some(consensus_publisher) = consensus_publisher {
         let message = ConsensusObserverMessage::new_block_payload_message(
             block.gen_block_info(HashValue::zero(), 0, None),

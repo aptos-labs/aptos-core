@@ -1799,7 +1799,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         return call;
                     }
                 }
-                let target_exp = self.translate_exp(exp, &target_ty);
+                let target_exp = if let EA::Exp_::ExpDotted(exp) = &exp.value {
+                    self.translate_dotted(exp, &target_ty, *mutable, context)
+                } else {
+                    self.translate_exp(exp, &target_ty)
+                };
                 if self.subs.specialize(&target_ty).is_reference() {
                     self.error(&loc, "cannot borrow from a reference")
                 }
@@ -3557,12 +3561,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         } else {
             expected_type.clone()
         };
-        let ref_vec_exp_e = &sp(
-            vec_exp.loc,
-            EA::Exp_::Borrow(mutable, Box::new(vec_exp.clone())),
-        );
+        let (ty, _) = self.translate_exp_free(vec_exp);
+        let ref_vec_exp_e = if ty.is_reference() {
+            vec_exp.clone()
+        } else {
+            sp(
+                vec_exp.loc,
+                EA::Exp_::Borrow(mutable, Box::new(vec_exp.clone())),
+            )
+        };
         let vec_exp_e = self.translate_exp_in_context(
-            ref_vec_exp_e,
+            &ref_vec_exp_e,
             &Type::Reference(
                 ReferenceKind::from_is_mut(mutable),
                 Box::new(Type::Vector(Box::new(inner_ty.clone()))),
@@ -3718,7 +3727,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         dotted: &EA::ExpDotted,
         expected_type: &Type,
-        index_mutate: bool,
+        index_mutate: bool, // type of reference for type checking of index expression
         context: &ErrorMessageContext,
     ) -> ExpData {
         match &dotted.value {
@@ -3773,7 +3782,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    /// Creates a select operation for the given field name, the kind dependening on whether
+    /// Creates a select operation for the given field name, the kind depending on whether
     /// variant fields or struct fields are selected.
     fn create_select_oper(
         &mut self,

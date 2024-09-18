@@ -230,15 +230,22 @@ impl StructDefinitionGen {
                     for (i, fd) in fields.into_iter().enumerate() {
                         variant_fields[i % self.variants.len()].push(fd)
                     }
+                    let mut seen_names = BTreeSet::new();
                     StructFieldInformation::DeclaredVariants(
                         variant_fields
                             .into_iter()
                             .zip(self.variants.iter())
-                            .map(|(fields, name)| VariantDefinition {
-                                name: IdentifierIndex(
-                                    name.index(state.identifiers_len) as TableIndex
-                                ),
-                                fields,
+                            .filter_map(|(fields, name)| {
+                                let variant_name = name.index(state.identifiers_len) as TableIndex;
+                                // avoid duplicates
+                                if seen_names.insert(variant_name) {
+                                    Some(VariantDefinition {
+                                        name: IdentifierIndex(variant_name),
+                                        fields,
+                                    })
+                                } else {
+                                    None
+                                }
                             })
                             .collect(),
                     )

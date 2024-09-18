@@ -40,8 +40,6 @@ error: data invariant does not hold
   =         result = <redacted>
   =         x = <redacted>
   =     at tests/sources/functional/mut_ref.move:92: return_ref_different_path_vec2
-  =     at tests/sources/functional/mut_ref.move:122: call_return_ref_different_path_vec2_incorrect
-  =         <redacted> = <redacted>
   =         r = <redacted>
   =     at tests/sources/functional/mut_ref.move:122: call_return_ref_different_path_vec2_incorrect
   =     at tests/sources/functional/mut_ref.move:8

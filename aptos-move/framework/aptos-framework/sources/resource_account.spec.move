@@ -155,8 +155,6 @@ spec aptos_framework::resource_account {
         let get = len(optional_auth_key) == 0;
         let account = global<account::Account>(source_addr);
 
-        requires source_addr != resource_addr;
-
         aborts_if len(ZERO_AUTH_KEY) != 32;
         include account::exists_at(resource_addr) ==> account::CreateResourceAccountAbortsIf;
         include !account::exists_at(resource_addr) ==> account::CreateAccountAbortsIf {addr: resource_addr};

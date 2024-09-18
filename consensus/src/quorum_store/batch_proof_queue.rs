@@ -310,6 +310,9 @@ impl BatchProofQueue {
                 self.author_to_batches
                     .get_mut(&item.info.author())
                     .map(|queue| queue.remove(&BatchSortKey::from_info(&item.info)));
+                counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
+                    .with_label_values(&["expired_batch_without_proof"])
+                    .inc();
                 false
             }
         });
@@ -625,6 +628,11 @@ impl BatchProofQueue {
             "Decreasing block timestamp"
         );
         self.latest_block_timestamp = block_timestamp;
+        if let Some(time_lag) = aptos_infallible::duration_since_epoch()
+            .checked_sub(Duration::from_micros(block_timestamp))
+        {
+            counters::TIME_LAG_IN_BATCH_PROOF_QUEUE.observe_duration(time_lag);
+        }
 
         let expired = self.expirations.expire(block_timestamp);
         let mut num_expired_but_not_committed = 0;
@@ -653,6 +661,9 @@ impl BatchProofQueue {
                             }
                         }
                         self.dec_remaining_proofs(&batch.author(), batch.num_txns());
+                        counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
+                            .with_label_values(&["expired_proof"])
+                            .inc();
                     }
                     claims::assert_some!(self.items.remove(&key.batch_key));
                 }
@@ -754,6 +765,9 @@ impl BatchProofQueue {
                         insertion_time.elapsed().as_secs_f64(),
                     );
                     self.dec_remaining_proofs(&batch.author(), batch.num_txns());
+                    counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
+                        .with_label_values(&["committed_proof"])
+                        .inc();
                 }
                 let item = self
                     .items
@@ -773,7 +787,13 @@ impl BatchProofQueue {
                             };
                         }
                     }
+                } else if !item.is_committed() {
+                    counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
+                        .with_label_values(&["committed_batch_without_proof"])
+                        .inc();
                 }
+                // The item is just marked committed for now.
+                // When the batch is expired, then it will be removed from items.
                 item.mark_committed();
             } else {
                 let batch_sort_key = BatchSortKey::from_info(batch.info());
