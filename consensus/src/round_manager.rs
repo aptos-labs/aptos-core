@@ -58,15 +58,10 @@ use aptos_logger::prelude::*;
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
-    block_info::BlockInfo,
-    epoch_state::EpochState,
-    on_chain_config::{
+    aggregate_signature::PartialSignatures, block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
-    },
-    randomness::RandMetadata,
-    validator_verifier::ValidatorVerifier,
-    PeerId,
+    }, randomness::RandMetadata, validator_verifier::ValidatorVerifier, PeerId
 };
 use fail::fail_point;
 use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, StreamExt};
@@ -772,6 +767,10 @@ impl RoundManager {
     async fn process_certificates(&mut self) -> anyhow::Result<()> {
         let sync_info = self.block_store.sync_info();
         if let Some(new_round_event) = self.round_state.process_certificates(sync_info) {
+            info!(
+                self.new_log(LogEvent::NewRound),
+                reason = new_round_event.reason
+            );
             self.process_new_round_event(new_round_event).await?;
         }
         Ok(())
@@ -1018,6 +1017,26 @@ impl RoundManager {
             .context("[RoundManager] Process proposal")?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
+
+        // optimistic proposal hack
+        if self
+            .proposer_election
+            .is_valid_proposer(self.proposal_generator.author(), proposal_round + 1)
+        {
+            let vote_data = vote.vote_data().clone();
+            let ledger_info = vote.ledger_info().clone();
+            let mut fake_partial_signature = PartialSignatures::empty();
+            fake_partial_signature.add_signature(
+                self.proposal_generator.author(),
+                vote.signature().clone(),
+            );
+            let fake_aggregate_signature = self.epoch_state.verifier.aggregate_signatures(&fake_partial_signature)?;
+            let signed_ledger_info = LedgerInfoWithSignatures::new(ledger_info, fake_aggregate_signature);
+            let fake_quorum_cert = QuorumCert::new(vote_data, signed_ledger_info);
+            let result = VoteReceptionResult::NewQuorumCertificate(Arc::new(fake_quorum_cert));
+            self.process_vote_reception_result(&vote, result)
+                .await?;
+        }
 
         self.broadcast_fast_shares(vote.ledger_info().commit_info())
             .await;

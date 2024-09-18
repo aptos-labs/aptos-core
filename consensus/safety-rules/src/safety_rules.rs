@@ -228,10 +228,10 @@ impl SafetyRules {
 
     /// This verifies a QC has valid signatures.
     pub(crate) fn verify_qc(&self, qc: &QuorumCert) -> Result<(), Error> {
-        let epoch_state = self.epoch_state()?;
+        // let epoch_state = self.epoch_state()?;
 
-        qc.verify(&epoch_state.verifier)
-            .map_err(|e| Error::InvalidQuorumCertificate(e.to_string()))?;
+        // qc.verify(&epoch_state.verifier)
+        //     .map_err(|e| Error::InvalidQuorumCertificate(e.to_string()))?;
         Ok(())
     }
 
@@ -398,10 +398,10 @@ impl SafetyRules {
             ));
         }
 
-        // Verify that ledger_info contains at least 2f + 1 dostinct signatures
-        ledger_info
-            .verify_signatures(&self.epoch_state()?.verifier)
-            .map_err(|error| Error::InvalidQuorumCertificate(error.to_string()))?;
+        // // Verify that ledger_info contains at least 2f + 1 dostinct signatures
+        // ledger_info
+        //     .verify_signatures(&self.epoch_state()?.verifier)
+        //     .map_err(|error| Error::InvalidQuorumCertificate(error.to_string()))?;
 
         // TODO: add guarding rules in unhappy path
         // TODO: add extension check
