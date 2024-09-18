@@ -210,7 +210,8 @@ impl Factory for K8sFactory {
                         None,
                         config,
                     );
-                    indexer_deployer.start().await
+                    indexer_deployer.start().await?;
+                    indexer_deployer.wait_completed().await
                 } else {
                     Ok(())
                 }

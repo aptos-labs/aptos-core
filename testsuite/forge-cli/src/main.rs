@@ -457,6 +457,7 @@ fn main() -> Result<()> {
                         config,
                     );
                     runtime.block_on(indexer_deployer.start())?;
+                    runtime.block_on(indexer_deployer.wait_completed())?;
                 }
                 Ok(())
             },
