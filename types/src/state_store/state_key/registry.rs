@@ -20,6 +20,7 @@ use move_core_types::{
 };
 use once_cell::sync::Lazy;
 use std::{
+    mem,
     borrow::Borrow,
     hash::{Hash, Hasher},
     sync::{Arc, Weak},
@@ -149,17 +150,24 @@ where
     }
 
     fn maybe_remove(&self, key1: &Key1, key2: &Key2) {
-        let mut locked = self.inner.write();
-        if let Some(map2) = locked.get_mut(key1) {
-            if let Some(entry) = map2.get(key2) {
-                if entry.upgrade().is_none() {
-                    map2.remove(key2);
+        // If the entry is removed, it must be dropped outside of the lock
+        // to prevent lock reentrancy
+        let mut maybe_entry = None;
+        {
+            let mut locked = self.inner.write();
+            if let Some(map2) = locked.get_mut(key1) {
+                if let Some(entry) = map2.get(key2) {
+                    maybe_entry = entry.upgrade();
+                    if maybe_entry.is_none() {
+                        map2.remove(key2);
+                    }
+                }
+                if map2.is_empty() {
+                    locked.remove(key1);
                 }
             }
-            if map2.is_empty() {
-                locked.remove(key1);
-            }
         }
+        mem::drop(maybe_entry);
     }
 
     pub fn get_or_add<Ref1, Ref2, Gen>(
