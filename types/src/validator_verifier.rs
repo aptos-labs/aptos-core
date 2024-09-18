@@ -155,18 +155,6 @@ pub struct ValidatorVerifier {
     pessimistic_verify_set: Arc<DashSet<AccountAddress>>,
 }
 
-// // Implement Eq and PartialEq for ValidatorVerifier. Skip pessimistic_verify_set field in the comparison.
-// impl PartialEq for ValidatorVerifier {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.validator_infos == other.validator_infos
-//             && self.quorum_voting_power == other.quorum_voting_power
-//             && self.total_voting_power == other.total_voting_power
-//             && self.address_to_validator_index == other.address_to_validator_index
-//     }
-// }
-
-// impl Eq for ValidatorVerifier {}
-
 /// Reconstruct fields from the raw data upon deserialization.
 impl<'de> Deserialize<'de> for ValidatorVerifier {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
