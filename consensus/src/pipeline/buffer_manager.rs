@@ -346,13 +346,9 @@ impl BufferManager {
     fn try_add_pending_commit_vote(&mut self, vote: CommitVote) -> bool {
         let block_id = vote.commit_info().id();
         let round = vote.commit_info().round();
-        let epoch = vote.commit_info().epoch();
 
-        // Store the commit vote only if it is for one of the next 100 rounds in the same epoch.
-        // As the buffer manager is reset between epoch, we don't benefit from storing the pending commit votes
-        // for the next epoch.
-        if epoch == self.epoch_state.epoch
-            && round > self.highest_committed_round
+        // Store the commit vote only if it is for one of the next 100 rounds.
+        if round > self.highest_committed_round
             && self.highest_committed_round + self.max_pending_rounds_in_commit_vote_cache > round
         {
             if let Some(votes) = self.pending_commit_votes.get_mut(&round) {
@@ -378,7 +374,6 @@ impl BufferManager {
                 round = round,
                 highest_committed_round = self.highest_committed_round,
                 block_id = block_id,
-                epoch = epoch,
                 "Received a commit vote not in the next 100 rounds, ignored."
             );
             false
