@@ -104,21 +104,25 @@ module aptos_framework::transaction_validation {
                 )
             };
 
-            let account_sequence_number = account::get_sequence_number(transaction_sender);
-            assert!(
-                txn_sequence_number < (1u64 << 63),
-                error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
-            );
+            // let account_sequence_number = account::get_sequence_number(transaction_sender);
+            // assert!(
+            //     txn_sequence_number < (1u64 << 63),
+            //     error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
+            // );
 
-            assert!(
-                txn_sequence_number >= account_sequence_number,
-                error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
-            );
+            // assert!(
+            //     txn_sequence_number >= account_sequence_number,
+            //     error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
+            // );
 
-            assert!(
-                txn_sequence_number == account_sequence_number,
-                error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
-            );
+            // assert!(
+            //     txn_sequence_number == account_sequence_number,
+            //     error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
+            // );
+
+            let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
+
+            
         } else {
             // In this case, the transaction is sponsored and the account does not exist, so ensure
             // the default values match.
