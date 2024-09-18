@@ -381,6 +381,11 @@ impl LedgerInfoWithPartialSignatures {
     }
 }
 
+pub enum SignatureWithStatus {
+    Verified(bls12381::Signature),
+    Unverified(bls12381::Signature),
+}
+
 /// This data structure is used to support the optimistic signature verification feature.
 /// Contains the ledger info and the signatures received on the ledger info from different validators.
 /// Some of the signatures could be verified before inserting into this data structure. Some of the signatures
@@ -442,12 +447,15 @@ impl LedgerInfoWithMixedSignatures {
     pub fn add_signature(
         &mut self,
         validator: AccountAddress,
-        signature: bls12381::Signature,
-        verification_status: VerificationStatus,
+        signature_with_status: SignatureWithStatus,
     ) {
-        match verification_status {
-            VerificationStatus::Verified => self.add_verified_signature(validator, signature),
-            VerificationStatus::Unverified => self.add_unverified_signature(validator, signature),
+        match signature_with_status {
+            SignatureWithStatus::Verified(signature) => {
+                self.add_verified_signature(validator, signature)
+            },
+            SignatureWithStatus::Unverified(signature) => {
+                self.add_unverified_signature(validator, signature)
+            },
         };
     }
 
@@ -495,11 +503,13 @@ impl LedgerInfoWithMixedSignatures {
             .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
         {
             Ok(_) => {
-                for (account_address, signature) in self.unverified_signatures.signatures() {
+                for (account_address, signature) in
+                    mem::replace(&mut self.unverified_signatures, PartialSignatures::empty())
+                        .signatures()
+                {
                     self.verified_signatures
                         .add_signature(*account_address, signature.clone());
                 }
-                self.unverified_signatures = PartialSignatures::empty();
                 Ok(LedgerInfoWithSignatures::new(
                     self.ledger_info.clone(),
                     aggregated_sig,
@@ -529,11 +539,10 @@ impl LedgerInfoWithMixedSignatures {
                 }
 
                 // For these authors, we will not use optimistic signature verification in the future.
-                for author in mem::replace(
-                    &mut self.unverified_signatures.signatures(),
-                    &BTreeMap::new(),
-                )
-                .keys()
+                for author in
+                    mem::replace(&mut self.unverified_signatures, PartialSignatures::empty())
+                        .signatures()
+                        .keys()
                 {
                     epoch_state.verifier.add_pessimistic_verify_set(*author);
                 }
@@ -688,8 +697,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[0].author(),
-            validator_signers[0].sign(&ledger_info).unwrap(),
-            VerificationStatus::Verified,
+            SignatureWithStatus::Verified(validator_signers[0].sign(&ledger_info).unwrap()),
         );
         partial_sig.add_signature(
             validator_signers[0].author(),
@@ -698,8 +706,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[1].author(),
-            validator_signers[1].sign(&ledger_info).unwrap(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus::Unverified(validator_signers[1].sign(&ledger_info).unwrap()),
         );
         partial_sig.add_signature(
             validator_signers[1].author(),
@@ -708,8 +715,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[2].author(),
-            validator_signers[2].sign(&ledger_info).unwrap(),
-            VerificationStatus::Verified,
+            SignatureWithStatus::Verified(validator_signers[2].sign(&ledger_info).unwrap()),
         );
         partial_sig.add_signature(
             validator_signers[2].author(),
@@ -718,8 +724,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[3].author(),
-            validator_signers[3].sign(&ledger_info).unwrap(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus::Unverified(validator_signers[3].sign(&ledger_info).unwrap()),
         );
         partial_sig.add_signature(
             validator_signers[3].author(),
@@ -751,8 +756,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[4].author(),
-            bls12381::Signature::dummy_signature(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus::Unverified(bls12381::Signature::dummy_signature()),
         );
 
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
@@ -802,8 +806,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[5].author(),
-            validator_signers[5].sign(&ledger_info).unwrap(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus::Unverified(validator_signers[5].sign(&ledger_info).unwrap()),
         );
         partial_sig.add_signature(
             validator_signers[5].author(),
@@ -861,8 +864,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[6].author(),
-            bls12381::Signature::dummy_signature(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus::Unverified(bls12381::Signature::dummy_signature()),
         );
 
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 6);
