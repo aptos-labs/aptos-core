@@ -59,7 +59,7 @@ impl Default for ConsensusObserverConfig {
             max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
             max_num_pending_blocks: 100,                       // 100 blocks
             max_subscription_timeout_ms: 30_000,               // 30 seconds
-            max_synced_version_timeout_ms: 60_000,             // 60 seconds
+            max_synced_version_timeout_ms: 30_000,             // 30 seconds
             progress_check_interval_ms: 5_000,                 // 5 seconds
             subscription_peer_change_interval_ms: 60_000,      // 1 minute
             subscription_refresh_interval_ms: 300_000,         // 5 minutes
