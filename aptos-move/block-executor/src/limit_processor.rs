@@ -1,19 +1,97 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters, types::ReadWriteSummary};
+use crate::{
+    counters,
+    types::{InputOutputKey, ReadWriteSummary},
+};
 use aptos_logger::info;
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
     transaction::{block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction},
 };
 use claims::{assert_le, assert_none};
-use std::time::Instant;
+use std::{
+    collections::{BinaryHeap, HashMap, HashSet},
+    time::Instant,
+};
+
+pub enum ObjectStatus {
+    NotWrittenYet,
+    Estimate,
+    Waiting,
+    Finalized,
+}
+
+pub struct ObjectData {
+    status: ObjectStatus,
+    to_fail: Vec<TxnIndex>,
+    to_notify: Vec<TxnIndex>,
+    waiting: Vec<TxnIndex>,
+}
+
+pub enum Event<T: Transaction> {
+    END,
+    READ(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex),
+    WRITE(InputOutputKey<T::Key, T::Tag, T::Identifier>),
+}
+
+pub struct OrderedEvent<T: Transaction> {
+    event_gas: u64,
+    txn_idx: TxnIndex,
+    event: Event<T>,
+}
+
+pub struct SimulationData<T: Transaction> {
+    versioned_objects:
+        HashMap<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex), ObjectData>,
+    objects: HashMap<InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex>,
+    // each transaction keeps vector of all events, sorted by gas
+    events: Vec<Vec<(u64, Event<T>)>>,
+
+    //need to compute events from the following reads/writes, maybe be forced to keep them
+    //reads: Vec<HashSet<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex)>>,
+    //writes: Vec<HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>>,
+    to_be_notified: Vec<HashSet<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex)>>,
+    reads_for_validation: Vec<HashSet<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex)>>,
+    writes_for_validation: Vec<HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>>,
+    to_validate: Vec<TxnIndex>,
+    transaction_pq: BinaryHeap<TxnIndex>,
+    //this allows to track by how much should gas be shifted by the current transaction
+    origin_gas: Vec<u64>,
+    //next event to be added to PQ
+    cur_event: Vec<usize>,
+    //are we really using incarnations at all?
+    //whenever element is removed, set origin to current gas
+    //insert first even t only in the event_pq
+    txn_pq: BinaryHeap<TxnIndex>,
+    //only keep  at most one event from each transaction
+    //whenever removed, use origin_gas and cur_event to insert next event from the same transaction
+    event_pq: BinaryHeap<OrderedEvent<T>>,
+    num_workers: usize,
+}
+
+pub enum AccumulatedEffectiveBlockGasData<T: Transaction> {
+    TxnReadWriteSummaries(Vec<ReadWriteSummary<T>>),
+    Simulation(SimulationData<T>),
+}
+
+pub struct AccumulatedEffectiveBlockGas<T: Transaction> {
+    gas_value: u64,
+    data: AccumulatedEffectiveBlockGasData<T>,
+}
+
+impl<T: Transaction> AccumulatedEffectiveBlockGas<T> {
+    fn new_simulation(init_size: usize, num_workers: usize) {
+        Self { gas_value: 0 }
+    }
+}
 
 pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
-    accumulated_effective_block_gas: u64,
+    accumulated_effective_block_gas: AccumulatedEffectiveBlockGas<T>,
     accumulated_approx_output_size: u64,
     accumulated_fee_statement: FeeStatement,
     txn_fee_statements: Vec<FeeStatement>,
@@ -23,10 +101,14 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
-    pub fn new(block_gas_limit_type: BlockGasLimitType, init_size: usize) -> Self {
+    pub fn new(
+        block_gas_limit_type: BlockGasLimitType,
+        init_size: usize,
+        num_workers: usize,
+    ) -> Self {
         Self {
             block_gas_limit_type,
-            accumulated_effective_block_gas: 0,
+            accumulated_effective_block_gas: if block_gas_limit_type.is_simulation() { AccumulatedEffectiveBlockGas::new_simulation(init_size, num_workers)}; } else {},
             accumulated_approx_output_size: 0,
             accumulated_fee_statement: FeeStatement::zero(),
             txn_fee_statements: Vec::with_capacity(init_size),
