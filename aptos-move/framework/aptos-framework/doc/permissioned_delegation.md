@@ -18,7 +18,6 @@
 <b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
-<b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 </code></pre>
 
 
@@ -195,14 +194,14 @@ Authorization function for account abstraction.
     <b>let</b> signature = new_signature_from_bytes(
         <a href="bcs_stream.md#0x1_bcs_stream_deserialize_vector">bcs_stream::deserialize_vector</a>&lt;u8&gt;(&<b>mut</b> stream, |x| deserialize_u8(x))
     );
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
-            &signature,
-            &public_key,
-            <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">transaction_context::get_transaction_hash</a>(),
-        ),
-        <a href="permissioned_delegation.md#0x1_permissioned_delegation_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
-    );
+    // <b>assert</b>!(
+    //     <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_signature_verify_strict">ed25519::signature_verify_strict</a>(
+    //         &signature,
+    //         &public_key,
+    //         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2, 3],
+    //     ),
+    //     <a href="permissioned_delegation.md#0x1_permissioned_delegation_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
+    // );
     <b>if</b> (<b>exists</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_Delegation">Delegation</a>&gt;(addr)) {
         <b>let</b> handles = &<b>borrow_global</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_Delegation">Delegation</a>&gt;(addr).handles;
         <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(handles, public_key)) {

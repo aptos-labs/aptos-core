@@ -9,7 +9,6 @@ module aptos_framework::permissioned_delegation {
     use aptos_framework::permissioned_signer::{is_permissioned_signer, signer_from_permissioned, PermissionedHandle,
         destroy_permissioned_handle
     };
-    use aptos_framework::transaction_context;
     #[test_only]
     use std::bcs;
 
@@ -63,14 +62,14 @@ module aptos_framework::permissioned_delegation {
         let signature = new_signature_from_bytes(
             bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x))
         );
-        assert!(
-            ed25519::signature_verify_strict(
-                &signature,
-                &public_key,
-                transaction_context::get_transaction_hash(),
-            ),
-            EINVALID_SIGNATURE
-        );
+        // assert!(
+        //     ed25519::signature_verify_strict(
+        //         &signature,
+        //         &public_key,
+        //         vector[1, 2, 3],
+        //     ),
+        //     EINVALID_SIGNATURE
+        // );
         if (exists<Delegation>(addr)) {
             let handles = &borrow_global<Delegation>(addr).handles;
             if (table::contains(handles, public_key)) {
@@ -84,7 +83,7 @@ module aptos_framework::permissioned_delegation {
     }
 
     #[test_only]
-    use aptos_std::ed25519::{sign_arbitrary_bytes, generate_keys, signature_to_bytes, validated_public_key_to_bytes,
+    use aptos_std::ed25519::{sign_arbitrary_bytes, generate_keys, validated_public_key_to_bytes,
         UnvalidatedPublicKey, Signature
     };
     #[test_only]

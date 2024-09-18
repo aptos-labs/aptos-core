@@ -46,7 +46,7 @@ module aptos_framework::lite_account {
 
     /// Update dispatchable authenticator that enables account abstraction.
     /// Note: it is a private entry function that can only be called directly from transaction.
-    entry fun add_dispatchable_authentication_function(
+    public entry fun add_dispatchable_authentication_function(
         account: &signer,
         module_address: address,
         module_name: String,
@@ -60,7 +60,7 @@ module aptos_framework::lite_account {
         );
     }
 
-    entry fun remove_dispatchable_authentication_funciton(
+    public entry fun remove_dispatchable_authentication_funciton(
         account: &signer,
         module_address: address,
         module_name: String,
@@ -76,7 +76,7 @@ module aptos_framework::lite_account {
 
     /// Update dispatchable authenticator that disables account abstraction.
     /// Note: it is a private entry function that can only be called directly from transaction.
-    entry fun remove_dispatchable_authenticator(
+    public entry fun remove_dispatchable_authenticator(
         account: &signer,
     ) acquires DispatchableAuthenticator {
         assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
