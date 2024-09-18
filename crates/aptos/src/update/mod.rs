@@ -7,6 +7,8 @@
 mod aptos;
 mod helpers;
 mod movefmt;
+mod prover_dependencies;
+mod prover_dependency_installer;
 mod revela;
 mod tool;
 mod update_helper;
@@ -25,7 +27,7 @@ trait BinaryUpdater {
     fn check(&self) -> bool;
 
     /// Only used for messages we print to the user.
-    fn pretty_name(&self) -> &'static str;
+    fn pretty_name(&self) -> String;
 
     /// Return information about whether an update is required.
     fn get_update_info(&self) -> Result<UpdateRequiredInfo>;

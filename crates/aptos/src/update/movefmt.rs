@@ -64,8 +64,8 @@ impl BinaryUpdater for FormatterUpdateTool {
         self.check
     }
 
-    fn pretty_name(&self) -> &'static str {
-        "movefmt"
+    fn pretty_name(&self) -> String {
+        "movefmt".to_string()
     }
 
     /// Return information about whether an update is required.
@@ -127,5 +127,6 @@ pub fn get_movefmt_path() -> Result<PathBuf> {
         FORMATTER_EXE_ENV,
         FORMATTER_BINARY_NAME,
         FORMATTER_EXE,
+        true,
     )
 }
