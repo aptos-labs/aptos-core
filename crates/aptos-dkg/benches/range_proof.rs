@@ -1,60 +1,69 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_dkg::range_proof::{batch_prove, batch_verify, commit, setup};
 use blstrs::Scalar;
-use criterion::{criterion_group, criterion_main, measurement::{Measurement, WallTime}, BenchmarkGroup, Criterion, Throughput, BenchmarkId};
+use criterion::{criterion_group, criterion_main, Criterion};
 use rand::thread_rng;
 use rand_core::RngCore;
-use aptos_dkg::range_proof::{batch_prove, batch_verify, commit, powers_of_tau, setup};
 
 pub fn bench_groups(c: &mut Criterion) {
     let mut group = c.benchmark_group("range_proof");
-    let num_chunks = std::env::var("NUM_CHUNKS").unwrap_or_default().parse::<usize>().unwrap_or(32);
-    let batch_size = std::env::var("BATCH_SIZE").unwrap_or_default().parse::<usize>().unwrap_or(8191);
-    group.bench_function(format!("prove/num_chunks={num_chunks}/batch_size={batch_size}").as_str(), move |b| {
+
+    let ell = std::env::var("L")
+        .unwrap_or(std::env::var("ELL").unwrap_or_default())
+        .parse::<usize>()
+        .unwrap_or(16);
+
+    let n = std::env::var("N")
+        .unwrap_or_default()
+        .parse::<usize>()
+        .unwrap_or(127);
+
+    group.bench_function(format!("prove/ell={ell}/n={n}").as_str(), move |b| {
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let n_ptau_required = batch_size + 1;
-                let ptau = powers_of_tau(&mut rng, n_ptau_required);
-                let pp = setup(ptau, num_chunks, batch_size);
-                let z_vals: Vec<Scalar> = (0..batch_size).map(|_| {
-                    let val = rng.next_u64() >> (64 - num_chunks);
-                    Scalar::from(val)
-                }).collect();
-                let (com, prover_state) = commit(&pp, &z_vals, &mut rng);
-                (pp, z_vals, com, prover_state)
+                let pp = setup(ell, n);
+                let zz: Vec<Scalar> = (0..n)
+                    .map(|_| {
+                        let val = rng.next_u64() >> (64 - ell);
+                        Scalar::from(val)
+                    })
+                    .collect();
+                let (cc, r) = commit(&pp, &zz, &mut rng);
+                (pp, zz, cc, r)
             },
             |(pp, z_vals, com, prover_state)| {
                 let mut rng = thread_rng();
                 let _proof = batch_prove(&mut rng, &pp, &z_vals, &com, &prover_state);
-            }
+            },
         )
     });
-    group.bench_function(format!("verify/num_chunks={num_chunks}/batch_size={batch_size}").as_str(), |b| {
+    group.bench_function(format!("verify/ell={ell}/n={n}").as_str(), |b| {
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let n_ptau_required = batch_size + 1;
-                let ptau = powers_of_tau(&mut rng, n_ptau_required);
-                let pp = setup(ptau, num_chunks, batch_size);
-                let z_vals: Vec<Scalar> = (0..batch_size).map(|_| {
-                    let val = rng.next_u64() >> (64 - num_chunks);
-                    Scalar::from(val)
-                }).collect();
-                let (com, prover_state) = commit(&pp, &z_vals, &mut rng);
-                let proof = batch_prove(&mut rng, &pp, &z_vals, &com, &prover_state);
-                (pp, com, proof)
+                let pp = setup(ell, n);
+                let zz: Vec<Scalar> = (0..n)
+                    .map(|_| {
+                        let val = rng.next_u64() >> (64 - ell);
+                        Scalar::from(val)
+                    })
+                    .collect();
+                let (cc, r) = commit(&pp, &zz, &mut rng);
+                let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r);
+                (pp, cc, proof)
             },
             |(pp, com, proof)| {
                 batch_verify(&pp, &com, &proof).unwrap();
-            }
+            },
         )
     });
 }
 
 criterion_group!(
     name = benches;
-    config = Criterion::default();
+    config = Criterion::default().sample_size(10);
     targets = bench_groups);
 criterion_main!(benches);
