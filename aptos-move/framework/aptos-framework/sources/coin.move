@@ -14,7 +14,7 @@ module aptos_framework::coin {
     use aptos_framework::guid;
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
-
+    use aptos_framework::move_to_auth::move_to_with_ref;
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, object_address};
     use aptos_framework::primary_fungible_store;
@@ -336,9 +336,10 @@ module aptos_framework::coin {
                 string::utf8(b""),
             );
 
-            let metadata_object_signer = &object::generate_signer(&metadata_object_cref);
+            let metadata_object_write_ref = object::generate_write_resources_ref(&object::generate_extend_ref(&metadata_object_cref));
+
             let type = type_info::type_of<CoinType>();
-            move_to(metadata_object_signer, PairedCoinType { type });
+            move_to_with_ref(&metadata_object_write_ref, PairedCoinType { type });
             let metadata_obj = object::object_from_constructor_ref(&metadata_object_cref);
 
             table::add(&mut map.coin_to_fungible_asset_map, type, metadata_obj);
@@ -351,7 +352,7 @@ module aptos_framework::coin {
             let mint_ref = fungible_asset::generate_mint_ref(&metadata_object_cref);
             let transfer_ref = fungible_asset::generate_transfer_ref(&metadata_object_cref);
             let burn_ref = fungible_asset::generate_burn_ref(&metadata_object_cref);
-            move_to(metadata_object_signer,
+            move_to_with_ref(&metadata_object_write_ref,
                 PairedFungibleAssetRefs {
                     mint_ref_opt: option::some(mint_ref),
                     transfer_ref_opt: option::some(transfer_ref),

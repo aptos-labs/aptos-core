@@ -72,8 +72,8 @@ module aptos_token_objects::property_map {
     }
 
     public fun extend(ref: &ExtendRef, container: PropertyMap) {
-        let signer = object::generate_signer_for_extending(ref);
-        move_to(&signer, container);
+        let write_ref = object::generate_write_resources_ref(ref);
+        move_to(&write_ref, container);
     }
 
     /// Burns the entire property map
