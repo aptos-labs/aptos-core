@@ -51,19 +51,19 @@ impl Drop for Entry {
                 match &bcs::from_bytes::<Path>(path).expect("Failed to deserialize Path.") {
                     Path::Code(module_id) => REGISTRY
                         .module(address, &module_id.name)
-                        .maybe_remove(&module_id.address, &module_id.name),
+                        .maybe_remove(&module_id.address, &module_id.name, &*self),
                     Path::Resource(struct_tag) => REGISTRY
                         .resource(struct_tag, address)
-                        .maybe_remove(struct_tag, address),
+                        .maybe_remove(struct_tag, address, &*self),
                     Path::ResourceGroup(struct_tag) => REGISTRY
                         .resource_group(struct_tag, address)
-                        .maybe_remove(struct_tag, address),
+                        .maybe_remove(struct_tag, address, &*self),
                 }
             },
-            StateKeyInner::TableItem { handle, key } => {
-                REGISTRY.table_item(handle, key).maybe_remove(handle, key)
-            },
-            StateKeyInner::Raw(bytes) => REGISTRY.raw(bytes).maybe_remove(bytes, &()),
+            StateKeyInner::TableItem { handle, key } => REGISTRY
+                .table_item(handle, key)
+                .maybe_remove(handle, key, &*self),
+            StateKeyInner::Raw(bytes) => REGISTRY.raw(bytes).maybe_remove(bytes, &(), &*self),
         }
     }
 }
@@ -148,11 +148,11 @@ where
         })
     }
 
-    fn maybe_remove(&self, key1: &Key1, key2: &Key2) {
+    fn maybe_remove(&self, key1: &Key1, key2: &Key2, dropping_entry: *const Entry) {
         let mut locked = self.inner.write();
         if let Some(map2) = locked.get_mut(key1) {
             if let Some(entry) = map2.get(key2) {
-                if entry.upgrade().is_none() {
+                if entry.as_ptr() == dropping_entry {
                     map2.remove(key2);
                 }
             }
