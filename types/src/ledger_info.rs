@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
+    mem,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -380,8 +381,12 @@ impl LedgerInfoWithPartialSignatures {
     }
 }
 
-/// Contains the ledger info and partially aggregated signature from a set of validators, this data
-/// is only used during the aggregating the votes from different validators and is not persisted in DB.
+/// This data structure is used to support the optimistic signature verification feature.
+/// Contains the ledger info and the signatures received on the ledger info from different validators.
+/// Some of the signatures could be verified before inserting into this data structure. Some of the signatures
+/// are not verified. Rather than verifying the signatures immediately, we aggregate all the signatures and
+/// verify the aggregated signature at once. If the aggregated signature is invalid, then we verify each individual
+/// unverified signature and remove the invalid signatures.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LedgerInfoWithMixedSignatures {
     ledger_info: LedgerInfo,
@@ -447,19 +452,11 @@ impl LedgerInfoWithMixedSignatures {
     }
 
     pub fn verified_voters(&self) -> Vec<&AccountAddress> {
-        self.verified_signatures
-            .signatures()
-            .keys()
-            .collect_vec()
-            .clone()
+        self.verified_signatures.signatures().keys().collect_vec()
     }
 
     pub fn unverified_voters(&self) -> Vec<&AccountAddress> {
-        self.unverified_signatures
-            .signatures()
-            .keys()
-            .collect_vec()
-            .clone()
+        self.unverified_signatures.signatures().keys().collect_vec()
     }
 
     // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
@@ -532,12 +529,14 @@ impl LedgerInfoWithMixedSignatures {
                 }
 
                 // For these authors, we will not use optimistic signature verification in the future.
-                let pessimistic_authors = self.unverified_signatures.signatures().keys().cloned();
-                epoch_state
-                    .verifier
-                    .add_pessimistic_verify_set(pessimistic_authors);
-
-                self.unverified_signatures = PartialSignatures::empty();
+                for author in mem::replace(
+                    &mut self.unverified_signatures.signatures(),
+                    &BTreeMap::new(),
+                )
+                .keys()
+                {
+                    epoch_state.verifier.add_pessimistic_verify_set(*author);
+                }
 
                 match self.check_voting_power(&epoch_state.verifier, true) {
                     Ok(_) => Ok(LedgerInfoWithSignatures::new(

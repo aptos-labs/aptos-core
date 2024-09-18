@@ -227,13 +227,8 @@ impl ValidatorVerifier {
         ))
     }
 
-    pub fn add_pessimistic_verify_set(
-        &self,
-        pessimistic_authors: impl Iterator<Item = AccountAddress>,
-    ) {
-        for author in pessimistic_authors {
-            self.pessimistic_verify_set.insert(author);
-        }
+    pub fn add_pessimistic_verify_set(&self, author: AccountAddress) {
+        self.pessimistic_verify_set.insert(author);
     }
 
     pub fn pessimistic_verify_set(&self) -> Arc<DashSet<AccountAddress>> {
