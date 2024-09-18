@@ -8,15 +8,9 @@
 //! when enough votes (or timeout votes) have been observed.
 //! Votes are automatically dropped when the structure goes out of scope.
 
-use crate::{
-    counters,
-    qc_aggregator::{create_qc_aggregator, QcAggregator},
-    util::time_service::TimeService,
-};
-use aptos_config::config::QcAggregatorType;
+use crate::counters;
 use aptos_consensus_types::{
     common::Author,
-    delayed_qc_msg::DelayedQcMsg,
     quorum_cert::QuorumCert,
     timeout_2chain::{TwoChainTimeoutCertificate, TwoChainTimeoutWithPartialSignatures},
     vote::Vote,
@@ -29,7 +23,6 @@ use aptos_types::{
     ledger_info::LedgerInfoWithPartialSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use futures_channel::mpsc::UnboundedSender;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
@@ -43,9 +36,6 @@ pub enum VoteReceptionResult {
     /// The vote has been added but QC has not been formed yet. Return the amount of voting power
     /// QC currently has.
     VoteAdded(u128),
-    /// The vote has been added and we have gather enough voting power to form the QC but we have
-    /// delayed the QC to aggregate as many signatures as possible.
-    VoteAddedQCDelayed(u128),
     /// The very same vote message has been processed in past.
     DuplicateVote,
     /// The very same author has already voted for another proposal in this round (equivocation).
@@ -79,23 +69,16 @@ pub struct PendingVotes {
     author_to_vote: HashMap<Author, (Vote, HashValue)>,
     /// Whether we have echoed timeout for this round.
     echo_timeout: bool,
-
-    qc_aggregator: Box<dyn QcAggregator>,
 }
 
 impl PendingVotes {
     /// Creates an empty PendingVotes structure for a specific epoch and round
-    pub fn new(
-        time_service: Arc<dyn TimeService>,
-        delayed_qc_tx: UnboundedSender<DelayedQcMsg>,
-        qc_aggregator_type: QcAggregatorType,
-    ) -> Self {
+    pub fn new() -> Self {
         PendingVotes {
             li_digest_to_votes: HashMap::new(),
             maybe_partial_2chain_tc: None,
             author_to_vote: HashMap::new(),
             echo_timeout: false,
-            qc_aggregator: create_qc_aggregator(qc_aggregator_type, time_service, delayed_qc_tx),
         }
     }
 
@@ -189,30 +172,37 @@ impl PendingVotes {
         li_with_sig.add_signature(vote.author(), vote.signature().clone());
 
         // check if we have enough signatures to create a QC
-        let voting_power =
-            match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
-                // a quorum of signature was reached, a new QC is formed
-                Ok(aggregated_voting_power) => {
-                    return self.qc_aggregator.handle_aggregated_qc(
-                        validator_verifier,
-                        aggregated_voting_power,
-                        vote,
-                        li_with_sig,
+        let voting_power = match validator_verifier
+            .check_voting_power(li_with_sig.signatures().keys(), true)
+        {
+            // a quorum of signature was reached, a new QC is formed
+            Ok(aggregated_voting_power) => {
+                assert!(
+                        aggregated_voting_power >= validator_verifier.quorum_voting_power(),
+                        "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                     );
-                },
+                match li_with_sig.aggregate_signatures(validator_verifier) {
+                    Ok(ledger_info_with_sig) => {
+                        return VoteReceptionResult::NewQuorumCertificate(Arc::new(
+                            QuorumCert::new(vote.vote_data().clone(), ledger_info_with_sig),
+                        ))
+                    },
+                    Err(e) => return VoteReceptionResult::ErrorAggregatingSignature(e),
+                }
+            },
 
-                // not enough votes
-                Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
+            // not enough votes
+            Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
 
-                // error
-                Err(error) => {
-                    error!(
-                        "MUST_FIX: vote received could not be added: {}, vote: {}",
-                        error, vote
-                    );
-                    return VoteReceptionResult::ErrorAddingVote(error);
-                },
-            };
+            // error
+            Err(error) => {
+                error!(
+                    "MUST_FIX: vote received could not be added: {}, vote: {}",
+                    error, vote
+                );
+                return VoteReceptionResult::ErrorAddingVote(error);
+            },
+        };
 
         //
         // 4. We couldn't form a QC, let's check if we can create a TC
@@ -405,8 +395,6 @@ impl fmt::Display for PendingVotes {
 #[cfg(test)]
 mod tests {
     use super::{PendingVotes, VoteReceptionResult};
-    use crate::util::mock_time_service::SimulatedTimeService;
-    use aptos_config::config::QcAggregatorType;
     use aptos_consensus_types::{
         block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
@@ -415,9 +403,7 @@ mod tests {
         block_info::BlockInfo, ledger_info::LedgerInfo,
         validator_verifier::random_validator_verifier,
     };
-    use futures_channel::mpsc::unbounded;
     use itertools::Itertools;
-    use std::sync::Arc;
 
     /// Creates a random ledger info for epoch 1 and round 1.
     fn random_ledger_info() -> LedgerInfo {
@@ -440,12 +426,7 @@ mod tests {
 
         // set up 4 validators
         let (signers, validator) = random_validator_verifier(4, Some(2), false);
-        let (delayed_qc_tx, _) = unbounded();
-        let mut pending_votes = PendingVotes::new(
-            Arc::new(SimulatedTimeService::new()),
-            delayed_qc_tx,
-            QcAggregatorType::NoDelay,
-        );
+        let mut pending_votes = PendingVotes::new();
 
         // create random vote from validator[0]
         let li1 = random_ledger_info();
@@ -512,12 +493,7 @@ mod tests {
 
         // set up 4 validators
         let (signers, validator) = random_validator_verifier(4, None, false);
-        let (delayed_qc_tx, _) = unbounded();
-        let mut pending_votes = PendingVotes::new(
-            Arc::new(SimulatedTimeService::new()),
-            delayed_qc_tx,
-            QcAggregatorType::NoDelay,
-        );
+        let mut pending_votes = PendingVotes::new();
 
         // submit a new vote from validator[0] -> VoteAdded
         let li0 = random_ledger_info();
