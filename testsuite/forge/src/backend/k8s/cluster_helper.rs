@@ -503,6 +503,7 @@ pub async fn check_persistent_volumes(
 /// Installs a testnet in a k8s namespace by first running genesis, and the installing the aptos-nodes via helm
 /// Returns the current era, as well as a mapping of validators and fullnodes
 pub async fn install_testnet_resources(
+    new_era: String,
     kube_namespace: String,
     num_validators: usize,
     num_fullnodes: usize,
@@ -513,16 +514,13 @@ pub async fn install_testnet_resources(
     enable_haproxy: bool,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
-) -> Result<(String, HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
+) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await?;
 
     // get deployment-specific helm values and cache it
     let tmp_dir = TempDir::new().expect("Could not create temp dir");
     let aptos_node_values_file = dump_helm_values_to_file(APTOS_NODE_HELM_RELEASE_NAME, &tmp_dir)?;
     let genesis_values_file = dump_helm_values_to_file(GENESIS_HELM_RELEASE_NAME, &tmp_dir)?;
-
-    // generate a random era to wipe the network state
-    let new_era = generate_new_era();
 
     // get forge override helm values and cache it
     let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
@@ -602,7 +600,7 @@ pub async fn install_testnet_resources(
     )
     .await?;
 
-    Ok((new_era.clone(), validators, fullnodes))
+    Ok((validators, fullnodes))
 }
 
 pub fn construct_node_helm_values(

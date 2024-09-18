@@ -122,6 +122,15 @@ pub mod mocks {
         }
     }
 
+    impl<T> Default for MockK8sResourceApi<T>
+    where
+        T: Clone + Metadata<Ty = ObjectMeta> + Send + Sync,
+    {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     #[async_trait]
     impl<T> ReadWrite<T> for MockK8sResourceApi<T>
     where
@@ -152,7 +161,7 @@ pub mod mocks {
             ) {
                 return Err(KubeError::Api(ErrorResponse {
                     status: "failed".to_string(),
-                    message: format!("Resource with same name already exists"),
+                    message: "Resource with same name already exists".to_string(),
                     reason: "already_exists".to_string(),
                     code: 409,
                 }));

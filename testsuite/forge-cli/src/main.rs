@@ -65,6 +65,7 @@ use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use serde_json::{json, Value};
 use std::{
     env,
     num::NonZeroUsize,
@@ -432,21 +433,30 @@ fn main() -> Result<()> {
             OperatorCommand::Create(create) => {
                 let kube_client = runtime.block_on(create_k8s_client())?;
                 let era = generate_new_era();
-                let values = ForgeDeployerValues {
-                    profile: DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
-                    era,
-                    namespace: create.namespace,
-                    indexer_grpc_values: None,
-                    indexer_processor_values: None,
-                };
-                let forge_deployer_manager =
-                    ForgeDeployerManager::from_k8s_client(kube_client, values);
-                runtime.block_on(forge_deployer_manager.ensure_namespace_prepared())?;
+                let config: Value = serde_json::from_value(json!({
+                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    "era": era,
+                    "namespace": create.namespace.clone(),
+                }))?;
+                let testnet_deployer = ForgeDeployerManager::new(
+                    kube_client.clone(),
+                    create.namespace.clone(),
+                    FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                    None,
+                    config.clone(),
+                );
                 // NOTE: this is generally not going to run from within the cluster, do not perform any operations
                 // that might require internal DNS resolution to work, such as txn emission directly against the node service IPs.
-                runtime.block_on(forge_deployer_manager.start(ForgeDeployerType::Testnet))?;
+                runtime.block_on(testnet_deployer.start())?;
                 if create.enable_indexer {
-                    runtime.block_on(forge_deployer_manager.start(ForgeDeployerType::Indexer))?;
+                    let indexer_deployer = ForgeDeployerManager::new(
+                        kube_client,
+                        create.namespace,
+                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        None,
+                        config,
+                    );
+                    runtime.block_on(indexer_deployer.start())?;
                 }
                 Ok(())
             },
