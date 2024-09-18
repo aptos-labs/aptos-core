@@ -534,7 +534,7 @@ impl LedgerInfoWithMixedSignatures {
                     .collect::<Vec<_>>();
                 for (account_address, signature) in verified {
                     self.verified_signatures
-                        .add_signature(account_address, signature.clone());
+                        .add_signature(account_address, signature);
                     self.unverified_signatures.remove_signature(account_address);
                 }
 
