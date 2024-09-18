@@ -27,6 +27,7 @@
 <b>use</b> <a href="function_info.md#0x1_function_info">0x1::function_info</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -146,6 +147,15 @@ An integral part of Account Abstraction.
 
 
 
+<a id="0x1_lite_account_ENOT_MASTER_SIGNER"></a>
+
+
+
+<pre><code><b>const</b> <a href="lite_account.md#0x1_lite_account_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>: u64 = 4;
+</code></pre>
+
+
+
 <a id="0x1_lite_account_EAUTH_FUNCTION_SIGNATURE_MISMATCH"></a>
 
 
@@ -181,7 +191,7 @@ Update dispatchable authenticator that enables account abstraction.
 Note: it is a private entry function that can only be called directly from transaction.
 
 
-<pre><code>entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_add_dispatchable_authentication_function">add_dispatchable_authentication_function</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_add_dispatchable_authentication_function">add_dispatchable_authentication_function</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -190,12 +200,13 @@ Note: it is a private entry function that can only be called directly from trans
 <summary>Implementation</summary>
 
 
-<pre><code>entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_add_dispatchable_authentication_function">add_dispatchable_authentication_function</a>(
+<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_add_dispatchable_authentication_function">add_dispatchable_authentication_function</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     module_address: <b>address</b>,
     module_name: String,
     function_name: String,
 ) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> {
+    <b>assert</b>!(!is_permissioned_signer(<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="lite_account.md#0x1_lite_account_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <a href="lite_account.md#0x1_lite_account_update_dispatchable_authenticator_impl">update_dispatchable_authenticator_impl</a>(
         <a href="account.md#0x1_account">account</a>,
         <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(module_address, module_name, function_name),
@@ -214,7 +225,7 @@ Note: it is a private entry function that can only be called directly from trans
 
 
 
-<pre><code>entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authentication_funciton">remove_dispatchable_authentication_funciton</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authentication_funciton">remove_dispatchable_authentication_funciton</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -223,12 +234,13 @@ Note: it is a private entry function that can only be called directly from trans
 <summary>Implementation</summary>
 
 
-<pre><code>entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authentication_funciton">remove_dispatchable_authentication_funciton</a>(
+<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authentication_funciton">remove_dispatchable_authentication_funciton</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     module_address: <b>address</b>,
     module_name: String,
     function_name: String,
 ) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> {
+    <b>assert</b>!(!is_permissioned_signer(<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="lite_account.md#0x1_lite_account_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <a href="lite_account.md#0x1_lite_account_update_dispatchable_authenticator_impl">update_dispatchable_authenticator_impl</a>(
         <a href="account.md#0x1_account">account</a>,
         <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(module_address, module_name, function_name),
@@ -249,7 +261,7 @@ Update dispatchable authenticator that disables account abstraction.
 Note: it is a private entry function that can only be called directly from transaction.
 
 
-<pre><code>entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -258,9 +270,10 @@ Note: it is a private entry function that can only be called directly from trans
 <summary>Implementation</summary>
 
 
-<pre><code>entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(
+<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authenticator">remove_dispatchable_authenticator</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
 ) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a> {
+    <b>assert</b>!(!is_permissioned_signer(<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="lite_account.md#0x1_lite_account_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> resource_addr = <a href="lite_account.md#0x1_lite_account_resource_addr">resource_addr</a>(addr);
     <b>if</b> (<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_DispatchableAuthenticator">DispatchableAuthenticator</a>&gt;(resource_addr)) {
@@ -484,7 +497,7 @@ Return the current dispatchable authenticator move function info. <code>None</co
 The native function to dispatch customized move authentication function.
 
 
-<pre><code><b>fun</b> <a href="lite_account.md#0x1_lite_account_dispatchable_authenticate">dispatchable_authenticate</a>(account_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+<pre><code><b>fun</b> <a href="lite_account.md#0x1_lite_account_dispatchable_authenticate">dispatchable_authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 </code></pre>
 
 
@@ -494,7 +507,7 @@ The native function to dispatch customized move authentication function.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="lite_account.md#0x1_lite_account_dispatchable_authenticate">dispatchable_authenticate</a>(
-    account_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     signature: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     function: &FunctionInfo
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;

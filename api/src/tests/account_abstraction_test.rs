@@ -90,7 +90,7 @@ async fn test_account_abstraction_single_signer() {
     let balance_start = context.get_apt_balance(other.address()).await;
     let aa_txn = account.sign_aa_transaction_with_transaction_builder(
         vec![],
-        Some(&context.root_account().await), // root account as fee payer
+        None,
         factory
             .account_transfer(other.address(), 4)
             .expiration_timestamp_secs(u64::MAX),
