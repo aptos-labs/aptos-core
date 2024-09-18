@@ -70,6 +70,26 @@ impl ConsensusPublisher {
         (consensus_publisher, outbound_message_receiver)
     }
 
+    #[cfg(test)]
+    /// Creates a new consensus publisher with the given active subscribers
+    pub fn new_with_active_subscribers(
+        consensus_observer_config: ConsensusObserverConfig,
+        consensus_observer_client: Arc<
+            ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+        >,
+        active_subscribers: HashSet<PeerNetworkId>,
+    ) -> Self {
+        // Create the consensus publisher
+        let (consensus_publisher, _) =
+            ConsensusPublisher::new(consensus_observer_config, consensus_observer_client);
+
+        // Update the active subscribers
+        *consensus_publisher.active_subscribers.write() = active_subscribers;
+
+        // Return the publisher
+        consensus_publisher
+    }
+
     /// Adds the given subscriber to the set of active subscribers
     fn add_active_subscriber(&self, peer_network_id: PeerNetworkId) {
         self.active_subscribers.write().insert(peer_network_id);
@@ -150,7 +170,7 @@ impl ConsensusPublisher {
         let (peer_network_id, message, response_sender) = network_message.into_parts();
 
         // Update the RPC request counter
-        metrics::increment_request_counter(
+        metrics::increment_counter(
             &metrics::PUBLISHER_RECEIVED_REQUESTS,
             message.get_label(),
             &peer_network_id,

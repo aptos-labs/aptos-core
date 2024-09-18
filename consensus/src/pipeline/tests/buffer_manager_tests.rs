@@ -161,6 +161,7 @@ pub fn prepare_buffer_manager(
         0,
         ConsensusObserverConfig::default(),
         None,
+        100,
     );
 
     (
