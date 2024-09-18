@@ -16,8 +16,8 @@ module 0x42::test {
     }
     private fun coin_inc_new_1(self: &mut test::Coin) {
         {
-          let __: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut test::Coin>(self));
-          __ = Add<u256>(Deref(__), 1)
+          let $t: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut test::Coin>(self));
+          $t = Add<u256>(Deref($t), 1)
         };
         Tuple()
     }
@@ -41,8 +41,8 @@ module 0x42::test {
     }
     private fun inc_new(x: &mut u256) {
         {
-          let __: &mut u256 = x;
-          __ = Add<u256>(Deref(__), 1)
+          let $t: &mut u256 = x;
+          $t = Add<u256>(Deref($t), 1)
         };
         Tuple()
     }
@@ -52,8 +52,8 @@ module 0x42::test {
     }
     private fun inc_vec_coin_new(x: vector<test::Coin>,index: u64) {
         {
-          let __: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(vector::borrow_mut<test::Coin>(Borrow(Mutable)(x), index)));
-          __ = Add<u256>(Deref(__), 1)
+          let $t: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(vector::borrow_mut<test::Coin>(Borrow(Mutable)(x), index)));
+          $t = Add<u256>(Deref($t), 1)
         };
         Tuple()
     }
@@ -63,8 +63,8 @@ module 0x42::test {
     }
     private fun inc_vec_new(x: &mut vector<u256>,index: u64) {
         {
-          let __: &mut u256 = vector::borrow_mut<u256>(x, index);
-          __ = Add<u256>(Deref(__), 1)
+          let $t: &mut u256 = vector::borrow_mut<u256>(x, index);
+          $t = Add<u256>(Deref($t), 1)
         };
         Tuple()
     }
@@ -74,8 +74,8 @@ module 0x42::test {
     }
     private fun inc_vec_wrapped_coin_new(x: vector<test::Wrapper<test::Coin>>,index: u64) {
         {
-          let __: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(select test::Wrapper.0<test::Wrapper<test::Coin>>(vector::borrow_mut<test::Wrapper<test::Coin>>(Borrow(Mutable)(x), index))));
-          __ = Add<u256>(Deref(__), 1)
+          let $t: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(select test::Wrapper.0<test::Wrapper<test::Coin>>(vector::borrow_mut<test::Wrapper<test::Coin>>(Borrow(Mutable)(x), index))));
+          $t = Add<u256>(Deref($t), 1)
         };
         Tuple()
     }
@@ -85,8 +85,8 @@ module 0x42::test {
     }
     private fun inc_wrapped_coin_new(x: &mut test::Wrapper<test::Coin>) {
         {
-          let __: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(select test::Wrapper.0<&mut test::Wrapper<test::Coin>>(x)));
-          __ = Add<u256>(Deref(__), 1)
+          let $t: &mut u256 = Borrow(Mutable)(select test::Coin.0<test::Coin>(select test::Wrapper.0<&mut test::Wrapper<test::Coin>>(x)));
+          $t = Add<u256>(Deref($t), 1)
         };
         Tuple()
     }

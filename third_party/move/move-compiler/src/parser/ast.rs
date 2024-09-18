@@ -703,7 +703,7 @@ pub enum Exp_ {
     Unit,
 
     // a = e
-    Assign(Box<Exp>, Box<Exp>),
+    Assign(Box<Exp>, Option<BinOp>, Box<Exp>),
 
     // return e
     Return(Option<Box<Exp>>),
@@ -1916,9 +1916,13 @@ impl AstDebug for Exp_ {
                 w.comma(es, |w, e| e.ast_debug(w));
                 w.write(")");
             },
-            E::Assign(lvalue, rhs) => {
+            E::Assign(lvalue, op_opt, rhs) => {
                 lvalue.ast_debug(w);
-                w.write(" = ");
+                w.write(" ");
+                if let Some(op) = op_opt {
+                    op.ast_debug(w);
+                }
+                w.write("= ");
                 rhs.ast_debug(w);
             },
             E::Return(e) => {

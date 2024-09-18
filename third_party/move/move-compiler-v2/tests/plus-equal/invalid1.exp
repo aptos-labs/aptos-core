@@ -7,8 +7,8 @@ module 0x42::test {
             let p: &mut u64 = Borrow(Mutable)(x);
             x: u64 = Add<u64>(x, 1);
             {
-              let __: &mut u64 = p;
-              __ = Add<u64>(Deref(__), 1)
+              let $t: &mut u64 = p;
+              $t = Add<u64>(Deref($t), 1)
             };
             x;
             Tuple()

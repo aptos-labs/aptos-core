@@ -10,8 +10,8 @@ use crate::{
     expansion::{
         aliases::{AliasMap, AliasSet},
         ast::{
-            self as E, Address, Fields, LValueOrDotDot_, ModuleAccess_, ModuleIdent, ModuleIdent_,
-            SpecId,
+            self as E, Address, Fields, LValueOrDotDot_, LValue_, ModuleAccess_, ModuleIdent,
+            ModuleIdent_, SequenceItem_, SpecId,
         },
         byte_string, hex_string,
     },
@@ -2654,7 +2654,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             EE::ExpList(exps(context, pes))
         },
 
-        PE::Assign(lvalue, rhs) => {
+        PE::Assign(lvalue, op_opt, rhs) => {
             let l_opt = lvalues(context, *lvalue);
             let er = exp(context, *rhs);
             match l_opt {
@@ -2662,9 +2662,100 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
                 },
-                Some(LValue::Assigns(al)) => EE::Assign(al, er),
-                Some(LValue::Mutate(el)) => EE::Mutate(el, er),
-                Some(LValue::FieldMutate(edotted)) => EE::FieldMutate(edotted, er),
+                Some(LValue::Assigns(al)) => match op_opt {
+                    Some(op) => {
+                        if al.value.len() == 1 {
+                            match &al.value[0] {
+                                sp!(var_loc, LValue_::Var(module_access, ty_opt)) => {
+                                    let x = sp(
+                                        *var_loc,
+                                        EE::Name(module_access.clone(), ty_opt.clone()),
+                                    );
+                                    let rhs_expanded = sp(loc, EE::BinopExp(Box::new(x), op, er));
+                                    EE::Assign(al, Box::new(rhs_expanded))
+                                },
+                                _ => {
+                                    context.env.add_diag(diag!(Syntax::InvalidLValue, (loc, "Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment")));
+                                    EE::UnresolvedError
+                                },
+                            }
+                        } else {
+                            context.env.add_diag(diag!(Syntax::InvalidLValue, (loc, "Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment")));
+                            EE::UnresolvedError
+                        }
+                    },
+                    None => EE::Assign(al, er),
+                },
+                Some(LValue::Mutate(el)) => {
+                    match op_opt {
+                        // *e1 += e2
+                        // =>
+                        // { let t = e1; *t = *t + e2 }
+                        Some(op) => {
+                            let inner_loc = el.loc;
+                            // t
+                            let tmp_symbol = Symbol::from("$t");
+                            let tmp_name = sp(inner_loc, tmp_symbol);
+                            let mod_acc = ModuleAccess_::Name(tmp_name);
+                            let tmp_ = EE::Name(sp(inner_loc, mod_acc.clone()), None);
+                            let tmp = sp(inner_loc, tmp_);
+                            // let t = e1;
+                            let lval_ = LValue_::Var(sp(inner_loc, mod_acc), None);
+                            let lval = sp(inner_loc, lval_);
+                            let lvals = sp(inner_loc, vec![lval]);
+                            let bind_ = SequenceItem_::Bind(lvals, match &el.value {
+                                EE::Index(..) => sp(inner_loc, EE::Borrow(true, el)),
+                                _ => *el,
+                            });
+                            let bind = sp(inner_loc, bind_);
+                            // *t
+                            let deref_tmp = sp(loc, EE::Dereference(Box::new(tmp.clone())));
+                            // *t + e2
+                            let rhs_expanded = sp(loc, EE::BinopExp(Box::new(deref_tmp), op, er));
+                            // *t = *t + e2
+                            let assign = sp(loc, EE::Mutate(Box::new(tmp), Box::new(rhs_expanded)));
+                            // { let t = e1; *t = *t + e2 }
+                            let sequence =
+                                VecDeque::from([bind, sp(loc, SequenceItem_::Seq(assign))]);
+                            EE::Block(sequence)
+                        },
+                        None => EE::Mutate(el, er),
+                    }
+                },
+                Some(LValue::FieldMutate(edotted)) => match op_opt {
+                    // e1.f += e2
+                    // =>
+                    // { let t = &mut e1.f; *t = *t + e2 }
+                    Some(op) => {
+                        let lhs_loc = edotted.loc;
+                        // t
+                        let tmp_symbol = Symbol::from("$t");
+                        let tmp_name = sp(lhs_loc, tmp_symbol);
+                        let mod_acc = ModuleAccess_::Name(tmp_name);
+                        let tmp_ = EE::Name(sp(lhs_loc, mod_acc.clone()), None);
+                        let tmp = sp(lhs_loc, tmp_);
+                        // e1.f
+                        let e = sp(edotted.loc, EE::ExpDotted(edotted));
+                        // &mut e1.f
+                        let e_mut = sp(lhs_loc, EE::Borrow(true, Box::new(e)));
+                        // let t = &mut e1.f;
+                        let lval_ = LValue_::Var(sp(lhs_loc, mod_acc), None);
+                        let lval = sp(lhs_loc, lval_);
+                        let lvals = sp(lhs_loc, vec![lval]);
+                        let bind_ = SequenceItem_::Bind(lvals, e_mut);
+                        let bind = sp(lhs_loc, bind_);
+                        // *t
+                        let deref_tmp = sp(loc, EE::Dereference(Box::new(tmp.clone())));
+                        // *t + e2
+                        let rhs_expanded = sp(loc, EE::BinopExp(Box::new(deref_tmp), op, er));
+                        // *t = *t + e2
+                        let assign = sp(loc, EE::Mutate(Box::new(tmp), Box::new(rhs_expanded)));
+                        // { let t = *e1; *t = *t + e2 }
+                        let sequence = VecDeque::from([bind, sp(loc, SequenceItem_::Seq(assign))]);
+                        EE::Block(sequence)
+                    },
+                    None => EE::FieldMutate(edotted, er),
+                },
             }
         },
         PE::Return(pe_opt) => {
