@@ -14,7 +14,7 @@ use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ApiConfig {
     /// Enables the REST API endpoint

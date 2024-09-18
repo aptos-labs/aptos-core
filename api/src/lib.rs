@@ -14,6 +14,7 @@ pub mod context;
 mod error_converter;
 mod events;
 mod failpoint;
+mod gas_estimation;
 mod index;
 mod log;
 pub mod metrics;

@@ -28,8 +28,8 @@ pub struct LoadBalancingThresholdConfig {
 }
 
 impl Default for LoadBalancingThresholdConfig {
-    fn default() -> LoadBalancingThresholdConfig {
-        LoadBalancingThresholdConfig {
+    fn default() -> Self {
+        Self {
             avg_mempool_traffic_threshold_in_tps: 0,
             latency_slack_between_top_upstream_peers: 50,
             max_number_of_upstream_peers: 1,
@@ -37,7 +37,23 @@ impl Default for LoadBalancingThresholdConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct LatencyStatsTrackingConfig {
+    pub num_intervals: usize,
+    pub time_per_interval_s: f32,
+}
+
+impl Default for LatencyStatsTrackingConfig {
+    fn default() -> Self {
+        Self {
+            num_intervals: 60,
+            time_per_interval_s: 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct MempoolConfig {
     /// Maximum number of transactions allowed in the Mempool
@@ -100,6 +116,8 @@ pub struct MempoolConfig {
     /// up to 10 minutes (shared_mempool_priority_update_interval_secs) to enable the load balancing. If this flag is enabled,
     /// then the PFNs will always do load balancing irrespective of the load.
     pub enable_max_load_balancing_at_any_load: bool,
+
+    pub latency_stats_tracking_config: LatencyStatsTrackingConfig,
 }
 
 impl Default for MempoolConfig {
@@ -164,6 +182,7 @@ impl Default for MempoolConfig {
                 },
             ],
             enable_max_load_balancing_at_any_load: false,
+            latency_stats_tracking_config: LatencyStatsTrackingConfig::default(),
         }
     }
 }

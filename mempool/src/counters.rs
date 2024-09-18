@@ -69,6 +69,7 @@ pub const CLIENT_EVENT_LABEL: &str = "client_event";
 pub const CLIENT_EVENT_GET_TXN_LABEL: &str = "client_event_get_txn";
 pub const RECONFIG_EVENT_LABEL: &str = "reconfig";
 pub const PEER_BROADCAST_EVENT_LABEL: &str = "peer_broadcast";
+pub const CLIENT_EVENT_GET_LATENCY_SUMMARY_LABEL: &str = "client_event_get_latency_summary";
 
 // task spawn stage labels
 pub const SPAWN_LABEL: &str = "spawn";

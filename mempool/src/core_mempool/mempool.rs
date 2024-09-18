@@ -14,7 +14,8 @@ use crate::{
     logging::{LogEntry, LogSchema, TxnsLog},
     network::BroadcastPeerPriority,
     shared_mempool::types::{
-        MempoolSenderBucket, MultiBucketTimelineIndexIds, TimelineIndexIdentifier,
+        MempoolLatencySummary, MempoolSenderBucket, MultiBucketTimelineIndexIds,
+        TimelineIndexIdentifier,
     },
 };
 use aptos_config::config::NodeConfig;
@@ -61,13 +62,20 @@ impl Mempool {
         sender: &AccountAddress,
         sequence_number: u64,
         tracked_use_case: Option<(UseCaseKey, &String)>,
-        block_timestamp: Duration,
+        latest_chain_timestamp: Duration,
+        cur_latency_tracking: &mut MempoolLatencySummary,
     ) {
         trace!(
             LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
             is_rejected = false
         );
-        self.log_commit_latency(*sender, sequence_number, tracked_use_case, block_timestamp);
+        self.log_commit_latency(
+            *sender,
+            sequence_number,
+            tracked_use_case,
+            latest_chain_timestamp,
+            cur_latency_tracking,
+        );
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
@@ -141,7 +149,7 @@ impl Mempool {
     }
 
     fn log_consensus_pulled_latency(&self, account: AccountAddress, sequence_number: u64) {
-        if let Some((insertion_info, bucket, priority)) = self
+        if let Some((insertion_info, bucket, priority, _floor)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
@@ -166,7 +174,7 @@ impl Mempool {
         sequence_number: u64,
         stage: &'static str,
     ) {
-        if let Some((insertion_info, bucket, priority)) = self
+        if let Some((insertion_info, bucket, priority, _floor)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
@@ -223,7 +231,7 @@ impl Mempool {
                         insertion_info.submitted_by_label(),
                         bucket,
                     ])
-                    .observe(commit_duration.as_secs_f64());
+                    .observe(commit_minus_parked.as_secs_f64());
             }
         }
     }
@@ -233,9 +241,15 @@ impl Mempool {
         account: AccountAddress,
         sequence_number: u64,
         tracked_use_case: Option<(UseCaseKey, &String)>,
-        block_timestamp: Duration,
+        latest_chain_timestamp: Duration,
+        cur_latency_tracking: &mut MempoolLatencySummary,
     ) {
-        if let Some((insertion_info, bucket, priority)) = self
+        // We are tracking latency for framework, and for non-top-usecases.
+        let should_track_latency = tracked_use_case.as_ref().map_or(true, |(use_case_key, _)| {
+            use_case_key == &UseCaseKey::Platform
+        });
+
+        if let Some((insertion_info, bucket, priority, floor)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
@@ -252,9 +266,12 @@ impl Mempool {
                 tracked_use_case,
             );
 
-            let insertion_timestamp =
-                aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
-            if let Some(insertion_to_block) = block_timestamp.checked_sub(insertion_timestamp) {
+            if insertion_info.park_time.is_none() {
+                let insertion_timestamp =
+                    aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
+                // When doing state sync, we do not have per-transaction timestamps, only for the whole chunk,
+                // so the commit latency here will be approximate (larget than it actually was).
+                let insertion_to_block = latest_chain_timestamp.saturating_sub(insertion_timestamp);
                 counters::core_mempool_txn_commit_latency(
                     counters::COMMIT_ACCEPTED_BLOCK_LABEL,
                     insertion_info.submitted_by_label(),
@@ -262,6 +279,11 @@ impl Mempool {
                     insertion_to_block,
                     priority.to_string().as_str(),
                 );
+
+                if should_track_latency {
+                    cur_latency_tracking
+                        .observe_inclusion_time(floor, insertion_to_block.as_secs_f64());
+                }
             }
         }
     }

@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
-use super::types::MempoolMessageId;
+use super::{
+    latency_tracking::MempoolLatencyStatsTracking,
+    types::{GetLatencySummaryRequest, MempoolLatencySummary, MempoolMessageId},
+};
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     counters,
@@ -168,6 +171,32 @@ pub(crate) async fn process_client_get_transaction<NetworkClient, TransactionVal
     if callback.send(txn).is_err() {
         warn!(LogSchema::event_log(
             LogEntry::GetTransaction,
+            LogEvent::CallbackFail
+        ));
+        counters::CLIENT_CALLBACK_FAIL.inc();
+    }
+}
+
+/// Processes get latency summary request by client.
+pub(crate) async fn process_client_get_latency_summary<NetworkClient, TransactionValidator>(
+    smp: SharedMempool<NetworkClient, TransactionValidator>,
+    request: GetLatencySummaryRequest,
+    callback: oneshot::Sender<MempoolLatencySummary>,
+    timer: HistogramTimer,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation,
+{
+    timer.stop_and_record();
+    let _timer = counters::process_get_txn_latency_timer_client();
+    let mempool_latency_summary = smp
+        .latency_stats_tracking
+        .lock()
+        .get_latency_summary(request.target_samples);
+
+    if callback.send(mempool_latency_summary).is_err() {
+        warn!(LogSchema::event_log(
+            LogEntry::GetLatencySummary,
             LogEvent::CallbackFail
         ));
         counters::CLIENT_CALLBACK_FAIL.inc();
@@ -595,17 +624,22 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
 pub(crate) fn process_committed_transactions(
     mempool: &Mutex<CoreMempool>,
     use_case_history: &Mutex<UseCaseHistory>,
+    latency_stats_tracking: &Mutex<MempoolLatencyStatsTracking>,
     transactions: Vec<CommittedTransaction>,
-    block_timestamp_usecs: u64,
+    latest_chain_timestamp_usecs: u64,
 ) {
     let mut pool = mempool.lock();
-    let block_timestamp = Duration::from_micros(block_timestamp_usecs);
+    let latest_chain_timestamp = Duration::from_micros(latest_chain_timestamp_usecs);
 
     let tracking_usecases = {
         let mut history = use_case_history.lock();
         history.update_usecases(&transactions);
         history.compute_tracking_set()
     };
+
+    let mut latency_tracking = latency_stats_tracking.lock();
+    latency_tracking.check_rollover();
+    let cur_latency_tracking = latency_tracking.get_current_mut();
 
     for transaction in transactions {
         pool.log_commit_transaction(
@@ -614,13 +648,14 @@ pub(crate) fn process_committed_transactions(
             tracking_usecases
                 .get(&transaction.use_case)
                 .map(|name| (transaction.use_case.clone(), name)),
-            block_timestamp,
+            latest_chain_timestamp,
+            cur_latency_tracking,
         );
         pool.commit_transaction(&transaction.sender, transaction.sequence_number);
     }
 
-    if block_timestamp_usecs > 0 {
-        pool.gc_by_expiration_time(block_timestamp);
+    if latest_chain_timestamp_usecs > 0 {
+        pool.gc_by_expiration_time(latest_chain_timestamp);
     }
 }
 

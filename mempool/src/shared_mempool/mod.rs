@@ -10,5 +10,6 @@ pub use runtime::bootstrap;
 #[cfg(any(test, feature = "fuzzing"))]
 pub(crate) use runtime::start_shared_mempool;
 mod coordinator;
+pub(crate) mod latency_tracking;
 pub(crate) mod tasks;
 pub(crate) mod use_case_history;

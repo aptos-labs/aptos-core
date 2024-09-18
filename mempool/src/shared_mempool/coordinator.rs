@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Processes that are directly spawned by shared mempool runtime initialization
-use super::types::MempoolClientRequest;
+use super::{latency_tracking::MempoolLatencyStatsTracking, types::MempoolClientRequest};
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     counters,
@@ -145,6 +145,7 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
     let mempool = smp.mempool.clone();
     let mempool_validator = smp.validator.clone();
     let use_case_history = smp.use_case_history.clone();
+    let latency_stats_tracking = smp.latency_stats_tracking.clone();
     let num_committed_txns_recieved_since_peers_updated = smp
         .network_interface
         .num_committed_txns_received_since_peers_updated
@@ -156,6 +157,7 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
                 &mempool,
                 &mempool_validator,
                 &use_case_history,
+                &latency_stats_tracking,
                 commit_notification,
                 &num_committed_txns_recieved_since_peers_updated,
             );
@@ -217,6 +219,27 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
                 ))
                 .await;
         },
+        MempoolClientRequest::GetLatencySummary(request, callback) => {
+            // This timer measures how long it took for the bounded executor to *schedule* the
+            // task.
+            let _timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_GET_LATENCY_SUMMARY_LABEL,
+                counters::SPAWN_LABEL,
+            );
+            // This timer measures how long it took for the task to go from scheduled to started.
+            let task_start_timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_GET_LATENCY_SUMMARY_LABEL,
+                counters::START_LABEL,
+            );
+            bounded_executor
+                .spawn(tasks::process_client_get_latency_summary(
+                    smp.clone(),
+                    request,
+                    callback,
+                    task_start_timer,
+                ))
+                .await;
+        },
     }
 }
 
@@ -226,13 +249,14 @@ fn handle_commit_notification<TransactionValidator>(
     mempool: &Arc<Mutex<CoreMempool>>,
     mempool_validator: &Arc<RwLock<TransactionValidator>>,
     use_case_history: &Arc<Mutex<UseCaseHistory>>,
+    latency_stats_tracking: &Arc<Mutex<MempoolLatencyStatsTracking>>,
     msg: MempoolCommitNotification,
     num_committed_txns_recieved_since_peers_updated: &Arc<AtomicU64>,
 ) where
     TransactionValidator: TransactionValidation,
 {
     debug!(
-        block_timestamp_usecs = msg.block_timestamp_usecs,
+        block_timestamp_usecs = msg.latest_chain_timestamp_usecs,
         num_committed_txns = msg.transactions.len(),
         LogSchema::event_log(LogEntry::StateSyncCommit, LogEvent::Received),
     );
@@ -248,8 +272,9 @@ fn handle_commit_notification<TransactionValidator>(
     process_committed_transactions(
         mempool,
         use_case_history,
+        latency_stats_tracking,
         msg.transactions,
-        msg.block_timestamp_usecs,
+        msg.latest_chain_timestamp_usecs,
     );
     mempool_validator.write().notify_commit();
     let latency = start_time.elapsed();

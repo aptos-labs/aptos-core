@@ -36,10 +36,13 @@ pub enum Error {
 #[async_trait]
 pub trait MempoolNotificationSender: Send + Clone + Sync + 'static {
     /// Notify mempool of the newly committed transactions at the specified block timestamp.
+    /// `latest_chain_timestamp_usecs` represents what is chain timestamp after all committed transactions are applied.
+    /// If we are executing one block at the time, it will be timestamp of that block.
+    /// If we are doing state-sync across block boundaries, it will be the timestamp of most recent block.
     async fn notify_new_commit(
         &self,
         committed_transactions: Vec<Transaction>,
-        block_timestamp_usecs: u64,
+        latest_chain_timestamp_usecs: u64,
     ) -> Result<(), Error>;
 }
 
@@ -78,7 +81,7 @@ impl MempoolNotificationSender for MempoolNotifier {
     async fn notify_new_commit(
         &self,
         transactions: Vec<Transaction>,
-        block_timestamp_usecs: u64,
+        latest_chain_timestamp_usecs: u64,
     ) -> Result<(), Error> {
         // Get only user transactions from committed transactions
         let user_transactions: Vec<CommittedTransaction> = transactions
@@ -97,7 +100,7 @@ impl MempoolNotificationSender for MempoolNotifier {
         // See https://github.com/aptos-labs/aptos-core/issues/1882 for more details.
         let commit_notification = MempoolCommitNotification {
             transactions: user_transactions,
-            block_timestamp_usecs,
+            latest_chain_timestamp_usecs,
         };
 
         // Send the notification to mempool
@@ -149,15 +152,18 @@ impl FusedStream for MempoolNotificationListener {
 #[derive(Debug)]
 pub struct MempoolCommitNotification {
     pub transactions: Vec<CommittedTransaction>,
-    pub block_timestamp_usecs: u64, // The timestamp of the committed block.
+    /// The chain timestamp after above transactions are applied.
+    /// If we are executing one block at the time, it will be timestamp of that block.
+    /// If we are doing state-sync across block boundaries, it will be the timestamp of most recent block.
+    pub latest_chain_timestamp_usecs: u64,
 }
 
 impl fmt::Display for MempoolCommitNotification {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "MempoolCommitNotification [block_timestamp_usecs: {}, txns: {:?}]",
-            self.block_timestamp_usecs, self.transactions
+            "MempoolCommitNotification [latest_chain_timestamp_usecs: {}, txns: {:?}]",
+            self.latest_chain_timestamp_usecs, self.transactions
         )
     }
 }
@@ -296,7 +302,7 @@ mod tests {
                         }
                     ]);
                     assert_eq!(
-                        mempool_commit_notification.block_timestamp_usecs,
+                        mempool_commit_notification.latest_chain_timestamp_usecs,
                         block_timestamp_usecs
                     );
                 },
