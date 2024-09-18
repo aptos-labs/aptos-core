@@ -208,7 +208,7 @@ impl ConsensusObserverNetworkHandler {
             None => {
                 error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Missing response sender for RCP request: {:?}",
+                        "Missing response sender for the RPC request: {:?}",
                         request
                     ))
                 );
