@@ -351,24 +351,11 @@ impl BufferManager {
         if round > self.highest_committed_round
             && self.highest_committed_round + self.max_pending_rounds_in_commit_vote_cache > round
         {
-            if let Some(votes) = self.pending_commit_votes.get_mut(&round) {
-                if self
-                    .epoch_state
-                    .verifier
-                    .get_voting_power(&vote.author())
-                    .is_some()
-                {
-                    votes.insert(vote.author(), vote);
-                    true
-                } else {
-                    false
-                }
-            } else {
-                let mut votes = HashMap::new();
-                votes.insert(vote.author(), vote);
-                self.pending_commit_votes.insert(round, votes);
-                true
-            }
+            self.pending_commit_votes
+                .entry(round)
+                .or_default()
+                .insert(vote.author(), vote);
+            true
         } else {
             debug!(
                 round = round,
