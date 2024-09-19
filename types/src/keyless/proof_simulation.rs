@@ -266,7 +266,6 @@
         let pvk = prepare_verifying_key(&vk);
         for i in 0..n_iters {
 
-            // TODO: Make public input optional and use default value if not specified. Also make an equivalent function for simulated proof verification
             let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(
                 &[public_input],
                 &pk,

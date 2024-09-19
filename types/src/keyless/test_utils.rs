@@ -154,7 +154,6 @@ pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
     };
 
-
     (sig, SAMPLE_PK.clone())
 }
 

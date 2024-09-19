@@ -88,12 +88,10 @@ fn test_rotate_vk() {
 
     // Old proof for old VK
     let (old_sig, pk) = get_sample_groth16_sig_and_pk();
-    //let (old_sig, pk) = get_random_simulated_groth16_sig_and_pk();
     let account = create_keyless_account(&mut h, pk.clone());
     let transaction =
         spend_keyless_account(&mut h, old_sig.clone(), &account, *recipient.address());
     let output = h.run_raw(transaction);
-    println!("output: {:?}", output);
     assert_success!(output.status().clone());
 
     // New proof for old VK
