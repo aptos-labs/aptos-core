@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/simplifier/moved_var_not_simplified3.move:4:17
+  │
+4 │         let y = move x;
+  │                 ^^^^^^ attempted to move here
+5 │         let _ = x;
+  │             - used here

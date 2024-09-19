@@ -1,0 +1,13 @@
+// -- Model dump before bytecode pipeline
+module 0x2::X {
+    struct S {
+        dummy_field: bool,
+    }
+} // end 0x2::X
+module 0x2::M {
+    use 0x2::X::{Self, S as X}; // resolved as: 0x2::X
+    struct A {
+        f1: X::S,
+        f2: X::S,
+    }
+} // end 0x2::M

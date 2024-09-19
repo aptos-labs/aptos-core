@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/expr_unary_negation.move:5:19
+  │
+5 │     assert!(((1 - -2) == 3) && (-(1 - 2) == 1), 100);
+  │                   ^
+  │                   │
+  │                   Unexpected '-'
+  │                   Expected an expression term
