@@ -14,7 +14,7 @@ pub mod dispatchable_fungible_asset;
 pub mod event;
 pub mod function_info;
 pub mod hash;
-mod lite_account;
+pub mod lite_account;
 pub mod object;
 pub mod object_code_deployment;
 pub mod permissioned_signer;

@@ -60,7 +60,7 @@ module aptos_framework::lite_account {
         );
     }
 
-    public entry fun remove_dispatchable_authentication_funciton(
+    public entry fun remove_dispatchable_authentication_function(
         account: &signer,
         module_address: address,
         module_name: String,
