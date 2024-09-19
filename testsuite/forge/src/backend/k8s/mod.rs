@@ -180,6 +180,7 @@ impl Factory for K8sFactory {
                     genesis_modules_path,
                     self.use_port_forward,
                     self.enable_haproxy,
+                    self.enable_indexer,
                     genesis_config_fn,
                     node_config_fn,
                 )

@@ -512,6 +512,7 @@ pub async fn install_testnet_resources(
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
     enable_haproxy: bool,
+    enable_indexer: bool,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
@@ -523,7 +524,7 @@ pub async fn install_testnet_resources(
     let genesis_values_file = dump_helm_values_to_file(GENESIS_HELM_RELEASE_NAME, &tmp_dir)?;
 
     // get forge override helm values and cache it
-    let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
+    let mut aptos_node_forge_helm_values_yaml = construct_node_helm_values(
         node_helm_config_fn,
         fs::read_to_string(get_node_default_helm_path())
             .expect("Not able to read default value file"),
@@ -534,14 +535,19 @@ pub async fn install_testnet_resources(
         node_image_tag,
         enable_haproxy,
     )?;
+    // disable uploading genesis to blob storage since indexer requires it in the cluster
+    if enable_indexer {
+        aptos_node_forge_helm_values_yaml["genesis_blob_upload_url"] = "".into();
+    }
 
     let aptos_node_forge_values_file = dump_string_to_file(
         "aptos-node-values.yaml".to_string(),
-        aptos_node_forge_helm_values_yaml,
+        serde_yaml::to_string(&aptos_node_forge_helm_values_yaml)
+            .expect("Unable to serialize aptos-node helm values"),
         &tmp_dir,
     )?;
 
-    let genesis_forge_helm_values_yaml = construct_genesis_helm_values(
+    let mut genesis_forge_helm_values_yaml = construct_genesis_helm_values(
         genesis_helm_config_fn,
         kube_namespace.clone(),
         new_era.clone(),
@@ -549,9 +555,18 @@ pub async fn install_testnet_resources(
         genesis_image_tag,
         enable_haproxy,
     )?;
+    // run genesis from this directory in the image
+    if let Some(genesis_modules_path) = genesis_modules_path {
+        genesis_forge_helm_values_yaml["genesis"]["moveModulesDir"] = genesis_modules_path.into();
+    }
+    // disable uploading genesis to blob storage since indexer requires it in the cluster
+    if enable_indexer {
+        genesis_forge_helm_values_yaml["genesis"]["genesis_blob_upload_url"] = "".into();
+    }
     let genesis_forge_values_file = dump_string_to_file(
         "genesis-values.yaml".to_string(),
-        genesis_forge_helm_values_yaml,
+        serde_yaml::to_string(&genesis_forge_helm_values_yaml)
+            .expect("Unable to serialize genesis helm values"),
         &tmp_dir,
     )?;
 
@@ -564,33 +579,13 @@ pub async fn install_testnet_resources(
         aptos_node_forge_values_file,
     ];
 
-    let mut genesis_upgrade_options = vec![
+    let genesis_upgrade_options = vec![
         // use the old values
         "-f".to_string(),
         genesis_values_file,
         "-f".to_string(),
         genesis_forge_values_file,
     ];
-
-    // run genesis from the directory in aptos/init image
-    if let Some(genesis_modules_path) = genesis_modules_path {
-        genesis_upgrade_options.extend([
-            "--set".to_string(),
-            format!("genesis.moveModulesDir={}", genesis_modules_path),
-        ]);
-    }
-
-    // upgrade genesis
-    upgrade_genesis_helm(genesis_upgrade_options.as_slice(), kube_namespace.clone())?;
-
-    // wait for genesis to run again, and get the updated validators
-    wait_genesis_job(&kube_client, &new_era, &kube_namespace).await?;
-
-    // TODO(rustielin): get the helm releases to be consistent
-    upgrade_aptos_node_helm(
-        aptos_node_upgrade_options.as_slice(),
-        kube_namespace.clone(),
-    )?;
 
     let (validators, fullnodes) = collect_running_nodes(
         &kube_client,
@@ -612,7 +607,7 @@ pub fn construct_node_helm_values(
     num_fullnodes: usize,
     image_tag: String,
     enable_haproxy: bool,
-) -> Result<String> {
+) -> Result<serde_yaml::Value> {
     let mut value: serde_yaml::Value = serde_yaml::from_str(&base_helm_values)?;
     value["numValidators"] = num_validators.into();
     value["numFullnodeGroups"] = num_fullnodes.into();
@@ -631,7 +626,7 @@ pub fn construct_node_helm_values(
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
-    serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
+    Ok(value)
 }
 
 pub fn construct_genesis_helm_values(
@@ -641,7 +636,7 @@ pub fn construct_genesis_helm_values(
     num_validators: usize,
     genesis_image_tag: String,
     enable_haproxy: bool,
-) -> Result<String> {
+) -> Result<serde_yaml::Value> {
     let validator_internal_host_suffix = if enable_haproxy {
         VALIDATOR_HAPROXY_SERVICE_SUFFIX
     } else {
@@ -673,7 +668,7 @@ pub fn construct_genesis_helm_values(
         (config_fn)(&mut value);
     }
 
-    serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
+    Ok(value)
 }
 
 /// Collect the running nodes in the network into K8sNodes
@@ -841,12 +836,14 @@ where
     if let Err(KubeError::Api(api_err)) = api.create(&PostParams::default(), &resource).await {
         if api_err.code == 409 {
             info!(
-                "Resource {} already exists, continuing with it",
+                "Resource {:?}, {} already exists, continuing with it",
+                std::any::type_name::<T>(),
                 resource.name()
             );
         } else {
             return Err(ApiError::RetryableError(format!(
-                "Failed to use existing resource {}: {:?}",
+                "Failed to use existing resource{:?} {}: {:?}",
+                std::any::type_name::<T>(),
                 resource.name(),
                 api_err
             )));
@@ -1117,6 +1114,8 @@ mod tests {
         )
         .unwrap();
 
+        let node_helm_values_str = serde_yaml::to_string(&node_helm_values).unwrap();
+
         let expected_helm_values = "---
 numValidators: 5
 numFullnodeGroups: 6
@@ -1131,7 +1130,7 @@ labels:
   forge-test-suite: unknown-testsuite
   forge-username: unknown-username
 ";
-        assert_eq!(node_helm_values, expected_helm_values);
+        assert_eq!(node_helm_values_str, expected_helm_values);
     }
 
     #[tokio::test]
@@ -1147,6 +1146,7 @@ labels:
             true,
         )
         .unwrap();
+        let genesis_helm_values_str = serde_yaml::to_string(&genesis_helm_values).unwrap();
         let expected_helm_values = "---
 imageTag: genesis_image
 chain:
@@ -1166,8 +1166,8 @@ labels:
   forge-test-suite: unknown-testsuite
   forge-username: unknown-username
 ";
-        assert_eq!(genesis_helm_values, expected_helm_values);
-        println!("{}", genesis_helm_values);
+        assert_eq!(genesis_helm_values_str, expected_helm_values);
+        println!("{}", genesis_helm_values_str);
     }
 
     #[tokio::test]

@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{k8s_wait_indexer_strategy, maybe_create_k8s_resource, K8sApi, ReadWrite, Result};
 use anyhow::bail;
+use aptos_logger::info;
 use k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{ConfigMap, Namespace, ServiceAccount},
@@ -165,13 +166,19 @@ impl ForgeDeployerManager {
         Ok(job)
     }
 
+    /**
+     * Start the deployer job in the cluster. Ensures the namespace is prepared and then creates the configmap and job.
+     * This will fail if the job or configmap already exists in the namespace.
+     */
     pub async fn start(&self) -> Result<()> {
         self.ensure_namespace_prepared().await?;
         let config_map = self.build_forge_deployer_k8s_config_map()?;
         let job = self.build_forge_deployer_k8s_job(config_map.name())?;
+        info!("Creating forge deployer configmap: {:?}", config_map);
         self.config_maps_api
             .create(&PostParams::default(), &config_map)
             .await?;
+        info!("Creating forge deployer job: {:?}", job);
         self.jobs_api.create(&PostParams::default(), &job).await?;
         Ok(())
     }
@@ -219,8 +226,11 @@ impl ForgeDeployerManager {
     }
 
     async fn ensure_namespace_prepared(&self) -> Result<()> {
+        info!("Ensuring namespace is prepared");
         let namespace = self.build_namespace();
+        info!("Creating namespace: {:?}", namespace);
         maybe_create_k8s_resource(self.namespace_api.clone(), namespace.clone()).await?;
+        info!("Creating service account and role binding");
         let service_account = self.build_service_account();
         maybe_create_k8s_resource(self.serviceaccount_api.clone(), service_account).await?;
         let role_binding = self.build_role_binding();
@@ -239,14 +249,17 @@ impl ForgeDeployerManager {
                 let completed = job
                     .status
                     .as_ref()
-                    .expect("Failed to get job status")
+                    .ok_or_else(|| anyhow::anyhow!("Failed to get job status"))?
                     .succeeded
-                    .expect("Failed to get job succeeded number")
-                    > 0;
+                    .ok_or_else(|| anyhow::anyhow!("Failed to get job succeeded number"))
+                    .map(|succeeded| succeeded > 0)
+                    .unwrap_or(false);
                 if completed {
                     Ok(())
                 } else {
-                    bail!("Job not completed yet: {:?}", job);
+                    // log and bail both
+                    info!("Job {} not completed yet: {:?}", job_name, job);
+                    bail!("Job {} not completed yet", job_name);
                 }
             })
         })
