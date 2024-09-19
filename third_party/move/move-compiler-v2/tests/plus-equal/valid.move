@@ -1,7 +1,7 @@
 module 0x42::test {
-	struct Coin(u256) has drop;
+	struct Coin(u256) has drop, key;
 
-	struct Wrapper<T>(T) has drop;
+	struct Wrapper<T>(T) has drop, key;
 
 	fun add1_old(x: u256): u256 {
 		x = x + 1;
@@ -69,5 +69,10 @@ module 0x42::test {
 
 	fun inc_vec_wrapped_coin_old(x: vector<Wrapper<Coin>>, index: u64) {
 		x[index].0.0 = x[index].0.0 + 1;
+	}
+
+	fun inv_coin_at(addr: address) acquires Coin {
+		let coin = &mut Coin[addr];
+		coin.0 += 1;
 	}
 }

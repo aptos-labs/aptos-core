@@ -94,6 +94,18 @@ module 0x42::test {
         select test::Coin.0<test::Coin>(select test::Wrapper.0<&mut test::Wrapper<test::Coin>>(x)) = Add<u256>(select test::Coin.0<test::Coin>(select test::Wrapper.0<&mut test::Wrapper<test::Coin>>(x)), 1);
         Tuple()
     }
+    private fun inv_coin_at(addr: address)
+        acquires test::Coin(*)
+     {
+        {
+          let coin: &mut test::Coin = BorrowGlobal(Mutable)<test::Coin>(addr);
+          {
+            let $t: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut test::Coin>(coin));
+            $t = Add<u256>(Deref($t), 1)
+          };
+          Tuple()
+        }
+    }
 } // end 0x42::test
 
 ============ initial bytecode ================
@@ -379,6 +391,23 @@ fun test::inc_wrapped_coin_old($t0: &mut test::Wrapper<test::Coin>) {
   6: $t6 := borrow_field<test::Coin>.0($t7)
   7: write_ref($t6, $t1)
   8: return ()
+}
+
+
+[variant baseline]
+fun test::inv_coin_at($t0: address) {
+     var $t1: &mut test::Coin
+     var $t2: &mut u256
+     var $t3: u256
+     var $t4: u256
+     var $t5: u256
+  0: $t1 := borrow_global<test::Coin>($t0)
+  1: $t2 := borrow_field<test::Coin>.0($t1)
+  2: $t4 := read_ref($t2)
+  3: $t5 := 1
+  4: $t3 := +($t4, $t5)
+  5: write_ref($t2, $t3)
+  6: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -779,13 +808,37 @@ fun test::inc_wrapped_coin_old($t0: &mut test::Wrapper<test::Coin>) {
 }
 
 
+[variant baseline]
+fun test::inv_coin_at($t0: address) {
+     var $t1: &mut test::Coin
+     var $t2: &mut u256
+     var $t3: u256 [unused]
+     var $t4: u256
+     var $t5: u256
+     # live vars: $t0
+  0: $t1 := borrow_global<test::Coin>($t0)
+     # live vars: $t1
+  1: $t2 := borrow_field<test::Coin>.0($t1)
+     # live vars: $t2
+  2: $t4 := read_ref($t2)
+     # live vars: $t2, $t4
+  3: $t5 := 1
+     # live vars: $t2, $t4, $t5
+  4: $t4 := +($t4, $t5)
+     # live vars: $t2, $t4
+  5: write_ref($t2, $t4)
+     # live vars:
+  6: return ()
+}
+
+
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.test {
-struct Coin has drop {
+struct Coin has drop, key {
 	_0: u256
 }
-struct Wrapper<Ty0> has drop {
+struct Wrapper<Ty0> has drop, key {
 	_0: Ty0
 }
 
@@ -1001,6 +1054,21 @@ B0:
 	6: MoveLoc[0](Arg0: &mut Wrapper<Coin>)
 	7: MutBorrowFieldGeneric[0](Wrapper._0: Ty0)
 	8: MutBorrowField[0](Coin._0: u256)
+	9: WriteRef
+	10: Ret
+}
+inv_coin_at(Arg0: address) /* def_idx: 16 */ {
+L1:	loc0: &mut u256
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: MutBorrowGlobal[0](Coin)
+	2: MutBorrowField[0](Coin._0: u256)
+	3: StLoc[1](loc0: &mut u256)
+	4: CopyLoc[1](loc0: &mut u256)
+	5: ReadRef
+	6: LdU256(1)
+	7: Add
+	8: MoveLoc[1](loc0: &mut u256)
 	9: WriteRef
 	10: Ret
 }
