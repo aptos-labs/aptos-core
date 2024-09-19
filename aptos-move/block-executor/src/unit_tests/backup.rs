@@ -279,7 +279,69 @@ struct TestExecutor {
     synchronization_status: Arc<AtomicU64>,
 }
 
-// TODO: picture and description of the test case.
+/// two workers, three transactions, each transaction (txn_idx, incarnation, backup/main)
+///
+/// write(A) by (0, 0, main) can not be completed without read(A) by (1, 0, main) and read(C) by (2, 0, main) being finished
+///
+/// Hence, by the time txn 0 is commited, (1, 0, main) is finished and backup is not called on txn 1
+///
+/// (2, 0, main) has busy waiting for backup to be started
+///
+///  (2, 0, main) always aborts and never ends up writing to D due to the following reasons:
+///      1. read(B) gets suspended due to finding estimate from aborted (1, 0, main),
+///         and is wokeup up by (2, 0, backup) causing SPECULATIVE_EXECUTION_ABORT_ERROR
+///      2. if maybe_next_idx_to_commit is set, we wait for (2, 0, backup) to commit,
+///         then we attempt to read module, which causes SPECULATIVE_EXECUTION_ABORT_ERROR,
+///         this is due the fact that reading modules is expensive, hence we error out of (2, 0, backup),
+///         since we know that it is doomed to lose rights to write (try_set_execution_flag_writing returns false)
+///     3. if maybe_next_idx_to_commit is not set, (2, 0, main) calls try_set_execution_flag_writing, which detects
+///        that backup is already running, thus it triggers validation which fails since (1, 1, main) has already written to C.
+///
+///
+/// ___________________________________________________________________________________________________________________________________________________
+/// (0,  0, main)        | (1, 0, main)             | (1, 1, main)             | (2, 0, main)                               | (2, 0, backup)          |
+/// _____________________|__________________________|__________________________|____________________________________________|_________________________|
+///  start (worker 0)    | start (worker 1)         |                          |                                            |                         |
+///                      |    read(A)               |                          |                                            |                         |
+///                      |    write(B)              |                          |                                            |                         |
+///                      |    write(B)              |                          |                                            |                         |
+///                      | end                      |                          |                                            |                         |
+///                      |                          |                          | start (worker 1)                           |                         |
+///                      |                          |                          |    read(C)                                 |                         |
+///  write(A)            |                          |                          |                                            |                         |
+///                      |                          |                          |                                            |                         |
+///  commit              |                          |                          |                                            |                         |
+///                      | validation (worker 0)    |                          |                                            |                         |
+///                      |      fail on A           |                          |    write(D)                                |                         |
+///                      | abort                    |                          |                                            |                         |
+///                      |                          | start (worker 0)         |                                            |                         |
+///                      |                          |     read(B)              |    read(B)                                 |                         |
+///                      |                          |                          |    if suspended                            |                         |
+///                      |                          |                          |       if woken up by backup                |                         |
+///                      |                          |                          |          error                             |                         |
+///                      |                          |                          |          abort                             |                         |
+///                      |                          |     read(A)              |                                            |                         |
+///                      |                          |     write(B)             |                                            |                         |
+///                      |                          |     write(C)             |                                            |                         |
+///                      |                          |  end                     |                                            |                         |
+///                      |                          |  try wake up worker 1    |                                            |                         |
+///                      |                          |  commit                  |                                            |                         |
+///                      |                          |                          |                                            | start (worker 0)        |
+///                      |                          |                          |                                            |                         |
+///                      |                          |                          |    if not wait for backup to commit:       |                         |
+///                      |                          |                          |       try_set_execution_flag_writing       |                         |
+///                      |                          |                          |           fail validation on C             |                         |
+///                      |                          |                          |            return false                    |                         |
+///                      |                          |                          |       abort                                |                         |
+///                      |                          |                          |                                            |                         |
+///                      |                          |                          |                                            |      read(C)            |
+///                      |                          |                          |                                            |  end                    |
+///                      |                          |                          |                                            |  try wake up worker 1   |
+///                      |                          |                          |                                            |  commit                 |
+///                      |                          |                          |    try_read_module                         |                         |
+///                      |                          |                          |       error                                |                         |
+///                      |                          |                          |       abort                                |                         |
+///______________________|__________________________|__________________________|____________________________________________|_________________________|
 
 impl ExecutorTask for TestExecutor {
     type Environment = (Option<Arc<AtomicU64>>, Arc<AtomicU64>);
@@ -316,6 +378,7 @@ impl ExecutorTask for TestExecutor {
                 assert_eq!(txn_idx, 0, "Algorithm for TXN 0");
 
                 assert_eq!(incarnation, 0);
+                // backup is called only after some transaction is committed
                 assert!(!is_backup);
 
                 let target_mask = TXN1_READ_FLAG + TXN2_READ_FLAG;
@@ -331,6 +394,8 @@ impl ExecutorTask for TestExecutor {
             },
             1 => {
                 assert_eq!(txn_idx, 1, "Algorithm for TXN 1");
+
+                // txn 0 is not committed (waiting for our read) => there should not be backup called on txn 1
                 assert!(!is_backup);
 
                 match incarnation {
@@ -357,7 +422,8 @@ impl ExecutorTask for TestExecutor {
 
                         // No write should be visible at B.
                         assert_none!(view.get_resource_state_value(&TestKey::B, None).unwrap());
-                        // TODO: check A. and final correct value.
+                        assert_eq!(view.get_resource_state_value(&TestKey::A, None).unwrap().unwrap().bytes(), TestValue::final_correct_value().bytes().unwrap(),
+                        "txn 0 must have written to A, since it caused our incarnation 0 to fail validation");
 
                         let prev_status = self
                             .synchronization_status
@@ -425,9 +491,10 @@ impl ExecutorTask for TestExecutor {
                                 // There is a slim chance (as (2, 0) starts before (1, 1)), that
                                 // Read happens after (1,1) has completed. In this case, it will
                                 // read the value from (1,1).
-                                assert!(
-                                    maybe_state_value.unwrap().bytes().is_empty(),
-                                    "Must be encoding of FinalCorrectValue2"
+                                assert_eq!(
+                                    maybe_state_value.unwrap().bytes(),
+                                    TestValue::final_correct_value().bytes().unwrap(),
+                                    "Must be encoding of FinalCorrectValue"
                                 );
                             },
                         }
