@@ -5,7 +5,7 @@
 use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
 use anyhow::bail;
 use aptos_logger::info;
-use futures::future;
+use futures::{future, FutureExt};
 use rand::rngs::StdRng;
 use serde_json::json;
 use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
@@ -169,7 +169,7 @@ impl Factory for K8sFactory {
                 &new_era, &self.kube_namespace
             );
 
-            let deploy_testnet_fut = Box::pin(async {
+            let deploy_testnet_fut = async {
                 match install_testnet_resources(
                     new_era.clone(),
                     self.kube_namespace.clone(),
@@ -183,6 +183,7 @@ impl Factory for K8sFactory {
                     self.enable_indexer,
                     genesis_config_fn,
                     node_config_fn,
+                    false,
                 )
                 .await
                 {
@@ -192,10 +193,11 @@ impl Factory for K8sFactory {
                         bail!(e);
                     },
                 }
-            });
+            }
+            .boxed();
 
             // add an indexer too!
-            let deploy_indexer_fut = Box::pin(async {
+            let deploy_indexer_fut = async {
                 if self.enable_indexer {
                     // NOTE: by default, use a deploy profile and no additional configuration values
                     let config = serde_json::from_value(json!({
@@ -209,14 +211,14 @@ impl Factory for K8sFactory {
                         self.kube_namespace.clone(),
                         FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
                         None,
-                        config,
                     );
-                    indexer_deployer.start().await?;
+                    indexer_deployer.start(config).await?;
                     indexer_deployer.wait_completed().await
                 } else {
                     Ok(())
                 }
-            });
+            }
+            .boxed();
 
             // join on testnet and indexer deployment futures, handling the output from the testnet
             // deployment

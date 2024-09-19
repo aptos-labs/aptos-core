@@ -32,9 +32,6 @@ pub struct ForgeDeployerManager {
     pub namespace: String,
     pub image_repo: String,
     pub image_tag: Option<String>,
-
-    // the values to use for the deployer, including namespace, era, etc
-    pub config: serde_json::Value,
 }
 
 impl ForgeDeployerManager {
@@ -43,7 +40,6 @@ impl ForgeDeployerManager {
         namespace: String,
         image_repo: String,
         image_tag: Option<String>,
-        config: serde_json::Value,
     ) -> Self {
         let jobs_api = Arc::new(K8sApi::from_client(
             kube_client.clone(),
@@ -73,7 +69,6 @@ impl ForgeDeployerManager {
             namespace,
             image_repo,
             image_tag,
-            config,
         }
     }
 
@@ -90,9 +85,9 @@ impl ForgeDeployerManager {
 
     /// Builds a k8s configmap for the forge deployer that contains the values needed to deploy the forge components
     /// Does not actually create the configmap in k8s
-    fn build_forge_deployer_k8s_config_map(&self) -> Result<ConfigMap> {
+    fn build_forge_deployer_k8s_config_map(&self, config: serde_json::Value) -> Result<ConfigMap> {
         let configmap_name = self.get_name();
-        let deploy_values_json = serde_json::to_string(&self.config)?;
+        let deploy_values_json = serde_json::to_string(&config)?;
 
         // create the configmap with values
         let config_map = ConfigMap {
@@ -170,9 +165,9 @@ impl ForgeDeployerManager {
      * Start the deployer job in the cluster. Ensures the namespace is prepared and then creates the configmap and job.
      * This will fail if the job or configmap already exists in the namespace.
      */
-    pub async fn start(&self) -> Result<()> {
+    pub async fn start(&self, config: serde_json::Value) -> Result<()> {
         self.ensure_namespace_prepared().await?;
-        let config_map = self.build_forge_deployer_k8s_config_map()?;
+        let config_map = self.build_forge_deployer_k8s_config_map(config)?;
         let job = self.build_forge_deployer_k8s_job(config_map.name())?;
         info!("Creating forge deployer configmap: {:?}", config_map);
         self.config_maps_api
@@ -275,14 +270,7 @@ mod tests {
 
     fn get_mock_forge_deployer_manager() -> ForgeDeployerManager {
         let namespace = "forge-large-banana".to_string();
-        let config = serde_json::from_value(json!(
-            {
-                "profile": "large-banana",
-                "era": "1",
-                "namespace": namespace,
-            }
-        ))
-        .expect("Issue creating Forge deployer config");
+
         ForgeDeployerManager {
             jobs_api: Arc::new(MockK8sResourceApi::new()),
             config_maps_api: Arc::new(MockK8sResourceApi::new()),
@@ -292,7 +280,6 @@ mod tests {
             namespace,
             image_repo: FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
             image_tag: None,
-            config,
         }
     }
 
@@ -301,7 +288,15 @@ mod tests {
     #[tokio::test]
     async fn test_start_deployer_fresh_environment() {
         let manager = get_mock_forge_deployer_manager();
-        manager.start().await.unwrap();
+        let config = serde_json::from_value(json!(
+            {
+                "profile": "large-banana",
+                "era": "1",
+                "namespace": manager.namespace.clone(),
+            }
+        ))
+        .expect("Issue creating Forge deployer config");
+        manager.start(config).await.unwrap();
         let indexer_deployer_name = manager.get_name();
         manager
             .jobs_api
@@ -320,6 +315,14 @@ mod tests {
     #[tokio::test]
     async fn test_start_deployer_existing_job() {
         let mut manager = get_mock_forge_deployer_manager();
+        let config = serde_json::from_value(json!(
+            {
+                "profile": "large-banana",
+                "era": "1",
+                "namespace": manager.namespace.clone(),
+            }
+        ))
+        .expect("Issue creating Forge deployer config");
         manager.jobs_api = Arc::new(MockK8sResourceApi::from_resource(Job {
             metadata: ObjectMeta {
                 name: Some(manager.get_name()),
@@ -328,7 +331,7 @@ mod tests {
             },
             ..Default::default()
         }));
-        let result = manager.start().await;
+        let result = manager.start(config).await;
         assert!(result.is_err());
     }
 

@@ -62,7 +62,11 @@ use aptos_testcases::{
 };
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use futures::stream::{FuturesUnordered, StreamExt};
+use futures::{
+    future,
+    stream::{FuturesUnordered, StreamExt},
+    FutureExt,
+};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
@@ -435,30 +439,49 @@ fn main() -> Result<()> {
                 let era = generate_new_era();
                 let config: Value = serde_json::from_value(json!({
                     "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
-                    "era": era,
+                    "era": era.clone(),
                     "namespace": create.namespace.clone(),
                 }))?;
-                let testnet_deployer = ForgeDeployerManager::new(
-                    kube_client.clone(),
-                    create.namespace.clone(),
-                    FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
-                    None,
-                    config.clone(),
-                );
-                // NOTE: this is generally not going to run from within the cluster, do not perform any operations
-                // that might require internal DNS resolution to work, such as txn emission directly against the node service IPs.
-                runtime.block_on(testnet_deployer.start())?;
-                if create.enable_indexer {
-                    let indexer_deployer = ForgeDeployerManager::new(
-                        kube_client,
-                        create.namespace,
-                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+
+                let deploy_testnet_fut = async {
+                    install_testnet_resources(
+                        era.clone(),
+                        create.namespace.clone(),
+                        create.num_validators,
+                        create.num_fullnodes,
+                        create.validator_image_tag,
+                        create.testnet_image_tag,
+                        create.move_modules_dir,
+                        false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
+                        create.enable_haproxy,
+                        create.enable_indexer,
                         None,
-                        config,
-                    );
-                    runtime.block_on(indexer_deployer.start())?;
-                    runtime.block_on(indexer_deployer.wait_completed())?;
+                        None,
+                        true,
+                    )
+                    .await?;
+                    Ok(())
                 }
+                .boxed();
+
+                let deploy_indexer_fut = async {
+                    if create.enable_indexer {
+                        let indexer_deployer = ForgeDeployerManager::new(
+                            kube_client.clone(),
+                            create.namespace.clone(),
+                            FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                            None,
+                        );
+                        indexer_deployer.start(config).await?;
+                        indexer_deployer.wait_completed().await
+                    } else {
+                        Ok(())
+                    }
+                }
+                .boxed();
+
+                runtime.block_on(future::try_join(deploy_testnet_fut, deploy_indexer_fut))?;
+
                 Ok(())
             },
         },

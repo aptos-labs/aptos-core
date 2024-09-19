@@ -36,12 +36,16 @@ use std::{
     env,
     fmt::Debug,
     fs,
+    fs::File,
+    io::Write,
     net::TcpListener,
+    path::Path,
     process::{Command, Stdio},
     str,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
+use tempfile::TempDir;
 use thiserror::Error;
 use tokio::time::Duration;
 
@@ -49,6 +53,21 @@ use tokio::time::Duration;
 pub fn get_free_port() -> u32 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.local_addr().unwrap().port() as u32
+}
+
+/// Dumps the given String contents into a file at the given temp directory
+pub fn dump_string_to_file(
+    file_name: String,
+    content: String,
+    tmp_dir: &TempDir,
+) -> Result<String> {
+    let file_path = tmp_dir.path().join(file_name.clone());
+    info!("Wrote content to: {:?}", &file_path);
+    let mut file = File::create(file_path).expect("Could not create file in temp dir");
+    file.write_all(&content.into_bytes())
+        .expect("Could not write to file");
+    let file_path_str = tmp_dir.path().join(file_name).display().to_string();
+    Ok(file_path_str)
 }
 
 /// Waits for the testnet's genesis job to complete, while tailing the job's logs
@@ -406,7 +425,7 @@ pub async fn check_persistent_volumes(
 }
 
 /// Installs a testnet in a k8s namespace by first running genesis, and the installing the aptos-nodes via helm
-/// Returns the current era, as well as a mapping of validators and fullnodes
+/// Returns all validators and fullnodes by collecting the running nodes
 pub async fn install_testnet_resources(
     new_era: String,
     kube_namespace: String,
@@ -420,6 +439,9 @@ pub async fn install_testnet_resources(
     enable_indexer: bool,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
+    // If true, skip collecting running nodes after installing the testnet. This is useful when we only care about creating resources
+    // but not healthchecking or collecting the nodes for further operations. Setting this to "true" effectively makes the return type useless though.
+    skip_collecting_running_nodes: bool,
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await?;
 
@@ -470,22 +492,23 @@ pub async fn install_testnet_resources(
         kube_namespace.clone(),
         FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
         None,
-        config.clone(),
     );
 
-    testnet_deployer.start().await?;
+    testnet_deployer.start(config).await?;
 
-    wait_genesis_job(&kube_client, &new_era, &kube_namespace).await?;
-
-    let (validators, fullnodes) = collect_running_nodes(
-        &kube_client,
-        kube_namespace,
-        use_port_forward,
-        enable_haproxy,
-    )
-    .await?;
-
-    Ok((validators, fullnodes))
+    if skip_collecting_running_nodes {
+        Ok((HashMap::new(), HashMap::new()))
+    } else {
+        wait_genesis_job(&kube_client, &new_era, &kube_namespace).await?;
+        let (validators, fullnodes) = collect_running_nodes(
+            &kube_client,
+            kube_namespace,
+            use_port_forward,
+            enable_haproxy,
+        )
+        .await?;
+        Ok((validators, fullnodes))
+    }
 }
 
 pub fn construct_node_helm_values(
