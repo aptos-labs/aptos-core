@@ -641,7 +641,7 @@ more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default_features = false }
-ntest = "0.9.0"
+ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
 num_cpus = "1.13.1"
@@ -666,7 +666,7 @@ passkey-client = { version = "0.2.0" }
 passkey-types = { version = "0.2.0" }
 pbjson = "0.5.1"
 percent-encoding = "2.1.0"
-petgraph = "0.5.1"
+petgraph = "0.6.5"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
 # We're using git deps until https://github.com/poem-web/poem/pull/829 gets formally released.
