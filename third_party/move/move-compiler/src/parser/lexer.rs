@@ -481,7 +481,7 @@ fn find_token(
         '"' => {
             let line = &text.lines().next().unwrap()[1..];
             match get_string_len(line) {
-                Some(last_quote) => {
+                Some(_last_quote) => {
                     let loc = make_loc(file_hash, start_offset, start_offset);
                     return Err(Box::new(diag!(
                         Syntax::InvalidByteString,
