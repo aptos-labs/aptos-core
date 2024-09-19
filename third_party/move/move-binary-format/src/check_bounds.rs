@@ -385,8 +385,11 @@ impl<'a> BoundsChecker<'a> {
                 }
             },
             StructFieldInformation::DeclaredVariants(variants) => {
-                for field in variants.iter().flat_map(|v| v.fields.iter()) {
-                    self.check_field_def(type_param_count, field)?;
+                for variant in variants {
+                    check_bounds_impl(self.view.identifiers(), variant.name)?;
+                    for field in &variant.fields {
+                        self.check_field_def(type_param_count, field)?;
+                    }
                 }
                 if variants.is_empty() {
                     // Empty variants are not allowed

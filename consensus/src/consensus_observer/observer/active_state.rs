@@ -101,8 +101,8 @@ impl ActiveObserverState {
     /// root ledger info and remove the blocks from the given stores.
     pub fn create_commit_callback(
         &self,
-        pending_ordered_blocks: OrderedBlockStore,
-        block_payload_store: BlockPayloadStore,
+        pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
+        block_payload_store: Arc<Mutex<BlockPayloadStore>>,
     ) -> StateComputerCommitCallBackType {
         // Clone the root pointer
         let root = self.root.clone();
@@ -243,7 +243,7 @@ async fn extract_on_chain_configs(
     let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
         on_chain_configs.get();
     if let Err(error) = &onchain_randomness_config_seq_num {
-        error!(
+        warn!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                 "Failed to read on-chain randomness config seq num! Error: {:?}",
                 error
@@ -282,15 +282,17 @@ async fn extract_on_chain_configs(
 /// A simple helper function that handles the committed blocks
 /// (as part of the commit callback).
 fn handle_committed_blocks(
-    pending_ordered_blocks: OrderedBlockStore,
-    block_payload_store: BlockPayloadStore,
+    pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
+    block_payload_store: Arc<Mutex<BlockPayloadStore>>,
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
     blocks: &[Arc<PipelinedBlock>],
     ledger_info: LedgerInfoWithSignatures,
 ) {
     // Remove the committed blocks from the payload and pending stores
-    block_payload_store.remove_committed_blocks(blocks);
-    pending_ordered_blocks.remove_blocks_for_commit(&ledger_info);
+    block_payload_store.lock().remove_committed_blocks(blocks);
+    pending_ordered_blocks
+        .lock()
+        .remove_blocks_for_commit(&ledger_info);
 
     // Verify the ledger info is for the same epoch
     let mut root = root.lock();
@@ -407,8 +409,12 @@ mod test {
         let root = Arc::new(Mutex::new(create_ledger_info(epoch, round)));
 
         // Create the ordered block store and block payload store
-        let ordered_block_store = OrderedBlockStore::new(node_config.consensus_observer);
-        let mut block_payload_store = BlockPayloadStore::new(node_config.consensus_observer);
+        let ordered_block_store = Arc::new(Mutex::new(OrderedBlockStore::new(
+            node_config.consensus_observer,
+        )));
+        let block_payload_store = Arc::new(Mutex::new(BlockPayloadStore::new(
+            node_config.consensus_observer,
+        )));
 
         // Handle the committed blocks at the wrong epoch and verify the root is not updated
         handle_committed_blocks(
@@ -432,12 +438,16 @@ mod test {
 
         // Add pending ordered blocks
         let num_ordered_blocks = 10;
-        let ordered_blocks =
-            create_and_add_ordered_blocks(&ordered_block_store, num_ordered_blocks, epoch, round);
+        let ordered_blocks = create_and_add_ordered_blocks(
+            ordered_block_store.clone(),
+            num_ordered_blocks,
+            epoch,
+            round,
+        );
 
         // Add block payloads for the ordered blocks
         for ordered_block in &ordered_blocks {
-            create_and_add_payloads_for_ordered_block(&mut block_payload_store, ordered_block);
+            create_and_add_payloads_for_ordered_block(block_payload_store.clone(), ordered_block);
         }
 
         // Create the commit ledger info (for the second to last block)
@@ -461,8 +471,11 @@ mod test {
         );
 
         // Verify the committed blocks are removed from the stores
-        assert_eq!(ordered_block_store.get_all_ordered_blocks().len(), 1);
-        assert_eq!(block_payload_store.get_block_payloads().lock().len(), 1);
+        assert_eq!(ordered_block_store.lock().get_all_ordered_blocks().len(), 1);
+        assert_eq!(
+            block_payload_store.lock().get_block_payloads().lock().len(),
+            1
+        );
 
         // Verify the root is updated
         assert_eq!(root.lock().clone(), committed_ledger_info);
@@ -495,7 +508,7 @@ mod test {
 
     /// Creates and adds the specified number of ordered blocks to the ordered blocks
     fn create_and_add_ordered_blocks(
-        ordered_block_store: &OrderedBlockStore,
+        ordered_block_store: Arc<Mutex<OrderedBlockStore>>,
         num_ordered_blocks: usize,
         epoch: u64,
         starting_round: Round,
@@ -532,7 +545,9 @@ mod test {
             let ordered_block = OrderedBlock::new(blocks, ordered_proof);
 
             // Insert the block into the ordered block store
-            ordered_block_store.insert_ordered_block(ordered_block.clone());
+            ordered_block_store
+                .lock()
+                .insert_ordered_block(ordered_block.clone());
 
             // Add the block to the ordered blocks
             ordered_blocks.push(ordered_block);
@@ -543,13 +558,15 @@ mod test {
 
     /// Creates and adds payloads for the ordered block
     fn create_and_add_payloads_for_ordered_block(
-        block_payload_store: &mut BlockPayloadStore,
+        block_payload_store: Arc<Mutex<BlockPayloadStore>>,
         ordered_block: &OrderedBlock,
     ) {
         for block in ordered_block.blocks() {
             let block_payload =
                 BlockPayload::new(block.block_info(), BlockTransactionPayload::empty());
-            block_payload_store.insert_block_payload(block_payload, true);
+            block_payload_store
+                .lock()
+                .insert_block_payload(block_payload, true);
         }
     }
 

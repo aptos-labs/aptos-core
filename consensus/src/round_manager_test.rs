@@ -4,6 +4,7 @@
 
 use crate::{
     block_storage::{pending_blocks::PendingBlocks, BlockReader, BlockStore},
+    counters,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -1144,11 +1145,13 @@ fn new_round_on_timeout_certificate() {
                 None,
             ),
         );
+        let before = counters::ERROR_COUNT.get();
         assert!(node
             .round_manager
             .process_proposal_msg(old_good_proposal)
             .await
-            .is_err());
+            .is_ok()); // we eat the error
+        assert_eq!(counters::ERROR_COUNT.get(), before + 1); // but increase the counter
     });
 }
 

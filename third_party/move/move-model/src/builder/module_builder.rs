@@ -1257,6 +1257,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         }
                     })
                     .collect_vec();
+                if variant_maps.is_empty() {
+                    self.parent.error(
+                        &self.parent.to_loc(&def.loc),
+                        &format!(
+                            "enum type `{}` must have at least one variant.",
+                            qsym.symbol.display(self.parent.env.symbol_pool())
+                        ),
+                    )
+                }
                 (StructLayout::Variants(variant_maps), false)
             },
             EA::StructLayout::Native(_) => (StructLayout::None, false),
@@ -3480,9 +3489,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let spec = self.struct_specs.remove(&name.symbol).unwrap_or_default();
             let mut field_data: BTreeMap<FieldId, FieldData> = BTreeMap::new();
             let mut variants: BTreeMap<Symbol, model::StructVariant> = BTreeMap::new();
-            match &entry.layout {
+            let is_enum = match &entry.layout {
                 StructLayout::Singleton(fields, _) => {
                     field_data.extend(fields.values().map(|f| (FieldId::new(f.name), f.clone())));
+                    false
                 },
                 StructLayout::Variants(entry_variants) => {
                     for (order, variant) in entry_variants.iter().enumerate() {
@@ -3501,9 +3511,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             field_data.insert(field_id, field);
                         }
                     }
+                    true
                 },
-                StructLayout::None => {},
-            }
+                StructLayout::None => false,
+            };
             let data = StructData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
@@ -3513,11 +3524,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 abilities: entry.abilities,
                 spec_var_opt: None,
                 field_data,
-                variants: if variants.is_empty() {
-                    None
-                } else {
-                    Some(variants)
-                },
+                variants: if is_enum { Some(variants) } else { None },
                 spec: RefCell::new(spec),
                 is_native: entry.is_native,
             };

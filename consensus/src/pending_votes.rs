@@ -19,8 +19,12 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
-    ledger_info::{LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures, VerificationStatus},
+    ledger_info::{LedgerInfoWithUnverifiedSignatures, LedgerInfoWithSignatures, VerificationStatus},
     validator_verifier::VerifyError,
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+    sync::Arc,
 };
 use std::{collections::HashMap, fmt, sync::Arc};
 
@@ -139,7 +143,7 @@ impl PendingVotes {
         let (hash_index, status) = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
             (
                 len,
-                VoteStatus::NotEnoughVotes(LedgerInfoWithMixedSignatures::new(
+                VoteStatus::NotEnoughVotes(LedgerInfoWithUnverifiedSignatures::new(
                     vote.ledger_info().clone(),
                 )),
             )

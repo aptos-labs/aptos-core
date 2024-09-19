@@ -16,7 +16,7 @@ use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithVerifiedSignatures},
     validator_verifier::ValidatorVerifier,
 };
 use futures::future::BoxFuture;
@@ -68,7 +68,7 @@ fn generate_executed_item_from_ordered(
     order_vote_enabled: bool,
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
-    let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
+    let partial_commit_proof = LedgerInfoWithVerifiedSignatures::new(
         generate_commit_ledger_info(&commit_info, &ordered_proof, order_vote_enabled),
         verified_signatures,
     );
@@ -106,7 +106,7 @@ pub struct OrderedItem {
 
 pub struct ExecutedItem {
     pub executed_blocks: Vec<PipelinedBlock>,
-    pub partial_commit_proof: LedgerInfoWithPartialSignatures,
+    pub partial_commit_proof: LedgerInfoWithVerifiedSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_info: BlockInfo,
     pub ordered_proof: LedgerInfoWithSignatures,
@@ -114,7 +114,7 @@ pub struct ExecutedItem {
 
 pub struct SignedItem {
     pub executed_blocks: Vec<PipelinedBlock>,
-    pub partial_commit_proof: LedgerInfoWithPartialSignatures,
+    pub partial_commit_proof: LedgerInfoWithVerifiedSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
     pub rb_handle: Option<(Instant, DropGuard)>,
@@ -146,9 +146,10 @@ impl BufferItem {
         ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
+        unverified_signatures: PartialSignatures,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
-            unverified_signatures: PartialSignatures::empty(),
+            unverified_signatures,
             commit_proof: None,
             callback,
             ordered_blocks,

@@ -90,6 +90,7 @@ pub struct ConsensusConfig {
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
     pub enable_pre_commit: bool,
+    pub max_pending_rounds_in_commit_vote_cache: u64,
     pub optimistic_sig_verification_for_votes: bool,
     pub optimistic_sig_verification_for_order_votes: bool,
 }
@@ -319,6 +320,7 @@ impl Default for ConsensusConfig {
             },
             num_bounded_executor_tasks: 16,
             enable_pre_commit: true,
+            max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification_for_votes: true,
             optimistic_sig_verification_for_order_votes: true,
         }
