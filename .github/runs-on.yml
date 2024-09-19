@@ -1,11 +1,21 @@
 images:
+  # This is pinned to a specific AMI
   aptos-ubuntu-x64:
     platform: "linux"
     arch: "x64"
     ami: "ami-09f7d4bfb08b771be" # image for testing, with gcloud sdk and kubectl
     owner: "058264343338" # aptos-ci AWS account id
+
+  # Points to the latest image prefixed with aptos-. Use this for testing manually built images
   aptos-ubuntu-x64-latest:
     platform: "linux"
     arch: "x64"
     owner: "058264343338" # aptos-ci AWS account id
     name: "aptos-runs-on-*"
+
+  # Points to the latest image built by the build-runs-on-image workflow
+  aptos-ubuntu-x64-stable:
+    platform: "linux"
+    arch: "x64"
+    owner: "058264343338" # aptos-ci AWS account id
+    name: "aptos-stable-runs-on-*"
