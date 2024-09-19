@@ -39,6 +39,18 @@ module 0x42::test {
           Tuple()
         }
     }
+    private fun inc_coin_at(addr: address)
+        acquires test::Coin(*)
+     {
+        {
+          let coin: &mut test::Coin = BorrowGlobal(Mutable)<test::Coin>(addr);
+          {
+            let $t: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut test::Coin>(coin));
+            $t = Add<u256>(Deref($t), 1)
+          };
+          Tuple()
+        }
+    }
     private fun inc_new(x: &mut u256) {
         {
           let $t: &mut u256 = x;
@@ -93,18 +105,6 @@ module 0x42::test {
     private fun inc_wrapped_coin_old(x: &mut test::Wrapper<test::Coin>) {
         select test::Coin.0<test::Coin>(select test::Wrapper.0<&mut test::Wrapper<test::Coin>>(x)) = Add<u256>(select test::Coin.0<test::Coin>(select test::Wrapper.0<&mut test::Wrapper<test::Coin>>(x)), 1);
         Tuple()
-    }
-    private fun inv_coin_at(addr: address)
-        acquires test::Coin(*)
-     {
-        {
-          let coin: &mut test::Coin = BorrowGlobal(Mutable)<test::Coin>(addr);
-          {
-            let $t: &mut u256 = Borrow(Mutable)(select test::Coin.0<&mut test::Coin>(coin));
-            $t = Add<u256>(Deref($t), 1)
-          };
-          Tuple()
-        }
     }
 } // end 0x42::test
 
@@ -195,6 +195,23 @@ fun test::coin_inc_old_2($t0: &mut test::Coin) {
   3: $t2 := +($t3, $t4)
   4: write_ref($t1, $t2)
   5: return ()
+}
+
+
+[variant baseline]
+fun test::inc_coin_at($t0: address) {
+     var $t1: &mut test::Coin
+     var $t2: &mut u256
+     var $t3: u256
+     var $t4: u256
+     var $t5: u256
+  0: $t1 := borrow_global<test::Coin>($t0)
+  1: $t2 := borrow_field<test::Coin>.0($t1)
+  2: $t4 := read_ref($t2)
+  3: $t5 := 1
+  4: $t3 := +($t4, $t5)
+  5: write_ref($t2, $t3)
+  6: return ()
 }
 
 
@@ -393,23 +410,6 @@ fun test::inc_wrapped_coin_old($t0: &mut test::Wrapper<test::Coin>) {
   8: return ()
 }
 
-
-[variant baseline]
-fun test::inv_coin_at($t0: address) {
-     var $t1: &mut test::Coin
-     var $t2: &mut u256
-     var $t3: u256
-     var $t4: u256
-     var $t5: u256
-  0: $t1 := borrow_global<test::Coin>($t0)
-  1: $t2 := borrow_field<test::Coin>.0($t1)
-  2: $t4 := read_ref($t2)
-  3: $t5 := 1
-  4: $t3 := +($t4, $t5)
-  5: write_ref($t2, $t3)
-  6: return ()
-}
-
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
@@ -528,6 +528,30 @@ fun test::coin_inc_old_2($t0: &mut test::Coin) {
   4: write_ref($t1, $t3)
      # live vars:
   5: return ()
+}
+
+
+[variant baseline]
+fun test::inc_coin_at($t0: address) {
+     var $t1: &mut test::Coin
+     var $t2: &mut u256
+     var $t3: u256 [unused]
+     var $t4: u256
+     var $t5: u256
+     # live vars: $t0
+  0: $t1 := borrow_global<test::Coin>($t0)
+     # live vars: $t1
+  1: $t2 := borrow_field<test::Coin>.0($t1)
+     # live vars: $t2
+  2: $t4 := read_ref($t2)
+     # live vars: $t2, $t4
+  3: $t5 := 1
+     # live vars: $t2, $t4, $t5
+  4: $t4 := +($t4, $t5)
+     # live vars: $t2, $t4
+  5: write_ref($t2, $t4)
+     # live vars:
+  6: return ()
 }
 
 
@@ -808,30 +832,6 @@ fun test::inc_wrapped_coin_old($t0: &mut test::Wrapper<test::Coin>) {
 }
 
 
-[variant baseline]
-fun test::inv_coin_at($t0: address) {
-     var $t1: &mut test::Coin
-     var $t2: &mut u256
-     var $t3: u256 [unused]
-     var $t4: u256
-     var $t5: u256
-     # live vars: $t0
-  0: $t1 := borrow_global<test::Coin>($t0)
-     # live vars: $t1
-  1: $t2 := borrow_field<test::Coin>.0($t1)
-     # live vars: $t2
-  2: $t4 := read_ref($t2)
-     # live vars: $t2, $t4
-  3: $t5 := 1
-     # live vars: $t2, $t4, $t5
-  4: $t4 := +($t4, $t5)
-     # live vars: $t2, $t4
-  5: write_ref($t2, $t4)
-     # live vars:
-  6: return ()
-}
-
-
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.test {
@@ -912,7 +912,22 @@ B0:
 	8: WriteRef
 	9: Ret
 }
-inc_new(Arg0: &mut u256) /* def_idx: 6 */ {
+inc_coin_at(Arg0: address) /* def_idx: 6 */ {
+L1:	loc0: &mut u256
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: MutBorrowGlobal[0](Coin)
+	2: MutBorrowField[0](Coin._0: u256)
+	3: StLoc[1](loc0: &mut u256)
+	4: CopyLoc[1](loc0: &mut u256)
+	5: ReadRef
+	6: LdU256(1)
+	7: Add
+	8: MoveLoc[1](loc0: &mut u256)
+	9: WriteRef
+	10: Ret
+}
+inc_new(Arg0: &mut u256) /* def_idx: 7 */ {
 B0:
 	0: CopyLoc[0](Arg0: &mut u256)
 	1: ReadRef
@@ -922,7 +937,7 @@ B0:
 	5: WriteRef
 	6: Ret
 }
-inc_old(Arg0: &mut u256) /* def_idx: 7 */ {
+inc_old(Arg0: &mut u256) /* def_idx: 8 */ {
 B0:
 	0: CopyLoc[0](Arg0: &mut u256)
 	1: ReadRef
@@ -932,12 +947,12 @@ B0:
 	5: WriteRef
 	6: Ret
 }
-inc_vec_coin_new(Arg0: vector<Coin>, Arg1: u64) /* def_idx: 8 */ {
+inc_vec_coin_new(Arg0: vector<Coin>, Arg1: u64) /* def_idx: 9 */ {
 L2:	loc0: &mut u256
 B0:
 	0: MutBorrowLoc[0](Arg0: vector<Coin>)
 	1: MoveLoc[1](Arg1: u64)
-	2: VecMutBorrow(5)
+	2: VecMutBorrow(6)
 	3: MutBorrowField[0](Coin._0: u256)
 	4: StLoc[2](loc0: &mut u256)
 	5: CopyLoc[2](loc0: &mut u256)
@@ -948,23 +963,23 @@ B0:
 	10: WriteRef
 	11: Ret
 }
-inc_vec_coin_old(Arg0: vector<Coin>, Arg1: u64) /* def_idx: 9 */ {
+inc_vec_coin_old(Arg0: vector<Coin>, Arg1: u64) /* def_idx: 10 */ {
 B0:
 	0: ImmBorrowLoc[0](Arg0: vector<Coin>)
 	1: CopyLoc[1](Arg1: u64)
-	2: VecImmBorrow(5)
+	2: VecImmBorrow(6)
 	3: ImmBorrowField[0](Coin._0: u256)
 	4: ReadRef
 	5: LdU256(1)
 	6: Add
 	7: MutBorrowLoc[0](Arg0: vector<Coin>)
 	8: MoveLoc[1](Arg1: u64)
-	9: VecMutBorrow(5)
+	9: VecMutBorrow(6)
 	10: MutBorrowField[0](Coin._0: u256)
 	11: WriteRef
 	12: Ret
 }
-inc_vec_new(Arg0: &mut vector<u256>, Arg1: u64) /* def_idx: 10 */ {
+inc_vec_new(Arg0: &mut vector<u256>, Arg1: u64) /* def_idx: 11 */ {
 L2:	loc0: &mut u256
 B0:
 	0: MoveLoc[0](Arg0: &mut vector<u256>)
@@ -979,7 +994,7 @@ B0:
 	9: WriteRef
 	10: Ret
 }
-inc_vec_old(Arg0: vector<u256>, Arg1: u64) /* def_idx: 11 */ {
+inc_vec_old(Arg0: vector<u256>, Arg1: u64) /* def_idx: 12 */ {
 B0:
 	0: ImmBorrowLoc[0](Arg0: vector<u256>)
 	1: CopyLoc[1](Arg1: u64)
@@ -993,12 +1008,12 @@ B0:
 	9: WriteRef
 	10: Ret
 }
-inc_vec_wrapped_coin_new(Arg0: vector<Wrapper<Coin>>, Arg1: u64) /* def_idx: 12 */ {
+inc_vec_wrapped_coin_new(Arg0: vector<Wrapper<Coin>>, Arg1: u64) /* def_idx: 13 */ {
 L2:	loc0: &mut u256
 B0:
 	0: MutBorrowLoc[0](Arg0: vector<Wrapper<Coin>>)
 	1: MoveLoc[1](Arg1: u64)
-	2: VecMutBorrow(9)
+	2: VecMutBorrow(10)
 	3: MutBorrowFieldGeneric[0](Wrapper._0: Ty0)
 	4: MutBorrowField[0](Coin._0: u256)
 	5: StLoc[2](loc0: &mut u256)
@@ -1010,11 +1025,11 @@ B0:
 	11: WriteRef
 	12: Ret
 }
-inc_vec_wrapped_coin_old(Arg0: vector<Wrapper<Coin>>, Arg1: u64) /* def_idx: 13 */ {
+inc_vec_wrapped_coin_old(Arg0: vector<Wrapper<Coin>>, Arg1: u64) /* def_idx: 14 */ {
 B0:
 	0: ImmBorrowLoc[0](Arg0: vector<Wrapper<Coin>>)
 	1: CopyLoc[1](Arg1: u64)
-	2: VecImmBorrow(9)
+	2: VecImmBorrow(10)
 	3: ImmBorrowFieldGeneric[0](Wrapper._0: Ty0)
 	4: ImmBorrowField[0](Coin._0: u256)
 	5: ReadRef
@@ -1022,13 +1037,13 @@ B0:
 	7: Add
 	8: MutBorrowLoc[0](Arg0: vector<Wrapper<Coin>>)
 	9: MoveLoc[1](Arg1: u64)
-	10: VecMutBorrow(9)
+	10: VecMutBorrow(10)
 	11: MutBorrowFieldGeneric[0](Wrapper._0: Ty0)
 	12: MutBorrowField[0](Coin._0: u256)
 	13: WriteRef
 	14: Ret
 }
-inc_wrapped_coin_new(Arg0: &mut Wrapper<Coin>) /* def_idx: 14 */ {
+inc_wrapped_coin_new(Arg0: &mut Wrapper<Coin>) /* def_idx: 15 */ {
 L1:	loc0: &mut u256
 B0:
 	0: MoveLoc[0](Arg0: &mut Wrapper<Coin>)
@@ -1043,7 +1058,7 @@ B0:
 	9: WriteRef
 	10: Ret
 }
-inc_wrapped_coin_old(Arg0: &mut Wrapper<Coin>) /* def_idx: 15 */ {
+inc_wrapped_coin_old(Arg0: &mut Wrapper<Coin>) /* def_idx: 16 */ {
 B0:
 	0: CopyLoc[0](Arg0: &mut Wrapper<Coin>)
 	1: ImmBorrowFieldGeneric[0](Wrapper._0: Ty0)
@@ -1054,21 +1069,6 @@ B0:
 	6: MoveLoc[0](Arg0: &mut Wrapper<Coin>)
 	7: MutBorrowFieldGeneric[0](Wrapper._0: Ty0)
 	8: MutBorrowField[0](Coin._0: u256)
-	9: WriteRef
-	10: Ret
-}
-inv_coin_at(Arg0: address) /* def_idx: 16 */ {
-L1:	loc0: &mut u256
-B0:
-	0: MoveLoc[0](Arg0: address)
-	1: MutBorrowGlobal[0](Coin)
-	2: MutBorrowField[0](Coin._0: u256)
-	3: StLoc[1](loc0: &mut u256)
-	4: CopyLoc[1](loc0: &mut u256)
-	5: ReadRef
-	6: LdU256(1)
-	7: Add
-	8: MoveLoc[1](loc0: &mut u256)
 	9: WriteRef
 	10: Ret
 }

@@ -71,7 +71,7 @@ module 0x42::test {
 		x[index].0.0 = x[index].0.0 + 1;
 	}
 
-	fun inv_coin_at(addr: address) acquires Coin {
+	fun inc_coin_at(addr: address) acquires Coin {
 		let coin = &mut Coin[addr];
 		coin.0 += 1;
 	}
