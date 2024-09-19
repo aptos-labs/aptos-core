@@ -318,11 +318,6 @@ impl LedgerInfoWithV0 {
     }
 }
 
-pub enum VerificationStatus {
-    Verified,
-    Unverified,
-}
-
 /// Contains the ledger info and partially aggregated signature from a set of validators, this data
 /// is only used during the aggregating the votes from different validators and is not persisted in DB.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -437,9 +432,6 @@ impl LedgerInfoWithUnverifiedSignatures {
         if self.verified_signatures.contains_voter(&validator) {
             return;
         }
-        if self.unverified_signatures.contains_voter(&validator) {
-            self.unverified_signatures.remove_signature(validator);
-        }
         self.unverified_signatures
             .add_signature(validator, signature);
     }
@@ -527,15 +519,18 @@ impl LedgerInfoWithUnverifiedSignatures {
                             .verify(*account_address, self.ledger_info(), signature)
                             .is_ok()
                         {
-                            return Some((*account_address, signature.clone()));
+                            return Some(*account_address);
                         }
                         None
                     })
                     .collect::<Vec<_>>();
-                for (account_address, signature) in verified {
-                    self.verified_signatures
-                        .add_signature(account_address, signature);
-                    self.unverified_signatures.remove_signature(account_address);
+                for account_address in verified {
+                    if let Some(signature) =
+                        self.unverified_signatures.remove_signature(account_address)
+                    {
+                        self.verified_signatures
+                            .add_signature(account_address, signature);
+                    }
                 }
 
                 // For these authors, we will not use optimistic signature verification in the future.
