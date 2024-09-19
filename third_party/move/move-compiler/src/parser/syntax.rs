@@ -1914,7 +1914,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                     let rhs = Box::new(parse_exp(context)?);
                     Exp_::Assign(Box::new(lhs), None, rhs)
                 },
-                Tok::PlusEqual => {
+                Tok::PlusEqual | Tok::SubEqual | Tok::MulEqual | Tok::ModEqual | Tok::DivEqual | Tok::BitOrEqual | Tok::BitAndEqual | Tok::XorEqual | Tok::ShlEqual | Tok::ShrEqual => {
                     require_language_version(
                         context,
                         current_token_loc(context.tokens),
@@ -1949,6 +1949,15 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 fn op_equal_to_binop(token: &Tok) -> Option<BinOp_> {
     match token {
         Tok::PlusEqual => Some(BinOp_::Add),
+        Tok::SubEqual => Some(BinOp_::Sub),
+        Tok::MulEqual => Some(BinOp_::Mul),
+        Tok::ModEqual => Some(BinOp_::Mod),
+        Tok::DivEqual => Some(BinOp_::Div),
+        Tok::BitOrEqual => Some(BinOp_::BitOr),
+        Tok::BitAndEqual => Some(BinOp_::BitAnd),
+        Tok::XorEqual => Some(BinOp_::Xor),
+        Tok::ShlEqual => Some(BinOp_::Shl),
+        Tok::ShrEqual => Some(BinOp_::Shr),
         _ => None,
     }
 }
