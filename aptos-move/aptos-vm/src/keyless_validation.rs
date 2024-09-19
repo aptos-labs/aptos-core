@@ -198,6 +198,7 @@ pub(crate) fn validate_authenticators(
         sig.verify_expiry(onchain_timestamp_obj.microseconds)
             .map_err(|_| {
                 // println!("[aptos-vm][groth16] ZKP expired");
+
                 invalid_signature!("The ephemeral keypair has expired")
             })?;
     }
@@ -211,6 +212,7 @@ pub(crate) fn validate_authenticators(
         Some(bytes) => Some(EphemeralPublicKey::ed25519(
             Ed25519PublicKey::try_from(bytes.as_slice()).map_err(|_| {
                 // println!("[aptos-vm][groth16] On chain TW PK is invalid");
+
                 invalid_signature!("The training wheels PK set on chain is not a valid PK")
             })?,
         )),
@@ -303,8 +305,8 @@ pub(crate) fn validate_authenticators(
                                 .verify_groth16_proof(public_inputs_hash, pvk.as_ref().unwrap());
 
                             result.map_err(|_| {
-                                 // println!("[aptos-vm][groth16] ZKP verification failed");
-                                 // println!("[aptos-vm][groth16] PIH: {}", public_inputs_hash);
+                                // println!("[aptos-vm][groth16] ZKP verification failed");
+                                // println!("[aptos-vm][groth16] PIH: {}", public_inputs_hash);
                                 // match zksig.proof {
                                 //     ZKP::Groth16(proof) => {
                                 //         println!("[aptos-vm][groth16] ZKP: {}", proof.hash());
