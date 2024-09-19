@@ -66,7 +66,7 @@ pub(crate) fn choose_index(mut weights: Vec<u128>, state: Vec<u8>) -> usize {
                 Ordering::Greater
             }
         })
-        .unwrap_err()
+        .expect_err("Comparison never returns equals, so it's always guaranteed to be error")
 }
 
 #[test]

@@ -8,8 +8,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_16, AptosGasParameters, MiscGasParameters,
-    NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
@@ -40,13 +39,8 @@ impl GenesisMoveVM {
         let features = Features::default();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
-        let pseudo_meter_vector_ty_to_ty_tag_construction = true;
-        let vm_config = aptos_prod_vm_config(
-            &features,
-            &timed_features,
-            pseudo_meter_vector_ty_to_ty_tag_construction,
-            aptos_default_ty_builder(&features),
-        );
+        let vm_config =
+            aptos_prod_vm_config(&features, &timed_features, aptos_default_ty_builder());
 
         // All genesis sessions run with unmetered gas meter, and here we set
         // the gas parameters for natives as zeros (because they do not matter).
@@ -60,7 +54,7 @@ impl GenesisMoveVM {
         );
 
         let vm = MoveVM::new_with_config(
-            aptos_natives_with_builder(&mut native_builder),
+            aptos_natives_with_builder(&mut native_builder, false),
             vm_config.clone(),
         );
 
@@ -105,6 +99,7 @@ impl MoveVmExt {
         gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
         gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
+        inject_create_signer_for_gov_sim: bool,
         resolver: &impl AptosMoveResolver,
     ) -> Self {
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
@@ -113,8 +108,7 @@ impl MoveVmExt {
         //            We should clean up the logic here once we get that refactored.
         let (native_gas_params, misc_gas_params, ty_builder) = match gas_params {
             Ok(gas_params) => {
-                let ty_builder =
-                    aptos_prod_ty_builder(env.features(), gas_feature_version, gas_params);
+                let ty_builder = aptos_prod_ty_builder(gas_feature_version, gas_params);
                 (
                     gas_params.natives.clone(),
                     gas_params.vm.misc.clone(),
@@ -122,7 +116,7 @@ impl MoveVmExt {
                 )
             },
             Err(_) => {
-                let ty_builder = aptos_default_ty_builder(env.features());
+                let ty_builder = aptos_default_ty_builder();
                 (
                     NativeGasParameters::zeros(),
                     MiscGasParameters::zeros(),
@@ -142,8 +136,6 @@ impl MoveVmExt {
 
         // TODO(George): Move gas configs to environment to avoid this clone!
         let mut vm_config = env.vm_config().clone();
-        vm_config.pseudo_meter_vector_ty_to_ty_tag_construction =
-            gas_feature_version >= RELEASE_V1_16;
         vm_config.ty_builder = ty_builder;
         vm_config.disallow_dispatch_for_native = env
             .features()
@@ -155,6 +147,7 @@ impl MoveVmExt {
                 vm_config,
                 resolver,
                 env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+                inject_create_signer_for_gov_sim,
             )
             .expect("should be able to create Move VM; check if there are duplicated natives"),
             env,
@@ -167,17 +160,25 @@ impl MoveVmExt {
         env: Arc<Environment>,
         resolver: &impl AptosMoveResolver,
     ) -> Self {
-        Self::new_impl(gas_feature_version, gas_params, env, None, resolver)
+        Self::new_impl(gas_feature_version, gas_params, env, None, false, resolver)
     }
 
-    pub fn new_with_gas_hook(
+    pub fn new_with_extended_options(
         gas_feature_version: u64,
         gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
         gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
+        inject_create_signer_for_gov_sim: bool,
         resolver: &impl AptosMoveResolver,
     ) -> Self {
-        Self::new_impl(gas_feature_version, gas_params, env, gas_hook, resolver)
+        Self::new_impl(
+            gas_feature_version,
+            gas_params,
+            env,
+            gas_hook,
+            inject_create_signer_for_gov_sim,
+            resolver,
+        )
     }
 
     pub fn new_session<'r, R: AptosMoveResolver>(

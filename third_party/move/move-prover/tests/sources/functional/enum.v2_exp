@@ -1,0 +1,62 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+  ┌─ tests/sources/functional/enum.move:9:9
+  │
+9 │         invariant self.x > 20;
+  │         ^^^^^^^^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/enum.move:15: t9_common_field
+  =     at tests/sources/functional/enum.move:16: t9_common_field
+  =     at tests/sources/functional/enum.move:17: t9_common_field
+  =     at tests/sources/functional/enum.move:14: t9_common_field
+  =     at tests/sources/functional/enum.move:9
+  =     at tests/sources/functional/enum.move:10
+  =     at tests/sources/functional/enum.move:14: t9_common_field
+  =         common = <redacted>
+  =     at tests/sources/functional/enum.move:19: t9_common_field
+  =     at tests/sources/functional/enum.move:9
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/enum.move:10:9
+   │
+10 │         invariant (self is CommonFields::Bar) ==> self.z > 10;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/enum.move:25: test_data_invariant
+   =     at tests/sources/functional/enum.move:26: test_data_invariant
+   =     at tests/sources/functional/enum.move:27: test_data_invariant
+   =     at tests/sources/functional/enum.move:24: test_data_invariant
+   =     at tests/sources/functional/enum.move:9
+   =     at tests/sources/functional/enum.move:10
+   =     at tests/sources/functional/enum.move:24: test_data_invariant
+   =         common = <redacted>
+   =     at tests/sources/functional/enum.move:29: test_data_invariant
+   =         <redacted> = <redacted>
+   =         z = <redacted>
+   =     at tests/sources/functional/enum.move:9
+   =     at tests/sources/functional/enum.move:10
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/enum.move:68:13
+   │
+68 │             assert _common_vector_1.x != _common_vector_2.x; // this fails
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/enum.move:56: test_enum_vector
+   =     at tests/sources/functional/enum.move:55: test_enum_vector
+   =         _common_vector_1 = <redacted>
+   =     at tests/sources/functional/enum.move:59: test_enum_vector
+   =     at tests/sources/functional/enum.move:60: test_enum_vector
+   =     at tests/sources/functional/enum.move:61: test_enum_vector
+   =     at tests/sources/functional/enum.move:58: test_enum_vector
+   =     at tests/sources/functional/enum.move:9
+   =     at tests/sources/functional/enum.move:10
+   =     at tests/sources/functional/enum.move:58: test_enum_vector
+   =         _common_fields = <redacted>
+   =     at tests/sources/functional/enum.move:64: test_enum_vector
+   =     at tests/sources/functional/enum.move:65: test_enum_vector
+   =     at tests/sources/functional/enum.move:9
+   =     at tests/sources/functional/enum.move:65: test_enum_vector
+   =     at tests/sources/functional/enum.move:63: test_enum_vector
+   =         _common_vector_2 = <redacted>
+   =     at tests/sources/functional/enum.move:68: test_enum_vector

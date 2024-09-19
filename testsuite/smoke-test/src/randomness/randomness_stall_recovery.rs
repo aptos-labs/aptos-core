@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    genesis::enable_sync_only_mode, randomness::get_on_chain_resource,
-    smoke_test_environment::SwarmBuilder,
+    genesis::enable_sync_only_mode, smoke_test_environment::SwarmBuilder,
+    utils::get_on_chain_resource,
 };
 use aptos::common::types::GasOptions;
 use aptos_config::config::{OverrideNodeConfig, PersistableConfig};
@@ -80,6 +80,23 @@ async fn randomness_stall_recovery() {
         info!("Restarting validator {}.", idx);
         validator.start().unwrap();
         info!("Let validator {} bake for 5 secs.", idx);
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    }
+
+    info!("Hot-fixing the VFNs.");
+    for (idx, vfn) in swarm.fullnodes_mut().enumerate() {
+        info!("Stopping VFN {}.", idx);
+        vfn.stop();
+        let config_path = vfn.config_path();
+        let mut vfn_override_config = OverrideNodeConfig::load_config(config_path.clone()).unwrap();
+        vfn_override_config
+            .override_config_mut()
+            .randomness_override_seq_num = 1;
+        info!("Updating VFN {} config.", idx);
+        vfn_override_config.save_config(config_path).unwrap();
+        info!("Restarting VFN {}.", idx);
+        vfn.start().unwrap();
+        info!("Let VFN {} bake for 5 secs.", idx);
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 

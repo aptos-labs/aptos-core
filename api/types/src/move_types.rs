@@ -225,6 +225,12 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
 
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
+        if let Some((_, name)) = s.variant_info {
+            map.insert(
+                IdentifierWrapper::from_str("__variant__")?,
+                MoveValue::String(name.to_string()).json()?,
+            );
+        }
         for (id, val) in s.value {
             map.insert(id.into(), MoveValue::try_from(val)?.json()?);
         }
@@ -324,6 +330,7 @@ impl From<TransactionArgument> for MoveValue {
             TransactionArgument::Bool(v) => MoveValue::Bool(v),
             TransactionArgument::Address(v) => MoveValue::Address(v.into()),
             TransactionArgument::U8Vector(bytes) => MoveValue::Bytes(HexEncodedBytes(bytes)),
+            TransactionArgument::Serialized(bytes) => MoveValue::Bytes(HexEncodedBytes(bytes)),
         }
     }
 }
@@ -853,6 +860,8 @@ pub struct MoveStruct {
     pub name: IdentifierWrapper,
     /// Whether the struct is a native struct of Move
     pub is_native: bool,
+    /// Whether the struct is marked with the #[event] annotation
+    pub is_event: bool,
     /// Abilities associated with the struct
     pub abilities: Vec<MoveAbility>,
     /// Generic types associated with the struct
@@ -1506,6 +1515,7 @@ mod tests {
         AnnotatedMoveStruct {
             abilities: AbilitySet::EMPTY,
             ty_tag: type_struct(typ),
+            variant_info: None,
             value: values,
         }
     }

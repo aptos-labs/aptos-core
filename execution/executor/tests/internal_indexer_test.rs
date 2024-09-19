@@ -53,7 +53,7 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
         validators[0].data.owner_address,
-        validators[0].consensus_key.clone(),
+        Arc::new(validators[0].consensus_key.clone()),
     );
     let account1 = LocalAccount::generate(&mut rng);
     let account2 = LocalAccount::generate(&mut rng);
@@ -136,7 +136,7 @@ fn test_db_indexer_data() {
     use std::{thread, time::Duration};
     // create test db
     let (aptos_db, core_account) = create_test_db();
-    let total_version = aptos_db.get_synced_version().unwrap();
+    let total_version = aptos_db.expect_synced_version();
     assert_eq!(total_version, 11);
     let temp_path = TempPath::new();
     let mut node_config = aptos_config::config::NodeConfig::default();
@@ -149,17 +149,18 @@ fn test_db_indexer_data() {
 
     let db_indexer = DBIndexer::new(internal_indexer_db.clone(), aptos_db.clone());
     // assert the data matches the expected data
-    let mut version = internal_indexer_db.get_persisted_version().unwrap();
-    assert_eq!(version, 0);
-    while version < total_version {
-        version = db_indexer.process_a_batch(Some(version)).unwrap();
+    let version = internal_indexer_db.get_persisted_version().unwrap();
+    assert_eq!(version, None);
+    let mut start_version = version.map_or(0, |v| v + 1);
+    while start_version < total_version {
+        start_version = db_indexer.process_a_batch(start_version).unwrap();
     }
     // wait for the commit to finish
     thread::sleep(Duration::from_millis(100));
     // indexer has process all the transactions
     assert_eq!(
         internal_indexer_db.get_persisted_version().unwrap(),
-        total_version
+        Some(total_version)
     );
 
     let txn_iter = internal_indexer_db

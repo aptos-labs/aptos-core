@@ -100,7 +100,6 @@ fn test_new_initialized_configs() {
         aptos_data_client,
         streaming_service_client,
         TimeService::mock(),
-        None,
     );
 
     // Verify the initial configs were notified

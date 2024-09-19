@@ -221,20 +221,26 @@ impl Context {
             .map_err(|e| e.into())
     }
 
-    pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
+    pub fn get_oldest_version_and_block_height<E: ServiceUnavailableError>(
+        &self,
+    ) -> Result<(Version, u64), E> {
+        self.db
+            .get_first_viable_block()
+            .context("Failed to retrieve oldest block information")
+            .map_err(|e| E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError))
+    }
+
+    pub fn get_latest_storage_ledger_info<E: ServiceUnavailableError>(
+        &self,
+    ) -> Result<LedgerInfo, E> {
         let ledger_info = self
             .get_latest_ledger_info_with_signatures()
             .context("Failed to retrieve latest ledger info")
             .map_err(|e| {
                 E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
             })?;
-        let (oldest_version, oldest_block_height) = self
-            .db
-            .get_first_viable_block()
-            .context("Failed to retrieve oldest block information")
-            .map_err(|e| {
-                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-            })?;
+
+        let (oldest_version, oldest_block_height) = self.get_oldest_version_and_block_height()?;
         let (_, _, newest_block_event) = self
             .db
             .get_block_info_by_version(ledger_info.ledger_info().version())
@@ -250,6 +256,15 @@ impl Context {
             oldest_block_height,
             newest_block_event.height(),
         ))
+    }
+
+    pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
+        if self.indexer_reader.is_some() {
+            let ledger_info = self.get_latest_internal_indexer_ledger_version_and_ledger_info()?;
+            Ok(ledger_info)
+        } else {
+            self.get_latest_storage_ledger_info()
+        }
     }
 
     pub fn get_latest_ledger_info_and_verify_lookup_version<E: StdApiError>(
@@ -275,6 +290,47 @@ impl Context {
         }
 
         Ok((latest_ledger_info, requested_ledger_version))
+    }
+
+    pub fn get_latest_internal_indexer_ledger_version_and_ledger_info<
+        E: ServiceUnavailableError,
+    >(
+        &self,
+    ) -> Result<LedgerInfo, E> {
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            if let Some(latest_version) = indexer_reader
+                .get_latest_internal_indexer_ledger_version()
+                .map_err(|err| {
+                    E::service_unavailable_with_code_no_info(err, AptosErrorCode::InternalError)
+                })?
+            {
+                let (_, _, new_block_event) = self
+                    .db
+                    .get_block_info_by_version(latest_version)
+                    .map_err(|_| {
+                        E::service_unavailable_with_code_no_info(
+                            "Failed to get block",
+                            AptosErrorCode::InternalError,
+                        )
+                    })?;
+                let (oldest_version, oldest_block_height) =
+                    self.get_oldest_version_and_block_height()?;
+                return Ok(LedgerInfo::new_ledger_info(
+                    &self.chain_id(),
+                    new_block_event.epoch(),
+                    latest_version,
+                    oldest_version,
+                    oldest_block_height,
+                    new_block_event.height(),
+                    new_block_event.proposed_time(),
+                ));
+            }
+        }
+
+        Err(E::service_unavailable_with_code_no_info(
+            "Indexer reader doesn't exist, or doesn't have data.",
+            AptosErrorCode::InternalError,
+        ))
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {

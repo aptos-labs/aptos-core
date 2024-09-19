@@ -21,7 +21,7 @@ use aptos_types::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
         EntryFunction, Script, SignedTransaction,
     },
-    utility_coin::APTOS_COIN_TYPE,
+    utility_coin::{AptosCoinType, CoinType},
 };
 use move_core_types::{
     identifier::Identifier,
@@ -757,6 +757,10 @@ async fn test_account_transaction_with_context(mut context: TestContext) {
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn]).await;
 
+    if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
+        indexer_reader.wait_for_internal_indexer(2).unwrap();
+    }
+
     let txns = context
         .get(
             format!(
@@ -875,7 +879,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_address() {
         "0x1222",
         "Coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -894,7 +898,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_module_name() {
         "0x1",
         "CoinInvalid",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -913,7 +917,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_name() {
         "0x1",
         "Coin",
         "transfer_invalid",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -932,7 +936,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_arguments() {
         "0x1",
         "Coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u8).unwrap(), // invalid type
@@ -951,7 +955,7 @@ async fn test_get_txn_execute_failed_by_missing_entry_function_arguments() {
         "0x1",
         "Coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             // missing arguments
@@ -974,7 +978,7 @@ async fn test_get_txn_execute_failed_by_entry_function_validation() {
         "0x1",
         "Coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
@@ -997,7 +1001,7 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_module_name() {
         "0x1",
         "coin",
         "transfer::what::what",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
@@ -1020,7 +1024,7 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name() {
         "0x1",
         "coin::coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
@@ -1561,7 +1565,7 @@ async fn test_simulation_failure_with_detail_error() {
                 Identifier::new("MemeCoin").unwrap(),
             ),
             Identifier::new("transfer").unwrap(),
-            vec![APTOS_COIN_TYPE.clone()],
+            vec![AptosCoinType::type_tag()],
             vec![
                 bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
                 bcs::to_bytes(&1u64).unwrap(),

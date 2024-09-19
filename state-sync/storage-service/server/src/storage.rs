@@ -443,7 +443,7 @@ impl StorageReaderInterface for StorageReader {
     ) -> aptos_storage_service_types::Result<u64, Error> {
         let number_of_states = self
             .storage
-            .get_state_leaf_count(version)
+            .get_state_item_count(version)
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
         Ok(number_of_states as u64)
     }
@@ -570,7 +570,7 @@ impl DbReader for TimedStorageReader {
             ledger_version: Version,
         ) -> StorageResult<TransactionOutputListWithProof>;
 
-        fn get_state_leaf_count(&self, version: Version) -> StorageResult<usize>;
+        fn get_state_item_count(&self, version: Version) -> StorageResult<usize>;
 
         fn get_state_value_chunk_with_proof(
             &self,

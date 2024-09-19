@@ -25,84 +25,84 @@ module aptos_std::table_with_length {
     }
 
     /// Destroy a table. The table must be empty to succeed.
-    public fun destroy_empty<K: copy + drop, V>(table: TableWithLength<K, V>) {
-        assert!(table.length == 0, error::invalid_state(ENOT_EMPTY));
-        let TableWithLength { inner, length: _ } = table;
+    public fun destroy_empty<K: copy + drop, V>(self: TableWithLength<K, V>) {
+        assert!(self.length == 0, error::invalid_state(ENOT_EMPTY));
+        let TableWithLength { inner, length: _ } = self;
         table::destroy(inner)
     }
 
     /// Add a new entry to the table. Aborts if an entry for this
     /// key already exists. The entry itself is not stored in the
     /// table, and cannot be discovered from it.
-    public fun add<K: copy + drop, V>(table: &mut TableWithLength<K, V>, key: K, val: V) {
-        table::add(&mut table.inner, key, val);
-        table.length = table.length + 1;
+    public fun add<K: copy + drop, V>(self: &mut TableWithLength<K, V>, key: K, val: V) {
+        table::add(&mut self.inner, key, val);
+        self.length = self.length + 1;
     }
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun borrow<K: copy + drop, V>(table: &TableWithLength<K, V>, key: K): &V {
-        table::borrow(&table.inner, key)
+    public fun borrow<K: copy + drop, V>(self: &TableWithLength<K, V>, key: K): &V {
+        table::borrow(&self.inner, key)
     }
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun borrow_mut<K: copy + drop, V>(table: &mut TableWithLength<K, V>, key: K): &mut V {
-        table::borrow_mut(&mut table.inner, key)
+    public fun borrow_mut<K: copy + drop, V>(self: &mut TableWithLength<K, V>, key: K): &mut V {
+        table::borrow_mut(&mut self.inner, key)
     }
 
     /// Returns the length of the table, i.e. the number of entries.
-    public fun length<K: copy + drop, V>(table: &TableWithLength<K, V>): u64 {
-        table.length
+    public fun length<K: copy + drop, V>(self: &TableWithLength<K, V>): u64 {
+        self.length
     }
 
     /// Returns true if this table is empty.
-    public fun empty<K: copy + drop, V>(table: &TableWithLength<K, V>): bool {
-        table.length == 0
+    public fun empty<K: copy + drop, V>(self: &TableWithLength<K, V>): bool {
+        self.length == 0
     }
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
-    public fun borrow_mut_with_default<K: copy + drop, V: drop>(table: &mut TableWithLength<K, V>, key: K, default: V): &mut V {
-        if (table::contains(&table.inner, key)) {
-            table::borrow_mut(&mut table.inner, key)
+    public fun borrow_mut_with_default<K: copy + drop, V: drop>(self: &mut TableWithLength<K, V>, key: K, default: V): &mut V {
+        if (table::contains(&self.inner, key)) {
+            table::borrow_mut(&mut self.inner, key)
         } else {
-            table::add(&mut table.inner, key, default);
-            table.length = table.length + 1;
-            table::borrow_mut(&mut table.inner, key)
+            table::add(&mut self.inner, key, default);
+            self.length = self.length + 1;
+            table::borrow_mut(&mut self.inner, key)
         }
     }
 
     /// Insert the pair (`key`, `value`) if there is no entry for `key`.
     /// update the value of the entry for `key` to `value` otherwise
-    public fun upsert<K: copy + drop, V: drop>(table: &mut TableWithLength<K, V>, key: K, value: V) {
-        if (!table::contains(&table.inner, key)) {
-            add(table, copy key, value)
+    public fun upsert<K: copy + drop, V: drop>(self: &mut TableWithLength<K, V>, key: K, value: V) {
+        if (!table::contains(&self.inner, key)) {
+            add(self, copy key, value)
         } else {
-            let ref = table::borrow_mut(&mut table.inner, key);
+            let ref = table::borrow_mut(&mut self.inner, key);
             *ref = value;
         };
     }
 
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun remove<K: copy + drop, V>(table: &mut TableWithLength<K, V>, key: K): V {
-        let val = table::remove(&mut table.inner, key);
-        table.length = table.length - 1;
+    public fun remove<K: copy + drop, V>(self: &mut TableWithLength<K, V>, key: K): V {
+        let val = table::remove(&mut self.inner, key);
+        self.length = self.length - 1;
         val
     }
 
     /// Returns true iff `table` contains an entry for `key`.
-    public fun contains<K: copy + drop, V>(table: &TableWithLength<K, V>, key: K): bool {
-        table::contains(&table.inner, key)
+    public fun contains<K: copy + drop, V>(self: &TableWithLength<K, V>, key: K): bool {
+        table::contains(&self.inner, key)
     }
 
     #[test_only]
     /// Drop table even if not empty, only when testing.
-    public fun drop_unchecked<K: copy + drop, V>(table: TableWithLength<K, V>) {
+    public fun drop_unchecked<K: copy + drop, V>(self: TableWithLength<K, V>) {
         // Unpack table with length, dropping length count but not
         // inner table.
-        let TableWithLength{inner, length: _} = table;
+        let TableWithLength{inner, length: _} = self;
         table::drop_unchecked(inner); // Drop inner table.
     }
 

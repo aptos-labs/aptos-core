@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: field `1` not declared in struct `S`
+  ┌─ tests/checking/positional_fields/invalid_anonymous_field3.move:5:9
+  │
+5 │         x.1;
+  │         ^

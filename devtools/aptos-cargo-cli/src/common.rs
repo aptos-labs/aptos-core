@@ -15,14 +15,18 @@ use guppy::{
     },
     CargoMetadata, MetadataCommand,
 };
-use log::{debug, info};
+use log::{debug, info, warn};
+use reqwest::Error;
 use std::{
     fs,
     io::Read,
-    path::{Path, PathBuf},
+    path::Path,
     process::{Command, Output},
 };
 use url::Url;
+
+// The target directory for the devtool
+const DEVTOOL_TARGET_DIRECTORY: &str = "target/aptos-x-tool";
 
 // File types in `aptos-core` that are not relevant to the rust build and test process.
 // Note: this is a best effort list and will need to be updated as time goes on.
@@ -47,7 +51,9 @@ const MAX_NUM_DAYS_SINCE_MERGE_BASE: u64 = 7;
 // The delimiter used to separate the package path and the package name.
 pub const PACKAGE_NAME_DELIMITER: &str = "#";
 
-fn workspace_dir() -> PathBuf {
+/// Returns the workspace directory for the current project
+fn workspace_dir() -> String {
+    // Get the cargo path for the current project
     let output = Command::new("cargo")
         .arg("locate-project")
         .arg("--workspace")
@@ -56,7 +62,13 @@ fn workspace_dir() -> PathBuf {
         .unwrap()
         .stdout;
     let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
-    cargo_path.parent().unwrap().to_path_buf()
+
+    // Parse the workspace directory from the cargo path
+    let workspace_dir = cargo_path.parent().unwrap().to_path_buf();
+    workspace_dir
+        .to_str()
+        .expect("Failed to parse workspace directory!")
+        .into()
 }
 
 #[derive(Args, Debug, Clone)]
@@ -94,89 +106,54 @@ impl SelectedPackageArgs {
     }
 
     fn fetch_remote_metadata(&self, merge_base: &str) -> anyhow::Result<CargoMetadata> {
+        // Get the local metadata file path
         let base_sha = self.git_rev_parse(merge_base);
         let file_name = format!("metadata-{}.json", base_sha);
-        let dir_path = format!(
-            "{}/target/aptos-x-tool",
-            workspace_dir().to_str().expect("invalid UTF-8")
+        let dir_path = format!("{}/{}", workspace_dir(), DEVTOOL_TARGET_DIRECTORY);
+        let local_metadata_file_path = format!("{}/{}", dir_path, file_name);
+
+        // Read the metadata from the local file (if it exists)
+        debug!(
+            "Attempting to read metadata from local file: {:?}",
+            local_metadata_file_path
         );
-        let file_path = format!("{}/{}", dir_path, file_name);
-        let mut contents = String::new();
-
-        // Check if the file exists in the local directory
-        if let Ok(file) = fs::File::open(&file_path) {
-            let mut buf_reader = std::io::BufReader::new(file);
-            buf_reader.read_to_string(&mut contents)?;
-        } else {
-            // Make an HTTP call to the GCS bucket to get the file contents
-            let url = format!(
-                "https://storage.googleapis.com/aptos-core-cargo-metadata-public/{}",
-                file_name
-            );
-            let response = reqwest::blocking::get(url)?.error_for_status();
-            match response {
-                Ok(response) => {
-                    let response = response.text()?;
-                    contents.clone_from(&response);
-
-                    // Write the contents of the file to the local directory
-                    fs::create_dir_all("target/aptos-x-tool")?;
-                    fs::write(file_path, response)?;
-                },
-                Err(error) => {
-                    return Err(anyhow!(
-                        "Failed to fetch remote metadata for merge-base commit: {:?}! Error: {}\
-                            \nRebasing your branch may fix this error!",
-                        merge_base,
-                        error
-                    ));
-                },
-            }
+        if let Some(metadata) = read_metadata_from_local_file(&local_metadata_file_path) {
+            return Ok(metadata);
         }
 
-        // Return the contents of the file
-        Ok(CargoMetadata::parse_json(&contents)?)
+        // Otherwise, attempt to read the metadata from the GCS bucket
+        debug!(
+            "Attempting to fetch metadata from GCS bucket! File path {:?}",
+            file_name
+        );
+        if let Some(metadata) =
+            read_metadata_from_gcs(merge_base, file_name, &local_metadata_file_path)
+        {
+            return Ok(metadata);
+        }
+
+        // Otherwise, attempt to recompute the metadata locally
+        debug!(
+            "Attempting to recompute metadata locally for merge-base commit: {:?}",
+            merge_base
+        );
+        if let Some(metadata) =
+            recompute_merge_base_metadata(merge_base, &dir_path, &local_metadata_file_path)
+        {
+            return Ok(metadata);
+        }
+
+        // Return an error (nothing else can be done)
+        Err(anyhow!(
+            "Failed to fetch or recompute remote metadata for merge-base commit: {:?}",
+            merge_base
+        ))
     }
 
-    /// Identifies the changed files compared to the merge base, and
-    /// returns the relevant package graphs and file list.
-    pub fn identify_changed_files(
-        &self,
-    ) -> anyhow::Result<(PackageGraph, PackageGraph, Utf8Paths0)> {
-        // Determine the merge base
+    /// Ensures the merge base is not too old
+    pub fn check_merge_base(&self) -> anyhow::Result<()> {
+        // Identify the merge base
         let merge_base = self.identify_merge_base()?;
-
-        // Download merge base metadata
-        let base_metadata = self.fetch_remote_metadata(&merge_base)?;
-        let base_package_graph = base_metadata.build_graph().unwrap();
-
-        // Compute head metadata
-        let head_metadata = MetadataCommand::new()
-            .exec()
-            .map_err(|e| anyhow!("{}", e))?;
-        let head_package_graph = head_metadata.build_graph().unwrap();
-
-        // Compute changed files
-        let changed_files = self.compute_changed_files(&merge_base)?;
-        debug!("Identified the changed files: {:?}", changed_files);
-
-        // Return the package graphs and the changed files
-        Ok((base_package_graph, head_package_graph, changed_files))
-    }
-
-    /// Identifies the merge base to compare against. This is done by identifying
-    /// the commit at which the current branch forked off origin/main.
-    ///
-    /// Note: if the merge-base is too old, an error will be returned.
-    fn identify_merge_base(&self) -> anyhow::Result<String> {
-        // Run the git merge-base command
-        let merge_base_output = Command::new("git")
-            .arg("merge-base")
-            .arg("HEAD")
-            .arg("origin/main")
-            .output()
-            .expect("failed to execute git merge-base");
-        let merge_base = parse_string_from_output(merge_base_output);
 
         // Get the commit timestamp of the merge-base
         let commit_timestamp_output = Command::new("git")
@@ -206,8 +183,8 @@ impl SelectedPackageArgs {
         // Check if the merge-base is too old
         if time_difference_days >= MAX_NUM_DAYS_SINCE_MERGE_BASE {
             return Err(anyhow!(
-                "The merge base is too old ({:?} days)! Please rebase your branch!",
-                time_difference_days
+                "The merge base is too old! Maximum: {:?} (days), Merge-base: {:?} (days)! Please rebase your branch!",
+                MAX_NUM_DAYS_SINCE_MERGE_BASE, time_difference_days
             ));
         } else {
             info!(
@@ -216,7 +193,50 @@ impl SelectedPackageArgs {
             );
         }
 
-        // Return the merge-base commit
+        Ok(())
+    }
+
+    /// Identifies the changed files compared to the merge base, and
+    /// returns the relevant package graphs and file list.
+    pub fn identify_changed_files(
+        &self,
+    ) -> anyhow::Result<(PackageGraph, PackageGraph, Utf8Paths0)> {
+        // Determine the merge base
+        let merge_base = self.identify_merge_base()?;
+
+        // Download the merge base metadata
+        let base_metadata = self.fetch_remote_metadata(&merge_base)?;
+        let base_package_graph = base_metadata.build_graph().unwrap();
+
+        // Compute head metadata
+        let head_metadata = MetadataCommand::new()
+            .exec()
+            .map_err(|e| anyhow!("{}", e))?;
+        let head_package_graph = head_metadata.build_graph().unwrap();
+
+        // Compute changed files
+        let changed_files = self.compute_changed_files(&merge_base)?;
+
+        // Return the package graphs and the changed files
+        Ok((base_package_graph, head_package_graph, changed_files))
+    }
+
+    /// Identifies the merge base to compare against. This is done by identifying
+    /// the commit at which the current branch forked off origin/main.
+    ///
+    /// Note: if the merge-base is too old, an error will be returned.
+    fn identify_merge_base(&self) -> anyhow::Result<String> {
+        // Run the git merge-base command
+        let merge_base_output = Command::new("git")
+            .arg("merge-base")
+            .arg("HEAD")
+            .arg("origin/main")
+            .output()
+            .expect("failed to execute git merge-base");
+        let merge_base = parse_string_from_output(merge_base_output);
+
+        // Log and return the merge base
+        info!("Identified the merge base: {:?}", merge_base);
         Ok(merge_base)
     }
 
@@ -281,10 +301,191 @@ impl SelectedPackageArgs {
     }
 }
 
+/// Parses the cargo metadata from the given contents
+fn parse_cargo_metadata(metadata_contents: &String) -> Option<CargoMetadata> {
+    match CargoMetadata::parse_json(metadata_contents) {
+        Ok(cargo_metadata) => {
+            // The metadata was successfully parsed from the file
+            Some(cargo_metadata)
+        },
+        Err(error) => {
+            warn!("Error parsing metadata from contents: {:?}", error);
+            None
+        },
+    }
+}
+
 /// Parses a UTF-8 string from the given command output
 fn parse_string_from_output(output: Output) -> String {
     String::from_utf8(output.stdout)
         .expect("invalid UTF-8")
         .trim()
         .to_owned()
+}
+
+/// Prints a warning message for the failed fetch of the remote metadata
+fn print_metadata_fetch_error(merge_base: &str, error: Error) {
+    warn!(
+        "Failed to fetch remote metadata for merge-base commit: {:?}! Error: {:?}\
+                            \nRebasing your branch may fix this error!",
+        merge_base, error
+    );
+}
+
+/// Attempt to read the cargo metadata from the local file (if it exists)
+fn read_metadata_from_local_file(local_metadata_file_path: &String) -> Option<CargoMetadata> {
+    if let Ok(file) = fs::File::open(local_metadata_file_path) {
+        // Read the file and parse the contents
+        let mut contents = String::new();
+        let mut buf_reader = std::io::BufReader::new(file);
+        match buf_reader.read_to_string(&mut contents) {
+            Ok(_) => {
+                // Parse the contents as cargo metadata
+                parse_cargo_metadata(&contents)
+            },
+            Err(error) => {
+                warn!(
+                    "Error reading metadata file from local path: {:?}. Error: {:?}",
+                    local_metadata_file_path, error
+                );
+                None
+            },
+        }
+    } else {
+        None
+    }
+}
+
+/// Attempt to read the cargo metadata from the GCS bucket (if it exists)
+fn read_metadata_from_gcs(
+    merge_base: &str,
+    remote_file_name: String,
+    local_metadata_file_path: &String,
+) -> Option<CargoMetadata> {
+    // Make a request to the GCS bucket to fetch the metadata file
+    let url = format!(
+        "https://storage.googleapis.com/aptos-core-cargo-metadata-public/{}",
+        remote_file_name
+    );
+    let response = match reqwest::blocking::get(url) {
+        Ok(response) => response.error_for_status(),
+        Err(error) => {
+            print_metadata_fetch_error(merge_base, error);
+            return None;
+        },
+    };
+
+    // Parse the metadata response
+    match response {
+        Ok(response) => {
+            // Get the response text
+            match response.text() {
+                Ok(response) => {
+                    // Parse the contents as JSON
+                    let cargo_metadata = parse_cargo_metadata(&response);
+
+                    // If the metadata was successfully parsed, write it to the local directory
+                    if cargo_metadata.is_some() {
+                        write_metadata_locally(local_metadata_file_path, response);
+                    }
+
+                    // Return the metadata
+                    return cargo_metadata;
+                },
+                Err(error) => {
+                    print_metadata_fetch_error(merge_base, error);
+                    return None;
+                },
+            }
+        },
+        Err(error) => {
+            print_metadata_fetch_error(merge_base, error);
+        },
+    }
+
+    None // Unable to read the metadata from the GCS bucket
+}
+
+/// Recomputes and returns the metadata for the merge base commit locally
+fn recompute_merge_base_metadata(
+    merge_base: &str,
+    local_dir_path: &String,
+    local_metadata_file_path: &String,
+) -> Option<CargoMetadata> {
+    // Clone the aptos-core repository to the local directory
+    debug!(
+        "Cloning aptos-core repository to local directory: {:?}",
+        local_dir_path
+    );
+    let clone_directory = format!("{}/aptos-core", local_dir_path);
+    Command::new("git")
+        .arg("clone")
+        .arg("--depth")
+        .arg("500") // Clone the last 500 commits to ensure the merge base is included
+        .arg("https://github.com/aptos-labs/aptos-core.git")
+        .arg(clone_directory.clone())
+        .output()
+        .expect("failed to execute git clone");
+
+    // Check out the merge base commit for the aptos-core clone
+    debug!(
+        "Checking out merge base commit for aptos-core clone: {:?}",
+        merge_base
+    );
+    Command::new("git")
+        .current_dir(clone_directory.clone())
+        .arg("checkout")
+        .arg(merge_base)
+        .output()
+        .expect("failed to execute git checkout");
+
+    // Recompute the metadata for the merge base commit
+    let output = Command::new("cargo")
+        .current_dir(clone_directory.clone())
+        .arg("metadata")
+        .arg("--all-features")
+        .output()
+        .expect("failed to execute cargo metadata");
+    let output = parse_string_from_output(output);
+
+    // Parse the metadata from the output
+    let cargo_metadata = parse_cargo_metadata(&output);
+
+    // If the metadata was successfully parsed, write it to the local directory
+    if cargo_metadata.is_some() {
+        write_metadata_locally(local_metadata_file_path, output);
+    }
+
+    // Delete the aptos-core clone
+    debug!("Deleting aptos-core clone directory: {:?}", clone_directory);
+    if let Err(error) = fs::remove_dir_all(clone_directory.clone()) {
+        warn!(
+            "Error deleting aptos-core clone directory: {:?}. Error: {:?}",
+            clone_directory, error
+        );
+    }
+
+    // Return the metadata
+    cargo_metadata
+}
+
+/// Writes the metadata to the local filesystem (at the specified path)
+fn write_metadata_locally(local_file_path: &String, metadata: String) {
+    // Create the directory for the file
+    if let Err(error) = fs::create_dir_all(DEVTOOL_TARGET_DIRECTORY) {
+        warn!(
+            "Error creating directory for file: {:?}. Error: {:?}",
+            local_file_path, error
+        );
+        return;
+    }
+
+    // Write the contents of the file
+    debug!("Writing metadata to local file: {:?}", local_file_path);
+    if let Err(error) = fs::write(local_file_path.clone(), metadata) {
+        warn!(
+            "Error writing file: {:?}. Error: {:?}",
+            local_file_path, error
+        );
+    }
 }

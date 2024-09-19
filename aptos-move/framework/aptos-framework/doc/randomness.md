@@ -36,6 +36,7 @@ Security holds under the same proof-of-stake assumption that secures the Aptos n
 -  [Function `u256_range`](#0x1_randomness_u256_range)
 -  [Function `permutation`](#0x1_randomness_permutation)
 -  [Function `safe_add_mod`](#0x1_randomness_safe_add_mod)
+-  [Function `take_first`](#0x1_randomness_take_first)
 -  [Function `safe_add_mod_for_verification`](#0x1_randomness_safe_add_mod_for_verification)
 -  [Function `fetch_and_increment_txn_counter`](#0x1_randomness_fetch_and_increment_txn_counter)
 -  [Function `is_unbiasable`](#0x1_randomness_is_unbiasable)
@@ -320,7 +321,7 @@ Generates a sequence of bytes uniformly at random
     <b>let</b> c = 0;
     <b>while</b> (c &lt; n) {
         <b>let</b> blob = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> v, blob);
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_reverse_append">vector::reverse_append</a>(&<b>mut</b> v, blob);
 
         c = c + 32;
     };
@@ -827,6 +828,8 @@ If n is 0, returns the empty vector.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_permutation">permutation</a>(n: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
+
     <b>let</b> values = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
 
     <b>if</b>(n == 0) {
@@ -865,8 +868,6 @@ If n is 0, returns the empty vector.
         tail = tail - 1;
     };
 
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
-
     values
 }
 </code></pre>
@@ -891,14 +892,34 @@ Compute <code>(a + b) % m</code>, assuming <code>m &gt;= 1, 0 &lt;= a &lt; m, 0&
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="randomness.md#0x1_randomness_safe_add_mod">safe_add_mod</a>(a: u256, b: u256, m: u256): u256 {
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_safe_add_mod">safe_add_mod</a>(a: u256, b: u256, m: u256): u256 {
+    <b>let</b> a_clone = a;
     <b>let</b> neg_b = m - b;
-    <b>if</b> (a &lt; neg_b) {
-        a + b
-    } <b>else</b> {
-        a - neg_b
-    }
+    <b>let</b> a_less = a &lt; neg_b;
+    <a href="randomness.md#0x1_randomness_take_first">take_first</a>(<b>if</b> (a_less) { a + b } <b>else</b> { a_clone - neg_b }, <b>if</b> (!a_less) { a_clone - neg_b } <b>else</b> { a + b })
 }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_randomness_take_first"></a>
+
+## Function `take_first`
+
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_take_first">take_first</a>(x: u256, _y: u256): u256
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_take_first">take_first</a>(x: u256, _y: u256 ): u256 { x }
 </code></pre>
 
 

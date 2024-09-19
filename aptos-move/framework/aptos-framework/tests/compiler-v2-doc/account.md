@@ -760,7 +760,7 @@ The caller does not have a digital-signature-based capability to call this funct
 
 <a id="0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
 
-The specified rotation capablity offer does not exist at the specified offerer address
+The specified rotation capability offer does not exist at the specified offerer address
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>: u64 = 18;
@@ -1224,7 +1224,7 @@ A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519
 Here is an example attack if we don't ask for the second signature <code>cap_update_table</code>:
 Alice has rotated her account <code>addr_a</code> to <code>new_addr_a</code>. As a result, the following entry is created, to help Alice when recovering her wallet:
 <code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>[new_addr_a]</code> -> <code>addr_a</code>
-Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+Alice has had a bad day: her laptop blew up and she needs to reset her account on a new one.
 (Fortunately, she still has her secret key <code>new_sk_a</code> associated with her new address <code>new_addr_a</code>, so she can do this.)
 
 But Bob likes to mess with Alice.
@@ -3151,6 +3151,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 <b>pragma</b> aborts_if_is_strict = <b>false</b>;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="account.md#0x1_account_spec_create_resource_address">spec_create_resource_address</a>(source, seed);
+<b>ensures</b> [abstract] source != result;
 </code></pre>
 
 
@@ -3240,7 +3241,7 @@ The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7
 
 
 The Account existed under the signer.
-The guid_creation_num of the ccount resource is up to MAX_U64.
+The guid_creation_num of the account resource is up to MAX_U64.
 
 
 <pre><code><b>let</b> addr = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer);

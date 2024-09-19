@@ -61,7 +61,7 @@ use aptos_types::{
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignedTransaction, Transaction,
+        MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
@@ -90,6 +90,7 @@ use move_binary_format::{
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    file_format::CompiledScript,
     CompiledModule,
 };
 use move_core_types::{
@@ -219,21 +220,37 @@ impl AptosVM {
     /// Creates a new VM instance, initializing the runtime environment from the state.
     pub fn new(state_view: &impl StateView) -> Self {
         let env = Arc::new(Environment::new(state_view));
-        Self::new_with_environment(env, state_view)
+        Self::new_with_environment(env, state_view, false)
+    }
+
+    pub fn new_for_gov_sim(state_view: &impl StateView) -> Self {
+        let env = Arc::new(Environment::new(state_view));
+        Self::new_with_environment(env, state_view, true)
     }
 
     /// Creates a new VM instance based on the runtime environment, and used by block
     /// executor to create multiple tasks sharing the same execution configurations.
     // TODO: Passing `state_view` is not needed once we move keyless and gas-related
     //       configs to the environment.
-    pub(crate) fn new_with_environment(env: Arc<Environment>, state_view: &impl StateView) -> Self {
+    pub(crate) fn new_with_environment(
+        env: Arc<Environment>,
+        state_view: &impl StateView,
+        inject_create_signer_for_gov_sim: bool,
+    ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let (gas_params, storage_gas_params, gas_feature_version) =
             get_gas_parameters(env.features(), state_view);
 
         let resolver = state_view.as_move_resolver();
-        let move_vm = MoveVmExt::new(gas_feature_version, gas_params.as_ref(), env, &resolver);
+        let move_vm = MoveVmExt::new_with_extended_options(
+            gas_feature_version,
+            gas_params.as_ref(),
+            env,
+            None,
+            inject_create_signer_for_gov_sim,
+            &resolver,
+        );
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).
@@ -620,6 +637,7 @@ impl AptosVM {
                 txn_data,
                 log_context,
                 traversal_context,
+                self.is_simulation,
             )
         })?;
 
@@ -665,6 +683,7 @@ impl AptosVM {
                 txn_data,
                 log_context,
                 traversal_context,
+                self.is_simulation,
             )
         })?;
         let output = epilogue_session.finish(
@@ -696,6 +715,19 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         script: &Script,
     ) -> Result<(), VMStatus> {
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
+        {
+            for arg in script.args() {
+                if let TransactionArgument::Serialized(_) = arg {
+                    return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
+                        .finish(Location::Script)
+                        .into_vm_status());
+                }
+            }
+        }
+
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
@@ -709,11 +741,30 @@ impl AptosVM {
 
         let func = session.load_script(script.code(), script.ty_args())?;
 
-        // TODO(Gerardo): consolidate the extended validation to verifier.
-        verifier::event_validation::verify_no_event_emission_in_script(
+        let compiled_script = match CompiledScript::deserialize_with_config(
             script.code(),
             self.deserializer_config(),
-        )?;
+        ) {
+            Ok(script) => script,
+            Err(err) => {
+                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                let partial_err = PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Script);
+                return Err(partial_err.into_vm_status());
+            },
+        };
+
+        // Check that unstable bytecode cannot be executed on mainnet
+        if self
+            .features()
+            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT)
+        {
+            self.reject_unstable_bytecode_for_script(&compiled_script)?;
+        }
+
+        // TODO(Gerardo): consolidate the extended validation to verifier.
+        verifier::event_validation::verify_no_event_emission_in_compiled_script(&compiled_script)?;
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
@@ -1184,7 +1235,13 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if self.is_simulation {
+        // Once `simulation_enhancement` is enabled, we use `execute_multisig_transaction` for simulation,
+        // deprecating `simulate_multisig_transaction`.
+        if self.is_simulation
+            && !self
+                .features()
+                .is_transaction_simulation_enhancement_enabled()
+        {
             self.simulate_multisig_transaction(
                 resolver,
                 session,
@@ -1488,7 +1545,6 @@ impl AptosVM {
                     gas_meter,
                     Compatibility::new(
                         true,
-                        true,
                         !self
                             .features()
                             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
@@ -1588,6 +1644,22 @@ impl AptosVM {
                             )
                             .finish(Location::Undefined));
                     }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
+    pub fn reject_unstable_bytecode_for_script(&self, module: &CompiledScript) -> VMResult<()> {
+        if self.chain_id().is_mainnet() {
+            if let Some(metadata) =
+                aptos_framework::get_compilation_metadata_from_compiled_script(module)
+            {
+                if metadata.unstable {
+                    return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
+                        .with_message("script marked unstable cannot be run on mainnet".to_string())
+                        .finish(Location::Script));
                 }
             }
         }
@@ -2290,8 +2362,10 @@ impl AptosVM {
                 transaction_validation::run_script_prologue(
                     session,
                     txn_data,
+                    self.features(),
                     log_context,
                     traversal_context,
+                    self.is_simulation,
                 )
             },
             TransactionPayload::Multisig(multisig_payload) => {
@@ -2301,13 +2375,18 @@ impl AptosVM {
                 transaction_validation::run_script_prologue(
                     session,
                     txn_data,
+                    self.features(),
                     log_context,
                     traversal_context,
+                    self.is_simulation,
                 )?;
-                // Skip validation if this is part of tx simulation.
-                // This allows simulating multisig txs without having to first create the multisig
-                // tx.
-                if !self.is_simulation {
+                // Once "simulation_enhancement" is enabled, the simulation path also validates the
+                // multisig transaction by running the multisig prologue.
+                if !self.is_simulation
+                    || self
+                        .features()
+                        .is_transaction_simulation_enhancement_enabled()
+                {
                     transaction_validation::run_multisig_prologue(
                         session,
                         txn_data,
@@ -2585,6 +2664,19 @@ impl VMValidator for AptosVM {
                 }
             } else {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            }
+        }
+
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::ALLOW_SERIALIZED_SCRIPT_ARGS)
+        {
+            if let TransactionPayload::Script(script) = transaction.payload() {
+                for arg in script.args() {
+                    if let TransactionArgument::Serialized(_) = arg {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
             }
         }
 

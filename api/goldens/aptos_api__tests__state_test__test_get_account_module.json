@@ -120,6 +120,7 @@
       {
         "name": "GUID",
         "is_native": false,
+        "is_event": false,
         "abilities": [
           "drop",
           "store"
@@ -135,6 +136,7 @@
       {
         "name": "ID",
         "is_native": false,
+        "is_event": false,
         "abilities": [
           "copy",
           "drop",

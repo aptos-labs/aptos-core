@@ -32,7 +32,7 @@ use tonic::Status;
 type EndVersion = u64;
 
 const SERVICE_TYPE: &str = "indexer_fullnode";
-const MINIMUM_TASK_LOAD_SIZE_IN_BYTES: usize = 1_000_000;
+const MINIMUM_TASK_LOAD_SIZE_IN_BYTES: usize = 100_000;
 
 // Basically a handler for a single GRPC stream request
 pub struct IndexerStreamCoordinator {
