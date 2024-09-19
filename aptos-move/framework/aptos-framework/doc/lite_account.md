@@ -10,7 +10,7 @@
 -  [Resource `DispatchableAuthenticator`](#0x1_lite_account_DispatchableAuthenticator)
 -  [Constants](#@Constants_0)
 -  [Function `add_dispatchable_authentication_function`](#0x1_lite_account_add_dispatchable_authentication_function)
--  [Function `remove_dispatchable_authentication_funciton`](#0x1_lite_account_remove_dispatchable_authentication_funciton)
+-  [Function `remove_dispatchable_authentication_function`](#0x1_lite_account_remove_dispatchable_authentication_function)
 -  [Function `remove_dispatchable_authenticator`](#0x1_lite_account_remove_dispatchable_authenticator)
 -  [Function `resource_addr`](#0x1_lite_account_resource_addr)
 -  [Function `update_dispatchable_authenticator_impl`](#0x1_lite_account_update_dispatchable_authenticator_impl)
@@ -219,13 +219,13 @@ Note: it is a private entry function that can only be called directly from trans
 
 </details>
 
-<a id="0x1_lite_account_remove_dispatchable_authentication_funciton"></a>
+<a id="0x1_lite_account_remove_dispatchable_authentication_function"></a>
 
-## Function `remove_dispatchable_authentication_funciton`
+## Function `remove_dispatchable_authentication_function`
 
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authentication_funciton">remove_dispatchable_authentication_funciton</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authentication_function">remove_dispatchable_authentication_function</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -234,7 +234,7 @@ Note: it is a private entry function that can only be called directly from trans
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authentication_funciton">remove_dispatchable_authentication_funciton</a>(
+<pre><code><b>public</b> entry <b>fun</b> <a href="lite_account.md#0x1_lite_account_remove_dispatchable_authentication_function">remove_dispatchable_authentication_function</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     module_address: <b>address</b>,
     module_name: String,

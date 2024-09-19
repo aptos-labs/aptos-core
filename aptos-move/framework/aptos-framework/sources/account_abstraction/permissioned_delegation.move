@@ -62,23 +62,23 @@ module aptos_framework::permissioned_delegation {
         let signature = new_signature_from_bytes(
             bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x))
         );
-        // assert!(
-        //     ed25519::signature_verify_strict(
-        //         &signature,
-        //         &public_key,
-        //         vector[1, 2, 3],
-        //     ),
-        //     EINVALID_SIGNATURE
-        // );
+        assert!(
+            ed25519::signature_verify_strict(
+                &signature,
+                &public_key,
+                vector[1, 2, 3],
+            ),
+            error::permission_denied(EINVALID_SIGNATURE)
+        );
         if (exists<Delegation>(addr)) {
             let handles = &borrow_global<Delegation>(addr).handles;
             if (table::contains(handles, public_key)) {
                 signer_from_permissioned(table::borrow(handles, public_key))
             } else {
-                account
+                abort error::permission_denied(EINVALID_SIGNATURE)
             }
         } else {
-            account
+            abort error::permission_denied(EINVALID_SIGNATURE)
         }
     }
 
@@ -92,6 +92,8 @@ module aptos_framework::permissioned_delegation {
     use aptos_framework::permissioned_signer;
     #[test_only]
     use aptos_framework::timestamp;
+    #[test_only]
+    use aptos_framework::transaction_context;
 
     #[test_only]
     struct SignatureBundle has drop {
