@@ -351,7 +351,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Get Docker Image Tag
-        uses: aptos-labs/aptos-core/.github/actions/get-latest-docker-image-tag@main
+        uses: ./.github/actions/get-latest-docker-image-tag
         id: get-docker-image-tag
         with:
           branch: ${{ steps.determine-the-target-branch.outputs.TARGET_BRANCH }}
