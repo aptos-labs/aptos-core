@@ -14,5 +14,6 @@ module M {
     const C10: vector<u8> = b"<empty>";
     const C11: vector<u8> = x"deadbeef";
     const C12: vector<u8> = b"\"foo\"";
+    const C13: vector<u8> = b"\"\x48";
 }
 }

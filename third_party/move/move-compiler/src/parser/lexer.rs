@@ -492,7 +492,7 @@ fn find_token(
                     let loc = make_loc(file_hash, start_offset, start_offset);
                     return Err(Box::new(diag!(
                         Syntax::InvalidCharacter,
-                        (loc, format!("Invalid character: '{}'", c))
+                        (loc, format!("Invalid character: '{}'; string literal must begin with `b\"` and closing quote `\"` must appear on same line", c))
                     )));
                 },
             }
