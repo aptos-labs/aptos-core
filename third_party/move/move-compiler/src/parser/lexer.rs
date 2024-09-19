@@ -485,7 +485,7 @@ fn find_token(
                     let loc = make_loc(file_hash, start_offset, start_offset);
                     return Err(Box::new(diag!(
                         Syntax::InvalidByteString,
-                        (loc, "String literal must begin with b\" (for a byte string) or h\" (for a hex string)")
+                        (loc, "String literal must begin with b\" (for a byte string) or x\" (for a hex string)")
                     )));
                 },
                 None => {

@@ -13,7 +13,6 @@ module M {
     const C9: u32 = (453 as u32);
     const C10: vector<u8> = b"<empty>";
     const C11: vector<u8> = x"deadbeef";
-    const C12: vector<u8> = "<empty>";
-    const C13: u64 = ";
+    const C12: vector<u8> = b"\"foo\"";
 }
 }
