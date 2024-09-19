@@ -64,9 +64,9 @@ impl EntryABI {
 #[derive(Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Script {
     #[serde(with = "serde_bytes")]
-    code: Vec<u8>,
-    ty_args: Vec<TypeTag>,
-    args: Vec<TransactionArgument>,
+    pub code: Vec<u8>,
+    pub ty_args: Vec<TypeTag>,
+    pub args: Vec<TransactionArgument>,
 }
 
 impl Script {
@@ -78,15 +78,15 @@ impl Script {
         }
     }
 
-    pub fn code(&self) -> &[u8] {
+    pub const fn code(&self) -> &[u8] {
         &self.code
     }
 
-    pub fn ty_args(&self) -> &[TypeTag] {
+    pub const fn ty_args(&self) -> &[TypeTag] {
         &self.ty_args
     }
 
-    pub fn args(&self) -> &[TransactionArgument] {
+    pub const fn args(&self) -> &[TransactionArgument] {
         &self.args
     }
 
@@ -108,11 +108,11 @@ impl fmt::Debug for Script {
 /// Call a Move entry function.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EntryFunction {
-    module: ModuleId,
-    function: Identifier,
-    ty_args: Vec<TypeTag>,
+    pub module: ModuleId,
+    pub function: Identifier,
+    pub ty_args: Vec<TypeTag>,
     #[serde(with = "vec_bytes")]
-    args: Vec<Vec<u8>>,
+    pub args: Vec<Vec<u8>>,
 }
 
 impl EntryFunction {
@@ -130,19 +130,19 @@ impl EntryFunction {
         }
     }
 
-    pub fn module(&self) -> &ModuleId {
+    pub const fn module(&self) -> &ModuleId {
         &self.module
     }
 
-    pub fn function(&self) -> &IdentStr {
+    pub const fn function(&self) -> &IdentStr {
         &self.function
     }
 
-    pub fn ty_args(&self) -> &[TypeTag] {
+    pub const fn ty_args(&self) -> &[TypeTag] {
         &self.ty_args
     }
 
-    pub fn args(&self) -> &[Vec<u8>] {
+    pub const fn args(&self) -> &[Vec<u8>] {
         &self.args
     }
 
