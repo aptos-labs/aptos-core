@@ -78,15 +78,15 @@ impl Script {
         }
     }
 
-    pub const fn code(&self) -> &[u8] {
+    pub fn code(&self) -> &[u8] {
         &self.code
     }
 
-    pub const fn ty_args(&self) -> &[TypeTag] {
+    pub fn ty_args(&self) -> &[TypeTag] {
         &self.ty_args
     }
 
-    pub const fn args(&self) -> &[TransactionArgument] {
+    pub fn args(&self) -> &[TransactionArgument] {
         &self.args
     }
 
@@ -130,19 +130,19 @@ impl EntryFunction {
         }
     }
 
-    pub const fn module(&self) -> &ModuleId {
+    pub fn module(&self) -> &ModuleId {
         &self.module
     }
 
-    pub const fn function(&self) -> &IdentStr {
+    pub fn function(&self) -> &IdentStr {
         &self.function
     }
 
-    pub const fn ty_args(&self) -> &[TypeTag] {
+    pub fn ty_args(&self) -> &[TypeTag] {
         &self.ty_args
     }
 
-    pub const fn args(&self) -> &[Vec<u8>] {
+    pub fn args(&self) -> &[Vec<u8>] {
         &self.args
     }
 
