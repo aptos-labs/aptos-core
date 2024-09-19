@@ -30,6 +30,8 @@ Aptos Binary verification steps
 File 'LICENSE.txt' is obtained from: https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 "@ | Out-File -FilePath "VERIFICATION.txt" -Encoding utf8 -Append
 
+Copy-Item ..\LICENSE -Destination LICENSE.txt
+
 choco pack --version $VERSION configuration=release
 
 choco apikey --api-key $apiKey --source https://push.chocolatey.org/
