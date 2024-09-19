@@ -524,6 +524,79 @@ fn early_skips() {
 }
 
 #[test]
+fn weak_validation_modes() {
+    let s = Scheduler::new(3);
+
+    for i in 0..3 {
+        // No validation tasks.
+        assert_matches!(
+            s.next_task(),
+            SchedulerTask::ExecutionTask(j, 0, ExecutionTaskType::Execution) if i == j
+        );
+    }
+
+    for i in 0..3 {
+        // Validation index is at 0, so transactions will be validated and no
+        // need to return a validation task
+        assert_matches!(
+            s.finish_execution(i, 0, ValidationMode::SuffixAndSelf),
+            Ok(SchedulerTask::Retry)
+        );
+    }
+
+    assert!(s.try_abort(0, 0));
+    assert_matches!(
+        s.finish_abort(0, 0),
+        Ok(SchedulerTask::ExecutionTask(
+            0,
+            1,
+            ExecutionTaskType::Execution
+        ))
+    );
+
+    // all_the_next_tasks must be validations, or retries, validation_idx should be 3
+    for _ in 0..3 {
+        s.next_task();
+    }
+
+    // this should have no affect
+    assert_matches!(
+        s.finish_execution(0, 1, ValidationMode::None),
+        Ok(SchedulerTask::Retry)
+    );
+
+    // new tasks should not be available
+    // since validation_idx is not decreased
+    assert_matches!(s.next_task(), SchedulerTask::Retry);
+
+    assert!(s.try_abort(1, 0));
+
+    assert_matches!(
+        s.finish_abort(1, 0),
+        Ok(SchedulerTask::ExecutionTask(
+            1,
+            1,
+            ExecutionTaskType::Execution
+        ))
+    );
+
+    // all_the_next_tasks must be validations, or retries, validation_idx should be 3
+    for _ in 0..3 {
+        s.next_task();
+    }
+
+    assert_matches!(
+        s.finish_execution(1, 1, ValidationMode::SuffixOnly),
+        Ok(SchedulerTask::Retry)
+    );
+
+    // SuffixOnly, should have decrease validation_idx
+    // wave should be equal to 2, incerments from aborting txn 0, and finish_execution above)
+
+    assert_matches!(s.next_task(), SchedulerTask::ValidationTask(2, 0, 2));
+}
+
+#[test]
 fn scheduler_tasks() {
     let s = Scheduler::new(5);
 
@@ -537,9 +610,9 @@ fn scheduler_tasks() {
 
     for i in 0..5 {
         // Validation index is at 0, so transactions will be validated and no
-        // need to return a validation task to the caller.
+        // need to return a validation task
         assert_matches!(
-            s.finish_execution(i, 0, ValidationMode::SelfOnly),
+            s.finish_execution(i, 0, ValidationMode::SuffixAndSelf),
             Ok(SchedulerTask::Retry)
         );
     }

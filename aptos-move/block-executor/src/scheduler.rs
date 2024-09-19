@@ -203,10 +203,10 @@ impl PartialEq for ExecutionStatus {
 /// after the prefix is committed never needs to be re-validated.
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum ValidationMode {
-    None,
-    SelfOnly,
-    SuffixOnly,
-    SuffixAndSelf,
+    None = 0,
+    SelfOnly = 1,
+    SuffixOnly = 2,
+    SuffixAndSelf = 3,
 }
 
 impl ValidationMode {
@@ -601,8 +601,8 @@ impl Scheduler {
                     cur_wave,
                 ));
             } else {
-                //this is the same as call to update_on_validation, but validity is guaranteed
-                //self.finish_validation(txn_idx, cur_wave);
+                //this can only happen if backup is triggered
+                //hence, we know that all previous transactions are commited and cur_wave must not be smaller than maybe_max_validated_wave
                 validation_status.maybe_max_validated_wave = Some(cur_wave);
                 self.queueing_commits_arm();
             }
@@ -630,14 +630,16 @@ impl Scheduler {
         let status = self.txn_status[txn_idx as usize].0.write();
         match *status {
             ExecutionStatus::Executing(_, _, ref flag)
-            | ExecutionStatus::ReadyToWakeUp(_, _, ref flag)
-                if *flag == ExecutingFlag::Writing =>
-            {
-                // Only when back-up execution happens, another execution of the
-                // same transaction could have set the flag to Writing stage (while
-                // current call is a call-back from the VM). Writing flag is the
-                // tie breaker, so the caller need not continue.
-                true
+            | ExecutionStatus::ReadyToWakeUp(_, _, ref flag) => {
+                if *flag == ExecutingFlag::Writing {
+                    // Only when back-up execution happens, another execution of the
+                    // same transaction could have set the flag to Writing stage (while
+                    // current call is a call-back from the VM). Writing flag is the
+                    // tie breaker, so the caller need not continue.
+                    true
+                } else {
+                    false
+                }
             },
             ExecutionStatus::Committed(committed_incarnation) => {
                 // Committed status with the same incarnation means the ongoing
@@ -645,7 +647,11 @@ impl Scheduler {
                 // Note: this means back-up execution was active.
                 incarnation == committed_incarnation
             },
-            _ => false,
+            ExecutionStatus::Aborting(_)
+            | ExecutionStatus::Executed(_)
+            | ExecutionStatus::ExecutionHalted
+            | ExecutionStatus::ReadyToExecute(_)
+            | ExecutionStatus::Suspended(_, _) => false,
         }
     }
 
@@ -659,18 +665,19 @@ impl Scheduler {
     ) -> Option<bool> {
         match &mut **status {
             ExecutionStatus::Executing(incarnation, _, ref mut flag)
-            | ExecutionStatus::ReadyToWakeUp(incarnation, _, ref mut flag)
-                if (expected_incarnation.is_none()
-                    || *incarnation == expected_incarnation.unwrap()) =>
-            {
-                match flag {
-                    ExecutingFlag::Main => unreachable!("Should never be Main after backup"),
-                    ExecutingFlag::Backup => {
-                        *flag = ExecutingFlag::Writing;
-                        // In the backup, no validation needed.
-                        Some(true)
-                    },
-                    ExecutingFlag::Writing => None,
+            | ExecutionStatus::ReadyToWakeUp(incarnation, _, ref mut flag) => {
+                if expected_incarnation.is_none() || *incarnation == expected_incarnation.unwrap() {
+                    match flag {
+                        ExecutingFlag::Main => unreachable!("Should never be Main after backup"),
+                        ExecutingFlag::Backup => {
+                            *flag = ExecutingFlag::Writing;
+                            // In the backup, no validation needed.
+                            Some(true)
+                        },
+                        ExecutingFlag::Writing => None,
+                    }
+                } else {
+                    None
                 }
             },
             ExecutionStatus::Suspended(_, _)
@@ -688,7 +695,6 @@ impl Scheduler {
                 // Transaction is Commited, Executed/about to be Committed, or Execution is Halted
                 None
             },
-            _ => None,
         }
     }
 
@@ -697,6 +703,7 @@ impl Scheduler {
     // Some(bool): worker won. true means backup, or winning vs backup after a successful validation,
     // so no further validation of this output is necessary. false means validation is necessary,
     // this happens when backup is not observed.
+
     pub(crate) fn try_set_execution_flag_writing<F>(
         &self,
         txn_idx: TxnIndex,
@@ -996,7 +1003,12 @@ impl Scheduler {
                 *lock = DependencyStatus::ExecutionHalted;
                 cvar.notify_one();
             },
-            _ => (),
+            ExecutionStatus::Aborting(_)
+            | ExecutionStatus::ReadyToExecute(_)
+            | ExecutionStatus::Committed(_)
+            | ExecutionStatus::ExecutionHalted
+            | ExecutionStatus::Executed(_)
+            | ExecutionStatus::Executing(_, ExecutionTaskType::Execution, _) => (),
         }
     }
 
@@ -1085,7 +1097,12 @@ impl Scheduler {
                 );
                 Some(ret)
             },
-            _ => None,
+            ExecutionStatus::Aborting(_)
+            | ExecutionStatus::Committed(_)
+            | ExecutionStatus::Executed(_)
+            | ExecutionStatus::Executing(_, _, _)
+            | ExecutionStatus::ExecutionHalted
+            | ExecutionStatus::Suspended(_, _) => None,
         }
     }
 
@@ -1358,13 +1375,13 @@ mod tests {
         // no need to validate
         assert_matches!(s.try_set_execution_flag_writing(0, backup_v), Some(true));
 
-        let not_backup_win_validation = Some(|| -> bool { true });
-        let not_backup_lose_validation = Some(|| -> bool { false });
+        let main_win_validation = Some(|| -> bool { true });
+        let main_lose_validation = Some(|| -> bool { false });
 
         //no need to validate
         assert_matches!(s.has_lost_execution_flag_writing(0, 0), true);
         assert_matches!(
-            s.try_set_execution_flag_writing(0, not_backup_win_validation),
+            s.try_set_execution_flag_writing(0, main_win_validation),
             None
         );
 
@@ -1377,11 +1394,11 @@ mod tests {
         assert_matches!(s.try_backup(0), Some(1));
 
         assert_matches!(
-            s.try_set_execution_flag_writing(0, not_backup_lose_validation),
+            s.try_set_execution_flag_writing(0, main_lose_validation),
             None
         ); //no need to validate
         assert_matches!(
-            s.try_set_execution_flag_writing(0, not_backup_win_validation),
+            s.try_set_execution_flag_writing(0, main_win_validation),
             Some(true)
         );
         assert_matches!(s.try_backup(0), None);
@@ -1392,7 +1409,7 @@ mod tests {
         s.try_incarnate(0);
 
         assert_matches!(
-            s.try_set_execution_flag_writing(0, not_backup_lose_validation),
+            s.try_set_execution_flag_writing(0, main_lose_validation),
             Some(false)
         ); //n
 
