@@ -19,8 +19,8 @@ spec:
       labels:
         {{- include "aptos-fullnode.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: fullnode
-        {{- if $.Values.chain.name }}
-        chain_name: {{ $.Values.chain.name }}
+        {{- if or $.Values.chain.label $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.label | default $.Values.chain.name }}
         {{- end}}
       annotations:
         prometheus.io/scrape: "true"
@@ -29,7 +29,6 @@ spec:
         aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
         {{- end}}
     spec:
-      terminationGracePeriodSeconds: 0
       initContainers:
       {{- with .Values.restore }}
       {{- if .enabled }}
@@ -38,7 +37,7 @@ spec:
         imagePullPolicy: {{ .image.pullPolicy }}
         resources:
           {{- toYaml .resources | nindent 10 }}
-        command:
+        args:
         - /bin/bash
         - -c
         - |-
@@ -112,7 +111,7 @@ spec:
         image: {{ .Values.image.repo }}:{{ .Values.image.tag | default $.Values.imageTag }}
         {{- end }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        command:
+        args:
         - /bin/bash
         - -c
         - |-
@@ -129,7 +128,7 @@ spec:
           curl -o /opt/aptos/genesis/genesis.blob {{ (get .Values.aptos_chains .Values.chain.name).genesis_blob_url }}
           {{- end }}
           # Start the node
-          /usr/local/bin/aptos-node -f /opt/aptos/etc/fullnode.yaml
+          exec /usr/local/bin/aptos-node -f /opt/aptos/etc/fullnode.yaml
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         env:
@@ -161,15 +160,33 @@ spec:
         - containerPort: 9102
           name: admin
         # NOTE: these require the API to be enabled, which is not always the case
-        livenessProbe: # restart the pod if the REST API is ever unresponsive
+        # Wait for up to 20 * 15 = 300 seconds before starting the liveness and readiness probes.
+        startupProbe:
           httpGet:
             path: /v1/-/healthy
             port: 8080
-          initialDelaySeconds: 30
-        readinessProbe: # pod is ready when state sync is caught up
+          timeoutSeconds: 5
+          failureThreshold: 20
+          periodSeconds: 15
+        # Restart the pod if the REST API is ever unresponsive for 60 seconds.
+        livenessProbe:
+          httpGet:
+            path: /v1/-/healthy
+            port: 8080
+          timeoutSeconds: 5
+          periodSeconds: 15
+          successThreshold: 1
+          failureThreshold: 4
+         # Pod is ready when state sync is caught up.
+         # If it falls more than 10 seconds behind, remove it from the service.
+        readinessProbe:
           httpGet:
             path: /v1/-/healthy?duration_secs=10
             port: 8080
+          timeoutSeconds: 5
+          periodSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false

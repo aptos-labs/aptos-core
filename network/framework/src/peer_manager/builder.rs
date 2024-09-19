@@ -8,10 +8,10 @@ use crate::{
     noise::{stream::NoiseStream, HandshakeAuthMode},
     peer_manager::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
-        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
+        PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{
-        network::{NetworkClientConfig, NetworkServiceConfig},
+        network::{NetworkClientConfig, NetworkServiceConfig, ReceivedMessage},
         wire::handshake::v1::ProtocolIdSet,
     },
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
@@ -70,10 +70,9 @@ struct PeerManagerContext {
 
     peers_and_metadata: Arc<PeersAndMetadata>,
     upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
-    max_concurrent_network_reqs: usize,
     channel_size: usize,
     max_frame_size: usize,
     max_message_size: usize,
@@ -92,11 +91,10 @@ impl PeerManagerContext {
         peers_and_metadata: Arc<PeersAndMetadata>,
         upstream_handlers: HashMap<
             ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+            aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
-        max_concurrent_network_reqs: usize,
         channel_size: usize,
         max_frame_size: usize,
         max_message_size: usize,
@@ -113,7 +111,6 @@ impl PeerManagerContext {
             upstream_handlers,
             connection_event_handlers,
 
-            max_concurrent_network_reqs,
             channel_size,
             max_frame_size,
             max_message_size,
@@ -125,7 +122,7 @@ impl PeerManagerContext {
     fn add_upstream_handler(
         &mut self,
         protocol_id: ProtocolId,
-        channel: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        channel: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     ) -> &mut Self {
         self.upstream_handlers.insert(protocol_id, channel);
         self
@@ -171,7 +168,6 @@ impl PeerManagerBuilder {
         peers_and_metadata: Arc<PeersAndMetadata>,
         authentication_mode: AuthenticationMode,
         channel_size: usize,
-        max_concurrent_network_reqs: usize,
         max_frame_size: usize,
         max_message_size: usize,
         enable_proxy_protocol: bool,
@@ -206,7 +202,6 @@ impl PeerManagerBuilder {
                 peers_and_metadata,
                 HashMap::new(),
                 Vec::new(),
-                max_concurrent_network_reqs,
                 channel_size,
                 max_frame_size,
                 max_message_size,
@@ -342,7 +337,6 @@ impl PeerManagerBuilder {
             pm_context.upstream_handlers,
             pm_context.connection_event_handlers,
             pm_context.channel_size,
-            pm_context.max_concurrent_network_reqs,
             pm_context.max_frame_size,
             pm_context.max_message_size,
             pm_context.inbound_connection_limit,
@@ -417,7 +411,7 @@ impl PeerManagerBuilder {
     pub fn add_service(
         &mut self,
         config: &NetworkServiceConfig,
-    ) -> aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification> {
+    ) -> aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage> {
         // Register the direct send and rpc protocols
         self.transport_context()
             .add_protocols(&config.direct_send_protocols_and_preferences);

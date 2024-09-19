@@ -15,7 +15,6 @@ use aptos_data_streaming_service::{
     streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback},
 };
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
-use aptos_schemadb::DB;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbReaderWriter,
     DbWriter, ExecutedTrees, Order, Result, StateSnapshotReceiver,
@@ -83,7 +82,10 @@ pub fn create_mock_reader_writer_with_version(
     let mut reader = reader.unwrap_or_else(create_mock_db_reader);
     reader
         .expect_get_synced_version()
-        .returning(move || Ok(highest_synced_version));
+        .returning(move || Ok(Some(highest_synced_version)));
+    reader
+        .expect_get_pre_committed_version()
+        .returning(move || Ok(Some(highest_synced_version)));
     reader
         .expect_get_latest_epoch_state()
         .returning(|| Ok(create_empty_epoch_state()));
@@ -236,7 +238,9 @@ mock! {
 
         fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-        fn get_synced_version(&self) -> Result<Version>;
+        fn get_synced_version(&self) -> Result<Option<Version>>;
+
+        fn get_pre_committed_version(&self) -> Result<Option<Version>>;
 
         fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
@@ -290,7 +294,7 @@ mock! {
             ledger_version: Version,
         ) -> Result<TransactionAccumulatorSummary>;
 
-        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+        fn get_state_item_count(&self, version: Version) -> Result<usize>;
 
         fn get_state_value_chunk_with_proof(
             &self,
@@ -474,7 +478,6 @@ mock! {
             epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
             target_ledger_info: LedgerInfoWithSignatures,
             target_output_with_proof: TransactionOutputListWithProof,
-            internal_indexer_db: Option<Arc<DB>>,
         ) -> AnyhowResult<JoinHandle<()>, crate::error::Error>;
 
         fn pending_storage_data(&self) -> bool;

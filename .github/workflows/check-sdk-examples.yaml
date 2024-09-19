@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version-file: .node-version
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
 
       # Run example code in typescript.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2

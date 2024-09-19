@@ -5,11 +5,11 @@
 use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
-    loader::{Function, Loader, ModuleStorageAdapter, Resolver},
+    loader::{Loader, ModuleStorageAdapter, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
-    trace,
+    trace, LoadedFunction,
 };
 use fail::fail_point;
 use move_binary_format::{
@@ -17,6 +17,7 @@ use move_binary_format::{
     file_format::{
         Ability, AbilitySet, AccessKind, Bytecode, FieldInstantiationIndex, FunctionHandleIndex,
         FunctionInstantiationIndex, LocalIndex, SignatureIndex, StructDefInstantiationIndex,
+        StructVariantInstantiationIndex, VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::{
@@ -43,7 +44,6 @@ use std::{
     cmp::min,
     collections::{BTreeMap, HashSet, VecDeque},
     fmt::Write,
-    sync::Arc,
 };
 
 macro_rules! set_err_info {
@@ -85,8 +85,7 @@ impl Interpreter {
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
     pub(crate) fn entrypoint(
-        function: Arc<Function>,
-        ty_args: Vec<Type>,
+        function: LoadedFunction,
         args: Vec<Value>,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
@@ -110,7 +109,6 @@ impl Interpreter {
             traversal_context,
             extensions,
             function,
-            ty_args,
             args,
         )
     }
@@ -129,11 +127,10 @@ impl Interpreter {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        function: Arc<Function>,
-        ty_args: Vec<Type>,
+        function: LoadedFunction,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
-        let mut locals = Locals::new(function.local_count());
+        let mut locals = Locals::new(function.local_tys().len());
         for (i, value) in args.into_iter().enumerate() {
             locals
                 .store_loc(i, value, loader.vm_config().check_invariant_in_swap_loc)
@@ -145,12 +142,12 @@ impl Interpreter {
         }
 
         let mut current_frame = self
-            .make_new_frame(gas_meter, loader, function, ty_args, locals)
+            .make_new_frame(gas_meter, loader, function, locals)
             .map_err(|err| self.set_location(err))?;
 
         // Access control for the new frame.
         self.access_control
-            .enter_function(&current_frame, current_frame.function.as_ref())
+            .enter_function(&current_frame, &current_frame.function)
             .map_err(|e| self.set_location(e))?;
         loop {
             let resolver = current_frame.resolver(loader, module_store);
@@ -172,7 +169,7 @@ impl Interpreter {
                         .map_err(|e| self.set_location(e))?;
 
                     self.access_control
-                        .exit_function(current_frame.function.as_ref())
+                        .exit_function(&current_frame.function)
                         .map_err(|e| self.set_location(e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
@@ -188,40 +185,41 @@ impl Interpreter {
                         // end of execution. `self` should no longer be used afterward
                         // Clean up access control
                         self.access_control
-                            .exit_function(current_frame.function.as_ref())
+                            .exit_function(&current_frame.function)
                             .map_err(|e| self.set_location(e))?;
                         return Ok(self.operand_stack.value);
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let func = resolver
-                        .function_from_handle(fh_idx)
+                    let function = resolver
+                        .build_loaded_function_from_handle_and_ty_args(fh_idx, vec![])
                         .map_err(|e| self.set_location(e))?;
 
                     if self.paranoid_type_checks {
-                        self.check_friend_or_private_call(&current_frame.function, &func)?;
+                        self.check_friend_or_private_call(&current_frame.function, &function)?;
                     }
 
                     // Charge gas
-                    let module_id = func
-                        .module_id()
-                        .ok_or_else(|| {
+                    let module_id = function.module_id().ok_or_else(|| {
+                        let err =
                             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message("Failed to get native function module id".to_string())
-                        })
-                        .map_err(|e| set_err_info!(current_frame, e))?;
+                                .with_message(
+                                    "Failed to get native function module id".to_string(),
+                                );
+                        set_err_info!(current_frame, err)
+                    })?;
                     gas_meter
                         .charge_call(
                             module_id,
-                            func.name(),
+                            function.name(),
                             self.operand_stack
-                                .last_n(func.param_count())
+                                .last_n(function.param_tys().len())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
-                            (func.local_count() as u64).into(),
+                            (function.local_tys().len() as u64).into(),
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
-                    if func.is_native() {
+                    if function.is_native() {
                         self.call_native(
                             &mut current_frame,
                             &resolver,
@@ -230,27 +228,30 @@ impl Interpreter {
                             gas_meter,
                             traversal_context,
                             extensions,
-                            func,
-                            vec![],
+                            &function,
                         )?;
                         continue;
                     }
-                    self.set_new_call_frame(&mut current_frame, gas_meter, loader, func, vec![])?;
+                    self.set_new_call_frame(&mut current_frame, gas_meter, loader, function)?;
                 },
                 ExitCode::CallGeneric(idx) => {
                     let ty_args = resolver
-                        .instantiate_generic_function(Some(gas_meter), idx, current_frame.ty_args())
+                        .instantiate_generic_function(
+                            Some(gas_meter),
+                            idx,
+                            current_frame.function.ty_args(),
+                        )
                         .map_err(|e| set_err_info!(current_frame, e))?;
-                    let func = resolver
-                        .function_from_instantiation(idx)
+                    let function = resolver
+                        .build_loaded_function_from_instantiation_and_ty_args(idx, ty_args)
                         .map_err(|e| self.set_location(e))?;
 
                     if self.paranoid_type_checks {
-                        self.check_friend_or_private_call(&current_frame.function, &func)?;
+                        self.check_friend_or_private_call(&current_frame.function, &function)?;
                     }
 
                     // Charge gas
-                    let module_id = func
+                    let module_id = function
                         .module_id()
                         .ok_or_else(|| {
                             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -260,16 +261,19 @@ impl Interpreter {
                     gas_meter
                         .charge_call_generic(
                             module_id,
-                            func.name(),
-                            ty_args.iter().map(|ty| TypeWithLoader { ty, loader }),
+                            function.name(),
+                            function
+                                .ty_args()
+                                .iter()
+                                .map(|ty| TypeWithLoader { ty, loader }),
                             self.operand_stack
-                                .last_n(func.param_count())
+                                .last_n(function.param_tys().len())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
-                            (func.local_count() as u64).into(),
+                            (function.local_tys().len() as u64).into(),
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
-                    if func.is_native() {
+                    if function.is_native() {
                         self.call_native(
                             &mut current_frame,
                             &resolver,
@@ -278,12 +282,11 @@ impl Interpreter {
                             gas_meter,
                             traversal_context,
                             extensions,
-                            func,
-                            ty_args,
+                            &function,
                         )?;
                         continue;
                     }
-                    self.set_new_call_frame(&mut current_frame, gas_meter, loader, func, ty_args)?;
+                    self.set_new_call_frame(&mut current_frame, gas_meter, loader, function)?;
                 },
             }
         }
@@ -294,10 +297,9 @@ impl Interpreter {
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        func: Arc<Function>,
-        ty_args: Vec<Type>,
+        function: LoadedFunction,
     ) -> VMResult<()> {
-        match (func.module_id(), current_frame.function.module_id()) {
+        match (function.module_id(), current_frame.function.module_id()) {
             (Some(module_id), Some(current_module_id)) if module_id != current_module_id => {
                 if self.active_modules.contains(module_id) {
                     return Err(self.set_location(
@@ -318,14 +320,14 @@ impl Interpreter {
         }
 
         let mut frame = self
-            .make_call_frame(gas_meter, loader, func, ty_args)
+            .make_call_frame(gas_meter, loader, function)
             .map_err(|err| {
                 self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
             })?;
 
         // Access control for the new frame.
         self.access_control
-            .enter_function(&frame, frame.function.as_ref())
+            .enter_function(&frame, &frame.function)
             .map_err(|e| self.set_location(e))?;
 
         std::mem::swap(current_frame, &mut frame);
@@ -346,26 +348,26 @@ impl Interpreter {
         &mut self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        func: Arc<Function>,
-        ty_args: Vec<Type>,
+        function: LoadedFunction,
     ) -> PartialVMResult<Frame> {
-        let mut locals = Locals::new(func.local_count());
-        let param_count = func.param_count();
+        let mut locals = Locals::new(function.local_tys().len());
+        let num_param_tys = function.param_tys().len();
 
-        for i in 0..param_count {
+        for i in 0..num_param_tys {
             locals.store_loc(
-                param_count - i - 1,
+                num_param_tys - i - 1,
                 self.operand_stack.pop()?,
                 loader.vm_config().check_invariant_in_swap_loc,
             )?;
 
+            let ty_args = function.ty_args();
             if self.paranoid_type_checks {
                 let ty = self.operand_stack.pop_ty()?;
-                let expected_ty = &func.local_tys()[param_count - i - 1];
+                let expected_ty = &function.local_tys()[num_param_tys - i - 1];
                 if !ty_args.is_empty() {
                     let expected_ty = loader
                         .ty_builder()
-                        .create_ty_with_subst_with_legacy_check(expected_ty, &ty_args)?;
+                        .create_ty_with_subst(expected_ty, ty_args)?;
                     ty.paranoid_check_eq(&expected_ty)?;
                 } else {
                     // Directly check against the expected type to save a clone here.
@@ -373,47 +375,44 @@ impl Interpreter {
                 }
             }
         }
-        self.make_new_frame(gas_meter, loader, func, ty_args, locals)
+        self.make_new_frame(gas_meter, loader, function, locals)
     }
 
-    /// Create a new `Frame` given a `Function` and the function `Locals`.
+    /// Create a new `Frame` given a function and its locals.
     ///
     /// The locals must be loaded before calling this.
     fn make_new_frame(
         &self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: Arc<Function>,
-        ty_args: Vec<Type>,
+        function: LoadedFunction,
         locals: Locals,
     ) -> PartialVMResult<Frame> {
+        let ty_args = function.ty_args();
         for ty in function.local_tys() {
             gas_meter
-                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(&ty_args)? as u64))?;
+                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
         }
 
         let local_tys = if self.paranoid_type_checks {
             if ty_args.is_empty() {
                 function.local_tys().to_vec()
             } else {
+                let ty_builder = loader.ty_builder();
                 function
                     .local_tys()
                     .iter()
-                    .map(|ty| {
-                        loader
-                            .ty_builder()
-                            .create_ty_with_subst_with_legacy_check(ty, &ty_args)
-                    })
+                    .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
                     .collect::<PartialVMResult<Vec<_>>>()?
             }
         } else {
             vec![]
         };
+
         Ok(Frame {
             pc: 0,
             locals,
             function,
-            ty_args,
             local_tys,
             ty_cache: FrameTypeCache::default(),
         })
@@ -429,8 +428,7 @@ impl Interpreter {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        function: Arc<Function>,
-        ty_args: Vec<Type>,
+        function: &LoadedFunction,
     ) -> VMResult<()> {
         // Note: refactor if native functions push a frame on the stack
         self.call_native_impl(
@@ -441,8 +439,7 @@ impl Interpreter {
             gas_meter,
             traversal_context,
             extensions,
-            function.clone(),
-            ty_args,
+            function,
         )
         .map_err(|e| match function.module_id() {
             Some(id) => {
@@ -471,30 +468,29 @@ impl Interpreter {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        function: Arc<Function>,
-        ty_args: Vec<Type>,
+        function: &LoadedFunction,
     ) -> PartialVMResult<()> {
         let ty_builder = resolver.loader().ty_builder();
 
         let mut args = VecDeque::new();
-        let expected_args = function.param_count();
-        for _ in 0..expected_args {
+        let num_param_tys = function.param_tys().len();
+        for _ in 0..num_param_tys {
             args.push_front(self.operand_stack.pop()?);
         }
-        let mut args_ty = VecDeque::new();
+        let mut arg_tys = VecDeque::new();
 
+        let ty_args = function.ty_args();
         if self.paranoid_type_checks {
-            for i in 0..expected_args {
+            for i in 0..num_param_tys {
                 let ty = self.operand_stack.pop_ty()?;
-                let expected_ty = &function.param_tys()[expected_args - i - 1];
+                let expected_ty = &function.param_tys()[num_param_tys - i - 1];
                 if !ty_args.is_empty() {
-                    let expected_ty =
-                        ty_builder.create_ty_with_subst_with_legacy_check(expected_ty, &ty_args)?;
+                    let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
                     ty.paranoid_check_eq(&expected_ty)?;
                 } else {
                     ty.paranoid_check_eq(expected_ty)?;
                 }
-                args_ty.push_front(ty);
+                arg_tys.push_front(ty);
             }
         }
 
@@ -516,7 +512,7 @@ impl Interpreter {
             args.iter(),
         )?;
 
-        let result = native_function(&mut native_context, ty_args.clone(), args)?;
+        let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
@@ -546,7 +542,7 @@ impl Interpreter {
 
                 if self.paranoid_type_checks {
                     for ty in function.return_tys() {
-                        let ty = ty_builder.create_ty_with_subst_with_legacy_check(ty, &ty_args)?;
+                        let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
                         self.operand_stack.push_ty(ty)?;
                     }
                 }
@@ -592,8 +588,11 @@ impl Interpreter {
                         PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                             .with_message(format!("Module {} doesn't exist", module_name))
                     })?;
-
-                let target_func = resolver.function_from_name(&module_name, &func_name)?;
+                let target_func = resolver.build_loaded_function_from_name_and_ty_args(
+                    &module_name,
+                    &func_name,
+                    ty_args,
+                )?;
 
                 if target_func.is_friend_or_private()
                     || target_func.module_id() == function.module_id()
@@ -604,6 +603,13 @@ impl Interpreter {
                         ));
                 }
 
+                if resolver.loader().vm_config().disallow_dispatch_for_native
+                    && target_func.is_native()
+                {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message("Invoking native function during dispatch".to_string()));
+                }
+
                 // Checking type of the dispatch target function
                 //
                 // MoveVM will check that the native function that performs the dispatch will have the same
@@ -611,9 +617,10 @@ impl Interpreter {
                 // in the end to determine which function to jump to. The native function shouldn't switch ordering of arguments.
                 //
                 // Runtime will use such convention to reconstruct the type stack required to perform paranoid mode checks.
-                if function.ty_param_abilities != target_func.ty_param_abilities
-                    || function.return_tys != target_func.return_tys
-                    || function.param_tys[0..function.param_tys.len() - 1] != target_func.param_tys
+                if function.ty_param_abilities() != target_func.ty_param_abilities()
+                    || function.return_tys() != target_func.return_tys()
+                    || &function.param_tys()[0..function.param_tys().len() - 1]
+                        != target_func.param_tys()
                 {
                     return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
                         .with_message(
@@ -627,20 +634,14 @@ impl Interpreter {
 
                 // Maintaining the type stack for the paranoid mode using calling convention mentioned above.
                 if self.paranoid_type_checks {
-                    args_ty.pop_back();
-                    for ty in args_ty {
+                    arg_tys.pop_back();
+                    for ty in arg_tys {
                         self.operand_stack.push_ty(ty)?;
                     }
                 }
 
-                self.set_new_call_frame(
-                    current_frame,
-                    gas_meter,
-                    resolver.loader(),
-                    target_func,
-                    ty_args,
-                )
-                .map_err(|err| err.to_partial())
+                self.set_new_call_frame(current_frame, gas_meter, resolver.loader(), target_func)
+                    .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
                 let arena_id = traversal_context
@@ -678,8 +679,8 @@ impl Interpreter {
     /// Make sure only private/friend function can only be invoked by modules under the same address.
     fn check_friend_or_private_call(
         &self,
-        caller: &Arc<Function>,
-        callee: &Arc<Function>,
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
     ) -> VMResult<()> {
         if callee.is_friend_or_private() {
             match (caller.module_id(), callee.module_id()) {
@@ -968,20 +969,19 @@ impl Interpreter {
         idx: usize,
         frame: &Frame,
     ) -> PartialVMResult<()> {
-        // Print out the function name with type arguments.
-        let func = &frame.function;
-
         debug_write!(buf, "    [{}] ", idx)?;
-        if let Some(module) = func.module_id() {
-            debug_write!(buf, "{}::{}::", module.address().to_hex(), module.name(),)?;
-        }
-        debug_write!(buf, "{}", func.name())?;
-        let ty_args = frame.ty_args();
-        let mut ty_tags = vec![];
-        for ty in ty_args {
-            ty_tags.push(loader.type_to_type_tag(ty)?);
-        }
-        if !ty_tags.is_empty() {
+
+        // Print out the function name.
+        let function = &frame.function;
+        debug_write!(buf, "{}", function.name_as_pretty_string())?;
+
+        // Print out type arguments, if they exist.
+        let ty_args = function.ty_args();
+        if !ty_args.is_empty() {
+            let mut ty_tags = vec![];
+            for ty in ty_args {
+                ty_tags.push(loader.type_to_type_tag(ty)?);
+            }
             debug_write!(buf, "<")?;
             let mut it = ty_tags.iter();
             if let Some(tag) = it.next() {
@@ -999,7 +999,7 @@ impl Interpreter {
         debug_writeln!(buf)?;
         debug_writeln!(buf, "        Code:")?;
         let pc = frame.pc as usize;
-        let code = func.code();
+        let code = function.code();
         let before = if pc > 3 { pc - 3 } else { 0 };
         let after = min(code.len(), pc + 4);
         for (idx, instr) in code.iter().enumerate().take(pc).skip(before) {
@@ -1013,7 +1013,7 @@ impl Interpreter {
         // Print out the locals.
         debug_writeln!(buf)?;
         debug_writeln!(buf, "        Locals:")?;
-        if func.local_count() > 0 {
+        if !function.local_tys().is_empty() {
             values::debug::print_locals(buf, &frame.locals)?;
             debug_writeln!(buf)?;
         } else {
@@ -1058,7 +1058,7 @@ impl Interpreter {
                 format!(
                     " frame #{}: {} [pc = {}]\n",
                     i,
-                    frame.function.pretty_string(),
+                    frame.function.name_as_pretty_string(),
                     frame.pc,
                 )
                 .as_str(),
@@ -1068,7 +1068,7 @@ impl Interpreter {
             format!(
                 "*frame #{}: {} [pc = {}]:\n",
                 self.call_stack.0.len(),
-                current_frame.function.pretty_string(),
+                current_frame.function.name_as_pretty_string(),
                 current_frame.pc,
             )
             .as_str(),
@@ -1343,15 +1343,17 @@ fn check_depth_of_type_impl(
     Ok(ty_depth)
 }
 
-/// A `Frame` is the execution context for a function. It holds the locals of the function and
-/// the function itself.
-// #[derive(Debug)]
+/// Represents the execution context for a function. When calls are made, frames are
+/// pushed and then popped to/from the call stack.
 struct Frame {
     pc: u16,
+    // Currently being executed function.
+    function: LoadedFunction,
+    // Locals for this execution context and their instantiated types.
     locals: Locals,
-    function: Arc<Function>,
-    ty_args: Vec<Type>,
     local_tys: Vec<Type>,
+    // Cache of types accessed in this frame, to improve performance when accessing
+    // and constructing types.
     ty_cache: FrameTypeCache,
 }
 
@@ -1359,11 +1361,18 @@ struct Frame {
 struct FrameTypeCache {
     struct_field_type_instantiation:
         BTreeMap<StructDefInstantiationIndex, Vec<(Type, NumTypeNodes)>>,
+    struct_variant_field_type_instantiation:
+        BTreeMap<StructVariantInstantiationIndex, Vec<(Type, NumTypeNodes)>>,
     struct_def_instantiation_type: BTreeMap<StructDefInstantiationIndex, (Type, NumTypeNodes)>,
+    struct_variant_instantiation_type:
+        BTreeMap<StructVariantInstantiationIndex, (Type, NumTypeNodes)>,
     /// For a given field instantiation, the:
     ///    ((Type of the field, size of the field type) and (Type of its defining struct, size of its defining struct)
     field_instantiation:
         BTreeMap<FieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
+    /// Same as above, bot for variant field instantiations
+    variant_field_instantiation:
+        BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
 }
 
@@ -1412,6 +1421,32 @@ impl FrameTypeCache {
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
+    fn get_variant_field_type_and_struct_type(
+        &mut self,
+        idx: VariantFieldInstantiationIndex,
+        resolver: &Resolver,
+        ty_args: &[Type],
+    ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
+        let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
+            Self::get_or(&mut self.variant_field_instantiation, idx, |idx| {
+                let info = resolver.variant_field_instantiation_info_at(idx);
+                let struct_type = resolver.create_struct_instantiation_ty(
+                    &info.definition_struct_type,
+                    &info.instantiation,
+                    ty_args,
+                )?;
+                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let field_ty = resolver.instantiate_ty(
+                    &info.uninstantiated_field_ty,
+                    ty_args,
+                    &info.instantiation,
+                )?;
+                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
+            })?;
+        Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
+    }
+
     #[inline(always)]
     fn get_struct_type(
         &mut self,
@@ -1428,6 +1463,27 @@ impl FrameTypeCache {
     }
 
     #[inline(always)]
+    fn get_struct_variant_type(
+        &mut self,
+        idx: StructVariantInstantiationIndex,
+        resolver: &Resolver,
+        ty_args: &[Type],
+    ) -> PartialVMResult<(&Type, NumTypeNodes)> {
+        let (ty, ty_count) =
+            Self::get_or(&mut self.struct_variant_instantiation_type, idx, |idx| {
+                let info = resolver.get_struct_variant_instantiation_at(idx);
+                let ty = resolver.create_struct_instantiation_ty(
+                    &info.definition_struct_type,
+                    &info.instantiation,
+                    ty_args,
+                )?;
+                let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+                Ok((ty, ty_count))
+            })?;
+        Ok((ty, *ty_count))
+    }
+
+    #[inline(always)]
     fn get_struct_fields_types(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -1440,6 +1496,29 @@ impl FrameTypeCache {
             |idx| {
                 Ok(resolver
                     .instantiate_generic_struct_fields(idx, ty_args)?
+                    .into_iter()
+                    .map(|ty| {
+                        let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
+                        (ty, num_nodes)
+                    })
+                    .collect::<Vec<_>>())
+            },
+        )?)
+    }
+
+    #[inline(always)]
+    fn get_struct_variant_fields_types(
+        &mut self,
+        idx: StructVariantInstantiationIndex,
+        resolver: &Resolver,
+        ty_args: &[Type],
+    ) -> PartialVMResult<&[(Type, NumTypeNodes)]> {
+        Ok(Self::get_or(
+            &mut self.struct_variant_field_type_instantiation,
+            idx,
+            |idx| {
+                Ok(resolver
+                    .instantiate_generic_struct_variant_fields(idx, ty_args)?
                     .into_iter()
                     .map(|ty| {
                         let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
@@ -1493,8 +1572,7 @@ impl Frame {
                 } else {
                     e
                 };
-                e.at_code_offset(self.function.index(), self.pc)
-                    .finish(self.location())
+                set_err_info!(self, e)
             })
     }
 
@@ -1606,6 +1684,18 @@ impl Frame {
             | Bytecode::VecPopBack(_)
             | Bytecode::VecUnpack(_, _)
             | Bytecode::VecSwap(_) => (),
+
+            // Since bytecode version 7
+            Bytecode::PackVariant(_)
+            | Bytecode::PackVariantGeneric(_)
+            | Bytecode::UnpackVariant(_)
+            | Bytecode::UnpackVariantGeneric(_)
+            | Bytecode::TestVariant(_)
+            | Bytecode::TestVariantGeneric(_)
+            | Bytecode::MutBorrowVariantField(_)
+            | Bytecode::MutBorrowVariantFieldGeneric(_)
+            | Bytecode::ImmBorrowVariantField(_)
+            | Bytecode::ImmBorrowVariantFieldGeneric(_) => (),
         };
         Ok(())
     }
@@ -1726,83 +1816,61 @@ impl Frame {
                 let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
                 interpreter.operand_stack.push_ty(field_mut_ref_ty)?;
             },
+            Bytecode::ImmBorrowVariantField(fh_idx) | Bytecode::MutBorrowVariantField(fh_idx) => {
+                let is_mut = matches!(instruction, Bytecode::MutBorrowVariantField(..));
+                let field_info = resolver.variant_field_info_at(*fh_idx);
+                let ty = interpreter.operand_stack.pop_ty()?;
+                let expected_ty = resolver.create_struct_ty(&field_info.definition_struct_type);
+                ty.paranoid_check_ref_eq(&expected_ty, is_mut)?;
+                let field_ty = &field_info.uninstantiated_field_ty;
+                let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
+                interpreter.operand_stack.push_ty(field_ref_ty)?;
+            },
+            Bytecode::ImmBorrowVariantFieldGeneric(idx)
+            | Bytecode::MutBorrowVariantFieldGeneric(idx) => {
+                let is_mut = matches!(instruction, Bytecode::MutBorrowVariantFieldGeneric(..));
+                let struct_ty = interpreter.operand_stack.pop_ty()?;
+                let ((field_ty, _), (expected_struct_ty, _)) =
+                    ty_cache.get_variant_field_type_and_struct_type(*idx, resolver, ty_args)?;
+                struct_ty.paranoid_check_ref_eq(expected_struct_ty, is_mut)?;
+                let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
+                interpreter.operand_stack.push_ty(field_ref_ty)?;
+            },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
-                let args_ty = resolver.get_struct_field_tys(*idx)?;
+                let args_ty = resolver.get_struct(*idx)?;
+                let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
                 let output_ty = resolver.get_struct_ty(*idx);
-                let ability = output_ty.abilities()?;
-
-                // If the struct has a key ability, we expect all of its field to have store ability but not key ability.
-                let field_expected_abilities = if ability.has_key() {
-                    ability
-                        .remove(Ability::Key)
-                        .union(AbilitySet::singleton(Ability::Store))
-                } else {
-                    ability
-                };
-
-                if field_count as usize != args_ty.field_tys.len() {
-                    return Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message("Args count mismatch".to_string()),
-                    );
-                }
-
-                for (ty, expected_ty) in interpreter
-                    .operand_stack
-                    .popn_tys(field_count)?
-                    .into_iter()
-                    .zip(args_ty.field_tys.iter())
-                {
-                    // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
-                    // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
-                    ty.paranoid_check_abilities(field_expected_abilities)?;
-                    ty.paranoid_check_eq(expected_ty)?;
-                }
-
-                interpreter.operand_stack.push_ty(output_ty)?;
+                Self::verify_pack(interpreter, field_count, field_tys, output_ty)?;
             },
             Bytecode::PackGeneric(idx) => {
                 let field_count = resolver.field_instantiation_count(*idx);
                 let output_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
                 let args_ty = ty_cache.get_struct_fields_types(*idx, resolver, ty_args)?;
-                let ability = output_ty.abilities()?;
-
-                // If the struct has a key ability, we expect all of its field to have store ability but not key ability.
-                let field_expected_abilities = if ability.has_key() {
-                    ability
-                        .remove(Ability::Key)
-                        .union(AbilitySet::singleton(Ability::Store))
-                } else {
-                    ability
-                };
 
                 if field_count as usize != args_ty.len() {
+                    // This is an inconsistency between the cache and the actual
+                    // type declaration. We would crash if for some reason this invariant does
+                    // not hold. It seems impossible to hit, but we keep it here for safety
+                    // reasons, as a previous version of this code had this too.
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message("Args count mismatch".to_string()),
                     );
                 }
 
-                for (ty, (expected_ty, _)) in interpreter
-                    .operand_stack
-                    .popn_tys(field_count)?
-                    .into_iter()
-                    .zip(args_ty.iter())
-                {
-                    // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
-                    // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
-                    ty.paranoid_check_abilities(field_expected_abilities)?;
-                    ty.paranoid_check_eq(expected_ty)?;
-                }
-
-                interpreter.operand_stack.push_ty(output_ty)?;
+                Self::verify_pack(
+                    interpreter,
+                    field_count,
+                    args_ty.iter().map(|(ty, _)| ty),
+                    output_ty,
+                )?;
             },
             Bytecode::Unpack(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
                 struct_ty.paranoid_check_eq(&resolver.get_struct_ty(*idx))?;
-                let struct_decl = resolver.get_struct_field_tys(*idx)?;
-                for ty in struct_decl.field_tys.iter() {
+                let struct_decl = resolver.get_struct(*idx)?;
+                for (_name, ty) in struct_decl.fields(None)?.iter() {
                     interpreter.operand_stack.push_ty(ty.clone())?;
                 }
             },
@@ -1817,6 +1885,72 @@ impl Frame {
                 for (ty, _) in struct_fields_types {
                     interpreter.operand_stack.push_ty(ty.clone())?;
                 }
+            },
+            Bytecode::PackVariant(idx) => {
+                let info = resolver.get_struct_variant_at(*idx);
+                let field_tys = info
+                    .definition_struct_type
+                    .fields(Some(info.variant))?
+                    .iter()
+                    .map(|(_, ty)| ty);
+                let output_ty = resolver.create_struct_ty(&info.definition_struct_type);
+                Self::verify_pack(interpreter, info.field_count, field_tys, output_ty)?;
+            },
+            Bytecode::PackVariantGeneric(idx) => {
+                let info = resolver.get_struct_variant_instantiation_at(*idx);
+                let output_ty = ty_cache
+                    .get_struct_variant_type(*idx, resolver, ty_args)?
+                    .0
+                    .clone();
+                let args_ty = ty_cache.get_struct_variant_fields_types(*idx, resolver, ty_args)?;
+                Self::verify_pack(
+                    interpreter,
+                    info.field_count,
+                    args_ty.iter().map(|(ty, _)| ty),
+                    output_ty,
+                )?;
+            },
+            Bytecode::UnpackVariant(idx) => {
+                let info = resolver.get_struct_variant_at(*idx);
+                let expected_struct_ty = resolver.create_struct_ty(&info.definition_struct_type);
+                let actual_struct_ty = interpreter.operand_stack.pop_ty()?;
+                actual_struct_ty.paranoid_check_eq(&expected_struct_ty)?;
+                for (_name, ty) in info
+                    .definition_struct_type
+                    .fields(Some(info.variant))?
+                    .iter()
+                {
+                    interpreter.operand_stack.push_ty(ty.clone())?;
+                }
+            },
+            Bytecode::UnpackVariantGeneric(idx) => {
+                let expected_struct_type =
+                    ty_cache.get_struct_variant_type(*idx, resolver, ty_args)?.0;
+                let actual_struct_type = interpreter.operand_stack.pop_ty()?;
+                actual_struct_type.paranoid_check_eq(expected_struct_type)?;
+                let struct_fields_types =
+                    ty_cache.get_struct_variant_fields_types(*idx, resolver, ty_args)?;
+                for (ty, _) in struct_fields_types {
+                    interpreter.operand_stack.push_ty(ty.clone())?;
+                }
+            },
+            Bytecode::TestVariant(idx) => {
+                let info = resolver.get_struct_variant_at(*idx);
+                let expected_struct_ty = resolver.create_struct_ty(&info.definition_struct_type);
+                let actual_struct_ty = interpreter.operand_stack.pop_ty()?;
+                actual_struct_ty.paranoid_check_ref_eq(&expected_struct_ty, false)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(ty_builder.create_bool_ty())?;
+            },
+            Bytecode::TestVariantGeneric(idx) => {
+                let expected_struct_ty =
+                    ty_cache.get_struct_variant_type(*idx, resolver, ty_args)?.0;
+                let actual_struct_ty = interpreter.operand_stack.pop_ty()?;
+                actual_struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(ty_builder.create_bool_ty())?;
             },
             Bytecode::ReadRef => {
                 let ref_ty = interpreter.operand_stack.pop_ty()?;
@@ -2089,6 +2223,37 @@ impl Frame {
         Ok(())
     }
 
+    fn verify_pack<'a>(
+        interpreter: &mut Interpreter,
+        field_count: u16,
+        field_tys: impl Iterator<Item = &'a Type>,
+        output_ty: Type,
+    ) -> PartialVMResult<()> {
+        let ability = output_ty.abilities()?;
+
+        // If the struct has a key ability, we expect all of its field to have store ability but not key ability.
+        let field_expected_abilities = if ability.has_key() {
+            ability
+                .remove(Ability::Key)
+                .union(AbilitySet::singleton(Ability::Store))
+        } else {
+            ability
+        };
+        for (ty, expected_ty) in interpreter
+            .operand_stack
+            .popn_tys(field_count)?
+            .into_iter()
+            .zip(field_tys)
+        {
+            // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
+            // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
+            ty.paranoid_check_abilities(field_expected_abilities)?;
+            ty.paranoid_check_eq(expected_ty)?;
+        }
+
+        interpreter.operand_stack.push_ty(output_ty)
+    }
+
     fn execute_code_impl(
         &mut self,
         resolver: &Resolver,
@@ -2141,7 +2306,7 @@ impl Frame {
                     Self::pre_execution_type_stack_transition(
                         &self.local_tys,
                         &self.locals,
-                        self.ty_args(),
+                        self.function.ty_args(),
                         resolver,
                         interpreter,
                         instruction,
@@ -2293,15 +2458,19 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) = self
-                            .ty_cache
-                            .get_field_type_and_struct_type(*fi_idx, resolver, &self.ty_args)?;
+                        let ((_, field_ty_count), (_, struct_ty_count)) =
+                            self.ty_cache.get_field_type_and_struct_type(
+                                *fi_idx,
+                                resolver,
+                                self.function.ty_args(),
+                            )?;
                         gas_meter.charge_create_ty(struct_ty_count)?;
                         gas_meter.charge_create_ty(field_ty_count)?;
 
-                        let instr = match instruction {
-                            Bytecode::MutBorrowFieldGeneric(_) => S::MutBorrowFieldGeneric,
-                            _ => S::ImmBorrowFieldGeneric,
+                        let instr = if matches!(instruction, Bytecode::MutBorrowFieldGeneric(_)) {
+                            S::MutBorrowFieldGeneric
+                        } else {
+                            S::ImmBorrowFieldGeneric
                         };
                         gas_meter.charge_simple_instr(instr)?;
 
@@ -2309,6 +2478,64 @@ impl Frame {
 
                         let offset = resolver.field_instantiation_offset(*fi_idx);
                         let field_ref = reference.borrow_field(offset)?;
+                        interpreter.operand_stack.push(field_ref)?;
+                    },
+                    Bytecode::ImmBorrowVariantField(idx) | Bytecode::MutBorrowVariantField(idx) => {
+                        let instr = if matches!(instruction, Bytecode::MutBorrowVariantField(_)) {
+                            S::MutBorrowVariantField
+                        } else {
+                            S::ImmBorrowVariantField
+                        };
+                        gas_meter.charge_simple_instr(instr)?;
+
+                        let field_info = resolver.variant_field_info_at(*idx);
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let field_ref = reference.borrow_variant_field(
+                            &field_info.variants,
+                            field_info.offset,
+                            &|v| {
+                                field_info
+                                    .definition_struct_type
+                                    .variant_name_for_message(v)
+                            },
+                        )?;
+                        interpreter.operand_stack.push(field_ref)?;
+                    },
+                    Bytecode::ImmBorrowVariantFieldGeneric(fi_idx)
+                    | Bytecode::MutBorrowVariantFieldGeneric(fi_idx) => {
+                        // TODO: Even though the types are not needed for execution, we still
+                        //       instantiate them for gas metering.
+                        //
+                        //       This is a bit wasteful since the newly created types are
+                        //       dropped immediately.
+                        let ((_, field_ty_count), (_, struct_ty_count)) =
+                            self.ty_cache.get_variant_field_type_and_struct_type(
+                                *fi_idx,
+                                resolver,
+                                self.function.ty_args(),
+                            )?;
+                        gas_meter.charge_create_ty(struct_ty_count)?;
+                        gas_meter.charge_create_ty(field_ty_count)?;
+
+                        let instr = match instruction {
+                            Bytecode::MutBorrowVariantFieldGeneric(_) => {
+                                S::MutBorrowVariantFieldGeneric
+                            },
+                            _ => S::ImmBorrowVariantFieldGeneric,
+                        };
+                        gas_meter.charge_simple_instr(instr)?;
+
+                        let field_info = resolver.variant_field_instantiation_info_at(*fi_idx);
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let field_ref = reference.borrow_variant_field(
+                            &field_info.variants,
+                            field_info.offset,
+                            &|v| {
+                                field_info
+                                    .definition_struct_type
+                                    .variant_name_for_message(v)
+                            },
+                        )?;
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
@@ -2324,25 +2551,38 @@ impl Frame {
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
                     },
+                    Bytecode::PackVariant(idx) => {
+                        let info = resolver.get_struct_variant_at(*idx);
+                        let struct_type = resolver.create_struct_ty(&info.definition_struct_type);
+                        check_depth_of_type(resolver, &struct_type)?;
+                        gas_meter.charge_pack_variant(
+                            false,
+                            interpreter
+                                .operand_stack
+                                .last_n(info.field_count as usize)?,
+                        )?;
+                        let args = interpreter.operand_stack.popn(info.field_count)?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
+                    },
                     Bytecode::PackGeneric(si_idx) => {
                         // TODO: Even though the types are not needed for execution, we still
                         //       instantiate them for gas metering.
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let field_tys = self.ty_cache.get_struct_fields_types(
-                            *si_idx,
-                            resolver,
-                            &self.ty_args,
-                        )?;
+                        let ty_args = self.function.ty_args();
+                        let field_tys = self
+                            .ty_cache
+                            .get_struct_fields_types(*si_idx, resolver, ty_args)?;
 
                         for (_, ty_count) in field_tys {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
                         let (ty, ty_count) =
-                            self.ty_cache
-                                .get_struct_type(*si_idx, resolver, &self.ty_args)?;
+                            self.ty_cache.get_struct_type(*si_idx, resolver, ty_args)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         check_depth_of_type(resolver, ty)?;
 
@@ -2356,12 +2596,52 @@ impl Frame {
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
                     },
+                    Bytecode::PackVariantGeneric(si_idx) => {
+                        let ty_args = self.function.ty_args();
+                        let field_tys = self
+                            .ty_cache
+                            .get_struct_variant_fields_types(*si_idx, resolver, ty_args)?;
+
+                        for (_, ty_count) in field_tys {
+                            gas_meter.charge_create_ty(*ty_count)?;
+                        }
+
+                        let (ty, ty_count) = self
+                            .ty_cache
+                            .get_struct_variant_type(*si_idx, resolver, ty_args)?;
+                        gas_meter.charge_create_ty(ty_count)?;
+                        check_depth_of_type(resolver, ty)?;
+
+                        let info = resolver.get_struct_variant_instantiation_at(*si_idx);
+                        gas_meter.charge_pack_variant(
+                            true,
+                            interpreter
+                                .operand_stack
+                                .last_n(info.field_count as usize)?,
+                        )?;
+                        let args = interpreter.operand_stack.popn(info.field_count)?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
+                    },
                     Bytecode::Unpack(_sd_idx) => {
-                        let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
+                        let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
 
-                        gas_meter.charge_unpack(false, struct_.field_views())?;
+                        gas_meter.charge_unpack(false, struct_value.field_views())?;
 
-                        for value in struct_.unpack()? {
+                        for value in struct_value.unpack()? {
+                            interpreter.operand_stack.push(value)?;
+                        }
+                    },
+                    Bytecode::UnpackVariant(sd_idx) => {
+                        let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
+
+                        gas_meter.charge_unpack_variant(false, struct_value.field_views())?;
+
+                        let info = resolver.get_struct_variant_at(*sd_idx);
+                        for value in struct_value.unpack_variant(info.variant, &|v| {
+                            info.definition_struct_type.variant_name_for_message(v)
+                        })? {
                             interpreter.operand_stack.push(value)?;
                         }
                     },
@@ -2371,18 +2651,16 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ty_and_field_counts = self.ty_cache.get_struct_fields_types(
-                            *si_idx,
-                            resolver,
-                            &self.ty_args,
-                        )?;
+                        let ty_args = self.function.ty_args();
+                        let ty_and_field_counts = self
+                            .ty_cache
+                            .get_struct_fields_types(*si_idx, resolver, ty_args)?;
                         for (_, ty_count) in ty_and_field_counts {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
                         let (ty, ty_count) =
-                            self.ty_cache
-                                .get_struct_type(*si_idx, resolver, &self.ty_args)?;
+                            self.ty_cache.get_struct_type(*si_idx, resolver, ty_args)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
                         check_depth_of_type(resolver, ty)?;
@@ -2397,6 +2675,61 @@ impl Frame {
                         for value in struct_.unpack()? {
                             interpreter.operand_stack.push(value)?;
                         }
+                    },
+                    Bytecode::UnpackVariantGeneric(si_idx) => {
+                        let ty_args = self.function.ty_args();
+                        let ty_and_field_counts = self
+                            .ty_cache
+                            .get_struct_variant_fields_types(*si_idx, resolver, ty_args)?;
+                        for (_, ty_count) in ty_and_field_counts {
+                            gas_meter.charge_create_ty(*ty_count)?;
+                        }
+
+                        let (ty, ty_count) = self
+                            .ty_cache
+                            .get_struct_variant_type(*si_idx, resolver, ty_args)?;
+                        gas_meter.charge_create_ty(ty_count)?;
+
+                        check_depth_of_type(resolver, ty)?;
+
+                        let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
+
+                        gas_meter.charge_unpack_variant(true, struct_.field_views())?;
+
+                        let info = resolver.get_struct_variant_instantiation_at(*si_idx);
+                        for value in struct_.unpack_variant(info.variant, &|v| {
+                            info.definition_struct_type.variant_name_for_message(v)
+                        })? {
+                            interpreter.operand_stack.push(value)?;
+                        }
+                    },
+                    Bytecode::TestVariant(sd_idx) => {
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        gas_meter.charge_simple_instr(S::TestVariant)?;
+                        let info = resolver.get_struct_variant_at(*sd_idx);
+                        interpreter
+                            .operand_stack
+                            .push(reference.test_variant(info.variant)?)?;
+                    },
+                    Bytecode::TestVariantGeneric(sd_idx) => {
+                        // TODO: Even though the types are not needed for execution, we still
+                        //       instantiate them for gas metering.
+                        //
+                        //       This is a bit wasteful since the newly created types are
+                        //       dropped immediately.
+                        let (_, struct_ty_count) = self.ty_cache.get_struct_variant_type(
+                            *sd_idx,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
+                        gas_meter.charge_create_ty(struct_ty_count)?;
+
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        gas_meter.charge_simple_instr(S::TestVariantGeneric)?;
+                        let info = resolver.get_struct_variant_instantiation_at(*sd_idx);
+                        interpreter
+                            .operand_stack
+                            .push(reference.test_variant(info.variant)?)?;
                     },
                     Bytecode::ReadRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
@@ -2532,7 +2865,7 @@ impl Frame {
                             .with_sub_status(error_code)
                             .with_message(format!(
                                 "{} at offset {}",
-                                self.function.pretty_string(),
+                                self.function.name_as_pretty_string(),
                                 self.pc,
                             ));
                         return Err(error);
@@ -2572,9 +2905,11 @@ impl Frame {
                     | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobalGeneric(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_struct_type(*si_idx, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_struct_type(
+                            *si_idx,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.borrow_global(
                             is_mut,
@@ -2602,9 +2937,11 @@ impl Frame {
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_struct_type(*si_idx, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_struct_type(
+                            *si_idx,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.exists(
                             true,
@@ -2631,9 +2968,11 @@ impl Frame {
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_struct_type(*si_idx, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_struct_type(
+                            *si_idx,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.move_from(
                             true,
@@ -2673,9 +3012,11 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_struct_type(*si_idx, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_struct_type(
+                            *si_idx,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.move_to(
                             true,
@@ -2702,9 +3043,11 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Bytecode::VecPack(si, num) => {
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_signature_index_type(*si, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                            *si,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         check_depth_of_type(resolver, ty)?;
                         gas_meter.charge_vec_pack(
@@ -2717,9 +3060,11 @@ impl Frame {
                     },
                     Bytecode::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_signature_index_type(*si, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                            *si,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_len(TypeWithLoader {
                             ty,
@@ -2731,9 +3076,11 @@ impl Frame {
                     Bytecode::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_signature_index_type(*si, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                            *si,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.borrow_elem(idx, ty);
                         gas_meter.charge_vec_borrow(false, make_ty!(ty), res.is_ok())?;
@@ -2742,9 +3089,11 @@ impl Frame {
                     Bytecode::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_signature_index_type(*si, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                            *si,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.borrow_elem(idx, ty);
                         gas_meter.charge_vec_borrow(true, make_ty!(ty), res.is_ok())?;
@@ -2753,18 +3102,22 @@ impl Frame {
                     Bytecode::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_signature_index_type(*si, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                            *si,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(make_ty!(ty), &elem)?;
                         vec_ref.push_back(elem, ty)?;
                     },
                     Bytecode::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_signature_index_type(*si, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                            *si,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.pop(ty);
                         gas_meter.charge_vec_pop_back(make_ty!(ty), res.as_ref().ok())?;
@@ -2772,9 +3125,11 @@ impl Frame {
                     },
                     Bytecode::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_signature_index_type(*si, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                            *si,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_unpack(
                             make_ty!(ty),
@@ -2790,9 +3145,11 @@ impl Frame {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) =
-                            self.ty_cache
-                                .get_signature_index_type(*si, resolver, &self.ty_args)?;
+                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                            *si,
+                            resolver,
+                            self.function.ty_args(),
+                        )?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap(make_ty!(ty))?;
                         vec_ref.swap(idx1, idx2, ty)?;
@@ -2801,7 +3158,7 @@ impl Frame {
                 if interpreter.paranoid_type_checks {
                     Self::post_execution_type_stack_transition(
                         &self.local_tys,
-                        &self.ty_args,
+                        self.function.ty_args(),
                         resolver,
                         interpreter,
                         &mut self.ty_cache,
@@ -2828,10 +3185,6 @@ impl Frame {
                 }
             }
         }
-    }
-
-    fn ty_args(&self) -> &[Type] {
-        &self.ty_args
     }
 
     fn resolver<'a>(

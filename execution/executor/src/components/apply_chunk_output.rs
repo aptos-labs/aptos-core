@@ -317,6 +317,9 @@ impl ApplyChunkOutput {
         let mut txn_info_hashes = Vec::with_capacity(num_txns);
         let hashes_vec =
             Self::calculate_events_and_writeset_hashes(to_commit_from_execution.parsed_outputs());
+        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&["process_events_and_writeset_hashes"])
+            .start_timer();
         let hashes_vec: Vec<(HashValue, HashValue)> = hashes_vec
             .into_par_iter()
             .map(|(event_hashes, write_set_hash)| {

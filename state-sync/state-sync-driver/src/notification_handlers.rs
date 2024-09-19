@@ -168,7 +168,7 @@ impl ConsensusSyncRequest {
     }
 }
 
-/// A simple handler for consensus notifications
+/// A simple handler for consensus or consensus observer notifications
 pub struct ConsensusNotificationHandler {
     // The listener for notifications from consensus
     consensus_listener: ConsensusNotificationListener,

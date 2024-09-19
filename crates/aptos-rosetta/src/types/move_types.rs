@@ -39,7 +39,8 @@ pub const SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION: &str =
     "switch_operator_with_same_commission";
 pub const UPDATE_VOTER_FUNCTION: &str = "update_voter";
 pub const UNLOCK_STAKE_FUNCTION: &str = "unlock_stake";
-// TODO fix the typo in function name. commision -> commission
+// TODO fix the typo in function name. commision -> commission (this has to be done on-chain first)
+// TODO: Handle update_commission and update_commision
 pub const UPDATE_COMMISSION_FUNCTION: &str = "update_commision";
 pub const DISTRIBUTE_STAKING_REWARDS_FUNCTION: &str = "distribute";
 
@@ -239,7 +240,7 @@ pub struct UndelegationEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WithdrawUndelegedEvent {
+pub struct WithdrawUndelegatedEvent {
     pub pool_address: AccountAddress,
     pub delegator_address: AccountAddress,
     pub amount_withdrawn: u64,

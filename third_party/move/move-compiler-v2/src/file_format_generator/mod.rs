@@ -3,6 +3,7 @@
 
 mod function_generator;
 mod module_generator;
+mod peephole_optimizer;
 
 use crate::{file_format_generator::module_generator::ModuleContext, options::Options, Experiment};
 use module_generator::ModuleGenerator;
@@ -145,6 +146,8 @@ const MAX_STRUCT_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_SIGNATURE_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_STRUCT_DEF_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_STRUCT_DEF_INST_COUNT: usize = FF::TableIndex::MAX as usize;
+const MAX_STRUCT_VARIANT_COUNT: usize = FF::TableIndex::MAX as usize;
+const MAX_STRUCT_VARIANT_INST_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_FIELD_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_FIELD_INST_COUNT: usize = FF::TableIndex::MAX as usize;
 const MAX_FUNCTION_COUNT: usize = FF::TableIndex::MAX as usize;

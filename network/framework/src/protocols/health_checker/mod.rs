@@ -57,10 +57,8 @@ mod test;
 
 /// The interface from Network to HealthChecker layer.
 ///
-/// `HealthCheckerNetworkEvents` is a `Stream` of `PeerManagerNotification` where the
-/// raw `Bytes` rpc messages are deserialized into
-/// `HealthCheckerMsg` types. `HealthCheckerNetworkEvents` is a thin wrapper
-/// around an `channel::Receiver<PeerManagerNotification>`.
+/// `HealthCheckerNetworkEvents` is a `Stream` of `HealthCheckerMsg`.
+/// (Behind the scenes, network messages are being deserialized)
 pub type HealthCheckerNetworkEvents = NetworkEvents<HealthCheckerMsg>;
 
 /// Returns a network application config for the health check client and service
@@ -344,11 +342,9 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             },
             Err(err) => {
                 warn!(
-                    NetworkSchema::new(&self.network_context)
-                        .remote_peer(&peer_id),
-                    error = ?err,
+                    NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                     round = round,
-                    "{} Ping failed for peer: {} round: {} with error: {:?}",
+                    "{} Ping failed for peer: {} round: {} with error: {:#}",
                     self.network_context,
                     peer_id.short_str(),
                     round,

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: local `x1` of type `test::S2` does not have the `copy` ability
+   ┌─ tests/ability-check/bug_14189.move:34:18
+   │
+34 │         let x2 = S3 { x: x1, y: x0, z: x1 };
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ copy needed here because value is still in use

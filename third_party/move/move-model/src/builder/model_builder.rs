@@ -8,7 +8,7 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Address, Attribute, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Address, Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
@@ -20,6 +20,7 @@ use crate::{
     well_known,
 };
 use codespan_reporting::diagnostic::Severity;
+use itertools::Itertools;
 use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
@@ -132,7 +133,8 @@ pub(crate) struct StructEntry {
 
 #[derive(Debug, Clone)]
 pub(crate) enum StructLayout {
-    Singleton(BTreeMap<Symbol, FieldData>),
+    /// The second bool is true iff the struct has positional fields
+    Singleton(BTreeMap<Symbol, FieldData>, bool),
     Variants(Vec<StructVariant>),
     None,
 }
@@ -143,6 +145,7 @@ pub(crate) struct StructVariant {
     pub name: Symbol,
     pub attributes: Vec<Attribute>,
     pub fields: BTreeMap<Symbol, FieldData>,
+    pub is_positional: bool,
 }
 
 /// A declaration of a function.
@@ -474,6 +477,37 @@ impl<'env> ModelBuilder<'env> {
         self.const_table.insert(name, entry);
     }
 
+    /// Adds friend declarations for package visibility.
+    /// This should only be called when all modules are loaded.
+    pub fn add_friend_decl_for_package_visibility(&mut self) {
+        let target_modules = self
+            .env
+            .get_modules()
+            .filter(|module_env| module_env.is_primary_target() && !module_env.is_script_module())
+            .map(|module_env| module_env.get_id())
+            .collect_vec();
+        for cur_mod in target_modules {
+            let cur_mod_env = self.env.get_module(cur_mod);
+            let cur_mod_name = cur_mod_env.get_name().clone();
+            for need_to_be_friended_by in cur_mod_env.need_to_be_friended_by() {
+                let need_to_be_friend_with = self.env.get_module_data_mut(need_to_be_friended_by);
+                let already_friended = need_to_be_friend_with
+                    .friend_decls
+                    .iter()
+                    .any(|friend_decl| friend_decl.module_name == cur_mod_name);
+                if !already_friended {
+                    let loc = need_to_be_friend_with.loc.clone();
+                    let friend_decl = FriendDecl {
+                        loc,
+                        module_name: cur_mod_name.clone(),
+                        module_id: Some(cur_mod),
+                    };
+                    need_to_be_friend_with.friend_decls.push(friend_decl);
+                }
+            }
+        }
+    }
+
     pub fn resolve_address(&self, loc: &Loc, addr: &EA::Address) -> NumericalAddress {
         match addr {
             EA::Address::Numerical(_, bytes) => bytes.value,
@@ -505,36 +539,34 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
-    /// Looks up the fields of a structure, with instantiated field types. Returns empty
-    /// map if the struct has variants.
-    pub fn lookup_struct_fields(
+    /// Looks up field declaration, returning a list of optional variant name and type of the field
+    /// in the variant. The variant name is None and the list a singleton for proper struct types.
+    pub fn lookup_struct_field_decl(
         &self,
         id: &QualifiedInstId<StructId>,
-    ) -> (BTreeMap<Symbol, Type>, bool) {
+        field_name: Symbol,
+    ) -> (Vec<(Option<Symbol>, Type)>, bool) {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        let instantiate_fields = |fields: &BTreeMap<Symbol, FieldData>, common_only: bool| {
+        let get_instantiated_field = |fields: &BTreeMap<Symbol, FieldData>| {
             fields
-                .values()
-                .filter_map(|f| {
-                    if !common_only || f.common_for_variants {
-                        Some((f.name, f.ty.instantiate(&id.inst)))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
+                .get(&field_name)
+                .map(|data| data.ty.instantiate(&id.inst))
         };
         match &entry.layout {
-            StructLayout::Singleton(fields) => (instantiate_fields(fields, false), false),
+            StructLayout::Singleton(fields, _) => (
+                get_instantiated_field(fields)
+                    .map(|ty| vec![(None, ty)])
+                    .unwrap_or_default(),
+                false,
+            ),
             StructLayout::Variants(variants) => (
-                if variants.is_empty() {
-                    BTreeMap::new()
-                } else {
-                    instantiate_fields(&variants[0].fields, true)
-                },
+                variants
+                    .iter()
+                    .filter_map(|v| get_instantiated_field(&v.fields).map(|ty| (Some(v.name), ty)))
+                    .collect(),
                 true,
             ),
-            _ => (BTreeMap::new(), false),
+            _ => (vec![], false),
         }
     }
 

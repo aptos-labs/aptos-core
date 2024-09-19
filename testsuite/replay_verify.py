@@ -4,51 +4,38 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-import subprocess
 import shutil
+import subprocess
 import sys
-from multiprocessing import Pool, freeze_support
-from typing import Tuple
 from collections import deque
+from multiprocessing import Pool, freeze_support
+from typing import List, Tuple
 
+from verify_core.common import clear_artifacts, warm_cache_and_get_latest_backup_version
 
-from verify_core.common import (
-    clear_artifacts,
-    warm_cache_and_get_latest_backup_version,
-)
-
-
-TESTNET_RANGES = [
+TESTNET_RANGES: List[Tuple[int, int]] = [
     (862_000_000, 878_000_000),
-    (878_000_000, 894_000_000),
     (894_000_000, 910_000_000),
-    (910_000_000, 926_000_000),
     (942_000_000, 958_000_000),
-    (958_000_000, 974_000_000),
     (974_000_000, 990_000_000),
-    (990_000_000, 1_006_000_000),
     (1_006_000_000, 1_022_000_000),
-    (1_022_000_000, 1_038_000_000),
     (1_038_000_000, 1_054_000_000),
-    (1_054_000_000, 1_070_000_000),
     (1_070_000_000, 1_086_000_000),
-    (1_086_000_000, 1_102_000_000),
     (1_102_000_000, 1_115_000_000),
-    (1_115_000_000, 1_128_000_000),
     (1_128_000_000, 1_141_000_000),
-    (1_141_000_000, 1_154_000_000),
     (1_154_000_000, 1_167_000_000),
+    (5_495_000_000, 5_520_000_000),
+    (5_520_000_000, 5_545_000_000),
+    (5_600_000_000, 5_625_000_000),
+    (5_650_000_000, 5_675_000_000),
+    (5_675_000_000, 5_700_000_000),
+    (5_765_000_000, 5_785_000_000),
+    (5_922_000_000, 5_935_000_000),
+    (5_935_000_000, 5_950_000_000),
+    (5_950_000_000, sys.maxsize),
 ]
 
-MAINNET_RANGES = [
-    (392_000_000, 408_000_000),
-    (408_000_000, 424_000_000),
-    (424_000_000, 439_000_000),
-    (439_000_000, 455_000_000),
-    (455_000_000, 471_000_000),
-    (471_000_000, 487_000_000),
-    (487_000_000, 503_000_000),
-    (503_000_000, 518_000_000),
+MAINNET_RANGES: List[Tuple[int, int]] = [
     (518_000_000, 534_000_000),
     (534_000_000, 550_000_000),
     (550_000_000, 566_000_000),
@@ -60,7 +47,16 @@ MAINNET_RANGES = [
     # Skip tapos range
     (949_000_000, 954_000_000),
     (954_000_000, 969_000_000),
-    (969_000_000, sys.maxsize),
+    (969_000_000, 984_000_000),
+    (984_000_000, 1_000_000_000),
+    (1_000_000_000, 1_020_000_000),
+    (1_020_000_000, 1_040_000_000),
+    (1_040_000_000, 1_060_000_000),
+    (1_060_000_000, 1_085_000_000),
+    # Skip tapos2 range
+    (1_635_000_000, 1_655_000_000),
+    (1_655_000_000, 1_675_000_000),
+    (1_675_000_000, sys.maxsize),
 ]
 
 
@@ -199,10 +195,11 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
     ), "runner_cnt must match the number of runners in the mapping"
     runner_start = runner_mapping[runner_no][0]
     runner_end = runner_mapping[runner_no][1]
-    warm_cache_and_get_latest_backup_version(BACKUP_CONFIG_TEMPLATE_PATH)
+    latest_version = warm_cache_and_get_latest_backup_version(
+        BACKUP_CONFIG_TEMPLATE_PATH
+    )
     if runner_no == runner_cnt - 1:
-        if runner_end is None:
-            raise Exception("Failed to query latest version from backup")
+        runner_end = min(runner_end, latest_version)
     print("runner start %d end %d" % (runner_start, runner_end))
     if start_version is not None and end_version is not None:
         runner_start = start_version

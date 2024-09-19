@@ -127,6 +127,10 @@ fn no_verify_locals_good() {
                 }),
             },
         ],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
     assert!(verify_module(&compiled_module_good).is_ok());
 }
@@ -211,6 +215,10 @@ fn big_signature_test() {
                 code,
             }),
         }],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
 
     // save module and verify that it can ser/de

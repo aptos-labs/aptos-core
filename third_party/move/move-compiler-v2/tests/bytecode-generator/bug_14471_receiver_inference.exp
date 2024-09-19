@@ -1,0 +1,79 @@
+// -- Model dump before bytecode pipeline
+module 0x815::m {
+    struct MyMap {
+        table: m::Table<address, m::ValueWrap>,
+    }
+    struct Table {
+        x: #0,
+        y: #1,
+    }
+    struct ValueWrap {
+        val: u64,
+    }
+    private fun contains<T1,T2>(self: &m::Table<#0, #1>,_key: #0): bool {
+        true
+    }
+    private fun add<T1,T2>(self: &mut m::Table<#0, #1>,_key: #0,_val: #1) {
+        Tuple()
+    }
+    public fun add_when_missing(key: address,val: u64)
+        acquires m::MyMap(*)
+     {
+        {
+          let my_map: &mut m::MyMap = BorrowGlobal(Mutable)<m::MyMap>(0x815);
+          if Not(m::contains<address, m::ValueWrap>(Borrow(Immutable)(select m::MyMap.table<&mut m::MyMap>(my_map)), key)) {
+            {
+              let wrap: m::ValueWrap = pack m::ValueWrap(val);
+              m::add<address, m::ValueWrap>(Borrow(Mutable)(select m::MyMap.table<&mut m::MyMap>(my_map)), key, wrap);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          }
+        }
+    }
+} // end 0x815::m
+
+============ initial bytecode ================
+
+[variant baseline]
+fun m::contains<#0, #1>($t0: &m::Table<#0, #1>, $t1: #0): bool {
+     var $t2: bool
+  0: $t2 := true
+  1: return $t2
+}
+
+
+[variant baseline]
+fun m::add<#0, #1>($t0: &mut m::Table<#0, #1>, $t1: #0, $t2: #1) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::add_when_missing($t0: address, $t1: u64) {
+     var $t2: &mut m::MyMap
+     var $t3: address
+     var $t4: bool
+     var $t5: bool
+     var $t6: &m::Table<address, m::ValueWrap>
+     var $t7: m::ValueWrap
+     var $t8: &mut m::Table<address, m::ValueWrap>
+  0: $t3 := 0x815
+  1: $t2 := borrow_global<m::MyMap>($t3)
+  2: $t6 := borrow_field<m::MyMap>.table($t2)
+  3: $t5 := m::contains<address, m::ValueWrap>($t6, $t0)
+  4: $t4 := !($t5)
+  5: if ($t4) goto 6 else goto 11
+  6: label L0
+  7: $t7 := pack m::ValueWrap($t1)
+  8: $t8 := borrow_field<m::MyMap>.table($t2)
+  9: m::add<address, m::ValueWrap>($t8, $t0, $t7)
+ 10: goto 12
+ 11: label L1
+ 12: label L2
+ 13: return ()
+}
+
+
+============ bytecode verification succeeded ========

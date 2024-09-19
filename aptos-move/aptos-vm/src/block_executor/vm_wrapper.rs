@@ -33,7 +33,7 @@ impl ExecutorTask for AptosExecutorTask {
     type Txn = SignatureVerifiedTransaction;
 
     fn init(env: Self::Environment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new_with_environment(env, state_view);
+        let vm = AptosVM::new_with_environment(env, state_view, false);
         let id = state_view.id();
         Self { vm, id }
     }
@@ -76,7 +76,7 @@ impl ExecutorTask for AptosExecutorTask {
                     ExecutionStatus::DelayedFieldsCodeInvariantError(
                         vm_status.message().cloned().unwrap_or_default(),
                     )
-                } else if AptosVM::should_restart_execution(vm_output.change_set()) {
+                } else if AptosVM::should_restart_execution(vm_output.events()) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()

@@ -8,7 +8,7 @@ use crate::{
     },
     EmitModeParams,
 };
-use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -34,7 +34,9 @@ use tokio::time::sleep;
 
 pub struct SubmissionWorker {
     pub(crate) accounts: Vec<Arc<LocalAccount>>,
-    client: RestClient,
+    clients: Arc<Vec<RestClient>>,
+    /// Main one is used to submit requests, all are used for querying/latency
+    main_client_index: usize,
     stop: Arc<AtomicBool>,
     params: EmitModeParams,
     stats: Arc<DynamicStatsTracking>,
@@ -47,7 +49,8 @@ pub struct SubmissionWorker {
 impl SubmissionWorker {
     pub fn new(
         accounts: Vec<LocalAccount>,
-        client: RestClient,
+        clients: Arc<Vec<RestClient>>,
+        main_client_index: usize,
         stop: Arc<AtomicBool>,
         params: EmitModeParams,
         stats: Arc<DynamicStatsTracking>,
@@ -59,7 +62,8 @@ impl SubmissionWorker {
         let accounts = accounts.into_iter().map(Arc::new).collect();
         Self {
             accounts,
-            client,
+            clients,
+            main_client_index,
             stop,
             params,
             stats,
@@ -68,6 +72,10 @@ impl SubmissionWorker {
             skip_latency_stats,
             rng,
         }
+    }
+
+    fn client(&self) -> &RestClient {
+        &self.clients[self.main_client_index]
     }
 
     #[allow(clippy::collapsible_if)]
@@ -89,10 +97,10 @@ impl SubmissionWorker {
                 && loop_start_time.duration_since(wait_until) > Duration::from_secs(5)
             {
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(120)),
-                    warn!(
-                        "[{:?}] txn_emitter worker drifted out of sync too much: {}s",
-                        self.client.path_prefix_string(),
+                    SampleRate::Duration(Duration::from_secs(5)),
+                    error!(
+                        "[{:?}] txn_emitter worker drifted out of sync too much: {}s. Is expiration too short, or 5s buffer on top of it?",
+                        self.client().path_prefix_string(),
                         loop_start_time.duration_since(wait_until).as_secs()
                     )
                 );
@@ -123,7 +131,7 @@ impl SubmissionWorker {
                     SampleRate::Duration(Duration::from_secs(300)),
                     info!(
                         "[{:?}] txn_emitter worker: handling {} accounts, generated txns for: {}",
-                        self.client.path_prefix_string(),
+                        self.client().path_prefix_string(),
                         self.accounts.len(),
                         account_to_start_and_end_seq_num.len(),
                     )
@@ -142,7 +150,7 @@ impl SubmissionWorker {
                         .chunks(self.params.max_submit_batch_size)
                         .map(|reqs| {
                             submit_transactions(
-                                &self.client,
+                                self.client(),
                                 reqs,
                                 loop_start_time,
                                 txn_offset_time.clone(),
@@ -155,10 +163,10 @@ impl SubmissionWorker {
                 let submitted_after = loop_start_time.elapsed();
                 if submitted_after.as_secs() > 5 {
                     sample!(
-                        SampleRate::Duration(Duration::from_secs(120)),
+                        SampleRate::Duration(Duration::from_secs(30)),
                         warn!(
                             "[{:?}] txn_emitter worker waited for more than 5s to submit transactions: {}s after loop start",
-                            self.client.path_prefix_string(),
+                            self.client().path_prefix_string(),
                             submitted_after.as_secs(),
                         )
                     );
@@ -168,7 +176,7 @@ impl SubmissionWorker {
                     // we also don't want to be stuck waiting for txn_expiration_time_secs
                     // after stop is called, so we sleep until time or stop is set.
                     self.sleep_check_done(Duration::from_secs(
-                        self.params.txn_expiration_time_secs + 20,
+                        self.params.txn_expiration_time_secs + 3,
                     ))
                     .await
                 }
@@ -241,7 +249,7 @@ impl SubmissionWorker {
         let (latest_fetched_counts, sum_of_completion_timestamps_millis) =
             wait_for_accounts_sequence(
                 start_time,
-                &self.client,
+                self.client(),
                 &account_to_start_and_end_seq_num,
                 txn_expiration_ts_secs,
                 check_account_sleep_duration,
@@ -263,10 +271,10 @@ impl SubmissionWorker {
                 .expired
                 .fetch_add(num_expired as u64, Ordering::Relaxed);
             sample!(
-                SampleRate::Duration(Duration::from_secs(120)),
+                SampleRate::Duration(Duration::from_secs(60)),
                 warn!(
                     "[{:?}] Transactions were not committed before expiration: {:?}, for {:?}",
-                    self.client.path_prefix_string(),
+                    self.client().path_prefix_string(),
                     num_expired,
                     self.accounts
                         .iter()

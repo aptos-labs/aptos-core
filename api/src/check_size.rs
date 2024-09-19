@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use hyper::Method;
 use poem::{
     error::SizedLimitError,
+    http::Method,
     web::headers::{self, HeaderMapExt},
     Endpoint, Middleware, Request, Result,
 };
@@ -37,7 +37,6 @@ pub struct PostSizeLimitEndpoint<E> {
     max_size: u64,
 }
 
-#[async_trait::async_trait]
 impl<E: Endpoint> Endpoint for PostSizeLimitEndpoint<E> {
     type Output = E::Output;
 

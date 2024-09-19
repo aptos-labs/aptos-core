@@ -7,4 +7,4 @@ error: unexpected token
    │               ^^^^
    │               │
    │               Unexpected 'self'
-   │               Expected '('
+   │               Expected ';'

@@ -37,7 +37,7 @@ use aptos_types::{
         RawTransactionWithData, SignedTransaction, TransactionPayload,
     },
     vm_status::StatusCode,
-    APTOS_COIN_TYPE,
+    AptosCoinType, CoinType,
 };
 use aptos_vm::{AptosSimulationVM, AptosVM};
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
@@ -568,7 +568,7 @@ impl TransactionsApi {
                     &state_view,
                     ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
                     ident_str!("balance").into(),
-                    vec![APTOS_COIN_TYPE.clone()],
+                    vec![AptosCoinType::type_tag()],
                     vec![signed_transaction.sender().to_vec()],
                     context.node_config.api.max_gas_view_function,
                 );
@@ -995,7 +995,7 @@ impl TransactionsApi {
             address.into(),
             page.start_option(),
             page.limit(&latest_ledger_info)?,
-            latest_ledger_info.version(),
+            account.ledger_version,
             &latest_ledger_info,
         )?;
         match accept_type {
@@ -1435,8 +1435,7 @@ impl TransactionsApi {
                 let mut user_transactions = Vec::new();
                 for transaction in transactions.into_iter() {
                     match transaction {
-                        Transaction::UserTransaction(user_txn) => {
-                            let mut txn = *user_txn;
+                        Transaction::UserTransaction(mut user_txn) => {
                             match &vm_status {
                                 VMStatus::Error {
                                     message: Some(msg), ..
@@ -1444,13 +1443,13 @@ impl TransactionsApi {
                                 | VMStatus::ExecutionFailure {
                                     message: Some(msg), ..
                                 } => {
-                                    txn.info.vm_status +=
+                                    user_txn.info.vm_status +=
                                         format!("\nExecution failed with message: {}", msg)
                                             .as_str();
                                 },
                                 _ => (),
                             }
-                            user_transactions.push(txn);
+                            user_transactions.push(user_txn);
                         },
                         _ => {
                             return Err(SubmitTransactionError::internal_with_code(

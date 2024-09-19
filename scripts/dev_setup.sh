@@ -26,7 +26,7 @@ VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.2
 CVC5_VERSION=0.0.3
 DOTNET_VERSION=6.0
-BOOGIE_VERSION=3.0.9
+BOOGIE_VERSION=3.2.4
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
@@ -1099,11 +1099,12 @@ if [[ "$INSTALL_JSTS" == "true" ]]; then
   install_solidity
 fi
 
+install_libudev-dev
+
 install_python3
 if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
   if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
     pip3 install pre-commit
-    install_libudev-dev
   else
     install_pkg python-pre-commit "$PACKAGE_MANAGER"
   fi

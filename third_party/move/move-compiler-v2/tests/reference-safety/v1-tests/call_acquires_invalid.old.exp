@@ -1,0 +1,118 @@
+
+Diagnostics:
+error: function acquires global `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:16:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+15 │         let r1 = borrow_global_mut<R>(addr);
+   │                  -------------------------- previous mutable global borrow
+16 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+
+error: function acquires global `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:22:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+21 │         let f_ref = &mut borrow_global_mut<R>(addr).f;
+   │                     ---------------------------------
+   │                     │    │
+   │                     │    previous mutable global borrow
+   │                     used by mutable field borrow
+22 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+
+error: function acquires global `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:28:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+27 │         let r1 = id_mut(borrow_global_mut<R>(addr));
+   │                  ----------------------------------
+   │                  │      │
+   │                  │      previous mutable global borrow
+   │                  used by mutable call result
+28 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+
+error: function acquires global `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:34:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+33 │         let f_ref = id_mut(&mut borrow_global_mut<R>(addr).f);
+   │                            ---------------------------------
+   │                            │    │
+   │                            │    previous mutable global borrow
+   │                            used by mutable field borrow
+34 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+
+error: function acquires global `M::R` which is currently borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:40:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+39 │         let r1 = borrow_global<R>(addr);
+   │                  ---------------------- previous global borrow
+40 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+
+error: function acquires global `M::R` which is currently borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:46:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+45 │         let f_ref = &borrow_global<R>(addr).f;
+   │                     -------------------------
+   │                     ││
+   │                     │previous global borrow
+   │                     used by field borrow
+46 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+
+error: function acquires global `M::R` which is currently borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:52:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+51 │         let r1 = id(borrow_global<R>(addr));
+   │                  --------------------------
+   │                  │  │
+   │                  │  previous global borrow
+   │                  used by call result
+52 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+
+error: function acquires global `M::R` which is currently borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:58:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+57 │         let f_ref = id(&borrow_global<R>(addr).f);
+   │                        -------------------------
+   │                        ││
+   │                        │previous global borrow
+   │                        used by field borrow
+58 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here
+
+error: function acquires global `M::R` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/call_acquires_invalid.move:66:23
+   │
+10 │     fun acq(addr: address): R acquires R {
+   │                                        -- access declared here
+   ·
+65 │         let r1; if (cond) r1 = borrow_global_mut<R>(addr) else r1 = &mut r;
+   │                                -------------------------- previous mutable global borrow
+66 │         let R { f } = acq(addr);
+   │                       ^^^^^^^^^ function called here

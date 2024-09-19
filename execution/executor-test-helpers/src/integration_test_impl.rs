@@ -31,12 +31,12 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        Transaction,
-        Transaction::UserTransaction,
+        Transaction::{self, UserTransaction},
         TransactionListWithProof, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
+    AptosCoinType,
 };
 use aptos_vm::AptosVM;
 use rand::SeedableRng;
@@ -69,7 +69,7 @@ pub fn test_execution_with_storage_impl_inner(
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
         validators[0].data.owner_address,
-        validators[0].consensus_key.clone(),
+        Arc::new(validators[0].consensus_key.clone()),
     );
 
     // This generates accounts that do not overlap with genesis
@@ -555,7 +555,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 }
 
 pub fn get_account_balance(state_view: &dyn StateView, address: &AccountAddress) -> u64 {
-    CoinStoreResource::fetch_move_resource(state_view, address)
+    CoinStoreResource::<AptosCoinType>::fetch_move_resource(state_view, address)
         .unwrap()
         .map_or(0, |coin_store| coin_store.coin())
 }

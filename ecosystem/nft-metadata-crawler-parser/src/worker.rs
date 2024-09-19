@@ -33,34 +33,37 @@ use url::Url;
 
 /// Stuct that represents a parser for a single entry from queue
 pub struct Worker {
-    config: Arc<ParserConfig>,
+    parser_config: Arc<ParserConfig>,
     conn: PooledConnection<ConnectionManager<PgConnection>>,
+    max_num_retries: i32,
     gcs_client: Arc<GCSClient>,
     pubsub_message: String,
     model: NFTMetadataCrawlerURIs,
     asset_data_id: String,
     asset_uri: String,
-    last_transaction_version: i32,
+    last_transaction_version: i64,
     last_transaction_timestamp: chrono::NaiveDateTime,
     force: bool,
 }
 
 impl Worker {
     pub fn new(
-        config: Arc<ParserConfig>,
+        parser_config: Arc<ParserConfig>,
         conn: PooledConnection<ConnectionManager<PgConnection>>,
+        max_num_retries: i32,
         gcs_client: Arc<GCSClient>,
         pubsub_message: &str,
         asset_data_id: &str,
         asset_uri: &str,
-        last_transaction_version: i32,
+        last_transaction_version: i64,
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
     ) -> Self {
         let model = NFTMetadataCrawlerURIs::new(asset_uri);
         let worker = Self {
-            config,
+            parser_config,
             conn,
+            max_num_retries,
             gcs_client,
             pubsub_message: pubsub_message.to_string(),
             model,
@@ -112,9 +115,9 @@ impl Worker {
             // Parse asset_uri
             self.log_info("Parsing asset_uri");
             let json_uri = URIParser::parse(
-                &self.config.ipfs_prefix,
+                &self.parser_config.ipfs_prefix,
                 &self.model.get_asset_uri(),
-                self.config.ipfs_auth_key.as_deref(),
+                self.parser_config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse asset_uri", None);
@@ -125,7 +128,7 @@ impl Worker {
             // Parse JSON for raw_image_uri and raw_animation_uri
             self.log_info("Starting JSON parsing");
             let (raw_image_uri, raw_animation_uri, json) =
-                JSONParser::parse(json_uri, self.config.max_file_size_bytes)
+                JSONParser::parse(json_uri, self.parser_config.max_file_size_bytes)
                     .await
                     .unwrap_or_else(|e| {
                         // Increment retry count if JSON parsing fails
@@ -141,7 +144,7 @@ impl Worker {
             if json != Value::Null {
                 self.log_info("Writing JSON to GCS");
                 let cdn_json_uri_result = write_json_to_gcs(
-                    &self.config.bucket,
+                    &self.parser_config.bucket,
                     &self.asset_uri,
                     &json,
                     &self.gcs_client,
@@ -156,7 +159,7 @@ impl Worker {
                 }
 
                 let cdn_json_uri = cdn_json_uri_result
-                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .map(|value| format!("{}{}", self.parser_config.cdn_prefix, value))
                     .ok();
                 self.model.set_cdn_json_uri(cdn_json_uri);
             }
@@ -213,9 +216,9 @@ impl Worker {
             }
 
             let img_uri = URIParser::parse(
-                &self.config.ipfs_prefix,
+                &self.parser_config.ipfs_prefix,
                 &raw_image_uri,
-                self.config.ipfs_auth_key.as_deref(),
+                self.parser_config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_image_uri", None);
@@ -230,9 +233,9 @@ impl Worker {
                 .inc();
             let (image, format) = ImageOptimizer::optimize(
                 &img_uri,
-                self.config.max_file_size_bytes,
-                self.config.image_quality,
-                self.config.max_image_dimensions,
+                self.parser_config.max_file_size_bytes,
+                self.parser_config.image_quality,
+                self.parser_config.max_image_dimensions,
             )
             .await
             .unwrap_or_else(|e| {
@@ -247,7 +250,7 @@ impl Worker {
                 self.log_info("Writing image to GCS");
                 let cdn_image_uri_result = write_image_to_gcs(
                     format,
-                    &self.config.bucket,
+                    &self.parser_config.bucket,
                     &raw_image_uri,
                     image,
                     &self.gcs_client,
@@ -262,7 +265,7 @@ impl Worker {
                 }
 
                 let cdn_image_uri = cdn_image_uri_result
-                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .map(|value| format!("{}{}", self.parser_config.cdn_prefix, value))
                     .ok();
                 self.model.set_cdn_image_uri(cdn_image_uri);
                 self.model.reset_json_parser_retry_count();
@@ -306,9 +309,9 @@ impl Worker {
         if let Some(raw_animation_uri) = raw_animation_uri_option {
             self.log_info("Parsing raw_animation_uri");
             let animation_uri = URIParser::parse(
-                &self.config.ipfs_prefix,
+                &self.parser_config.ipfs_prefix,
                 &raw_animation_uri,
-                self.config.ipfs_auth_key.as_deref(),
+                self.parser_config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_animation_uri", None);
@@ -323,9 +326,9 @@ impl Worker {
                 .inc();
             let (animation, format) = ImageOptimizer::optimize(
                 &animation_uri,
-                self.config.max_file_size_bytes,
-                self.config.image_quality,
-                self.config.max_image_dimensions,
+                self.parser_config.max_file_size_bytes,
+                self.parser_config.image_quality,
+                self.parser_config.max_image_dimensions,
             )
             .await
             .unwrap_or_else(|e| {
@@ -340,7 +343,7 @@ impl Worker {
                 self.log_info("Writing animation to GCS");
                 let cdn_animation_uri_result = write_image_to_gcs(
                     format,
-                    &self.config.bucket,
+                    &self.parser_config.bucket,
                     &raw_animation_uri,
                     animation,
                     &self.gcs_client,
@@ -352,7 +355,7 @@ impl Worker {
                 }
 
                 let cdn_animation_uri = cdn_animation_uri_result
-                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .map(|value| format!("{}{}", self.parser_config.cdn_prefix, value))
                     .ok();
                 self.model.set_cdn_animation_uri(cdn_animation_uri);
             }
@@ -362,9 +365,9 @@ impl Worker {
             self.upsert();
         }
 
-        if self.model.get_json_parser_retry_count() >= self.config.max_num_parse_retries
-            || self.model.get_image_optimizer_retry_count() >= self.config.max_num_parse_retries
-            || self.model.get_animation_optimizer_retry_count() >= self.config.max_num_parse_retries
+        if self.model.get_json_parser_retry_count() >= self.max_num_retries
+            || self.model.get_image_optimizer_retry_count() >= self.max_num_retries
+            || self.model.get_animation_optimizer_retry_count() >= self.max_num_retries
         {
             self.log_info("Retry count exceeded, marking as do_not_parse");
             self.model.set_do_not_parse(true);
@@ -376,19 +379,16 @@ impl Worker {
     }
 
     fn upsert(&mut self) {
-        upsert_uris(
-            &mut self.conn,
-            &self.model,
-            self.last_transaction_version as i64,
-        )
-        .unwrap_or_else(|e| {
-            self.log_error("Commit to Postgres failed", &e);
-            panic!();
-        });
+        upsert_uris(&mut self.conn, &self.model, self.last_transaction_version).unwrap_or_else(
+            |e| {
+                self.log_error("Commit to Postgres failed", &e);
+                panic!();
+            },
+        );
     }
 
     fn is_blacklisted_uri(&mut self, uri: &str) -> bool {
-        self.config
+        self.parser_config
             .uri_blacklist
             .iter()
             .any(|blacklist_uri| uri.contains(blacklist_uri))

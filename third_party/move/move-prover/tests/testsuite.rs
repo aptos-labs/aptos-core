@@ -8,6 +8,7 @@ use datatest_stable::Requirements;
 use itertools::Itertools;
 use log::{info, warn};
 use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
+use move_model::metadata::LanguageVersion;
 use move_prover::{cli::Options, run_move_prover, run_move_prover_v2};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use once_cell::sync::OnceCell;
@@ -168,8 +169,10 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> datatest_stable::R
 
     let mut error_writer = Buffer::no_color();
     let result = if feature.v2 {
+        options.language_version = Some(LanguageVersion::V2_0);
         run_move_prover_v2(&mut error_writer, options)
     } else {
+        options.model_builder.language_version = LanguageVersion::V2_0;
         run_move_prover(&mut error_writer, options)
     };
     let mut diags = match result {

@@ -100,6 +100,10 @@ spec std::features {
         spec_is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    spec fun spec_simulation_enhancement_enabled(): bool {
+        spec_is_enabled(TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
     spec abort_if_multisig_payload_mismatch_enabled {
         pragma opaque;
         aborts_if [abstract] false;

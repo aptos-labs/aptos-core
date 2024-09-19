@@ -1,0 +1,38 @@
+name: Backport to Release Branches 
+
+on:
+  pull_request_target:
+    types: ["labeled", "closed"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  permission-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check repository permission for user which triggered workflow
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+
+  backport:
+    name: Backport PR
+    needs: [permission-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backport Action
+        uses: sorenlouv/backport-github-action@ad888e978060bc1b2798690dd9d03c4036560947
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          add_original_reviewers: true 
+
+      - name: Info log
+        if: ${{ success() }}
+        run: cat ~/.backport/backport.info.log
+        
+      - name: Debug log
+        if: ${{ failure() }}
+        run: cat ~/.backport/backport.debug.log        

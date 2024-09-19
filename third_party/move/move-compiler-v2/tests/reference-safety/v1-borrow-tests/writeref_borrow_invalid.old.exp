@@ -1,0 +1,9 @@
+
+============ bytecode verification failed ========
+
+Diagnostics:
+bug: bytecode verification failed with unexpected status code `WRITEREF_EXISTS_BORROW_ERROR`. This is a compiler bug, consider reporting it.
+   ┌─ tests/reference-safety/v1-borrow-tests/writeref_borrow_invalid.move:10:18
+   │
+10 │         *g_mut = G { v: 0 };
+   │                  ^^^^^^^^^^

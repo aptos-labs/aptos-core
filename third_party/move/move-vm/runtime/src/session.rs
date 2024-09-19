@@ -11,11 +11,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    compatibility::Compatibility,
-    errors::*,
-    file_format::{AbilitySet, LocalIndex},
-};
+use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -66,13 +62,14 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
         if !func.is_entry() {
+            let module_id = func
+                .module_id()
+                .cloned()
+                .expect("Entry function always has module id");
             return Err(PartialVMError::new(
                 StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
             )
-            .finish(Location::Module(
-                func.module_id()
-                    .expect("Entry function always has module id"),
-            )));
+            .finish(Location::Module(module_id)));
         }
 
         self.move_vm.runtime.execute_function_instantiation(
@@ -414,11 +411,6 @@ impl<'r, 'l> Session<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Gets the abilities for this type, at it's particular instantiation
-    pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        ty.abilities().map_err(|e| e.finish(Location::Undefined))
-    }
-
     /// Gets the underlying native extensions.
     pub fn get_native_extensions(&mut self) -> &mut NativeContextExtensions<'r> {
         &mut self.native_extensions
@@ -467,27 +459,6 @@ impl<'r, 'l> Session<'r, 'l> {
                 gas_meter,
                 &mut traversal_context.visited,
                 traversal_context.referenced_modules,
-                ids,
-            )
-    }
-
-    pub fn check_dependencies_and_charge_gas_non_recursive_optional<'a, I>(
-        &mut self,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        ids: I,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-    {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_dependencies_and_charge_gas_non_recursive_optional(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                &mut traversal_context.visited,
                 ids,
             )
     }
