@@ -89,6 +89,7 @@ pub fn run_model_builder_in_compiler_mode(
     deps: Vec<PackageInfo>,
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
+    warnings_are_errors: bool,
     language_version: LanguageVersion,
     warn_of_deprecation_use: bool,
     warn_of_deprecation_use_in_aptos_libs: bool,
@@ -116,6 +117,7 @@ pub fn run_model_builder_in_compiler_mode(
             .set_warn_of_deprecation_use(warn_of_deprecation_use)
             .set_warn_of_deprecation_use_in_aptos_libs(warn_of_deprecation_use_in_aptos_libs)
             .set_skip_attribute_checks(skip_attribute_checks)
+            .set_warnings_are_errors(warnings_are_errors)
             .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)
             .set_lang_v2(language_version != LanguageVersion::V1)
@@ -138,9 +140,11 @@ pub fn run_model_builder_with_options<
     options: ModelBuilderOptions,
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
+    warnings_are_errors: bool,
 ) -> anyhow::Result<GlobalEnv> {
-    let mut flags = Flags::verification();
-    flags = flags.set_skip_attribute_checks(skip_attribute_checks);
+    let flags = Flags::verification()
+        .set_skip_attribute_checks(skip_attribute_checks)
+        .set_warnings_are_errors(warnings_are_errors);
     run_model_builder_with_options_and_compilation_flags(
         move_sources,
         move_deps,
@@ -378,14 +382,21 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 return Ok(env);
             },
             Ok(compiler) => {
-                let (units, warnings) = compiler.into_compiled_units();
-                if !warnings.is_empty() {
-                    // NOTE: these diagnostics are just warnings. it should be feasible to continue the
-                    // model building here. But before that, register the warnings to the `GlobalEnv`
-                    // first so we get a chance to report these warnings as well.
-                    add_move_lang_diagnostics(&mut env, warnings);
+                match compiler.into_compiled_units() {
+                    Ok((units, warnings)) => {
+                        if !warnings.is_empty() {
+                            // NOTE: these diagnostics are just warnings. it should be feasible to continue the
+                            // model building here. But before that, register the warnings to the `GlobalEnv`
+                            // first so we get a chance to report these warnings as well.
+                            add_move_lang_diagnostics(&mut env, warnings);
+                        }
+                        units
+                    },
+                    Err(diags) => {
+                        add_move_lang_diagnostics(&mut env, diags);
+                        return Ok(env);
+                    },
                 }
-                units
             },
         };
 

@@ -17,9 +17,13 @@ use codespan_reporting::{
 };
 use itertools::Itertools;
 use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
-use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_compiler_v2::{options::Options, Experiment};
+use move_command_line_common::{env::bool_to_str, files::MOVE_COMPILED_EXTENSION};
+use move_compiler::{
+    command_line::MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG,
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+    shared::move_compiler_warnings_are_errors_env_var,
+};
+use move_compiler_v2::{Experiment, Options};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -103,6 +107,8 @@ pub struct BuildOptions {
     /// Select bytecode, language, compiler for Move 2
     #[clap(long)]
     pub move_2: bool,
+    #[clap(long = MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG, default_value=bool_to_str(move_compiler_warnings_are_errors_env_var()))]
+    pub warnings_are_errors: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -131,6 +137,7 @@ impl Default for BuildOptions {
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
             move_2: false,
+            warnings_are_errors: move_compiler_warnings_are_errors_env_var(),
         }
     }
 }
@@ -176,6 +183,7 @@ pub fn build_model(
     skip_attribute_checks: bool,
     known_attributes: BTreeSet<String>,
     experiments: Vec<String>,
+    warnings_are_errors: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let bytecode_version = Some(
         language_version
@@ -203,6 +211,7 @@ pub fn build_model(
             skip_attribute_checks,
             known_attributes,
             experiments,
+            warnings_are_errors,
         },
     };
     let compiler_version = compiler_version.unwrap_or_default();
@@ -248,6 +257,7 @@ impl BuiltPackage {
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
+                warnings_are_errors: options.warnings_are_errors,
             },
         };
 

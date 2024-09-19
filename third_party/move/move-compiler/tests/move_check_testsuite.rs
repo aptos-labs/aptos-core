@@ -8,7 +8,7 @@ use move_command_line_common::{
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
-    diagnostics::*,
+    diagnostics::{codes::Severity, *},
     shared::{known_attributes::KnownAttribute, Flags, NumericalAddress},
     unit_test, CommentMap, Compiler, SteppedCompiler, PASS_CFGIR, PASS_PARSER,
 };
@@ -29,6 +29,9 @@ const SKIP_ATTRIBUTE_CHECKS_PATH: &str = "/skip_attribute_checks/";
 
 /// Root of tests which require to set warn_of_deprecation_use flag
 const WARN_DEPRECATION_PATH: &str = "/deprecated/";
+
+/// Dirs enabling warnings_are_errors flag.
+const WARNINGS_ARE_ERRORS_PATH: &str = "/warnings-are-errors/";
 
 fn default_testing_addresses() -> BTreeMap<String, NumericalAddress> {
     let mapping = [
@@ -111,6 +114,9 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
         if p.contains(WARN_DEPRECATION_PATH) {
             flags = flags.set_warn_of_deprecation_use(true);
         }
+        if p.contains(WARNINGS_ARE_ERRORS_PATH) {
+            flags = flags.set_warnings_are_errors(true);
+        }
     };
     run_test(path, &exp_path, &out_path, flags)?;
     Ok(())
@@ -131,6 +137,7 @@ fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyh
             .collect()
     };
 
+    let warnings_are_errors = flags.warnings_are_errors();
     let (files, comments_and_compiler_res) = Compiler::from_files(
         targets,
         relative_move_stdlib_files,
@@ -140,13 +147,21 @@ fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyh
     )
     .run::<PASS_PARSER>()?;
     let diags = move_check_for_errors(comments_and_compiler_res);
+    let warning_was_promoted = if warnings_are_errors {
+        matches!(diags.max_severity(), Some(Severity::Warning))
+    } else {
+        false
+    };
 
     let has_diags = !diags.is_empty();
-    let diag_buffer = if has_diags {
+    let mut diag_buffer = if has_diags {
         move_compiler::diagnostics::report_diagnostics_to_buffer(&files, diags)
     } else {
         vec![]
     };
+    if warning_was_promoted {
+        diag_buffer.extend("Exiting: Warnings found, and configuration requests that warnings be treated as errors.\n".as_bytes());
+    }
 
     let save_diags = read_bool_env_var(KEEP_TMP);
     let update_baseline = read_env_update_baseline();
