@@ -293,7 +293,6 @@ jobs:
   fetch-latest-docker-image-tag:
     needs:
       - permission-check
-      - determine-docker-build-metadata
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
