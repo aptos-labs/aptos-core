@@ -283,7 +283,7 @@ where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
-    let mut statuses: Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))> = vec![];
+    let mut statuses = vec![];
 
     let start_storage_read = Instant::now();
     let state_view = smp
@@ -454,6 +454,8 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
+    use super::priority;
+
     let mut mempool = smp.mempool.lock();
     for (transaction, sequence_info, ready_time_at_sender, priority) in transactions.into_iter() {
         let mempool_status = mempool.add_txn(
