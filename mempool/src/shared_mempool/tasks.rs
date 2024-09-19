@@ -283,7 +283,7 @@ where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
-    let mut statuses = vec![];
+    let mut statuses: Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))> = vec![];
 
     let start_storage_read = Instant::now();
     let state_view = smp
