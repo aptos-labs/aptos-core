@@ -25,7 +25,7 @@ use aptos_crypto::{
     ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, SigningKey, Uniform,
 };
 use ark_bn254::Bn254;
-use ark_groth16::PreparedVerifyingKey;
+use ark_groth16::{prepare_verifying_key, PreparedVerifyingKey};
 use base64::{encode_config, URL_SAFE_NO_PAD};
 use once_cell::sync::Lazy;
 use ring::signature;
@@ -95,7 +95,6 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
     }
 }
 
- use ark_groth16::prepare_verifying_key;
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
 pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey, PreparedVerifyingKey<Bn254>) {
@@ -118,11 +117,8 @@ pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPu
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
     };
     let pk = SAMPLE_PK.clone();
-    let rsa_jwk = RSA_JWK { kid: "test-rsa".to_string(), kty: "RSA".to_string(), alg: "RS256".to_string(), e: "AQAB".to_string(), n: "6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_string() };
-    // TODO: Try run_jwk_and_config_script
-    //let rsa_jwk = RSA_JWK::secure_test_jwk();
-    let config = Configuration { override_aud_vals: ["test.recovery.aud".to_string()].to_vec(), max_signatures_per_txn: 3, max_exp_horizon_secs: 1000000000000, training_wheels_pubkey: None, max_commited_epk_bytes: 93, max_iss_val_bytes: 120, max_extra_field_bytes: 350, max_jwt_header_b64_bytes: 300 };
-    //let config = Configuration::new_for_testing();
+    let rsa_jwk = get_sample_jwk();
+    let config = Configuration::new_for_testing();
     let pih = get_public_inputs_hash(&sig, &pk, &rsa_jwk, &config).unwrap();
 
     let mut rng = rand::thread_rng();
@@ -132,14 +128,7 @@ pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPu
 
     // Replace dummy proof with the simulated proof
     zks.proof = ZKP::Groth16(proof);
-    println!("zks in simulation is: {:?}", zks.clone());
-    println!("pvk in simulation is: {:?}", pvk.clone());
-    assert!(zks.verify_groth16_proof(pih.clone(), &pvk).is_ok());
     sig.cert = EphemeralCertificate::ZeroKnowledgeSig(zks.clone());
-    let test_pih = get_public_inputs_hash(&sig, &pk, &rsa_jwk, &config).unwrap();
-    println!("pih: {}", pih);
-    println!("test_pih: {}", test_pih);
-
 
     (sig, pk, pvk)
 }

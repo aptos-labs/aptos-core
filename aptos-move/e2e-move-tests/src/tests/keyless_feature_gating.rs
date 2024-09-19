@@ -153,34 +153,16 @@ fn test_proof_simulation() {
         core_resources,
         Groth16VerificationKey::from(pvk),
     );
+    run_jwk_and_config_script(&mut h);
 
     let transaction = create_and_spend_keyless_account(&mut h, sig, pk, *recipient.address());
     let output = h.run_raw(transaction);
 
-    let should_succeed = true;
-    if !should_succeed {
-        match output.status() {
-            TransactionStatus::Discard(status) => {
-                assert_eq!(
-                    *status, FEATURE_UNDER_GATING,
-                    "Expected TransactionStatus::Discard to be FEATURE_UNDER_GATING, but got: {:?}",
-                    status
-                )
-            },
-            _ => {
-                panic!(
-                    "Expected to get a TransactionStatus::Discard, but got: {:?}",
-                    output.status()
-                )
-            },
-        }
-    } else {
-        assert_success!(
-            output.status().clone(),
-            "Expected TransactionStatus::Keep(ExecutionStatus::Success), but got: {:?}",
-            output.status()
-        );
-    }
+    assert_success!(
+        output.status().clone(),
+        "Expected TransactionStatus::Keep(ExecutionStatus::Success), but got: {:?}",
+        output.status()
+    );
 }
 
 #[test]
