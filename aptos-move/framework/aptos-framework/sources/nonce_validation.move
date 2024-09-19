@@ -14,7 +14,7 @@ module aptos_framework::nonce_validation {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::smart_table;
-
+    use aptos_framework::transaction_validation::NonceHistorySignerCap;
     friend aptos_framework::genesis;
 
 
@@ -35,12 +35,17 @@ module aptos_framework::nonce_validation {
             table_2,
             current_table: 1,
         };
-        move_to(aptos_framework, nonce_history);
+
+        let (resource_account_signer, signer_cap) = account::create_resource_account(main_account, seed);
+        let signer_cap_resource = NonceHistorySignerCap {
+            signer_cap,
+        };
+        move_to<NonceHistory>(resource_account_signer, nonce_history);
+        move_to<NonceHistorySignerCap>(aptos_framwork, signer_cap_resource);
     }
 
     public(friend) fun switch_table(aptos_framework: &signer) {
         let nonce_history = borrow_global_mut<NonceHistory>(@aptos_framework);
-        nonce_history.
         nonce_history.current_table = 3 - nonce_history.current_table;
     }
 

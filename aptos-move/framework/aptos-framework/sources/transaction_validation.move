@@ -13,7 +13,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-
+    use aptos_framework::nonce_validation::{Self, NonceHistory};
     friend aptos_framework::genesis;
 
     /// This holds information that will be picked up by the VM to call the
@@ -26,6 +26,10 @@ module aptos_framework::transaction_validation {
         module_prologue_name: vector<u8>,
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
+    }
+
+    struct NonceHistorySignerCap has key {
+        signer_cap: account::SignerCapability,
     }
 
     /// MSB is used to indicate a gas payer tx
@@ -120,8 +124,9 @@ module aptos_framework::transaction_validation {
             //     error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
             // );
 
-            let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
 
+            let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
+            let 
             
         } else {
             // In this case, the transaction is sponsored and the account does not exist, so ensure
