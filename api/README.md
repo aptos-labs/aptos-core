@@ -14,7 +14,6 @@ With our API setup, the spec files (`api/doc/spec.yaml` / `api/doc/spec.json`) a
 
 This process updates the docs at:
 - https://fullnode.devnet.aptoslabs.com/v1/spec#/ (and testnet / mainnet, based on the API rollout schedule)
-- https://aptos-labs.github.io/ts-sdk-doc/
 
 All commands here are relative to the root of `aptos-core`.
 
@@ -31,7 +30,6 @@ pnpm install
 pnpm generate-client
 ```
 4. Manually update the helper methods in the TypeScript SDK in: `ecosystem/typescript/sdk/src/aptos_client.ts`. Note: This is necessary because we wrap the generated client, so the docs on the methods in that file are written by hand. For example, if you change `/accounts/<addr>/resources` in the API, the `getAccountResources` method in the generated client will be different. You must therefore then change `getAccountResources` in `ecosystem/typescript/sdk/src/aptos_client.ts`, which wraps the generated method.
-5. Update the TS SDK docs site (https://aptos-labs.github.io/ts-sdk-doc/):
 ```
 pnpm generate-ts-docs
 ```
