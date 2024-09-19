@@ -87,8 +87,8 @@ fn test_rotate_vk() {
     );
 
     // Old proof for old VK
-    //let (old_sig, pk) = get_sample_groth16_sig_and_pk();
-    let (old_sig, pk) = get_random_simulated_groth16_sig_and_pk();
+    let (old_sig, pk) = get_sample_groth16_sig_and_pk();
+    //let (old_sig, pk) = get_random_simulated_groth16_sig_and_pk();
     let account = create_keyless_account(&mut h, pk.clone());
     let transaction =
         spend_keyless_account(&mut h, old_sig.clone(), &account, *recipient.address());
@@ -132,6 +132,54 @@ fn test_rotate_vk() {
             panic!("Expected TransactionStatus::Discard, got Keep({:?})", es)
         },
         TransactionStatus::Retry => panic!("Expected TransactionStatus::Discard, got Retry"),
+    }
+}
+
+#[test]
+fn test_proof_simulation() {
+    let (mut h, recipient, core_resources) = init_feature_gating(
+        vec![
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
+        ],
+        vec![],
+    );
+
+    let (sig, pk, pvk) = get_random_simulated_groth16_sig_and_pk();
+    run_upgrade_vk_script(
+        &mut h,
+        core_resources,
+        Groth16VerificationKey::from(pvk),
+    );
+
+    let transaction = create_and_spend_keyless_account(&mut h, sig, pk, *recipient.address());
+    let output = h.run_raw(transaction);
+
+    let should_succeed = true;
+    if !should_succeed {
+        match output.status() {
+            TransactionStatus::Discard(status) => {
+                assert_eq!(
+                    *status, FEATURE_UNDER_GATING,
+                    "Expected TransactionStatus::Discard to be FEATURE_UNDER_GATING, but got: {:?}",
+                    status
+                )
+            },
+            _ => {
+                panic!(
+                    "Expected to get a TransactionStatus::Discard, but got: {:?}",
+                    output.status()
+                )
+            },
+        }
+    } else {
+        assert_success!(
+            output.status().clone(),
+            "Expected TransactionStatus::Keep(ExecutionStatus::Success), but got: {:?}",
+            output.status()
+        );
     }
 }
 

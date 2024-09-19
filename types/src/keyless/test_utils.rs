@@ -98,7 +98,7 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
  use ark_groth16::prepare_verifying_key;
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
-pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
+pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey, PreparedVerifyingKey<Bn254>) {
     // We need a ZeroKnowledgeSig inside of a KeylessSignature to derive a public input hash. The Groth16 proof
     // is not used to actually derive the hash so we can temporarily give a dummy
     // proof before later replacing it with a simulated proof
@@ -141,7 +141,7 @@ pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPu
     println!("test_pih: {}", test_pih);
 
 
-    (sig, pk)
+    (sig, pk, pvk)
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
