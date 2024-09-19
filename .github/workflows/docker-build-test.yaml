@@ -288,17 +288,12 @@ jobs:
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
-
-  # Run e2e compat test against testnet branch. This is a PR required job.
-  forge-compat-test:
+  
+  # This job determines the latest docker image tag for the release branch, which is used by forge compat test.
+  fetch-latest-docker-image-tag:
     needs:
       - permission-check
       - determine-docker-build-metadata
-      - rust-images
-      - rust-images-failpoints
-      - rust-images-performance
-      - rust-images-consensus-only-perf-test
-      - file_change_determinator
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
@@ -307,17 +302,92 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all branches and tags
+
+      # To test the compat test against the last released docker image, we need to get the last released docker image tag.
+      # This step determines appropriate branch to fetch the latest docker image tag from based on the current branch.
+      # Determine the IMAGE_TAG based on the latest release R and check for images built on branch R - 1:
+      # - ex. For commits on the aptos-release-v1.19 branch, the IMAGE_TAG should be the latest commit built on aptos-release-v1.18
+      # - For commits on the main branch, the IMAGE_TAG should be the latest commit on the max release aptos-release-v<MAX> branch
+      - name: Determine branch to fetch latest docker image tag from
+        id: determine-the-target-branch
+        run: |
+          # Determine the base branch (the branch we're merging into)
+          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
+            base_branch="${{ github.base_ref }}"
+          else
+            base_branch="${{ github.ref_name }}"
+          fi
+
+          if [[ $base_branch == "main" ]]; then
+            target_branch=$(git ls-remote --heads origin 'aptos-release-v*' | sort -V | tail -n 1 | awk -F'/' '{print $NF}')
+          elif [[ $base_branch =~ ^aptos-release-v([0-9]+)\.([0-9]+)$ ]]; then
+            major=${BASH_REMATCH[1]}
+            minor=${BASH_REMATCH[2]}
+            prev_minor=$((minor - 1))
+            target_branch="aptos-release-v${major}.${prev_minor}"
+          else
+            echo "Not merging to main or a release branch, using the main branch for compat test" >&2
+            target_branch="main"
+          fi
+          echo "TARGET_BRANCH=${target_branch}" >> $GITHUB_OUTPUT
+          echo "Determined TARGET_BRANCH: ${target_branch}" >&2
+
+      # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Get Docker Image Tag
+        uses: aptos-labs/aptos-core/.github/actions/get-latest-docker-image-tag@main
+        id: get-docker-image-tag
+        with:
+          branch: ${{ steps.determine-the-target-branch.outputs.TARGET_BRANCH }}
+          variants: "failpoints performance"
+
+      - name: Log TARGET_BRANCH and IMAGE_TAG
+        run: |
+          echo "TARGET_BRANCH: ${{ steps.determine-the-target-branch.outputs.TARGET_BRANCH }}"
+          echo "IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}"
+
+      - name: Set IMAGE_TAG as job output
+        run: echo "IMAGE_TAG=${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}" >> $GITHUB_OUTPUT
+
+    outputs:
+      IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
+  
+  forge-compat-test:
+    needs: 
+      - fetch-latest-docker-image-tag
+      - permission-check
+      - determine-docker-build-metadata
+      - rust-images
+      - rust-images-failpoints
+      - rust-images-performance
+      - rust-images-consensus-only-perf-test
+      - file_change_determinator
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: 25a081116546670e62ca927ba90478de78557056 #aptos-node-v1.20
+      IMAGE_TAG: ${{ needs.fetch-latest-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 300
-      COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
-
+    secrets: inherit
+  
   # Run forge framework upgradability test. This is a PR required job.
   forge-framework-upgrade-test:
     needs:
