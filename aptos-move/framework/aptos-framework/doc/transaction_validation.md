@@ -48,6 +48,7 @@
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="nonce_validation.md#0x1_nonce_validation">0x1::nonce_validation</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -234,6 +235,15 @@ important to the semantics of the system.
 
 
 
+<a id="0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_EXISTS"></a>
+
+
+
+<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_EXISTS">PROLOGUE_NONCE_ALREADY_EXISTS</a>: u64 = 1012;
+</code></pre>
+
+
+
 <a id="0x1_transaction_validation_initialize"></a>
 
 ## Function `initialize`
@@ -325,21 +335,27 @@ Only called during genesis to initialize system resources for this module.
             )
         };
 
-        <b>let</b> account_sequence_number = <a href="account.md#0x1_account_get_sequence_number">account::get_sequence_number</a>(transaction_sender);
-        <b>assert</b>!(
-            txn_sequence_number &lt; (1u64 &lt;&lt; 63),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>)
-        );
+        // <b>let</b> account_sequence_number = <a href="account.md#0x1_account_get_sequence_number">account::get_sequence_number</a>(transaction_sender);
+        // <b>assert</b>!(
+        //     txn_sequence_number &lt; (1u64 &lt;&lt; 63),
+        //     <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>)
+        // );
 
-        <b>assert</b>!(
-            txn_sequence_number &gt;= account_sequence_number,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD">PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD</a>)
-        );
+        // <b>assert</b>!(
+        //     txn_sequence_number &gt;= account_sequence_number,
+        //     <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD">PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD</a>)
+        // );
 
-        <b>assert</b>!(
-            txn_sequence_number == account_sequence_number,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW">PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW</a>)
-        );
+        // <b>assert</b>!(
+        //     txn_sequence_number == account_sequence_number,
+        //     <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW">PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW</a>)
+        // );
+
+        <b>assert</b>!(!<a href="nonce_validation.md#0x1_nonce_validation_nonce_exists">nonce_validation::nonce_exists</a>(transaction_sender, txn_sequence_number),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_EXISTS">PROLOGUE_NONCE_ALREADY_EXISTS</a>));
+
+        <a href="nonce_validation.md#0x1_nonce_validation_insert_nonce">nonce_validation::insert_nonce</a>(transaction_sender, txn_sequence_number);
+
     } <b>else</b> {
         // In this case, the transaction is sponsored and the <a href="account.md#0x1_account">account</a> does not exist, so ensure
         // the default values match.

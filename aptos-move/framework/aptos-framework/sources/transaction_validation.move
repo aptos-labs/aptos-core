@@ -13,7 +13,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::nonce_validation::{Self, NonceHistory};
+    use aptos_framework::nonce_validation;
     friend aptos_framework::genesis;
 
     /// This holds information that will be picked up by the VM to call the
@@ -26,10 +26,6 @@ module aptos_framework::transaction_validation {
         module_prologue_name: vector<u8>,
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
-    }
-
-    struct NonceHistorySignerCap has key {
-        signer_cap: account::SignerCapability,
     }
 
     /// MSB is used to indicate a gas payer tx
@@ -51,6 +47,7 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
     const PROLOGUE_EFEE_PAYER_NOT_ENABLED: u64 = 1010;
+    const PROLOGUE_NONCE_ALREADY_EXISTS: u64 = 1012;
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
@@ -124,10 +121,11 @@ module aptos_framework::transaction_validation {
             //     error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
             // );
 
-
-            let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
-            let 
+            assert!(!nonce_validation::nonce_exists(transaction_sender, txn_sequence_number),
+                error::invalid_argument(PROLOGUE_NONCE_ALREADY_EXISTS));
             
+            nonce_validation::insert_nonce(transaction_sender, txn_sequence_number);
+
         } else {
             // In this case, the transaction is sponsored and the account does not exist, so ensure
             // the default values match.

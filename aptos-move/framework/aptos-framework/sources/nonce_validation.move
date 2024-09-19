@@ -1,31 +1,26 @@
 module aptos_framework::nonce_validation {
-    use std::bcs;
-    use std::error;
-    use std::features;
-    use std::signer;
-    use std::vector;
-
     use aptos_framework::account;
-    use aptos_framework::aptos_account;
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::chain_id;
-    use aptos_framework::coin;
-    use aptos_framework::system_addresses;
-    use aptos_framework::timestamp;
-    use aptos_framework::transaction_fee;
-    use aptos_framework::smart_table;
-    use aptos_framework::transaction_validation::NonceHistorySignerCap;
+    use aptos_std::smart_table::{Self, SmartTable};
     friend aptos_framework::genesis;
+    friend aptos_framework::transaction_validation;
 
+    struct NonceKey has copy, drop, store {
+        sender_address: address,
+        nonce: u64,
+    }
 
     struct NonceHistory has key {
         // Key = (sender address, nonce), Value = bool (always set to true).
-        table_1: SmartTable<(address, u64), bool>,
-        table_2: SmartTable<(address, u64), bool>,
+        table_1: SmartTable<NonceKey, bool>,
+        table_2: SmartTable<NonceKey, bool>,
         // Either 1 or 2
         current_table: u64,
-        last_switched_time: u64,
     }
+
+    struct NonceHistorySignerCap has key {
+        signer_cap: account::SignerCapability,
+    }
+
 
     public(friend) fun initialize(aptos_framework: &signer) {
         let table_1 = smart_table::new_with_config(5000, 75, 5);
@@ -36,45 +31,45 @@ module aptos_framework::nonce_validation {
             current_table: 1,
         };
 
-        let (resource_account_signer, signer_cap) = account::create_resource_account(main_account, seed);
-        let signer_cap_resource = NonceHistorySignerCap {
-            signer_cap,
-        };
-        move_to<NonceHistory>(resource_account_signer, nonce_history);
-        move_to<NonceHistorySignerCap>(aptos_framwork, signer_cap_resource);
+        move_to<NonceHistory>(aptos_framework, nonce_history);
     }
 
-    public(friend) fun switch_table(aptos_framework: &signer) {
+    public(friend) fun switch_table() acquires NonceHistory {
         let nonce_history = borrow_global_mut<NonceHistory>(@aptos_framework);
         nonce_history.current_table = 3 - nonce_history.current_table;
     }
 
     public(friend) fun insert_nonce(
-        aptos_framework: &signer,
         sender_address: address,
         nonce: u64,
-    ) {
+    ) acquires NonceHistory {
         let nonce_history = borrow_global_mut<NonceHistory>(@aptos_framework);
-        let table = if nonce_history.current_table == 1 {
-            &mut nonce_history.table_1
-        } else {
-            &mut nonce_history.table_2
+        let nonce_key = NonceKey {
+            sender_address,
+            nonce,
         };
-        table.insert((address, nonce), true);
+        if (nonce_history.current_table == 1) {
+            smart_table::upsert(&mut nonce_history.table_1, nonce_key, true);
+        } else {
+            smart_table::upsert(&mut nonce_history.table_2, nonce_key, true);
+        };
     }
 
-    public(friend) fun check_nonce(
-        aptos_framework: &signer,
+    public(friend) fun nonce_exists(
         sender_address: address,
         nonce: u64,
-    ): bool {
-        let nonce_history = borrow_global_mut<NonceHistory>(@aptos_framework);
-        if nonce_history.table1.contains_key((address, nonce)) {
-            return true;
-        }
-        if nonce_history.table2.contains_key((address, nonce)) {
-            return true;
-        }
-        return false;
+    ): bool acquires NonceHistory {
+        let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
+        let nonce_key = NonceKey {
+            sender_address,
+            nonce,
+        };
+        if (smart_table::contains(&nonce_history.table_1, nonce_key)) {
+            return true
+        };
+        if (smart_table::contains(&nonce_history.table_2, nonce_key)) {
+            return true
+        };
+        false
     }
 }

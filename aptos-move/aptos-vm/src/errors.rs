@@ -37,6 +37,8 @@ pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
 pub const EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
 // Insufficient balance to cover the required deposit.
 pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
+// Nonce exists
+pub const ENONCE_EXISTS : u64 = 1012;
 
 // Specified account is not a multisig account.
 const EACCOUNT_NOT_MULTISIG: u64 = 2002;
@@ -97,6 +99,7 @@ pub fn convert_prologue_error(
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                     location, code, category, reason);
                     speculative_error!(log_context, err_msg.clone());
+                    println!("Error: {:?}", err_msg);
                     return Err(VMStatus::error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                         Some(err_msg),
@@ -134,10 +137,14 @@ pub fn convert_prologue_error(
                 (INVALID_STATE, EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT) => {
                     StatusCode::INSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT
                 },
+                (INVALID_ARGUMENT, ENONCE_EXISTS) => {
+                    StatusCode::NONCE_EXISTS
+                },
                 (category, reason) => {
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                     location, code, category, reason);
                     speculative_error!(log_context, err_msg.clone());
+                    println!("Error {:?}", err_msg);
                     return Err(VMStatus::Error {
                         status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                         sub_status: None,
@@ -159,6 +166,7 @@ pub fn convert_prologue_error(
                 log_context,
                 format!("[aptos_vm] Unexpected prologue error: {:?}", status),
             );
+            println!("Error# [aptos_vm] Unexpected prologue error: {:?}", status);
             VMStatus::Error {
                 status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                 sub_status: status.sub_status(),
@@ -185,6 +193,7 @@ pub fn convert_epilogue_error(
             let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
 			location, code, category, reason);
             speculative_error!(log_context, err_msg.clone());
+            println!("Error- {:?}", err_msg);
             VMStatus::error(
                 StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                 Some(err_msg),
@@ -197,6 +206,7 @@ pub fn convert_epilogue_error(
                 let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
 			    location, code, category, reason);
                 speculative_error!(log_context, err_msg.clone());
+                println!("Error@ {:?}", err_msg);
                 VMStatus::error(
                     StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                     Some(err_msg),
@@ -213,6 +223,7 @@ pub fn convert_epilogue_error(
         status => {
             let err_msg = format!("[aptos_vm] Unexpected success epilogue error: {:?}", status);
             speculative_error!(log_context, err_msg.clone());
+            println!("Error! {:?}", err_msg);
             VMStatus::Error {
                 status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                 sub_status: status.sub_status(),

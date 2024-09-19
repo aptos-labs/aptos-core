@@ -29,7 +29,8 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_validation;
     use aptos_framework::version;
     use aptos_framework::vesting;
-
+    use aptos_framework::nonce_validation;
+    
     const EDUPLICATE_ACCOUNT: u64 = 1;
     const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
 
@@ -93,6 +94,8 @@ module aptos_framework::genesis {
             b"multi_agent_script_prologue",
             b"epilogue",
         );
+
+        nonce_validation::initialize(&aptos_framework_account);
 
         // Give the decentralized on-chain governance control over the core framework account.
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, aptos_framework_signer_cap);
