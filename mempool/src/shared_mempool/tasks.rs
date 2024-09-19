@@ -454,8 +454,6 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
-    use super::priority;
-
     let mut mempool = smp.mempool.lock();
     for (transaction, sequence_info, ready_time_at_sender, priority) in transactions.into_iter() {
         let mempool_status = mempool.add_txn(
@@ -464,7 +462,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
             sequence_info,
             timeline_state,
             client_submitted,
-            read_time_at_sender,
+            ready_time_at_sender,
             priority,
         );
         statuses.push((transaction, (mempool_status, None)));
