@@ -18,7 +18,7 @@ use crate::consensus_observer::{
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, warn};
+use aptos_logger::{info, warn};
 use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
@@ -157,7 +157,7 @@ impl SubscriptionManager {
             .get_connected_peers_and_metadata()
             .unwrap_or_else(|error| {
                 // Log the error
-                error!(
+                warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Failed to get connected peers and metadata! Error: {:?}",
                         error
@@ -327,7 +327,7 @@ impl SubscriptionManager {
                 },
                 Err(error) => {
                     // We encountered an error while sending the request
-                    error!(
+                    warn!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                             "Failed to send unsubscribe request to peer: {}! Error: {:?}",
                             peer_network_id, error

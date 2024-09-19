@@ -372,7 +372,7 @@ module aptos_framework::primary_fungible_store {
 
         // User 2 burns their primary store but should still be able to transfer afterward.
         let user_2_primary_store = primary_store(user_2_address, metadata);
-        object::burn(user_2, user_2_primary_store);
+        object::burn_object(user_2, user_2_primary_store);
         assert!(object::is_burnt(user_2_primary_store), 0);
         // Balance still works
         assert!(balance(user_2_address, metadata) == 80, 0);
@@ -396,7 +396,7 @@ module aptos_framework::primary_fungible_store {
 
         // User 2 burns their primary store but should still be able to withdraw afterward.
         let user_2_primary_store = primary_store(user_2_address, metadata);
-        object::burn(user_2, user_2_primary_store);
+        object::burn_object(user_2, user_2_primary_store);
         assert!(object::is_burnt(user_2_primary_store), 0);
         let coins = withdraw(user_2, metadata, 70);
         assert!(balance(user_2_address, metadata) == 10, 0);

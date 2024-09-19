@@ -1,0 +1,55 @@
+
+Diagnostics:
+error: local `r` of type `m::R` does not have the `drop` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:15:17
+   │
+15 │         let x = &mut r;
+   │                 ^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `r` of type `m::R` does not have the `drop` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:23:17
+   │
+23 │         let x = &mut r;
+   │                 ^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `x` of type `m::R` does not have the `copy` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:24:9
+   │
+24 │         *x; // Expected ok because x is only read; ability analysis will check whether read is ok
+   │         ^^ reference content copied here
+
+error: value of type `m::R` does not have the `drop` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:24:9
+   │
+24 │         *x; // Expected ok because x is only read; ability analysis will check whether read is ok
+   │         ^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `m::R` does not have the `drop` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:31:17
+   │
+31 │         let x = &mut r;
+   │                 ^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `x` of type `m::R` does not have the `copy` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:33:9
+   │
+33 │         *x; // Same as f1aok
+   │         ^^ reference content copied here
+
+error: value of type `m::R` does not have the `drop` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:33:9
+   │
+33 │         *x; // Same as f1aok
+   │         ^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `m::R` does not have the `drop` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:42:13
+   │
+42 │         x = &mut r;
+   │             ^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `r` of type `m::R` does not have the `drop` ability
+   ┌─ tests/more-v1/liveness/mut_ref2.move:48:17
+   │
+48 │         let x = &mut r;
+   │                 ^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/missing_angle_brace_close.move:3:22
+  │
+3 │         let x = t<u64;
+  │                  -   ^ Expected '>'
+  │                  │
+  │                  To match this '<'
+  │                  Perhaps you need a blank space before this '<' operator?

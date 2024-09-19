@@ -14,7 +14,7 @@ module 0x42::token {
 
     struct Token has key { val: u64 }
 
-    public fun get_value(ref: &obj::ReaderRef<Token>): u64 {
+    public fun get_value(ref: &obj::ReaderRef<Token>): u64 acquires Token {
         obj::reader(ref).val
     }
 }

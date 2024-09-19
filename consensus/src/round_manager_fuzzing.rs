@@ -24,10 +24,7 @@ use crate::{
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
-    config::{ConsensusConfig, QcAggregatorType},
-    network_id::NetworkId,
-};
+use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
 use aptos_consensus_types::{proposal_msg::ProposalMsg, utils::PayloadTxnsSize};
 use aptos_infallible::Mutex;
 use aptos_network::{
@@ -50,7 +47,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::mpsc, executor::block_on};
-use futures_channel::mpsc::unbounded;
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
@@ -113,16 +109,9 @@ fn create_round_state() -> RoundState {
     let base_timeout = std::time::Duration::new(60, 0);
     let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
     let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
-    let (delayed_qc_tx, _) = unbounded();
     let time_service = Arc::new(SimulatedTimeService::new());
 
-    RoundState::new(
-        time_interval,
-        time_service,
-        round_timeout_sender,
-        delayed_qc_tx,
-        QcAggregatorType::NoDelay,
-    )
+    RoundState::new(time_interval, time_service, round_timeout_sender)
 }
 
 // Creates an RoundManager for fuzzing
