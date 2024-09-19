@@ -93,10 +93,7 @@ fn set_shard_property(
     if !skip_reporting_cf(cf_name) {
         for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
             metrics[db_shard_id]
-                .with_label_values(&[
-                    cf_name,
-                    aptos_rocksdb_property_name,
-                ])
+                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
                 .set(db.get_property(cf_name, rockdb_property_name)? as i64);
         }
     }
