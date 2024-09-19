@@ -393,7 +393,7 @@ jobs:
   # Run e2e compat test against testnet branch. This is a PR required job.
   forge-compat-test:
     needs: 
-      - fetch-latest-docker-image-tag
+      - fetch-last-released-docker-image-tag
       - permission-check
       - determine-docker-build-metadata
       - rust-images
