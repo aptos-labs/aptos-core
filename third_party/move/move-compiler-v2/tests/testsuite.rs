@@ -719,9 +719,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         },
         // Unreachable code remover
         TestConfig {
-            name: "plus-equal",
-            runner: |p| run_test(p, get_config_by_name("plus-equal")),
-            include: vec!["/plus-equal/"],
+            name: "op-equal",
+            runner: |p| run_test(p, get_config_by_name("op-equal")),
+            include: vec!["/op-equal/"],
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone().set_language_version(LanguageVersion::V2_1),
