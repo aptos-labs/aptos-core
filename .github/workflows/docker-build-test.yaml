@@ -380,6 +380,7 @@ jobs:
       - rust-images-consensus-only-perf-test
       - file_change_determinator
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
@@ -387,7 +388,6 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
-    secrets: inherit
   
   # Run forge framework upgradability test. This is a PR required job.
   forge-framework-upgrade-test:
