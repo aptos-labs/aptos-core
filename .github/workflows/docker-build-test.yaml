@@ -399,14 +399,14 @@ jobs:
       - rust-images
       - rust-images-failpoints
       - rust-images-performance
-      - rust-images-consensus-only-perf-test
+      # - rust-images-consensus-only-perf-test
       - file_change_determinator
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: ${{ needs.fetch-latest-docker-image-tag.outputs.IMAGE_TAG }}
+      IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 300
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
