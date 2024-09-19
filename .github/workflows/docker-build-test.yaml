@@ -289,8 +289,8 @@ jobs:
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
   
-  # This job determines the latest docker image tag for the release branch, which is used by forge compat test.
-  fetch-latest-docker-image-tag:
+  # This job determines the last released docker image tag, which is used by forge compat test.
+  fetch-last-released-docker-image-tag:
     needs:
       - permission-check
     if: |
