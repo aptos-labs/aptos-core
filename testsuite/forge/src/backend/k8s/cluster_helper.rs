@@ -4,11 +4,11 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
-    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
-    DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
-    FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_CHART_PATH,
-    GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
+    nodes_healthcheck, wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn,
+    K8sApi, K8sNode, NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME,
+    DEFAULT_FORGE_DEPLOYER_PROFILE, DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME,
+    FORGE_KEY_SEED, FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX,
+    FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_RELEASE_NAME, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
     NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
     VALIDATOR_SERVICE_SUFFIX,
 };
@@ -36,16 +36,12 @@ use std::{
     env,
     fmt::Debug,
     fs,
-    fs::File,
-    io::Write,
     net::TcpListener,
-    path::Path,
     process::{Command, Stdio},
     str,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tempfile::TempDir;
 use thiserror::Error;
 use tokio::time::Duration;
 
@@ -303,97 +299,6 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
     Ok(())
 }
 
-fn upgrade_helm_release(
-    release_name: String,
-    helm_chart: String,
-    options: &[String],
-    kube_namespace: String,
-) -> Result<()> {
-    // Check to make sure helm_chart exists
-    let helm_chart_path = Path::new(&helm_chart);
-    if !helm_chart_path.exists() {
-        bail!(
-            "Helm chart {} does not exist, try running from the repo root",
-            helm_chart
-        );
-    }
-
-    // only create cluster-level resources once
-    let psp_values = match kube_namespace.as_str() {
-        "default" => "podSecurityPolicy=true",
-        _ => "podSecurityPolicy=false",
-    };
-    let upgrade_base_args = [
-        "upgrade".to_string(),
-        // "--debug".to_string(),
-        "--install".to_string(),
-        // // force replace if necessary
-        // "--force".to_string(),
-        // in a new namespace
-        "--create-namespace".to_string(),
-        "--namespace".to_string(),
-        kube_namespace,
-        // upgrade
-        release_name.clone(),
-        helm_chart.clone(),
-        // reuse old values
-        "--reuse-values".to_string(),
-        "--history-max".to_string(),
-        "2".to_string(),
-    ];
-    let upgrade_override_args = ["--set".to_string(), psp_values.to_string()];
-    let upgrade_args = [&upgrade_base_args, options, &upgrade_override_args].concat();
-    info!("{:?}", upgrade_args);
-    let upgrade_output = Command::new(HELM_BIN)
-        .stdout(Stdio::inherit())
-        .args(&upgrade_args)
-        .output()
-        .unwrap_or_else(|_| {
-            panic!(
-                "failed to helm upgrade release {} with chart {}",
-                release_name, helm_chart
-            )
-        });
-    if !upgrade_output.status.success() {
-        bail!(format!(
-            "Upgrade not completed: {}",
-            String::from_utf8(upgrade_output.stderr).unwrap()
-        ));
-    }
-
-    Ok(())
-}
-
-// TODO: upgrade via kube api
-#[allow(dead_code)]
-fn upgrade_validator(
-    _validator_name: String,
-    _options: &[String],
-    _kube_namespace: String,
-) -> Result<()> {
-    todo!()
-}
-
-fn upgrade_aptos_node_helm(options: &[String], kube_namespace: String) -> Result<()> {
-    upgrade_helm_release(
-        APTOS_NODE_HELM_RELEASE_NAME.to_string(),
-        APTOS_NODE_HELM_CHART_PATH.to_string(),
-        options,
-        kube_namespace,
-    )
-}
-
-// runs helm upgrade on the installed aptos-genesis release named "genesis"
-// if a new "era" is specified, a new genesis will be created, and old resources will be destroyed
-fn upgrade_genesis_helm(options: &[String], kube_namespace: String) -> Result<()> {
-    upgrade_helm_release(
-        GENESIS_HELM_RELEASE_NAME.to_string(),
-        GENESIS_HELM_CHART_PATH.to_string(),
-        options,
-        kube_namespace,
-    )
-}
-
 pub async fn uninstall_testnet_resources(kube_namespace: String) -> Result<()> {
     // delete kubernetes resources
     delete_k8s_cluster(kube_namespace.clone()).await?;
@@ -518,11 +423,6 @@ pub async fn install_testnet_resources(
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await?;
 
-    // get deployment-specific helm values and cache it
-    let tmp_dir = TempDir::new().expect("Could not create temp dir");
-    let aptos_node_values_file = dump_helm_values_to_file(APTOS_NODE_HELM_RELEASE_NAME, &tmp_dir)?;
-    let genesis_values_file = dump_helm_values_to_file(GENESIS_HELM_RELEASE_NAME, &tmp_dir)?;
-
     // get forge override helm values and cache it
     let mut aptos_node_forge_helm_values_yaml = construct_node_helm_values(
         node_helm_config_fn,
@@ -540,13 +440,6 @@ pub async fn install_testnet_resources(
         aptos_node_forge_helm_values_yaml["genesis_blob_upload_url"] = "".into();
     }
 
-    let aptos_node_forge_values_file = dump_string_to_file(
-        "aptos-node-values.yaml".to_string(),
-        serde_yaml::to_string(&aptos_node_forge_helm_values_yaml)
-            .expect("Unable to serialize aptos-node helm values"),
-        &tmp_dir,
-    )?;
-
     let mut genesis_forge_helm_values_yaml = construct_genesis_helm_values(
         genesis_helm_config_fn,
         kube_namespace.clone(),
@@ -563,29 +456,26 @@ pub async fn install_testnet_resources(
     if enable_indexer {
         genesis_forge_helm_values_yaml["genesis"]["genesis_blob_upload_url"] = "".into();
     }
-    let genesis_forge_values_file = dump_string_to_file(
-        "genesis-values.yaml".to_string(),
-        serde_yaml::to_string(&genesis_forge_helm_values_yaml)
-            .expect("Unable to serialize genesis helm values"),
-        &tmp_dir,
-    )?;
 
-    // combine all helm values
-    let aptos_node_upgrade_options = vec![
-        // use the old values
-        "-f".to_string(),
-        aptos_node_values_file,
-        "-f".to_string(),
-        aptos_node_forge_values_file,
-    ];
+    let config: Value = serde_json::from_value(serde_json::json!({
+        "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+        "era": new_era,
+        "namespace": kube_namespace.clone(),
+        "testnet-values": aptos_node_forge_helm_values_yaml,
+        "genesis-values": genesis_forge_helm_values_yaml,
+    }))?;
 
-    let genesis_upgrade_options = vec![
-        // use the old values
-        "-f".to_string(),
-        genesis_values_file,
-        "-f".to_string(),
-        genesis_forge_values_file,
-    ];
+    let testnet_deployer = ForgeDeployerManager::new(
+        kube_client.clone(),
+        kube_namespace.clone(),
+        FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+        None,
+        config.clone(),
+    );
+
+    testnet_deployer.start().await?;
+
+    wait_genesis_job(&kube_client, &new_era, &kube_namespace).await?;
 
     let (validators, fullnodes) = collect_running_nodes(
         &kube_client,
@@ -764,57 +654,6 @@ pub async fn create_k8s_client() -> Result<K8sClient> {
         }
     })?;
     Ok(client)
-}
-
-/// Gets the result of helm status command as JSON
-fn get_helm_status(helm_release_name: &str) -> Result<Value> {
-    let status_args = [
-        "status",
-        helm_release_name,
-        "--namespace",
-        "default",
-        "-o",
-        "json",
-    ];
-    info!("{:?}", status_args);
-    let raw_helm_values = Command::new(HELM_BIN)
-        .args(status_args)
-        .output()
-        .unwrap_or_else(|_| panic!("Failed to helm status {}", helm_release_name));
-
-    let helm_values = String::from_utf8(raw_helm_values.stdout).unwrap();
-    serde_json::from_str(&helm_values).map_err(|e| {
-        format_err!(
-            "Failed to deserialize helm values. Check if release {} exists: {}",
-            helm_release_name,
-            e
-        )
-    })
-}
-
-/// Dumps the given String contents into a file at the given temp directory
-pub fn dump_string_to_file(
-    file_name: String,
-    content: String,
-    tmp_dir: &TempDir,
-) -> Result<String> {
-    let file_path = tmp_dir.path().join(file_name.clone());
-    info!("Wrote content to: {:?}", &file_path);
-    let mut file = File::create(file_path).expect("Could not create file in temp dir");
-    file.write_all(&content.into_bytes())
-        .expect("Could not write to file");
-    let file_path_str = tmp_dir.path().join(file_name).display().to_string();
-    Ok(file_path_str)
-}
-
-fn dump_helm_values_to_file(helm_release_name: &str, tmp_dir: &TempDir) -> Result<String> {
-    // get aptos-node values
-    let v: Value = get_helm_status(helm_release_name).unwrap();
-    let config = &v["config"];
-    let content = config.to_string();
-    let file_name = format!("{}_status.json", helm_release_name);
-
-    dump_string_to_file(file_name, content, tmp_dir)
 }
 
 #[derive(Error, Debug)]
