@@ -325,12 +325,35 @@ jobs:
           fi
 
           if [[ $base_branch == "main" ]]; then
-            target_branch=$(git ls-remote --heads origin 'aptos-release-v*' | sort -V | tail -n 1 | awk -F'/' '{print $NF}')
-          elif [[ $base_branch =~ ^aptos-release-v([0-9]+)\.([0-9]+)$ ]]; then
+            target_branch=$(git ls-remote --heads origin 'aptos-release-v*' | 
+                            grep -E 'refs/heads/aptos-release-v[0-9]+\.[0-9]+$' | 
+                            sed 's/.*refs\/heads\///' | 
+                            sort -t. -k2,2n -k3,3n | 
+                            tail -n 1)
+          elif [[ $base_branch =~ ^aptos-release-v([0-9]+)\.([0-9]+) ]]; then
             major=${BASH_REMATCH[1]}
             minor=${BASH_REMATCH[2]}
-            prev_minor=$((minor - 1))
-            target_branch="aptos-release-v${major}.${prev_minor}"
+
+            if [[ $minor -eq 0 ]]; then
+                # If the minor version is 0, look for the latest branch in the previous major version
+                prev_major=$((major - 1))
+                target_branch=$(git ls-remote --heads origin "aptos-release-v${prev_major}.*" | 
+                                grep -E "refs/heads/aptos-release-v${prev_major}\.[0-9]+$" | 
+                                sed 's/.*refs\/heads\///' | 
+                                sort -t. -k2,2n -k3,3n | 
+                                tail -n 1)
+            else
+                # If the minor version is greater than 0, look for the previous minor version
+                prev_minor=$((minor - 1))
+                target_branch="aptos-release-v${major}.${prev_minor}"
+            fi
+
+            # Now do the check whether the target branch exists, outside the if-else
+            if git ls-remote --heads origin "aptos-release-v${target_branch}" | grep -q "refs/heads/${target_branch}"; then
+                echo "Target branch is $target_branch"
+            else
+                echo "Branch $target_branch does not exist"
+            fi
           else
             echo "Not merging to main or a release branch, using the main branch for compat test" >&2
             target_branch="main"
