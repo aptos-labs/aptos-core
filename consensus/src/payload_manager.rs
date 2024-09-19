@@ -428,6 +428,12 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 block.gen_block_info(HashValue::zero(), 0, None),
                 transaction_payload.clone(),
             );
+
+            info!(
+                "Publishing block payload message to all listeners: {:?}",
+                message
+            );
+
             consensus_publisher.publish_message(message).await;
         }
 
