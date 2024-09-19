@@ -47,7 +47,7 @@ fun test::test() {
 
 Diagnostics:
 error: cannot copy local `x` which is still mutably borrowed
-  ┌─ tests/plus-equal/invalid1.move:5:3
+  ┌─ tests/op-equal/invalid1.move:5:3
   │
 4 │         let p = &mut x;
   │                 ------ local `x` previously mutably borrowed here
@@ -57,7 +57,7 @@ error: cannot copy local `x` which is still mutably borrowed
   │          - conflicting reference `p` used here
 
 error: cannot drop local `x` which is still borrowed
-  ┌─ tests/plus-equal/invalid1.move:5:3
+  ┌─ tests/op-equal/invalid1.move:5:3
   │
 4 │         let p = &mut x;
   │                 ------ local `x` previously mutably borrowed here
