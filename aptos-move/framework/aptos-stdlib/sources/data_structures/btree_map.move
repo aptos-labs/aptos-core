@@ -5,7 +5,7 @@
 /// more metadata into one node, which is more disk friendly (and gas friendly).
 
 module aptos_std::btree_map {
-    use aptos_std::bucket_table::{Self, BucketTable};
+    use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::{Self, Option};
     use std::vector;
 
@@ -20,16 +20,15 @@ module aptos_std::btree_map {
 
     const NULL_INDEX: u64 = 0;
     const DEFAULT_ORDER : u8 = 32;
-    const MAX_NUM_NODES : u64 = 1048576;
 
-    /// A node of the SmartTree.
-    struct Node has drop, store {
+    /// A node of the BTreeMap.
+    struct Node<V: copy + drop + store> has copy, drop, store {
         // Whether this node is a leaf node.
         is_leaf: bool,
         // The node index of its parent node, or NULL_INDEX if it doesn't have parent.
         parent: u64,
         // The children of the nodes. (When the node is leaf node, all keys of the node is stored in children.max_key)
-        children: vector<Child>,
+        children: vector<Child<V>>,
         // The node index of its previous node at the same level, or NULL_INDEX if it doesn't have a previous node.
         prev: u64,
         // The node index of its next node at the same level, or NULL_INDEX if it doesn't have a next node.
@@ -37,14 +36,22 @@ module aptos_std::btree_map {
     }
 
     /// The metadata of a child of a node.
-    struct Child has copy, drop, store {
-        // The max key of its child, or the key of the current node if it is a leaf node.
-        max_key: u64,
-        // The node index of it's child, or NULL_INDEX if the current node is a leaf node.
-        node_index: u64,
+    enum Child<V: copy + drop + store> has copy, drop, store {
+        Inner {
+            // The max key of its child, or the key of the current node if it is a leaf node.
+            max_key: u64,
+            // The node index of it's child, or NULL_INDEX if the current node is a leaf node.
+            node_index: u64,
+        },
+        Leaf {
+            // The max key of its child, or the key of the current node if it is a leaf node.
+            max_key: u64,
+
+            value: V,
+        }
     }
 
-    /// An iterator to iterate all keys in the SmartTree.
+    /// An iterator to iterate all keys in the BTreeMap.
     struct Iterator has copy, drop {
         // The node index of the iterator pointing to.
         node_index: u64,
@@ -54,14 +61,12 @@ module aptos_std::btree_map {
         key: u64,
     }
 
-    /// The SmartTree data structure.
-    struct SmartTree<V> has store {
+    /// The BTreeMap data structure.
+    struct BTreeMap<V: copy + drop + store> has store {
         // The node index of the root node.
         root_index: u64,
         // Mapping of node_index -> node.
-        nodes: BucketTable<u64, Node>,
-        // Mapping of key -> value.
-        entries: BucketTable<u64, V>,
+        nodes: TableWithLength<u64, Node<V>>,
         // The max number of children a node can have.
         order: u8,
         // The node index of the leftmost node.
@@ -74,22 +79,21 @@ module aptos_std::btree_map {
     // Constructors && Destructors //
     /////////////////////////////////
 
-    /// Returns a new SmartTree with the default configuration.
-    public fun new<V: store>(): SmartTree<V> {
+    /// Returns a new BTreeMap with the default configuration.
+    public fun new<V: copy + drop + store>(): BTreeMap<V> {
         new_with_order(DEFAULT_ORDER)
     }
 
-    /// Returns a new SmartTree with the provided order (the maximum # of children a node can have).
-    public fun new_with_order<V: store>(order: u8): SmartTree<V> {
+    /// Returns a new BTreeMap with the provided order (the maximum # of children a node can have).
+    public fun new_with_order<V: copy + drop + store>(order: u8): BTreeMap<V> {
         assert!(order >= 5, E_INVALID_PARAMETER);
         let root_node = new_node(/*is_leaf=*/true, /*parent=*/NULL_INDEX);
-        let nodes = bucket_table::new(1);
+        let nodes = table_with_length::new();
         let root_index = 1;
-        bucket_table::add(&mut nodes, root_index, root_node);
-        SmartTree {
+        table_with_length::add(&mut nodes, root_index, root_node);
+        BTreeMap {
             root_index: root_index,
             nodes: nodes,
-            entries: bucket_table::new(1),
             order: order,
             min_leaf_index: root_index,
             max_leaf_index: root_index,
@@ -97,34 +101,31 @@ module aptos_std::btree_map {
     }
 
     /// Destroys the tree if it's empty, otherwise aborts.
-    public fun destroy_empty<V>(tree: SmartTree<V>) {
-        let SmartTree { entries, nodes, root_index, order: _, min_leaf_index: _, max_leaf_index: _ } = tree;
-        assert!(bucket_table::length(&entries) == 0, E_TREE_NOT_EMPTY);
-        assert!(bucket_table::length(&nodes) == 1, E_TREE_NOT_EMPTY);
-        bucket_table::remove(&mut nodes, &root_index);
-        bucket_table::destroy_empty(nodes);
-        bucket_table::destroy_empty(entries);
+    public fun destroy_empty<V: copy + drop + store>(tree: BTreeMap<V>) {
+        let BTreeMap { nodes, root_index, order: _, min_leaf_index: _, max_leaf_index: _ } = tree;
+        aptos_std::debug::print(&nodes);
+        assert!(table_with_length::length(&nodes) == 1, E_TREE_NOT_EMPTY);
+        let Node { children, is_leaf: _, parent: _, prev: _, next: _ } = table_with_length::remove(&mut nodes, root_index);
+        assert!(vector::is_empty(&children), E_TREE_NOT_EMPTY);
+        vector::destroy_empty(children);
+        table_with_length::destroy_empty(nodes);
     }
 
     ///////////////
     // Modifiers //
     ///////////////
 
-    /// Inserts the key/value into the SmartTree.
+    /// Inserts the key/value into the BTreeMap.
     /// Aborts if the key is already in the tree.
-    public fun insert<V>(tree: &mut SmartTree<V>, key: u64, value: V) {
-        assert!(size(tree) < MAX_NUM_NODES, E_TREE_TOO_BIG);
-
-        bucket_table::add(&mut tree.entries, key, value);
-
+    public fun insert<V: copy + drop + store>(tree: &mut BTreeMap<V>, key: u64, value: V) {
         let leaf = find_leaf(tree, key);
 
         if (leaf == NULL_INDEX) {
             // In this case, the key is greater than all keys in the tree.
             leaf = tree.max_leaf_index;
-            let current = bucket_table::borrow(&tree.nodes, leaf).parent;
+            let current = table_with_length::borrow(&tree.nodes, leaf).parent;
             while (current != NULL_INDEX) {
-                let current_node = bucket_table::borrow_mut(&mut tree.nodes, current);
+                let current_node = table_with_length::borrow_mut(&mut tree.nodes, current);
                 let last_index = vector::length(&current_node.children) - 1;
                 let last_element = vector::borrow_mut(&mut current_node.children, last_index);
                 last_element.max_key = key;
@@ -132,31 +133,35 @@ module aptos_std::btree_map {
             }
         };
 
-        insert_at(tree, leaf, new_child(key, NULL_INDEX));
+        insert_at(tree, leaf, new_leaf_child(key, value));
     }
 
     /// If the key doesn't exist in the tree, inserts the key/value, and returns none.
     /// Otherwise updates the value under the given key, and returns the old value.
-    public fun upsert<V>(tree: &mut SmartTree<V>, key: u64, value: V): Option<V> {
-        if (!bucket_table::contains(&tree.entries, &key)) {
+    public fun upsert<V: copy + drop + store>(tree: &mut BTreeMap<V>, key: u64, value: V): Option<V> {
+        let iter = find(tree, key);
+        if (is_end_iter(tree, &iter)) {
             insert(tree, key, value);
             return option::none()
-        };
+        } else {
+            let node = table_with_length::borrow_mut(&mut tree.nodes, iter.node_index);
+            let children = &mut node.children;
 
-        let old_value = bucket_table::remove(&mut tree.entries, &key);
-        bucket_table::add(&mut tree.entries, key, value);
-        option::some(old_value)
+            let child = vector::borrow_mut(children, iter.child_index);
+            assert!(child.max_key == key, E_INTERNAL);
+            let old = child.value;
+            child.value = value;
+            option::some(old)
+        }
     }
 
-    /// Removes the entry from SmartTree and returns the value which `key` maps to.
+    /// Removes the entry from BTreeMap and returns the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun remove<V>(tree: &mut SmartTree<V>, key: u64): V {
-        let value = bucket_table::remove(&mut tree.entries, &key);
-        let leaf = find_leaf(tree, key);
-        assert!(leaf != NULL_INDEX, E_INTERNAL);
+    public fun remove<V: copy + drop + store>(tree: &mut BTreeMap<V>, key: u64): V {
+        let iter = find(tree, key);
+        assert!(!is_end_iter(tree, &iter), E_INTERNAL);
 
-        remove_at(tree, leaf, key);
-        value
+        remove_at(tree, iter.node_index, key).value
     }
 
     ///////////////
@@ -169,24 +174,24 @@ module aptos_std::btree_map {
     }
 
     // Returns true iff the iterator is a begin iterator.
-    public fun is_begin_iter<V>(tree: &SmartTree<V>, iter: &Iterator): bool {
+    public fun is_begin_iter<V: copy + drop + store>(tree: &BTreeMap<V>, iter: &Iterator): bool {
         (empty(tree) && iter.node_index == NULL_INDEX) || (iter.node_index == tree.min_leaf_index && iter.child_index == 0)
     }
 
     // Returns true iff the iterator is an end iterator.
-    public fun is_end_iter<V>(_tree: &SmartTree<V>, iter: &Iterator): bool {
+    public fun is_end_iter<V: copy + drop + store>(_tree: &BTreeMap<V>, iter: &Iterator): bool {
         iter.node_index == NULL_INDEX
     }
 
     /// Returns an iterator pointing to the first element that is greater or equal to the provided
     /// key, or an end iterator if such element doesn't exist.
-    public fun lower_bound<V>(tree: &SmartTree<V>, key: u64): Iterator {
+    public fun lower_bound<V: copy + drop + store>(tree: &BTreeMap<V>, key: u64): Iterator {
         let leaf = find_leaf(tree, key);
         if (leaf == NULL_INDEX) {
             return new_end_iter(tree)
         };
 
-        let node = bucket_table::borrow(&tree.nodes, leaf);
+        let node = table_with_length::borrow(&tree.nodes, leaf);
         assert!(node.is_leaf, E_INTERNAL);
 
         let keys = &node.children;
@@ -205,22 +210,36 @@ module aptos_std::btree_map {
             };
         };
 
-        new_iter(leaf, l, vector::borrow(keys, l).max_key)
+        if (l == len) {
+            new_end_iter(tree)
+        } else {
+            new_iter(leaf, l, vector::borrow(keys, l).max_key)
+        }
     }
 
     /// Returns an iterator pointing to the element that equals to the provided key, or an end
     /// iterator if the key is not found.
-    public fun find<V>(tree: &SmartTree<V>, key: u64): Iterator {
-        if (!bucket_table::contains(&tree.entries, &key)) {
-            return new_end_iter(tree)
-        };
-
-        lower_bound(tree, key)
+    public fun find<V: copy + drop + store>(tree: &BTreeMap<V>, key: u64): Iterator {
+        let lower_bound = lower_bound(tree, key);
+        if (is_end_iter(tree, &lower_bound)) {
+            lower_bound
+        } else if (lower_bound.key == key) {
+            lower_bound
+        } else {
+            new_end_iter(tree)
+        }
     }
 
     /// Returns true iff the key exists in the tree.
-    public fun contains<V>(tree: &SmartTree<V>, key: u64): bool {
-        bucket_table::contains(&tree.entries, &key)
+    public fun contains<V: copy + drop + store>(tree: &BTreeMap<V>, key: u64): bool {
+        let lower_bound = lower_bound(tree, key);
+        if (is_end_iter(tree, &lower_bound)) {
+            false
+        } else if (lower_bound.key == key) {
+            true
+        } else {
+            false
+        }
     }
 
     /// Returns the key of the given iterator.
@@ -230,45 +249,89 @@ module aptos_std::btree_map {
     }
 
     /// Returns a reference to the element with its key, aborts if the key is not found.
-    public fun borrow<V>(tree: &SmartTree<V>, key: u64): &V {
-        bucket_table::borrow(&tree.entries, key)
+    public fun borrow<V: copy + drop + store>(tree: &BTreeMap<V>, key: u64): &V {
+        let iter = find(tree, key);
+
+        assert!(is_end_iter(tree, &iter), E_INVALID_PARAMETER);
+        let children = &table_with_length::borrow(&tree.nodes, iter.node_index).children;
+        &vector::borrow(children, iter.child_index).value
     }
 
     /// Returns a mutable reference to the element with its key at the given index, aborts if the key is not found.
-    public fun borrow_mut<V>(tree: &mut SmartTree<V>, key: u64): &mut V {
-        bucket_table::borrow_mut(&mut tree.entries, key)
+    public fun borrow_mut<V: copy + drop + store>(tree: &mut BTreeMap<V>, key: u64): &mut V {
+        let iter = find(tree, key);
+
+        assert!(is_end_iter(tree, &iter), E_INVALID_PARAMETER);
+        let children = &mut table_with_length::borrow_mut(&mut tree.nodes, iter.node_index).children;
+        &mut vector::borrow_mut(children, iter.child_index).value
     }
 
-    /// Returns the number of elements in the SmartTree.
-    public fun size<V>(tree: &SmartTree<V>): u64 {
-        bucket_table::length(&tree.entries)
+    // /// Returns the number of elements in the BTreeMap.
+    public fun size<V: copy + drop + store>(tree: &BTreeMap<V>): u64 {
+        size_for_node(tree, tree.root_index)
     }
 
-    /// Returns true iff the SmartTree is empty.
-    public fun empty<V>(tree: &SmartTree<V>): bool {
-        bucket_table::length(&tree.entries) == 0
+    fun size_for_node<V: copy + drop + store>(tree: &BTreeMap<V>, node_index: u64): u64 {
+        let node = table_with_length::borrow(&tree.nodes, node_index);
+        if (node.is_leaf) {
+            vector::length(&node.children)
+        } else {
+            let size = 0;
+
+            for (i in 0..vector::length(&node.children)) {
+                size = size + size_for_node(tree, node.children[i].node_index);
+            };
+            size
+        }
+    }
+
+    #[test_only]
+    fun print_tree<V: copy + drop + store>(tree: &BTreeMap<V>) {
+        aptos_std::debug::print(tree);
+        print_tree_for_node(tree, tree.root_index, 0);
+    }
+
+    #[test_only]
+    fun print_tree_for_node<V: copy + drop + store>(tree: &BTreeMap<V>, node_index: u64, level: u64) {
+        let node = table_with_length::borrow(&tree.nodes, node_index);
+
+        aptos_std::debug::print(&level);
+        aptos_std::debug::print(node);
+
+        if (!node.is_leaf) {
+            for (i in 0..vector::length(&node.children)) {
+                print_tree_for_node(tree, node.children[i].node_index, level + 1);
+            };
+        };
+    }
+
+    /// Returns true iff the BTreeMap is empty.
+    fun empty<V: copy + drop + store>(tree: &BTreeMap<V>): bool {
+        let node = table_with_length::borrow(&tree.nodes, tree.min_leaf_index);
+
+        vector::is_empty(&node.children)
     }
 
     /// Return the begin iterator.
-    public fun new_begin_iter<V>(tree: &SmartTree<V>): Iterator {
+    public fun new_begin_iter<V: copy + drop + store>(tree: &BTreeMap<V>): Iterator {
         if (empty(tree)) {
             return new_iter(NULL_INDEX, 0, 0)
         };
 
-        let node = bucket_table::borrow(&tree.nodes, tree.min_leaf_index);
+        let node = table_with_length::borrow(&tree.nodes, tree.min_leaf_index);
         let key = vector::borrow(&node.children, 0).max_key;
 
         new_iter(tree.min_leaf_index, 0, key)
     }
 
     /// Return the end iterator.
-    public fun new_end_iter<V>(_tree: &SmartTree<V>): Iterator {
+    public fun new_end_iter<V: copy + drop + store>(_tree: &BTreeMap<V>): Iterator {
         new_iter(NULL_INDEX, 0, 0)
     }
 
     /// Returns the next iterator, or none if already at the end iterator.
     /// Requires the tree is not changed after the input iterator is generated.
-    public fun next_iter<V>(tree: &SmartTree<V>, iter: Iterator): Option<Iterator> {
+    public fun next_iter<V: copy + drop + store>(tree: &BTreeMap<V>, iter: Iterator): Option<Iterator> {
         let node_index = iter.node_index;
         if (node_index == NULL_INDEX) {
             return option::none()
@@ -279,12 +342,12 @@ module aptos_std::btree_map {
 
     /// Returns the next iterator, aborts if already at the end iterator.
     /// Requires the tree is not changed after the input iterator is generated.
-    public fun next_iter_or_die<V>(tree: &SmartTree<V>, iter: Iterator): Iterator {
+    public fun next_iter_or_die<V: copy + drop + store>(tree: &BTreeMap<V>, iter: Iterator): Iterator {
         assert!(iter.node_index != NULL_INDEX, E_INVALID_PARAMETER);
 
         let node_index = iter.node_index;
 
-        let node = bucket_table::borrow(&tree.nodes, node_index);
+        let node = table_with_length::borrow(&tree.nodes, node_index);
         iter.child_index = iter.child_index + 1;
         if (iter.child_index < vector::length(&node.children)) {
             iter.key = vector::borrow(&node.children, iter.child_index).max_key;
@@ -293,7 +356,7 @@ module aptos_std::btree_map {
 
         let next_index = node.next;
         if (next_index != NULL_INDEX) {
-            let next_node = bucket_table::borrow(&tree.nodes, next_index);
+            let next_node = table_with_length::borrow(&tree.nodes, next_index);
             iter.node_index = next_index;
             iter.child_index = 0;
             iter.key = vector::borrow(&next_node.children, 0).max_key;
@@ -305,7 +368,7 @@ module aptos_std::btree_map {
 
     /// Returns the previous iterator, or none if already at the begin iterator.
     /// Requires the tree is not changed after the input iterator is generated.
-    public fun prev_iter<V>(tree: &SmartTree<V>, iter: Iterator): Option<Iterator> {
+    public fun prev_iter<V: copy + drop + store>(tree: &BTreeMap<V>, iter: Iterator): Option<Iterator> {
         if (iter.node_index == tree.min_leaf_index && iter.child_index == 0) {
             return option::none()
         };
@@ -315,7 +378,7 @@ module aptos_std::btree_map {
 
     /// Returns the previous iterator, aborts if already at the begin iterator.
     /// Requires the tree is not changed after the input iterator is generated.
-    public fun prev_iter_or_die<V>(tree: &SmartTree<V>, iter: Iterator): Iterator {
+    public fun prev_iter_or_die<V: copy + drop + store>(tree: &BTreeMap<V>, iter: Iterator): Iterator {
         let node_index = iter.node_index;
 
         let prev_index;
@@ -323,7 +386,7 @@ module aptos_std::btree_map {
         if (node_index == NULL_INDEX) {
             prev_index = tree.max_leaf_index;
         } else {
-            let node = bucket_table::borrow(&tree.nodes, node_index);
+            let node = table_with_length::borrow(&tree.nodes, node_index);
             if (iter.child_index >= 1) {
                 iter.child_index = iter.child_index - 1;
                 iter.key = vector::borrow(&node.children, iter.child_index).max_key;
@@ -334,7 +397,7 @@ module aptos_std::btree_map {
 
         assert!(prev_index != NULL_INDEX, E_INTERNAL);
 
-        let prev_node = bucket_table::borrow(&tree.nodes, prev_index);
+        let prev_node = table_with_length::borrow(&tree.nodes, prev_index);
         let len = vector::length(&prev_node.children);
         iter.node_index = prev_index;
         iter.child_index = len - 1;
@@ -346,8 +409,8 @@ module aptos_std::btree_map {
     // Internal Implementations //
     //////////////////////////////
 
-    fun new_node(is_leaf: bool, parent: u64): Node {
-        Node {
+    fun new_node<V: copy + drop + store>(is_leaf: bool, parent: u64): Node<V> {
+        Node<V> {
             is_leaf: is_leaf,
             parent: parent,
             children: vector::empty(),
@@ -356,10 +419,17 @@ module aptos_std::btree_map {
         }
     }
 
-    fun new_child(max_key: u64, node_index: u64): Child {
-        Child {
+    fun new_inner_child<V: copy + drop + store>(max_key: u64, node_index: u64): Child<V> {
+        Child::Inner {
             max_key: max_key,
             node_index: node_index,
+        }
+    }
+
+    fun new_leaf_child<V: copy + drop + store>(max_key: u64, value: V): Child<V> {
+        Child::Leaf {
+            max_key: max_key,
+            value: value,
         }
     }
 
@@ -371,10 +441,10 @@ module aptos_std::btree_map {
         }
     }
 
-    fun find_leaf<V>(tree: &SmartTree<V>, key: u64): u64 {
+    fun find_leaf<V: copy + drop + store>(tree: &BTreeMap<V>, key: u64): u64 {
         let current = tree.root_index;
         while (current != NULL_INDEX) {
-            let node = bucket_table::borrow(&tree.nodes, current);
+            let node = table_with_length::borrow(&tree.nodes, current);
             if (node.is_leaf) {
                 return current
             };
@@ -400,34 +470,39 @@ module aptos_std::btree_map {
         NULL_INDEX
     }
 
-    fun insert_at<V>(tree: &mut SmartTree<V>, node_index: u64, child: Child) {
-        let node = bucket_table::remove(&mut tree.nodes, &node_index);
-        let parent_index = node.parent;
-        let children = &mut node.children;
-        let is_leaf = &mut node.is_leaf;
-        let next = &mut node.next;
-        let prev = &mut node.prev;
-        let current_size = vector::length(children);
-        let key = child.max_key;
+    fun insert_at<V: copy + drop + store>(tree: &mut BTreeMap<V>, node_index: u64, child: Child<V>) {
+        let current_size = {
+            let node = table_with_length::borrow_mut(&mut tree.nodes, node_index);
+            let children = &mut node.children;
+            let current_size = vector::length(children);
+            let key = child.max_key;
 
-        if (current_size < (tree.order as u64)) {
-            // Do not need to split.
-            let i = current_size;
-            vector::push_back(children, new_child(0, 0));
-            while (i > 0) {
-                let previous_child = vector::borrow(children, i - 1);
-                if (previous_child.max_key < key) {
-                    break
+            if (current_size < (tree.order as u64)) {
+                // Do not need to split.
+                let i = current_size;
+                vector::push_back(children, new_inner_child(0, 0));
+                while (i > 0) {
+                    let previous_child = vector::borrow(children, i - 1);
+                    if (previous_child.max_key < key) {
+                        break
+                    };
+                    *vector::borrow_mut(children, i) = *previous_child;
+                    i = i - 1;
                 };
-                *vector::borrow_mut(children, i) = *previous_child;
-                i = i - 1;
+                *vector::borrow_mut(children, i) = child;
+                return
             };
-            *vector::borrow_mut(children, i) = child;
-            bucket_table::add(&mut tree.nodes, node_index, node);
-            return
+            current_size
         };
 
         // # of children in the current node exceeds the threshold, need to split into two nodes.
+        let node = table_with_length::remove(&mut tree.nodes, node_index);
+        let parent_index = node.parent;
+        let is_leaf = &mut node.is_leaf;
+        let next = &mut node.next;
+        let prev = &mut node.prev;
+        let children = &mut node.children;
+        let key = child.max_key;
 
         let target_size = ((tree.order as u64) + 1) / 2;
 
@@ -442,11 +517,11 @@ module aptos_std::btree_map {
             };
         };
 
-        let left_node_index = bucket_table::length(&tree.nodes) + 2;
+        let left_node_index = table_with_length::length(&tree.nodes) + 2;
 
         if (parent_index == NULL_INDEX) {
             // Splitting root now, need to create a new root.
-            parent_index = bucket_table::length(&tree.nodes) + 3;
+            parent_index = table_with_length::length(&tree.nodes) + 3;
             node.parent = parent_index;
 
             tree.root_index = parent_index;
@@ -455,8 +530,8 @@ module aptos_std::btree_map {
             if (max_element < key) {
                 max_element = key;
             };
-            vector::push_back(&mut parent_node.children, new_child(max_element, node_index));
-            bucket_table::add(&mut tree.nodes, parent_index, parent_node);
+            vector::push_back(&mut parent_node.children, new_inner_child(max_element, node_index));
+            table_with_length::add(&mut tree.nodes, parent_index, parent_node);
         };
 
         let right_node = new_node(*is_leaf, parent_index);
@@ -465,7 +540,7 @@ module aptos_std::btree_map {
         *next = node_index;
         right_node.prev = left_node_index;
         if (*prev != NULL_INDEX) {
-            bucket_table::borrow_mut(&mut tree.nodes, *prev).next = left_node_index;
+            table_with_length::borrow_mut(&mut tree.nodes, *prev).next = left_node_index;
         };
 
         if (l < target_size) {
@@ -507,27 +582,27 @@ module aptos_std::btree_map {
         if (!*is_leaf) {
             let i = 0;
             while (i < target_size) {
-                bucket_table::borrow_mut(&mut tree.nodes, vector::borrow(children, i).node_index).parent = left_node_index;
+                table_with_length::borrow_mut(&mut tree.nodes, vector::borrow(children, i).node_index).parent = left_node_index;
                 i = i + 1;
             };
         };
 
         let split_key = vector::borrow(children, target_size - 1).max_key;
 
-        bucket_table::add(&mut tree.nodes, left_node_index, node);
-        bucket_table::add(&mut tree.nodes, node_index, right_node);
+        table_with_length::add(&mut tree.nodes, left_node_index, node);
+        table_with_length::add(&mut tree.nodes, node_index, right_node);
         if (node_index == tree.min_leaf_index) {
             tree.min_leaf_index = left_node_index;
         };
-        insert_at(tree, parent_index, new_child(split_key, left_node_index));
+        insert_at(tree, parent_index, new_inner_child(split_key, left_node_index));
     }
 
-    fun update_key<V>(tree: &mut SmartTree<V>, node_index: u64, old_key: u64, new_key: u64) {
+    fun update_key<V: copy + drop + store>(tree: &mut BTreeMap<V>, node_index: u64, old_key: u64, new_key: u64) {
         if (node_index == NULL_INDEX) {
             return
         };
 
-        let node = bucket_table::borrow_mut(&mut tree.nodes, node_index);
+        let node = table_with_length::borrow_mut(&mut tree.nodes, node_index);
         let keys = &mut node.children;
         let current_size = vector::length(keys);
 
@@ -551,71 +626,94 @@ module aptos_std::btree_map {
         };
     }
 
-    fun remove_at<V>(tree: &mut SmartTree<V>, node_index: u64, key: u64) {
-        let node = bucket_table::remove(&mut tree.nodes, &node_index);
+    fun remove_at<V: copy + drop + store>(tree: &mut BTreeMap<V>, node_index: u64, key: u64): Child<V> {
+        let (old_child, current_size, max_key_updated, big_enough) = {
+            let node = table_with_length::borrow_mut(&mut tree.nodes, node_index);
+
+            let children = &mut node.children;
+            let current_size = vector::length(children);
+
+            if (current_size == 1) {
+                // Remove the only element at root node.
+                assert!(node_index == tree.root_index, E_INTERNAL);
+                assert!(key == vector::borrow(children, 0).max_key, E_INTERNAL);
+                return vector::pop_back(children);
+            };
+
+            let prev = node.prev;
+            let next = node.next;
+            let parent = node.parent;
+            let is_leaf = node.is_leaf;
+
+            let l = 0;
+            let r = current_size;
+
+            while (l != r) {
+                let mid = l + (r - l) / 2;
+                if (vector::borrow(children, mid).max_key < key) {
+                    l = mid + 1;
+                } else {
+                    r = mid;
+                };
+            };
+
+            current_size = current_size - 1;
+
+            let max_key_updated = l == current_size;
+
+            while (l < current_size) {
+                *vector::borrow_mut(children, l) = *vector::borrow(children, l + 1);
+                l = l + 1;
+            };
+            let old_child = vector::pop_back(children);
+
+            let big_enough = current_size * 2 >= (tree.order as u64);
+            if (!max_key_updated && big_enough) {
+                return old_child;
+            };
+
+            if (!big_enough && node_index == tree.root_index) {
+                if (current_size == 1 && !is_leaf) {
+                    tree.root_index = vector::borrow(children, 0).node_index;
+                    table_with_length::borrow_mut(&mut tree.nodes, tree.root_index).parent = NULL_INDEX;
+                    table_with_length::remove(&mut tree.nodes, node_index);
+                } else {
+                    // nothing to change
+                };
+                return old_child;
+            };
+
+            (old_child, current_size, max_key_updated, big_enough)
+        };
+
+        // We need to update tree beyond the current node
+
+        let node = table_with_length::remove(&mut tree.nodes, node_index);
+
         let prev = node.prev;
         let next = node.next;
         let parent = node.parent;
         let is_leaf = node.is_leaf;
 
         let children = &mut node.children;
-        let current_size = vector::length(children);
 
-        if (current_size == 1) {
-            // Remove the only element at root node.
-            assert!(node_index == tree.root_index, E_INTERNAL);
-            assert!(key == vector::borrow(children, 0).max_key, E_INTERNAL);
-            vector::pop_back(children);
-            bucket_table::add(&mut tree.nodes, node_index, node);
-            return
+        if (max_key_updated) {
+            update_key(tree, parent, key, vector::borrow(children, current_size - 1).max_key);
+
+            if (big_enough) {
+                return old_child;
+            }
         };
 
-        let l = 0;
-        let r = current_size;
 
-        while (l != r) {
-            let mid = l + (r - l) / 2;
-            if (vector::borrow(children, mid).max_key < key) {
-                l = mid + 1;
-            } else {
-                r = mid;
-            };
-        };
+        // Children size is below threshold, we need to rebalance
 
-        current_size = current_size - 1;
-
-        if (l == current_size) {
-            update_key(tree, parent, key, vector::borrow(children, l - 1).max_key);
-        };
-
-        while (l < current_size) {
-            *vector::borrow_mut(children, l) = *vector::borrow(children, l + 1);
-            l = l + 1;
-        };
-        vector::pop_back(children);
-
-        if (current_size * 2 >= (tree.order as u64)) {
-            bucket_table::add(&mut tree.nodes, node_index, node);
-            return
-        };
-
-        if (node_index == tree.root_index) {
-            if (current_size == 1 && !is_leaf) {
-                tree.root_index = vector::borrow(children, 0).node_index;
-                bucket_table::borrow_mut(&mut tree.nodes, tree.root_index).parent = NULL_INDEX;
-            } else {
-                bucket_table::add(&mut tree.nodes, node_index, node);
-            };
-            return
-        };
-
-        // Children size is below threshold.
 
         let brother_index = next;
-        if (brother_index == NULL_INDEX || bucket_table::borrow(&tree.nodes, brother_index).parent != parent) {
+        if (brother_index == NULL_INDEX || table_with_length::borrow(&tree.nodes, brother_index).parent != parent) {
             brother_index = prev;
         };
-        let brother_node = bucket_table::remove(&mut tree.nodes, &brother_index);
+        let brother_node = table_with_length::remove(&mut tree.nodes, brother_index);
         let brother_children = &mut brother_node.children;
         let brother_size = vector::length(brother_children);
 
@@ -625,8 +723,8 @@ module aptos_std::btree_map {
             if (brother_index == next) {
                 let borrowed_element = *vector::borrow(brother_children, 0);
                 vector::push_back(children, borrowed_element);
-                if (borrowed_element.node_index != NULL_INDEX) {
-                    bucket_table::borrow_mut(&mut tree.nodes, borrowed_element.node_index).parent = node_index;
+                if (borrowed_element is Child::Inner<V>) {
+                    table_with_length::borrow_mut(&mut tree.nodes, borrowed_element.node_index).parent = node_index;
                 };
                 let i = 0;
                 while (i < brother_size) {
@@ -642,16 +740,16 @@ module aptos_std::btree_map {
                     i = i - 1;
                 };
                 let borrowed_element = vector::pop_back(brother_children);
-                if (borrowed_element.node_index != NULL_INDEX) {
-                    bucket_table::borrow_mut(&mut tree.nodes, borrowed_element.node_index).parent = node_index;
+                if (borrowed_element is Child::Inner<V>) {
+                    table_with_length::borrow_mut(&mut tree.nodes, borrowed_element.node_index).parent = node_index;
                 };
                 *vector::borrow_mut(children, 0) = borrowed_element;
                 update_key(tree, parent, vector::borrow(children, 0).max_key, vector::borrow(brother_children, brother_size - 1).max_key);
             };
 
-            bucket_table::add(&mut tree.nodes, node_index, node);
-            bucket_table::add(&mut tree.nodes, brother_index, brother_node);
-            return
+            table_with_length::add(&mut tree.nodes, node_index, node);
+            table_with_length::add(&mut tree.nodes, brother_index, brother_node);
+            return old_child;
         };
 
         // The brother node doesn't have enough elements to borrow, merge with the brother node.
@@ -660,7 +758,7 @@ module aptos_std::btree_map {
                 let len = vector::length(children);
                 let i = 0;
                 while (i < len) {
-                    bucket_table::borrow_mut(&mut tree.nodes, vector::borrow(children, i).node_index).parent = brother_index;
+                    table_with_length::borrow_mut(&mut tree.nodes, vector::borrow(children, i).node_index).parent = brother_index;
                     i = i + 1;
                 };
             };
@@ -671,13 +769,13 @@ module aptos_std::btree_map {
             move children;
 
             if (node.next != NULL_INDEX) {
-                bucket_table::borrow_mut(&mut tree.nodes, node.next).prev = brother_index;
+                table_with_length::borrow_mut(&mut tree.nodes, node.next).prev = brother_index;
             };
             if (node.prev != NULL_INDEX) {
-                bucket_table::borrow_mut(&mut tree.nodes, node.prev).next = brother_index;
+                table_with_length::borrow_mut(&mut tree.nodes, node.prev).next = brother_index;
             };
 
-            bucket_table::add(&mut tree.nodes, brother_index, node);
+            table_with_length::add(&mut tree.nodes, brother_index, node);
             if (tree.min_leaf_index == node_index) {
                 tree.min_leaf_index = brother_index;
             };
@@ -690,7 +788,7 @@ module aptos_std::btree_map {
                 let len = vector::length(brother_children);
                 let i = 0;
                 while (i < len) {
-                    bucket_table::borrow_mut(&mut tree.nodes, vector::borrow(brother_children, i).node_index).parent = node_index;
+                    table_with_length::borrow_mut(&mut tree.nodes, vector::borrow(brother_children, i).node_index).parent = node_index;
                     i = i + 1;
                 };
             };
@@ -701,13 +799,13 @@ module aptos_std::btree_map {
             move brother_children;
 
             if (brother_node.next != NULL_INDEX) {
-                bucket_table::borrow_mut(&mut tree.nodes, brother_node.next).prev = node_index;
+                table_with_length::borrow_mut(&mut tree.nodes, brother_node.next).prev = node_index;
             };
             if (brother_node.prev != NULL_INDEX) {
-                bucket_table::borrow_mut(&mut tree.nodes, brother_node.prev).next = node_index;
+                table_with_length::borrow_mut(&mut tree.nodes, brother_node.prev).next = node_index;
             };
 
-            bucket_table::add(&mut tree.nodes, node_index, brother_node);
+            table_with_length::add(&mut tree.nodes, node_index, brother_node);
             if (tree.min_leaf_index == brother_index) {
                 tree.min_leaf_index = node_index;
             };
@@ -715,7 +813,8 @@ module aptos_std::btree_map {
             if (parent != NULL_INDEX) {
                 remove_at(tree, parent, key_to_remove);
             };
-        }
+        };
+        old_child
     }
 
     ///////////
@@ -723,7 +822,7 @@ module aptos_std::btree_map {
     ///////////
 
     #[test_only]
-    fun destroy<V: drop>(tree: SmartTree<V>) {
+    fun destroy<V: drop + copy + store>(tree: BTreeMap<V>) {
         let it = new_begin_iter(&tree);
         while (!is_end_iter(&tree, &it)) {
             remove(&mut tree, it.key);
@@ -736,8 +835,8 @@ module aptos_std::btree_map {
     }
 
     #[test_only]
-    fun validate_iteration<V>(tree: &SmartTree<V>) {
-        let expected_num_elements = bucket_table::length(&tree.entries);
+    fun validate_iteration<V: drop + copy + store>(tree: &BTreeMap<V>) {
+        let expected_num_elements = size(tree);
         let num_elements = 0;
         let it = new_begin_iter(tree);
         while (!is_end_iter(tree, &it)) {
@@ -764,8 +863,8 @@ module aptos_std::btree_map {
     }
 
     #[test_only]
-    fun validate_subtree<V>(tree: &SmartTree<V>, node_index: u64, expected_max_key: Option<u64>, expected_parent: u64) {
-        let node = bucket_table::borrow(&tree.nodes, node_index);
+    fun validate_subtree<V: drop + copy + store>(tree: &BTreeMap<V>, node_index: u64, expected_max_key: Option<u64>, expected_parent: u64) {
+        let node = table_with_length::borrow(&tree.nodes, node_index);
         let len = vector::length(&node.children);
         assert!(len <= (tree.order as u64), E_INTERNAL);
         assert!(len * 2 >= (tree.order as u64) || node_index == tree.root_index, E_INTERNAL);
@@ -789,7 +888,7 @@ module aptos_std::btree_map {
             let i = 0;
             while (i < len) {
                 let child = vector::borrow(&node.children, i);
-                assert!(child.node_index == NULL_INDEX, E_INTERNAL);
+                assert!((child is Child::Leaf<V>), E_INTERNAL);
                 i = i + 1;
             };
         };
@@ -801,7 +900,7 @@ module aptos_std::btree_map {
     }
 
     #[test_only]
-    fun validate_tree<V>(tree: &SmartTree<V>) {
+    fun validate_tree<V: drop + copy + store>(tree: &BTreeMap<V>) {
         validate_subtree(tree, tree.root_index, option::none(), NULL_INDEX);
         validate_iteration(tree);
     }
@@ -809,20 +908,23 @@ module aptos_std::btree_map {
     #[test]
     fun test_smart_tree() {
         let tree = new_with_order(5);
-        insert(&mut tree, 1, 1);
-        insert(&mut tree, 2, 2);
-        assert!(upsert(&mut tree, 3, 3) == option::none(), E_INTERNAL);
-        insert(&mut tree, 4, 4);
-        assert!(upsert(&mut tree, 4, 8) == option::some(4), E_INTERNAL);
-        insert(&mut tree, 5, 5);
-        insert(&mut tree, 6, 6);
+        print_tree(&tree);
+        insert(&mut tree, 1, 1); print_tree(&tree);
+        insert(&mut tree, 2, 2); print_tree(&tree);
+        let r1 = upsert(&mut tree, 3, 3); print_tree(&tree);
+        assert!(r1 == option::none(), E_INTERNAL);
+        insert(&mut tree, 4, 4); print_tree(&tree);
+        let r2 = upsert(&mut tree, 4, 8); print_tree(&tree);
+        assert!(r2 == option::some(4), E_INTERNAL);
+        insert(&mut tree, 5, 5); print_tree(&tree);
+        insert(&mut tree, 6, 6); print_tree(&tree);
 
-        remove(&mut tree, 5);
-        remove(&mut tree, 4);
-        remove(&mut tree, 1);
-        remove(&mut tree, 3);
-        remove(&mut tree, 2);
-        remove(&mut tree, 6);
+        remove(&mut tree, 5); print_tree(&tree);
+        remove(&mut tree, 4); print_tree(&tree);
+        remove(&mut tree, 1); print_tree(&tree);
+        remove(&mut tree, 3); print_tree(&tree);
+        remove(&mut tree, 2); print_tree(&tree);
+        remove(&mut tree, 6); print_tree(&tree);
 
         destroy_empty(tree);
     }
