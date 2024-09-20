@@ -34,6 +34,9 @@ proptest! {
             let hash = txn.hash();
             prop_assert_eq!(transaction_db.get_transaction(version as Version).unwrap(), txn);
             prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash).unwrap(), Some(version as Version));
+            if version > 0 {
+                prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash).unwrap(), None);
+            }
         }
 
         prop_assert!(transaction_db.get_transaction(num_txns as Version).is_err());
