@@ -1455,8 +1455,9 @@ module supra_framework::pbo_delegation_pool {
             / unlock_schedule.period_duration;
         let last_unlocked_period = unlock_schedule.last_unlock_period;
         let schedule_length = vector::length(&unlock_schedule.schedule);
+        let one = fixed_point64::create_from_rational(1,1);
         let cfraction = unlock_schedule.cumulative_unlocked_fraction;
-        while (last_unlocked_period < unlock_periods_passed) {
+        while (last_unlocked_period < unlock_periods_passed && fixed_point64::less(cfraction,one)) {
             let next_fraction = if (schedule_length <= last_unlocked_period) {
                 *vector::borrow(&unlock_schedule.schedule, schedule_length - 1)
             } else { *vector::borrow(&unlock_schedule.schedule, last_unlocked_period) };
@@ -5159,6 +5160,83 @@ module supra_framework::pbo_delegation_pool {
         let unlock_coin = can_principle_unlock(delegator_address, pool_address, 100 * ONE_APT);
         assert!(unlock_coin, 18);
     }
+
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    //Test that `last_unlock_period` increases only up to the point so as to allow
+    //cumulative fraction to become greater or equals one and not more than that
+    public entry fun test_stop_after_cfraction_one_success(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator :&signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        let principle_lockup_time = 7776000;  // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[1],
+            2,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        
+        // after 6 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        // after 7 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 8 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+let unlock_coin = can_principle_unlock(delegator_address, pool_address, (100 * ONE_APT));
+        assert!(unlock_coin, 11);
+        
+        let unlock_schedule = borrow_global<DelegationPool>(pool_address).principle_unlock_schedule;
+        let cfraction_upperbound = fixed_point64::create_from_rational(3,2);
+        assert!(fixed_point64::less(unlock_schedule.cumulative_unlocked_fraction,cfraction_upperbound) , unlock_schedule.last_unlock_period);
+
+
+    }
+
+
+
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 20, location = Self)]
