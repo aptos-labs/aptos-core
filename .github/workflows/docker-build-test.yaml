@@ -313,52 +313,11 @@ jobs:
       # Determine the IMAGE_TAG based on the latest release R and check for images built on branch R - 1:
       # - ex. For commits on the aptos-release-v1.19 branch, the IMAGE_TAG should be the latest commit built on aptos-release-v1.18
       # - For commits on the main branch, the IMAGE_TAG should be the latest commit on the max release aptos-release-v<MAX> branch
-      - name: Determine branch to fetch latest docker image tag from
-        id: determine-the-target-branch
-        run: |
-          # Determine the base branch (the branch we're merging into)
-          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
-            base_branch="${{ github.base_ref }}"
-          else
-            base_branch="${{ github.ref_name }}"
-          fi
-
-          if [[ $base_branch == "main" ]]; then
-            target_branch=$(git ls-remote --heads origin 'aptos-release-v*' | 
-                            grep -E 'refs/heads/aptos-release-v[0-9]+\.[0-9]+$' | 
-                            sed 's/.*refs\/heads\///' | 
-                            sort -t. -k2,2n -k3,3n | 
-                            tail -n 1)
-          elif [[ $base_branch =~ ^aptos-release-v([0-9]+)\.([0-9]+) ]]; then
-            major=${BASH_REMATCH[1]}
-            minor=${BASH_REMATCH[2]}
-
-            if [[ $minor -eq 0 ]]; then
-                # If the minor version is 0, look for the latest branch in the previous major version
-                prev_major=$((major - 1))
-                target_branch=$(git ls-remote --heads origin "aptos-release-v${prev_major}.*" | 
-                                grep -E "refs/heads/aptos-release-v${prev_major}\.[0-9]+$" | 
-                                sed 's/.*refs\/heads\///' | 
-                                sort -t. -k2,2n -k3,3n | 
-                                tail -n 1)
-            else
-                # If the minor version is greater than 0, look for the previous minor version
-                prev_minor=$((minor - 1))
-                target_branch="aptos-release-v${major}.${prev_minor}"
-            fi
-
-            # Now do the check whether the target branch exists, outside the if-else
-            if git ls-remote --heads origin "aptos-release-v${target_branch}" | grep -q "refs/heads/${target_branch}"; then
-                echo "Target branch is $target_branch"
-            else
-                echo "Branch $target_branch does not exist"
-            fi
-          else
-            echo "Not merging to main or a release branch, using the main branch for compat test" >&2
-            target_branch="main"
-          fi
-          echo "TARGET_BRANCH=${target_branch}" >> $GITHUB_OUTPUT
-          echo "Determined TARGET_BRANCH: ${target_branch}" >&2
+      - name: Determine target branch
+        uses: ./.github/actions/determine-branch-to-fetch-last-released-image
+        id: determine-target-branch
+        with:
+          base-branch: ${{ github.base_ref || github.ref_name }}
 
       # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
@@ -376,12 +335,12 @@ jobs:
         uses: ./.github/actions/get-latest-docker-image-tag
         id: get-docker-image-tag
         with:
-          branch: ${{ steps.determine-the-target-branch.outputs.TARGET_BRANCH }}
+          branch: ${{ steps.determine-target-branch.outputs.TARGET_BRANCH }}
           variants: "failpoints performance"
 
       - name: Log TARGET_BRANCH and IMAGE_TAG
         run: |
-          echo "TARGET_BRANCH: ${{ steps.determine-the-target-branch.outputs.TARGET_BRANCH }}"
+          echo "TARGET_BRANCH: ${{ steps.determine-target-branch.outputs.TARGET_BRANCH }}"
           echo "IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}"
 
       - name: Set IMAGE_TAG as job output

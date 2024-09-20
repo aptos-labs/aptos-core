@@ -1,0 +1,36 @@
+name: "Determine Branch to Fetch Latest Docker Image for Compat Test"
+description: |
+  Determine the branch to fetch the latest docker image tag from for the compat test
+
+inputs:
+  base-branch:
+    description: "The base branch to determine the target from"
+    required: true
+
+outputs:
+  TARGET_BRANCH:
+    description: "The determined target branch"
+    value: ${{ steps.determine-target-branch.outputs.TARGET_BRANCH }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.base-branch }}
+        path: checkout_branch
+        fetch-depth: 100
+
+    - uses: ./checkout_branch/.github/actions/python-setup
+      with:
+        pyproject_directory: checkout_branch/testsuite
+
+    - name: Determine target branch
+      id: determine-target-branch
+      run: |
+        base_branch="${{ inputs.base-branch }}"
+        target_branch=$(./testrun determine_target_branch_to_fetch_last_released_image.py "$base_branch")
+        echo "TARGET_BRANCH=${target_branch}" >> $GITHUB_OUTPUT
+        echo "Determined TARGET_BRANCH: ${target_branch}"
+      shell: bash
+      working-directory: checkout_branch/testsuite # the checkout_branch is a subdirectory

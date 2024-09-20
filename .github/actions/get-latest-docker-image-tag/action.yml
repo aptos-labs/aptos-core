@@ -35,6 +35,8 @@ runs:
         for variant in "${variants[@]}"; do
           variants_args+=("--variant" "$variant")
         done
-        ./testrun find_latest_image.py "${variants_args[@]}"
+        IMAGE_TAG=$(./testrun find_latest_image.py "${variants_args[@]}")
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "Latest image tag: $IMAGE_TAG"
       shell: bash
       working-directory: checkout_branch/testsuite # the checkout_branch is a subdirectory
