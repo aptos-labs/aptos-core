@@ -832,7 +832,7 @@ pub fn verify_committed_transactions(
                 .try_as_signed_user_txn()
                 .unwrap();
             let txn_with_proof = db
-                .get_transaction_by_hash(txn_to_commit.transaction().hash(), true)
+                .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
                 .unwrap()
                 .unwrap();
             assert_eq!(

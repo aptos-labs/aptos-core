@@ -125,13 +125,14 @@ impl DbReader for AptosDB {
     fn get_transaction_by_hash(
         &self,
         hash: HashValue,
+        ledger_version: Version,
         fetch_events: bool,
     ) -> Result<Option<TransactionWithProof>> {
         gauged_api("get_transaction_by_hash", || {
             self.ledger_db
                 .transaction_db()
                 .get_transaction_version_by_hash(&hash)?
-                .map(|v| self.get_transaction_with_proof(v, v, fetch_events))
+                .map(|v| self.get_transaction_with_proof(v, ledger_version, fetch_events))
                 .transpose()
         })
     }
