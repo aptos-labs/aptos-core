@@ -50,7 +50,7 @@ jobs:
       BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
       BRANCH_HASH: ${{ steps.hash-branch.outputs.BRANCH_HASH }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Determine branch based on cadence
         id: determine-test-branch
