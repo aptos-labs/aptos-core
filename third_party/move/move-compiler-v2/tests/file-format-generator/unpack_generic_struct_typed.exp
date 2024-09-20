@@ -1,0 +1,64 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.m {
+use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+
+
+struct E<Ty0> has copy, drop, store {
+	key: Ty0
+}
+struct Option<Ty0> has copy, drop, store {
+	vec: vector<Ty0>
+}
+
+public destroy_none<Ty0>(Arg0: Option<Ty0>) /* def_idx: 0 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: Option<Ty0>)
+	1: Call is_none<Ty0>(&Option<Ty0>): bool
+	2: BrFalse(4)
+B1:
+	3: Branch(6)
+B2:
+	4: LdU64(262144)
+	5: Abort
+B3:
+	6: MoveLoc[0](Arg0: Option<Ty0>)
+	7: UnpackGeneric[0](Option<Ty0>)
+	8: VecUnpack(2, 0)
+	9: Ret
+}
+public foo<Ty0: drop + store>(Arg0: E<Ty0>, Arg1: &mut Ty0) /* def_idx: 1 */ {
+L2:	loc0: E<Ty0>
+L3:	loc1: Ty0
+L4:	loc2: E<Ty0>
+L5:	loc3: E<Ty0>
+L6:	loc4: u64
+B0:
+	0: MoveLoc[0](Arg0: E<Ty0>)
+	1: StLoc[2](loc0: E<Ty0>)
+	2: MoveLoc[2](loc0: E<Ty0>)
+	3: UnpackGeneric[1](E<Ty0>)
+	4: StLoc[3](loc1: Ty0)
+	5: MoveLoc[3](loc1: Ty0)
+	6: PackGeneric[1](E<Ty0>)
+	7: StLoc[4](loc2: E<Ty0>)
+	8: MoveLoc[4](loc2: E<Ty0>)
+	9: StLoc[5](loc3: E<Ty0>)
+	10: MoveLoc[5](loc3: E<Ty0>)
+	11: UnpackGeneric[1](E<Ty0>)
+	12: LdU64(3)
+	13: StLoc[6](loc4: u64)
+	14: MoveLoc[1](Arg1: &mut Ty0)
+	15: WriteRef
+	16: Ret
+}
+public is_none<Ty0>(Arg0: &Option<Ty0>): bool /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](Arg0: &Option<Ty0>)
+	1: ImmBorrowFieldGeneric[0](Option.vec: vector<Ty0>)
+	2: Call vector::is_empty<Ty0>(&vector<Ty0>): bool
+	3: Ret
+}
+}
+============ bytecode verification succeeded ========
