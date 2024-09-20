@@ -14,7 +14,7 @@ runs:
     # rust-cache action will cache ~/.cargo and ./target
     # https://github.com/Swatinem/rust-cache#cache-details
     - name: Run cargo cache
-      uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
+      uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # pin@v2.7.3
 
     - name: install related tools and prover dependencies
       shell: bash
