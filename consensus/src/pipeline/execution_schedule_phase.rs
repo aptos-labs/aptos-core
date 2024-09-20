@@ -135,6 +135,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             }
             let results = itertools::zip_eq(ordered_blocks, results)
                 .map(|(block, res)| {
+                    info!("[debug] set_execution_result: block id {}, block {:?}, res {:?}", block.id(), block, res);
                     Ok(block.set_execution_result(res?))
                 })
                 .collect::<ExecutorResult<Vec<_>>>()?;
