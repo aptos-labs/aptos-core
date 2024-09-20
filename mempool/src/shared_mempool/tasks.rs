@@ -464,7 +464,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
             sequence_info,
             timeline_state,
             client_submitted,
-            ready_time_at_sender,
+            read_time_at_sender,
             priority,
         );
         statuses.push((transaction, (mempool_status, None)));
