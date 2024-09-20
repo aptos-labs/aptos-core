@@ -19,7 +19,7 @@ runs:
       with:
         ref: ${{ inputs.base-branch }}
         path: checkout_branch
-        fetch-depth: 100
+        fetch-depth: 0
 
     - uses: ./checkout_branch/.github/actions/python-setup
       with:
