@@ -86,9 +86,9 @@ on:
 
 jobs:
   prepare:
-    runs-on: "runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,spot=false"
+    runs-on: ${{ inputs.RUNS_ON }}
     outputs:
-      jobs_ids: ${{ steps.gen-jobs.outputs.job_ids }}
+      job_ids: ${{ steps.gen-jobs.outputs.job_ids }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
           path: |
             aptos-debugger
             testsuite/replay_verify.py
-          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+          key: aptos-debugger-ee4ecab92c937d27426acce2c8e9e3da88f94c53 #aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
 
       - name: Prepare for build if not cached
         if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
@@ -151,10 +151,14 @@ jobs:
             \
             --max-ranges-per-job 16 \
             --output-json-file jobs.json \
-          
-          JOB_IDS=`jq 'length as $N | [range(0; $N)]' jobs.json`
-          
-          echo "jobs_ids=$JOB_IDS" >> $GITHUB_OUTPUT
+
+
+          jq -c 'length as $N | [range(0; $N)]' jobs.json > job_ids.json
+
+          cat job_ids.json
+          jq . jobs.json
+
+          echo "job_ids=$(cat job_ids.json)" >> $GITHUB_OUTPUT
 
       - name: Cache backup storage config and job definition
         uses: actions/cache/save@v4
@@ -171,7 +175,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        job_id: ${{ fromJson(steps.prepare.outputs.job_ids) }}
+        job_id: ${{ fromJson(needs.prepare.outputs.job_ids) }}
     steps:
       - name: Load cached aptos-debugger binary and replay_verify.py script
         uses: actions/cache/restore@v4
@@ -179,7 +183,7 @@ jobs:
           path: |
             aptos-debugger
             testsuite/replay_verify.py
-          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+          key: aptos-debugger-ee4ecab92c937d27426acce2c8e9e3da88f94c53 #aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
           fail-on-cache-miss: true
 
       - name: Load cached backup storage metadata cache dir

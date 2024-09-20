@@ -12,7 +12,7 @@ use aptos_backup_cli::{
 use aptos_logger::info;
 use aptos_types::transaction::Version;
 use clap::Parser;
-use itertools::{zip_eq, Itertools};
+use itertools::Itertools;
 use std::{
     io::Write,
     iter::{once, zip},
@@ -50,14 +50,14 @@ pub struct Opt {
         value_delimiter = ' '
     )]
     ranges_to_skip: Vec<String>,
-    #[clap(long, help = "Output job ranges to json files, evenly distributed.")]
-    output_json_files: Vec<PathBuf>,
+    #[clap(long, help = "Maximum ranges per job.")]
+    max_ranges_per_job: u64,
+    #[clap(long, help = "Output json file containing the jobs.")]
+    output_json_file: PathBuf,
 }
 
 impl Opt {
     pub async fn run(self) -> anyhow::Result<()> {
-        assert!(!self.output_json_files.is_empty());
-
         let storage = self.storage.init_storage().await?;
         let metadata_view = sync_and_load(
             &self.metadata_cache_opt,
@@ -180,29 +180,20 @@ impl Opt {
             })
             .collect_vec();
 
-        info!(
-            "Generated {} jobs. Now distribute them evenly between outputs.",
-            job_ranges.len()
-        );
+        let num_jobs = (job_ranges.len() as f32 / self.max_ranges_per_job as f32).ceil() as usize;
+        let mut jobs = vec![vec![]; num_jobs];
 
-        let mut outputs = vec![vec![]; self.output_json_files.len()];
         let mut job_idx = -1;
-        zip(job_ranges, (0..self.output_json_files.len()).cycle()).for_each(
+        zip(job_ranges, (0..num_jobs).cycle()).for_each(
             |((partial, first, last, desc), output_idx)| {
                 job_idx += 1;
                 let suffix = if partial { "-partial" } else { "" };
                 let job = format!("{output_idx}-{job_idx}{suffix} {first} {last} {desc}");
-                outputs[output_idx].push(job);
+                jobs[output_idx].push(job);
             },
         );
 
-        zip_eq(self.output_json_files.iter(), outputs.into_iter()).try_for_each(
-            |(path, jobs)| {
-                info!("Writing to {:?}", path);
-                info!("{}", serde_json::to_string_pretty(&jobs)?);
-                std::fs::File::create(path)?.write_all(&serde_json::to_vec(&jobs)?)
-            },
-        )?;
+        std::fs::File::create(self.output_json_file)?.write_all(&serde_json::to_vec(&jobs)?)?;
 
         Ok(())
     }
