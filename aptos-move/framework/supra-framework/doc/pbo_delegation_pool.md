@@ -3698,8 +3698,9 @@ accurate as time passes
         / unlock_schedule.period_duration;
     <b>let</b> last_unlocked_period = unlock_schedule.last_unlock_period;
     <b>let</b> schedule_length = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&unlock_schedule.schedule);
+    <b>let</b> one = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_rational">fixed_point64::create_from_rational</a>(1,1);
     <b>let</b> cfraction = unlock_schedule.cumulative_unlocked_fraction;
-    <b>while</b> (last_unlocked_period &lt; unlock_periods_passed) {
+    <b>while</b> (last_unlocked_period &lt; unlock_periods_passed && <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_less">fixed_point64::less</a>(cfraction,one)) {
         <b>let</b> next_fraction = <b>if</b> (schedule_length &lt;= last_unlocked_period) {
             *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&unlock_schedule.schedule, schedule_length - 1)
         } <b>else</b> { *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&unlock_schedule.schedule, last_unlocked_period) };
