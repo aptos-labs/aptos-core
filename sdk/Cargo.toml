@@ -26,6 +26,7 @@ ed25519-dalek-bip32 = { workspace = true }
 hex = { workspace = true }
 move-core-types = { workspace = true }
 rand_core = { workspace = true }
+rand = { workspace = true }
 serde_json = { workspace = true }
 tiny-bip39 = { workspace = true }
 

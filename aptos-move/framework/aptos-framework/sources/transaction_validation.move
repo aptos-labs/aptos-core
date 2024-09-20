@@ -494,8 +494,8 @@ module aptos_framework::transaction_validation {
         };
 
         // Increment sequence number
-        let addr = signer::address_of(&account);
-        account::increment_sequence_number(addr);
+        // let addr = signer::address_of(&account);
+        // account::increment_sequence_number(addr);
     }
 
     inline fun skip_auth_key_check(is_simulation: bool, auth_key: &vector<u8>): bool {

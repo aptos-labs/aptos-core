@@ -929,8 +929,8 @@ Called by the Adapter
     };
 
     // Increment sequence number
-    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
-    <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(addr);
+    // <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    // <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(addr);
 }
 </code></pre>
 

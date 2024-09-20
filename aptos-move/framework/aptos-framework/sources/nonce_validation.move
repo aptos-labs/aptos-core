@@ -25,8 +25,8 @@ module aptos_framework::nonce_validation {
 
     public(friend) fun initialize(aptos_framework: &signer) {
         // let table_1 = smart_table::new();
-        let table_1 = smart_table::new_with_config(2000000, 75, 50);
-        // let table_2 = smart_table::new_with_config(5000, 75, 5);
+        // let table_1 = smart_table::new_with_config(2000000, 75, 50);
+        let table_1 = smart_table::new_with_config(100000, 75, 5);
         let nonce_history = NonceHistory {
             table_1,
             // table_2,

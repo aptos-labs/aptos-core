@@ -33,6 +33,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+use rand::Rng;
 
 #[derive(Debug)]
 enum LocalAccountAuthenticator {
@@ -170,11 +171,14 @@ impl LocalAccount {
     }
 
     pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
+        let random_sequence_number = rand::thread_rng().gen::<u64>();
         let raw_txn = builder
             .sender(self.address())
-            .sequence_number(self.increment_sequence_number())
+            .sequence_number(random_sequence_number)
             .build();
-        self.sign_transaction(raw_txn)
+        let txn = self.sign_transaction(raw_txn);
+        // println!("SignedTransaction: {:?}, {:?}", txn.sender(), txn.sequence_number());
+        txn
     }
 
     pub fn sign_multi_agent_with_transaction_builder(

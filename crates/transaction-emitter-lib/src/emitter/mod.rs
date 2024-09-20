@@ -939,6 +939,7 @@ async fn wait_for_accounts_sequence(
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
 ) -> (HashMap<AccountAddress, u64>, u128) {
+    println!("wait for accounts sequence: {:?}", account_seqs);
     let mut pending_addresses: HashSet<_> = account_seqs.keys().copied().collect();
     let mut latest_fetched_counts = HashMap::new();
 
@@ -1035,6 +1036,8 @@ where
         .map_err(|e| format_err!("Get accounts failed: {:?}", e))?
         .into_iter()
         .unzip();
+
+    println!("seq_nums: {:?}, expirations: {:?}", seq_nums, timestamps);
 
     // return min for the timestamp, to make sure
     // all sequence numbers were <= to return values at that timestamp

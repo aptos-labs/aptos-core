@@ -11,6 +11,7 @@ use aptos_types::{
         authenticator::AuthenticationKey,
         user_transaction_context::{EntryFunctionPayload, UserTransactionContext},
     },
+    account_address::AccountAddress,
 };
 use better_any::{Tid, TidAble};
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
@@ -40,6 +41,8 @@ pub struct NativeTransactionContext {
     /// A transaction context is available upon transaction prologue/execution/epilogue. It is not available
     /// when a VM session is created for other purposes, such as for processing validator transactions.
     user_transaction_context_opt: Option<UserTransactionContext>,
+    sender: AccountAddress,
+    sequence_number: u64,
 }
 
 impl NativeTransactionContext {
@@ -50,6 +53,8 @@ impl NativeTransactionContext {
         script_hash: Vec<u8>,
         chain_id: u8,
         user_transaction_context_opt: Option<UserTransactionContext>,
+        sender: AccountAddress,
+        sequence_number: u64,
     ) -> Self {
         Self {
             txn_hash,
@@ -57,6 +62,8 @@ impl NativeTransactionContext {
             script_hash,
             chain_id,
             user_transaction_context_opt,
+            sender,
+            sequence_number,
         }
     }
 

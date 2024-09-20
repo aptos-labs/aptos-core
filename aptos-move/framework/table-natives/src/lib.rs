@@ -48,6 +48,8 @@ pub struct NativeTableContext<'a> {
     resolver: &'a dyn TableResolver,
     txn_hash: [u8; 32],
     table_data: RefCell<TableData>,
+    sender: AccountAddress,
+    sequence_number: u64,
 }
 
 // See stdlib/Error.move
@@ -109,11 +111,13 @@ pub struct TableChange {
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an
     /// extension into VM session functions.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver, sender: AccountAddress, sequence_number: u64) -> Self {
         Self {
             resolver,
             txn_hash,
             table_data: Default::default(),
+            sender,
+            sequence_number,
         }
     }
 
@@ -356,9 +360,12 @@ fn native_add_box(
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
 
     let res = match gv.move_to(val) {
-        Ok(_) => Ok(smallvec![]),
+        Ok(_) => {
+            // println!("New entry created, txn hash: {:?}", table_context.txn_hash);
+            Ok(smallvec![])
+        },
         Err(e) => {
-            println!("Already exists. key: {:?}, error: {:?}", key, e);
+            // println!("Already exists. key: {:?}, error: {:?}, sender: {:?}, sequence number: {:?}", key, e, table_context.sender, table_context.sequence_number);
             Err(SafeNativeError::Abort {
                 abort_code: ALREADY_EXISTS,
             })

@@ -17,6 +17,7 @@ pub enum SessionId {
         sender: AccountAddress,
         sequence_number: u64,
         script_hash: Vec<u8>,
+        expiration_time: u64,
     },
     BlockMeta {
         // block id
@@ -30,11 +31,13 @@ pub enum SessionId {
         sender: AccountAddress,
         sequence_number: u64,
         script_hash: Vec<u8>,
+        expiration_time: u64,
     },
     Epilogue {
         sender: AccountAddress,
         sequence_number: u64,
         script_hash: Vec<u8>,
+        expiration_time: u64,
     },
     // For those runs that are not a transaction and the output of which won't be committed.
     Void,
@@ -58,6 +61,7 @@ impl SessionId {
             sender: txn_metadata.sender,
             sequence_number: txn_metadata.sequence_number,
             script_hash: txn_metadata.script_hash.clone(),
+            expiration_time: txn_metadata.expiration_timestamp_secs,
         }
     }
 
@@ -82,6 +86,73 @@ impl SessionId {
             sender: txn_metadata.sender,
             sequence_number: txn_metadata.sequence_number,
             script_hash: txn_metadata.script_hash.clone(),
+            expiration_time: txn_metadata.expiration_timestamp_secs,
+        }
+    }
+
+    pub fn sequence_number(&self) -> u64 {
+        match self {
+            Self::Txn {
+                sender: _,
+                sequence_number,
+                script_hash: _,
+                expiration_time: _,
+            }
+            | Self::Prologue {
+                sender: _,
+                sequence_number,
+                script_hash: _,
+                expiration_time: _,
+            }
+            | Self::Epilogue {
+                sender: _,
+                sequence_number,
+                script_hash: _,
+                expiration_time: _,
+            }
+            | Self::RunOnAbort {
+                sender: _,
+                sequence_number,
+                script_hash: _,
+            } => *sequence_number,
+            Self::BlockMeta { id: _ }
+            | Self::Genesis { id: _ }
+            | Self::Void
+            | Self::BlockMetaExt { id: _ }
+            | Self::ValidatorTxn { script_hash: _ } => 0,
+        }
+    }
+
+    pub fn sender(&self) -> AccountAddress {
+        match self {
+            Self::Txn {
+                sender,
+                sequence_number: _,
+                script_hash: _,
+                expiration_time: _,
+            }
+            | Self::Prologue {
+                sender,
+                sequence_number: _,
+                script_hash: _,
+                expiration_time: _,
+            }
+            | Self::Epilogue {
+                sender,
+                sequence_number: _,
+                script_hash: _,
+                expiration_time: _,
+            }
+            | Self::RunOnAbort {
+                sender,
+                sequence_number: _,
+                script_hash: _,
+            } => *sender,
+            Self::BlockMeta { id: _ }
+            | Self::Genesis { id: _ }
+            | Self::Void
+            | Self::BlockMetaExt { id: _ }
+            | Self::ValidatorTxn { script_hash: _ } => AccountAddress::ZERO,
         }
     }
 
@@ -98,6 +169,7 @@ impl SessionId {
             sender: txn_metadata.sender,
             sequence_number: txn_metadata.sequence_number,
             script_hash: txn_metadata.script_hash.clone(),
+            expiration_time: txn_metadata.expiration_timestamp_secs,
         }
     }
 
@@ -121,16 +193,19 @@ impl SessionId {
                 sender: _,
                 sequence_number: _,
                 script_hash,
+                expiration_time: _,
             }
             | Self::Prologue {
                 sender: _,
                 sequence_number: _,
                 script_hash,
+                expiration_time: _,
             }
             | Self::Epilogue {
                 sender: _,
                 sequence_number: _,
                 script_hash,
+                expiration_time: _,
             }
             | Self::RunOnAbort {
                 sender: _,

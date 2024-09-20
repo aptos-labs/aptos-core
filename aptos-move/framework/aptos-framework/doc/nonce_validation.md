@@ -136,8 +136,8 @@
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     // <b>let</b> table_1 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>();
-    <b>let</b> table_1 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new_with_config">smart_table::new_with_config</a>(2000000, 75, 50);
-    // <b>let</b> table_2 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new_with_config">smart_table::new_with_config</a>(5000, 75, 5);
+    // <b>let</b> table_1 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new_with_config">smart_table::new_with_config</a>(2000000, 75, 50);
+    <b>let</b> table_1 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new_with_config">smart_table::new_with_config</a>(100000, 75, 5);
     <b>let</b> nonce_history = <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
         table_1,
         // table_2,

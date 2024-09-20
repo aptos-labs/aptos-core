@@ -334,7 +334,10 @@ impl TransactionGenerator {
                     transaction_generator
                         .generate_transactions(sender, 1)
                         .pop()
-                        .map(Transaction::UserTransaction)
+                        .map(|txn| {
+                            println!("Address: {}, sequence number: {}", txn.sender(), txn.sequence_number());
+                            Transaction::UserTransaction(txn)
+                        })
                 },
                 |sender_idx| *sender_idx,
             );
