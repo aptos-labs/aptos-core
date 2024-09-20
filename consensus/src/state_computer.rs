@@ -245,16 +245,15 @@ impl StateComputer for ExecutionProxy {
             } else {
                 let user_txn_status = &compute_status[compute_status.len() - user_txns.len()..];
 
-                // daniel todo: make it Sync
-                // // notify mempool about failed transaction
-                // if let Err(e) = txn_notifier
-                //     .notify_failed_txn(user_txns, user_txn_status)
-                //     .await
-                // {
-                //     error!(
-                //         error = ?e, "Failed to notify mempool of rejected txns",
-                //     );
-                // }
+                // notify mempool about failed transaction
+                if let Err(e) = txn_notifier
+                    .notify_failed_txn(user_txns, user_txn_status)
+                    .await
+                {
+                    error!(
+                        error = ?e, "Failed to notify mempool of rejected txns",
+                    );
+                }
             }
 
             Ok(pipeline_execution_result)
