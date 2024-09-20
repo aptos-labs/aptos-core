@@ -9,7 +9,8 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - Gas:
-          new: current
+          old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.16.1-rc.json
+          new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.18.0.json
       - Framework:
           bytecode_version: 6
           git_hash: ~
