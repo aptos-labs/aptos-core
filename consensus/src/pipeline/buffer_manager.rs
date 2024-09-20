@@ -20,7 +20,9 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{
-    common::{Author, Round}, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock
+    common::{Author, Round},
+    pipeline::commit_vote::CommitVote,
+    pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
@@ -29,7 +31,8 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, aggregate_signature::PartialSignatures, epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures
+    account_address::AccountAddress, aggregate_signature::PartialSignatures,
+    epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -43,12 +46,12 @@ use futures::{
 };
 use once_cell::sync::OnceCell;
 use std::{
-    collections::BTreeMap,
-    {collections::HashMap, sync::{
+    collections::{BTreeMap, HashMap},
+    sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
-}};
+};
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -163,7 +166,11 @@ pub struct BufferManager {
 
     pending_commit_proofs: BTreeMap<Round, LedgerInfoWithSignatures>,
 
-    buffered_commit_votes: HashMap<Round, HashMap<Author, CommitVote>>,
+    max_pending_rounds_in_commit_vote_cache: u64,
+    // If the buffer manager receives a commit vote for a block that is not in buffer items, then
+    // the vote will be cached. We can cache upto max_pending_rounds_in_commit_vote_cache (100) blocks.
+    pending_commit_votes: BTreeMap<Round, HashMap<AccountAddress, CommitVote>>,
+
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
@@ -197,6 +204,7 @@ impl BufferManager {
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        max_pending_rounds_in_commit_vote_cache: u64,
         execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
@@ -265,7 +273,9 @@ impl BufferManager {
 
             pending_commit_proofs: BTreeMap::new(),
 
-            buffered_commit_votes: HashMap::new(),
+            max_pending_rounds_in_commit_vote_cache,
+            pending_commit_votes: BTreeMap::new(),
+
             execution_futures,
         }
     }
@@ -343,6 +353,30 @@ impl BufferManager {
         }
     }
 
+    fn try_add_pending_commit_vote(&mut self, vote: CommitVote) -> bool {
+        let block_id = vote.commit_info().id();
+        let round = vote.commit_info().round();
+
+        // Store the commit vote only if it is for one of the next 100 rounds.
+        if round > self.highest_committed_round
+            && self.highest_committed_round + self.max_pending_rounds_in_commit_vote_cache > round
+        {
+            self.pending_commit_votes
+                .entry(round)
+                .or_default()
+                .insert(vote.author(), vote);
+            true
+        } else {
+            debug!(
+                round = round,
+                highest_committed_round = self.highest_committed_round,
+                block_id = block_id,
+                "Received a commit vote not in the next 100 rounds, ignored."
+            );
+            false
+        }
+    }
+
     fn drain_pending_commit_proof_till(
         &mut self,
         round: Round,
@@ -404,12 +438,10 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
-
         let mut unverified_signatures = PartialSignatures::empty();
         if let Some(block) = ordered_blocks.last() {
-            if let Some(commit_votes) = self.buffered_commit_votes.remove(&block.round()) {
-                info!("[PreExecution] process {} buffered commit votes for round {}", commit_votes.len(), block.round());
-                commit_votes
+            if let Some(votes) = self.pending_commit_votes.remove(&block.round()) {
+                votes
                     .values()
                     .filter(|vote| vote.commit_info().id() == block.id())
                     .for_each(|vote| {
@@ -417,8 +449,12 @@ impl BufferManager {
                     });
             }
         }
-
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback, unverified_signatures);
+        let item = BufferItem::new_ordered(
+            ordered_blocks,
+            ordered_proof,
+            callback,
+            unverified_signatures,
+        );
         self.buffer.push_back(item);
     }
 
@@ -778,11 +814,10 @@ impl BufferManager {
                     } else {
                         return None;
                     }
-                } else {
-                    self.buffered_commit_votes.entry(vote.round()).or_default().insert(vote.author(), vote);
+                } else if self.try_add_pending_commit_vote(vote) {
                     reply_ack(protocol, response_sender);
-
-                    // reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
+                } else {
+                    reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
             },
             CommitMessage::Decision(commit_proof) => {
@@ -988,6 +1023,7 @@ impl BufferManager {
                 },
                 Some(Ok(round)) = self.persisting_phase_rx.next() => {
                     // see where `need_backpressure()` is called.
+                    self.pending_commit_votes.retain(|rnd, _| *rnd > round);
                     self.highest_committed_round = round
                 },
                 Some(rpc_request) = verified_commit_msg_rx.next() => {

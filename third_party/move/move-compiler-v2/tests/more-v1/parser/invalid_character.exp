@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/more-v1/parser/invalid_character.move:1:12
+  │
+1 │ address 0x1~
+  │            ^ Invalid character: '~'

@@ -21,6 +21,9 @@ pub enum Error {
     #[error("Subscription progress stopped: {0}")]
     SubscriptionProgressStopped(String),
 
+    #[error("Subscriptions reset: {0}")]
+    SubscriptionsReset(String),
+
     #[error("Subscription suboptimal: {0}")]
     SubscriptionSuboptimal(String),
 
@@ -40,6 +43,7 @@ impl Error {
             Self::RpcError(_) => "rpc_error",
             Self::SubscriptionDisconnected(_) => "subscription_disconnected",
             Self::SubscriptionProgressStopped(_) => "subscription_progress_stopped",
+            Self::SubscriptionsReset(_) => "subscriptions_reset",
             Self::SubscriptionSuboptimal(_) => "subscription_suboptimal",
             Self::SubscriptionTimeout(_) => "subscription_timeout",
             Self::UnexpectedError(_) => "unexpected_error",

@@ -4,6 +4,16 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [4.2.2] - 2024/09/20
+- Fix localnet indexer processors that were emitting spamming logs in 4.2.1.
+
+## [4.2.1] - 2024/09/19
+- Fix localnet indexer processors that were failing to startup in 4.2.0
+
+## [4.2.0] - 2024/09/16
+- Update latest VM and associated changes
+- Update to latest compiler
+
 ## [4.1.0] - 2024/08/30
 - Marks Move 2 and compiler v2 as stable.
 - Adds new `--move-2` flag to work with Move 2 without need for multiple other flags. 

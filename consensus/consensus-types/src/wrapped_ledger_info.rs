@@ -77,6 +77,10 @@ impl WrappedLedgerInfo {
         &self.signed_ledger_info
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.ledger_info().ledger_info().epoch()
+    }
+
     pub fn commit_info(&self) -> &BlockInfo {
         self.ledger_info().ledger_info().commit_info()
     }

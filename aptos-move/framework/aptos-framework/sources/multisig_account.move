@@ -457,14 +457,14 @@ module aptos_framework::multisig_account {
     #[view]
     /// Return the id of the last transaction that was executed (successful or failed) or removed.
     public fun last_resolved_sequence_number(multisig_account: address): u64 acquires MultisigAccount {
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
+        let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         multisig_account_resource.last_executed_sequence_number
     }
 
     #[view]
     /// Return the id of the next transaction created.
     public fun next_sequence_number(multisig_account: address): u64 acquires MultisigAccount {
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
+        let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         multisig_account_resource.next_sequence_number
     }
 
@@ -472,7 +472,7 @@ module aptos_framework::multisig_account {
     /// Return a bool tuple indicating whether an owner has voted and if so, whether they voted yes or no.
     public fun vote(
         multisig_account: address, sequence_number: u64, owner: address): (bool, bool) acquires MultisigAccount {
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
+        let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         assert!(
             sequence_number > 0 && sequence_number < multisig_account_resource.next_sequence_number,
             error::invalid_argument(EINVALID_SEQUENCE_NUMBER),
@@ -486,7 +486,7 @@ module aptos_framework::multisig_account {
 
     #[view]
     public fun available_transaction_queue_capacity(multisig_account: address): u64 acquires MultisigAccount {
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
+        let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         let num_pending_transactions = multisig_account_resource.next_sequence_number - multisig_account_resource.last_executed_sequence_number - 1;
         if (num_pending_transactions > MAX_PENDING_TRANSACTIONS) {
             0

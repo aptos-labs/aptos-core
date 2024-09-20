@@ -346,7 +346,7 @@ impl NetworkSender {
             if self.author == peer {
                 let self_msg = Event::Message(self.author, msg.clone());
                 if let Err(err) = self_sender.send(self_msg).await {
-                    error!(error = ?err, "Error delivering a self msg");
+                    warn!(error = ?err, "Error delivering a self msg");
                 }
                 continue;
             }

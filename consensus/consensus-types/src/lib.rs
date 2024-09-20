@@ -8,7 +8,6 @@ pub mod block;
 pub mod block_data;
 pub mod block_retrieval;
 pub mod common;
-pub mod delayed_qc_msg;
 pub mod epoch_retrieval;
 pub mod order_vote;
 pub mod order_vote_msg;

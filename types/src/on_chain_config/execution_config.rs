@@ -168,6 +168,19 @@ impl TransactionShufflerType {
             user_use_case_spread_factor: 4,
         }
     }
+
+    pub fn user_use_case_spread_factor(&self) -> Option<usize> {
+        match self {
+            TransactionShufflerType::NoShuffling
+            | TransactionShufflerType::DeprecatedSenderAwareV1(_)
+            | TransactionShufflerType::SenderAwareV2(_)
+            | TransactionShufflerType::DeprecatedFairness { .. } => None,
+            TransactionShufflerType::UseCaseAware {
+                user_use_case_spread_factor,
+                ..
+            } => Some(*user_use_case_spread_factor),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

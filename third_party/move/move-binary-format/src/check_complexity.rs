@@ -244,6 +244,7 @@ impl<'a> BinaryComplexityMeter<'a> {
                 },
                 StructFieldInformation::DeclaredVariants(variants) => {
                     for variant in variants {
+                        self.meter_identifier(variant.name)?;
                         for field in &variant.fields {
                             self.charge(field.signature.0.num_nodes() as u64)?;
                         }

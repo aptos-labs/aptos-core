@@ -129,4 +129,14 @@ warning: [lint] Needless pair of `*` and `&` operators: consider removing them
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
 
 
+Diagnostics:
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:35:15
+   │
+35 │         *&mut borrow_global_mut<S>(addr).y
+   │               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+
+
 ============ bytecode verification succeeded ========

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/num_hex_literal_underscore_trailing.move:4:22
+  │
+4 │         let _ = 0x0u8_;
+  │                      ^
+  │                      │
+  │                      Unexpected '_'
+  │                      Expected ';'

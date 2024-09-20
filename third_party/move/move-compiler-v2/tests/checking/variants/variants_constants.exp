@@ -45,3 +45,13 @@ module 0x815::m {
 
     }
 } // end 0x815::m
+
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/checking/variants/variants_constants.move:29:16
+   │
+29 │         match (c) { Red => abort 1, Blue => abort 2 } // no error
+   │                ^
+   │
+   = missing `Color::RGB{..}`

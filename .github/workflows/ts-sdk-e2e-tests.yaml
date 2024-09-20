@@ -44,7 +44,7 @@ jobs:
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -55,7 +55,7 @@ jobs:
     needs: [permission-check, file_change_determinator]
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           ref: ${{ env.GIT_SHA }}

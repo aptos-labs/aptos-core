@@ -57,10 +57,8 @@ const V2_E2E_ROOT: &str = "move-compiler-v2/transactional-tests/tests";
 /// Ignored directories in the move_check tree.
 static IGNORED_UNIT_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
     let mut set = BTreeSet::new();
-    set.insert("expansion".to_string());
     set.insert("evm".to_string());
     set.insert("async".to_string());
-    set.insert("dependencies".to_string());
     set
 });
 
