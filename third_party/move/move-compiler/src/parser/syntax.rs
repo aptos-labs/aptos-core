@@ -128,17 +128,6 @@ fn require_move_2_and_advance(
     Ok(require_move_2(context, loc, description))
 }
 
-// fn require_language_version_and_advance(
-//     context: &mut Context,
-//     min_language_version: LanguageVersion,
-//     description: &str,
-// ) -> Result<bool, Box<Diagnostic>> {
-//     let loc = current_token_loc(context.tokens);
-//     context.tokens.advance()?;
-//     require_language_version(context, loc, min_language_version, description)?;
-
-// }
-
 pub fn make_loc(file_hash: FileHash, start: usize, end: usize) -> Loc {
     Loc::new(file_hash, start as u32, end as u32)
 }
