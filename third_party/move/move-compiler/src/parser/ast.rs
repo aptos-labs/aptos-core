@@ -1053,32 +1053,24 @@ impl fmt::Display for BinOp_ {
 
 impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match &self {
-                Visibility::Public(_) => Visibility::PUBLIC,
-                Visibility::Script(_) => Visibility::SCRIPT,
-                Visibility::Friend(_) => Visibility::FRIEND,
-                Visibility::Package(_) => Visibility::PACKAGE,
-                Visibility::Internal => Visibility::INTERNAL,
-            }
-        )
+        write!(f, "{}", match &self {
+            Visibility::Public(_) => Visibility::PUBLIC,
+            Visibility::Script(_) => Visibility::SCRIPT,
+            Visibility::Friend(_) => Visibility::FRIEND,
+            Visibility::Package(_) => Visibility::PACKAGE,
+            Visibility::Internal => Visibility::INTERNAL,
+        })
     }
 }
 
 impl fmt::Display for Ability_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match &self {
-                Ability_::Copy => Ability_::COPY,
-                Ability_::Drop => Ability_::DROP,
-                Ability_::Store => Ability_::STORE,
-                Ability_::Key => Ability_::KEY,
-            }
-        )
+        write!(f, "{}", match &self {
+            Ability_::Copy => Ability_::COPY,
+            Ability_::Drop => Ability_::DROP,
+            Ability_::Store => Ability_::STORE,
+            Ability_::Key => Ability_::KEY,
+        })
     }
 }
 
