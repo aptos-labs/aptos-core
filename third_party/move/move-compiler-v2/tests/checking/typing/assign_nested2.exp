@@ -1,0 +1,39 @@
+
+Diagnostics:
+warning: Unused local variable `r_ref`. Consider removing or prefixing with an underscore: `_r_ref`
+   ┌─ tests/checking/typing/assign_nested2.move:12:13
+   │
+12 │         let r_ref = &mut r;
+   │             ^^^^^
+
+warning: Unused local variable `s`. Consider removing or prefixing with an underscore: `_s`
+   ┌─ tests/checking/typing/assign_nested2.move:13:13
+   │
+13 │         let s = S { f: 0 };
+   │             ^
+
+// -- Model dump before bytecode pipeline
+module 0x8675309::A {
+    struct S {
+        f: u64,
+    }
+    private fun four(): (u64, u64, u64, u64) {
+        Tuple(0, 1, 2, 3)
+    }
+    public fun mixed() {
+        {
+          let x: u64;
+          {
+            let r: u64 = 0;
+            {
+              let r_ref: &mut u64 = Borrow(Mutable)(r);
+              {
+                let s: A::S = pack A::S(0);
+                (_: u64, x: u64, _: u64, _: u64): (u64, u64, u64, u64) = A::four();
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x8675309::A

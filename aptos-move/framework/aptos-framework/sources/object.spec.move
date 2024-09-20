@@ -475,7 +475,11 @@ spec aptos_framework::object {
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
     }
 
-    spec burn<T: key>(owner: &signer, object: Object<T>) {
+    spec burn<T: key>(_owner: &signer, _object: Object<T>) {
+        aborts_if true;
+    }
+
+    spec burn_object<T: key>(owner: &signer, object: Object<T>) {
         pragma aborts_if_is_partial;
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);

@@ -624,11 +624,23 @@ fn check_module_complexity(module: &CompiledModule) -> Result<(), MetaDataValida
         check_ident_complexity(module, &mut meter, handle.name)?;
     }
     for def in module.struct_defs() {
-        if let StructFieldInformation::Declared(fields) = &def.field_information {
-            for field in fields {
-                check_ident_complexity(module, &mut meter, field.name)?;
-                check_sigtok_complexity(module, &mut meter, &field.signature.0)?
-            }
+        match &def.field_information {
+            StructFieldInformation::Native => {},
+            StructFieldInformation::Declared(fields) => {
+                for field in fields {
+                    check_ident_complexity(module, &mut meter, field.name)?;
+                    check_sigtok_complexity(module, &mut meter, &field.signature.0)?
+                }
+            },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                for variant in variants {
+                    check_ident_complexity(module, &mut meter, variant.name)?;
+                    for field in &variant.fields {
+                        check_ident_complexity(module, &mut meter, field.name)?;
+                        check_sigtok_complexity(module, &mut meter, &field.signature.0)?
+                    }
+                }
+            },
         }
     }
     for def in module.function_defs() {

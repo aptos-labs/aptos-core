@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: local `s2` of type `M::S` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:17:9
+   │
+17 │         s != s2;
+   │         ^^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `s` of type `M::S` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:17:9
+   │
+17 │         s != s2;
+   │         ^^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `r1` of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:22:9
+   │
+22 │         r1 != r2;
+   │         ^^^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: local `r2` of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:22:9
+   │
+22 │         r1 != r2;
+   │         ^^^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `M::G1<M::Key>` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:27:9
+   │
+27 │         G1<Key>{} != G1<Key>{};
+   │         ^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument)
+
+error: value of type `M::G2<M::Key>` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/neq_invalid2.move:28:9
+   │
+28 │         G2<Key>{} != G2<Key>{};
+   │         ^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument)

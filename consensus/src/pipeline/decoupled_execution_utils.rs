@@ -48,6 +48,7 @@ pub fn prepare_phases_and_buffer_manager(
     highest_committed_round: u64,
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    max_pending_rounds_in_commit_vote_cache: u64,
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 ) -> (
     PipelinePhase<PreExecutionPhase>,
@@ -154,6 +155,7 @@ pub fn prepare_phases_and_buffer_manager(
             highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
+            max_pending_rounds_in_commit_vote_cache,
             execution_futures,
         ),
     )

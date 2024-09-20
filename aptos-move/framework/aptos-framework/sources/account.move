@@ -517,7 +517,7 @@ module aptos_framework::account {
     public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
         assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let addr = signer::address_of(account);
-        let account_resource = borrow_global_mut<Account>(addr);
+        let account_resource = borrow_global<Account>(addr);
         assert!(
             option::contains(&account_resource.rotation_capability_offer.for, &to_be_revoked_address),
             error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
@@ -587,7 +587,7 @@ module aptos_framework::account {
     public entry fun revoke_signer_capability(account: &signer, to_be_revoked_address: address) acquires Account {
         assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let addr = signer::address_of(account);
-        let account_resource = borrow_global_mut<Account>(addr);
+        let account_resource = borrow_global<Account>(addr);
         assert!(
             option::contains(&account_resource.signer_capability_offer.for, &to_be_revoked_address),
             error::not_found(ENO_SUCH_SIGNER_CAPABILITY)
@@ -842,7 +842,7 @@ module aptos_framework::account {
         signed_message_bytes: vector<u8>,
         message: T,
     ) acquires Account {
-        let account_resource = borrow_global_mut<Account>(account);
+        let account_resource = borrow_global<Account>(account);
         // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
         if (account_scheme == ED25519_SCHEME) {
             let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key);

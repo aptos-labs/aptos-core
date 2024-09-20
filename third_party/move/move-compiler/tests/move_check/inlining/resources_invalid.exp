@@ -1,9 +1,3 @@
-error[E04020]: missing acquires annotation
-  ┌─ tests/move_check/inlining/resources_invalid.move:8:9
-  │
-8 │         borrow_global<T>(ref.addr)
-  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^ The call acquires '0x42::token::Token', but the 'acquires' list for the current function 'get_value` does not contain this type. It must be present in the calling context's acquires list
-
 error[E14002]: Inlined code invalid in this context
   ┌─ tests/move_check/inlining/resources_invalid.move:8:26
   │

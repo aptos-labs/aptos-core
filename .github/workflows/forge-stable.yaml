@@ -50,7 +50,7 @@ jobs:
       BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
       BRANCH_HASH: ${{ steps.hash-branch.outputs.BRANCH_HASH }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Determine branch based on cadence
         id: determine-test-branch
@@ -128,7 +128,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      IMAGE_TAG: 70806ff543496aa6de7807feff49e7e1370efd20 #aptos-node-v1.19.1
+      IMAGE_TAG: 25a081116546670e62ca927ba90478de78557056 #aptos-node-v1.20
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: framework_upgrade
@@ -269,7 +269,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300 # Run for 5 minutes
       # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: 70806ff543496aa6de7807feff49e7e1370efd20 #aptos-node-v1.19.1
+      IMAGE_TAG: 25a081116546670e62ca927ba90478de78557056 #aptos-node-v1.20
       GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
       POST_TO_SLACK: true
 

@@ -32,6 +32,8 @@ pub struct GasEstimationConfig {
     pub aggressive_block_history: usize,
     /// Time after write when previous value is returned without recomputing
     pub cache_expiration_ms: u64,
+    /// Whether to account which TransactionShufflerType is used onchain, and how it affects gas estimation
+    pub incorporate_reordering_effects: bool,
 }
 
 impl Default for GasEstimationConfig {
@@ -44,6 +46,7 @@ impl Default for GasEstimationConfig {
             market_block_history: 30,
             aggressive_block_history: 120,
             cache_expiration_ms: 500,
+            incorporate_reordering_effects: true,
         }
     }
 }

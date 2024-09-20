@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "4.1.0"
+version = "4.2.2"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -85,7 +85,7 @@ pathsearch = { workspace = true }
 poem = { workspace = true }
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "fa1ce4947f4c2be57529f1c9732529e05a06cb7f", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "51a34901b40d7f75767ac907b4d2478104d6a515", default-features = false }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
@@ -93,7 +93,7 @@ self_update = { git = "https://github.com/banool/self_update.git", rev = "830615
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "fa1ce4947f4c2be57529f1c9732529e05a06cb7f" }
+server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "51a34901b40d7f75767ac907b4d2478104d6a515" }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid use of reserved name
+  ┌─ tests/more-v1/expansion/restricted_module_names.move:2:14
+  │
+2 │ module 0x42::Self {}
+  │              ^^^^ Invalid module name 'Self'. 'Self' is restricted and cannot be used to name a module
