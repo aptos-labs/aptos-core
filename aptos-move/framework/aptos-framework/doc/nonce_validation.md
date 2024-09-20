@@ -48,6 +48,12 @@
 <dd>
 
 </dd>
+<dt>
+<code>txn_expiration_time: u64</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -71,12 +77,6 @@
 <dl>
 <dt>
 <code>table_1: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceKey">nonce_validation::NonceKey</a>, bool&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>table_2: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceKey">nonce_validation::NonceKey</a>, bool&gt;</code>
 </dt>
 <dd>
 
@@ -135,11 +135,12 @@
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <b>let</b> table_1 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new_with_config">smart_table::new_with_config</a>(5000, 75, 5);
-    <b>let</b> table_2 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new_with_config">smart_table::new_with_config</a>(5000, 75, 5);
+    // <b>let</b> table_1 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>();
+    <b>let</b> table_1 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new_with_config">smart_table::new_with_config</a>(2000000, 75, 50);
+    // <b>let</b> table_2 = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new_with_config">smart_table::new_with_config</a>(5000, 75, 5);
     <b>let</b> nonce_history = <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
         table_1,
-        table_2,
+        // table_2,
         current_table: 1,
     };
 
@@ -182,7 +183,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_insert_nonce">insert_nonce</a>(sender_address: <b>address</b>, nonce: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_insert_nonce">insert_nonce</a>(sender_address: <b>address</b>, nonce: u64, txn_expiration_time: u64)
 </code></pre>
 
 
@@ -194,17 +195,19 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_insert_nonce">insert_nonce</a>(
     sender_address: <b>address</b>,
     nonce: u64,
+    txn_expiration_time: u64,
 ) <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
     <b>let</b> nonce_history = <b>borrow_global_mut</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework);
     <b>let</b> nonce_key = <a href="nonce_validation.md#0x1_nonce_validation_NonceKey">NonceKey</a> {
         sender_address,
         nonce,
+        txn_expiration_time,
     };
-    <b>if</b> (nonce_history.current_table == 1) {
+    // <b>if</b> (nonce_history.current_table == 1) {
         <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_upsert">smart_table::upsert</a>(&<b>mut</b> nonce_history.table_1, nonce_key, <b>true</b>);
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_upsert">smart_table::upsert</a>(&<b>mut</b> nonce_history.table_2, nonce_key, <b>true</b>);
-    };
+    // } <b>else</b> {
+    //     <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_upsert">smart_table::upsert</a>(&<b>mut</b> nonce_history.table_2, nonce_key, <b>true</b>);
+    // };
 }
 </code></pre>
 
@@ -218,7 +221,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_nonce_exists">nonce_exists</a>(sender_address: <b>address</b>, nonce: u64): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_nonce_exists">nonce_exists</a>(sender_address: <b>address</b>, nonce: u64, txn_expiration_time: u64): bool
 </code></pre>
 
 
@@ -230,18 +233,20 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_nonce_exists">nonce_exists</a>(
     sender_address: <b>address</b>,
     nonce: u64,
+    txn_expiration_time: u64,
 ): bool <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
     <b>let</b> nonce_history = <b>borrow_global</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework);
     <b>let</b> nonce_key = <a href="nonce_validation.md#0x1_nonce_validation_NonceKey">NonceKey</a> {
         sender_address,
         nonce,
+        txn_expiration_time,
     };
     <b>if</b> (<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&nonce_history.table_1, nonce_key)) {
         <b>return</b> <b>true</b>
     };
-    <b>if</b> (<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&nonce_history.table_2, nonce_key)) {
-        <b>return</b> <b>true</b>
-    };
+    // <b>if</b> (<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&nonce_history.table_2, nonce_key)) {
+    //     <b>return</b> <b>true</b>
+    // };
     <b>false</b>
 }
 </code></pre>

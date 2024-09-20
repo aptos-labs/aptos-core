@@ -357,9 +357,12 @@ fn native_add_box(
 
     let res = match gv.move_to(val) {
         Ok(_) => Ok(smallvec![]),
-        Err(_) => Err(SafeNativeError::Abort {
-            abort_code: ALREADY_EXISTS,
-        }),
+        Err(e) => {
+            println!("Already exists. key: {:?}, error: {:?}", key, e);
+            Err(SafeNativeError::Abort {
+                abort_code: ALREADY_EXISTS,
+            })
+        },
     };
 
     drop(table_data);

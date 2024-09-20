@@ -7,6 +7,8 @@
 module aptos_std::smart_table {
     use std::error;
     use std::vector;
+    use std::debug;
+    use std::string;
     use aptos_std::aptos_hash::sip_hash_from_value;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use aptos_std::type_info::size_of_val;
@@ -278,6 +280,8 @@ module aptos_std::smart_table {
             bucket_index(self.level, self.num_buckets, entry.hash) != new_bucket_index
         });
         let new_bucket = vector::trim_reverse(old_bucket, p);
+        debug::print(&string::utf8(b"The new bucket index is: "));
+        debug::print(&new_bucket_index);
         table_with_length::add(&mut self.buckets, new_bucket_index, new_bucket);
     }
 
