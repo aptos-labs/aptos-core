@@ -33,9 +33,9 @@ proptest! {
         for (version, txn) in txns.into_iter().enumerate() {
             let hash = txn.hash();
             prop_assert_eq!(transaction_db.get_transaction(version as Version).unwrap(), txn);
-            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash, num_txns as Version).unwrap(), Some(version as Version));
+            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash).unwrap(), Some(version as Version));
             if version > 0 {
-                prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash, version as Version - 1).unwrap(), None);
+                prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash).unwrap(), None);
             }
         }
 
@@ -108,7 +108,6 @@ proptest! {
         let db = AptosDB::new_for_test(&tmp_dir);
         let transaction_db  = db.ledger_db.transaction_db();
         let txns = init_db(universe, gens, transaction_db);
-        let num_txns = txns.len();
 
         {
             prop_assert!(transaction_db.get_transaction(0).is_ok());
@@ -120,12 +119,12 @@ proptest! {
 
         {
             prop_assert!(transaction_db.get_transaction(1).is_ok());
-            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash(), num_txns as Version).unwrap(), Some(1));
+            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash()).unwrap(), Some(1));
             let batch = SchemaBatch::new();
             transaction_db.prune_transaction_by_hash_indices(&[txns[1].clone()], &batch).unwrap();
             transaction_db.write_schemas(batch).unwrap();
             prop_assert!(transaction_db.get_transaction(1).is_ok());
-            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash(), num_txns as Version).unwrap(), None);
+            prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&txns[1].hash()).unwrap(), None);
         }
     }
 }
