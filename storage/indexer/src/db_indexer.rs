@@ -411,19 +411,19 @@ impl DBIndexer {
         if self.indexer_db.transaction_enabled() {
             batch.put::<InternalIndexerMetadataSchema>(
                 &MetadataKey::TransactionVersion,
-                &MetadataValue::Version(version),
+                &MetadataValue::Version(version - 1),
             )?;
         }
         if self.indexer_db.event_enabled() {
             batch.put::<InternalIndexerMetadataSchema>(
                 &MetadataKey::EventVersion,
-                &MetadataValue::Version(version),
+                &MetadataValue::Version(version - 1),
             )?;
         }
         if self.indexer_db.statekeys_enabled() {
             batch.put::<InternalIndexerMetadataSchema>(
                 &MetadataKey::StateVersion,
-                &MetadataValue::Version(version),
+                &MetadataValue::Version(version - 1),
             )?;
         }
         batch.put::<InternalIndexerMetadataSchema>(
