@@ -863,9 +863,10 @@ impl Context {
     pub fn get_transaction_by_hash(
         &self,
         hash: HashValue,
+        ledger_version: u64,
     ) -> Result<Option<TransactionOnChainData>> {
         self.db
-            .get_transaction_by_hash(hash, true)?
+            .get_transaction_by_hash(hash, ledger_version, true)?
             .map(|t| self.convert_into_transaction_on_chain_data(t))
             .transpose()
     }

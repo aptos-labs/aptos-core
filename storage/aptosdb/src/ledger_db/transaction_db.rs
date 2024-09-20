@@ -69,8 +69,12 @@ impl TransactionDb {
     pub(crate) fn get_transaction_version_by_hash(
         &self,
         hash: &HashValue,
+        ledger_version: Version,
     ) -> Result<Option<Version>> {
-        self.db.get::<TransactionByHashSchema>(hash)
+        Ok(match self.db.get::<TransactionByHashSchema>(hash)? {
+            Some(version) if version <= ledger_version => Some(version),
+            _ => None,
+        })
     }
 
     pub(crate) fn commit_transactions(
