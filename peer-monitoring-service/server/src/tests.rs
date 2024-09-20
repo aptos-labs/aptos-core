@@ -638,7 +638,6 @@ mod database_mock {
             fn get_transaction_by_hash(
                 &self,
                 hash: HashValue,
-                ledger_version: Version,
                 fetch_events: bool,
             ) -> Result<Option<TransactionWithProof>>;
 

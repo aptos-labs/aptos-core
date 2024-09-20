@@ -793,11 +793,10 @@ impl TransactionsApi {
             let context = self.context.clone();
             let accept_type = accept_type.clone();
 
-            let ledger_info =
-                api_spawn_blocking(move || context.get_latest_storage_ledger_info()).await?;
+            let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
 
             let txn_data = self
-                .get_by_hash(hash.into(), &ledger_info)
+                .get_by_hash(hash.into())
                 .await
                 .context(format!("Failed to get transaction by hash {}", hash))
                 .map_err(|err| {
@@ -837,7 +836,7 @@ impl TransactionsApi {
             api_spawn_blocking(move || context.get_latest_storage_ledger_info()).await?;
 
         let txn_data = self
-            .get_by_hash(hash.into(), &ledger_info)
+            .get_by_hash(hash.into())
             .await
             .context(format!("Failed to get transaction by hash {}", hash))
             .map_err(|err| {
@@ -961,15 +960,12 @@ impl TransactionsApi {
     async fn get_by_hash(
         &self,
         hash: aptos_crypto::HashValue,
-        ledger_info: &LedgerInfo,
     ) -> anyhow::Result<Option<TransactionData>> {
         let context = self.context.clone();
-        let version = ledger_info.version();
-        let from_db =
-            tokio::task::spawn_blocking(move || context.get_transaction_by_hash(hash, version))
-                .await
-                .context("Failed to join task to read transaction by hash")?
-                .context("Failed to read transaction by hash from DB")?;
+        let from_db = tokio::task::spawn_blocking(move || context.get_transaction_by_hash(hash))
+            .await
+            .context("Failed to join task to read transaction by hash")?
+            .context("Failed to read transaction by hash from DB")?;
         Ok(match from_db {
             None => self
                 .context
