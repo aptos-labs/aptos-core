@@ -524,6 +524,13 @@ pub type Bind = Spanned<Bind_>;
 pub type BindList = Spanned<Vec<Bind>>;
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct TypedBind_(pub Bind, pub Option<Type>);
+pub type TypedBind = Spanned<TypedBind_>;
+
+// b1 [":" <Type>], ..., bn [":" <Type>]
+pub type TypedBindList = Spanned<Vec<TypedBind>>;
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum BindFieldOrDotDot_ {
     // f : b
     FieldBind(Field, Bind),
@@ -680,8 +687,8 @@ pub enum Exp_ {
 
     // { seq }
     Block(Sequence),
-    // |x1, ..., xn| e
-    Lambda(BindList, Box<Exp>), // spec only
+    // | x1 [: t1], ..., xn [: tn] | e
+    Lambda(TypedBindList, Box<Exp>),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -1780,6 +1787,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
             },
@@ -1787,6 +1795,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
                 w.write(" = ");
@@ -1884,9 +1893,9 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e) => {
+            E::Lambda(sp!(_, tbs), e) => {
                 w.write("|");
-                bs.ast_debug(w);
+                tbs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
             },
@@ -2124,6 +2133,23 @@ impl AstDebug for Bind_ {
                 w.comma(args, |w, b| b.ast_debug(w));
                 w.write(")");
             },
+        }
+    }
+}
+
+impl AstDebug for Vec<TypedBind> {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        w.comma(self, |w, b| b.ast_debug(w));
+    }
+}
+
+impl AstDebug for TypedBind_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        let TypedBind_(b, ty_opt) = self;
+        b.ast_debug(w);
+        if let Some(ty) = ty_opt {
+            w.write(":");
+            ty.ast_debug(w)
         }
     }
 }

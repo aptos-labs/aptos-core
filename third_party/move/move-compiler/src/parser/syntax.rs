@@ -781,6 +781,26 @@ fn parse_bind_field(context: &mut Context) -> Result<(Field, Bind), Box<Diagnost
     Ok((f, arg))
 }
 
+// Parse an optionally typed binding:
+//     TypedBind = Bind ( ":" <Type> )?
+fn parse_typed_bind(context: &mut Context) -> Result<TypedBind, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    let bind = parse_bind(context)?;
+    let ty_opt = if match_token(context.tokens, Tok::Colon)? {
+        Some(parse_type(context)?)
+    } else {
+        None
+    };
+    let end_loc = context.tokens.previous_end_loc();
+    let typed_bind_ = TypedBind_(bind, ty_opt);
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        end_loc,
+        typed_bind_,
+    ))
+}
+
 // Parse a binding:
 //      Bind =
 //          <Var>
@@ -895,14 +915,14 @@ fn parse_bind_or_dotdot(context: &mut Context) -> Result<BindOrDotDot, Box<Diagn
 
 // Parse a list of bindings for lambda.
 //      LambdaBindList =
-//          "|" Comma<Bind> "|"
-fn parse_lambda_bind_list(context: &mut Context) -> Result<BindList, Box<Diagnostic>> {
+//          "|" Comma<TypedBind> "|"
+fn parse_lambda_bind_list(context: &mut Context) -> Result<TypedBindList, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let b = parse_comma_list(
         context,
         Tok::Pipe,
         Tok::Pipe,
-        parse_bind,
+        parse_typed_bind,
         "a variable or structure binding",
     )?;
     let end_loc = context.tokens.previous_end_loc();
