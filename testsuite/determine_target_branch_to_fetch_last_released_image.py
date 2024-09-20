@@ -50,7 +50,7 @@ def branch_exists(branch):
     result = subprocess.run(['git', 'ls-remote', '--heads', 'origin', branch], capture_output=True)
     return result.returncode == 0
 
-def determine_target_branch(base_branch, max_commits=100):
+def determine_target_branch(base_branch, max_commits=5000):
     """Determine the appropriate target branch based on the base branch"""
     if base_branch == 'main':
         # For main, use the latest release branch
