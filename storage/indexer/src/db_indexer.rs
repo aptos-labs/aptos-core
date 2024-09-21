@@ -220,6 +220,7 @@ impl InternalIndexerDB {
             u64,     // index among events for the same transaction
         )>,
     > {
+        println!("[jpark][db_indexer.rs][lookup_events_by_key] event_key, start_seq_num, limit, ledger_version: {:?}, {:?}, {:?}, {:?}", event_key, start_seq_num, limit, ledger_version);
         let mut iter = self.db.iter::<EventByKeySchema>()?;
         iter.seek(&(*event_key, start_seq_num))?;
 
@@ -227,6 +228,7 @@ impl InternalIndexerDB {
         let mut cur_seq = start_seq_num;
         for res in iter.take(limit as usize) {
             let ((path, seq), (ver, idx)) = res?;
+            println!("[jpark][db_indexer.rs][lookup_events_by_key] path, seq, ver, idx: {:?}, {:?}, {:?}, {:?}", path, seq, ver, idx);
             if path != *event_key || ver > ledger_version {
                 break;
             }
@@ -238,6 +240,7 @@ impl InternalIndexerDB {
                 };
                 bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
             }
+            println!("[jpark][db_indexer.rs][lookup_events_by_key] pushed");
             result.push((seq, ver, idx));
             cur_seq += 1;
         }
@@ -403,10 +406,18 @@ impl DBIndexer {
                     )?;
                 }
             }
-
+            // println!("[jpark][db_indexer.rs] check point 0");
             if self.indexer_db.event_enabled() {
+                // println!("[jpark][db_indexer.rs] check point 1");
                 events.iter().enumerate().for_each(|(idx, event)| {
+                    if !event.is_new_epoch_event()
+                        && !event.is_new_block_event()
+                        && !event.is_new_block_event()
+                    {
+                        println!("[jpark][db_indexer.rs] event: {:?}", event);
+                    }
                     if let ContractEvent::V1(v1) = event {
+                        // println!("[jpark][db_indexer.rs] check point 2");
                         batch
                             .put::<EventByKeySchema>(
                                 &(*v1.key(), v1.sequence_number()),
@@ -420,31 +431,40 @@ impl DBIndexer {
                             )
                             .expect("Failed to put events by version to a batch");
                     }
-                    if let ContractEvent::V2(v2) = event {
-                        if let Some(translated_v1_event) = self
-                            .translate_event_v2_to_v1(v2)
-                            .expect("Failure in translating event")
-                        {
-                            let key = *translated_v1_event.key();
-                            let sequence_number = translated_v1_event.sequence_number();
-                            batch
-                                .put::<EventByKeySchema>(
-                                    &(key, sequence_number),
-                                    &(version, idx as u64),
-                                )
-                                .expect("Failed to put events by key to a batch");
-                            batch
-                                .put::<EventByVersionSchema>(
-                                    &(key, version, sequence_number),
-                                    &(idx as u64),
-                                )
-                                .expect("Failed to put events by version to a batch");
-                            batch
-                                .put::<TranslatedV1EventSchema>(
-                                    &(version, idx as u64),
-                                    &translated_v1_event,
-                                )
-                                .expect("Failed to put translated v1 events to a batch");
+                    let is_event_v2_translation_enabled: bool = true;
+                    if is_event_v2_translation_enabled {
+                        if let ContractEvent::V2(v2) = event {
+                            println!("[jpark][db_indexer.rs] check point 3");
+                            if let Some(translated_v1_event) = self
+                                .translate_event_v2_to_v1(v2)
+                                .expect("Failure in translating event")
+                            {
+                                println!("[jpark][db_indexer.rs] check point 4");
+                                println!(
+                                    "[jpark][db_indexer.rs] translated_v1_event: {:?}",
+                                    translated_v1_event
+                                );
+                                let key = *translated_v1_event.key();
+                                let sequence_number = translated_v1_event.sequence_number();
+                                batch
+                                    .put::<EventByKeySchema>(
+                                        &(key, sequence_number),
+                                        &(version, idx as u64),
+                                    )
+                                    .expect("Failed to put events by key to a batch");
+                                batch
+                                    .put::<EventByVersionSchema>(
+                                        &(key, version, sequence_number),
+                                        &(idx as u64),
+                                    )
+                                    .expect("Failed to put events by version to a batch");
+                                batch
+                                    .put::<TranslatedV1EventSchema>(
+                                        &(version, idx as u64),
+                                        &translated_v1_event,
+                                    )
+                                    .expect("Failed to put translated v1 events to a batch");
+                            }
                         }
                     }
                 });
@@ -496,32 +516,67 @@ impl DBIndexer {
         address: &AccountAddress,
         struct_tag_str: &str,
     ) -> Result<Option<StateValue>> {
+        println!(
+            "[jpark][db_indexer.rs][get_resource] address: {:?}, struct_tag_str: {:?}",
+            address, struct_tag_str
+        );
         let state_view = self
             .main_db_reader
             .latest_state_checkpoint_view()
             .expect("Failed to get state view");
-
+        println!("[jpark][db_indexer.rs][get_resource] check point 0");
         let struct_tag = StructTag::from_str(struct_tag_str)?;
+        println!(
+            "[jpark][db_indexer.rs][get_resource] struct_tag: {:?}",
+            struct_tag
+        );
         let state_key = StateKey::resource(address, &struct_tag)?;
+        println!(
+            "[jpark][db_indexer.rs][get_resource] state_key: {:?}",
+            state_key
+        );
         let maybe_state_value = state_view.get_state_value(&state_key)?;
+        println!(
+            "[jpark][db_indexer.rs][get_resource] maybe_state_value: {:?}",
+            maybe_state_value
+        );
         Ok(maybe_state_value)
     }
 
     fn translate_event_v2_to_v1(&self, v2: &ContractEventV2) -> Result<Option<ContractEventV1>> {
+        println!(
+            "[jpark][db_indexer.rs][translate_event_v2_to_v1] type_tag: {:?}",
+            v2.type_tag()
+        );
+        println!(
+            "[jpark][db_indexer.rs][translate_event_v2_to_v1] type_tag.as_str: {:?}",
+            v2.type_tag().to_canonical_string().as_str()
+        );
         match v2.type_tag().to_canonical_string().as_str() {
             COIN_DEPOSIT_TYPE_STR => {
+                println!("[jpark][db_indexer.rs][translate_event_v2_to_v1] check point 0");
                 let coin_deposit = CoinDeposit::try_from_bytes(v2.event_data())?;
+                println!("[jpark][db_indexer.rs][translate_event_v2_to_v1] check point 1");
+                println!(
+                    "[jpark][db_indexer.rs][translate_event_v2_to_v1] coin_deposit: {:?}",
+                    coin_deposit
+                );
                 let struct_tag_str = format!("0x1::coin::CoinStore<{}>", coin_deposit.coin_type());
+                println!(
+                    "[jpark][db_indexer.rs][translate_event_v2_to_v1] struct_tag_str: {:?}",
+                    struct_tag_str
+                );
                 // We can use `DummyCoinType` as it does not affect the correctness of deserialization.
                 let state_value = self
                     .get_resource(coin_deposit.account(), &struct_tag_str)?
                     .expect("Event handle resource not found");
+                println!("[jpark][db_indexer.rs][translate_event_v2_to_v1] check point 2");
                 let coin_store_resource: CoinStoreResource<DummyCoinType> =
                     bcs::from_bytes(state_value.bytes())?;
-
+                println!("[jpark][db_indexer.rs][translate_event_v2_to_v1] check point 3");
                 let key = *coin_store_resource.deposit_events().key();
                 let sequence_number = self.indexer_db.get_next_sequence_number(&key)?;
-
+                println!("[jpark][db_indexer.rs][translate_event_v2_to_v1] check point 4");
                 let deposit_event = DepositEvent::new(coin_deposit.amount());
                 Ok(Some(ContractEventV1::new(
                     key,
@@ -615,6 +670,10 @@ impl DBIndexer {
             start_seq_num
         };
 
+        println!(
+            "[jpark][db_indexer.rs][get_events_by_event_key] event_key, start_seq_num, cursor, order, limit, ledger_version: {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
+            event_key, start_seq_num, cursor, order, limit, ledger_version
+        );
         // Convert requested range and order to a range in ascending order.
         let (first_seq, real_limit) = get_first_seq_num_and_limit(order, cursor, limit)?;
 
@@ -640,6 +699,7 @@ impl DBIndexer {
             }
         }
 
+        println!("[jpark][db_indexer.rs][get_events_by_event_key] check point 0");
         let mut events_with_version = event_indices
             .into_iter()
             .map(|(seq, ver, idx)| {
@@ -653,17 +713,21 @@ impl DBIndexer {
                             .get_translated_v1_event_by_version_and_index(ver, idx)?,
                     ),
                 };
+                println!("[jpark][db_indexer.rs][get_events_by_event_key] check point 1");
+                println!("[jpark][db_indexer.rs][get_events_by_event_key] event: {:?}", event);
                 let v0 = match &event {
                     ContractEvent::V1(event) => event,
                     ContractEvent::V2(_) => bail!("Unexpected module event"),
                 };
+                println!("[jpark][db_indexer.rs][get_events_by_event_key] check point 2");
+                println!("[jpark][db_indexer.rs][get_events_by_event_key] seq: {}, v0.sequence_number(): {}", seq, v0.sequence_number());
                 ensure!(
                     seq == v0.sequence_number(),
                     "Index broken, expected seq:{}, actual:{}",
                     seq,
                     v0.sequence_number()
                 );
-
+                println!("[jpark][db_indexer.rs][get_events_by_event_key] check point 3");
                 Ok(EventWithVersion::new(ver, event))
             })
             .collect::<Result<Vec<_>>>()?;

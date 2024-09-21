@@ -603,6 +603,17 @@ module std::features {
         is_enabled(COLLECTION_OWNER)
     }
 
+    /// Whether the event v2 translation is enabled.
+    ///
+    /// Lifetime: transient
+    const EVENT_V2_TRANSLATION: u64 = 80;
+
+    public fun get_event_v2_translation_feature(): u64 { EVENT_V2_TRANSLATION }
+
+    public fun event_v2_translation_enabled(): bool acquires Features {
+        is_enabled(EVENT_V2_TRANSLATION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

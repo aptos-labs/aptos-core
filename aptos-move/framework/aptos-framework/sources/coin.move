@@ -1272,6 +1272,50 @@ module aptos_framework::coin {
         amount
     }
 
+
+    // Test purpose
+
+    /// Transfers `amount` of coins `CoinType` from `from` to `to`.
+    public entry fun transfer_with_v2_event<CoinType>(
+        from: &signer,
+        to: address,
+        amount: u64,
+    ) acquires CoinStore, CoinConversionMap, CoinInfo, PairedCoinType {
+        let coin = withdraw<CoinType>(from, amount);
+        deposit_with_v2_event(to, coin);
+    }
+
+    /// Deposit the coin balance into the recipient's account and emit an event.
+    public fun deposit_with_v2_event<CoinType>(
+        account_addr: address,
+        coin: Coin<CoinType>
+    ) acquires CoinStore, CoinConversionMap, CoinInfo {
+        if (exists<CoinStore<CoinType>>(account_addr)) {
+            let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+            assert!(
+                !coin_store.frozen,
+                error::permission_denied(EFROZEN),
+            );
+            event::emit(
+                CoinDeposit { coin_type: type_name<CoinType>(), account: account_addr, amount: coin.value }
+            );
+            merge(&mut coin_store.coin, coin);
+        } else {
+            let metadata = paired_metadata<CoinType>();
+            if (option::is_some(&metadata) && migrated_primary_fungible_store_exists(
+                account_addr,
+                option::destroy_some(metadata)
+            )) {
+                primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
+            } else {
+                abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
+            };
+        }
+    }
+
+
+
+
     #[test_only]
     struct FakeMoney {}
 

@@ -95,6 +95,7 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
+    EVENT_V2_TRANSLATION = 80,
 }
 
 impl FeatureFlag {
@@ -153,7 +154,7 @@ impl FeatureFlag {
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
-            FeatureFlag::MODULE_EVENT_MIGRATION,
+            // FeatureFlag::MODULE_EVENT_MIGRATION,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
@@ -172,6 +173,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::EVENT_V2_TRANSLATION,
         ]
     }
 }

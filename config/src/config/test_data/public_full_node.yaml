@@ -24,3 +24,12 @@ full_node_networks:
 api:
     enabled: true
     address: 127.0.0.1:8080
+
+#indexer_db_config:
+#  enable_event: true
+#  enable_statekeys: true
+#  enable_transaction: true
+#
+#storage:
+#  rocksdb_configs:
+#    enable_storage_sharding: true

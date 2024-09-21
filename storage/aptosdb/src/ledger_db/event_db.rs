@@ -146,13 +146,24 @@ impl EventDb {
         skip_index: bool,
         batch: &SchemaBatch,
     ) -> Result<()> {
+        // println!("[jpark][event_db.rs] check point 0");
+        // println!("[jpark][event_db.rs] events: {:?}", events);
         // Event table and indices updates
         events
             .iter()
             .enumerate()
             .try_for_each::<_, Result<_>>(|(idx, event)| {
+                if !event.is_new_epoch_event() && !event.is_new_block_event() {
+                    println!("[jpark][event_db.rs] event: {:?}", event);
+                }
                 if let ContractEvent::V1(v1) = event {
+                    if !event.is_new_epoch_event() && !event.is_new_block_event() {
+                        println!("[jpark][event_db.rs] check point 1");
+                    }
                     if !skip_index {
+                        if !event.is_new_epoch_event() && !event.is_new_block_event() {
+                            println!("[jpark][event_db.rs] check point 2");
+                        }
                         batch.put::<EventByKeySchema>(
                             &(*v1.key(), v1.sequence_number()),
                             &(version, idx as u64),
@@ -162,6 +173,9 @@ impl EventDb {
                             &(idx as u64),
                         )?;
                     }
+                }
+                if !event.is_new_epoch_event() && !event.is_new_block_event() {
+                    println!("[jpark][event_db.rs] check point 3");
                 }
                 batch.put::<EventSchema>(&(version, idx as u64), event)
             })?;

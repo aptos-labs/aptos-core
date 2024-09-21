@@ -7,7 +7,7 @@ use crate::{
     dkg::DKGStartEvent,
     event::EventKey,
     jwks::ObservedJWKsUpdated,
-    on_chain_config::new_epoch_event_key,
+    on_chain_config::{new_block_event_key, new_epoch_event_key},
     transaction::Version,
 };
 use anyhow::{bail, Error, Result};
@@ -158,6 +158,13 @@ impl ContractEvent {
     pub fn is_new_epoch_event(&self) -> bool {
         match self {
             ContractEvent::V1(event) => *event.key() == new_epoch_event_key(),
+            ContractEvent::V2(_event) => false,
+        }
+    }
+
+    pub fn is_new_block_event(&self) -> bool {
+        match self {
+            ContractEvent::V1(event) => *event.key() == new_block_event_key(),
             ContractEvent::V2(_event) => false,
         }
     }

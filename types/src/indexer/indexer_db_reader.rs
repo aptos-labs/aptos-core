@@ -14,7 +14,7 @@ use crate::{
 };
 use anyhow::Result;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Order {
     Ascending,
     Descending,

@@ -131,6 +131,7 @@ pub enum FeatureFlag {
     FederatedKeyless,
     TransactionSimulationEnhancement,
     CollectionOwner,
+    EventV2Translation,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -347,6 +348,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
             },
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::EventV2Translation => AptosFeatureFlag::EVENT_V2_TRANSLATION,
         }
     }
 }
@@ -490,6 +492,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::TransactionSimulationEnhancement
             },
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
+            AptosFeatureFlag::EVENT_V2_TRANSLATION => FeatureFlag::EventV2Translation,
         }
     }
 }

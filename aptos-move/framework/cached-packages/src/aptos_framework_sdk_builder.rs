@@ -317,6 +317,13 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Transfers `amount` of coins `CoinType` from `from` to `to`.
+    CoinTransferWithV2Event {
+        coin_type: TypeTag,
+        to: AccountAddress,
+        amount: u64,
+    },
+
     /// Upgrade total supply to use a parallelizable implementation if it is
     /// available.
     CoinUpgradeSupply {
@@ -1253,6 +1260,11 @@ impl EntryFunctionCall {
                 to,
                 amount,
             } => coin_transfer(coin_type, to, amount),
+            CoinTransferWithV2Event {
+                coin_type,
+                to,
+                amount,
+            } => coin_transfer_with_v2_event(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
             DelegationPoolAddStake {
                 pool_address,
@@ -2484,6 +2496,26 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
             ident_str!("coin").to_owned(),
         ),
         ident_str!("transfer").to_owned(),
+        vec![coin_type],
+        vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Transfers `amount` of coins `CoinType` from `from` to `to`.
+pub fn coin_transfer_with_v2_event(
+    coin_type: TypeTag,
+    to: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("transfer_with_v2_event").to_owned(),
         vec![coin_type],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
     ))
@@ -5228,6 +5260,18 @@ mod decoder {
         }
     }
 
+    pub fn coin_transfer_with_v2_event(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinTransferWithV2Event {
+                coin_type: script.ty_args().get(0)?.clone(),
+                to: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn coin_upgrade_supply(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinUpgradeSupply {
@@ -6712,6 +6756,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_transfer".to_string(),
             Box::new(decoder::coin_transfer),
+        );
+        map.insert(
+            "coin_transfer_with_v2_event".to_string(),
+            Box::new(decoder::coin_transfer_with_v2_event),
         );
         map.insert(
             "coin_upgrade_supply".to_string(),

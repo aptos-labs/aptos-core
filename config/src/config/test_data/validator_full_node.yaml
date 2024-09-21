@@ -40,3 +40,12 @@ full_node_networks:
           role: "Validator"
 api:
     enabled: true
+
+#indexer_db_config:
+#  enable_event: true
+#  enable_statekeys: true
+#  enable_transaction: true
+#
+#storage:
+#  rocksdb_configs:
+#    enable_storage_sharding: true
