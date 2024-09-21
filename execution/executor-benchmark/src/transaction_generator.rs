@@ -131,6 +131,7 @@ impl TransactionGenerator {
         mut accounts: AccountCache,
         name: &str,
     ) -> AccountCache {
+        println!("Resyncing sequence numbers for {} accounts.", name);
         let mut updated = 0;
         for account in &mut accounts.accounts {
             let seq_num = get_sequence_number(account.address(), reader.clone());
@@ -155,6 +156,7 @@ impl TransactionGenerator {
         num_accounts: usize,
         num_to_skip: usize,
     ) -> AccountCache {
+        println!("Generating user account cache with {} accounts.", num_accounts);
         Self::resync_sequence_numbers(
             reader,
             Self::gen_account_cache(
@@ -167,6 +169,7 @@ impl TransactionGenerator {
     }
 
     fn gen_seed_account_cache(reader: Arc<dyn DbReader>, num_accounts: usize) -> AccountCache {
+        println!("Generating seed account cache with {} accounts.", num_accounts);
         Self::resync_sequence_numbers(
             reader,
             Self::gen_account_cache(
@@ -303,6 +306,7 @@ impl TransactionGenerator {
         phase: Arc<AtomicUsize>,
         transactions_per_sender: usize,
     ) -> usize {
+        println!("Run workload: block size {:?}, num blocks {:?}, phase: {:?}, transactions_per_sender: {:?}", block_size, num_blocks, phase, transactions_per_sender);
         let last_non_empty_phase = Arc::new(AtomicUsize::new(0));
         let transaction_generators = Mutex::new(transaction_generators);
         assert!(self.block_sender.is_some());
@@ -311,6 +315,7 @@ impl TransactionGenerator {
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
         let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
         for i in 0..num_blocks {
+            println!("Generating block {}", i);
             let sender_indices = rand::seq::index::sample(
                 &mut thread_rng(),
                 account_pool_size,
@@ -335,7 +340,7 @@ impl TransactionGenerator {
                         .generate_transactions(sender, 1)
                         .pop()
                         .map(|txn| {
-                            println!("Address: {}, sequence number: {}", txn.sender(), txn.sequence_number());
+                            // println!("Address: {}, sequence number: {}", txn.sender(), txn.sequence_number());
                             Transaction::UserTransaction(txn)
                         })
                 },
@@ -658,6 +663,7 @@ impl TransactionGenerator {
         F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
         S: Fn(&T) -> usize,
     {
+        println!("Generate and send block. inputs {:?}", inputs.len());
         let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
         let block_size = inputs.len();
         let mut jobs = Vec::new();

@@ -40,7 +40,7 @@ SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "200000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
 )
 DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
 
@@ -68,7 +68,7 @@ CODE_PERF_VERSION = "v6"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=4)
+    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=1)
 )
 
 if os.environ.get("DETAILED"):

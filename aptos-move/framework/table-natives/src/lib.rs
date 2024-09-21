@@ -365,7 +365,7 @@ fn native_add_box(
             Ok(smallvec![])
         },
         Err(e) => {
-            // println!("Already exists. key: {:?}, error: {:?}, sender: {:?}, sequence number: {:?}", key, e, table_context.sender, table_context.sequence_number);
+            println!("Already exists. key: {:?}, error: {:?}, sender: {:?}, sequence number: {:?}", key, e, table_context.sender, table_context.sequence_number);
             Err(SafeNativeError::Abort {
                 abort_code: ALREADY_EXISTS,
             })

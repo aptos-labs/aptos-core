@@ -242,12 +242,13 @@
         txn_expiration_time,
     };
     <b>if</b> (<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&nonce_history.table_1, nonce_key)) {
-        <b>return</b> <b>true</b>
-    };
+        <b>true</b>
+    } <b>else</b> {
+        <b>false</b>
+    }
     // <b>if</b> (<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&nonce_history.table_2, nonce_key)) {
     //     <b>return</b> <b>true</b>
     // };
-    <b>false</b>
 }
 </code></pre>
 

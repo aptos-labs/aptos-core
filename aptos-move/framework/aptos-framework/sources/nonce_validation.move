@@ -71,11 +71,12 @@ module aptos_framework::nonce_validation {
             txn_expiration_time,
         };
         if (smart_table::contains(&nonce_history.table_1, nonce_key)) {
-            return true
-        };
+            true
+        } else {
+            false
+        }
         // if (smart_table::contains(&nonce_history.table_2, nonce_key)) {
         //     return true
         // };
-        false
     }
 }
