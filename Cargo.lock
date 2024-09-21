@@ -1245,6 +1245,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.4.14",
  "itertools 0.13.0",
+ "serde_json",
  "tokio",
 ]
 
