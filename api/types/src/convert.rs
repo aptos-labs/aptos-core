@@ -1011,14 +1011,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         if let Some(indexer_reader) = self.indexer_reader.as_ref() {
-            // Attempt to get table_info from the indexer_reader if it exists
-            Ok(indexer_reader.get_table_info(handle)?)
-        } else if self.db.indexer_enabled() {
-            // Attempt to get table_info from the db if indexer is enabled
-            Ok(Some(self.db.get_table_info(handle)?))
-        } else {
-            Ok(None)
+            return Ok(indexer_reader.get_table_info(handle).unwrap_or(None));
         }
+        Ok(None)
     }
 
     fn explain_vm_status(
