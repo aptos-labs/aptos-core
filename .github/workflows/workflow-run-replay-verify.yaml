@@ -209,14 +209,78 @@ jobs:
           install_components: "kubectl,gke-gcloud-auth-plugin"
 
       - name: Run replay-verify in parallel
+        env:
+          BUCKET: ${{ inputs.BUCKET }}
+          SUB_DIR: ${{ inputs.SUB_DIR }}
         shell: bash
         run: |
-          # extract job by job_id
-          jq '.[${{ matrix.job_id }}].[]' jobs.json | while read _desc begin end msg; do
-               echo $begin-$end: $msg
-               sleep 30&
+          set -o nounset -o errexit -o pipefail
+          replay() {
+              idx=$1
+              id=$2
+              begin=$3
+              end=$4
+              desc=$5
+
+              echo ---------
+              echo Job start. $id: $desc
+              echo ---------
+
+              MC=metadata_cache_$idx
+              cp -r metadata_cache $MC
+              DB=db_$idx
+
+              for try in {0..6}
+              do
+                if [ $try -gt 0 ]; then
+                  SLEEP=$((10 * $try))
+                  echo "sleeping for $SLEEP seconds before retry #$try" >&2
+                  sleep $SLEEP
+                fi
+
+                res=0
+                ./aptos-debugger aptos-db replay-verify \
+                  --metadata-cache-dir $MC \
+                  --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
+                  --start-version $begin \
+                  --end-version $end \
+                  \
+                  --lazy-quit \
+                  --enable-storage-sharding \
+                  --target-db-dir $DB \
+                  --concurrent-downloads 8 \
+                  --replay-concurrency-level 2 \
+                  || res=$?
+
+                if [[ $res == 0 || $res == 2 ]]
+                then
+                  return $res
+                fi
+              done
+              return 1
+          }
+
+          pids=()
+          idx=0
+          while read id begin end desc; do
+
+              replay $idx $id $begin $end "$desc" 2>&1 | sed "s/^/[partition $idx]: /" &
+
+              pids[$idx]=$!
+              idx=$((idx+1))
+          done < <(jq '.[${{ matrix.job_id }}][]' jobs.json)
+
+          res=0
+          for idx in `seq 0 $((idx-1))`
+          do
+              range_res=0
+              wait ${pids[$idx]} || range_res=$?
+              echo partition $idx returned $range_res
+              if [[ $range_res != 0 ]]
+              then
+                  res=$range_res
+              fi
           done
-          
-          echo "start waiting"
-          wait
-          echo "done waiting"
+
+          echo All partitions done, returning $res
+          exit $res
