@@ -40,6 +40,7 @@ use aptos_types::{
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
+    indexer::indexer_db_reader::IndexerReader,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction,
@@ -96,8 +97,17 @@ impl ApiSpecificConfig {
 
 pub fn new_test_context(
     test_name: String,
+    node_config: NodeConfig,
+    use_db_with_indexer: bool,
+) -> TestContext {
+    new_test_context_inner(test_name, node_config, use_db_with_indexer, None)
+}
+
+pub fn new_test_context_inner(
+    test_name: String,
     mut node_config: NodeConfig,
     use_db_with_indexer: bool,
+    end_version: Option<u64>,
 ) -> TestContext {
     // Speculative logging uses a global variable and when many instances use it together, they
     // panic, so we disable this to run tests.
@@ -157,8 +167,12 @@ pub fn new_test_context(
     node_config
         .storage
         .set_data_dir(tmp_dir.path().to_path_buf());
-    let mock_indexer_service =
-        MockInternalIndexerDBService::new_for_test(db_rw.reader.clone(), &node_config, recver);
+    let mock_indexer_service = MockInternalIndexerDBService::new_for_test(
+        db_rw.reader.clone(),
+        &node_config,
+        recver,
+        end_version,
+    );
 
     let context = Context::new(
         ChainId::test(),
@@ -428,6 +442,10 @@ impl TestContext {
         .await;
     }
 
+    pub fn get_indexer_reader(&self) -> Option<&Arc<dyn IndexerReader>> {
+        self.context.get_indexer_reader()
+    }
+
     pub async fn create_multisig_account(
         &mut self,
         account: &mut LocalAccount,
@@ -563,6 +581,16 @@ impl TestContext {
 
     pub fn get_latest_ledger_info(&self) -> aptos_api_types::LedgerInfo {
         self.context.get_latest_ledger_info::<BasicError>().unwrap()
+    }
+
+    pub fn get_latest_storage_ledger_info(&self) -> aptos_api_types::LedgerInfo {
+        self.context
+            .get_latest_storage_ledger_info::<BasicError>()
+            .unwrap()
+    }
+
+    pub fn get_indexer_readers(&self) -> Option<&Arc<dyn IndexerReader>> {
+        self.context.get_indexer_reader()
     }
 
     pub fn get_transactions(&self, start: u64, limit: u16) -> Vec<TransactionOnChainData> {

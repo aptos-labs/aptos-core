@@ -21,7 +21,7 @@ mod transactions_test;
 mod view_function;
 mod webauthn_secp256r1_ecdsa;
 
-use aptos_api_test_context::{new_test_context as super_new_test_context, TestContext};
+use aptos_api_test_context::{new_test_context_inner as super_new_test_context, TestContext};
 use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, NodeConfig};
 
 fn new_test_context(test_name: String) -> TestContext {
@@ -29,12 +29,22 @@ fn new_test_context(test_name: String) -> TestContext {
 }
 
 fn new_test_context_with_config(test_name: String, node_config: NodeConfig) -> TestContext {
-    super_new_test_context(test_name, node_config, false)
+    super_new_test_context(test_name, node_config, false, None)
 }
 
 fn new_test_context_with_db_sharding_and_internal_indexer(test_name: String) -> TestContext {
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = true;
-    node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 10_000);
-    super_new_test_context(test_name, node_config, true)
+    node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 10);
+    super_new_test_context(test_name, node_config, true, None)
+}
+
+fn new_test_context_with_sharding_and_delayed_internal_indexer(
+    test_name: String,
+    end_version: Option<u64>,
+) -> TestContext {
+    let mut node_config = NodeConfig::default();
+    node_config.storage.rocksdb_configs.enable_storage_sharding = true;
+    node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 1);
+    super_new_test_context(test_name, node_config, true, end_version)
 }
