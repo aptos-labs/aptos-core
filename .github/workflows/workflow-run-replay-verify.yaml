@@ -211,7 +211,7 @@ jobs:
       - name: Run replay-verify in parallel
         env:
           BUCKET: ${{ inputs.BUCKET }}
-          SUB_DIR: ${{ inputs.SUB_DIR }}
+          #SUB_DIR: ${{ inputs.SUB_DIR }}
         shell: bash
         run: |
           set -o nounset -o errexit -o pipefail
