@@ -41,72 +41,75 @@ B0:
 }
 bools(Arg0: bool, Arg1: bool): bool /* def_idx: 2 */ {
 L2:	loc0: bool
+L3:	loc1: bool
+L4:	loc2: bool
+L5:	loc3: bool
 B0:
 	0: CopyLoc[0](Arg0: bool)
-	1: BrFalse(5)
+	1: BrFalse(44)
 B1:
 	2: CopyLoc[1](Arg1: bool)
 	3: StLoc[2](loc0: bool)
-	4: Branch(7)
 B2:
-	5: LdFalse
-	6: StLoc[2](loc0: bool)
+	4: MoveLoc[2](loc0: bool)
+	5: BrFalse(35)
 B3:
-	7: MoveLoc[2](loc0: bool)
-	8: BrFalse(12)
+	6: LdTrue
+	7: StLoc[3](loc1: bool)
 B4:
-	9: LdTrue
-	10: StLoc[2](loc0: bool)
-	11: Branch(20)
+	8: MoveLoc[3](loc1: bool)
+	9: BrFalse(27)
 B5:
-	12: CopyLoc[0](Arg0: bool)
-	13: BrFalse(18)
+	10: LdTrue
+	11: StLoc[4](loc2: bool)
 B6:
-	14: CopyLoc[1](Arg1: bool)
-	15: Not
-	16: StLoc[2](loc0: bool)
-	17: Branch(20)
+	12: MoveLoc[4](loc2: bool)
+	13: BrFalse(18)
 B7:
-	18: LdFalse
-	19: StLoc[2](loc0: bool)
+	14: LdTrue
+	15: StLoc[5](loc3: bool)
 B8:
-	20: MoveLoc[2](loc0: bool)
-	21: BrFalse(25)
+	16: MoveLoc[5](loc3: bool)
+	17: Ret
 B9:
-	22: LdTrue
-	23: StLoc[2](loc0: bool)
-	24: Branch(32)
+	18: MoveLoc[0](Arg0: bool)
+	19: BrTrue(24)
 B10:
-	25: CopyLoc[0](Arg0: bool)
-	26: BrTrue(30)
+	20: MoveLoc[1](Arg1: bool)
+	21: Not
+	22: StLoc[5](loc3: bool)
+	23: Branch(16)
 B11:
-	27: CopyLoc[1](Arg1: bool)
-	28: StLoc[2](loc0: bool)
-	29: Branch(32)
+	24: LdFalse
+	25: StLoc[5](loc3: bool)
+	26: Branch(16)
 B12:
-	30: LdFalse
-	31: StLoc[2](loc0: bool)
+	27: CopyLoc[0](Arg0: bool)
+	28: BrTrue(32)
 B13:
-	32: MoveLoc[2](loc0: bool)
-	33: BrFalse(37)
+	29: CopyLoc[1](Arg1: bool)
+	30: StLoc[4](loc2: bool)
+	31: Branch(12)
 B14:
-	34: LdTrue
-	35: StLoc[2](loc0: bool)
-	36: Branch(45)
+	32: LdFalse
+	33: StLoc[4](loc2: bool)
+	34: Branch(12)
 B15:
-	37: MoveLoc[0](Arg0: bool)
-	38: BrTrue(43)
+	35: CopyLoc[0](Arg0: bool)
+	36: BrFalse(41)
 B16:
-	39: MoveLoc[1](Arg1: bool)
-	40: Not
-	41: StLoc[2](loc0: bool)
-	42: Branch(45)
+	37: CopyLoc[1](Arg1: bool)
+	38: Not
+	39: StLoc[3](loc1: bool)
+	40: Branch(8)
 B17:
-	43: LdFalse
-	44: StLoc[2](loc0: bool)
+	41: LdFalse
+	42: StLoc[3](loc1: bool)
+	43: Branch(8)
 B18:
-	45: MoveLoc[2](loc0: bool)
-	46: Ret
+	44: LdFalse
+	45: StLoc[2](loc0: bool)
+	46: Branch(4)
 }
 equality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
 B0:
@@ -124,49 +127,51 @@ B0:
 }
 order(Arg0: u64, Arg1: u64): bool /* def_idx: 5 */ {
 L2:	loc0: bool
+L3:	loc1: bool
+L4:	loc2: bool
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: CopyLoc[1](Arg1: u64)
 	2: Lt
-	3: BrFalse(9)
+	3: BrFalse(30)
 B1:
 	4: CopyLoc[0](Arg0: u64)
 	5: CopyLoc[1](Arg1: u64)
 	6: Le
 	7: StLoc[2](loc0: bool)
-	8: Branch(11)
 B2:
-	9: LdFalse
-	10: StLoc[2](loc0: bool)
+	8: MoveLoc[2](loc0: bool)
+	9: BrFalse(27)
 B3:
-	11: MoveLoc[2](loc0: bool)
-	12: BrFalse(19)
+	10: CopyLoc[0](Arg0: u64)
+	11: CopyLoc[1](Arg1: u64)
+	12: Gt
+	13: Not
+	14: StLoc[3](loc1: bool)
 B4:
-	13: CopyLoc[0](Arg0: u64)
-	14: CopyLoc[1](Arg1: u64)
-	15: Gt
-	16: Not
-	17: StLoc[2](loc0: bool)
-	18: Branch(21)
+	15: MoveLoc[3](loc1: bool)
+	16: BrFalse(24)
 B5:
-	19: LdFalse
-	20: StLoc[2](loc0: bool)
+	17: MoveLoc[0](Arg0: u64)
+	18: MoveLoc[1](Arg1: u64)
+	19: Ge
+	20: Not
+	21: StLoc[4](loc2: bool)
 B6:
-	21: MoveLoc[2](loc0: bool)
-	22: BrFalse(29)
+	22: MoveLoc[4](loc2: bool)
+	23: Ret
 B7:
-	23: MoveLoc[0](Arg0: u64)
-	24: MoveLoc[1](Arg1: u64)
-	25: Ge
-	26: Not
-	27: StLoc[2](loc0: bool)
-	28: Branch(31)
+	24: LdFalse
+	25: StLoc[4](loc2: bool)
+	26: Branch(22)
 B8:
-	29: LdFalse
-	30: StLoc[2](loc0: bool)
+	27: LdFalse
+	28: StLoc[3](loc1: bool)
+	29: Branch(15)
 B9:
-	31: MoveLoc[2](loc0: bool)
-	32: Ret
+	30: LdFalse
+	31: StLoc[2](loc0: bool)
+	32: Branch(8)
 }
 }
 ============ bytecode verification succeeded ========

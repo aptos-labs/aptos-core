@@ -5,7 +5,9 @@
 use crate::{pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock,
+    common::{Author, Round},
+    pipeline::commit_vote::CommitVote,
+    pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
@@ -144,9 +146,10 @@ impl BufferItem {
         ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
+        unverified_signatures: PartialSignatures,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
-            unverified_signatures: PartialSignatures::empty(),
+            unverified_signatures,
             commit_proof: None,
             callback,
             ordered_blocks,
@@ -402,6 +405,13 @@ impl BufferItem {
             .last()
             .expect("Vec<PipelinedBlock> should not be empty")
             .id()
+    }
+
+    pub fn round(&self) -> Round {
+        self.get_blocks()
+            .last()
+            .expect("Vec<PipelinedBlock> should not be empty")
+            .round()
     }
 
     pub fn add_signature_if_matched(&mut self, vote: CommitVote) -> anyhow::Result<()> {

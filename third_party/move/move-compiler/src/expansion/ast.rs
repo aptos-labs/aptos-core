@@ -426,6 +426,13 @@ pub type LValue = Spanned<LValue_>;
 pub type LValueList_ = Vec<LValue>;
 pub type LValueList = Spanned<LValueList_>;
 
+/// These represent LValues with user-specified explicit types.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedLValue_(pub LValue, pub Option<Type>);
+pub type TypedLValue = Spanned<TypedLValue_>;
+pub type TypedLValueList_ = Vec<TypedLValue>;
+pub type TypedLValueList = Spanned<TypedLValueList_>;
+
 pub fn wild_card(loc: Loc) -> LValue {
     let wildcard = sp(loc, Symbol::from("_"));
     let lvalue_ = LValue_::Var(sp(loc, ModuleAccess_::Name(wildcard)), None);
@@ -500,7 +507,7 @@ pub enum Exp_ {
     While(Box<Exp>, Box<Exp>),
     Loop(Box<Exp>),
     Block(Sequence),
-    Lambda(LValueList, Box<Exp>),
+    Lambda(TypedLValueList, Box<Exp>),
     Quant(
         QuantKind,
         LValueWithRangeList,
@@ -1796,6 +1803,23 @@ impl AstDebug for ExpDotted_ {
                 e.ast_debug(w);
                 w.write(&format!(".{}", n))
             },
+        }
+    }
+}
+
+impl AstDebug for Vec<TypedLValue> {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        w.comma(self, |w, b| b.ast_debug(w));
+    }
+}
+
+impl AstDebug for TypedLValue_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        let TypedLValue_(lv, opt_ty) = self;
+        lv.ast_debug(w);
+        if let Some(ty) = opt_ty {
+            w.write(":");
+            ty.ast_debug(w);
         }
     }
 }

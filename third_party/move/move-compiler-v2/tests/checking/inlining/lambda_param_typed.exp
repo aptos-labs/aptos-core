@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
+  ┌─ tests/checking/inlining/lambda_param_typed.move:7:15
+  │
+7 │     inline_apply(f, b)
+  │                  ^
+
+error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
+   ┌─ tests/checking/inlining/lambda_param_typed.move:11:16
+   │
+11 │     inline_apply4(f, b)
+   │                   ^

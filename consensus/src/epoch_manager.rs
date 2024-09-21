@@ -8,7 +8,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
-    consensus_observer::publisher::ConsensusPublisher,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},
@@ -56,30 +56,24 @@ use crate::{
 use anyhow::{anyhow, bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{
-    ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig, QcAggregatorType,
-    SafetyRulesConfig, SecureBackend,
-};
+use aptos_config::config::{ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
-    delayed_qc_msg::DelayedQcMsg,
     epoch_retrieval::EpochRetrievalRequest,
     proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
 };
-use aptos_crypto::bls12381;
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_dkg::{
     pvss::{traits::Transcript, Player},
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
-use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
-use aptos_safety_rules::SafetyRulesManager;
-use aptos_secure_storage::{KVStorage, Storage};
+use aptos_safety_rules::{safety_rules_manager, PersistentSafetyStorage, SafetyRulesManager};
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
@@ -94,15 +88,12 @@ use aptos_types::{
     },
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
 use futures::{
-    channel::{
-        mpsc,
-        mpsc::{unbounded, Sender, UnboundedSender},
-        oneshot,
-    },
+    channel::{mpsc, mpsc::Sender, oneshot},
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
@@ -178,6 +169,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
+    key_storage: PersistentSafetyStorage,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -205,6 +197,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
+        let key_storage = safety_rules_manager::storage(sr_config);
         Self {
             author,
             config,
@@ -247,6 +240,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .build(),
             consensus_publisher,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
+            key_storage,
         }
     }
 
@@ -264,21 +258,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &self,
         time_service: Arc<dyn TimeService>,
         timeout_sender: aptos_channels::Sender<Round>,
-        delayed_qc_tx: UnboundedSender<DelayedQcMsg>,
-        qc_aggregator_type: QcAggregatorType,
     ) -> RoundState {
         let time_interval = Box::new(ExponentialTimeInterval::new(
             Duration::from_millis(self.config.round_initial_timeout_ms),
             self.config.round_timeout_backoff_exponent_base,
             self.config.round_timeout_backoff_max_exponent,
         ));
-        RoundState::new(
-            time_interval,
-            time_service,
-            timeout_sender,
-            delayed_qc_tx,
-            qc_aggregator_type,
-        )
+        RoundState::new(time_interval, time_service, timeout_sender)
     }
 
     /// Create a proposer election handler based on proposers
@@ -759,6 +745,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn start_round_manager(
         &mut self,
+        consensus_key: Option<Arc<PrivateKey>>,
         recovery_data: RecoveryData,
         epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
@@ -791,15 +778,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 "Unable to initialize safety rules.",
             );
         }
-        let (delayed_qc_tx, delayed_qc_rx) = unbounded();
 
         info!(epoch = epoch, "Create RoundState");
-        let round_state = self.create_round_state(
-            self.time_service.clone(),
-            self.timeout_sender.clone(),
-            delayed_qc_tx,
-            self.config.qc_aggregator_type.clone(),
-        );
+        let round_state =
+            self.create_round_state(self.time_service.clone(), self.timeout_sender.clone());
 
         info!(epoch = epoch, "Create ProposerElection");
         let proposer_election =
@@ -815,6 +797,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         self.execution_client
             .start_epoch(
+                consensus_key,
                 epoch_state.clone(),
                 safety_rules_container.clone(),
                 payload_manager.clone(),
@@ -910,12 +893,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
-        tokio::spawn(round_manager.start(
-            round_manager_rx,
-            buffered_proposal_rx,
-            delayed_qc_rx,
-            close_rx,
-        ));
+        tokio::spawn(round_manager.start(round_manager_rx, buffered_proposal_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
     }
@@ -940,6 +918,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn try_get_rand_config_for_new_epoch(
         &self,
+        maybe_consensus_key: Option<Arc<PrivateKey>>,
         new_epoch_state: &EpochState,
         onchain_randomness_config: &OnChainRandomnessConfig,
         maybe_dkg_state: anyhow::Result<DKGState>,
@@ -968,8 +947,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .copied()
             .ok_or_else(|| NoRandomnessReason::NotInValidatorSet)?;
 
-        let dkg_decrypt_key = load_dkg_decrypt_key(&self.config.safety_rules)
-            .ok_or_else(|| NoRandomnessReason::DKGDecryptKeyUnavailable)?;
+        let consensus_key =
+            maybe_consensus_key.ok_or(NoRandomnessReason::ConsensusKeyUnavailable)?;
+        let dkg_decrypt_key = maybe_dk_from_bls_sk(consensus_key.as_ref())
+            .map_err(NoRandomnessReason::ErrConvertingConsensusKeyToDecryptionKey)?;
         let transcript = bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(
             dkg_session.transcript.as_slice(),
         )
@@ -1009,8 +990,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .map_err(NoRandomnessReason::RandDbNotAvailable)?
             .filter(|(epoch, _)| *epoch == new_epoch)
         {
+            info!(epoch = new_epoch, "Recovering existing augmented key");
             bcs::from_bytes(&key_pair).map_err(NoRandomnessReason::KeyPairDeserializationError)?
         } else {
+            info!(
+                epoch = new_epoch_state.epoch,
+                "Generating a new augmented key"
+            );
             let mut rng =
                 StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
             let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
@@ -1133,7 +1119,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             // `jwk_consensus_config` not yet initialized, falling back to the old configs.
             Self::equivalent_jwk_consensus_config_from_deprecated_resources(&payload)
         });
+
+        let loaded_consensus_key = match self.load_consensus_key(&epoch_state.verifier) {
+            Ok(k) => Some(Arc::new(k)),
+            Err(e) => {
+                warn!("load_consensus_key failed: {e}");
+                None
+            },
+        };
+
         let rand_configs = self.try_get_rand_config_for_new_epoch(
+            loaded_consensus_key.clone(),
             &epoch_state,
             &onchain_randomness_config,
             dkg_state,
@@ -1180,6 +1176,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
                 epoch_state,
+                loaded_consensus_key.clone(),
                 consensus_config,
                 execution_config,
                 onchain_randomness_config,
@@ -1194,6 +1191,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .await
         } else {
             self.start_new_epoch_with_joltean(
+                loaded_consensus_key.clone(),
                 epoch_state,
                 consensus_config,
                 execution_config,
@@ -1242,6 +1240,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn start_new_epoch_with_joltean(
         &mut self,
+        consensus_key: Option<Arc<PrivateKey>>,
         epoch_state: Arc<EpochState>,
         consensus_config: OnChainConsensusConfig,
         execution_config: OnChainExecutionConfig,
@@ -1258,6 +1257,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 self.recovery_mode = false;
                 self.start_round_manager(
+                    consensus_key,
                     initial_data,
                     epoch_state,
                     consensus_config,
@@ -1289,6 +1289,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_new_epoch_with_dag(
         &mut self,
         epoch_state: Arc<EpochState>,
+        loaded_consensus_key: Option<Arc<PrivateKey>>,
         onchain_consensus_config: OnChainConsensusConfig,
         on_chain_execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
@@ -1301,9 +1302,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let epoch = epoch_state.epoch;
-        let consensus_key = new_consensus_key_from_storage(&self.config.safety_rules.backend)
-            .expect("unable to get private key");
-        let signer = Arc::new(ValidatorSigner::new(self.author, consensus_key));
+        let signer = Arc::new(ValidatorSigner::new(
+            self.author,
+            loaded_consensus_key
+                .clone()
+                .expect("unable to get private key"),
+        ));
         let commit_signer = Arc::new(DagCommitSigner::new(signer.clone()));
 
         assert!(
@@ -1320,6 +1324,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         self.execution_client
             .start_epoch(
+                loaded_consensus_key,
                 epoch_state.clone(),
                 commit_signer,
                 payload_manager.clone(),
@@ -1751,55 +1756,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let oidc_providers = payload.get::<SupportedOIDCProviders>().ok();
         OnChainJWKConsensusConfig::from((features, oidc_providers))
     }
-}
 
-fn new_consensus_key_from_storage(backend: &SecureBackend) -> anyhow::Result<bls12381::PrivateKey> {
-    let storage: Storage = backend.into();
-    storage
-        .available()
-        .map_err(|e| anyhow!("Storage is not available: {e}"))?;
-    storage
-        .get(CONSENSUS_KEY)
-        .map(|v| v.value)
-        .map_err(|e| anyhow!("storage get and map err: {e}"))
-}
-
-fn load_dkg_decrypt_key_from_identity_blob(
-    config: &SafetyRulesConfig,
-) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
-    let identity_blob = config.initial_safety_rules_config.identity_blob()?;
-    identity_blob.try_into_dkg_new_validator_decrypt_key()
-}
-
-fn load_dkg_decrypt_key_from_secure_storage(
-    config: &SafetyRulesConfig,
-) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
-    let consensus_key = new_consensus_key_from_storage(&config.backend)?;
-    maybe_dk_from_bls_sk(&consensus_key)
-}
-
-fn load_dkg_decrypt_key(
-    config: &SafetyRulesConfig,
-) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
-    match load_dkg_decrypt_key_from_secure_storage(config) {
-        Ok(dk) => {
-            return Some(dk);
-        },
-        Err(e) => {
-            warn!("{e}");
-        },
+    fn load_consensus_key(&self, vv: &ValidatorVerifier) -> anyhow::Result<PrivateKey> {
+        let pk = vv
+            .get_public_key(&self.author)
+            .ok_or_else(|| anyhow!("i am not in the validator set!"))?;
+        self.key_storage
+            .consensus_sk_by_pk(pk)
+            .map_err(|e| anyhow!("could not find sk by pk: {:?}", e))
     }
-
-    match load_dkg_decrypt_key_from_identity_blob(config) {
-        Ok(dk) => {
-            return Some(dk);
-        },
-        Err(e) => {
-            warn!("{e}");
-        },
-    }
-
-    None
 }
 
 #[derive(Debug)]
@@ -1810,7 +1775,8 @@ pub enum NoRandomnessReason {
     DKGCompletedSessionResourceMissing,
     CompletedSessionTooOld,
     NotInValidatorSet,
-    DKGDecryptKeyUnavailable,
+    ConsensusKeyUnavailable,
+    ErrConvertingConsensusKeyToDecryptionKey(anyhow::Error),
     TranscriptDeserializationError(bcs::Error),
     SecretShareDecryptionFailed(anyhow::Error),
     RngCreationError(rand::Error),
@@ -1818,5 +1784,4 @@ pub enum NoRandomnessReason {
     KeyPairDeserializationError(bcs::Error),
     KeyPairSerializationError(bcs::Error),
     KeyPairPersistError(anyhow::Error),
-    // Test only reasons
 }

@@ -33,7 +33,6 @@ error: data invariant does not hold
    =     at tests/sources/functional/enum.move:29: test_data_invariant
    =         <redacted> = <redacted>
    =         z = <redacted>
-   =     at tests/sources/functional/enum.move:30: test_data_invariant
    =     at tests/sources/functional/enum.move:9
    =     at tests/sources/functional/enum.move:10
 
@@ -52,13 +51,12 @@ error: unknown assertion failed
    =     at tests/sources/functional/enum.move:58: test_enum_vector
    =     at tests/sources/functional/enum.move:9
    =     at tests/sources/functional/enum.move:10
+   =     at tests/sources/functional/enum.move:58: test_enum_vector
+   =         _common_fields = <redacted>
    =     at tests/sources/functional/enum.move:64: test_enum_vector
    =     at tests/sources/functional/enum.move:65: test_enum_vector
-   =         <redacted> = <redacted>
-   =         _common_fields = <redacted>
    =     at tests/sources/functional/enum.move:9
    =     at tests/sources/functional/enum.move:65: test_enum_vector
    =     at tests/sources/functional/enum.move:63: test_enum_vector
-   =         <redacted> = <redacted>
    =         _common_vector_2 = <redacted>
    =     at tests/sources/functional/enum.move:68: test_enum_vector

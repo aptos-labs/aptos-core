@@ -354,7 +354,7 @@ impl<'env> StructTranslator<'env> {
     /// Return equality check for the field `f`
     pub fn boogie_field_is_equal(&self, f: &FieldEnv<'_>, sep: &str) -> String {
         let field_sel = boogie_field_sel(f);
-        let bv_flag = self.field_bv_flag(&f.get_id());
+        let bv_flag = self.field_bv_flag(f);
         let field_suffix =
             boogie_type_suffix_bv(self.parent.env, &self.inst(&f.get_type()), bv_flag);
         format!(
@@ -367,7 +367,7 @@ impl<'env> StructTranslator<'env> {
     pub fn boogie_field_is_valid(&self, field: &FieldEnv<'_>, sep: &str) -> String {
         let sel = format!("s->{}", boogie_field_sel(field));
         let ty = &field.get_type().instantiate(self.type_inst);
-        let bv_flag = self.field_bv_flag(&field.get_id());
+        let bv_flag = self.field_bv_flag(field);
         format!(
             "{}{}",
             sep,
@@ -380,11 +380,7 @@ impl<'env> StructTranslator<'env> {
         format!(
             "{}: {}",
             boogie_field_sel(f),
-            self.boogie_type_for_struct_field(
-                &f.get_id(),
-                self.parent.env,
-                &self.inst(&f.get_type())
-            )
+            self.boogie_type_for_struct_field(f, self.parent.env, &self.inst(&f.get_type()))
         )
     }
 
@@ -406,7 +402,7 @@ impl<'env> StructTranslator<'env> {
         for (pos, field_env) in struct_env.get_fields_of_variant(variant).enumerate() {
             let field_name = field_env.get_name().display(env.symbol_pool()).to_string();
             let field_type_name = self.boogie_type_for_struct_field(
-                &field_env.get_id(),
+                &field_env,
                 env,
                 &self.inst(&field_env.get_type()),
             );
@@ -558,7 +554,7 @@ impl<'env> StructTranslator<'env> {
     }
 
     /// Return whether a field involves bitwise operations
-    pub fn field_bv_flag(&self, field_id: &FieldId) -> bool {
+    pub fn field_bv_flag(&self, field_env: &FieldEnv) -> bool {
         let global_state = &self
             .parent
             .env
@@ -567,8 +563,20 @@ impl<'env> StructTranslator<'env> {
         let operation_map = &global_state.struct_operation_map;
         let mid = self.struct_env.module_env.get_id();
         let sid = self.struct_env.get_id();
+        let field_id = if field_env.struct_env.has_variants() {
+            let variant = field_env
+                .get_variant()
+                .expect("each field of enum must have a corresponding variant");
+            let pool = self.struct_env.symbol_pool();
+            FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                pool.string(variant).as_str(),
+                pool.string(field_env.get_name()).as_str(),
+            )))
+        } else {
+            field_env.get_id()
+        };
         if let Some(struct_info) = operation_map.get(&(mid, sid)) {
-            matches!(struct_info.get(field_id), Some(&Bitwise))
+            matches!(struct_info.get(&field_id), Some(&Bitwise))
         } else {
             false
         }
@@ -577,11 +585,11 @@ impl<'env> StructTranslator<'env> {
     /// Return boogie type for a struct
     pub fn boogie_type_for_struct_field(
         &self,
-        field_id: &FieldId,
+        field: &FieldEnv,
         env: &GlobalEnv,
         ty: &Type,
     ) -> String {
-        let bv_flag = self.field_bv_flag(field_id);
+        let bv_flag = self.field_bv_flag(field);
         if bv_flag {
             boogie_bv_type(env, ty)
         } else {
@@ -658,7 +666,7 @@ impl<'env> StructTranslator<'env> {
                         field_name,
                         struct_name,
                         self.boogie_type_for_struct_field(
-                            &field_env.get_id(),
+                            field_env,
                             env,
                             &self.inst(&field_env.get_type())
                         ),
@@ -2542,8 +2550,19 @@ impl<'env> FunctionTranslator<'env> {
                     writer.indent();
                     *last_tracked_loc = None;
                     self.track_loc(last_tracked_loc, &loc);
+                    let num_oper_code = global_state
+                        .get_temp_index_oper(mid, fid, *code, baseline_flag)
+                        .unwrap();
+                    let bv2int_str = if *num_oper_code == Bitwise {
+                        format!(
+                            "$int2bv.{}($abort_code)",
+                            boogie_num_type_base(&self.get_local_type(*code))
+                        )
+                    } else {
+                        "$abort_code".to_string()
+                    };
                     let code_str = str_local(*code);
-                    emitln!(writer, "{} := $abort_code;", code_str);
+                    emitln!(writer, "{} := {};", code_str, bv2int_str);
                     self.track_abort(&code_str);
                     emitln!(writer, "goto L{};", target.as_usize());
                     writer.unindent();
@@ -2551,7 +2570,19 @@ impl<'env> FunctionTranslator<'env> {
                 }
             },
             Abort(_, src) => {
-                emitln!(writer, "$abort_code := {};", str_local(*src));
+                let num_oper_code = global_state
+                    .get_temp_index_oper(mid, fid, *src, baseline_flag)
+                    .unwrap();
+                let int2bv_str = if *num_oper_code == Bitwise {
+                    format!(
+                        "$bv2int.{}({})",
+                        boogie_num_type_base(&self.get_local_type(*src)),
+                        str_local(*src)
+                    )
+                } else {
+                    str_local(*src)
+                };
+                emitln!(writer, "$abort_code := {};", int2bv_str);
                 emitln!(writer, "$abort_flag := true;");
                 emitln!(writer, "return;")
             },
@@ -2921,8 +2952,6 @@ impl<'env> FunctionTranslator<'env> {
                     _ => {},
                 },
                 Prop(_, PropKind::Modifies, exp) => {
-                    // global_state.exp_operation_map.get(exp.node_id()) == Bitwise;
-                    //let bv_flag = env.get_node_num_oper(exp.node_id()) == Bitwise;
                     let bv_flag = global_state.get_node_num_oper(exp.node_id()) == Bitwise;
                     need(&BOOL_TYPE, false, 1);
                     need(&self.inst(&env.get_node_type(exp.node_id())), bv_flag, 1)

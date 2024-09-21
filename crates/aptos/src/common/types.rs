@@ -18,7 +18,7 @@ use crate::{
     genesis::git::from_yaml,
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
-use anyhow::Context;
+use anyhow::{bail, Context};
 use aptos_api_types::ViewFunction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
@@ -106,6 +106,14 @@ pub enum CliError {
     MoveTestError,
     #[error("Move Prover failed: {0}")]
     MoveProverError(String),
+    #[error(
+        "The package is larger than {1} bytes ({0} bytes)! \
+        To lower the size you may want to include less artifacts via `--included-artifacts`. \
+        You can also override this check with `--override-size-check`. \
+        Alternatively, you can use the `--chunked-publish` to enable chunked publish mode, \
+        which chunks down the package and deploys it in several stages."
+    )]
+    PackageSizeExceeded(usize, usize),
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
     #[error("Unable to read file '{0}', error: {1}")]
@@ -131,6 +139,7 @@ impl CliError {
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError => "MoveTestError",
             CliError::MoveProverError(_) => "MoveProverError",
+            CliError::PackageSizeExceeded(_, _) => "PackageSizeExceeded",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
@@ -966,7 +975,7 @@ impl SaveFile {
 }
 
 /// Options specific to using the Rest endpoint
-#[derive(Debug, Default, Parser)]
+#[derive(Debug, Parser)]
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
@@ -983,6 +992,16 @@ pub struct RestOptions {
     /// environment variable.
     #[clap(long, env)]
     pub node_api_key: Option<String>,
+}
+
+impl Default for RestOptions {
+    fn default() -> Self {
+        Self {
+            url: None,
+            connection_timeout_secs: DEFAULT_EXPIRATION_SECS,
+            node_api_key: None,
+        }
+    }
 }
 
 impl RestOptions {
@@ -1022,25 +1041,53 @@ impl RestOptions {
     }
 }
 
+/// Options for optimization level
+#[derive(Debug, Clone, Parser)]
+pub enum OptimizationLevel {
+    /// No optimizations
+    None,
+    /// Default optimization level
+    Default,
+    /// Extra optimizations, that may take more time
+    Extra,
+}
+
+impl Default for OptimizationLevel {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+impl FromStr for OptimizationLevel {
+    type Err = anyhow::Error;
+
+    /// Parses an optimization level, or default.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "none" => Ok(Self::None),
+            "" | "default" => Ok(Self::Default),
+            "extra" => Ok(Self::Extra),
+            _ => bail!(
+                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `aggressive`)",
+                s
+            ),
+        }
+    }
+}
+
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
-    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
-    ///
-    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
-    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
-    ///
-    /// Currently, it also additionally pulls in all test compilation artifacts
-    #[clap(long)]
-    pub dev: bool,
-    /// Path to a move package (the folder with a Move.toml file)
+    /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
+
     /// Path to save the compiled move package
     ///
     /// Defaults to `<package_dir>/build`
     #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
+
     /// Named addresses for the move binary
     ///
     /// Example: alice=0x1234, bob=0x5678
@@ -1061,36 +1108,83 @@ pub struct MovePackageDir {
     #[clap(long)]
     pub(crate) skip_fetch_latest_git_deps: bool,
 
-    /// Specify the version of the bytecode the compiler is going to emit.
-    #[clap(long)]
-    pub bytecode_version: Option<u32>,
-
-    /// Specify the version of the compiler.
-    /// Currently, default to `v1`
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
-    pub compiler_version: Option<CompilerVersion>,
-
-    /// Specify the language version to be supported.
-    /// Currently, default to `v1`
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
-    pub language_version: Option<LanguageVersion>,
-
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
+
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
+    #[clap(long)]
+    pub dev: bool,
 
     /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
     /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
+
+    /// Select optimization level.  Choices are "none", "default", or "extra".
+    /// Level "extra" may spend more time on expensive optimizations in the future.
+    /// Level "none" does no optimizations, possibly leading to use of too many runtime resources.
+    /// Level "default" is the recommended level, and the default if not provided.
+    #[clap(long, alias = "optimization_level", value_parser = clap::value_parser!(OptimizationLevel))]
+    pub optimize: Option<OptimizationLevel>,
+
+    /// Experiments
+    #[clap(long, hide(true))]
+    pub experiments: Vec<String>,
+
+    /// ...or --bytecode BYTECODE_VERSION
+    /// Specify the version of the bytecode the compiler is going to emit.
+    /// Defaults to `6`, or `7` if language version 2 is selected
+    /// (through `--move-2` or `--language_version=2`), .
+    #[clap(
+        long,
+        default_value_if("move_2", "true", "7"),
+        alias = "bytecode",
+        verbatim_doc_comment
+    )]
+    pub bytecode_version: Option<u32>,
+
+    /// ...or --compiler COMPILER_VERSION
+    /// Specify the version of the compiler.
+    /// Defaults to `1`, or `2` if `--move-2` is selected.
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
+           alias = "compiler",
+           default_value_if("move_2", "true", "2.0"),
+           verbatim_doc_comment)]
+    pub compiler_version: Option<CompilerVersion>,
+
+    /// ...or --language LANGUAGE_VERSION
+    /// Specify the language version to be supported.
+    /// Currently, defaults to `1`, unless `--move-2` is selected.
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
+           alias = "language",
+           default_value_if("move_2", "true", "2.0"),
+           verbatim_doc_comment)]
+    pub language_version: Option<LanguageVersion>,
+
+    /// Select bytecode, language version, and compiler to support Move 2:
+    /// Same as `--bytecode_version=7 --language_version=2.0 --compiler_version=2.0`
+    #[clap(long, verbatim_doc_comment)]
+    pub move_2: bool,
+}
+
+impl Default for MovePackageDir {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MovePackageDir {
-    pub fn new(package_dir: PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {
             dev: false,
-            package_dir: Some(package_dir),
+            package_dir: None,
             output_dir: None,
             named_addresses: Default::default(),
             override_std: None,
@@ -1100,6 +1194,9 @@ impl MovePackageDir {
             language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
+            move_2: false,
+            optimize: None,
+            experiments: vec![],
         }
     }
 
@@ -1404,12 +1501,12 @@ pub struct ChangeSummary {
 pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
-    faucet_url: Option<reqwest::Url>,
+    pub faucet_url: Option<reqwest::Url>,
 
     /// Auth token to bypass faucet ratelimits. You can also set this as an environment
     /// variable with FAUCET_AUTH_TOKEN.
     #[clap(long, env)]
-    faucet_auth_token: Option<String>,
+    pub faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
@@ -2233,4 +2330,14 @@ pub struct OverrideSizeCheckOption {
     /// will still be blocked from publishing.
     #[clap(long)]
     pub(crate) override_size_check: bool,
+}
+
+#[derive(Parser)]
+pub struct ChunkedPublishOption {
+    /// Whether to publish a package in a chunked mode. This may require more than one transaction
+    /// for publishing the Move package.
+    ///
+    /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
+    #[clap(long)]
+    pub(crate) chunked_publish: bool,
 }

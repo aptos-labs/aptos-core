@@ -157,8 +157,11 @@ pub fn prepare_buffer_manager(
         }),
         bounded_executor,
         false,
+        true,
+        0,
         ConsensusObserverConfig::default(),
         None,
+        100,
     );
 
     (

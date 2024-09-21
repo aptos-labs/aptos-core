@@ -3,9 +3,9 @@
 
 use crate::{
     consensus_observer::{
-        network_message::{BlockTransactionPayload, ConsensusObserverMessage},
-        payload_store::BlockPayloadStatus,
-        publisher::ConsensusPublisher,
+        network::observer_message::{BlockTransactionPayload, ConsensusObserverMessage},
+        observer::payload_store::BlockPayloadStatus,
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
@@ -13,7 +13,7 @@ use crate::{
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload, ProofWithData, Round},
-    payload::{BatchPointer, TDataInfo},
+    payload::{BatchPointer, DataFetchFut, TDataInfo},
     proof_of_store::BatchInfo,
 };
 use aptos_crypto::HashValue;
@@ -25,7 +25,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use async_trait::async_trait;
-use futures::channel::mpsc::Sender;
+use futures::{channel::mpsc::Sender, FutureExt};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     ops::Deref,
@@ -120,8 +120,8 @@ impl QuorumStorePayloadManager {
         }
     }
 
-    fn request_transactions<'a>(
-        batches: impl Iterator<Item = (&'a BatchInfo, Vec<PeerId>)>,
+    fn request_transactions(
+        batches: Vec<(BatchInfo, Vec<PeerId>)>,
         block_timestamp: u64,
         batch_reader: Arc<dyn BatchReader>,
     ) -> Vec<(
@@ -218,7 +218,13 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     proof_with_status
                         .proofs
                         .iter()
-                        .map(|proof| (proof.info(), proof.shuffled_signers(&self.ordered_authors))),
+                        .map(|proof| {
+                            (
+                                proof.info().clone(),
+                                proof.shuffled_signers(&self.ordered_authors),
+                            )
+                        })
+                        .collect(),
                     timestamp,
                     batch_reader,
                 );
@@ -234,21 +240,25 @@ impl TPayloadManager for QuorumStorePayloadManager {
             timestamp: u64,
             ordered_authors: &[PeerId],
         ) {
-            if data_pointer.status.lock().is_some() {
+            let mut data_fut = data_pointer.data_fut.lock();
+            if data_fut.is_some() {
                 return;
             }
-            let receivers = QuorumStorePayloadManager::request_transactions(
-                data_pointer
-                    .batch_summary
-                    .iter()
-                    .map(|proof| (proof.info(), proof.signers(ordered_authors))),
-                timestamp,
-                batch_reader,
-            );
-            data_pointer
-                .status
-                .lock()
-                .replace(DataStatus::Requested(receivers));
+
+            let batches_and_responders = data_pointer
+                .batch_summary
+                .iter()
+                .map(|proof| {
+                    let signers = proof.signers(ordered_authors);
+                    // TODO(ibalajiarun): Add block author to signers
+                    (proof.info().clone(), signers)
+                })
+                .collect();
+            let fut =
+                request_txns_from_quorum_store(batches_and_responders, timestamp, batch_reader)
+                    .boxed()
+                    .shared();
+            *data_fut = Some(DataFetchFut { fut, iteration: 0 })
         }
 
         match payload {
@@ -418,7 +428,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 block.gen_block_info(HashValue::zero(), 0, None),
                 transaction_payload.clone(),
             );
-            consensus_publisher.publish_message(message).await;
+            consensus_publisher.publish_message(message);
         }
 
         Ok((
@@ -461,13 +471,13 @@ async fn get_transactions_for_observer(
     };
 
     // If the payload is valid, publish it to any downstream observers
-    let transaction_payload = block_payload.transaction_payload;
+    let transaction_payload = block_payload.transaction_payload();
     if let Some(consensus_publisher) = consensus_publisher {
         let message = ConsensusObserverMessage::new_block_payload_message(
             block.gen_block_info(HashValue::zero(), 0, None),
             transaction_payload.clone(),
         );
-        consensus_publisher.publish_message(message).await;
+        consensus_publisher.publish_message(message);
     }
 
     // Return the transactions and the transaction limit
@@ -477,86 +487,80 @@ async fn get_transactions_for_observer(
     ))
 }
 
+async fn request_txns_from_quorum_store(
+    batches_and_responders: Vec<(BatchInfo, Vec<PeerId>)>,
+    timestamp: u64,
+    batch_reader: Arc<dyn BatchReader>,
+) -> ExecutorResult<Vec<SignedTransaction>> {
+    let mut vec_ret = Vec::new();
+    let receivers = QuorumStorePayloadManager::request_transactions(
+        batches_and_responders,
+        timestamp,
+        batch_reader,
+    );
+    for (digest, rx) in receivers {
+        match rx.await {
+            Err(e) => {
+                // We probably advanced epoch already.
+                warn!(
+                    "Oneshot channel to get a batch was dropped with error {:?}",
+                    e
+                );
+                return Err(DataNotFound(digest));
+            },
+            Ok(Ok(data)) => {
+                vec_ret.push(data);
+            },
+            Ok(Err(e)) => {
+                return Err(e);
+            },
+        }
+    }
+    let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
+    Ok(ret)
+}
+
 async fn process_payload_helper<T: TDataInfo>(
     data_ptr: &BatchPointer<T>,
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
     ordered_authors: &[PeerId],
 ) -> ExecutorResult<Vec<SignedTransaction>> {
-    let status = data_ptr.status.lock().take();
-    match status.expect("Should have been updated before.") {
-        DataStatus::Cached(data) => {
-            counters::QUORUM_BATCH_READY_COUNT.inc();
-            data_ptr
-                .status
-                .lock()
-                .replace(DataStatus::Cached(data.clone()));
-            Ok(data)
-        },
-        DataStatus::Requested(receivers) => {
-            let _timer = counters::BATCH_WAIT_DURATION.start_timer();
-            let mut vec_ret = Vec::new();
-            if !receivers.is_empty() {
-                debug!(
-                    "QSE: waiting for data on {} receivers, block_round {}",
-                    receivers.len(),
-                    block.round()
-                );
-            }
-            let batches_and_responders = data_ptr.batch_summary.iter().map(|proof| {
-                let mut signers = proof.signers(ordered_authors);
-                if let Some(author) = block.author() {
-                    signers.push(author);
-                }
-                (proof.info(), signers)
-            });
-            for (digest, rx) in receivers {
-                match rx.await {
-                    Err(e) => {
-                        // We probably advanced epoch already.
-                        warn!(
-                            "Oneshot channel to get a batch was dropped with error {:?}",
-                            e
-                        );
-                        let new_receivers = QuorumStorePayloadManager::request_transactions(
-                            batches_and_responders,
-                            block.timestamp_usecs(),
-                            batch_reader.clone(),
-                        );
-                        // Could not get all data so requested again
-                        data_ptr
-                            .status
-                            .lock()
-                            .replace(DataStatus::Requested(new_receivers));
-                        return Err(DataNotFound(digest));
-                    },
-                    Ok(Ok(data)) => {
-                        vec_ret.push(data);
-                    },
-                    Ok(Err(e)) => {
-                        let new_receivers = QuorumStorePayloadManager::request_transactions(
-                            batches_and_responders,
-                            block.timestamp_usecs(),
-                            batch_reader.clone(),
-                        );
-                        // Could not get all data so requested again
-                        data_ptr
-                            .status
-                            .lock()
-                            .replace(DataStatus::Requested(new_receivers));
-                        return Err(e);
-                    },
-                }
-            }
-            let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
-            // execution asks for the data twice, so data is cached here for the second time.
-            data_ptr
-                .status
-                .lock()
-                .replace(DataStatus::Cached(ret.clone()));
-            Ok(ret)
-        },
+    let (iteration, fut) = {
+        let data_fut_guard = data_ptr.data_fut.lock();
+        let data_fut = data_fut_guard.as_ref().expect("must be initialized");
+        (data_fut.iteration, data_fut.fut.clone())
+    };
+
+    let result = fut.await;
+    // If error, reschedule before returning the result
+    if result.is_err() {
+        let mut data_fut_guard = data_ptr.data_fut.lock();
+        let data_fut = data_fut_guard.as_mut().expect("must be initialized");
+        // Protection against race, check the iteration number before rescheduling.
+        if data_fut.iteration == iteration {
+            let batches_and_responders = data_ptr
+                .batch_summary
+                .iter()
+                .map(|proof| {
+                    let mut signers = proof.signers(ordered_authors);
+                    if let Some(author) = block.author() {
+                        signers.push(author);
+                    }
+                    (proof.info().clone(), signers)
+                })
+                .collect();
+            data_fut.fut = request_txns_from_quorum_store(
+                batches_and_responders,
+                block.timestamp_usecs(),
+                batch_reader,
+            )
+            .boxed()
+            .shared();
+            data_fut.iteration = iteration + 1;
+        }
     }
+    result
 }
 
 /// This is deprecated. Use `process_payload_helper` instead after migrating to
@@ -596,9 +600,16 @@ async fn process_payload(
                             e
                         );
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
-                            proof_with_data.proofs.iter().map(|proof| {
-                                (proof.info(), proof.shuffled_signers(ordered_authors))
-                            }),
+                            proof_with_data
+                                .proofs
+                                .iter()
+                                .map(|proof| {
+                                    (
+                                        proof.info().clone(),
+                                        proof.shuffled_signers(ordered_authors),
+                                    )
+                                })
+                                .collect(),
                             block.timestamp_usecs(),
                             batch_reader.clone(),
                         );
@@ -614,9 +625,16 @@ async fn process_payload(
                     },
                     Ok(Err(e)) => {
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
-                            proof_with_data.proofs.iter().map(|proof| {
-                                (proof.info(), proof.shuffled_signers(ordered_authors))
-                            }),
+                            proof_with_data
+                                .proofs
+                                .iter()
+                                .map(|proof| {
+                                    (
+                                        proof.info().clone(),
+                                        proof.shuffled_signers(ordered_authors),
+                                    )
+                                })
+                                .collect(),
                             block.timestamp_usecs(),
                             batch_reader.clone(),
                         );

@@ -88,50 +88,16 @@ pub struct ConsensusConfig {
     pub proof_cache_capacity: u64,
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
+    pub enable_pre_commit: bool,
+
+    pub max_pending_rounds_in_commit_vote_cache: u64,
 }
 
+/// Deprecated
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub enum QcAggregatorType {
     #[default]
     NoDelay,
-    Delayed(DelayedQcAggregatorConfig),
-}
-
-impl QcAggregatorType {
-    pub fn default_delayed() -> Self {
-        // TODO: Enable the delayed aggregation by default once we have tested it more.
-        Self::Delayed(DelayedQcAggregatorConfig::default())
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct DelayedQcAggregatorConfig {
-    // Maximum Delay for a QC to be aggregated after round start (in milliseconds). This assumes that
-    // we have enough voting power to form a QC. If we don't have enough voting power, we will wait
-    // until we have enough voting power to form a QC.
-    pub max_delay_after_round_start_ms: u64,
-    // Percentage of aggregated voting power to wait for before aggregating a QC. For example, if this
-    // is set to 95% then, a QC is formed as soon as we have 95% of the voting power aggregated without
-    // any additional waiting.
-    pub aggregated_voting_power_pct_to_wait: usize,
-    // This knob control what is the % of the time (as compared to time between round start and time when we
-    // have enough voting power to form a QC) we wait after we have enough voting power to form a QC. In a sense,
-    // this knobs controls how much slower we are willing to make consensus to wait for more votes.
-    pub pct_delay_after_qc_aggregated: usize,
-    // In summary, let's denote the time we have enough voting power (2f + 1) to form a QC as T1 and
-    // the time we have aggregated `aggregated_voting_power_pct_to_wait` as T2. Then, we wait for
-    // min((T1 + `pct_delay_after_qc_aggregated` * T1 / 100), `max_delay_after_round_start_ms`, T2)
-    // before forming a QC.
-}
-
-impl Default for DelayedQcAggregatorConfig {
-    fn default() -> Self {
-        Self {
-            max_delay_after_round_start_ms: 700,
-            aggregated_voting_power_pct_to_wait: 90,
-            pct_delay_after_qc_aggregated: 30,
-        }
-    }
 }
 
 /// Execution backpressure which handles gas/s variance,
@@ -241,25 +207,25 @@ impl Default for ConsensusConfig {
                     // Block enters the pipeline after consensus orders it, and leaves the
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 800,
+                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    max_sending_block_txns_after_filtering_override:
+                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    backpressure_proposal_delay_ms: 50,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 1500,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1200,
+                    back_pressure_pipeline_latency_limit_ms: 1900,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1600,
-                    max_sending_block_txns_after_filtering_override:
-                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
                 },
                 // with execution backpressure, only later start reducing block size
                 PipelineBackpressureValues {
@@ -352,6 +318,8 @@ impl Default for ConsensusConfig {
                 rpc_timeout_ms: 10000,
             },
             num_bounded_executor_tasks: 16,
+            enable_pre_commit: true,
+            max_pending_rounds_in_commit_vote_cache: 100,
         }
     }
 }

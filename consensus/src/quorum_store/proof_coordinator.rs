@@ -309,12 +309,14 @@ impl ProofCoordinator {
                 Some(command) = rx.recv() => monitor!("proof_coordinator_handle_command", {
                     match command {
                         ProofCoordinatorCommand::Shutdown(ack_tx) => {
+                            counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofCoordinator::shutdown"]).inc();
                             ack_tx
                                 .send(())
                                 .expect("Failed to send shutdown ack to QuorumStore");
                             break;
                         },
                         ProofCoordinatorCommand::CommitNotification(batches) => {
+                            counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofCoordinator::commit_notification"]).inc();
                             for batch in batches {
                                 let digest = batch.digest();
                                 if let Entry::Occupied(existing_proof) = self.batch_info_to_proof.entry(batch.clone()) {

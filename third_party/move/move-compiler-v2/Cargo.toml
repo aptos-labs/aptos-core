@@ -37,6 +37,8 @@ num = { workspace = true }
 once_cell = { workspace = true }
 #paste = "1.0.5"
 petgraph = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -54,3 +56,6 @@ doctest = false
 name = "testsuite"
 harness = false
 doctest = false
+
+[package.metadata.cargo-machete]
+ignored = ["strum"]

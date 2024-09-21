@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unexpected name in this position
+  ┌─ tests/more-v1/parser/friend_decl_qualified_function.move:7:21
+  │
+7 │     friend 0x42::A::a;
+  │                     ^ Unexpected module member access. Expected a module identifier only

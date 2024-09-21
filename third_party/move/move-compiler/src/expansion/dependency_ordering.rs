@@ -337,6 +337,13 @@ fn function_acquires(context: &mut Context, acqs: &[E::ModuleAccess]) {
 fn struct_def(context: &mut Context, sdef: &E::StructDefinition) {
     if let E::StructLayout::Singleton(fields, _) = &sdef.layout {
         fields.iter().for_each(|(_, _, (_, bt))| type_(context, bt));
+    } else if let E::StructLayout::Variants(variants) = &sdef.layout {
+        for variant in variants {
+            variant
+                .fields
+                .iter()
+                .for_each(|(_, _, (_, bt))| type_(context, bt));
+        }
     }
 }
 
@@ -506,7 +513,9 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         },
 
         E::Lambda(ll, e) => {
-            lvalues(context, &ll.value);
+            use crate::expansion::ast::TypedLValue_;
+            let mapped = ll.value.iter().map(|sp!(_, TypedLValue_(lv, _opt_ty))| lv);
+            lvalues(context, mapped);
             exp(context, e)
         },
         E::Quant(_, binds, es_vec, eopt, e) => {

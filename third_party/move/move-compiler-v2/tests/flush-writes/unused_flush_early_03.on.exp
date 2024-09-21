@@ -1,0 +1,128 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::bar() {
+     # live vars:
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::foo(): (u64, u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: $t1 := 2
+     # live vars: $t0, $t1
+  2: $t2 := 3
+     # live vars: $t0, $t1, $t2
+  3: return ($t0, $t1, $t2)
+}
+
+
+[variant baseline]
+public fun m::test1() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: bool [unused]
+     var $t6: u64 [unused]
+     var $t7: bool [unused]
+     var $t8: u64 [unused]
+     # flush: $t1, $t2
+     # live vars:
+  0: ($t0, $t1, $t2) := m::foo()
+     # live vars: $t0, $t1, $t2
+  1: $t4 := 0
+     # live vars: $t0, $t1, $t2, $t4
+  2: $t3 := ==($t0, $t4)
+     # live vars: $t1, $t2, $t3
+  3: if ($t3) goto 4 else goto 6
+     # live vars: $t1, $t2
+  4: label L0
+     # live vars: $t1, $t2
+  5: m::bar()
+     # live vars: $t1, $t2
+  6: label L2
+     # live vars: $t1, $t2
+  7: $t0 := 0
+     # live vars: $t0, $t1, $t2
+  8: $t3 := ==($t1, $t0)
+     # live vars: $t2, $t3
+  9: if ($t3) goto 10 else goto 12
+     # live vars: $t2
+ 10: label L3
+     # live vars: $t2
+ 11: m::bar()
+     # live vars: $t2
+ 12: label L5
+     # live vars: $t2
+ 13: $t0 := 0
+     # live vars: $t0, $t2
+ 14: $t3 := ==($t2, $t0)
+     # live vars: $t3
+ 15: if ($t3) goto 16 else goto 18
+     # live vars:
+ 16: label L6
+     # live vars:
+ 17: m::bar()
+     # live vars:
+ 18: label L8
+     # live vars:
+ 19: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+bar() /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+foo(): u64 * u64 * u64 /* def_idx: 1 */ {
+B0:
+	0: LdU64(1)
+	1: LdU64(2)
+	2: LdU64(3)
+	3: Ret
+}
+public test1() /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+B0:
+	0: Call foo(): u64 * u64 * u64
+	1: StLoc[0](loc0: u64)
+	2: StLoc[1](loc1: u64)
+	3: LdU64(0)
+	4: Eq
+	5: BrFalse(7)
+B1:
+	6: Call bar()
+B2:
+	7: MoveLoc[1](loc1: u64)
+	8: LdU64(0)
+	9: Eq
+	10: BrFalse(12)
+B3:
+	11: Call bar()
+B4:
+	12: MoveLoc[0](loc0: u64)
+	13: LdU64(0)
+	14: Eq
+	15: BrFalse(17)
+B5:
+	16: Call bar()
+B6:
+	17: Ret
+}
+}
+============ bytecode verification succeeded ========
