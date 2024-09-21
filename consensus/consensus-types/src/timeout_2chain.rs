@@ -266,7 +266,7 @@ impl TwoChainTimeoutWithPartialSignatures {
         let (partial_sig, ordered_rounds) = self
             .signatures
             .get_partial_sig_with_rounds(verifier.address_to_validator_index());
-        let aggregated_sig = verifier.aggregate_signatures(&partial_sig)?;
+        let aggregated_sig = verifier.aggregate_signatures(partial_sig.signatures_iter())?;
         Ok(TwoChainTimeoutCertificate {
             timeout: self.timeout.clone(),
             signatures_with_rounds: AggregateSignatureWithRounds::new(

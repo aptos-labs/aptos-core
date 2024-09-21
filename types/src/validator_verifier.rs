@@ -5,8 +5,7 @@
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use crate::{
-    account_address::AccountAddress,
-    aggregate_signature::{AggregateSignature, PartialSignatures},
+    account_address::AccountAddress, aggregate_signature::AggregateSignature,
     on_chain_config::ValidatorSet,
 };
 use anyhow::{ensure, Result};
@@ -259,13 +258,13 @@ impl ValidatorVerifier {
     // Generates a multi signature or aggregate signature
     // from partial signatures as well as returns the aggregated pub key along with
     // list of pub keys used in signature aggregation.
-    pub fn aggregate_signatures(
+    pub fn aggregate_signatures<'a>(
         &self,
-        partial_signatures: &PartialSignatures,
+        signatures: impl Iterator<Item = (&'a AccountAddress, &'a bls12381::Signature)>,
     ) -> Result<AggregateSignature, VerifyError> {
         let mut sigs = vec![];
         let mut masks = BitVec::with_num_bits(self.len() as u16);
-        for (addr, sig) in partial_signatures.signatures() {
+        for (addr, sig) in signatures {
             let index = *self
                 .address_to_validator_index
                 .get(addr)
@@ -591,7 +590,7 @@ pub fn random_validator_verifier(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::validator_signer::ValidatorSigner;
+    use crate::{aggregate_signature::PartialSignatures, validator_signer::ValidatorSigner};
     use aptos_crypto::test_utils::{TestAptosCrypto, TEST_SEED};
     use proptest::{collection::vec, prelude::*};
     use std::collections::BTreeMap;
@@ -708,7 +707,7 @@ mod tests {
         partial_sig.add_signature(unknown_validator_signer.author(), unknown_signature);
 
         let multi_sig = unknown_validator
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(partial_sig.signatures().iter())
             .unwrap();
 
         assert_eq!(

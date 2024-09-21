@@ -94,6 +94,14 @@ impl PartialSignatures {
         self.signatures.insert(validator, signature);
     }
 
+    pub fn unpack(self) -> BTreeMap<AccountAddress, bls12381::Signature> {
+        self.signatures
+    }
+
+    pub fn signatures_iter(&self) -> impl Iterator<Item = (&AccountAddress, &bls12381::Signature)> {
+        self.signatures.iter()
+    }
+
     pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
         &self.signatures
     }
