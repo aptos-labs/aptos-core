@@ -19,12 +19,10 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
-    ledger_info::{LedgerInfoWithUnverifiedSignatures, LedgerInfoWithSignatures, VerificationStatus},
+    ledger_info::{
+        LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures, VerificationStatus,
+    },
     validator_verifier::VerifyError,
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-    sync::Arc,
 };
 use std::{collections::HashMap, fmt, sync::Arc};
 
@@ -60,7 +58,7 @@ pub enum VoteReceptionResult {
 #[derive(Debug, PartialEq, Eq)]
 pub enum VoteStatus {
     EnoughVotes(LedgerInfoWithSignatures),
-    NotEnoughVotes(LedgerInfoWithMixedSignatures),
+    NotEnoughVotes(LedgerInfoWithUnverifiedSignatures),
 }
 
 /// A PendingVotes structure keep track of votes
@@ -194,7 +192,7 @@ impl PendingVotes {
                 );
 
                 // check if we have enough signatures to create a QC
-                match li_with_sig.check_voting_power(&epoch_state.verifier) {
+                match li_with_sig.check_voting_power(&epoch_state.verifier, true) {
                     // a quorum of signature was reached, a new QC is formed
                     Ok(aggregated_voting_power) => {
                         assert!(
@@ -352,10 +350,10 @@ impl fmt::Display for PendingVotes {
                         f,
                         "LI {} has {} verified votes {:?}, {} unverified votes {:?}",
                         li_digest,
-                        li.verified_voters().len(),
-                        li.verified_voters(),
-                        li.unverified_voters().len(),
-                        li.unverified_voters()
+                        li.verified_voters().count(),
+                        li.verified_voters().collect::<Vec<_>>(),
+                        li.unverified_voters().count(),
+                        li.unverified_voters().collect::<Vec<_>>()
                     )?;
                 },
             }
@@ -576,7 +574,7 @@ mod tests {
         );
         partial_sigs.add_signature(signers[1].author(), vote_1.signature().clone());
 
-        assert_eq!(epoch_state.verifier.malicious_authors().len(), 0);
+        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 0);
 
         assert_eq!(
             pending_votes.insert_vote(&vote_2, epoch_state.clone(), VerificationStatus::Unverified),
@@ -586,12 +584,12 @@ mod tests {
             })
         );
 
-        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
 
         partial_sigs.add_signature(signers[3].author(), vote_3.signature().clone());
         let aggregated_sig = epoch_state
             .verifier
-            .aggregate_signatures(&partial_sigs)
+            .aggregate_signatures(partial_sigs.signatures_iter())
             .unwrap();
         match pending_votes.insert_vote(
             &vote_3,
@@ -633,7 +631,7 @@ mod tests {
             },
         };
 
-        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
     }
 
     #[test]

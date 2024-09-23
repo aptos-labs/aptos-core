@@ -39,7 +39,6 @@ use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
     common::{Author, Round},
-    order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -429,15 +428,17 @@ impl RoundManager {
                 let all_voters = match vote_status {
                     VoteStatus::EnoughVotes(li_with_sig) => epoch_state
                         .verifier
-                        .agg_signature_authors(li_with_sig.signatures()),
-                    VoteStatus::NotEnoughVotes(li_with_sig) => li_with_sig.all_voters(),
+                        .aggregate_signature_authors(li_with_sig.signatures()),
+                    VoteStatus::NotEnoughVotes(li_with_sig) => {
+                        li_with_sig.all_voters().collect::<Vec<_>>()
+                    },
                 };
                 let (voting_power, votes): (Vec<_>, Vec<_>) = all_voters
                     .into_iter()
                     .map(|author| {
                         epoch_state
                             .verifier
-                            .get_voting_power(&author)
+                            .get_voting_power(author)
                             .map(|voting_power| (voting_power as u128, 1))
                             .unwrap_or((0u128, 0))
                     })
@@ -1080,33 +1081,22 @@ impl RoundManager {
                 Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
             });
 
-            self.new_qc_from_order_vote_msg(&order_vote_msg).await?;
+            let order_vote = order_vote_msg.order_vote();
+            debug!(
+                self.new_log(LogEvent::ReceiveOrderVote)
+                    .remote_peer(order_vote.author()),
+                epoch = order_vote.ledger_info().epoch(),
+                round = order_vote.ledger_info().round(),
+                id = order_vote.ledger_info().consensus_block_id(),
+            );
 
-            self.process_order_vote(order_vote_msg.order_vote(), verification_status)
-                .await?;
-        }
-        Ok(())
-    }
+            if self
+                .pending_order_votes
+                .has_enough_order_votes(order_vote_msg.order_vote().ledger_info())
+            {
+                return Ok(());
+            }
 
-    async fn process_order_vote(
-        &mut self,
-        order_vote: &OrderVote,
-        verification_status: VerificationStatus,
-    ) -> anyhow::Result<()> {
-        debug!(
-            self.new_log(LogEvent::ReceiveOrderVote)
-                .remote_peer(order_vote.author()),
-            epoch = order_vote.ledger_info().epoch(),
-            round = order_vote.ledger_info().round(),
-            id = order_vote.ledger_info().consensus_block_id(),
-        );
-
-        if self
-            .pending_order_votes
-            .has_enough_order_votes(order_vote.ledger_info())
-        {
-            return Ok(());
-        }
             let highest_ordered_round = self.block_store.sync_info().highest_ordered_round();
             let order_vote_round = order_vote_msg.order_vote().ledger_info().round();
             let li_digest = order_vote_msg.order_vote().ledger_info().hash();
@@ -1120,20 +1110,22 @@ impl RoundManager {
                     let start = Instant::now();
                     order_vote_msg
                         .quorum_cert()
-                        .verify(&self.epoch_state().verifier)
+                        .verify(&self.epoch_state.verifier)
                         .context("[OrderVoteMsg QuorumCert verification failed")?;
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote_qc"])
                         .observe(start.elapsed().as_secs_f64());
                     self.pending_order_votes.insert_order_vote(
                         order_vote_msg.order_vote(),
-                        &self.epoch_state.verifier,
+                        self.epoch_state.clone(),
+                        verification_status,
                         Some(order_vote_msg.quorum_cert().clone()),
                     )
                 } else {
                     self.pending_order_votes.insert_order_vote(
                         order_vote_msg.order_vote(),
-                        &self.epoch_state.verifier,
+                        self.epoch_state.clone(),
+                        verification_status,
                         None,
                     )
                 };
