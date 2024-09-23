@@ -54,9 +54,9 @@ impl MetricsPusher {
             let response = request.timeout_connect(10_000).send_bytes(&buffer);
             if !response.ok() {
                 warn!(
-                    "Failed to push metrics to {},  resp: {}",
+                    "Failed to push metrics to {},  resp: {:?}",
                     push_metrics_endpoint,
-                    response.status_text()
+                    response.into_string(),
                 )
             }
         }
