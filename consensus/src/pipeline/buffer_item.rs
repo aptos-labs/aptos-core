@@ -19,8 +19,10 @@ use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithVerifiedSignatures},
-    validator_verifier::ValidatorVerifier,
+    ledger_info::{
+        LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures,
+        VerificationStatus,
+    },
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
@@ -56,7 +58,7 @@ fn verify_signatures(
     // by Law, Laurie and Matt, Brian J., in Cryptography and Coding, 2007).
     if let Ok(aggregated_signature) = epoch_state
         .verifier
-        .aggregate_signatures(&unverified_signatures)
+        .aggregate_signatures(unverified_signatures.signatures_iter())
     {
         if epoch_state
             .verifier
@@ -98,11 +100,9 @@ fn generate_executed_item_from_ordered(
     order_vote_enabled: bool,
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
-    let mut partial_commit_proof = LedgerInfoWithUnverifiedSignatures::new(generate_commit_ledger_info(
-        &commit_info,
-        &ordered_proof,
-        order_vote_enabled,
-    ));
+    let mut partial_commit_proof = LedgerInfoWithUnverifiedSignatures::new(
+        generate_commit_ledger_info(&commit_info, &ordered_proof, order_vote_enabled),
+    );
     for (author, sig) in verified_signatures.signatures() {
         partial_commit_proof.add_signature(*author, sig.clone(), VerificationStatus::Verified);
     }
@@ -390,7 +390,7 @@ impl BufferItem {
             Self::Signed(signed_item) => {
                 if signed_item
                     .partial_commit_proof
-                    .check_voting_power(&epoch_state.verifier)
+                    .check_voting_power(&epoch_state.verifier, true)
                     .is_ok()
                 {
                     let _time = counters::VERIFY_MSG
@@ -413,7 +413,7 @@ impl BufferItem {
             Self::Executed(executed_item) => {
                 if executed_item
                     .partial_commit_proof
-                    .check_voting_power(&epoch_state.verifier)
+                    .check_voting_power(&epoch_state.verifier, true)
                     .is_ok()
                 {
                     let _time = counters::VERIFY_MSG

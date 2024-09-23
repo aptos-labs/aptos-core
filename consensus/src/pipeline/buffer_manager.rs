@@ -38,8 +38,11 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, aggregate_signature::PartialSignatures,
-    epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress,
+    aggregate_signature::PartialSignatures,
+    epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfoWithSignatures, VerificationStatus},
 };
 use bytes::Bytes;
 use futures::{
@@ -950,7 +953,8 @@ impl BufferManager {
                             if let CommitMessage::Vote(vote) = &commit_msg.req {
                                 if !epoch_state_clone
                                     .verifier
-                                    .is_malicious_author(&vote.author())
+                                    .pessimistic_verify_set()
+                                    .contains(&vote.author())
                                 {
                                     let _ = tx.unbounded_send((
                                         commit_msg,
