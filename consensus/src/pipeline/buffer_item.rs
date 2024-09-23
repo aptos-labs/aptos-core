@@ -19,9 +19,8 @@ use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     epoch_state::EpochState,
-    ledger_info::{
-        LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures, VerificationStatus,
-    },
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithVerifiedSignatures},
+    validator_verifier::ValidatorVerifier,
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
@@ -99,7 +98,7 @@ fn generate_executed_item_from_ordered(
     order_vote_enabled: bool,
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
-    let mut partial_commit_proof = LedgerInfoWithMixedSignatures::new(generate_commit_ledger_info(
+    let mut partial_commit_proof = LedgerInfoWithUnverifiedSignatures::new(generate_commit_ledger_info(
         &commit_info,
         &ordered_proof,
         order_vote_enabled,
@@ -123,7 +122,7 @@ fn aggregate_commit_proof(
 ) -> LedgerInfoWithSignatures {
     let aggregated_sig = epoch_state
         .verifier
-        .aggregate_signatures(verified_signatures)
+        .aggregate_signatures(verified_signatures.signatures_iter())
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
@@ -142,7 +141,7 @@ pub struct OrderedItem {
 
 pub struct ExecutedItem {
     pub executed_blocks: Vec<PipelinedBlock>,
-    pub partial_commit_proof: LedgerInfoWithMixedSignatures,
+    pub partial_commit_proof: LedgerInfoWithUnverifiedSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_info: BlockInfo,
     pub ordered_proof: LedgerInfoWithSignatures,
@@ -150,7 +149,7 @@ pub struct ExecutedItem {
 
 pub struct SignedItem {
     pub executed_blocks: Vec<PipelinedBlock>,
-    pub partial_commit_proof: LedgerInfoWithMixedSignatures,
+    pub partial_commit_proof: LedgerInfoWithUnverifiedSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
     pub rb_handle: Option<(Instant, DropGuard)>,
@@ -182,9 +181,10 @@ impl BufferItem {
         ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
+        unverified_signatures: PartialSignatures,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
-            unverified_signatures: PartialSignatures::empty(),
+            unverified_signatures,
             commit_proof: None,
             callback,
             ordered_blocks,

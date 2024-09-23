@@ -58,7 +58,7 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
                 let aggregated_signature = self
                     .epoch_state
                     .verifier
-                    .aggregate_signatures(&parital_signatures_guard)
+                    .aggregate_signatures(parital_signatures_guard.signatures_iter())
                     .expect("Signature aggregation should succeed");
                 CertifiedAugData::new(self.aug_data.clone(), aggregated_signature)
             });

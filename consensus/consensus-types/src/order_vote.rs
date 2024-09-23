@@ -78,17 +78,16 @@ impl OrderVote {
     }
 
     /// Verifies the signature on the LedgerInfo.
-    pub fn signature_verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
             .verify(self.author(), &self.ledger_info, &self.signature)
-            .context("Failed to verify OrderVote")?;
-        Ok(())
+            .context("Failed to verify OrderVote")
     }
 
     /// Performs full verification including the signature verification.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         self.verify_metadata()?;
-        self.signature_verify(validator)?;
+        self.verify_signature(validator)?;
         Ok(())
     }
 }

@@ -182,7 +182,7 @@ mod tests {
             );
 
             let aggregated_signature = current_verifier
-                .aggregate_signatures(&partial_signatures)
+                .aggregate_signatures(partial_signatures.signatures_iter())
                 .unwrap();
 
             valid_ledger_info.push(LedgerInfoWithSignatures::new(

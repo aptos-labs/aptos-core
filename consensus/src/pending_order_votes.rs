@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters;
-use aptos_consensus_types::{common::Author, order_vote::OrderVote};
+use aptos_consensus_types::{common::Author, order_vote::OrderVote, quorum_cert::QuorumCert};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{
-        LedgerInfo, LedgerInfoWithMixedSignatures, LedgerInfoWithSignatures, VerificationStatus,
+        LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures,
+        VerificationStatus,
     },
     validator_verifier::VerifyError,
 };
@@ -23,7 +24,8 @@ pub enum OrderVoteReceptionResult {
     /// QC currently has.
     VoteAdded(u128),
     /// This block has just been certified after adding the vote.
-    NewLedgerInfoWithSignatures(LedgerInfoWithSignatures),
+    /// Returns the created order certificate and the QC on which the order certificate is based.
+    NewLedgerInfoWithSignatures((Arc<QuorumCert>, LedgerInfoWithSignatures)),
     /// There might be some issues adding a vote
     ErrorAddingVote(VerifyError),
     /// Error happens when aggregating signature
@@ -35,14 +37,16 @@ pub enum OrderVoteReceptionResult {
 #[derive(Debug, PartialEq, Eq)]
 enum OrderVoteStatus {
     EnoughVotes(LedgerInfoWithSignatures),
-    NotEnoughVotes(LedgerInfoWithMixedSignatures),
+    NotEnoughVotes(LedgerInfoWithUnverifiedSignatures),
 }
 
 /// A PendingVotes structure keep track of order votes for the last few rounds
 pub struct PendingOrderVotes {
     /// Maps LedgerInfo digest to associated signatures.
     /// Order vote status stores caches the information on whether the votes are enough to form a QC.
-    li_digest_to_votes: HashMap<HashValue /* LedgerInfo digest */, OrderVoteStatus>,
+    /// We also store the QC that the order votes certify.
+    li_digest_to_votes:
+        HashMap<HashValue /* LedgerInfo digest */, (QuorumCert, OrderVoteStatus)>,
 }
 
 impl PendingOrderVotes {
@@ -53,6 +57,10 @@ impl PendingOrderVotes {
         }
     }
 
+    pub fn exists(&self, li_digest: &HashValue) -> bool {
+        self.li_digest_to_votes.contains_key(li_digest)
+    }
+
     /// Add a vote to the pending votes
     // TODO: Should we add any counters here?
     pub fn insert_order_vote(
@@ -60,22 +68,31 @@ impl PendingOrderVotes {
         order_vote: &OrderVote,
         epoch_state: Arc<EpochState>,
         verification_status: VerificationStatus,
+        verified_quorum_cert: Option<QuorumCert>,
     ) -> OrderVoteReceptionResult {
         // derive data from order vote
         let li_digest = order_vote.ledger_info().hash();
 
         // obtain the ledger info with signatures associated to the order vote's ledger info
-        let status = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
+        let (quorum_cert, status) = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
             // if the ledger info with signatures doesn't exist yet, create it
-            OrderVoteStatus::NotEnoughVotes(LedgerInfoWithMixedSignatures::new(
-                order_vote.ledger_info().clone(),
-            ))
+            (
+                verified_quorum_cert.expect(
+                    "Quorum Cert is expected when creating a new entry in pending order votes",
+                ),
+                OrderVoteStatus::NotEnoughVotes(LedgerInfoWithUnverifiedSignatures::new(
+                    order_vote.ledger_info().clone(),
+                )),
+            )
         });
 
         match status {
             OrderVoteStatus::EnoughVotes(li_with_sig) => {
                 // we already have enough votes for this ledger info
-                OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig.clone())
+                OrderVoteReceptionResult::NewLedgerInfoWithSignatures((
+                    Arc::new(quorum_cert.clone()),
+                    li_with_sig.clone(),
+                ))
             },
             OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
                 // we don't have enough votes for this ledger info yet
@@ -102,7 +119,7 @@ impl PendingOrderVotes {
                     order_vote.signature().clone(),
                     verification_status,
                 );
-                match li_with_sig.check_voting_power(&epoch_state.verifier) {
+                match li_with_sig.check_voting_power(&epoch_state.verifier, true) {
                     Ok(aggregated_voting_power) => {
                         assert!(
                             aggregated_voting_power >= epoch_state.verifier.quorum_voting_power(),
@@ -118,9 +135,10 @@ impl PendingOrderVotes {
                             Ok(ledger_info_with_sig) => {
                                 *status =
                                     OrderVoteStatus::EnoughVotes(ledger_info_with_sig.clone());
-                                OrderVoteReceptionResult::NewLedgerInfoWithSignatures(
+                                OrderVoteReceptionResult::NewLedgerInfoWithSignatures((
+                                    Arc::new(quorum_cert.clone()),
                                     ledger_info_with_sig,
-                                )
+                                ))
                             },
                             Err(e) => OrderVoteReceptionResult::ErrorAggregatingSignature(e),
                         }
@@ -142,19 +160,21 @@ impl PendingOrderVotes {
 
     // Removes votes older than highest_ordered_round
     pub fn garbage_collect(&mut self, highest_ordered_round: u64) {
-        self.li_digest_to_votes.retain(|_, status| match status {
-            OrderVoteStatus::EnoughVotes(li_with_sig) => {
-                li_with_sig.ledger_info().round() > highest_ordered_round
-            },
-            OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
-                li_with_sig.ledger_info().round() > highest_ordered_round
-            },
-        });
+        self.li_digest_to_votes
+            .retain(|_, (_, status)| match status {
+                OrderVoteStatus::EnoughVotes(li_with_sig) => {
+                    li_with_sig.ledger_info().round() > highest_ordered_round
+                },
+                OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
+                    li_with_sig.ledger_info().round() > highest_ordered_round
+                },
+            });
     }
 
     pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
         let li_digest = ledger_info.hash();
-        if let Some(OrderVoteStatus::EnoughVotes(_)) = self.li_digest_to_votes.get(&li_digest) {
+        if let Some((_, OrderVoteStatus::EnoughVotes(_))) = self.li_digest_to_votes.get(&li_digest)
+        {
             return true;
         }
         false
@@ -164,7 +184,7 @@ impl PendingOrderVotes {
 #[cfg(test)]
 mod tests {
     use super::{OrderVoteReceptionResult, PendingOrderVotes};
-    use aptos_consensus_types::order_vote::OrderVote;
+    use aptos_consensus_types::{order_vote::OrderVote, quorum_cert::QuorumCert};
     use aptos_crypto::{bls12381, HashValue};
     use aptos_types::{
         aggregate_signature::PartialSignatures,
@@ -194,6 +214,7 @@ mod tests {
 
         // create random vote from validator[0]
         let li1 = random_ledger_info();
+        let qc = QuorumCert::dummy();
         let order_vote_1_author_0 = OrderVote::new_with_signature(
             signers[0].author(),
             li1.clone(),
@@ -205,7 +226,8 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &order_vote_1_author_0,
                 epoch_state.clone(),
-                VerificationStatus::Verified
+                VerificationStatus::Verified,
+                Some(qc.clone())
             ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
@@ -215,7 +237,8 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &order_vote_1_author_0,
                 epoch_state.clone(),
-                VerificationStatus::Verified
+                VerificationStatus::Verified,
+                None
             ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
@@ -231,7 +254,8 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &order_vote_2_author_1,
                 epoch_state.clone(),
-                VerificationStatus::Verified
+                VerificationStatus::Verified,
+                Some(qc.clone())
             ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
@@ -248,8 +272,9 @@ mod tests {
             &order_vote_2_author_2,
             epoch_state.clone(),
             VerificationStatus::Verified,
+            None,
         ) {
-            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures((_qc, li_with_sig)) => {
                 assert!(li_with_sig
                     .check_voting_power(&epoch_state.verifier)
                     .is_ok());
@@ -272,9 +297,9 @@ mod tests {
 
         let (signers, verifier) = random_validator_verifier(5, Some(3), false);
         let epoch_state = Arc::new(EpochState::new(1, verifier));
-
         let mut pending_order_votes = PendingOrderVotes::new();
         let mut partial_signatures = PartialSignatures::empty();
+        let qc = QuorumCert::dummy();
 
         // create random vote from validator[0]
         let li = random_ledger_info();
@@ -315,7 +340,8 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &vote_0,
                 epoch_state.clone(),
-                VerificationStatus::Unverified
+                VerificationStatus::Unverified,
+                Some(qc.clone())
             ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
@@ -324,7 +350,8 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &vote_0,
                 epoch_state.clone(),
-                VerificationStatus::Verified
+                VerificationStatus::Verified,
+                None
             ),
             OrderVoteReceptionResult::VoteAdded(1)
         );
@@ -333,17 +360,19 @@ mod tests {
             pending_order_votes.insert_order_vote(
                 &vote_1,
                 epoch_state.clone(),
-                VerificationStatus::Verified
+                VerificationStatus::Verified,
+                None
             ),
             OrderVoteReceptionResult::VoteAdded(2)
         );
 
-        assert_eq!(epoch_state.verifier.malicious_authors().len(), 0);
+        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 0);
         assert_eq!(
             pending_order_votes.insert_order_vote(
                 &vote_2,
                 epoch_state.clone(),
-                VerificationStatus::Unverified
+                VerificationStatus::Unverified,
+                None
             ),
             OrderVoteReceptionResult::ErrorAggregatingSignature(
                 VerifyError::TooLittleVotingPower {
@@ -352,18 +381,19 @@ mod tests {
                 }
             )
         );
-        assert_eq!(epoch_state.verifier.malicious_authors().len(), 1);
+        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
 
         let aggregate_sig = epoch_state
             .verifier
-            .aggregate_signatures(&partial_signatures)
+            .aggregate_signatures(partial_signatures.signatures_iter())
             .unwrap();
         match pending_order_votes.insert_order_vote(
             &vote_3,
             epoch_state.clone(),
             VerificationStatus::Unverified,
+            None,
         ) {
-            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures((_qc, li_with_sig)) => {
                 assert!(li_with_sig
                     .check_voting_power(&epoch_state.verifier)
                     .is_ok());
@@ -379,8 +409,9 @@ mod tests {
             &vote_4,
             epoch_state.clone(),
             VerificationStatus::Unverified,
+            None,
         ) {
-            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures((_qc, li_with_sig)) => {
                 assert!(li_with_sig
                     .check_voting_power(&epoch_state.verifier)
                     .is_ok());

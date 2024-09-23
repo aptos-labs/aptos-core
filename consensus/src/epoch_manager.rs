@@ -1434,9 +1434,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
-            let malicious_sender = self.epoch_state().verifier.is_malicious_author(&peer_id);
+            let perform_pessimistic_verification = self
+                .epoch_state()
+                .verifier
+                .pessimistic_verify_set()
+                .contains(&peer_id);
 
-            if self.config.optimistic_sig_verification_for_order_votes && !malicious_sender {
+            if self.config.optimistic_sig_verification_for_order_votes
+                && !perform_pessimistic_verification
+            {
                 if let UnverifiedEvent::OrderVoteMsg(order_vote) = &unverified_event {
                     order_vote.verify_metadata()?;
                     Self::forward_event_to(
@@ -1457,7 +1463,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             }
 
-            if self.config.optimistic_sig_verification_for_votes && !malicious_sender {
+            if self.config.optimistic_sig_verification_for_votes
+                && !perform_pessimistic_verification
+            {
                 if let UnverifiedEvent::VoteMsg(vote) = unverified_event.clone() {
                     self.bounded_executor
                         .spawn(async move {
