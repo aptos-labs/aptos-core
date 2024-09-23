@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: "enable federated keyless"
+proposals:
+  - name: enable_federated_keyless
+    metadata:
+      title: "enable federated keyless"
+      description: "enable federated keyless on testnet"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - federated_keyless
