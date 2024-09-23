@@ -20,7 +20,6 @@ runs:
     # rust-cache action will cache ~/.cargo and ./target
     # https://github.com/Swatinem/rust-cache#cache-details
     - name: Run cargo cache
-      if: !startsWith(github.ref, 'refs/pull/')
       uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # pin@v2.7.3
       with:
         key: ${{ inputs.ADDITIONAL_KEY }}
