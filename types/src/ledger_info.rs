@@ -361,7 +361,7 @@ impl LedgerInfoWithVerifiedSignatures {
         verifier: &ValidatorVerifier,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
         let aggregated_sig =
-            verifier.aggregate_signatures(self.partial_sigs.signatures().iter())?;
+            verifier.aggregate_signatures(self.partial_sigs.signatures_iter())?;
         Ok(LedgerInfoWithSignatures::new(
             self.ledger_info.clone(),
             aggregated_sig,
@@ -622,7 +622,7 @@ mod tests {
                 .expect("Incorrect quorum size.");
 
         let mut aggregated_signature = validator_verifier
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(partial_sig.signatures_iter())
             .unwrap();
 
         let ledger_info_with_signatures =
@@ -635,7 +635,7 @@ mod tests {
         }
 
         aggregated_signature = validator_verifier
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(partial_sig.signatures_iter())
             .unwrap();
 
         let ledger_info_with_signatures_reversed =
@@ -823,7 +823,7 @@ mod tests {
         let aggregate_sig = LedgerInfoWithSignatures::new(
             ledger_info.clone(),
             validator_verifier
-                .aggregate_signatures(&partial_sig)
+                .aggregate_signatures(partial_sig.signatures_iter())
                 .unwrap(),
         );
         assert_eq!(
