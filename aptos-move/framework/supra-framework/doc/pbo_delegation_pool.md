@@ -2379,7 +2379,8 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     <b>let</b> schedule = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&unlock_numerators,
         |e| {
-            <b>let</b> fraction = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_rational">fixed_point64::create_from_rational</a>((*e <b>as</b> u128), (unlock_denominator <b>as</b> u128));
+            <b>let</b> fraction = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_rational">fixed_point64::create_from_rational</a>((*e <b>as</b> u128),
+                (unlock_denominator <b>as</b> u128));
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> schedule, fraction);
         });
 
@@ -3538,7 +3539,7 @@ This does not apply to anyone who added stake later or operator
     <b>let</b> pool: &<b>mut</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a> = <b>borrow_global_mut</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> admin_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(multisig_admin);
     //Ensure that authorized admin is calling
-    <b>assert</b>!(admin_addr!=@0x0,<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EADMIN_ADDRESS_CANNOT_BE_ZERO">EADMIN_ADDRESS_CANNOT_BE_ZERO</a>));
+    <b>assert</b>!(admin_addr != @0x0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_EADMIN_ADDRESS_CANNOT_BE_ZERO">EADMIN_ADDRESS_CANNOT_BE_ZERO</a>));
     <b>assert</b>!(admin_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_get_with_default">option::get_with_default</a>(&pool.multisig_admin, @0x0),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ENOT_AUTHORIZED">ENOT_AUTHORIZED</a>));
 
@@ -3569,7 +3570,6 @@ This does not apply to anyone who added stake later or operator
             <b>let</b> val = <a href="../../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(pending_withdrawals, old_delegator);
             <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(pending_withdrawals, new_delegator, val);
         };
-
 
     };
 
@@ -3607,8 +3607,7 @@ This does not apply to anyone who added stake later or operator
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(&<b>mut</b> pool.principle_stake, new_delegator, val);
     };
 
-
-        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegatorReplacemendEvent">DelegatorReplacemendEvent</a> { pool_address, old_delegator, new_delegator },);
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegatorReplacemendEvent">DelegatorReplacemendEvent</a> { pool_address, old_delegator, new_delegator },);
 
 }
 </code></pre>
@@ -3646,9 +3645,9 @@ accurate as time passes
 
     //To avoid problem even <b>if</b> fraction is slightly above 1
     <b>let</b> unlockable_principle_stake = (<a href="../../aptos-stdlib/doc/math128.md#0x1_math128_min">math128::min</a>(<a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_multiply_u128">fixed_point64::multiply_u128</a>(
-            (delegator_principle_stake <b>as</b> u128), unlockable_fraction
-        ),
-        (delegator_principle_stake <b>as</b> u128)) <b>as</b> u64);
+                (delegator_principle_stake <b>as</b> u128), unlockable_fraction
+            ),
+            (delegator_principle_stake <b>as</b> u128)) <b>as</b> u64);
     <b>let</b> locked_amount = delegator_principle_stake - unlockable_principle_stake;
 
     <b>assert</b>!(delegator_active_balance &gt;= locked_amount,
@@ -3687,7 +3686,10 @@ accurate as time passes
     };
 
     <b>let</b> unlock_schedule = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).principle_unlock_schedule;
-
+    <b>let</b> one = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_rational">fixed_point64::create_from_rational</a>(1, 1);
+    <b>if</b> (<a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_greater_or_equal">fixed_point64::greater_or_equal</a>(unlock_schedule.cumulative_unlocked_fraction, one)) {
+        <b>return</b> <b>true</b>
+    };
     <b>if</b> (unlock_schedule.start_timestamp_secs &gt; <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()) {
         <b>let</b> unlockable_amount = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_cached_unlockable_balance">cached_unlockable_balance</a>(delegator_addr, pool_address);
         <b>return</b> amount &lt;= unlockable_amount
@@ -3698,13 +3700,14 @@ accurate as time passes
         / unlock_schedule.period_duration;
     <b>let</b> last_unlocked_period = unlock_schedule.last_unlock_period;
     <b>let</b> schedule_length = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&unlock_schedule.schedule);
-    <b>let</b> one = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_rational">fixed_point64::create_from_rational</a>(1,1);
     <b>let</b> cfraction = unlock_schedule.cumulative_unlocked_fraction;
-    <b>while</b> (last_unlocked_period &lt; unlock_periods_passed && <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_less">fixed_point64::less</a>(cfraction,one)) {
+    <b>while</b> (last_unlocked_period &lt; unlock_periods_passed && <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_less">fixed_point64::less</a>(
+            cfraction, one
+        )) {
         <b>let</b> next_fraction = <b>if</b> (schedule_length &lt;= last_unlocked_period) {
             *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&unlock_schedule.schedule, schedule_length - 1)
         } <b>else</b> { *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&unlock_schedule.schedule, last_unlocked_period) };
-        cfraction = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_add">fixed_point64::add</a>(cfraction,next_fraction);
+        cfraction = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_add">fixed_point64::add</a>(cfraction, next_fraction);
 
         last_unlocked_period = last_unlocked_period + 1;
     };
