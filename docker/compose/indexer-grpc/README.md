@@ -16,7 +16,7 @@ Relevant ports are exposed on the docker host for testing purposes
 
 ## Reset
 
-A simple script is provided to kill and remove all relevant docker containers and volumes, to reset the whole local testnet and indexer setup:
+A simple script is provided to kill and remove all relevant docker containers and volumes, to reset the whole localnet and indexer setup:
 
 ```
 ./reset_indexer_grpc_testnet.sh

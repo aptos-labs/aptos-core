@@ -2,22 +2,31 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    experiments::Experiment,
     file_format_generator::{
-        module_generator::{ModuleContext, ModuleGenerator},
-        MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
+        module_generator::{ModuleContext, ModuleGenerator, SOURCE_MAP_OK},
+        peephole_optimizer, Options, MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
     },
-    pipeline::livevar_analysis_processor::LiveVarAnnotation,
+    pipeline::{
+        flush_writes_processor::FlushWritesAnnotation,
+        livevar_analysis_processor::LiveVarAnnotation,
+    },
 };
-use move_binary_format::file_format as FF;
+use move_binary_format::{
+    file_format as FF,
+    file_format::{CodeOffset, FunctionDefinitionIndex},
+};
 use move_model::{
-    ast::TempIndex,
-    model::{FunId, FunctionEnv, Loc, QualifiedId, StructId, TypeParameter},
+    ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    model::{FunId, FunctionEnv, Loc, NodeId, Parameter, QualifiedId, StructId, TypeParameter},
+    symbol::Symbol,
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
     function_target::FunctionTarget,
     function_target_pipeline::FunctionVariant,
-    stackless_bytecode::{AssignKind, Bytecode, Constant, Label, Operation},
+    stackless_bytecode::{AssignKind, AttrId, Bytecode, Constant, Label, Operation},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,16 +34,21 @@ pub struct FunctionGenerator<'a> {
     /// The underlying module generator.
     gen: &'a mut ModuleGenerator,
     /// The set of temporaries which need to be pinned to locals because references are taken for
-    /// them.
+    /// them, or they are used in specs.
     pinned: BTreeSet<TempIndex>,
     /// A map from a temporary to information associated with it.
     temps: BTreeMap<TempIndex, TempInfo>,
     /// The value stack, represented by the temporaries which are located on it.
-    stack: Vec<TempIndex>,
+    /// Each temporary is paired with a bool, indicating whether the value was copied onto
+    /// the stack from a local.
+    /// If a value was copied onto the stack, then we don't have to save it back to the local.
+    stack: Vec<(TempIndex, bool)>,
     /// The locals which have been used so far. This contains the parameters of the function.
     locals: Vec<Type>,
     /// A map from branching labels to information about them.
     label_info: BTreeMap<Label, LabelInfo>,
+    /// A map from code offset to spec blocks associated with them
+    spec_blocks: BTreeMap<CodeOffset, Spec>,
     /// The generated code
     code: Vec<FF::Bytecode>,
 }
@@ -51,6 +65,8 @@ pub struct FunctionContext<'env> {
     pub loc: Loc,
     /// Type parameters, cached here.
     type_parameters: Vec<TypeParameter>,
+    /// Function definition index.
+    def_idx: FunctionDefinitionIndex,
 }
 
 /// Immutable context for processing a bytecode instruction.
@@ -58,6 +74,7 @@ pub struct FunctionContext<'env> {
 struct BytecodeContext<'env> {
     fun_ctx: &'env FunctionContext<'env>,
     code_offset: FF::CodeOffset,
+    attr_id: AttrId,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -95,6 +112,25 @@ impl<'a> FunctionGenerator<'a> {
         let function = gen.function_index(ctx, &loc, &fun_env);
         let visibility = fun_env.visibility();
         let fun_count = gen.module.function_defs.len();
+        let def_idx = FunctionDefinitionIndex::new(ctx.checked_bound(
+            &loc,
+            fun_count,
+            MAX_FUNCTION_DEF_COUNT,
+            "defined function",
+        ));
+        gen.source_map
+            .add_top_level_function_mapping(def_idx, ctx.env.to_ir_loc(&loc), fun_env.is_native())
+            .expect(SOURCE_MAP_OK);
+        for TypeParameter(name, _, loc) in fun_env.get_type_parameters() {
+            gen.source_map
+                .add_function_type_parameter_mapping(def_idx, ctx.source_name(name, loc))
+                .expect(SOURCE_MAP_OK)
+        }
+        for Parameter(name, _, loc) in fun_env.get_parameters() {
+            gen.source_map
+                .add_parameter_mapping(def_idx, ctx.source_name(name, loc))
+                .expect(SOURCE_MAP_OK)
+        }
         let (gen, code) = if !fun_env.is_native() {
             let mut fun_gen = Self {
                 gen,
@@ -103,16 +139,33 @@ impl<'a> FunctionGenerator<'a> {
                 stack: vec![],
                 locals: vec![],
                 label_info: Default::default(),
+                spec_blocks: BTreeMap::new(),
                 code: vec![],
             };
             let target = ctx.targets.get_target(&fun_env, &FunctionVariant::Baseline);
-
-            let code = fun_gen.gen_code(&FunctionContext {
+            let mut code = fun_gen.gen_code(&FunctionContext {
                 module: ctx.clone(),
                 fun: target,
                 loc: loc.clone(),
                 type_parameters: fun_env.get_type_parameters(),
+                def_idx,
             });
+            if fun_gen.spec_blocks.is_empty() {
+                // Currently, peephole optimizations require that there are no inline spec blocks.
+                // This is to ensure that spec-related data structures do not refer to code
+                // offsets which could be changed by the peephole optimizer.
+                let options = ctx
+                    .env
+                    .get_extension::<Options>()
+                    .expect("Options is available");
+                if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
+                    // TODO: fix source mapping (#14167)
+                    peephole_optimizer::run(&mut code);
+                }
+            } else {
+                // Write the spec block table back to the environment.
+                fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
+            }
             (fun_gen.gen, Some(code))
         } else {
             (gen, None)
@@ -131,21 +184,20 @@ impl<'a> FunctionGenerator<'a> {
             acquires_global_resources,
             code,
         };
-        ctx.checked_bound(
-            loc,
-            fun_count, // gen.module.function_defs.len(),
-            MAX_FUNCTION_DEF_COUNT,
-            "defined function",
-        );
+
         gen.module.function_defs.push(def)
     }
 
     /// Generates code for a function.
     fn gen_code(&mut self, ctx: &FunctionContext<'_>) -> FF::CodeUnit {
         // Initialize the abstract virtual machine
-        self.pinned = Self::pinned_temps(ctx);
+        // TODO: right now we pin temps which are parameter of the drop instruction.
+        //   This is needed since we cannot determine whether the local has been already moved on
+        //   the stack and is not longer available in the associated local. This needs to be reworked
+        //   to avoid this.
+        self.pinned = ctx.fun.get_pinned_temps(/*include_drop*/ true);
         self.temps = (0..ctx.fun.get_parameter_count())
-            .map(|temp| (temp, TempInfo::new(self.temp_to_local(ctx, temp))))
+            .map(|temp| (temp, TempInfo::new(self.temp_to_local(ctx, None, temp))))
             .collect();
         self.locals = (0..ctx.fun.get_parameter_count())
             .map(|temp| ctx.temp_type(temp).to_owned())
@@ -155,21 +207,22 @@ impl<'a> FunctionGenerator<'a> {
         let bytecode = ctx.fun.get_bytecode();
         for i in 0..bytecode.len() {
             let code_offset = i as FF::CodeOffset;
+            let bc = &bytecode[i];
             let bytecode_ctx = BytecodeContext {
                 fun_ctx: ctx,
                 code_offset,
+                attr_id: bc.get_attr_id(),
             };
             if i + 1 < bytecode.len() {
-                let bc = &bytecode[i];
                 let next_bc = &bytecode[i + 1];
-                self.gen_bytecode(&bytecode_ctx, &bytecode[i], Some(next_bc));
+                self.gen_bytecode(&bytecode_ctx, bc, Some(next_bc));
                 if !bc.is_branching() && matches!(next_bc, Bytecode::Label(..)) {
                     // At block boundaries without a preceding branch, need to flush stack
                     // TODO: to avoid this, we should use the CFG for code generation.
                     self.abstract_flush_stack_after(&bytecode_ctx, 0);
                 }
             } else {
-                self.gen_bytecode(&bytecode_ctx, &bytecode[i], None)
+                self.gen_bytecode(&bytecode_ctx, bc, None)
             }
         }
 
@@ -203,28 +256,29 @@ impl<'a> FunctionGenerator<'a> {
         }
     }
 
-    /// Compute the set of temporaries which are referenced in borrow instructions.
-    /// TODO: right now we also pin locals which are parameter of the destroy instruction.
-    ///   This is needed since we cannot determine whether the local has been already moved on
-    ///   the stack and is not longer available in the associated local. This needs to be reworked
-    ///   to avoid this.
-    fn pinned_temps(ctx: &FunctionContext) -> BTreeSet<TempIndex> {
-        let mut result = BTreeSet::new();
-        for bc in ctx.fun.get_bytecode() {
-            if let Bytecode::Call(_, _, Operation::BorrowLoc | Operation::Drop, args, _) = bc {
-                result.insert(args[0]);
-            }
-        }
-        result
-    }
-
     /// Generate file-format bytecode from a stackless bytecode and an optional next bytecode
     /// for peephole optimizations.
     fn gen_bytecode(&mut self, ctx: &BytecodeContext, bc: &Bytecode, next_bc: Option<&Bytecode>) {
+        self.gen
+            .source_map
+            .add_code_mapping(
+                ctx.fun_ctx.def_idx,
+                self.code.len() as FF::CodeOffset,
+                ctx.fun_ctx
+                    .module
+                    .env
+                    .to_ir_loc(&ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id)),
+            )
+            .expect(SOURCE_MAP_OK);
         match bc {
             Bytecode::Assign(_, dest, source, mode) => {
+                self.flush_any_conflicts(
+                    ctx,
+                    std::slice::from_ref(dest),
+                    std::slice::from_ref(source),
+                );
                 self.abstract_push_args(ctx, vec![*source], Some(mode));
-                let local = self.temp_to_local(ctx.fun_ctx, *dest);
+                let local = self.temp_to_local(ctx.fun_ctx, Some(ctx.attr_id), *dest);
                 self.emit(FF::Bytecode::StLoc(local));
                 self.abstract_pop(ctx)
             },
@@ -282,6 +336,7 @@ impl<'a> FunctionGenerator<'a> {
             Bytecode::Nop(_) => {
                 // do nothing -- labels are relative
             },
+            Bytecode::SpecBlock(_, spec) => self.gen_spec_block(ctx, spec),
             Bytecode::SaveMem(_, _, _)
             | Bytecode::Call(_, _, _, _, Some(_))
             | Bytecode::SaveSpecVar(_, _, _)
@@ -292,22 +347,31 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Balance the stack such that it exactly contains the `result` temps and nothing else. This
-    /// is used for instructions like `return` or `abort` which terminate a block und must leave
-    /// the stack empty at end.
+    /// is used for instructions like `branch`, `return` or `abort` which terminate a block
+    /// and must leave the stack empty at end.
     fn balance_stack_end_of_block(
         &mut self,
         ctx: &BytecodeContext,
         result: impl AsRef<[TempIndex]>,
     ) {
         let result = result.as_ref();
-        // First ensure the arguments are on the stack.
-        self.abstract_push_args(ctx, result, None);
-        if self.stack.len() != result.len() {
-            // Unfortunately, there is more on the stack than needed.
-            // Need to flush and push again so the stack is empty after return.
+        let stack = self.stack.iter().map(|(t, _)| *t).collect::<Vec<_>>();
+        // If the stack already contains exactly the result and none of the temps are used after
+        // or were copied from locals, nothing to do.
+        // [TODO]: we could further optimize this when:
+        //   1. `stack == result` and
+        //   2. some stack temps are alive after and were not copied from locals;
+        // then we can flush only until the lowest such temp on the stack, and then push them back,
+        // instead of always fully flushing the stack.
+        let stack_ready = stack == result
+            && self
+                .stack
+                .iter()
+                .all(|(temp, copied)| *copied || !ctx.is_alive_after(*temp, &[], false));
+        if !stack_ready {
+            // Flush the stack and push the result.
             self.abstract_flush_stack_before(ctx, 0);
-            self.abstract_push_args(ctx, result.as_ref(), None);
-            assert_eq!(self.stack.len(), result.len())
+            self.abstract_push_args(ctx, result, None);
         }
     }
 
@@ -322,7 +386,7 @@ impl<'a> FunctionGenerator<'a> {
             .insert(offset);
     }
 
-    /// Sets the resolution of a lable to the current code offset.
+    /// Sets the resolution of a label to the current code offset.
     fn define_label(&mut self, label: Label) {
         let offset = self.code.len() as FF::CodeOffset;
         self.label_info.entry(label).or_default().resolution = Some(offset)
@@ -336,6 +400,7 @@ impl<'a> FunctionGenerator<'a> {
         oper: &Operation,
         source: &[TempIndex],
     ) {
+        self.flush_any_conflicts(ctx, dest, source);
         let fun_ctx = ctx.fun_ctx;
         match oper {
             Operation::Function(mid, fid, inst) => {
@@ -352,6 +417,18 @@ impl<'a> FunctionGenerator<'a> {
                     FF::Bytecode::PackGeneric,
                 );
             },
+            Operation::PackVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::PackVariant,
+                    FF::Bytecode::PackVariantGeneric,
+                );
+            },
             Operation::Unpack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
@@ -361,6 +438,30 @@ impl<'a> FunctionGenerator<'a> {
                     source,
                     FF::Bytecode::Unpack,
                     FF::Bytecode::UnpackGeneric,
+                );
+            },
+            Operation::UnpackVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::UnpackVariant,
+                    FF::Bytecode::UnpackVariantGeneric,
+                );
+            },
+            Operation::TestVariant(mid, sid, variant, inst) => {
+                self.gen_struct_variant_oper(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    *variant,
+                    inst,
+                    source,
+                    FF::Bytecode::TestVariant,
+                    FF::Bytecode::TestVariantGeneric,
                 );
             },
             Operation::MoveTo(mid, sid, inst) => {
@@ -397,7 +498,7 @@ impl<'a> FunctionGenerator<'a> {
                 );
             },
             Operation::BorrowLoc => {
-                let local = self.temp_to_local(fun_ctx, source[0]);
+                let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), source[0]);
                 if fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference() {
                     self.emit(FF::Bytecode::MutBorrowLoc(local))
                 } else {
@@ -411,6 +512,18 @@ impl<'a> FunctionGenerator<'a> {
                     dest,
                     mid.qualified(*sid),
                     inst.clone(),
+                    None,
+                    *offset,
+                    source,
+                );
+            },
+            Operation::BorrowVariantField(mid, sid, variants, inst, offset) => {
+                self.gen_borrow_field(
+                    ctx,
+                    dest,
+                    mid.qualified(*sid),
+                    inst.clone(),
+                    Some(variants),
                     *offset,
                     source,
                 );
@@ -454,8 +567,6 @@ impl<'a> FunctionGenerator<'a> {
             },
             Operation::ReadRef => self.gen_builtin(ctx, dest, FF::Bytecode::ReadRef, source),
             Operation::WriteRef => {
-                // TODO: WriteRef in FF bytecode and in stackless bytecode use different operand
-                // order, perhaps we should fix this.
                 self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
             },
             Operation::Release => {
@@ -471,7 +582,7 @@ impl<'a> FunctionGenerator<'a> {
                     self.gen_builtin(ctx, dest, FF::Bytecode::Pop, source)
                 }
             },
-            Operation::FreezeRef => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
+            Operation::FreezeRef(_) => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
             Operation::CastU8 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU8, source),
             Operation::CastU16 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU16, source),
             Operation::CastU32 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU32, source),
@@ -508,6 +619,7 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::OpaqueCallBegin(_, _, _)
             | Operation::OpaqueCallEnd(_, _, _)
             | Operation::GetField(_, _, _, _)
+            | Operation::GetVariantField(_, _, _, _, _)
             | Operation::GetGlobal(_, _, _)
             | Operation::Uninit
             | Operation::Havoc(_)
@@ -595,6 +707,39 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_push_result(ctx, dest);
     }
 
+    fn gen_struct_variant_oper(
+        &mut self,
+        ctx: &BytecodeContext,
+        dest: &[TempIndex],
+        id: QualifiedId<StructId>,
+        variant: Symbol,
+        inst: &[Type],
+        source: &[TempIndex],
+        mk_simple: impl FnOnce(FF::StructVariantHandleIndex) -> FF::Bytecode,
+        mk_generic: impl FnOnce(FF::StructVariantInstantiationIndex) -> FF::Bytecode,
+    ) {
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source, None);
+        let struct_env = &fun_ctx.module.env.get_struct(id);
+        if inst.is_empty() {
+            let idx =
+                self.gen
+                    .struct_variant_index(&fun_ctx.module, &fun_ctx.loc, struct_env, variant);
+            self.emit(mk_simple(idx))
+        } else {
+            let idx = self.gen.struct_variant_inst_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                struct_env,
+                variant,
+                inst.to_vec(),
+            );
+            self.emit(mk_generic(idx))
+        }
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
     /// Generate code for the borrow-field instruction.
     fn gen_borrow_field(
         &mut self,
@@ -602,31 +747,65 @@ impl<'a> FunctionGenerator<'a> {
         dest: &[TempIndex],
         id: QualifiedId<StructId>,
         inst: Vec<Type>,
+        variants: Option<&[Symbol]>,
         offset: usize,
         source: &[TempIndex],
     ) {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source, None);
         let struct_env = &fun_ctx.module.env.get_struct(id);
-        let field_env = &struct_env.get_field_by_offset(offset);
         let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
-        if inst.is_empty() {
-            let idx = self
-                .gen
-                .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowField(idx))
+
+        if let Some(variants) = variants {
+            assert!(!variants.is_empty());
+            let field_env =
+                &struct_env.get_field_by_offset_optional_variant(Some(variants[0]), offset);
+            if inst.is_empty() {
+                let idx = self.gen.variant_field_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                );
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowVariantField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowVariantField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowField(idx))
+                let idx = self.gen.variant_field_inst_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                    inst,
+                );
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowVariantFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowVariantFieldGeneric(idx))
+                }
             }
         } else {
-            let idx = self
-                .gen
-                .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+            let field_env = &struct_env.get_field_by_offset_optional_variant(None, offset);
+            if inst.is_empty() {
+                let idx = self
+                    .gen
+                    .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                let idx = self
+                    .gen
+                    .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                }
             }
         }
         self.abstract_pop_n(ctx, source.len());
@@ -649,6 +828,12 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Generate code for the load instruction.
     fn gen_load(&mut self, ctx: &BytecodeContext, dest: &TempIndex, cons: &Constant) {
+        self.flush_any_conflicts(ctx, std::slice::from_ref(dest), &[]);
+        self.gen_load_push(ctx, cons, ctx.fun_ctx.fun.get_local_type(*dest));
+        self.abstract_push_result(ctx, vec![*dest]);
+    }
+
+    fn gen_load_push(&mut self, ctx: &BytecodeContext, cons: &Constant, dest_type: &Type) {
         use Constant::*;
         match cons {
             Bool(b) => {
@@ -666,17 +851,59 @@ impl<'a> FunctionGenerator<'a> {
             U256(n) => self.emit(FF::Bytecode::LdU256(
                 move_core_types::u256::U256::from_le_bytes(&n.to_le_bytes()),
             )),
+            Vector(vec) if vec.is_empty() => {
+                self.gen_vector_load_push(ctx, vec, dest_type);
+            },
             _ => {
-                let cons = self.gen.constant_index(
-                    &ctx.fun_ctx.module,
-                    &ctx.fun_ctx.loc,
-                    cons,
-                    ctx.fun_ctx.fun.get_local_type(*dest),
-                );
+                let cons =
+                    self.gen
+                        .constant_index(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, cons, dest_type);
                 self.emit(FF::Bytecode::LdConst(cons));
             },
         }
-        self.abstract_push_result(ctx, vec![*dest]);
+    }
+
+    fn gen_vector_load_push(&mut self, ctx: &BytecodeContext, vec: &[Constant], vec_type: &Type) {
+        let fun_ctx = ctx.fun_ctx;
+        let elem_type = if let Type::Vector(el) = vec_type {
+            el.as_ref().clone()
+        } else {
+            fun_ctx.internal_error("expected vector type");
+            Type::new_prim(PrimitiveType::Bool)
+        };
+        for cons in vec.iter() {
+            self.gen_load_push(ctx, cons, &elem_type);
+        }
+        let sign = self
+            .gen
+            .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
+        self.emit(FF::Bytecode::VecPack(sign, vec.len() as u64));
+    }
+
+    /// Generates code for an inline spec block. The spec block needs
+    /// to be rewritten s.t. free temporaries are replaced by the assigned
+    /// locals. The spec block is then stored in the spec block table
+    /// which will be written back to the function spec at the end of
+    /// translation. In the actual Move bytecode, a `Nop` is inserted
+    /// at the current code offset.
+    fn gen_spec_block(&mut self, ctx: &BytecodeContext, spec: &Spec) {
+        let mut replacer = |id: NodeId, target: RewriteTarget| {
+            if let RewriteTarget::Temporary(temp) = target {
+                Some(
+                    ExpData::Temporary(
+                        id,
+                        self.temps.get(&temp).expect("temp has mapping").local as TempIndex,
+                    )
+                    .into_exp(),
+                )
+            } else {
+                None
+            }
+        };
+        let (_, spec) = ExpRewriter::new(ctx.fun_ctx.module.env, &mut replacer)
+            .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
+        self.spec_blocks.insert(self.code.len() as CodeOffset, spec);
+        self.emit(FF::Bytecode::Nop)
     }
 
     /// Emits a file-format bytecode.
@@ -700,10 +927,14 @@ impl<'a> FunctionGenerator<'a> {
         // Now compute which temps need to be pushed, on top of any which are already on the stack
         let mut temps_to_push = self.analyze_stack(temps);
         // If any of the temps we need to push now are actually underneath the temps already on the stack,
-        // we need to even flush more of the stack to reach them.
+        // and their values were not copied from locals, we need to even flush more of the stack to reach them.
         let mut stack_to_flush = self.stack.len();
         for temp in temps_to_push {
-            if let Some(offs) = self.stack.iter().position(|t| t == temp) {
+            if let Some(offs) = self
+                .stack
+                .iter()
+                .position(|(t, copied)| !*copied && t == temp)
+            {
                 // The lowest point in the stack we need to flush.
                 stack_to_flush = std::cmp::min(offs, stack_to_flush);
                 // Unfortunately, whatever is on the stack already, needs to be flushed out and
@@ -714,41 +945,77 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_flush_stack_before(ctx, stack_to_flush);
         // Finally, push `temps_to_push` onto the stack.
         for (pos, temp) in temps_to_push.iter().enumerate() {
-            let local = self.temp_to_local(fun_ctx, *temp);
+            let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), *temp);
+            let copied;
             match push_kind {
                 Some(AssignKind::Move) => {
+                    copied = false;
                     self.emit(FF::Bytecode::MoveLoc(local));
                 },
                 Some(AssignKind::Copy) => {
+                    copied = true;
                     self.emit(FF::Bytecode::CopyLoc(local));
                 },
                 Some(AssignKind::Inferred) | Some(AssignKind::Store) => {
+                    copied = false;
                     fun_ctx
                         .internal_error("Inferred and Store AssignKind should be not appear here.");
                 },
                 None => {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
-                    if fun_ctx.is_copyable(*temp)
-                        && (ctx.is_alive_after(*temp) || temps_to_push[pos + 1..].contains(temp))
-                    {
+                    if ctx.is_alive_after(*temp, &temps_to_push[pos + 1..], true) {
+                        if !fun_ctx.is_copyable(*temp) {
+                            fun_ctx.module.internal_error(
+                                &ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id),
+                                format!("value in `$t{}` expected to be copyable", temp),
+                            )
+                        }
+                        copied = true;
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
+                        copied = false;
                         self.emit(FF::Bytecode::MoveLoc(local));
                     }
                 },
             }
-            self.stack.push(*temp)
+            self.stack.push((*temp, copied));
         }
     }
 
-    /// Ensures that all `temps` which are on the stack and used after this program
-    /// point are saved to locals. This flushes the stack as deep as needed for this.
+    /// If a temp already on the abstract stack is both:
+    ///   - not a source of the current instruction
+    ///   - destination of the current instruction
+    /// then, we have a conflicting write to that temp.
+    ///
+    /// This method ensures that conflicting writes do not happen by flushing out such temps
+    /// from the abstract stack before emitting code for the current instruction.
+    fn flush_any_conflicts(
+        &mut self,
+        ctx: &BytecodeContext,
+        dests: &[TempIndex],
+        sources: &[TempIndex],
+    ) {
+        let dests = BTreeSet::from_iter(dests.iter());
+        let sources = BTreeSet::from_iter(sources.iter());
+        let conflicts = dests.difference(&sources).collect::<BTreeSet<_>>();
+        if let Some(pos) = self.stack.iter().position(|(t, _)| conflicts.contains(&t)) {
+            self.abstract_flush_stack_before(ctx, pos);
+        }
+    }
+
+    /// Ensures that all `temps` which are on the stack, were not copied from a local,
+    /// and used after this program point are saved to locals. This flushes the stack
+    /// as deep as needed for this.
     fn save_used_after(&mut self, ctx: &BytecodeContext, temps: &[TempIndex]) {
         let mut stack_to_flush = self.stack.len();
-        for temp in temps {
-            if let Some(pos) = self.stack.iter().position(|t| t == temp) {
-                if ctx.is_alive_after(*temp) {
+        for (i, temp) in temps.iter().enumerate() {
+            if let Some(pos) = self
+                .stack
+                .iter()
+                .position(|(t, copied)| !*copied && t == temp)
+            {
+                if ctx.is_alive_after(*temp, &temps[i + 1..], true) {
                     // Determine new lowest point to which we need to flush
                     stack_to_flush = std::cmp::min(stack_to_flush, pos);
                 }
@@ -763,8 +1030,9 @@ impl<'a> FunctionGenerator<'a> {
     /// returns the temps which are not and need to be pushed.
     fn analyze_stack<'t>(&mut self, temps: &'t [TempIndex]) -> &'t [TempIndex] {
         let mut temps_to_push = temps; // worst case need to push all
+        let stack = self.stack.iter().map(|(t, _)| *t).collect::<Vec<_>>();
         for end in (1..=temps.len()).rev() {
-            if self.stack.ends_with(&temps[0..end]) {
+            if stack.ends_with(&temps[0..end]) {
                 // We found 0..end temps which are already on top of the stack. The remaining ones
                 // need to be pushed.
                 temps_to_push = &temps[end..temps.len()];
@@ -780,13 +1048,16 @@ impl<'a> FunctionGenerator<'a> {
     fn abstract_flush_stack(&mut self, ctx: &BytecodeContext, top: usize, before: bool) {
         let fun_ctx = ctx.fun_ctx;
         while self.stack.len() > top {
-            let temp = self.stack.pop().unwrap();
-            if before && ctx.is_alive_before(temp)
-                || !before && ctx.is_alive_after(temp)
-                || self.pinned.contains(&temp)
+            let (temp, copied) = self.stack.pop().unwrap();
+            if !copied
+                && ((before && ctx.is_alive_before(temp))
+                    || (!before && ctx.is_alive_after(temp, &[], false))
+                    || self.pinned.contains(&temp)
+                    || !ctx.fun_ctx.is_droppable(temp))
             {
-                // Only need to save to a local if the temp is still used afterwards
-                let local = self.temp_to_local(fun_ctx, temp);
+                // Only need to save to a local if the temp is: not copied from a local AND,
+                // still used afterwards, is pinned, or is not droppable.
+                let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), temp);
                 self.emit(FF::Bytecode::StLoc(local));
             } else {
                 self.emit(FF::Bytecode::Pop)
@@ -806,17 +1077,36 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Push the result of an operation to the abstract stack.
     fn abstract_push_result(&mut self, ctx: &BytecodeContext, result: impl AsRef<[TempIndex]>) {
-        let mut flush_mark = usize::MAX;
-        for temp in result.as_ref() {
+        let pre_stack_len = self.stack.len();
+        let result = result.as_ref();
+        // `flush_mark` is used to find the lowest index in `result` from which we flush.
+        let mut flush_mark = result.len();
+        // Push the temps in `result` onto the stack.
+        // Make `flush_mark` the index of the earliest temp that is pinned.
+        for (i, temp) in result.iter().enumerate() {
             if self.pinned.contains(temp) {
                 // need to flush this right away and maintain a local for it
-                flush_mark = flush_mark.min(self.stack.len())
+                flush_mark = flush_mark.min(i);
             }
-            self.stack.push(*temp);
+            // The result was not copied from a local.
+            self.stack.push((*temp, false));
         }
-        if flush_mark != usize::MAX {
-            self.abstract_flush_stack_after(ctx, flush_mark)
+        // Check if there are any temps that could be flushed right away.
+        // We only need to check from below the `flush_mark` (everything at `flush_mark`
+        // and above will be flushed anyway). We work down the `result` and if we find a
+        // temp that doesn't need to be flushed, we stop. Because, that temp could get
+        // consumed by a subsequent instruction and may never need to be flushed.
+        if let Some(flush_writes) = ctx.get_writes_to_flush() {
+            for (i, temp) in result[..flush_mark].iter().enumerate().rev() {
+                if flush_writes.contains(temp) {
+                    flush_mark = i;
+                } else {
+                    break;
+                }
+            }
         }
+        let stack_flush_mark = pre_stack_len + flush_mark;
+        self.abstract_flush_stack_after(ctx, stack_flush_mark);
     }
 
     /// Pop a value from the abstract stack.
@@ -843,14 +1133,42 @@ impl<'a> FunctionGenerator<'a> {
         local
     }
 
-    /// Allocates a local for the given temporary
-    fn temp_to_local(&mut self, ctx: &FunctionContext, temp: TempIndex) -> FF::LocalIndex {
+    /// Allocates a local for the given temporary.
+    /// If a local is not already available, then allocates one.
+    /// While allocating one, it adds it to the source map, unless
+    /// it is a parameter (these are recorded elsewhere).
+    fn temp_to_local(
+        &mut self,
+        ctx: &FunctionContext,
+        bc_attr_opt: Option<AttrId>,
+        temp: TempIndex,
+    ) -> FF::LocalIndex {
         if let Some(TempInfo { local }) = self.temps.get(&temp) {
             *local
         } else {
             let idx = self.new_local(ctx, ctx.temp_type(temp).to_owned());
             self.temps.insert(temp, TempInfo::new(idx));
-            idx
+
+            if temp < ctx.fun.get_parameter_count() {
+                // `temp` is a parameter.
+                // Don't add it to the source map here.
+                idx
+            } else {
+                let loc = if let Some(id) = bc_attr_opt {
+                    // Have a bytecode specific location for this local
+                    ctx.fun.get_bytecode_loc(id)
+                } else {
+                    // Fall back to function identifier
+                    ctx.fun.func_env.get_id_loc()
+                };
+                // Only add to the source map if it wasn't a parameter.
+                let name = ctx.fun.get_local_name(temp);
+                self.gen
+                    .source_map
+                    .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, loc))
+                    .expect(SOURCE_MAP_OK);
+                idx
+            }
         }
     }
 }
@@ -858,7 +1176,10 @@ impl<'a> FunctionGenerator<'a> {
 impl<'env> FunctionContext<'env> {
     /// Emits an internal error for this function.
     pub fn internal_error(&self, msg: impl AsRef<str>) {
-        self.module.internal_error(&self.loc, msg)
+        self.module.internal_error(
+            &self.loc,
+            format!("file format generator: {}", msg.as_ref()),
+        )
     }
 
     /// Gets the type of the temporary.
@@ -875,11 +1196,36 @@ impl<'env> FunctionContext<'env> {
             .type_abilities(self.temp_type(temp), &self.type_parameters)
             .has_ability(FF::Ability::Copy)
     }
+
+    /// Returns true of the given temporary can/should be dropped when flushing the stack.
+    pub fn is_droppable(&self, temp: TempIndex) -> bool {
+        self.module
+            .env
+            .type_abilities(self.temp_type(temp), &self.type_parameters)
+            .has_ability(FF::Ability::Drop)
+    }
 }
 
 impl<'env> BytecodeContext<'env> {
-    /// Determine whether the temporary is alive (used) in the reachable code after this point.
-    pub fn is_alive_after(&self, temp: TempIndex) -> bool {
+    /// Determine whether `temp` is alive (used) in the reachable code after this point,
+    /// or is part of the remaining argument list. When `dest_check` is true, we additionally
+    /// check if `temp` is also written to by the current instruction; if it is, then the
+    /// definition of `temp` being considered here is killed, making it not alive after this point.
+    pub fn is_alive_after(
+        &self,
+        temp: TempIndex,
+        remaining_args: &[TempIndex],
+        dest_check: bool,
+    ) -> bool {
+        if remaining_args.contains(&temp) {
+            // Temp is used another time in the same argument list of this instruction, and
+            // is alive after even if it is a destination
+            return true;
+        }
+        let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
+        if dest_check && bc.dests().contains(&temp) {
+            return false;
+        }
         let an = self
             .fun_ctx
             .fun
@@ -891,7 +1237,7 @@ impl<'env> BytecodeContext<'env> {
             .unwrap_or(false)
     }
 
-    /// Determine whether the temporary is alive (used) in the reachable code before and until
+    /// Determine whether `temp` is alive (used) in the reachable code before and until
     /// this point.
     pub fn is_alive_before(&self, temp: TempIndex) -> bool {
         let an = self
@@ -903,5 +1249,14 @@ impl<'env> BytecodeContext<'env> {
         an.get_live_var_info_at(self.code_offset)
             .map(|a| a.before.contains_key(&temp))
             .unwrap_or(false)
+    }
+
+    /// Get the set of temps to flush if possible at the current code offset.
+    pub fn get_writes_to_flush(&self) -> Option<&BTreeSet<TempIndex>> {
+        self.fun_ctx
+            .fun
+            .get_annotations()
+            .get::<FlushWritesAnnotation>()
+            .and_then(|annotation| annotation.0.get(&self.code_offset))
     }
 }

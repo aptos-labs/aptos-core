@@ -7,13 +7,6 @@ module <SELF>_0 {
           Tuple()
         }
     }
-    spec fun $main() {
-        if true {
-          break
-        } else {
-          Tuple()
-        }
-    }
 } // end <SELF>_0
 
 

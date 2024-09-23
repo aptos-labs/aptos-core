@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     dag::{
@@ -7,15 +8,34 @@ use crate::{
     },
     payload_manager::TPayloadManager,
 };
-use aptos_consensus_types::common::{Author, Payload, Round};
-use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_consensus_types::{
+    block::Block,
+    common::{Author, Payload, Round},
+};
+use aptos_executor_types::ExecutorResult;
+use aptos_types::{aggregate_signature::AggregateSignature, transaction::SignedTransaction};
+use async_trait::async_trait;
 
 pub(super) const TEST_DAG_WINDOW: u64 = 5;
 
 pub(super) struct MockPayloadManager {}
 
+#[async_trait]
 impl TPayloadManager for MockPayloadManager {
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+
+    fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
+
+    fn check_payload_availability(&self, _block: &Block) -> bool {
+        unimplemented!()
+    }
+
+    async fn get_transactions(
+        &self,
+        _block: &Block,
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
+        Ok((Vec::new(), None))
+    }
 }
 
 pub(super) struct MockOrderRule {}
@@ -37,7 +57,7 @@ pub(crate) fn new_certified_node(
         author,
         0,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false, true),
         parents,
         Extensions::empty(),
     );
@@ -56,7 +76,7 @@ pub(crate) fn new_node(
         author,
         timestamp,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false, true),
         parents,
         Extensions::empty(),
     )
@@ -96,7 +116,7 @@ pub(crate) fn generate_dag_nodes(
                 nodes_at_round.push(None);
             }
         }
-        previous_round = nodes_at_round.clone();
+        previous_round.clone_from(&nodes_at_round);
         nodes.push(nodes_at_round);
     }
     nodes

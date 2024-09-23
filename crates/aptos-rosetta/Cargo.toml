@@ -32,11 +32,9 @@ hex = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
-percent-encoding = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_yaml = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 warp = { workspace = true }

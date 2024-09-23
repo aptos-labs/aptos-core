@@ -4,9 +4,8 @@
 use move_binary_format::file_format::{
     AbilitySet, AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
     FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
-    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, SignatureToken::*,
-    StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter,
-    TypeSignature,
+    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken::*, StructDefinition,
+    StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TypeSignature,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -15,14 +14,15 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::move_vm::MoveVM;
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn instantiation_err() {
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
 
-    let mut big_ty = SignatureToken::TypeParameter(0);
+    let mut big_ty = TypeParameter(0);
 
     const N: usize = 7;
     for _ in 0..2 {
@@ -97,10 +97,20 @@ fn instantiation_err() {
                 ],
             }),
         }],
+        // TODO(#13806): followup on whether we need specific tests for variants here
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
 
     move_bytecode_verifier::verify_module(&cm).expect("verify failed");
-    let vm = MoveVM::new(vec![]).unwrap();
+
+    let vm_config = VMConfig {
+        paranoid_type_checks: false,
+        ..VMConfig::default()
+    };
+    let vm = MoveVM::new_with_config(vec![], vm_config);
 
     let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);
@@ -108,30 +118,26 @@ fn instantiation_err() {
     cm.serialize(&mut mod_bytes).unwrap();
 
     session
-        .publish_module(mod_bytes, addr, &mut GasStatus::new_unmetered())
+        .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
         .expect("Module must publish");
 
     let mut ty_arg = TypeTag::U128;
     for _ in 0..4 {
-        // ty_arg = TypeTag::Vector(Box::new(ty_arg));
         ty_arg = TypeTag::Struct(Box::new(StructTag {
             address: addr,
             module: Identifier::new("m").unwrap(),
             name: Identifier::new("s").unwrap(),
-            type_params: vec![ty_arg; N],
+            type_args: vec![ty_arg; N],
         }));
     }
 
-    let err = session.execute_entry_function(
-        &cm.self_id(),
-        ident_str!("f"),
-        vec![ty_arg],
-        Vec::<Vec<u8>>::new(),
-        &mut GasStatus::new_unmetered(),
+    let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
+    assert!(
+        res.is_err(),
+        "Instantiation must fail at load time when converting from type tag to type "
     );
-    assert!(err.is_err(), "Instantiation must fail at runtime");
     assert_eq!(
-        err.err().unwrap().major_status(),
-        StatusCode::VERIFICATION_ERROR
+        res.err().unwrap().major_status(),
+        StatusCode::TOO_MANY_TYPE_NODES
     );
 }

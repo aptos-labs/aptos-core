@@ -109,6 +109,20 @@ impl TransactionGasLog {
             data.insert("intrinsic-percentage".to_string(), json!(percentage));
         }
 
+        // Keyless cost
+        if !self.exec_io.keyless_cost.is_zero() {
+            let cost_scaled = format!(
+                "{:.8}",
+                (u64::from(self.exec_io.keyless_cost) as f64 / scaling_factor)
+            );
+            let percentage = format!(
+                "{:.2}%",
+                u64::from(self.exec_io.keyless_cost) as f64 / total_exec_io * 100.0
+            );
+            data.insert("keyless".to_string(), json!(cost_scaled));
+            data.insert("keyless-percentage".to_string(), json!(percentage));
+        }
+
         let mut deps = self.exec_io.dependencies.clone();
         deps.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
         data.insert(
@@ -174,6 +188,24 @@ impl TransactionGasLog {
             Value::Array(
                 aggregated
                     .storage_writes
+                    .into_iter()
+                    .map(convert_op)
+                    .collect(),
+            ),
+        );
+        data.insert(
+            "transaction_write".to_string(),
+            convert_op((
+                "transaction_write".to_string(),
+                1,
+                aggregated.transaction_write,
+            )),
+        );
+        data.insert(
+            "event_writes".to_string(),
+            Value::Array(
+                aggregated
+                    .event_writes
                     .into_iter()
                     .map(convert_op)
                     .collect(),

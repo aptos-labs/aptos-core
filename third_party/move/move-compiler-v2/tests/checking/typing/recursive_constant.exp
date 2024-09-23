@@ -1,0 +1,9 @@
+// -- Model dump before bytecode pipeline
+module 0x42::M {
+    public fun get_x(): u64 {
+        false
+    }
+    public fun get_y(): u64 {
+        false
+    }
+} // end 0x42::M

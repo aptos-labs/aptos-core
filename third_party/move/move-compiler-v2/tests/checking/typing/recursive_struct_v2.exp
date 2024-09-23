@@ -1,0 +1,141 @@
+
+Diagnostics:
+error: cyclic data
+  ┌─ tests/checking/typing/recursive_struct_v2.move:5:5
+  │
+5 │ ╭     struct T {
+6 │ │         f: S
+7 │ │     }
+  │ ╰─────^
+  │
+  = field `f` of `T` contains `S`
+  = field `f` of `S` contains `T`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:9:5
+   │
+ 9 │ ╭     struct S1 {
+10 │ │         f: S2
+11 │ │     }
+   │ ╰─────^
+   │
+   = field `f` of `S1` contains `S2`
+   = field `f` of `S2` contains `S3`
+   = field `f` of `S3` contains `S1`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:21:5
+   │
+21 │ ╭     struct S4<T> {
+22 │ │         f: S4<bool>
+23 │ │     }
+   │ ╰─────^
+   │
+   = field `f` of `S4` contains `S4`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:25:5
+   │
+25 │ ╭     struct S5 {
+26 │ │         f: S5
+27 │ │     }
+   │ ╰─────^
+   │
+   = field `f` of `S5` contains `S5`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:33:5
+   │
+33 │ ╭     struct S7 {
+34 │ │         f: S7
+35 │ │     }
+   │ ╰─────^
+   │
+   = field `f` of `S7` contains `S7`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:37:5
+   │
+37 │ ╭     struct X {
+38 │ │         f: Y,
+39 │ │         g: Y,
+40 │ │     }
+   │ ╰─────^
+   │
+   = field `f` of `X` contains `Y`
+   = field `f` of `Y` contains `X`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:49:5
+   │
+49 │ ╭     struct S {
+50 │ │         f: G<S>
+   │ │         - invalid field `f` of `S` containing `S` itself
+51 │ │     }
+   │ ╰─────^
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:53:5
+   │
+53 │ ╭     struct U<T> {
+54 │ │         f: G<U<T>>
+   │ │         - invalid field `f` of `U` containing `U` itself
+55 │ │     }
+   │ ╰─────^
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:61:5
+   │
+61 │ ╭     struct S1 {
+62 │ │         f: vector<S1>
+   │ │         - invalid field `f` of `S1` containing `S1` itself
+63 │ │     }
+   │ ╰─────^
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:65:5
+   │
+65 │ ╭     struct S2<T1, T2> {
+66 │ │         f: S3<u8, S2<T1, T2>>
+67 │ │     }
+   │ ╰─────^
+   │
+   = field `f` of `S2` contains `S3`
+   = field `f` of `S3` contains `S2`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:65:5
+   │
+65 │ ╭     struct S2<T1, T2> {
+66 │ │         f: S3<u8, S2<T1, T2>>
+   │ │         - invalid field `f` of `S2` containing `S2` itself
+67 │ │     }
+   │ ╰─────^
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:69:5
+   │
+69 │ ╭     struct S3<T1, T2> {
+70 │ │         f: S2<u8, S3<u8, u8>>
+   │ │         - invalid field `f` of `S3` containing `S3` itself
+71 │ │     }
+   │ ╰─────^
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:73:5
+   │
+73 │ ╭     struct S4<T> {
+74 │ │         f: S4<S4<T>>
+75 │ │     }
+   │ ╰─────^
+   │
+   = field `f` of `S4` contains `S4`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct_v2.move:73:5
+   │
+73 │ ╭     struct S4<T> {
+74 │ │         f: S4<S4<T>>
+   │ │         - invalid field `f` of `S4` containing `S4` itself
+75 │ │     }
+   │ ╰─────^

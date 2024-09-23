@@ -2,16 +2,14 @@
 
 [variant baseline]
 fun <SELF>_0::main() {
-     var $t0: u64
-     var $t1: u64
+     var $t0: &u64
+     var $t1: bool
      var $t2: &u64
-     var $t3: bool
-     var $t4: &u64
-  0: $t1 := 5
-  1: $t0 := infer($t1)
-  2: $t4 := borrow_local($t0)
-  3: $t3 := ==($t2, $t4)
-  4: return ()
+     var $t3: u64
+  0: $t3 := 5
+  1: $t2 := borrow_local($t3)
+  2: $t1 := ==($t0, $t2)
+  3: return ()
 }
 
 
@@ -26,19 +24,16 @@ error: use of unassigned local `ref`
 
 [variant baseline]
 fun <SELF>_0::main() {
-     var $t0: u64
-     var $t1: u64
+     var $t0: &u64
+     var $t1: bool
      var $t2: &u64
-     var $t3: bool
-     var $t4: &u64
-     # before: { no: $t0, $t1, $t2, $t3, $t4 }, after: { no: $t0, $t2, $t3, $t4 }
-  0: $t1 := 5
-     # before: { no: $t0, $t2, $t3, $t4 }, after: { no: $t2, $t3, $t4 }
-  1: $t0 := infer($t1)
-     # before: { no: $t2, $t3, $t4 }, after: { no: $t2, $t3 }
-  2: $t4 := borrow_local($t0)
-     # before: { no: $t2, $t3 }, after: { no: $t2 }
-  3: $t3 := ==($t2, $t4)
-     # before: { no: $t2 }, after: { no: $t2 }
-  4: return ()
+     var $t3: u64
+     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t2 }
+  0: $t3 := 5
+     # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
+  1: $t2 := borrow_local($t3)
+     # before: { no: $t0, $t1 }, after: { no: $t0 }
+  2: $t1 := ==($t0, $t2)
+     # before: { no: $t0 }, after: { no: $t0 }
+  3: return ()
 }

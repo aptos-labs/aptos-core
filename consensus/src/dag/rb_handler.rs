@@ -24,7 +24,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{Features, ValidatorTxnConfig},
+    on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
 };
@@ -46,7 +46,8 @@ pub(crate) struct NodeBroadcastHandler {
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
     vtxn_config: ValidatorTxnConfig,
-    features: Features,
+    randomness_config: OnChainRandomnessConfig,
+    jwk_consensus_config: OnChainJWKConsensusConfig,
     health_backoff: HealthBackoff,
 }
 
@@ -60,7 +61,8 @@ impl NodeBroadcastHandler {
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
         vtxn_config: ValidatorTxnConfig,
-        features: Features,
+        randomness_config: OnChainRandomnessConfig,
+        jwk_consensus_config: OnChainJWKConsensusConfig,
         health_backoff: HealthBackoff,
     ) -> Self {
         let epoch = epoch_state.epoch;
@@ -77,7 +79,8 @@ impl NodeBroadcastHandler {
             fetch_requester,
             payload_config,
             vtxn_config,
-            features,
+            randomness_config,
+            jwk_consensus_config,
             health_backoff,
         }
     }
@@ -118,7 +121,7 @@ impl NodeBroadcastHandler {
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
         for vtxn in node.validator_txns() {
             ensure!(
-                is_vtxn_expected(&self.features, vtxn),
+                is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                 "unexpected validator transaction: {:?}",
                 vtxn.topic()
             );

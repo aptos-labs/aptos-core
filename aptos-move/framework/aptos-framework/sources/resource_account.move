@@ -172,7 +172,10 @@ module aptos_framework::resource_account {
         let resource_addr = signer::address_of(resource);
         let (resource_signer_cap, empty_container) = {
             let container = borrow_global_mut<Container>(source_addr);
-            assert!(simple_map::contains_key(&container.store, &resource_addr), error::invalid_argument(EUNAUTHORIZED_NOT_OWNER));
+            assert!(
+                simple_map::contains_key(&container.store, &resource_addr),
+                error::invalid_argument(EUNAUTHORIZED_NOT_OWNER)
+            );
             let (_resource_addr, signer_cap) = simple_map::remove(&mut container.store, &resource_addr);
             (signer_cap, simple_map::length(&container.store) == 0)
         };
@@ -206,7 +209,9 @@ module aptos_framework::resource_account {
 
     #[test(user = @0x1111)]
     #[expected_failure(abort_code = 0x10002, location = aptos_std::simple_map)]
-    public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(user: signer) acquires Container {
+    public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(
+        user: signer
+    ) acquires Container {
         let user_addr = signer::address_of(&user);
         account::create_account(user_addr);
 
@@ -226,9 +231,9 @@ module aptos_framework::resource_account {
     #[test(framework = @0x1, user = @0x1234)]
     public entry fun with_coin(framework: signer, user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
+        let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(&framework);
         aptos_framework::aptos_account::create_account(copy user_addr);
 
-        let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(&framework);
         let coin = coin::mint<AptosCoin>(100, &mint);
         coin::deposit(copy user_addr, coin);
 
@@ -246,13 +251,13 @@ module aptos_framework::resource_account {
     #[expected_failure(abort_code = 0x60005, location = aptos_framework::coin)]
     public entry fun without_coin(framework: signer, user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
+        let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(&framework);
         aptos_framework::aptos_account::create_account(user_addr);
 
         let seed = x"01";
         create_resource_account(&user, copy seed, vector::empty());
 
         let resource_addr = aptos_framework::account::create_resource_address(&user_addr, seed);
-        let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(&framework);
         let coin = coin::mint<AptosCoin>(100, &mint);
         coin::deposit(resource_addr, coin);
 

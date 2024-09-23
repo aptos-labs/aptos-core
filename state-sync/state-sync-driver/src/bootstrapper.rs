@@ -39,6 +39,7 @@ pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the g
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
+#[derive(Clone)]
 pub(crate) struct VerifiedEpochStates {
     // If new epoch ending ledger infos have been fetched from the network
     fetched_epoch_ending_ledger_infos: bool,
@@ -142,10 +143,10 @@ impl VerifiedEpochStates {
 
             // Verify we haven't missed the waypoint
             if ledger_info_version > waypoint_version {
-                return Err(Error::VerificationError(
-                    format!("Failed to verify the waypoint: ledger info version is too high! Waypoint version: {:?}, ledger info version: {:?}",
-                            waypoint_version, ledger_info_version)
-                ));
+                panic!(
+                    "Failed to verify the waypoint: ledger info version is too high! Waypoint version: {:?}, ledger info version: {:?}",
+                    waypoint_version, ledger_info_version
+                );
             }
 
             // Check if we've found the ledger info corresponding to the waypoint version
@@ -153,10 +154,10 @@ impl VerifiedEpochStates {
                 match waypoint.verify(ledger_info) {
                     Ok(()) => self.set_verified_waypoint(waypoint_version),
                     Err(error) => {
-                        return Err(Error::VerificationError(
-                            format!("Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
-                                    error, waypoint, ledger_info)
-                        ));
+                        panic!(
+                            "Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
+                            error, waypoint, ledger_info
+                        );
                     },
                 }
             }
@@ -465,7 +466,7 @@ impl<
         }
 
         // Get the highest synced and known ledger info versions
-        let highest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
+        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
@@ -554,12 +555,13 @@ impl<
                 .ok_or_else(|| {
                     Error::IntegerOverflow("The number of versions behind has overflown!".into())
                 })?;
-            if num_versions_behind
-                < self
-                    .driver_configuration
-                    .config
-                    .num_versions_to_skip_snapshot_sync
-            {
+            let max_num_versions_behind = self
+                .driver_configuration
+                .config
+                .num_versions_to_skip_snapshot_sync;
+
+            // Check if the node is too far behind to fast sync
+            if num_versions_behind < max_num_versions_behind {
                 info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
                     "The node is only {} versions behind, will skip bootstrapping.",
                     num_versions_behind
@@ -569,10 +571,11 @@ impl<
                 // validator, consensus will take control and sync depending on how it sees fit.
                 self.bootstrapping_complete().await
             } else {
-                panic!("Fast syncing is currently unsupported for nodes with existing state! \
-                        You are currently {:?} versions behind the latest snapshot version ({:?}). Either \
-                        select a different syncing mode, or delete your storage and restart your node.",
-                       num_versions_behind, highest_known_ledger_version);
+                panic!("You are currently {:?} versions behind the latest snapshot version ({:?}). This is \
+                        more than the maximum allowed for fast sync ({:?}). If you want to fast sync to the \
+                        latest state, delete your storage and restart your node. Otherwise, if you want to \
+                        sync all the missing data, use intelligent syncing mode!",
+                       num_versions_behind, highest_known_ledger_version, max_num_versions_behind);
             }
         }
     }
@@ -597,11 +600,8 @@ impl<
 
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(&mut self) -> Result<(), Error> {
-        for _ in 0..self
-            .driver_configuration
-            .config
-            .max_consecutive_stream_notifications
-        {
+        let state_sync_driver_config = &self.driver_configuration.config;
+        for _ in 0..state_sync_driver_config.max_consecutive_stream_notifications {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
@@ -865,7 +865,11 @@ impl<
             self.verified_epoch_states
                 .set_fetched_epoch_ending_ledger_infos();
         } else {
-            return Err(Error::AdvertisedDataError("Our waypoint is unverified, but there's no higher epoch ending ledger infos advertised!".into()));
+            return Err(Error::AdvertisedDataError(format!(
+                "Our waypoint is unverified, but there's no higher epoch ending ledger infos \
+                advertised! Highest local epoch end: {:?}, highest advertised epoch end: {:?}",
+                highest_local_epoch_end, highest_advertised_epoch_end
+            )));
         };
 
         Ok(())
@@ -1554,5 +1558,11 @@ impl<
     #[cfg(test)]
     pub(crate) fn get_state_value_syncer(&mut self) -> &mut StateValueSyncer {
         &mut self.state_value_syncer
+    }
+
+    /// Manually sets the waypoint for testing purposes
+    #[cfg(test)]
+    pub(crate) fn set_waypoint(&mut self, waypoint: Waypoint) {
+        self.driver_configuration.waypoint = waypoint;
     }
 }

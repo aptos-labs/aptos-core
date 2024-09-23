@@ -1,0 +1,62 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::dead($t0: u64): u64 {
+     var $t1: u64
+  0: $t0 := infer($t0)
+  1: $t1 := infer($t0)
+  2: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::dead($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::dead($t0: u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+     # events: b:$t0, e:$t0, b:$t1
+  0: $t1 := move($t0)
+     # live vars: $t1
+     # events: e:$t1
+  1: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::dead($t0: u64): u64 {
+     var $t1: u64 [unused]
+  0: $t0 := move($t0)
+  1: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::dead($t0: u64): u64 {
+     var $t1: u64 [unused]
+  0: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+dead(Arg0: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========

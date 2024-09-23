@@ -72,4 +72,38 @@ spec aptos_framework::transaction_context {
         /// [high-level-req-2]
         aborts_if false;
     }
+
+    spec sender_internal(): address {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec secondary_signers_internal(): vector<address> {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec gas_payer_internal(): address {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec max_gas_amount_internal(): u64 {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec gas_unit_price_internal(): u64 {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec chain_id_internal(): u8 {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec entry_function_payload_internal(): Option<EntryFunctionPayload> {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+
+    spec multisig_payload_internal(): Option<MultisigPayload> {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
 }

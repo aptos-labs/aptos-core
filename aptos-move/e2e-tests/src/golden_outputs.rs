@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use goldenfile::Mint;
-use move_command_line_common::testing::EXP_EXT;
+use move_command_line_common::testing::get_compiler_exp_extension;
 use std::{cell::RefCell, fmt::Debug, fs::File, io::Write, path::PathBuf};
 
 pub const GOLDEN_DIR_PATH: &str = "goldens";
@@ -30,7 +30,7 @@ impl GoldenOutputs {
         let mut file_path = PathBuf::new();
         file_path.push(name);
         let file = RefCell::new(
-            mint.new_goldenfile(file_path.with_extension(EXP_EXT))
+            mint.new_goldenfile(file_path.with_extension(get_compiler_exp_extension()))
                 .unwrap(),
         );
         Self { mint, file }

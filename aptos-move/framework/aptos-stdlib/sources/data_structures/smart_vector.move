@@ -67,119 +67,119 @@ module aptos_std::smart_vector {
         v
     }
 
-    /// Destroy the vector `v`.
-    /// Aborts if `v` is not empty.
-    public fun destroy_empty<T>(v: SmartVector<T>) {
-        assert!(is_empty(&v), error::invalid_argument(EVECTOR_NOT_EMPTY));
-        let SmartVector { inline_vec, big_vec, inline_capacity: _, bucket_size: _ } = v;
+    /// Destroy the vector `self`.
+    /// Aborts if `self` is not empty.
+    public fun destroy_empty<T>(self: SmartVector<T>) {
+        assert!(is_empty(&self), error::invalid_argument(EVECTOR_NOT_EMPTY));
+        let SmartVector { inline_vec, big_vec, inline_capacity: _, bucket_size: _ } = self;
         vector::destroy_empty(inline_vec);
         option::destroy_none(big_vec);
     }
 
     /// Destroy a vector completely when T has `drop`.
-    public fun destroy<T: drop>(v: SmartVector<T>) {
-        clear(&mut v);
-        destroy_empty(v);
+    public fun destroy<T: drop>(self: SmartVector<T>) {
+        clear(&mut self);
+        destroy_empty(self);
     }
 
     /// Clear a vector completely when T has `drop`.
-    public fun clear<T: drop>(v: &mut SmartVector<T>) {
-        v.inline_vec = vector[];
-        if (option::is_some(&v.big_vec)) {
-            big_vector::destroy(option::extract(&mut v.big_vec));
+    public fun clear<T: drop>(self: &mut SmartVector<T>) {
+        self.inline_vec = vector[];
+        if (option::is_some(&self.big_vec)) {
+            big_vector::destroy(option::extract(&mut self.big_vec));
         }
     }
 
-    /// Acquire an immutable reference to the `i`th T of the vector `v`.
+    /// Acquire an immutable reference to the `i`th T of the vector `self`.
     /// Aborts if `i` is out of bounds.
-    public fun borrow<T>(v: &SmartVector<T>, i: u64): &T {
-        assert!(i < length(v), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        let inline_len = vector::length(&v.inline_vec);
+    public fun borrow<T>(self: &SmartVector<T>, i: u64): &T {
+        assert!(i < length(self), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+        let inline_len = vector::length(&self.inline_vec);
         if (i < inline_len) {
-            vector::borrow(&v.inline_vec, i)
+            vector::borrow(&self.inline_vec, i)
         } else {
-            big_vector::borrow(option::borrow(&v.big_vec), i - inline_len)
+            big_vector::borrow(option::borrow(&self.big_vec), i - inline_len)
         }
     }
 
-    /// Return a mutable reference to the `i`th T in the vector `v`.
+    /// Return a mutable reference to the `i`th T in the vector `self`.
     /// Aborts if `i` is out of bounds.
-    public fun borrow_mut<T>(v: &mut SmartVector<T>, i: u64): &mut T {
-        assert!(i < length(v), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        let inline_len = vector::length(&v.inline_vec);
+    public fun borrow_mut<T>(self: &mut SmartVector<T>, i: u64): &mut T {
+        assert!(i < length(self), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+        let inline_len = vector::length(&self.inline_vec);
         if (i < inline_len) {
-            vector::borrow_mut(&mut v.inline_vec, i)
+            vector::borrow_mut(&mut self.inline_vec, i)
         } else {
-            big_vector::borrow_mut(option::borrow_mut(&mut v.big_vec), i - inline_len)
+            big_vector::borrow_mut(option::borrow_mut(&mut self.big_vec), i - inline_len)
         }
     }
 
-    /// Empty and destroy the other vector, and push each of the Ts in the other vector onto the lhs vector in the
+    /// Empty and destroy the other vector, and push each of the Ts in the other vector onto the self vector in the
     /// same order as they occurred in other.
     /// Disclaimer: This function may be costly. Use it at your own discretion.
-    public fun append<T: store>(lhs: &mut SmartVector<T>, other: SmartVector<T>) {
+    public fun append<T: store>(self: &mut SmartVector<T>, other: SmartVector<T>) {
         let other_len = length(&other);
         let half_other_len = other_len / 2;
         let i = 0;
         while (i < half_other_len) {
-            push_back(lhs, swap_remove(&mut other, i));
+            push_back(self, swap_remove(&mut other, i));
             i = i + 1;
         };
         while (i < other_len) {
-            push_back(lhs, pop_back(&mut other));
+            push_back(self, pop_back(&mut other));
             i = i + 1;
         };
         destroy_empty(other);
     }
 
     /// Add multiple values to the vector at once.
-    public fun add_all<T: store>(v: &mut SmartVector<T>, vals: vector<T>) {
-        vector::for_each(vals, |val| { push_back(v, val); })
+    public fun add_all<T: store>(self: &mut SmartVector<T>, vals: vector<T>) {
+        vector::for_each(vals, |val| { push_back(self, val); })
     }
 
     /// Convert a smart vector to a native vector, which is supposed to be called mostly by view functions to get an
     /// atomic view of the whole vector.
     /// Disclaimer: This function may be costly as the smart vector may be huge in size. Use it at your own discretion.
-    public fun to_vector<T: store + copy>(v: &SmartVector<T>): vector<T> {
-        let res = v.inline_vec;
-        if (option::is_some(&v.big_vec)) {
-            let big_vec = option::borrow(&v.big_vec);
+    public fun to_vector<T: store + copy>(self: &SmartVector<T>): vector<T> {
+        let res = self.inline_vec;
+        if (option::is_some(&self.big_vec)) {
+            let big_vec = option::borrow(&self.big_vec);
             vector::append(&mut res, big_vector::to_vector(big_vec));
         };
         res
     }
 
-    /// Add T `val` to the end of the vector `v`. It grows the buckets when the current buckets are full.
+    /// Add T `val` to the end of the vector `self`. It grows the buckets when the current buckets are full.
     /// This operation will cost more gas when it adds new bucket.
-    public fun push_back<T: store>(v: &mut SmartVector<T>, val: T) {
-        let len = length(v);
-        let inline_len = vector::length(&v.inline_vec);
+    public fun push_back<T: store>(self: &mut SmartVector<T>, val: T) {
+        let len = length(self);
+        let inline_len = vector::length(&self.inline_vec);
         if (len == inline_len) {
-            let bucket_size = if (option::is_some(&v.inline_capacity)) {
-                if (len < *option::borrow(&v.inline_capacity)) {
-                    vector::push_back(&mut v.inline_vec, val);
+            let bucket_size = if (option::is_some(&self.inline_capacity)) {
+                if (len < *option::borrow(&self.inline_capacity)) {
+                    vector::push_back(&mut self.inline_vec, val);
                     return
                 };
-                *option::borrow(&v.bucket_size)
+                *option::borrow(&self.bucket_size)
             } else {
                 let val_size = size_of_val(&val);
                 if (val_size * (inline_len + 1) < 150 /* magic number */) {
-                    vector::push_back(&mut v.inline_vec, val);
+                    vector::push_back(&mut self.inline_vec, val);
                     return
                 };
-                let estimated_avg_size = max((size_of_val(&v.inline_vec) + val_size) / (inline_len + 1), 1);
+                let estimated_avg_size = max((size_of_val(&self.inline_vec) + val_size) / (inline_len + 1), 1);
                 max(1024 /* free_write_quota */ / estimated_avg_size, 1)
             };
-            option::fill(&mut v.big_vec, big_vector::empty(bucket_size));
+            option::fill(&mut self.big_vec, big_vector::empty(bucket_size));
         };
-        big_vector::push_back(option::borrow_mut(&mut v.big_vec), val);
+        big_vector::push_back(option::borrow_mut(&mut self.big_vec), val);
     }
 
-    /// Pop an T from the end of vector `v`. It does shrink the buckets if they're empty.
-    /// Aborts if `v` is empty.
-    public fun pop_back<T>(v: &mut SmartVector<T>): T {
-        assert!(!is_empty(v), error::invalid_state(EVECTOR_EMPTY));
-        let big_vec_wrapper = &mut v.big_vec;
+    /// Pop an T from the end of vector `self`. It does shrink the buckets if they're empty.
+    /// Aborts if `self` is empty.
+    public fun pop_back<T>(self: &mut SmartVector<T>): T {
+        assert!(!is_empty(self), error::invalid_state(EVECTOR_EMPTY));
+        let big_vec_wrapper = &mut self.big_vec;
         if (option::is_some(big_vec_wrapper)) {
             let big_vec = option::extract(big_vec_wrapper);
             let val = big_vector::pop_back(&mut big_vec);
@@ -190,21 +190,21 @@ module aptos_std::smart_vector {
             };
             val
         } else {
-            vector::pop_back(&mut v.inline_vec)
+            vector::pop_back(&mut self.inline_vec)
         }
     }
 
-    /// Remove the T at index i in the vector v and return the owned value that was previously stored at i in v.
+    /// Remove the T at index i in the vector self and return the owned value that was previously stored at i in self.
     /// All Ts occurring at indices greater than i will be shifted down by 1. Will abort if i is out of bounds.
     /// Disclaimer: This function may be costly. Use it at your own discretion.
-    public fun remove<T>(v: &mut SmartVector<T>, i: u64): T {
-        let len = length(v);
+    public fun remove<T>(self: &mut SmartVector<T>, i: u64): T {
+        let len = length(self);
         assert!(i < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        let inline_len = vector::length(&v.inline_vec);
+        let inline_len = vector::length(&self.inline_vec);
         if (i < inline_len) {
-            vector::remove(&mut v.inline_vec, i)
+            vector::remove(&mut self.inline_vec, i)
         } else {
-            let big_vec_wrapper = &mut v.big_vec;
+            let big_vec_wrapper = &mut self.big_vec;
             let big_vec = option::extract(big_vec_wrapper);
             let val = big_vector::remove(&mut big_vec, i - inline_len);
             if (big_vector::is_empty(&big_vec)) {
@@ -216,15 +216,15 @@ module aptos_std::smart_vector {
         }
     }
 
-    /// Swap the `i`th T of the vector `v` with the last T and then pop the vector.
+    /// Swap the `i`th T of the vector `self` with the last T and then pop the vector.
     /// This is O(1), but does not preserve ordering of Ts in the vector.
     /// Aborts if `i` is out of bounds.
-    public fun swap_remove<T>(v: &mut SmartVector<T>, i: u64): T {
-        let len = length(v);
+    public fun swap_remove<T>(self: &mut SmartVector<T>, i: u64): T {
+        let len = length(self);
         assert!(i < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        let inline_len = vector::length(&v.inline_vec);
-        let big_vec_wrapper = &mut v.big_vec;
-        let inline_vec = &mut v.inline_vec;
+        let inline_len = vector::length(&self.inline_vec);
+        let big_vec_wrapper = &mut self.big_vec;
+        let inline_vec = &mut self.inline_vec;
         if (i >= inline_len) {
             let big_vec = option::extract(big_vec_wrapper);
             let val = big_vector::swap_remove(&mut big_vec, i - inline_len);
@@ -250,21 +250,21 @@ module aptos_std::smart_vector {
     }
 
     /// Swap the Ts at the i'th and j'th indices in the vector v. Will abort if either of i or j are out of bounds
-    /// for v.
-    public fun swap<T: store>(v: &mut SmartVector<T>, i: u64, j: u64) {
+    /// for self.
+    public fun swap<T: store>(self: &mut SmartVector<T>, i: u64, j: u64) {
         if (i > j) {
-            return swap(v, j, i)
+            return swap(self, j, i)
         };
-        let len = length(v);
+        let len = length(self);
         assert!(j < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        let inline_len = vector::length(&v.inline_vec);
+        let inline_len = vector::length(&self.inline_vec);
         if (i >= inline_len) {
-            big_vector::swap(option::borrow_mut(&mut v.big_vec), i - inline_len, j - inline_len);
+            big_vector::swap(option::borrow_mut(&mut self.big_vec), i - inline_len, j - inline_len);
         } else if (j < inline_len) {
-            vector::swap(&mut v.inline_vec, i, j);
+            vector::swap(&mut self.inline_vec, i, j);
         } else {
-            let big_vec = option::borrow_mut(&mut v.big_vec);
-            let inline_vec = &mut v.inline_vec;
+            let big_vec = option::borrow_mut(&mut self.big_vec);
+            let inline_vec = &mut self.inline_vec;
             let element_i = vector::swap_remove(inline_vec, i);
             let element_j = big_vector::swap_remove(big_vec, j - inline_len);
             vector::push_back(inline_vec, element_j);
@@ -274,128 +274,128 @@ module aptos_std::smart_vector {
         }
     }
 
-    /// Reverse the order of the Ts in the vector v in-place.
+    /// Reverse the order of the Ts in the vector self in-place.
     /// Disclaimer: This function may be costly. Use it at your own discretion.
-    public fun reverse<T: store>(v: &mut SmartVector<T>) {
-        let inline_len = vector::length(&v.inline_vec);
+    public fun reverse<T: store>(self: &mut SmartVector<T>) {
+        let inline_len = vector::length(&self.inline_vec);
         let i = 0;
         let new_inline_vec = vector[];
         // Push the last `inline_len` Ts into a temp vector.
         while (i < inline_len) {
-            vector::push_back(&mut new_inline_vec, pop_back(v));
+            vector::push_back(&mut new_inline_vec, pop_back(self));
             i = i + 1;
         };
         vector::reverse(&mut new_inline_vec);
         // Reverse the big_vector left if exists.
-        if (option::is_some(&v.big_vec)) {
-            big_vector::reverse(option::borrow_mut(&mut v.big_vec));
+        if (option::is_some(&self.big_vec)) {
+            big_vector::reverse(option::borrow_mut(&mut self.big_vec));
         };
         // Mem::swap the two vectors.
         let temp_vec = vector[];
-        while (!vector::is_empty(&mut v.inline_vec)) {
-            vector::push_back(&mut temp_vec, vector::pop_back(&mut v.inline_vec));
+        while (!vector::is_empty(&mut self.inline_vec)) {
+            vector::push_back(&mut temp_vec, vector::pop_back(&mut self.inline_vec));
         };
         vector::reverse(&mut temp_vec);
         while (!vector::is_empty(&mut new_inline_vec)) {
-            vector::push_back(&mut v.inline_vec, vector::pop_back(&mut new_inline_vec));
+            vector::push_back(&mut self.inline_vec, vector::pop_back(&mut new_inline_vec));
         };
         vector::destroy_empty(new_inline_vec);
         // Push the rest Ts originally left in inline_vector back to the end of the smart vector.
         while (!vector::is_empty(&mut temp_vec)) {
-            push_back(v, vector::pop_back(&mut temp_vec));
+            push_back(self, vector::pop_back(&mut temp_vec));
         };
         vector::destroy_empty(temp_vec);
     }
 
-    /// Return `(true, i)` if `val` is in the vector `v` at index `i`.
+    /// Return `(true, i)` if `val` is in the vector `self` at index `i`.
     /// Otherwise, returns `(false, 0)`.
     /// Disclaimer: This function may be costly. Use it at your own discretion.
-    public fun index_of<T>(v: &SmartVector<T>, val: &T): (bool, u64) {
-        let (found, i) = vector::index_of(&v.inline_vec, val);
+    public fun index_of<T>(self: &SmartVector<T>, val: &T): (bool, u64) {
+        let (found, i) = vector::index_of(&self.inline_vec, val);
         if (found) {
             (true, i)
-        } else if (option::is_some(&v.big_vec)) {
-            let (found, i) = big_vector::index_of(option::borrow(&v.big_vec), val);
-            (found, i + vector::length(&v.inline_vec))
+        } else if (option::is_some(&self.big_vec)) {
+            let (found, i) = big_vector::index_of(option::borrow(&self.big_vec), val);
+            (found, i + vector::length(&self.inline_vec))
         } else {
             (false, 0)
         }
     }
 
-    /// Return true if `val` is in the vector `v`.
+    /// Return true if `val` is in the vector `self`.
     /// Disclaimer: This function may be costly. Use it at your own discretion.
-    public fun contains<T>(v: &SmartVector<T>, val: &T): bool {
-        if (is_empty(v)) return false;
-        let (exist, _) = index_of(v, val);
+    public fun contains<T>(self: &SmartVector<T>, val: &T): bool {
+        if (is_empty(self)) return false;
+        let (exist, _) = index_of(self, val);
         exist
     }
 
     /// Return the length of the vector.
-    public fun length<T>(v: &SmartVector<T>): u64 {
-        vector::length(&v.inline_vec) + if (option::is_none(&v.big_vec)) {
+    public fun length<T>(self: &SmartVector<T>): u64 {
+        vector::length(&self.inline_vec) + if (option::is_none(&self.big_vec)) {
             0
         } else {
-            big_vector::length(option::borrow(&v.big_vec))
+            big_vector::length(option::borrow(&self.big_vec))
         }
     }
 
-    /// Return `true` if the vector `v` has no Ts and `false` otherwise.
-    public fun is_empty<T>(v: &SmartVector<T>): bool {
-        length(v) == 0
+    /// Return `true` if the vector `self` has no Ts and `false` otherwise.
+    public fun is_empty<T>(self: &SmartVector<T>): bool {
+        length(self) == 0
     }
 
     /// Apply the function to each T in the vector, consuming it.
-    public inline fun for_each<T: store>(v: SmartVector<T>, f: |T|) {
-        aptos_std::smart_vector::reverse(&mut v); // We need to reverse the vector to consume it efficiently
-        aptos_std::smart_vector::for_each_reverse(v, |e| f(e));
+    public inline fun for_each<T: store>(self: SmartVector<T>, f: |T|) {
+        aptos_std::smart_vector::reverse(&mut self); // We need to reverse the vector to consume it efficiently
+        aptos_std::smart_vector::for_each_reverse(self, |e| f(e));
     }
 
     /// Apply the function to each T in the vector, consuming it.
-    public inline fun for_each_reverse<T>(v: SmartVector<T>, f: |T|) {
-        let len = aptos_std::smart_vector::length(&v);
+    public inline fun for_each_reverse<T>(self: SmartVector<T>, f: |T|) {
+        let len = aptos_std::smart_vector::length(&self);
         while (len > 0) {
-            f(aptos_std::smart_vector::pop_back(&mut v));
+            f(aptos_std::smart_vector::pop_back(&mut self));
             len = len - 1;
         };
-        aptos_std::smart_vector::destroy_empty(v)
+        aptos_std::smart_vector::destroy_empty(self)
     }
 
     /// Apply the function to a reference of each T in the vector.
-    public inline fun for_each_ref<T>(v: &SmartVector<T>, f: |&T|) {
+    public inline fun for_each_ref<T>(self: &SmartVector<T>, f: |&T|) {
         let i = 0;
-        let len = aptos_std::smart_vector::length(v);
+        let len = aptos_std::smart_vector::length(self);
         while (i < len) {
-            f(aptos_std::smart_vector::borrow(v, i));
+            f(aptos_std::smart_vector::borrow(self, i));
             i = i + 1
         }
     }
 
     /// Apply the function to a mutable reference to each T in the vector.
-    public inline fun for_each_mut<T>(v: &mut SmartVector<T>, f: |&mut T|) {
+    public inline fun for_each_mut<T>(self: &mut SmartVector<T>, f: |&mut T|) {
         let i = 0;
-        let len = aptos_std::smart_vector::length(v);
+        let len = aptos_std::smart_vector::length(self);
         while (i < len) {
-            f(aptos_std::smart_vector::borrow_mut(v, i));
+            f(aptos_std::smart_vector::borrow_mut(self, i));
             i = i + 1
         }
     }
 
     /// Apply the function to a reference of each T in the vector with its index.
-    public inline fun enumerate_ref<T>(v: &SmartVector<T>, f: |u64, &T|) {
+    public inline fun enumerate_ref<T>(self: &SmartVector<T>, f: |u64, &T|) {
         let i = 0;
-        let len = aptos_std::smart_vector::length(v);
+        let len = aptos_std::smart_vector::length(self);
         while (i < len) {
-            f(i, aptos_std::smart_vector::borrow(v, i));
+            f(i, aptos_std::smart_vector::borrow(self, i));
             i = i + 1;
         };
     }
 
     /// Apply the function to a mutable reference of each T in the vector with its index.
-    public inline fun enumerate_mut<T>(v: &mut SmartVector<T>, f: |u64, &mut T|) {
+    public inline fun enumerate_mut<T>(self: &mut SmartVector<T>, f: |u64, &mut T|) {
         let i = 0;
-        let len = length(v);
+        let len = length(self);
         while (i < len) {
-            f(i, borrow_mut(v, i));
+            f(i, borrow_mut(self, i));
             i = i + 1;
         };
     }
@@ -403,100 +403,100 @@ module aptos_std::smart_vector {
     /// Fold the function over the Ts. For example, `fold(vector[1,2,3], 0, f)` will execute
     /// `f(f(f(0, 1), 2), 3)`
     public inline fun fold<Accumulator, T: store>(
-        v: SmartVector<T>,
+        self: SmartVector<T>,
         init: Accumulator,
         f: |Accumulator, T|Accumulator
     ): Accumulator {
         let accu = init;
-        aptos_std::smart_vector::for_each(v, |elem| accu = f(accu, elem));
+        aptos_std::smart_vector::for_each(self, |elem| accu = f(accu, elem));
         accu
     }
 
     /// Fold right like fold above but working right to left. For example, `fold(vector[1,2,3], 0, f)` will execute
     /// `f(1, f(2, f(3, 0)))`
     public inline fun foldr<Accumulator, T>(
-        v: SmartVector<T>,
+        self: SmartVector<T>,
         init: Accumulator,
         f: |T, Accumulator|Accumulator
     ): Accumulator {
         let accu = init;
-        aptos_std::smart_vector::for_each_reverse(v, |elem| accu = f(elem, accu));
+        aptos_std::smart_vector::for_each_reverse(self, |elem| accu = f(elem, accu));
         accu
     }
 
     /// Map the function over the references of the Ts of the vector, producing a new vector without modifying the
     /// original vector.
     public inline fun map_ref<T1, T2: store>(
-        v: &SmartVector<T1>,
+        self: &SmartVector<T1>,
         f: |&T1|T2
     ): SmartVector<T2> {
         let result = aptos_std::smart_vector::new<T2>();
-        aptos_std::smart_vector::for_each_ref(v, |elem| aptos_std::smart_vector::push_back(&mut result, f(elem)));
+        aptos_std::smart_vector::for_each_ref(self, |elem| aptos_std::smart_vector::push_back(&mut result, f(elem)));
         result
     }
 
     /// Map the function over the Ts of the vector, producing a new vector.
     public inline fun map<T1: store, T2: store>(
-        v: SmartVector<T1>,
+        self: SmartVector<T1>,
         f: |T1|T2
     ): SmartVector<T2> {
         let result = aptos_std::smart_vector::new<T2>();
-        aptos_std::smart_vector::for_each(v, |elem| push_back(&mut result, f(elem)));
+        aptos_std::smart_vector::for_each(self, |elem| push_back(&mut result, f(elem)));
         result
     }
 
     /// Filter the vector using the boolean function, removing all Ts for which `p(e)` is not true.
     public inline fun filter<T: store + drop>(
-        v: SmartVector<T>,
+        self: SmartVector<T>,
         p: |&T|bool
     ): SmartVector<T> {
         let result = aptos_std::smart_vector::new<T>();
-        aptos_std::smart_vector::for_each(v, |elem| {
+        aptos_std::smart_vector::for_each(self, |elem| {
             if (p(&elem)) aptos_std::smart_vector::push_back(&mut result, elem);
         });
         result
     }
 
-    public inline fun zip<T1: store, T2: store>(v1: SmartVector<T1>, v2: SmartVector<T2>, f: |T1, T2|) {
+    public inline fun zip<T1: store, T2: store>(self: SmartVector<T1>, v2: SmartVector<T2>, f: |T1, T2|) {
         // We need to reverse the vectors to consume it efficiently
-        aptos_std::smart_vector::reverse(&mut v1);
+        aptos_std::smart_vector::reverse(&mut self);
         aptos_std::smart_vector::reverse(&mut v2);
-        aptos_std::smart_vector::zip_reverse(v1, v2, |e1, e2| f(e1, e2));
+        aptos_std::smart_vector::zip_reverse(self, v2, |e1, e2| f(e1, e2));
     }
 
     /// Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.
     /// This errors out if the vectors are not of the same length.
     public inline fun zip_reverse<T1, T2>(
-        v1: SmartVector<T1>,
+        self: SmartVector<T1>,
         v2: SmartVector<T2>,
         f: |T1, T2|,
     ) {
-        let len = aptos_std::smart_vector::length(&v1);
+        let len = aptos_std::smart_vector::length(&self);
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
         assert!(len == aptos_std::smart_vector::length(&v2), 0x20005);
         while (len > 0) {
-            f(aptos_std::smart_vector::pop_back(&mut v1), aptos_std::smart_vector::pop_back(&mut v2));
+            f(aptos_std::smart_vector::pop_back(&mut self), aptos_std::smart_vector::pop_back(&mut v2));
             len = len - 1;
         };
-        aptos_std::smart_vector::destroy_empty(v1);
+        aptos_std::smart_vector::destroy_empty(self);
         aptos_std::smart_vector::destroy_empty(v2);
     }
 
     /// Apply the function to the references of each pair of elements in the two given vectors.
     /// This errors out if the vectors are not of the same length.
     public inline fun zip_ref<T1, T2>(
-        v1: &SmartVector<T1>,
+        self: &SmartVector<T1>,
         v2: &SmartVector<T2>,
         f: |&T1, &T2|,
     ) {
-        let len = aptos_std::smart_vector::length(v1);
+        let len = aptos_std::smart_vector::length(self);
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
         assert!(len == aptos_std::smart_vector::length(v2), 0x20005);
         let i = 0;
         while (i < len) {
-            f(aptos_std::smart_vector::borrow(v1, i), aptos_std::smart_vector::borrow(v2, i));
+            f(aptos_std::smart_vector::borrow(self, i), aptos_std::smart_vector::borrow(v2, i));
             i = i + 1
         }
     }
@@ -504,49 +504,49 @@ module aptos_std::smart_vector {
     /// Apply the function to mutable references to each pair of elements in the two given vectors.
     /// This errors out if the vectors are not of the same length.
     public inline fun zip_mut<T1, T2>(
-        v1: &mut SmartVector<T1>,
+        self: &mut SmartVector<T1>,
         v2: &mut SmartVector<T2>,
         f: |&mut T1, &mut T2|,
     ) {
         let i = 0;
-        let len = aptos_std::smart_vector::length(v1);
+        let len = aptos_std::smart_vector::length(self);
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
         assert!(len == aptos_std::smart_vector::length(v2), 0x20005);
         while (i < len) {
-            f(aptos_std::smart_vector::borrow_mut(v1, i), aptos_std::smart_vector::borrow_mut(v2, i));
+            f(aptos_std::smart_vector::borrow_mut(self, i), aptos_std::smart_vector::borrow_mut(v2, i));
             i = i + 1
         }
     }
 
     /// Map the function over the element pairs of the two vectors, producing a new vector.
     public inline fun zip_map<T1: store, T2: store, NewT: store>(
-        v1: SmartVector<T1>,
+        self: SmartVector<T1>,
         v2: SmartVector<T2>,
         f: |T1, T2|NewT
     ): SmartVector<NewT> {
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(aptos_std::smart_vector::length(&v1) == aptos_std::smart_vector::length(&v2), 0x20005);
+        assert!(aptos_std::smart_vector::length(&self) == aptos_std::smart_vector::length(&v2), 0x20005);
 
         let result = aptos_std::smart_vector::new<NewT>();
-        aptos_std::smart_vector::zip(v1, v2, |e1, e2| push_back(&mut result, f(e1, e2)));
+        aptos_std::smart_vector::zip(self, v2, |e1, e2| push_back(&mut result, f(e1, e2)));
         result
     }
 
     /// Map the function over the references of the element pairs of two vectors, producing a new vector from the return
     /// values without modifying the original vectors.
     public inline fun zip_map_ref<T1, T2, NewT: store>(
-        v1: &SmartVector<T1>,
+        self: &SmartVector<T1>,
         v2: &SmartVector<T2>,
         f: |&T1, &T2|NewT
     ): SmartVector<NewT> {
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(aptos_std::smart_vector::length(v1) == aptos_std::smart_vector::length(v2), 0x20005);
+        assert!(aptos_std::smart_vector::length(self) == aptos_std::smart_vector::length(v2), 0x20005);
 
         let result = aptos_std::smart_vector::new<NewT>();
-        aptos_std::smart_vector::zip_ref(v1, v2, |e1, e2| push_back(&mut result, f(e1, e2)));
+        aptos_std::smart_vector::zip_ref(self, v2, |e1, e2| push_back(&mut result, f(e1, e2)));
         result
     }
 

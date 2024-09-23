@@ -68,7 +68,7 @@ fn exceeding_max_dependency_size() {
     let mut h = MoveHarness::new();
 
     h.modify_gas_schedule(|gas_params| {
-        gas_params.vm.txn.max_total_dependency_size = 220.into();
+        gas_params.vm.txn.max_total_dependency_size = 260.into();
     });
 
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());

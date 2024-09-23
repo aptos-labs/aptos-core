@@ -12,6 +12,7 @@ use move_compiler::{
     shared::{known_attributes::KnownAttribute, Flags, NumericalAddress},
     unit_test, CommentMap, Compiler, SteppedCompiler, PASS_CFGIR, PASS_PARSER,
 };
+use pathdiff::diff_paths;
 use std::{collections::BTreeMap, fs, path::Path};
 
 /// Shared flag to keep any temporary results of the test
@@ -118,10 +119,21 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
 // Runs all tests under the test/testsuite directory.
 fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyhow::Result<()> {
     let targets: Vec<String> = vec![path.to_str().unwrap().to_owned()];
+    let relative_move_stdlib_files = {
+        let cwd = std::env::current_dir().expect("We are running in a directory that exists");
+        let abs_files = move_stdlib::move_stdlib_files();
+        abs_files
+            .iter()
+            .map(|file_str| match diff_paths(Path::new(file_str), &cwd) {
+                Some(relative_pathbuf) => relative_pathbuf.display().to_string(),
+                None => file_str.to_string(),
+            })
+            .collect()
+    };
 
     let (files, comments_and_compiler_res) = Compiler::from_files(
         targets,
-        move_stdlib::move_stdlib_files(),
+        relative_move_stdlib_files,
         default_testing_addresses(),
         flags,
         KnownAttribute::get_all_attribute_names(),

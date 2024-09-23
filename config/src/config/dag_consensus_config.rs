@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, ChainHealthBackoffValues,

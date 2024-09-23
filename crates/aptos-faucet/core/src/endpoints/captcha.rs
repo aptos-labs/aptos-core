@@ -34,7 +34,7 @@ impl CaptchaApi {
         path = "/request_captcha",
         method = "get",
         operation_id = "request_captcha",
-        response_header(name = "CAPTCHA_KEY", type = "u32", description = "Captcha key"),
+        response_header(name = "CAPTCHA_KEY", ty = "u32", description = "Captcha key"),
         tag = "ApiTags::Captcha"
     )]
     async fn request_captcha(&self) -> Result<Response<Binary<Vec<u8>>>, AptosTapErrorResponse> {

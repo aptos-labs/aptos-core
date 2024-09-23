@@ -42,6 +42,7 @@ pub enum Tok {
     LessLess,
     Equal,
     EqualEqual,
+    EqualGreater,
     EqualEqualGreater,
     LessEqualEqualGreater,
     Greater,
@@ -117,6 +118,7 @@ impl fmt::Display for Tok {
             LessLess => "<<",
             Equal => "=",
             EqualEqual => "==",
+            EqualGreater => "=>",
             EqualEqualGreater => "==>",
             LessEqualEqualGreater => "<==>",
             Greater => ">",
@@ -356,7 +358,7 @@ impl<'input> Lexer<'input> {
             let offset = self.text.len() - text.len();
             let (found_token, length) = find_token(self.file_hash, text, offset)?;
             token = found_token;
-            current_offset += length;
+            current_offset = offset + length;
         }
         Ok(token)
     }
@@ -476,6 +478,25 @@ fn find_token(
                 (get_name_token(&text[..len]), len)
             }
         },
+        '"' => {
+            let line = &text.lines().next().unwrap()[1..];
+            match get_string_len(line) {
+                Some(_last_quote) => {
+                    let loc = make_loc(file_hash, start_offset, start_offset);
+                    return Err(Box::new(diag!(
+                        Syntax::InvalidByteString,
+                        (loc, "String literal must begin with b\" (for a byte string) or x\" (for a hex string)")
+                    )));
+                },
+                None => {
+                    let loc = make_loc(file_hash, start_offset, start_offset);
+                    return Err(Box::new(diag!(
+                        Syntax::InvalidCharacter,
+                        (loc, format!("Invalid character: '{}'; string literal must begin with `b\"` and closing quote `\"` must appear on same line", c))
+                    )));
+                },
+            }
+        },
         '&' => {
             if text.starts_with("&mut ") {
                 (Tok::AmpMut, 5)
@@ -495,6 +516,8 @@ fn find_token(
         '=' => {
             if text.starts_with("==>") {
                 (Tok::EqualEqualGreater, 3)
+            } else if text.starts_with("=>") {
+                (Tok::EqualGreater, 2)
             } else if text.starts_with("==") {
                 (Tok::EqualEqual, 2)
             } else {

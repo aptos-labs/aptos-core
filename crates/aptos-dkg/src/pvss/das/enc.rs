@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::pvss::{
     encryption_dlog::g1::{DecryptPrivKey, EncryptPubKey},

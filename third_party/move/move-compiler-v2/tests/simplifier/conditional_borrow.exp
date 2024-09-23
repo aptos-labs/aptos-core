@@ -1,0 +1,100 @@
+// -- Model dump before bytecode pipeline
+module 0x8675::M {
+    struct S {
+        f: u64,
+    }
+    public fun test(): u64 {
+        Add<u64>(M::test1(7), M::test1(2))
+    }
+    private fun test1(r: u64): u64 {
+        {
+          let tref: &mut u64 = Borrow(Mutable)(if Lt<u64>(r, 4) {
+            r
+          } else {
+            3
+          });
+          tref = 10;
+          {
+            let y: u64 = r;
+            {
+              let tref2: &mut u64 = Borrow(Mutable)(y);
+              tref2 = Add<u64>(Deref(tref2), 1);
+              {
+                let z: u64 = y;
+                {
+                  let tref3: &mut u64 = Borrow(Mutable)(Add<u64>(z, 0));
+                  tref3 = Add<u64>(Deref(tref3), 2);
+                  {
+                    let a: u64 = z;
+                    {
+                      let tref4: &mut u64 = Borrow(Mutable)(a);
+                      tref4 = Add<u64>(Deref(tref4), 4);
+                      {
+                        let tref5: &mut u64 = Borrow(Mutable)(a);
+                        tref5 = Add<u64>(Deref(tref5), 8);
+                        {
+                          let tref6: &mut u64 = Borrow(Mutable)(3;
+                          a);
+                          tref6 = Add<u64>(Deref(tref6), 16);
+                          a
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun test1b(r: M::S): u64 {
+        {
+          let x: M::S = pack M::S(3);
+          {
+            let tref: &mut M::S = Borrow(Mutable)(if Lt<u64>(select M::S.f<M::S>(r), 4) {
+              r
+            } else {
+              x
+            });
+            select M::S.f<M::S>(Deref(tref)) = 10;
+            {
+              let y: M::S = r;
+              {
+                let tref2: &mut M::S = Borrow(Mutable)(y);
+                select M::S.f<M::S>(Deref(tref2)) = Add<u64>(select M::S.f<M::S>(Deref(tref2)), 1);
+                {
+                  let z: M::S = y;
+                  {
+                    let tref3: &mut u64 = Borrow(Mutable)(select M::S.f<M::S>(z));
+                    tref3 = Add<u64>(Deref(tref3), 1);
+                    {
+                      let a: M::S = z;
+                      {
+                        let tref4: &mut u64 = Borrow(Mutable)(select M::S.f<M::S>(a));
+                        tref4 = Add<u64>(Deref(tref4), 1);
+                        {
+                          let tref5: &mut u64 = Borrow(Mutable)(select M::S.f<M::S>(a));
+                          tref5 = Add<u64>(Deref(tref5), 8);
+                          {
+                            let tref6: &mut u64 = Borrow(Mutable)(3;
+                            select M::S.f<M::S>(a));
+                            tref6 = Add<u64>(Deref(tref6), 16);
+                            select M::S.f<M::S>(a)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun testb(): u64 {
+        Add<u64>(M::test1b(pack M::S(7)), M::test1b(pack M::S(2)))
+    }
+} // end 0x8675::M
+
+
+============ bytecode verification succeeded ========

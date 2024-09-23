@@ -3,24 +3,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use move_command_line_common::{
-    env::read_bool_env_var,
-    testing::{
-        add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT, EXP_EXT_V2,
-        MOVE_COMPILER_V2,
-    },
+use move_command_line_common::testing::{
+    add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT, EXP_EXT_V2,
 };
 use move_compiler::shared::known_attributes::KnownAttribute;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{
     compilation::{build_plan::BuildPlan, model_builder::ModelBuilder},
-    package_hooks,
-    package_hooks::PackageHooks,
+    package_hooks::{self, PackageHooks},
     resolution::resolution_graph as RG,
     source_package::{
         manifest_parser as MP,
         parsed_manifest::{CustomDepInfo, PackageDigest},
+        std_lib::StdVersion,
     },
-    BuildConfig, CompilerConfig, CompilerVersion, ModelConfig,
+    BuildConfig, CompilerConfig, ModelConfig,
 };
 use move_symbol_pool::Symbol;
 use std::{
@@ -32,15 +29,26 @@ use tempfile::tempdir;
 
 const COMPILE_EXT: &str = "compile";
 const MODEL_EXT: &str = "model";
+const OVERRIDE_EXT: &str = "override";
 
-fn run_test_impl(path: &Path, v2_flag: bool) -> datatest_stable::Result<String> {
+fn run_test_impl(
+    path: &Path,
+    compiler_version: CompilerVersion,
+) -> datatest_stable::Result<String> {
     let mut compiler_config = CompilerConfig {
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         ..Default::default()
     };
-    if v2_flag {
-        compiler_config.compiler_version = Some(CompilerVersion::V2);
-    }
+    compiler_config.compiler_version = Some(compiler_version);
+    let override_path = path.with_extension(OVERRIDE_EXT);
+    let override_std = if override_path.is_file() {
+        Some(
+            StdVersion::from_rev(&fs::read_to_string(override_path)?)
+                .expect("one of mainnet/testnet/devnet"),
+        )
+    } else {
+        None
+    };
     let should_compile = path.with_extension(COMPILE_EXT).is_file();
     let should_model = path.with_extension(MODEL_EXT).is_file();
     let contents = fs::read_to_string(path)?;
@@ -53,6 +61,7 @@ fn run_test_impl(path: &Path, v2_flag: bool) -> datatest_stable::Result<String> 
                 BuildConfig {
                     dev_mode: true,
                     test_mode: false,
+                    override_std,
                     generate_docs: false,
                     generate_abis: false,
                     install_dir: Some(tempdir().unwrap().path().to_path_buf()),
@@ -87,6 +96,8 @@ fn run_test_impl(path: &Path, v2_flag: bool) -> datatest_stable::Result<String> 
             (_, true) => match ModelBuilder::create(resolved_package, ModelConfig {
                 all_files_as_targets: false,
                 target_filter: None,
+                compiler_version,
+                language_version: LanguageVersion::default(),
             })
             .build_model()
             {
@@ -111,9 +122,13 @@ fn check_or_update(
     path: &Path,
     output: String,
     update_baseline: bool,
-    v2_flag: bool,
+    compiler_version: CompilerVersion,
 ) -> datatest_stable::Result<()> {
-    let exp_ext = if v2_flag { EXP_EXT_V2 } else { EXP_EXT };
+    let exp_ext = if compiler_version == CompilerVersion::V2_0 {
+        EXP_EXT_V2
+    } else {
+        EXP_EXT
+    };
     let exp_path = path.with_extension(exp_ext);
     let exp_exists = exp_path.is_file();
     if update_baseline {
@@ -151,17 +166,14 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
         return Ok(());
     }
 
-    let output_v1 = run_test_impl(path, false)?;
+    let output_v1 = run_test_impl(path, CompilerVersion::default())?;
     let update_baseline = read_env_update_baseline();
-    let res_v1 = check_or_update(path, output_v1.clone(), update_baseline, false);
-    if read_bool_env_var(MOVE_COMPILER_V2) {
-        // Run test against v2 when MOVE_COMPILER_V2 is set
-        let output_v2 = run_test_impl(path, true)?;
-        if output_v1 != output_v2 {
-            // TODO: compare the result between V1 and V2.
-        }
-    }
-    res_v1
+    check_or_update(
+        path,
+        output_v1.clone(),
+        update_baseline,
+        CompilerVersion::default(),
+    )
 }
 
 /// Some dummy hooks for testing the hook mechanism

@@ -1,18 +1,18 @@
 
 Diagnostics:
-error: the function expected 1 type argument but 0 were provided
+error: expected 1 type argument but 0 were provided
    ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:11:17
    │
 11 │         let x = foo<>(0);
    │                 ^^^^^^^^
 
-error: the function expected 1 type argument but 2 were provided
+error: expected 1 type argument but 2 were provided
    ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:12:17
    │
 12 │         let b = foo<bool, u64>(false);
    │                 ^^^^^^^^^^^^^^^^^^^^^
 
-error: the function expected 1 type argument but 2 were provided
+error: expected 1 type argument but 2 were provided
    ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:14:17
    │
 14 │         let r = foo<&mut u64, bool>(&mut 0);

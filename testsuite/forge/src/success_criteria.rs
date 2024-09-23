@@ -3,27 +3,31 @@
 
 use crate::{
     prometheus_metrics::{
-        fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice, SystemMetrics,
+        fetch_error_metrics, fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice,
+        SystemMetrics,
     },
     Swarm, SwarmExt, TestReport,
 };
 use anyhow::{bail, Context};
-use aptos::node::analyze::fetch_metadata::FetchMetadata;
-use aptos_sdk::types::PeerId;
+use aptos::node::analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata};
+use aptos_logger::info;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
 use prometheus_http_query::response::Sample;
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
-    pub max_no_progress_secs: f32,
-    pub max_round_gap: u64,
+    pub max_non_epoch_no_progress_secs: f32,
+    pub max_epoch_no_progress_secs: f32,
+    pub max_non_epoch_round_gap: u64,
+    pub max_epoch_round_gap: u64,
 }
 
 #[derive(Clone, Debug)]
 pub enum LatencyType {
     Average,
     P50,
+    P70,
     P90,
     P99,
 }
@@ -33,6 +37,8 @@ pub struct MetricsThreshold {
     max: f64,
     // % of the data point that can breach the max threshold
     max_breach_pct: usize,
+
+    expect_empty: bool,
 }
 
 impl MetricsThreshold {
@@ -40,6 +46,15 @@ impl MetricsThreshold {
         Self {
             max,
             max_breach_pct,
+            expect_empty: false,
+        }
+    }
+
+    pub fn new_expect_empty() -> Self {
+        Self {
+            max: 0.0,
+            max_breach_pct: 0,
+            expect_empty: true,
         }
     }
 
@@ -47,14 +62,22 @@ impl MetricsThreshold {
         Self {
             max: max * 1024.0 * 1024.0 * 1024.0,
             max_breach_pct,
+            expect_empty: false,
         }
     }
 
     pub fn ensure_metrics_threshold(
         &self,
         metrics_name: &str,
-        metrics: &Vec<Sample>,
+        metrics: &[Sample],
     ) -> anyhow::Result<()> {
+        if self.expect_empty {
+            if !metrics.is_empty() {
+                bail!("Data found for metrics expected to be empty");
+            }
+            return Ok(());
+        }
+
         if metrics.is_empty() {
             bail!("Empty metrics provided");
         }
@@ -139,12 +162,13 @@ impl LatencyBreakdownThreshold {
 
 #[derive(Default, Clone, Debug)]
 pub struct SuccessCriteria {
-    pub min_avg_tps: usize,
+    pub min_avg_tps: f64,
     latency_thresholds: Vec<(Duration, LatencyType)>,
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
-    max_expired_tps: Option<usize>,
-    max_failed_submission_tps: Option<usize>,
+    check_no_errors: bool,
+    max_expired_tps: Option<f64>,
+    max_failed_submission_tps: Option<f64>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
     system_metrics_threshold: Option<SystemMetricsThreshold>,
@@ -153,11 +177,16 @@ pub struct SuccessCriteria {
 
 impl SuccessCriteria {
     pub fn new(min_avg_tps: usize) -> Self {
+        Self::new_float(min_avg_tps as f64)
+    }
+
+    pub fn new_float(min_avg_tps: f64) -> Self {
         Self {
             min_avg_tps,
             latency_thresholds: Vec::new(),
             latency_breakdown_thresholds: None,
             check_no_restarts: false,
+            check_no_errors: true,
             max_expired_tps: None,
             max_failed_submission_tps: None,
             wait_for_all_nodes_to_catchup: None,
@@ -166,17 +195,22 @@ impl SuccessCriteria {
         }
     }
 
+    pub fn allow_errors(mut self) -> Self {
+        self.check_no_errors = false;
+        self
+    }
+
     pub fn add_no_restarts(mut self) -> Self {
         self.check_no_restarts = true;
         self
     }
 
-    pub fn add_max_expired_tps(mut self, max_expired_tps: usize) -> Self {
+    pub fn add_max_expired_tps(mut self, max_expired_tps: f64) -> Self {
         self.max_expired_tps = Some(max_expired_tps);
         self
     }
 
-    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: usize) -> Self {
+    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: f64) -> Self {
         self.max_failed_submission_tps = Some(max_failed_submission_tps);
         self
     }
@@ -242,7 +276,7 @@ impl SuccessCriteriaChecker {
 
     pub async fn check_for_success(
         success_criteria: &SuccessCriteria,
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         report: &mut TestReport,
         stats: &TxnStats,
         window: Duration,
@@ -252,7 +286,7 @@ impl SuccessCriteriaChecker {
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<()> {
-        println!(
+        info!(
             "End to end duration: {}s, performance measured for: {}s",
             window.as_secs(),
             stats.lasted.as_secs()
@@ -281,30 +315,42 @@ impl SuccessCriteriaChecker {
 
         if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
             swarm
+                .read()
+                .await
                 .wait_for_all_nodes_to_catchup_to_next(timeout)
                 .await
                 .context("Failed waiting for all nodes to catchup to next version")?;
         }
 
         if success_criteria.check_no_restarts {
-            swarm
+            let swarm_read = swarm.read().await;
+            swarm_read
                 .ensure_no_validator_restart()
                 .await
                 .context("Failed ensuring no validator restarted")?;
-            swarm
+            swarm_read
                 .ensure_no_fullnode_restart()
                 .await
                 .context("Failed ensuring no fullnode restarted")?;
         }
 
+        if success_criteria.check_no_errors {
+            Self::check_no_errors(swarm.clone()).await?;
+        }
+
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
-            Self::check_system_metrics(swarm, start_time, end_time, system_metrics_threshold)
-                .await?;
+            Self::check_system_metrics(
+                swarm.clone(),
+                start_time,
+                end_time,
+                system_metrics_threshold,
+            )
+            .await?;
         }
 
         if let Some(chain_progress_threshold) = &success_criteria.chain_progress_check {
             Self::check_chain_progress(
-                swarm,
+                swarm.clone(),
                 report,
                 chain_progress_threshold,
                 start_version,
@@ -318,109 +364,93 @@ impl SuccessCriteriaChecker {
     }
 
     async fn check_chain_progress(
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         report: &mut TestReport,
         chain_progress_threshold: &StateProgressThreshold,
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<()> {
         // Choose client with newest ledger version to fetch NewBlockEvents from:
-        let (_max_v, client) = swarm
-            .get_client_with_newest_ledger_version()
-            .await
-            .context("No clients replied in check_chain_progress")?;
+        let (_max_v, client) = {
+            swarm
+                .read()
+                .await
+                .get_client_with_newest_ledger_version()
+                .await
+                .context("No clients replied in check_chain_progress")?
+        };
 
         let epochs = FetchMetadata::fetch_new_block_events(&client, None, None)
             .await
             .unwrap();
 
-        let mut max_round_gap = 0;
-        let mut max_round_gap_version = 0;
-        let mut max_time_gap = 0;
-        let mut max_time_gap_version = 0;
-
-        let mut prev_block = None;
-        let mut prev_ts = 0;
-        let mut failed_from_nil = 0;
-        let mut previous_epooch = 0;
-        let mut previous_round = 0;
-        for block in epochs
-            .iter()
-            .flat_map(|epoch| epoch.blocks.iter())
-            .filter(|b| b.version > start_version && b.version < end_version)
-        {
-            let is_nil = block.event.proposer() == PeerId::ZERO;
-
-            let current_gap = if previous_epooch == block.event.epoch() {
-                block.event.round() - previous_round - 1
-            } else {
-                u64::from(!is_nil) + block.event.failed_proposer_indices().len() as u64
-            };
-
-            if is_nil {
-                failed_from_nil += current_gap;
-            } else {
-                if prev_ts > 0 {
-                    let round_gap = current_gap + failed_from_nil;
-                    let time_gap = block.event.proposed_time() as i64 - prev_ts as i64;
-
-                    if time_gap < 0 {
-                        println!(
-                            "Clock went backwards? {}, {:?}, {:?}",
-                            time_gap, block, prev_block
-                        );
-                    }
-
-                    if round_gap > max_round_gap {
-                        max_round_gap = round_gap;
-                        max_round_gap_version = block.version;
-                    }
-                    if time_gap > max_time_gap as i64 {
-                        max_time_gap = time_gap as u64;
-                        max_time_gap_version = block.version;
-                    }
-                }
-
-                failed_from_nil = 0;
-                prev_ts = block.event.proposed_time();
-                prev_block = Some(block);
-            }
-
-            previous_epooch = block.event.epoch();
-            previous_round = block.event.round();
-        }
-
-        let max_time_gap_secs = Duration::from_micros(max_time_gap).as_secs_f32();
-
-        let gap_text = format!(
-            "Max round gap was {} [limit {}] at version {}. Max no progress secs was {} [limit {}] at version {}.",
-            max_round_gap,
-            chain_progress_threshold.max_round_gap,
-            max_round_gap_version,
-            max_time_gap_secs,
-            chain_progress_threshold.max_no_progress_secs,
-            max_time_gap_version,
+        let gap_info = AnalyzeValidators::analyze_gap(
+            epochs
+                .iter()
+                .flat_map(|epoch| epoch.blocks.iter())
+                .filter(|b| b.version > start_version && b.version < end_version),
         );
 
-        if max_round_gap > chain_progress_threshold.max_round_gap
-            || max_time_gap_secs > chain_progress_threshold.max_no_progress_secs
+        let gap_text = format!(
+            "Max non-epoch-change gap was: {} [limit {}], {} [limit {}].",
+            gap_info.non_epoch_round_gap.to_string_as_round(),
+            chain_progress_threshold.max_non_epoch_round_gap,
+            gap_info.non_epoch_time_gap.to_string_as_time(),
+            chain_progress_threshold.max_non_epoch_no_progress_secs,
+        );
+
+        let epoch_gap_text = format!(
+            "Max epoch-change gap was: {} [limit {}], {} [limit {}].",
+            gap_info.epoch_round_gap.to_string_as_round(),
+            chain_progress_threshold.max_epoch_round_gap,
+            gap_info.epoch_time_gap.to_string_as_time(),
+            chain_progress_threshold.max_epoch_no_progress_secs,
+        );
+
+        info!(
+            max_non_epoch_round_gap = gap_info.non_epoch_round_gap.max_gap,
+            max_epoch_round_gap = gap_info.epoch_round_gap.max_gap,
+            max_non_epoch_time_gap = gap_info.non_epoch_time_gap.max_gap,
+            max_epoch_time_gap = gap_info.epoch_time_gap.max_gap,
+            "Max gap values",
+        );
+
+        report.report_text(gap_text.clone());
+        report.report_text(epoch_gap_text.clone());
+
+        if gap_info.non_epoch_round_gap.max_gap.round() as u64
+            > chain_progress_threshold.max_non_epoch_round_gap
+            || gap_info.non_epoch_time_gap.max_gap
+                > chain_progress_threshold.max_non_epoch_no_progress_secs
         {
-            bail!("Failed chain progress check. {}", gap_text);
-        } else {
-            println!("Passed progress check. {}", gap_text);
-            report.report_text(gap_text);
+            bail!(
+                "Failed non-epoch-change chain progress check. {}",
+                &gap_text
+            );
         }
+        info!("Passed non-epoch-change progress check. {}", gap_text);
+
+        if gap_info.epoch_round_gap.max_gap.round() as u64
+            > chain_progress_threshold.max_epoch_round_gap
+            || gap_info.epoch_time_gap.max_gap > chain_progress_threshold.max_epoch_no_progress_secs
+        {
+            bail!(
+                "Failed epoch-change chain progress check. {}",
+                &epoch_gap_text
+            );
+        }
+        info!("Passed epoch-change progress check. {}", epoch_gap_text);
 
         Ok(())
     }
 
     pub fn check_tps(
-        min_avg_tps: usize,
+        min_avg_tps: f64,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         let avg_tps = stats_rate.committed;
-        if avg_tps < min_avg_tps as u64 {
+        if avg_tps < min_avg_tps {
             bail!(
                 "TPS requirement{} failed. Average TPS {}, minimum TPS requirement {}. Full stats: {}",
                 traffic_name_addition,
@@ -429,7 +459,7 @@ impl SuccessCriteriaChecker {
                 stats_rate,
             )
         } else {
-            println!(
+            info!(
                 "TPS is {} and is within limit of {}",
                 stats_rate.committed, min_avg_tps
             );
@@ -438,14 +468,14 @@ impl SuccessCriteriaChecker {
     }
 
     fn check_max_value(
-        max_config: Option<usize>,
+        max_config: Option<f64>,
         stats_rate: &TxnStatsRate,
-        value: u64,
+        value: f64,
         value_desc: &str,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         if let Some(max) = max_config {
-            if value > max as u64 {
+            if value > max {
                 bail!(
                     "{} requirement{} failed. {} TPS: average {}, maximum requirement {}. Full stats: {}",
                     value_desc,
@@ -456,7 +486,7 @@ impl SuccessCriteriaChecker {
                     stats_rate,
                 )
             } else {
-                println!(
+                info!(
                     "{} TPS is {} and is below max limit of {}",
                     value_desc, value, max
                 );
@@ -468,9 +498,9 @@ impl SuccessCriteriaChecker {
     }
 
     pub fn check_throughput(
-        min_avg_tps: usize,
-        max_expired_config: Option<usize>,
-        max_failed_submission_config: Option<usize>,
+        min_avg_tps: f64,
+        max_expired_config: Option<f64>,
+        max_failed_submission_config: Option<f64>,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
@@ -500,8 +530,9 @@ impl SuccessCriteriaChecker {
         let mut failures = Vec::new();
         for (latency_threshold, latency_type) in latency_thresholds {
             let latency = Duration::from_millis(match latency_type {
-                LatencyType::Average => stats_rate.latency,
+                LatencyType::Average => stats_rate.latency as u64,
                 LatencyType::P50 => stats_rate.p50_latency,
+                LatencyType::P70 => stats_rate.p70_latency,
                 LatencyType::P90 => stats_rate.p90_latency,
                 LatencyType::P99 => stats_rate.p99_latency,
             });
@@ -518,7 +549,7 @@ impl SuccessCriteriaChecker {
                     .to_string(),
                 );
             } else {
-                println!(
+                info!(
                     "{:?} latency{} is {}s and is within limit of {}s",
                     latency_type,
                     traffic_name_addition,
@@ -534,8 +565,23 @@ impl SuccessCriteriaChecker {
         }
     }
 
+    async fn check_no_errors(
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+    ) -> anyhow::Result<()> {
+        let error_count = fetch_error_metrics(swarm).await?;
+        if error_count > 0 {
+            bail!(
+                "error!() count in validator logs was {}, and must be 0",
+                error_count
+            );
+        } else {
+            info!("No error!() found in validator logs");
+            Ok(())
+        }
+    }
+
     async fn check_system_metrics(
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         start_time: i64,
         end_time: i64,
         threshold: SystemMetricsThreshold,

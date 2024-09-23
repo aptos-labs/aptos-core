@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     schema::nft_metadata_crawler::parsed_asset_uris, utils::constants::MAX_RETRY_TIME_SECONDS,

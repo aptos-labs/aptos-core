@@ -1,0 +1,14 @@
+// -- Model dump before bytecode pipeline
+module 0xcafe::Ristretto {
+    public fun test() {
+        if true {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        Tuple()
+    }
+} // end 0xcafe::Ristretto
+
+
+============ bytecode verification succeeded ========

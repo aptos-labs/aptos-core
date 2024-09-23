@@ -755,11 +755,15 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
         }
     }
 
-    fn rewrite_enter_scope<'c>(&mut self, decls: impl Iterator<Item = &'c (NodeId, Symbol)>) {
+    fn rewrite_enter_scope<'c>(
+        &mut self,
+        _id: NodeId,
+        decls: impl Iterator<Item = &'c (NodeId, Symbol)>,
+    ) {
         self.shadowed.push(decls.map(|(_, name)| *name).collect())
     }
 
-    fn rewrite_exit_scope(&mut self) {
+    fn rewrite_exit_scope(&mut self, _id: NodeId) {
         self.shadowed.pop();
     }
 }

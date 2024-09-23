@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     keyless::{
@@ -73,7 +74,7 @@ fn test_pepper_serialization() {
     //println!("{:?}", bcs::to_bytes(&pepper).unwrap());
     let pepper_str = "\"2a000000000000000000000000000000000000000000000000000000000000\"";
 
-    const EXPECTED_PEPPER_LENGTH: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    const EXPECTED_PEPPER_LENGTH: usize = poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR;
     let pepper_bytes: [u8; EXPECTED_PEPPER_LENGTH] = [
         42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0,

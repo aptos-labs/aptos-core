@@ -11,7 +11,7 @@ use crate::{
         translate::is_valid_struct_constant_or_schema_name as is_constant_name,
     },
     naming::ast as N,
-    parser::ast::{Ability_, ConstantName, Field, FunctionName, StructName, Var},
+    parser::ast::{Ability_, CallKind, ConstantName, Field, FunctionName, StructName, Var},
     shared::{unique_map::UniqueMap, *},
     FullyCompiledProgram,
 };
@@ -279,7 +279,7 @@ impl<'env> Context<'env> {
                     None
                 },
             },
-            EA::ModuleAccess(m, n) => match self.resolve_module_type(nloc, &m, &n) {
+            EA::ModuleAccess(m, n, _) => match self.resolve_module_type(nloc, &m, &n) {
                 None => {
                     assert!(self.env.has_errors());
                     None
@@ -312,7 +312,7 @@ impl<'env> Context<'env> {
                 },
                 Some(_) => Some((None, ConstantName(n))),
             },
-            EA::ModuleAccess(m, n) => match self.resolve_module_constant(loc, &m, &n) {
+            EA::ModuleAccess(m, n, _) => match self.resolve_module_constant(loc, &m, &n) {
                 None => {
                     assert!(self.env.has_errors());
                     None
@@ -353,6 +353,9 @@ pub fn program(
     prog: E::Program,
 ) -> N::Program {
     let mut context = Context::new(compilation_env, pre_compiled_lib, &prog);
+    if context.env.flags().get_block_v1_compiler() {
+        panic!("V1 compiler not expected");
+    }
     let E::Program {
         modules: emodules,
         scripts: escripts,
@@ -594,7 +597,7 @@ fn acquires_type(context: &mut Context, sp!(loc, en_): E::ModuleAccess) -> Optio
                 .add_diag(diag!(NameResolution::NamePositionMismatch, (loc, msg)));
             None
         },
-        EN::ModuleAccess(m, n) => {
+        EN::ModuleAccess(m, n, _) => {
             let (decl_loc, _, abilities, _) = context.resolve_module_type(loc, &m, &n)?;
             acquires_type_struct(context, loc, decl_loc, m, StructName(n), &abilities)
         },
@@ -663,7 +666,7 @@ fn struct_def(
     let attributes = sdef.attributes;
     let abilities = sdef.abilities;
     let type_parameters = struct_type_parameters(context, sdef.type_parameters);
-    let fields = struct_fields(context, sdef.fields);
+    let fields = struct_fields(context, sdef.loc, sdef.layout);
     N::StructDefinition {
         attributes,
         abilities,
@@ -672,11 +675,14 @@ fn struct_def(
     }
 }
 
-fn struct_fields(context: &mut Context, efields: E::StructFields) -> N::StructFields {
-    match efields {
-        E::StructFields::Native(loc) => N::StructFields::Native(loc),
-        E::StructFields::Defined(em) => {
+fn struct_fields(context: &mut Context, _loc: Loc, elayout: E::StructLayout) -> N::StructFields {
+    match elayout {
+        E::StructLayout::Native(loc) => N::StructFields::Native(loc),
+        E::StructLayout::Singleton(em, _) => {
             N::StructFields::Defined(em.map(|_f, (idx, t)| (idx, type_(context, t))))
+        },
+        E::StructLayout::Variants(_) => {
+            panic!("ICE unexpected Move 2 struct layout")
         },
     }
 }
@@ -806,7 +812,7 @@ fn type_(context: &mut Context, sp!(loc, ety_): E::Type) -> N::Type {
             args.push(type_(context, *result));
             NT::builtin_(sp(loc, N::BuiltinTypeName_::Fun), args)
         },
-        ET::Apply(sp!(nloc, EN::ModuleAccess(m, n)), tys) => {
+        ET::Apply(sp!(nloc, EN::ModuleAccess(m, n, _)), tys) => {
             match context.resolve_module_type(nloc, &m, &n) {
                 None => {
                     assert!(context.env.has_errors());
@@ -936,7 +942,7 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::Loop(el) => NE::Loop(exp(context, *el)),
         EE::Block(seq) => NE::Block(sequence(context, seq)),
         EE::Lambda(args, body) => {
-            let bind_opt = bind_list(context, args);
+            let bind_opt = bind_typed_list(context, args);
             match bind_opt {
                 None => {
                     assert!(context.env.has_errors());
@@ -1026,7 +1032,7 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::Cast(e, t) => NE::Cast(exp(context, *e), type_(context, t)),
         EE::Annotate(e, t) => NE::Annotate(exp(context, *e), type_(context, t)),
 
-        EE::Call(sp!(mloc, E::ModuleAccess_::Name(n)), true, tys_opt, rhs)
+        EE::Call(sp!(mloc, E::ModuleAccess_::Name(n)), CallKind::Macro, tys_opt, rhs)
             if n.value.as_str() == N::BuiltinFunction_::ASSERT_MACRO =>
         {
             use N::BuiltinFunction_ as BF;
@@ -1037,9 +1043,25 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
                 ));
             }
             let nes = call_args(context, rhs);
+            if nes.value.len() == 1 {
+                context.env.add_diag(diag!(
+                    Syntax::UnsupportedLanguageItem,
+                    (
+                        mloc,
+                        "single-parameter assert! macro not supported by this compiler"
+                    )
+                ));
+            }
             NE::Builtin(sp(mloc, BF::Assert(true)), nes)
         },
-        EE::Call(sp!(mloc, ma_), is_macro, tys_opt, rhs) => {
+        EE::Call(sp!(mloc, _), CallKind::Receiver, ..) => {
+            context.env.add_diag(diag!(
+                Syntax::UnsupportedLanguageItem,
+                (mloc, "receiver style syntax not supported by this compiler")
+            ));
+            NE::UnresolvedError
+        },
+        EE::Call(sp!(mloc, ma_), kind, tys_opt, rhs) => {
             use E::ModuleAccess_ as EA;
             let ty_args = tys_opt.map(|tys| types(context, tys));
             let nes = call_args(context, rhs);
@@ -1055,12 +1077,14 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
                 },
 
                 EA::Name(n) => NE::VarCall(Var(n), nes),
-                EA::ModuleAccess(m, n) => match context.resolve_module_function(mloc, &m, &n) {
+                EA::ModuleAccess(m, n, _) => match context.resolve_module_function(mloc, &m, &n) {
                     None => {
                         assert!(context.env.has_errors());
                         NE::UnresolvedError
                     },
-                    Some(_) => NE::ModuleCall(m, FunctionName(n), is_macro, ty_args, nes),
+                    Some(_) => {
+                        NE::ModuleCall(m, FunctionName(n), kind == CallKind::Macro, ty_args, nes)
+                    },
                 },
             }
         },
@@ -1091,6 +1115,10 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::UnresolvedError => {
             assert!(context.env.has_errors());
             NE::UnresolvedError
+        },
+        // Variants only allowed in Move 2
+        EE::Match(..) | EE::Test(..) => {
+            panic!("ICE unexpected Move 2 construct")
         },
         // Matches variants only allowed in specs (we handle the allowed ones above)
         EE::Index(..) | EE::Quant(..) | EE::Name(_, Some(_)) => {
@@ -1144,7 +1172,8 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
                 NL::Var(v)
             }
         },
-        EL::Unpack(tn, etys_opt, efields) => {
+        EL::Unpack(tn, etys_opt, efields, dotdot) => {
+            assert!(dotdot.is_none(), "\"..\" syntax only supported in Move 2");
             let msg = match case {
                 C::Bind => "deconstructing binding",
                 C::Assign => "deconstructing assignment",
@@ -1162,6 +1191,7 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
                 nfields.expect("ICE fields were already unique"),
             )
         },
+        EL::PositionalUnpack(_, _, _) => panic!("positional fields only allowed in v2"),
         EL::Var(_, _) => panic!("unexpected specification construct"),
     };
     Some(sp(loc, nl_))
@@ -1169,6 +1199,10 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
 
 fn bind_list(context: &mut Context, ls: E::LValueList) -> Option<N::LValueList> {
     lvalue_list(context, LValueCase::Bind, ls)
+}
+
+fn bind_typed_list(context: &mut Context, ls: E::TypedLValueList) -> Option<N::LValueList> {
+    typed_lvalue_list(context, ls)
 }
 
 fn assign_list(context: &mut Context, ls: E::LValueList) -> Option<N::LValueList> {
@@ -1184,6 +1218,30 @@ fn lvalue_list(
         loc,
         b_.into_iter()
             .map(|inner| lvalue(context, case, inner))
+            .collect::<Option<_>>()?,
+    ))
+}
+
+fn typed_lvalue_list(
+    context: &mut Context,
+    sp!(loc, b_): E::TypedLValueList,
+) -> Option<N::LValueList> {
+    let case = LValueCase::Bind;
+    Some(sp(
+        loc,
+        b_.into_iter()
+            .map(|sp!(loc, E::TypedLValue_(inner, opt_ty))| {
+                if opt_ty.is_some() {
+                    context.env.add_diag(diag!(
+                        Syntax::UnsupportedLanguageItem,
+                        (
+                            loc,
+                            "Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond"
+                        )
+                    ))
+                }
+                lvalue(context, case, inner)
+            })
             .collect::<Option<_>>()?,
     ))
 }

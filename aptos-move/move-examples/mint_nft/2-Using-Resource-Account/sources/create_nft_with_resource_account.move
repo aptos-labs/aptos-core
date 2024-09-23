@@ -3,7 +3,7 @@
 ///
 /// Concept: resource account
 /// A resource account is a developer feature used to manage resources independent of an account managed by a user, specifically publishing modules and automatically signing for transactions.
-/// In this module, we are using a resource account to publish this module and programmatically sign for token minting and transfering transactions.
+/// In this module, we are using a resource account to publish this module and programmatically sign for token minting and transferring transactions.
 ///
 /// How to interact with this module:
 /// 1. Create an nft-receiver account (in addition to the source account we created in the last part). We'll use this account to receive an NFT in this tutorial.

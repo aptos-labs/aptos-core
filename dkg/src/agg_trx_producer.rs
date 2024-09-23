@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     transcript_aggregation::TranscriptAggregationState, types::DKGTranscriptRequest, DKGMessage,
@@ -60,7 +61,10 @@ impl<DKG: DKGTrait + 'static> TAggTranscriptProducer<DKG> for AggTranscriptProdu
             epoch_state,
         ));
         let task = async move {
-            let agg_trx = rb.broadcast(req, agg_state).await;
+            let agg_trx = rb
+                .broadcast(req, agg_state)
+                .await
+                .expect("broadcast cannot fail");
             info!(
                 epoch = epoch,
                 my_addr = my_addr,

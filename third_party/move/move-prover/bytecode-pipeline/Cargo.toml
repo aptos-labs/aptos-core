@@ -8,7 +8,7 @@ license = "Apache-2.0"
 
 [dependencies]
 abstract-domain-derive = { path = "../../move-model/bytecode/abstract_domain_derive" }
-anyhow = "1.0.52"
+anyhow = { workspace = true }
 move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
 move-model = { path = "../../move-model" }
@@ -17,31 +17,17 @@ move-model = { path = "../../move-model" }
 move-stackless-bytecode = { path = "../../move-model/bytecode" }
 
 # external dependencies
-async-trait = "0.1.42"
-atty = "0.2.14"
-clap = { version = "4.3.9", features = ["derive"] }
-codespan = "0.11.1"
-codespan-reporting = "0.11.1"
-futures = "0.3.12"
-hex = "0.4.3"
-itertools = "0.10.0"
-log = { version = "0.4.14", features = ["serde"] }
-num = "0.4.0"
-once_cell = "1.7.2"
-pretty = "0.10.0"
-rand = "0.8.3"
-serde = { version = "1.0.124", features = ["derive"] }
-serde_json = "1.0.64"
-simplelog = "0.9.0"
-tokio = { version = "1.18.2", features = ["full"] }
-toml = "0.5.8"
+codespan-reporting = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
+datatest-stable = { workspace = true }
 move-stackless-bytecode-test-utils = { path = "../../move-model/bytecode-test-utils" }
-shell-words = "1.0.0"
-tempfile = "3.2.0"
-walkdir = "2.3.1"
+shell-words = { workspace = true }
+tempfile = { workspace = true }
+walkdir = { workspace = true }
 
 [[test]]
 name = "testsuite"

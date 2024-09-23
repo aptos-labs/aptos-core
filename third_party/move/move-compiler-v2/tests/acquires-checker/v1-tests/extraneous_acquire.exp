@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unnecessary acquires annotation
+  ┌─ tests/acquires-checker/v1-tests/extraneous_acquire.move:5:23
+  │
+5 │     fun t0() acquires R1 {
+  │                       ^^^
+
+error: unnecessary acquires annotation
+  ┌─ tests/acquires-checker/v1-tests/extraneous_acquire.move:9:37
+  │
+9 │     fun t1(a: address) acquires R1, R2 {
+  │                                     ^^^

@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: cannot mutably borrow `Tester::Pair` since it is already borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_global_invalid.move:30:18
+   │
+29 │         let p1 = borrow_global_mut<Pair>(addr1);
+   │                  ------------------------------ struct `Tester::Pair` previously mutably borrowed here
+30 │         let p2 = borrow_global_mut<Pair>(addr2);
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+31 │         p1 == p2
+   │         -- conflicting reference `p1` used here
+
+error: cannot mutably borrow `Tester::Pair` since it is already borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_global_invalid.move:36:25
+   │
+35 │         let p1 = freeze(borrow_global_mut<Pair>(addr1));
+   │                  -------------------------------------- struct `Tester::Pair` previously borrowed here
+36 │         let p2 = freeze(borrow_global_mut<Pair>(addr2));
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+37 │         p1 == p2
+   │         -------- conflicting reference `p1` used here
+
+error: cannot mutably borrow `Tester::Pair` since it is already borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_global_invalid.move:42:19
+   │
+41 │         let c1 = &borrow_global_mut<Pair>(addr1).x;
+   │                  --------------------------------- struct `Tester::Pair` previously borrowed here
+42 │         let c2 = &borrow_global_mut<Pair>(addr2).x;
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+43 │         c1 == c2
+   │         -------- conflicting reference `c1` used here

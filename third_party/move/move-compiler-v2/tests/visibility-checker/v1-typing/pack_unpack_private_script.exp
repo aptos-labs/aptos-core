@@ -1,0 +1,18 @@
+
+Diagnostics:
+error: Invalid operation: pack of `M::T` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/v1-typing/pack_unpack_private_script.move:11:9
+   │
+11 │     fun main() {
+   │         ^^^^
+12 │         let t = T {  };
+   │                 ------ packed here
+
+error: Invalid operation: unpack of `M::T` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/v1-typing/pack_unpack_private_script.move:11:9
+   │
+11 │     fun main() {
+   │         ^^^^
+12 │         let t = T {  };
+13 │         let T {} = t;
+   │             ---- unpacked here

@@ -1,18 +1,14 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    randomness::{
-        decrypt_key_map, get_current_version, get_on_chain_resource, verify_dkg_transcript,
-        verify_randomness,
-    },
+    randomness::{decrypt_key_map, get_current_version, verify_dkg_transcript, verify_randomness},
     smoke_test_environment::SwarmBuilder,
+    utils::get_on_chain_resource,
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
-use aptos_types::{
-    dkg::DKGState,
-    on_chain_config::{FeatureFlag, Features},
-};
+use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
@@ -26,13 +22,9 @@ async fn randomness_correctness() {
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
 
-            // Ensure vtxn is enabled.
+            // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-
-            // Ensure randomness flag is set.
-            let mut features = Features::default();
-            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build_with_cli(0)
         .await;
@@ -50,8 +42,8 @@ async fn randomness_correctness() {
     let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
     assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
 
-    // Verify the randomness in 5 versions.
-    for _ in 0..5 {
+    // Verify the randomness in 10 versions.
+    for _ in 0..10 {
         let cur_txn_version = get_current_version(&rest_client).await;
         info!("Verifying WVUF output for version {}.", cur_txn_version);
         let wvuf_verify_result =
@@ -70,8 +62,8 @@ async fn randomness_correctness() {
     let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
     assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
 
-    // Again, verify the randomness in 5 versions.
-    for _ in 0..5 {
+    // Again, verify the randomness in 10 versions.
+    for _ in 0..10 {
         let cur_txn_version = get_current_version(&rest_client).await;
         info!("Verifying WVUF output for version {}.", cur_txn_version);
         let wvuf_verify_result =

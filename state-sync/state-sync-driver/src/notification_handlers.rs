@@ -99,16 +99,13 @@ impl CommitNotification {
 
         // Notify mempool of the committed transactions
         mempool_notification_handler
-            .notify_mempool_of_committed_transactions(
-                transactions.clone(),
-                blockchain_timestamp_usecs,
-            )
+            .notify_mempool_of_committed_transactions(transactions, blockchain_timestamp_usecs)
             .await?;
 
         // Notify the event subscription service of the events
         event_subscription_service
             .lock()
-            .notify_events(latest_synced_version, events.clone())?;
+            .notify_events(latest_synced_version, events)?;
 
         Ok(())
     }
@@ -171,7 +168,7 @@ impl ConsensusSyncRequest {
     }
 }
 
-/// A simple handler for consensus notifications
+/// A simple handler for consensus or consensus observer notifications
 pub struct ConsensusNotificationHandler {
     // The listener for notifications from consensus
     consensus_listener: ConsensusNotificationListener,

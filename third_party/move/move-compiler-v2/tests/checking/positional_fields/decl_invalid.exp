@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: reference type `&u8` is not allowed as a field type
+  ┌─ tests/checking/positional_fields/decl_invalid.move:2:11
+  │
+2 │     struct S(&u8);
+  │              ^^^
+  │
+  = required by declaration of field `0`

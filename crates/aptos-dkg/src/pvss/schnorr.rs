@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::{hash_to_scalar, random::random_scalar, HasMultiExp};
 use anyhow::bail;
@@ -46,7 +47,7 @@ where
 /// Computes the Fiat-Shamir challenge in the Schnorr PoK protocol given an instance $(g, pk = g^a)$
 /// and the commitment $R = g^r$.
 #[allow(non_snake_case)]
-fn schnorr_hash<Gr: Serialize>(c: Challenge<Gr>) -> Scalar
+fn schnorr_hash<Gr>(c: Challenge<Gr>) -> Scalar
 where
     Gr: Serialize,
 {

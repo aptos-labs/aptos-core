@@ -4,7 +4,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    register_int_counter_vec, register_int_gauge_vec, Histogram, HistogramVec, IntCounter,
+    IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -211,11 +212,40 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS: Lazy<IntCounterVec> = 
     .unwrap()
 });
 
-pub static APTOS_PROCESSED_TXNS_OUTPUT_SIZE: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+pub static APTOS_PROCESSED_TXNS_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
         "aptos_processed_txns_output_size",
-        "Histogram of transaction outputs",
+        "Histogram of transaction output sizes",
+        &["process"],
         exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 25).unwrap()
+    )
+    .unwrap()
+});
+
+pub static APTOS_PROCESSED_TXNS_NUM_AUTHENTICATORS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_processed_txns_num_authenticators",
+        "Histogram of number of authenticators in a transaction",
+        &["process"],
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 6).unwrap()
+    )
+    .unwrap()
+});
+
+pub static APTOS_PROCESSED_TXNS_AUTHENTICATOR: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_processed_txns_authenticator",
+        "Counter of authenticators by type, for processed transactions",
+        &["process", "auth_type"]
+    )
+    .unwrap()
+});
+
+pub static CONCURRENCY_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_executor_call_concurrency",
+        "Call concurrency by API.",
+        &["executor", "call"]
     )
     .unwrap()
 });

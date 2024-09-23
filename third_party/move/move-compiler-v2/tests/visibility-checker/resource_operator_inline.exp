@@ -1,0 +1,78 @@
+
+Diagnostics:
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/resource_operator_inline.move:45:9
+   │
+14 │         borrow_global<R>(addr)
+   │         ---------------------- called here
+   ·
+45 │     fun test_borrow() {
+   │         ^^^^^^^^^^^
+46 │         M::inline_borrow(@0x42);
+   │         ----------------------- from a call inlined at this callsite
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/resource_operator_inline.move:49:9
+   │
+18 │         borrow_global_mut<R>(addr)
+   │         -------------------------- called here
+   ·
+49 │     fun test_borrow_mut() {
+   │         ^^^^^^^^^^^^^^^
+50 │         M::inline_borrow_mut(@0x42);
+   │         --------------------------- from a call inlined at this callsite
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/resource_operator_inline.move:53:9
+   │
+22 │         move_to<R>(account, r)
+   │         ---------------------- called here
+   ·
+53 │     fun test_move_to(account: signer) {
+   │         ^^^^^^^^^^^^
+54 │         let r = M::new();
+55 │         M::inline_move_to(&account, r);
+   │         ------------------------------ from a call inlined at this callsite
+
+error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/resource_operator_inline.move:58:9
+   │
+26 │         move_from<R>(addr)
+   │         ------------------ called here
+   ·
+58 │     fun test_move_from(addr: address) {
+   │         ^^^^^^^^^^^^^^
+59 │         M::inline_move_from(addr);
+   │         ------------------------- from a call inlined at this callsite
+
+error: Invalid operation: pack of `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/resource_operator_inline.move:62:9
+   │
+30 │         R {}
+   │         ---- packed here
+   ·
+62 │     fun test_inline_pack() {
+   │         ^^^^^^^^^^^^^^^^
+63 │         M::inline_pack();
+   │         ---------------- from a call inlined at this callsite
+
+error: Invalid operation: unpack of `M::R` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/resource_operator_inline.move:66:9
+   │
+34 │         let R{} = r;
+   │             --- unpacked here
+   ·
+66 │     fun test_inline_unpack() {
+   │         ^^^^^^^^^^^^^^^^^^
+
+error: Invalid operation: access of the field `r` on type `M::T` can only be done within the defining module `0x42::M`
+   ┌─ tests/visibility-checker/resource_operator_inline.move:71:9
+   │
+38 │         t.r
+   │         --- accessed here
+   ·
+71 │     fun test_inline_access() {
+   │         ^^^^^^^^^^^^^^^^^^
+72 │         let t = M::new_t();
+73 │         M::inline_access(t);
+   │         ------------------- from a call inlined at this callsite

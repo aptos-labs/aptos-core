@@ -5,8 +5,9 @@
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
     exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
-    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
@@ -20,9 +21,9 @@ pub const TIMELINE_INDEX_LABEL: &str = "timeline";
 pub const PARKING_LOT_INDEX_LABEL: &str = "parking_lot";
 pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
 pub const SIZE_BYTES_LABEL: &str = "size_bytes";
-pub const GAS_UPGRADED_INDEX_LABEL: &str = "gas_upgraded";
 
 // Core mempool stages labels
+pub const BROADCAST_RECEIVED_LABEL: &str = "broadcast_received";
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_ACCEPTED_BLOCK_LABEL: &str = "commit_accepted_block";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
@@ -32,6 +33,8 @@ pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
 pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
 pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
 pub const BROADCAST_BATCHED_LABEL: &str = "broadcast_batched";
+pub const PARKED_TIME_LABEL: &str = "parked_time";
+pub const NON_PARKED_COMMIT_ACCEPTED_LABEL: &str = "non_park_commit_accepted";
 
 // Core mempool GC type labels
 pub const GC_SYSTEM_TTL_LABEL: &str = "system_ttl";
@@ -96,11 +99,14 @@ pub const SUBMITTED_BY_CLIENT_LABEL: &str = "client";
 pub const SUBMITTED_BY_DOWNSTREAM_LABEL: &str = "downstream";
 pub const SUBMITTED_BY_PEER_VALIDATOR_LABEL: &str = "peer_validator";
 
-// Histogram buckets that expand DEFAULT_BUCKETS with larger timescales and some constant sized
-// buckets between: 50-250ms (every 25ms), 250ms-5s (250ms), 5-10s (1s), and 10-25s (2.5s).
+// Histogram buckets with a large range of 0-500s and some constant sized buckets between:
+// 0-1.5s (every 25ms), 1.5-2s (every 100ms), 2-5s (250ms), 5-10s (1s), and 10-25s (2.5s).
 const MEMPOOL_LATENCY_BUCKETS: &[f64] = &[
-    0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.5, 0.75, 1.0,
-    1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0, 6.0,
+    0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.250, 0.275, 0.3, 0.325, 0.35, 0.375,
+    0.4, 0.425, 0.45, 0.475, 0.5, 0.525, 0.55, 0.575, 0.6, 0.625, 0.65, 0.675, 0.7, 0.725, 0.75,
+    0.775, 0.8, 0.825, 0.85, 0.875, 0.9, 0.925, 0.95, 0.975, 1.0, 1.025, 1.05, 1.075, 1.1, 1.125,
+    1.15, 1.175, 1.2, 1.225, 1.25, 1.275, 1.3, 1.325, 1.35, 1.375, 1.4, 1.425, 1.45, 1.475, 1.5,
+    1.6, 1.7, 1.8, 1.9, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0, 6.0,
     7.0, 8.0, 9.0, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0, 50.0, 100.0, 250.0, 500.0,
 ];
 
@@ -112,7 +118,7 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
 
 const TXN_CONSENSUS_PULLED_BUCKETS: &[f64] = &[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 25.0, 50.0, 100.0];
 
-static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+static TXN_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
         /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
     )
@@ -135,6 +141,15 @@ pub fn core_mempool_index_size(label: &'static str, size: usize) {
         .set(size as i64)
 }
 
+pub static SENDER_BUCKET_FREQUENCIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_core_mempool_sender_bucket_frequencies",
+        "Frequency of each sender bucket in core mempool",
+        &["sender_bucket"]
+    )
+    .unwrap()
+});
+
 /// Counter tracking size of each bucket in timeline index
 static CORE_MEMPOOL_TIMELINE_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -145,10 +160,10 @@ static CORE_MEMPOOL_TIMELINE_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub fn core_mempool_timeline_index_size(bucket_min_size_pairs: &Vec<(&str, usize)>) {
-    for &(bucket_min, size) in bucket_min_size_pairs {
+pub fn core_mempool_timeline_index_size(bucket_min_size_pairs: Vec<(String, usize)>) {
+    for (bucket_min, size) in bucket_min_size_pairs {
         CORE_MEMPOOL_TIMELINE_INDEX_SIZE
-            .with_label_values(&[bucket_min])
+            .with_label_values(&[bucket_min.as_str()])
             .set(size as i64)
     }
 }
@@ -171,14 +186,28 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter tracking number of txns received that are gas upgraded for the same sequence number
+pub static CORE_MEMPOOL_GAS_UPGRADED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_core_mempool_gas_upgraded_txns_count",
+        "Number of txns received that are gas upgraded for the same sequence number"
+    )
+    .unwrap()
+});
+
 pub fn core_mempool_txn_commit_latency(
     stage: &'static str,
     submitted_by: &'static str,
     bucket: &str,
     latency: Duration,
+    priority: &str,
 ) {
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
         .with_label_values(&[stage, submitted_by, bucket])
+        .observe(latency.as_secs_f64());
+
+    CORE_MEMPOOL_TXN_LATENCIES
+        .with_label_values(&[stage, submitted_by, bucket, priority])
         .observe(latency.as_secs_f64());
 }
 
@@ -189,6 +218,28 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
         &["stage", "submitted_by", "bucket"],
+        MEMPOOL_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Counter tracking latency of txns reaching various stages
+/// (e.g. time from txn entering core mempool to being pulled in consensus block)
+static CORE_MEMPOOL_TXN_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_core_mempool_txn_latencies",
+        "Latency of txn reaching various stages in mempool",
+        &["stage", "submitted_by", "bucket", "priority"],
+        MEMPOOL_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static TXN_E2E_USE_CASE_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_txn_e2e_use_case_commit_latency",
+        "Latency of txn commit_accept, by use_case",
+        &["use_case", "submitted_by", "bucket"],
         MEMPOOL_LATENCY_BUCKETS.to_vec()
     )
     .unwrap()
@@ -255,11 +306,39 @@ pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_core_mempool_txn_consensus_pulled",
+pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED_BY_BUCKET: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_core_mempool_txn_consensus_pulled_by_bucket",
         "Number of times a txn was pulled from core mempool by consensus",
+        &["bucket"],
         TXN_CONSENSUS_PULLED_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_count",
+        "Number of txns evicted from parking lot",
+        TXN_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_BYTES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_bytes",
+        "Bytes of txns evicted from parking lot",
+        exponential_buckets(/*start=*/ 500.0, /*factor=*/ 1.4, /*count=*/ 32).unwrap()
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_PARKING_LOT_EVICTED_LATENCY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_parking_lot_evicted_latency",
+        "Latency of evicting for each transaction from parking lot",
+        MEMPOOL_LATENCY_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -281,7 +360,7 @@ static MEMPOOL_SERVICE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_mempool_service_transactions",
         "Number of transactions handled in one request/response between mempool and consensus/state sync",
         &["type"],
-        TRANSACTION_COUNT_BUCKETS.clone()
+        TXN_COUNT_BUCKETS.clone()
     )
     .unwrap()
 });
@@ -427,6 +506,19 @@ pub fn shared_mempool_pending_broadcasts(peer: &PeerNetworkId) -> IntGauge {
         peer.network_id().as_str(),
         peer.peer_id().short_str().as_str(),
     ])
+}
+
+/// Counter tracking the number of peers that changed priority in shared mempool
+pub static SHARED_MEMPOOL_PRIORITY_CHANGE_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_shared_mempool_priority_change_count",
+        "Number of peers that changed priority in shared mempool",
+    )
+    .unwrap()
+});
+
+pub fn shared_mempool_priority_change_count(change_count: i64) {
+    SHARED_MEMPOOL_PRIORITY_CHANGE_COUNT.set(change_count);
 }
 
 static SHARED_MEMPOOL_TRANSACTIONS_PROCESSED: Lazy<IntCounterVec> = Lazy::new(|| {

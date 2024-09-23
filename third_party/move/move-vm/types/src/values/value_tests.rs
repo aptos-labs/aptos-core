@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loaded_data::runtime_types::Type, values::*, views::*};
+use crate::{loaded_data::runtime_types::TypeBuilder, values::*, views::*};
 use move_binary_format::errors::*;
 use move_core_types::{account_address::AccountAddress, u256::U256};
 
@@ -150,8 +150,11 @@ fn legacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
     let r = locals.borrow_loc(1)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
+    // Actual limits for type builder are irrelevant for the test.
+    let u8_ty = TypeBuilder::with_limits(10, 10).create_u8_ty();
+
     let r: VectorRef = r.value_as()?;
-    let r = r.borrow_elem(0, &Type::U8)?;
+    let r = r.borrow_elem(0, &u8_ty)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
     locals.store_loc(2, Value::struct_(Struct::pack([])), false)?;

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     block_executor::BlockAptosVM,
@@ -134,7 +135,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
-                let ret = BlockAptosVM::execute_block(
+                let ret = BlockAptosVM::execute_block_on_thread_pool(
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),

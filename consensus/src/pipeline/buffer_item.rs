@@ -5,7 +5,9 @@
 use crate::{pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock,
+    common::{Author, Round},
+    pipeline::commit_vote::CommitVote,
+    pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
@@ -24,10 +26,15 @@ use tokio::time::Instant;
 fn generate_commit_ledger_info(
     commit_info: &BlockInfo,
     ordered_proof: &LedgerInfoWithSignatures,
+    order_vote_enabled: bool,
 ) -> LedgerInfo {
     LedgerInfo::new(
         commit_info.clone(),
-        ordered_proof.ledger_info().consensus_data_hash(),
+        if order_vote_enabled {
+            HashValue::zero()
+        } else {
+            ordered_proof.ledger_info().consensus_data_hash()
+        },
     )
 }
 
@@ -58,10 +65,11 @@ fn generate_executed_item_from_ordered(
     verified_signatures: PartialSignatures,
     callback: StateComputerCommitCallBackType,
     ordered_proof: LedgerInfoWithSignatures,
+    order_vote_enabled: bool,
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
     let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
-        generate_commit_ledger_info(&commit_info, &ordered_proof),
+        generate_commit_ledger_info(&commit_info, &ordered_proof, order_vote_enabled),
         verified_signatures,
     );
     BufferItem::Executed(Box::new(ExecutedItem {
@@ -138,9 +146,10 @@ impl BufferItem {
         ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
+        unverified_signatures: PartialSignatures,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
-            unverified_signatures: PartialSignatures::empty(),
+            unverified_signatures,
             commit_proof: None,
             callback,
             ordered_blocks,
@@ -154,6 +163,7 @@ impl BufferItem {
         executed_blocks: Vec<PipelinedBlock>,
         validator: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
+        order_vote_enabled: bool,
     ) -> Self {
         match self {
             Self::Ordered(ordered_item) => {
@@ -167,10 +177,16 @@ impl BufferItem {
                 for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
                     assert_eq!(b1.id(), b2.id());
                 }
-                let mut commit_info = executed_blocks.last().unwrap().block_info();
+                let mut commit_info = executed_blocks
+                    .last()
+                    .expect("execute_blocks should not be empty!")
+                    .block_info();
                 match epoch_end_timestamp {
                     Some(timestamp) if commit_info.timestamp_usecs() != timestamp => {
-                        assert!(executed_blocks.last().unwrap().is_reconfiguration_suffix());
+                        assert!(executed_blocks
+                            .last()
+                            .expect("")
+                            .is_reconfiguration_suffix());
                         commit_info.change_timestamp(timestamp);
                     },
                     _ => (),
@@ -189,8 +205,11 @@ impl BufferItem {
                         callback,
                     }))
                 } else {
-                    let commit_ledger_info =
-                        generate_commit_ledger_info(&commit_info, &ordered_proof);
+                    let commit_ledger_info = generate_commit_ledger_info(
+                        &commit_info,
+                        &ordered_proof,
+                        order_vote_enabled,
+                    );
 
                     let verified_signatures =
                         verify_signatures(unverified_signatures, validator, &commit_ledger_info);
@@ -218,6 +237,7 @@ impl BufferItem {
                             verified_signatures,
                             callback,
                             ordered_proof,
+                            order_vote_enabled,
                         )
                     }
                 }
@@ -381,7 +401,17 @@ impl BufferItem {
     }
 
     pub fn block_id(&self) -> HashValue {
-        self.get_blocks().last().unwrap().id()
+        self.get_blocks()
+            .last()
+            .expect("Vec<PipelinedBlock> should not be empty")
+            .id()
+    }
+
+    pub fn round(&self) -> Round {
+        self.get_blocks()
+            .last()
+            .expect("Vec<PipelinedBlock> should not be empty")
+            .round()
     }
 
     pub fn add_signature_if_matched(&mut self, vote: CommitVote) -> anyhow::Result<()> {

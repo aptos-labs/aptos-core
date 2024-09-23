@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::algebra::{
     evaluation_domain::BatchEvaluationDomain,
@@ -23,7 +24,7 @@ const FFT_THRESH: usize = 64;
 ///
 /// For $X = \alpha$ we get $\ell_i(\alpha) = \frac{(1-\alpha^N) N^{-1} \omega^i}{(\omega^i - \alpha)}$.
 ///
-/// (See https://ethresear.ch/t/kate-commitments-from-the-lagrange-basis-without-ffts/6950/2)
+/// (See <https://ethresear.ch/t/kate-commitments-from-the-lagrange-basis-without-ffts/6950/2>)
 #[allow(non_snake_case)]
 pub fn all_n_lagrange_coefficients(dom: &BatchEvaluationDomain, alpha: &Scalar) -> Vec<Scalar> {
     let alpha_to_N = alpha.pow_vartime([dom.N() as u64]); // \alpha^N
@@ -78,7 +79,7 @@ pub fn all_n_lagrange_coefficients(dom: &BatchEvaluationDomain, alpha: &Scalar) 
 ///
 /// [TAB+20e] Aggregatable Subvector Commitments for Stateless Cryptocurrencies; by Alin Tomescu and
 /// Ittai Abraham and Vitalik Buterin and Justin Drake and Dankrad Feist and Dmitry Khovratovich;
-/// 2020; https://eprint.iacr.org/2020/527
+/// 2020; <https://eprint.iacr.org/2020/527>
 #[allow(non_snake_case)]
 pub fn all_lagrange_denominators(
     batch_dom: &BatchEvaluationDomain,

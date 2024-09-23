@@ -1,4 +1,4 @@
-/// This defines a minimally viable token for no-code solutions akin the the original token at
+/// This defines a minimally viable token for no-code solutions akin to the original token at
 /// 0x3::token module.
 /// The key features are:
 /// * Base token and collection features

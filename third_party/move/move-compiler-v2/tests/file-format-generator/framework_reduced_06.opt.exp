@@ -1,0 +1,66 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+struct S {
+	f: u64,
+	g: u64
+}
+
+bar(Arg0: &mut S): u64 * u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: MoveLoc[0](Arg0: &mut S)
+	2: Pop
+	3: LdU64(1)
+	4: Ret
+}
+f1(Arg0: &mut S, Arg1: u64, Arg2: address): &mut S * address * u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: &mut S)
+	1: MoveLoc[2](Arg2: address)
+	2: MoveLoc[1](Arg1: u64)
+	3: Ret
+}
+f2(Arg0: address, Arg1: &mut S, Arg2: address, Arg3: u64, Arg4: &mut S) /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[1](Arg1: &mut S)
+	1: Pop
+	2: MoveLoc[4](Arg4: &mut S)
+	3: Pop
+	4: Ret
+}
+f3(Arg0: u64, Arg1: &u64) /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[1](Arg1: &u64)
+	1: Pop
+	2: Ret
+}
+foo(Arg0: address, Arg1: &mut S, Arg2: &mut S): u64 /* def_idx: 4 */ {
+L3:	loc0: u64
+L4:	loc1: &u64
+B0:
+	0: MoveLoc[1](Arg1: &mut S)
+	1: LdU64(1)
+	2: MoveLoc[0](Arg0: address)
+	3: Call f1(&mut S, u64, address): &mut S * address * u64
+	4: StLoc[3](loc0: u64)
+	5: StLoc[0](Arg0: address)
+	6: StLoc[1](Arg1: &mut S)
+	7: CopyLoc[0](Arg0: address)
+	8: CopyLoc[1](Arg1: &mut S)
+	9: MoveLoc[0](Arg0: address)
+	10: CopyLoc[3](loc0: u64)
+	11: MoveLoc[2](Arg2: &mut S)
+	12: Call f2(address, &mut S, address, u64, &mut S)
+	13: MoveLoc[1](Arg1: &mut S)
+	14: ImmBorrowField[0](S.g: u64)
+	15: StLoc[4](loc1: &u64)
+	16: CopyLoc[3](loc0: u64)
+	17: MoveLoc[4](loc1: &u64)
+	18: Call f3(u64, &u64)
+	19: MoveLoc[3](loc0: u64)
+	20: Ret
+}
+}
+============ bytecode verification succeeded ========

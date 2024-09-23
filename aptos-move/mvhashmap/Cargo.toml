@@ -14,12 +14,10 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-aggregator = { workspace = true, features = ["testing"] }
+aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-infallible = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
-bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam = { workspace = true }

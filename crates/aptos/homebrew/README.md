@@ -47,7 +47,7 @@ aptos --help
 
 Note: This guide is for developers who are trying to update the Aptos homebrew formula.
 
-You can get the latest formula here: https://github.com/Homebrew/homebrew-core/blob/master/Formula/aptos.rb
+You can get the latest formula here: https://github.com/Homebrew/homebrew-core/blob/master/Formula/a/aptos.rb
 
 Copy the `aptos.rb` file to your `homebrew` `formula` directory. For example, on macOS with an M1, this will likely be:
 

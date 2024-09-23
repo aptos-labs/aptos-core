@@ -1,0 +1,73 @@
+processed 3 tasks
+
+task 0 'publish'. lines 1-8:
+Error: error[E04009]: expected specific type
+  ┌─ TEMPFILE:4:17
+  │
+4 │         assert!(exists<T>(addr), 0);
+  │                 ^^^^^^^^^^^^^^^
+  │                 │      │
+  │                 │      Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found the type parameter: 'T'
+  │                 Invalid call to exists.
+
+error[E04009]: expected specific type
+  ┌─ TEMPFILE:5:17
+  │
+5 │         let _ = borrow_global<T>(addr);
+  │                 ^^^^^^^^^^^^^^^^^^^^^^
+  │                 │             │
+  │                 │             Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found the type parameter: 'T'
+  │                 Invalid call to borrow_global.
+
+error[E04009]: expected specific type
+  ┌─ TEMPFILE:6:9
+  │
+6 │         move_from<T>(addr);
+  │         ^^^^^^^^^^^^^^^^^^
+  │         │         │
+  │         │         Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found the type parameter: 'T'
+  │         Invalid call to move_from.
+
+
+
+task 1 'publish'. lines 10-22:
+Error: error[E03009]: unbound variable
+   ┌─ TEMPFILE1:14:9
+   │
+14 │         invalid<R>(@0x41)
+   │         ^^^^^^^ Invalid function usage. Unbound variable 'invalid'
+
+error[E04005]: expected a single type
+   ┌─ TEMPFILE1:18:9
+   │
+13 │     public inline fun my_borrow() {
+   │                       --------- Expected a single type, but found expression list type: '()'
+   ·
+18 │         my_borrow().f;
+   │         ^^^^^^^^^^^ Invalid dot access
+
+error[E04009]: expected specific type
+   ┌─ TEMPFILE1:18:9
+   │
+13 │     public inline fun my_borrow() {
+   │                       --------- Expected a struct type in the current module but got: '()'
+   ·
+18 │         my_borrow().f;
+   │         ^^^^^^^^^^^^^ Unbound field 'f'
+
+
+
+task 2 'run'. lines 24-30:
+Error: error[E03002]: unbound module
+   ┌─ TEMPFILE2:26:9
+   │
+26 │     use 0x42::M;
+   │         ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
+
+error[E03002]: unbound module
+   ┌─ TEMPFILE2:28:9
+   │
+28 │         M::test_resource(&account)
+   │         ^ Unbound module or type alias 'M'
+
+

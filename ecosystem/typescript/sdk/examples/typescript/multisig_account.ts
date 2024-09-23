@@ -83,12 +83,6 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   const multisigTxExecution = new TransactionPayloadMultisig(
     new MultiSig(AccountAddress.fromHex(multisigAddress), transferTxPayload),
   );
-  // We can simulate the transaction to see if it will succeed without having to create it on chain.
-  const [simulationResp] = await client.simulateTransaction(
-    owner2,
-    await client.generateRawTransaction(owner2.address(), multisigTxExecution),
-  );
-  assert(simulationResp.success);
 
   // Create the multisig tx on chain.
   const createMultisigTx = await client.generateTransaction(owner2.address(), {

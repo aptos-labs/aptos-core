@@ -1,0 +1,62 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: $t0 := 6
+  1: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: $t0 := 6
+  1: return $t0
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     # live vars:
+     # events: b:$t0
+  0: $t0 := 6
+     # live vars: $t0
+     # events: e:$t0
+  1: return $t0
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: $t0 := 6
+  1: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: $t0 := 6
+  1: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(): u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(6)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========

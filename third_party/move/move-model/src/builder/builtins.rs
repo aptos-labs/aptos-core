@@ -7,9 +7,10 @@
 use crate::{
     ast::{Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
-    model::{Parameter, TypeParameter},
+    model::{Parameter, TypeParameter, TypeParameterKind},
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
 };
+use move_binary_format::file_format::{Ability, AbilitySet};
 use move_compiler::parser::ast::{self as PA};
 use move_core_types::u256::U256;
 use num::BigInt;
@@ -521,13 +522,18 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         );
 
         // Resources.
+        let param_t_with_key_decl = TypeParameter(
+            trans.env.symbol_pool().make("T"),
+            TypeParameterKind::new(AbilitySet::singleton(Ability::Key)),
+            loc.clone(),
+        );
         trans.define_spec_or_builtin_fun(
             trans.builtin_qualified_symbol("global"),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::Global(None),
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: BTreeMap::default(),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
                 params: vec![mk_param(trans, 1, address_t.clone())],
                 result_type: param_t.clone(),
                 visibility: Spec,
@@ -540,11 +546,11 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::BorrowGlobal(ReferenceKind::Immutable),
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: BTreeMap::default(),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
                 params: vec![mk_param(trans, 1, address_t.clone())],
                 result_type: ref_param_t.clone(),
-                visibility: SpecAndImpl, // Visible in specs also for translate_fun_as_spec mode
+                visibility: SpecAndImpl, // Visible in specs also for better error messages
             },
         );
         trans.define_spec_or_builtin_fun(
@@ -552,18 +558,18 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::BorrowGlobal(ReferenceKind::Mutable),
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: BTreeMap::default(),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
                 params: vec![mk_param(trans, 1, address_t.clone())],
                 result_type: mut_ref_param_t.clone(),
-                visibility: SpecAndImpl, // Visible in specs also for translate_fun_as_spec mode
+                visibility: SpecAndImpl, // Visible in specs also for better error messages
             },
         );
         trans.define_spec_or_builtin_fun(
             trans.builtin_qualified_symbol("freeze"),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
-                oper: Operation::Freeze,
+                oper: Operation::Freeze(true),
                 type_params: vec![param_t_decl.clone()],
                 type_param_constraints: BTreeMap::default(),
                 params: vec![mk_param(trans, 1, mut_ref_param_t)],
@@ -577,8 +583,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::MoveTo,
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: BTreeMap::default(),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
                 params: vec![
                     mk_param(
                         trans,
@@ -599,8 +605,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::MoveFrom,
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: BTreeMap::default(),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
                 params: vec![mk_param(trans, 1, address_t.clone())],
                 result_type: param_t.clone(),
                 visibility: Impl,
@@ -612,8 +618,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::Exists(None),
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: BTreeMap::default(),
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
                 params: vec![mk_param(trans, 1, address_t.clone())],
                 result_type: bool_t.clone(),
                 visibility: SpecAndImpl,

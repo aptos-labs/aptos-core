@@ -1,0 +1,18 @@
+
+Diagnostics:
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_loc_trivial.move:14:34
+   │
+12 │         let returned_ref = bump_and_give(&mut x, &other);
+   │                            -----------------------------
+   │                            │             │
+   │                            │             previous mutable local borrow
+   │                            used by call result
+13 │         // imagine some more interesting check than this assert
+14 │         assert!(*returned_ref == x.f, 42);
+   │                                  ^--
+   │                                  │
+   │                                  requirement enforced here
+   │                                  immutable borrow attempted here
+15 │         *result = *returned_ref;
+   │                   ------------- conflicting reference `returned_ref` used here

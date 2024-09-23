@@ -78,7 +78,7 @@ fn add_execution_phase_test_cases(
     let genesis_qc = certificate_for_genesis();
     let (signers, _validators) = random_validator_verifier(1, None, false);
     let block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc,
@@ -119,8 +119,15 @@ fn add_execution_phase_test_cases(
         &LedgerInfo::mock_genesis(None),
         random_hash_value,
     );
-    let bad_block =
-        Block::new_proposal(Payload::empty(false), 1, 1, bad_qc, &signers[0], Vec::new()).unwrap();
+    let bad_block = Block::new_proposal(
+        Payload::empty(false, true),
+        1,
+        1,
+        bad_qc,
+        &signers[0],
+        Vec::new(),
+    )
+    .unwrap();
     phase_tester.add_test_case(
         ExecutionRequest {
             ordered_blocks: vec![PipelinedBlock::new(

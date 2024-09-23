@@ -6,25 +6,20 @@ mod rest_interface;
 mod storage_interface;
 
 pub use crate::{rest_interface::RestDebuggerInterface, storage_interface::DBDebuggerInterface};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
-    account_state::AccountState,
-    account_view::AccountView,
-    on_chain_config::ValidatorSet,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        Result as StateViewResult, TStateView,
+        Result as StateViewResult, StateViewId, TStateView,
     },
     transaction::{Transaction, TransactionInfo, Version},
 };
 use lru::LruCache;
-use move_binary_format::file_format::CompiledModule;
+use move_core_types::language_storage::ModuleId;
 use std::{
     collections::HashMap,
-    ops::DerefMut,
     sync::{Arc, Mutex},
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -34,18 +29,13 @@ pub struct FilterCondition {
     pub skip_failed_txns: bool,
     pub skip_publish_txns: bool,
     pub check_source_code: bool,
+    pub target_account: Option<AccountAddress>,
 }
 
 // TODO(skedia) Clean up this interfact to remove account specific logic and move to state store
 // key-value interface with fine grained storage project
 #[async_trait::async_trait]
 pub trait AptosValidatorInterface: Sync {
-    async fn get_account_state_by_version(
-        &self,
-        account: AccountAddress,
-        version: Version,
-    ) -> Result<Option<AccountState>>;
-
     async fn get_state_value_by_version(
         &self,
         state_key: &StateKey,
@@ -63,6 +53,14 @@ pub trait AptosValidatorInterface: Sync {
         start: Version,
         limit: u64,
         filter_condition: FilterCondition,
+        package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
     ) -> Result<
         Vec<(
             u64,
@@ -75,71 +73,13 @@ pub trait AptosValidatorInterface: Sync {
         )>,
     >;
 
-    async fn get_latest_version(&self) -> Result<Version>;
+    async fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
     async fn get_version_by_account_sequence(
         &self,
         account: AccountAddress,
         seq: u64,
     ) -> Result<Option<Version>>;
-
-    async fn get_framework_modules_by_version(
-        &self,
-        version: Version,
-    ) -> Result<Vec<CompiledModule>> {
-        let mut acc = vec![];
-        for module_bytes in self
-            .get_account_state_by_version(CORE_CODE_ADDRESS, version)
-            .await?
-            .ok_or_else(|| anyhow!("Failure reading aptos root address state"))?
-            .get_modules()
-        {
-            acc.push(
-                CompiledModule::deserialize(module_bytes)
-                    .map_err(|e| anyhow!("Failure deserializing module: {:?}", e))?,
-            )
-        }
-        Ok(acc)
-    }
-
-    /// Get the account states of the most critical accounts, including:
-    /// 1. Aptos Framework code address
-    /// 2. All validator addresses
-    async fn get_admin_accounts(
-        &self,
-        version: Version,
-    ) -> Result<Vec<(AccountAddress, AccountState)>> {
-        let mut result = vec![];
-        let aptos_framework = self
-            .get_account_state_by_version(CORE_CODE_ADDRESS, version)
-            .await?
-            .ok_or_else(|| anyhow!("Aptos framework account doesn't exist"))?;
-
-        // Get all validator accounts
-        let validators = aptos_framework
-            .get_config::<ValidatorSet>()?
-            .ok_or_else(|| anyhow!("validator_config doesn't exist"))?;
-
-        // Get code account
-        result.push((
-            CORE_CODE_ADDRESS,
-            self.get_account_state_by_version(CORE_CODE_ADDRESS, version)
-                .await?
-                .ok_or_else(|| anyhow!("core_code_address doesn't exist"))?,
-        ));
-
-        // Get all validator accounts
-        for validator_info in validators.payload() {
-            let addr = *validator_info.account_address();
-            result.push((
-                addr,
-                self.get_account_state_by_version(addr, version)
-                    .await?
-                    .ok_or_else(|| anyhow!("validator {:?} doesn't exist", addr))?,
-            ));
-        }
-        Ok(result)
-    }
 }
 
 pub struct DebuggerStateView {
@@ -151,7 +91,6 @@ pub struct DebuggerStateView {
         )>,
     >,
     version: Version,
-    data_read_state_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
 }
 
 async fn handler_thread<'a>(
@@ -201,20 +140,6 @@ impl DebuggerStateView {
         Self {
             query_sender: Mutex::new(query_sender),
             version,
-            data_read_state_keys: None,
-        }
-    }
-
-    pub fn new_with_data_reads(
-        db: Arc<dyn AptosValidatorInterface + Send>,
-        version: Version,
-    ) -> Self {
-        let (fake_query_sender, thread_receiver) = unbounded_channel();
-        tokio::spawn(async move { handler_thread(db, thread_receiver).await });
-        Self {
-            query_sender: Mutex::new(fake_query_sender),
-            version,
-            data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
         }
     }
 
@@ -228,33 +153,16 @@ impl DebuggerStateView {
         query_handler_locked
             .send((state_key.clone(), version, tx))
             .unwrap();
-        let ret = rx.recv()?;
-        if let Some(reads) = &self.data_read_state_keys {
-            if !reads.lock().unwrap().contains_key(state_key) && ret.is_ok() {
-                let val = ret?.clone();
-                if val.is_some() {
-                    reads
-                        .lock()
-                        .unwrap()
-                        .deref_mut()
-                        .insert(state_key.clone(), val.clone().unwrap());
-                }
-                Ok(val)
-            } else {
-                ret
-            }
-        } else {
-            ret
-        }
-    }
-
-    pub fn get_state_keys(self) -> Arc<Mutex<HashMap<StateKey, StateValue>>> {
-        self.data_read_state_keys.unwrap()
+        rx.recv()?
     }
 }
 
 impl TStateView for DebuggerStateView {
     type Key = StateKey;
+
+    fn id(&self) -> StateViewId {
+        StateViewId::Replay
+    }
 
     fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         self.get_state_value_internal(state_key, self.version)

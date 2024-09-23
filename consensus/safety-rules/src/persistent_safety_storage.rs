@@ -43,7 +43,7 @@ impl PersistentSafetyStorage {
             .expect("Unable to initialize keys and accounts in storage");
 
         // Create the new persistent safety storage
-        let safety_data = SafetyData::new(1, 0, 0, 0, None);
+        let safety_data = SafetyData::new(1, 0, 0, 0, None, 0);
         let mut persisent_safety_storage = Self {
             enable_cached_safety_data,
             cached_safety_data: Some(safety_data.clone()),
@@ -96,16 +96,32 @@ impl PersistentSafetyStorage {
         Ok(self.internal_store.get(OWNER_ACCOUNT).map(|v| v.value)?)
     }
 
-    pub fn consensus_key_for_version(
+    pub fn consensus_sk_by_pk(
         &self,
-        version: bls12381::PublicKey,
+        pk: bls12381::PublicKey,
     ) -> Result<bls12381::PrivateKey, Error> {
         let _timer = counters::start_timer("get", CONSENSUS_KEY);
-        let key: bls12381::PrivateKey = self.internal_store.get(CONSENSUS_KEY).map(|v| v.value)?;
-        if key.public_key() != version {
+        let pk_hex = hex::encode(pk.to_bytes());
+        let explicit_storage_key = format!("{}_{}", CONSENSUS_KEY, pk_hex);
+        let explicit_sk = self
+            .internal_store
+            .get::<bls12381::PrivateKey>(explicit_storage_key.as_str())
+            .map(|v| v.value);
+        let default_sk = self
+            .internal_store
+            .get::<bls12381::PrivateKey>(CONSENSUS_KEY)
+            .map(|v| v.value);
+        let key = match (explicit_sk, default_sk) {
+            (Ok(sk_0), _) => sk_0,
+            (Err(_), Ok(sk_1)) => sk_1,
+            (Err(_), Err(_)) => {
+                return Err(Error::ValidatorKeyNotFound("not found!".to_string()));
+            },
+        };
+        if key.public_key() != pk {
             return Err(Error::SecureStorageMissingDataError(format!(
-                "PrivateKey for {:?} not found",
-                version
+                "Incorrect sk saved for {:?} the expected pk",
+                pk
             )));
         }
         Ok(key)
@@ -131,6 +147,10 @@ impl PersistentSafetyStorage {
         let _timer = counters::start_timer("set", SAFETY_DATA);
         counters::set_state(counters::EPOCH, data.epoch as i64);
         counters::set_state(counters::LAST_VOTED_ROUND, data.last_voted_round as i64);
+        counters::set_state(
+            counters::HIGHEST_TIMEOUT_ROUND,
+            data.highest_timeout_round as i64,
+        );
         counters::set_state(counters::PREFERRED_ROUND, data.preferred_round as i64);
 
         match self.internal_store.set(SAFETY_DATA, data.clone()) {
@@ -160,7 +180,6 @@ impl PersistentSafetyStorage {
         Ok(())
     }
 
-    #[cfg(any(test, feature = "testing"))]
     pub fn internal_store(&mut self) -> &mut Storage {
         &mut self.internal_store
     }
@@ -208,7 +227,7 @@ mod tests {
         assert_eq!(counters::get_state(counters::PREFERRED_ROUND), 0);
 
         safety_storage
-            .set_safety_data(SafetyData::new(9, 8, 1, 0, None))
+            .set_safety_data(SafetyData::new(9, 8, 1, 0, None, 0))
             .unwrap();
 
         let safety_data = safety_storage.safety_data().unwrap();

@@ -207,19 +207,19 @@ fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {
         address: primary_addr,
         module: Identifier::new("primary").unwrap(),
         name: Identifier::new("ResourceGroupContainer").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let primary_tag = StructTag {
         address: primary_addr,
         module: Identifier::new("primary").unwrap(),
         name: Identifier::new("Primary").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let secondary_tag = StructTag {
         address: secondary_addr,
         module: Identifier::new("secondary").unwrap(),
         name: Identifier::new("Secondary").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
 
     // Assert that no data exists yet

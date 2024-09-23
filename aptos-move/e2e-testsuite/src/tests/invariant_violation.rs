@@ -39,7 +39,7 @@ fn invariant_violation_error() {
     );
 
     // Disable the CHARGE_INVARIANT_VIOLATION flag.
-    executor.exec("features", "change_feature_flags", vec![], vec![
+    executor.exec("features", "change_feature_flags_internal", vec![], vec![
         MoveValue::Signer(AccountAddress::ONE)
             .simple_serialize()
             .unwrap(),

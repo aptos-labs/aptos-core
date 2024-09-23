@@ -9,8 +9,11 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_gas_algebra::Fee;
-use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
+use aptos_types::transaction::user_transaction_context::UserTransactionContext;
+use aptos_vm_types::{
+    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
+};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
 fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
@@ -31,7 +34,6 @@ pub struct RespawnedSession<'r, 'l> {
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
-    pub storage_refund: Fee,
 }
 
 impl<'r, 'l> RespawnedSession<'r, 'l> {
@@ -40,40 +42,41 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         session_id: SessionId,
         base: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
-        storage_refund: Fee,
-    ) -> Result<Self, VMStatus> {
+        user_transaction_context_opt: Option<UserTransactionContext>,
+    ) -> Self {
         let executor_view = ExecutorViewWithChangeSet::new(
             base.as_executor_view(),
             base.as_resource_group_view(),
             previous_session_change_set,
         );
 
-        Ok(RespawnedSessionBuilder {
+        RespawnedSessionBuilder {
             executor_view,
             resolver_builder: |executor_view| vm.as_move_resolver_with_group_view(executor_view),
-            session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
-            storage_refund,
+            session_builder: |resolver| {
+                Some(vm.new_session(resolver, session_id, user_transaction_context_opt))
+            },
         }
-        .build())
+        .build()
     }
 
-    pub fn execute<T>(
+    pub fn execute<T, E>(
         &mut self,
-        fun: impl FnOnce(&mut SessionExt) -> Result<T, VMStatus>,
-    ) -> Result<T, VMStatus> {
+        fun: impl FnOnce(&mut SessionExt) -> Result<T, E>,
+    ) -> Result<T, E> {
         self.with_session_mut(|session| {
-            fun(unwrap_or_invariant_violation(
-                session.as_mut(),
-                "VM respawned session has to be set for execution.",
-            )?)
+            fun(session
+                .as_mut()
+                .expect("session is set on construction and live until destruction."))
         })
     }
 
-    pub fn finish(
+    pub fn finish_with_squashed_change_set(
         mut self,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<VMChangeSet, VMStatus> {
-        let additional_change_set = self.with_session_mut(|session| {
+        assert_no_additional_creation: bool,
+    ) -> Result<(VMChangeSet, ModuleWriteSet), VMStatus> {
+        let (additional_change_set, module_write_set) = self.with_session_mut(|session| {
             unwrap_or_invariant_violation(
                 session.take(),
                 "VM session cannot be finished more than once.",
@@ -81,8 +84,8 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
             .finish(change_set_configs)
             .map_err(|e| e.into_vm_status())
         })?;
-        if additional_change_set.has_creation() {
-            // After respawning, for example, in the epilogue, there shouldn't be new slots
+        if assert_no_additional_creation && additional_change_set.has_creation() {
+            // After respawning in the epilogue, there shouldn't be new slots
             // created, otherwise there's a potential vulnerability like this:
             // 1. slot created by the user
             // 2. another user transaction deletes the slot and claims the refund
@@ -96,17 +99,13 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         }
         let mut change_set = self.into_heads().executor_view.change_set;
         change_set
-            .squash_additional_change_set(additional_change_set, change_set_configs)
+            .squash_additional_change_set(additional_change_set)
             .map_err(|_err| {
                 VMStatus::error(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                     err_msg("Failed to squash VMChangeSet"),
                 )
             })?;
-        Ok(change_set)
-    }
-
-    pub fn get_storage_fee_refund(&self) -> Fee {
-        *self.borrow_storage_refund()
+        Ok((change_set, module_write_set))
     }
 }

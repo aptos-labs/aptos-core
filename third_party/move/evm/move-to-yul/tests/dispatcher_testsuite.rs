@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use evm::{backend::MemoryVicinity, ExitReason};
 use evm_exec_utils::{compile, exec::Executor};
 use move_compiler::{
@@ -73,6 +77,7 @@ fn compile_yul_to_bytecode_bytes(filename: &str) -> Result<Vec<u8>> {
             paths: vec![contract_path(filename).to_string_lossy().to_string()],
             named_address_map: named_address_map.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: deps,
@@ -82,6 +87,11 @@ fn compile_yul_to_bytecode_bytes(filename: &str) -> Result<Vec<u8>> {
         flags,
         &known_attributes,
     )?;
+    if env.has_errors() {
+        let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+        env.report_diag(&mut error_writer, Severity::Warning);
+        panic!("compilation failed");
+    }
     let options = Options::default();
     let (_, out, _) = Generator::run(&options, &env)
         .pop()

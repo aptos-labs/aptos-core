@@ -60,6 +60,17 @@ impl<
         }
     }
 
+    pub fn stats(&self) -> BlockStateStats {
+        BlockStateStats {
+            num_resources: self.data.num_keys(),
+            num_resource_groups: self.group_data.num_keys(),
+            num_delayed_fields: self.delayed_fields.num_keys(),
+            num_modules: self.modules.num_keys(),
+            base_resources_size: self.data.total_base_value_size(),
+            base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
+        }
+    }
+
     /// Contains 'simple' versioned data (nothing contained in groups).
     pub fn data(&self) -> &VersionedData<K, V> {
         &self.data
@@ -91,4 +102,14 @@ impl<
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub struct BlockStateStats {
+    pub num_resources: usize,
+    pub num_resource_groups: usize,
+    pub num_delayed_fields: usize,
+    pub num_modules: usize,
+
+    pub base_resources_size: u64,
+    pub base_delayed_fields_size: u64,
 }

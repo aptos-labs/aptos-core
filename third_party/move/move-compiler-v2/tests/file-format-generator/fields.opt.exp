@@ -1,0 +1,91 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.fields {
+struct T has drop {
+	h: u64
+}
+struct S has drop {
+	f: u64,
+	g: T
+}
+
+read_ref(Arg0: &S): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: &S)
+	1: ImmBorrowField[0](S.g: T)
+	2: ImmBorrowField[1](T.h: u64)
+	3: ReadRef
+	4: Ret
+}
+read_val(Arg0: S): u64 /* def_idx: 1 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: S)
+	1: ImmBorrowField[0](S.g: T)
+	2: ImmBorrowField[1](T.h: u64)
+	3: ReadRef
+	4: Ret
+}
+write_local_direct(): S /* def_idx: 2 */ {
+L0:	loc0: S
+L1:	loc1: S
+B0:
+	0: LdU64(0)
+	1: LdU64(0)
+	2: Pack[0](T)
+	3: Pack[1](S)
+	4: StLoc[0](loc0: S)
+	5: LdU64(42)
+	6: MutBorrowLoc[0](loc0: S)
+	7: MutBorrowField[0](S.g: T)
+	8: MutBorrowField[1](T.h: u64)
+	9: WriteRef
+	10: MoveLoc[0](loc0: S)
+	11: Ret
+}
+write_local_via_ref(): S /* def_idx: 3 */ {
+L0:	loc0: S
+L1:	loc1: u64
+L2:	loc2: &mut S
+L3:	loc3: &mut u64
+L4:	loc4: S
+B0:
+	0: LdU64(0)
+	1: LdU64(0)
+	2: Pack[0](T)
+	3: Pack[1](S)
+	4: StLoc[0](loc0: S)
+	5: MutBorrowLoc[0](loc0: S)
+	6: LdU64(42)
+	7: StLoc[1](loc1: u64)
+	8: MutBorrowField[0](S.g: T)
+	9: MutBorrowField[1](T.h: u64)
+	10: StLoc[3](loc3: &mut u64)
+	11: MoveLoc[1](loc1: u64)
+	12: MoveLoc[3](loc3: &mut u64)
+	13: WriteRef
+	14: MoveLoc[0](loc0: S)
+	15: Ret
+}
+write_param(Arg0: &mut S) /* def_idx: 4 */ {
+B0:
+	0: LdU64(42)
+	1: MoveLoc[0](Arg0: &mut S)
+	2: MutBorrowField[0](S.g: T)
+	3: MutBorrowField[1](T.h: u64)
+	4: WriteRef
+	5: Ret
+}
+write_val(Arg0: S): S /* def_idx: 5 */ {
+L1:	loc0: S
+B0:
+	0: LdU64(42)
+	1: MutBorrowLoc[0](Arg0: S)
+	2: MutBorrowField[0](S.g: T)
+	3: MutBorrowField[1](T.h: u64)
+	4: WriteRef
+	5: MoveLoc[0](Arg0: S)
+	6: Ret
+}
+}
+============ bytecode verification succeeded ========

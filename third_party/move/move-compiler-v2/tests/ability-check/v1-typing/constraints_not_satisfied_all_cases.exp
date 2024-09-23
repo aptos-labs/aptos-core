@@ -1,0 +1,67 @@
+
+Diagnostics:
+error: type `T` is missing required ability `copy`
+  ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_all_cases.move:7:35
+  │
+3 │     struct CupC<T: copy> { f: T }
+  │                 - declaration of type parameter `T`
+  ·
+7 │     fun no_constraint<T>(_c: CupC<T>, _r: CupR<T>) { abort 0 }
+  │                                   ^
+  │
+  = required by instantiating type parameter `T:copy` of struct `CupC`
+
+error: type `T` is missing required ability `key`
+  ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_all_cases.move:7:48
+  │
+2 │     struct CupR<T: key> { f: T }
+  │                 - declaration of type parameter `T`
+  ·
+7 │     fun no_constraint<T>(_c: CupC<T>, _r: CupR<T>) { abort 0 }
+  │                                                ^
+  │
+  = required by instantiating type parameter `T:key` of struct `CupR`
+
+error: type `T` is missing required ability `copy`
+  ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_all_cases.move:9:37
+  │
+3 │     struct CupC<T: copy> { f: T }
+  │                 - declaration of type parameter `T`
+  ·
+9 │     fun t_resource<T: key>(_c: CupC<T>, _r: CupR<T>) { abort 0 }
+  │                                     ^
+  │
+  = required by instantiating type parameter `T:copy` of struct `CupC`
+
+error: type `T` is missing required ability `key`
+   ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_all_cases.move:11:51
+   │
+ 2 │     struct CupR<T: key> { f: T }
+   │                 - declaration of type parameter `T`
+   ·
+11 │     fun t_copyable<T: copy>(_c: CupC<T>, _r: CupR<T>) { abort 0 }
+   │                                                   ^
+   │
+   = required by instantiating type parameter `T:key` of struct `CupR`
+
+error: type `R` is missing required ability `copy`
+   ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_all_cases.move:13:20
+   │
+ 3 │     struct CupC<T: copy> { f: T }
+   │                 - declaration of type parameter `T`
+   ·
+13 │     fun r(_c: CupC<R>, _r: CupR<R>) { abort 0 }
+   │                    ^
+   │
+   = required by instantiating type parameter `T:copy` of struct `CupC`
+
+error: type `C` is missing required ability `key`
+   ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_all_cases.move:15:33
+   │
+ 2 │     struct CupR<T: key> { f: T }
+   │                 - declaration of type parameter `T`
+   ·
+15 │     fun c(_c: CupC<C>, _r: CupR<C>) { abort 0 }
+   │                                 ^
+   │
+   = required by instantiating type parameter `T:key` of struct `CupR`

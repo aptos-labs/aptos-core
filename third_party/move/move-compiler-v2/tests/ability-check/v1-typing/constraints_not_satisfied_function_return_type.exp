@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: type `R` is missing required ability `copy`
+  ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_function_return_type.move:5:22
+  │
+2 │     struct CupC<T: copy> { f: T }
+  │                 - declaration of type parameter `T`
+  ·
+5 │     fun foo():  CupC<R> {
+  │                      ^
+  │
+  = required by instantiating type parameter `T:copy` of struct `CupC`

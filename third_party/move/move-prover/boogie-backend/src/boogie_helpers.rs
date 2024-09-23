@@ -49,6 +49,16 @@ pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type]) -> String {
     boogie_struct_name_bv(struct_env, inst, false)
 }
 
+pub fn boogie_struct_variant_name(
+    struct_env: &StructEnv<'_>,
+    inst: &[Type],
+    variant: Symbol,
+) -> String {
+    let struct_name = boogie_struct_name(struct_env, inst);
+    let variant_name = variant.display(struct_env.symbol_pool());
+    format!("{}_{}", struct_name, variant_name)
+}
+
 pub fn boogie_struct_name_bv(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bool) -> String {
     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
         // Map to the theory type representation, which is `Table int V`. The key
@@ -385,6 +395,14 @@ pub fn boogie_type_suffix_for_struct(
     }
 }
 
+pub fn boogie_type_suffix_for_struct_variant(
+    struct_env: &StructEnv<'_>,
+    inst: &[Type],
+    variant: &Symbol,
+) -> String {
+    boogie_struct_variant_name(struct_env, inst, *variant)
+}
+
 /// Generate suffix after instantiation of type parameters
 pub fn boogie_inst_suffix_bv(env: &GlobalEnv, inst: &[Type], bv_flag: &[bool]) -> String {
     if inst.is_empty() {
@@ -573,6 +591,7 @@ pub fn boogie_value(env: &GlobalEnv, _options: &BoogieOptions, val: &Value) -> S
                 .map(|v| boogie_value(env, _options, v))
                 .collect_vec(),
         ),
+        Value::Tuple(vec) => format!("<<unsupported Tuple({:?})>>", vec),
     }
 }
 

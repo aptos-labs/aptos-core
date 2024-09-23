@@ -35,6 +35,8 @@ AccountAuthenticator:
         STRUCT:
           - authenticator:
               TYPENAME: MultiKeyAuthenticator
+    4:
+      NoAccountAuthenticator: UNIT
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
@@ -74,6 +76,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: KeylessPublicKey
+    4:
+      FederatedKeyless:
+        STRUCT:
+          - public_key:
+              TYPENAME: FederatedKeylessPublicKey
 AnySignature:
   ENUM:
     0:
@@ -138,6 +145,11 @@ BatchPayload:
     - txns:
         SEQ:
           TYPENAME: SignedTransaction
+BatchPointer:
+  STRUCT:
+    - batch_summary:
+        SEQ:
+          TYPENAME: BatchInfo
 BatchRequest:
   STRUCT:
     - epoch: U64
@@ -174,6 +186,24 @@ BlockData:
         TYPENAME: QuorumCert
     - block_type:
         TYPENAME: BlockType
+BlockEndInfo:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - block_gas_limit_reached: BOOL
+          - block_output_limit_reached: BOOL
+          - block_effective_block_gas_units: U64
+          - block_approx_output_size: U64
+BlockEpiloguePayload:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - block_id:
+              TYPENAME: HashValue
+          - block_end_info:
+              TYPENAME: BlockEndInfo
 BlockInfo:
   STRUCT:
     - epoch: U64
@@ -387,6 +417,10 @@ ConsensusMsg:
       BatchResponseV2:
         NEWTYPE:
           TYPENAME: BatchResponse
+    18:
+      OrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: OrderVoteMsg
 ContractEvent:
   ENUM:
     0:
@@ -459,6 +493,11 @@ EphemeralPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Ed25519PublicKey
+    1:
+      Secp256r1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256r1EcdsaPublicKey
 EphemeralSignature:
   ENUM:
     0:
@@ -491,6 +530,12 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+FederatedKeylessPublicKey:
+  STRUCT:
+    - jwk_addr:
+        TYPENAME: AccountAddress
+    - pk:
+        TYPENAME: KeylessPublicKey
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -519,6 +564,17 @@ IdCommitment:
   NEWTYPESTRUCT: BYTES
 Identifier:
   NEWTYPESTRUCT: STR
+InlineBatch:
+  STRUCT:
+    - batch_info:
+        TYPENAME: BatchInfo
+    - transactions:
+        SEQ:
+          TYPENAME: SignedTransaction
+InlineBatches:
+  NEWTYPESTRUCT:
+    SEQ:
+      TYPENAME: InlineBatch
 JWKMoveStruct:
   STRUCT:
     - variant:
@@ -604,6 +660,36 @@ OpenIdSig:
         TYPENAME: Pepper
     - idc_aud_val:
         OPTION: STR
+OptQuorumStorePayload:
+  ENUM:
+    0:
+      V1:
+        NEWTYPE:
+          TYPENAME: OptQuorumStorePayloadV1
+OptQuorumStorePayloadV1:
+  STRUCT:
+    - inline_batches:
+        TYPENAME: InlineBatches
+    - opt_batches:
+        TYPENAME: BatchPointer
+    - proofs:
+        TYPENAME: BatchPointer
+    - execution_limits:
+        TYPENAME: PayloadExecutionLimit
+OrderVote:
+  STRUCT:
+    - author:
+        TYPENAME: AccountAddress
+    - ledger_info:
+        TYPENAME: LedgerInfo
+    - signature:
+        TYPENAME: Signature
+OrderVoteMsg:
+  STRUCT:
+    - order_vote:
+        TYPENAME: OrderVote
+    - quorum_cert:
+        TYPENAME: QuorumCert
 PartialAuthenticatorAssertionResponse:
   STRUCT:
     - signature:
@@ -625,6 +711,27 @@ Payload:
       InQuorumStoreWithLimit:
         NEWTYPE:
           TYPENAME: ProofWithDataWithTxnLimit
+    3:
+      QuorumStoreInlineHybrid:
+        TUPLE:
+          - SEQ:
+              TUPLE:
+                - TYPENAME: BatchInfo
+                - SEQ:
+                    TYPENAME: SignedTransaction
+          - TYPENAME: ProofWithData
+          - OPTION: U64
+    4:
+      OptQuorumStore:
+        NEWTYPE:
+          TYPENAME: OptQuorumStorePayload
+PayloadExecutionLimit:
+  ENUM:
+    0:
+      None: UNIT
+    1:
+      MaxTransactionsToExecute:
+        NEWTYPE: U64
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -701,13 +808,6 @@ RandGenMessage:
     - epoch: U64
     - data: BYTES
 RandMetadata:
-  STRUCT:
-    - metadata_to_sign:
-        TYPENAME: RandMetadataToSign
-    - block_id:
-        TYPENAME: HashValue
-    - timestamp: U64
-RandMetadataToSign:
   STRUCT:
     - epoch: U64
     - round: U64
@@ -821,9 +921,9 @@ SyncInfo:
         TYPENAME: QuorumCert
     - highest_ordered_cert:
         OPTION:
-          TYPENAME: QuorumCert
+          TYPENAME: WrappedLedgerInfo
     - highest_commit_cert:
-        TYPENAME: QuorumCert
+        TYPENAME: WrappedLedgerInfo
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
@@ -856,6 +956,10 @@ Transaction:
       BlockMetadataExt:
         NEWTYPE:
           TYPENAME: BlockMetadataExt
+    6:
+      BlockEpilogue:
+        NEWTYPE:
+          TYPENAME: BlockEpiloguePayload
 TransactionArgument:
   ENUM:
     0:
@@ -889,6 +993,9 @@ TransactionArgument:
           TUPLEARRAY:
             CONTENT: U8
             SIZE: 32
+    9:
+      Serialized:
+        NEWTYPE: BYTES
 TransactionAuthenticator:
   ENUM:
     0:
@@ -1043,6 +1150,12 @@ VoteMsg:
         TYPENAME: Vote
     - sync_info:
         TYPENAME: SyncInfo
+WrappedLedgerInfo:
+  STRUCT:
+    - vote_data:
+        TYPENAME: VoteData
+    - signed_ledger_info:
+        TYPENAME: LedgerInfoWithSignatures
 WriteOp:
   ENUM:
     0:

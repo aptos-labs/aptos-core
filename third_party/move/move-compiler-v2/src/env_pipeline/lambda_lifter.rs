@@ -112,6 +112,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
                 fun_id.symbol(),
                 loc,
                 Visibility::Private,
+                false,
                 type_params,
                 params,
                 result_type,
@@ -223,12 +224,16 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         }
     }
 
-    fn rewrite_enter_scope<'b>(&mut self, vars: impl Iterator<Item = &'b (NodeId, Symbol)>) {
+    fn rewrite_enter_scope<'b>(
+        &mut self,
+        _id: NodeId,
+        vars: impl Iterator<Item = &'b (NodeId, Symbol)>,
+    ) {
         self.scopes
             .push(vars.map(|(_, sym)| sym).cloned().collect())
     }
 
-    fn rewrite_exit_scope(&mut self) {
+    fn rewrite_exit_scope(&mut self, _id: NodeId) {
         let exiting = self.scopes.pop().expect("stack balanced");
         // Remove all locals which are bound in the scope we are exiting.
         self.free_locals.retain(|name, _| !exiting.contains(name));

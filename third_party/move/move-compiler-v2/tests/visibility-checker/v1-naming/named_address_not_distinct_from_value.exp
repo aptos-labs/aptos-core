@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: constant `0x42::M::C` cannot be used here because it is private to the module `0x42::M`
+   ┌─ tests/visibility-checker/v1-naming/named_address_not_distinct_from_value.move:18:9
+   │
+18 │         0x42::M::C;
+   │         ^^^^^^^^^^

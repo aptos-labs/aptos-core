@@ -5,6 +5,7 @@ use super::reroot_path;
 use clap::*;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_disassembler::disassembler::Disassembler;
+use move_model::ast::ModuleName;
 use move_package::{compilation::compiled_package::CompiledUnitWithSource, BuildConfig};
 use std::path::PathBuf;
 
@@ -39,6 +40,13 @@ impl Disassemble {
         match package
             .get_module_by_name(needle_package, &module_or_script_name)
             .or_else(|_| package.get_script_by_name(needle_package, &module_or_script_name))
+            // If we can't find the module directly, check for a mangled script name
+            .or_else(|_| {
+                package.get_script_by_name(
+                    needle_package,
+                    ModuleName::pseudo_script_name_builder(&module_or_script_name, 0).as_str(),
+                )
+            })
             .ok()
         {
             None => anyhow::bail!(

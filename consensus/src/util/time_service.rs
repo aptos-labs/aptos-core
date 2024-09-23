@@ -80,8 +80,14 @@ where
     T: Send + 'static,
 {
     fn run(&mut self) -> Pin<Box<dyn Future<Output = ()> + Send>> {
-        let mut sender = self.sender.take().unwrap();
-        let message = self.message.take().unwrap();
+        let mut sender = self
+            .sender
+            .take()
+            .expect("Expect to be able to take sender");
+        let message = self
+            .message
+            .take()
+            .expect("Expect to be able to take message");
         let r = async move {
             if let Err(e) = sender.send(message).await {
                 error!("Error on send: {:?}", e);

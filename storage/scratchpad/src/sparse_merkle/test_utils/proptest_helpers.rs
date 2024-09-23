@@ -8,6 +8,7 @@ use crate::{
     SparseMerkleTree,
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_drop_helper::ArcAsyncDrop;
 use aptos_types::state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue};
 use proptest::{
     collection::{hash_set, vec},
@@ -128,13 +129,13 @@ trait AssertNoExternalStrongRef {
     fn assert_no_external_strong_ref(&self);
 }
 
-impl<V: Send + Sync + 'static> AssertNoExternalStrongRef for SparseMerkleTree<V> {
+impl<V: ArcAsyncDrop> AssertNoExternalStrongRef for SparseMerkleTree<V> {
     fn assert_no_external_strong_ref(&self) {
         assert_subtree_sole_strong_ref(self.inner.root());
     }
 }
 
-fn assert_subtree_sole_strong_ref<V: Send + Sync + 'static>(subtree: &SubTree<V>) {
+fn assert_subtree_sole_strong_ref<V: ArcAsyncDrop>(subtree: &SubTree<V>) {
     if let SubTree::NonEmpty {
         root: NodeHandle::Shared(arc),
         ..

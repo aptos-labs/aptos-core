@@ -42,7 +42,7 @@ error: cannot pass `|num|bool` to a function which expects argument of type `|nu
 37 │       wrongly_typed_fun_arg_callee(|x| false) // Wrongly typed function argument.
    │                                    ^^^^^^^^^
 
-error: the function expected 2 type arguments but 1 were provided
+error: expected 2 type arguments but 1 were provided
    ┌─ tests/checking/specs/expressions_err.move:42:7
    │
 42 │       wrong_instantiation<u64>(x) // Wrong instantiation

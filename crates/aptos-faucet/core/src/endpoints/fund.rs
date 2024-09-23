@@ -408,7 +408,5 @@ pub async fn mint(
 
 /// This returns long hashes with no 0x in front.
 fn get_hashes(txns: &[SignedTransaction]) -> Vec<String> {
-    txns.iter()
-        .map(|t| t.clone().committed_hash().to_hex())
-        .collect()
+    txns.iter().map(|t| t.committed_hash().to_hex()).collect()
 }

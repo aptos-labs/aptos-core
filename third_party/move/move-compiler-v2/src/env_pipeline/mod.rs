@@ -4,18 +4,29 @@
 //! This module contains a set of transformers and analyzers of global environment.
 //! Those can be arranged in a pipeline and executed in sequence.
 
-// TODO: move all other `&mut GlobalEnv` processors into this module.
-
-use log::debug;
+use log::trace;
 use move_model::model::GlobalEnv;
-use std::fmt::Write;
+use std::io::Write;
 
+pub mod acquires_checker;
+pub mod ast_simplifier;
+pub mod cyclic_instantiation_checker;
+pub mod flow_insensitive_checkers;
+pub mod function_checker;
+pub mod inliner;
 pub mod lambda_lifter;
+pub mod model_ast_lints;
+pub mod recursive_struct_checker;
+pub mod rewrite_target;
+pub mod seqs_in_binop_checker;
+pub mod spec_checker;
+pub mod spec_rewriter;
+pub mod unused_params_checker;
 
 /// Represents a pipeline of processors working on the global environment.
 #[derive(Default)]
 pub struct EnvProcessorPipeline<'a> {
-    /// A sequence of transformations to run on the model.
+    /// A sequence of checks and transformations to run on the model.
     /// For each processor, we store its name and the transformation function.
     processors: Vec<(String, Box<dyn Fn(&mut GlobalEnv) + 'a>)>,
 }
@@ -32,10 +43,10 @@ impl<'a> EnvProcessorPipeline<'a> {
     /// Runs the pipeline. Running will be ended if any of the steps produces an error.
     /// The function returns true if all steps succeeded without errors.
     pub fn run(&self, env: &mut GlobalEnv) -> bool {
-        debug!("before env processor pipeline: {}", env.dump_env());
+        trace!("before env processor pipeline: {}", env.dump_env());
         for (name, proc) in &self.processors {
             proc(env);
-            debug!("after env processor {}", name);
+            trace!("after env processor {}", name);
             if env.has_errors() {
                 return false;
             }
@@ -47,13 +58,13 @@ impl<'a> EnvProcessorPipeline<'a> {
     /// only.
     pub fn run_and_record(&self, env: &mut GlobalEnv, w: &mut impl Write) -> anyhow::Result<bool> {
         let msg = format!("before env processor pipeline:\n{}\n", env.dump_env());
-        debug!("{}", msg);
+        trace!("{}", msg);
         writeln!(w, "// -- Model dump {}", msg)?;
         for (name, proc) in &self.processors {
             proc(env);
             if !env.has_errors() {
                 let msg = format!("after env processor {}:\n{}\n", name, env.dump_env());
-                debug!("{}", msg);
+                trace!("{}", msg);
                 writeln!(w, "// -- Model dump {}", msg)?;
             } else {
                 return Ok(false);

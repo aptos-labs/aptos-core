@@ -53,6 +53,7 @@ impl From<PeerManagerError> for RpcError {
         }
     }
 }
+
 impl From<oneshot::Canceled> for RpcError {
     fn from(_: oneshot::Canceled) -> Self {
         RpcError::UnexpectedResponseChannelCancel
@@ -62,5 +63,11 @@ impl From<oneshot::Canceled> for RpcError {
 impl From<tokio::time::error::Elapsed> for RpcError {
     fn from(_err: tokio::time::error::Elapsed) -> RpcError {
         RpcError::TimedOut
+    }
+}
+
+impl From<tokio::task::JoinError> for RpcError {
+    fn from(err: tokio::task::JoinError) -> RpcError {
+        RpcError::Error(anyhow!("JoinError: {:?}", err))
     }
 }

@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 /// New style publishing via `code::publish_package`
 pub async fn publish_package(
-    info: &mut AptosPublicInfo<'_>,
+    info: &mut AptosPublicInfo,
     move_dir: PathBuf,
 ) -> Result<TransactionFactory> {
     let package = BuiltPackage::build(move_dir, BuildOptions::default())?;

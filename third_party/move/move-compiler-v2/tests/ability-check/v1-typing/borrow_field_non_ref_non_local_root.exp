@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: value of type `M::S` does not have the `copy` ability
+  ┌─ tests/ability-check/v1-typing/borrow_field_non_ref_non_local_root.move:9:22
+  │
+9 │         (&(if (cond) *foo() else bar()).f : &u64);
+  │                      ^^^^^^ reference content copied here

@@ -55,7 +55,7 @@ pub struct AptosDBBackend {
     window_size: usize,
     seek_len: usize,
     aptos_db: Arc<dyn DbReader>,
-    db_result: Mutex<(Vec<VersionedNewBlockEvent>, u64, bool)>,
+    db_result: Mutex<Option<(Vec<VersionedNewBlockEvent>, u64, bool)>>,
 }
 
 impl AptosDBBackend {
@@ -64,13 +64,13 @@ impl AptosDBBackend {
             window_size,
             seek_len,
             aptos_db,
-            db_result: Mutex::new((vec![], 0u64, true)),
+            db_result: Mutex::new(None),
         }
     }
 
     fn refresh_db_result(
         &self,
-        mut locked: MutexGuard<'_, (Vec<VersionedNewBlockEvent>, u64, bool)>,
+        locked: &mut MutexGuard<'_, Option<(Vec<VersionedNewBlockEvent>, u64, bool)>>,
         latest_db_version: u64,
     ) -> Result<(Vec<VersionedNewBlockEvent>, u64, bool)> {
         // assumes target round is not too far from latest commit
@@ -97,7 +97,7 @@ impl AptosDBBackend {
             std::cmp::max(latest_db_version, max_returned_version),
             hit_end,
         );
-        *locked = result.clone();
+        **locked = Some(result.clone());
         Ok(result)
     }
 
@@ -136,23 +136,33 @@ impl AptosDBBackend {
 
         if result.len() < self.window_size && !hit_end {
             error!(
-                "We are not fetching far enough in history, we filtered from {} to {}, but asked for {}",
+                "We are not fetching far enough in history, we filtered from {} to {}, but asked for {}. Target ({}, {}), received from {:?} to {:?}.",
                 events.len(),
                 result.len(),
-                self.window_size
+                self.window_size,
+                target_epoch,
+                target_round,
+                events.last().map_or((0, 0), |e| (e.event.epoch(), e.event.round())),
+                events.first().map_or((0, 0), |e| (e.event.epoch(), e.event.round())),
             );
         }
-        let root_hash = self
-            .aptos_db
-            .get_accumulator_root_hash(max_version)
-            .unwrap_or_else(|_| {
-                error!(
-                    "We couldn't fetch accumulator hash for the {} version, for {} epoch, {} round",
-                    max_version, target_epoch, target_round,
-                );
-                HashValue::zero()
-            });
-        (result, root_hash)
+
+        if result.is_empty() {
+            warn!("No events in the requested window could be found");
+            (result, HashValue::zero())
+        } else {
+            let root_hash = self
+                .aptos_db
+                .get_accumulator_root_hash(max_version)
+                .unwrap_or_else(|_| {
+                    error!(
+                        "We couldn't fetch accumulator hash for the {} version, for {} epoch, {} round",
+                        max_version, target_epoch, target_round,
+                    );
+                    HashValue::zero()
+                });
+            (result, root_hash)
+        }
     }
 }
 
@@ -163,18 +173,30 @@ impl MetadataBackend for AptosDBBackend {
         target_epoch: u64,
         target_round: Round,
     ) -> (Vec<NewBlockEvent>, HashValue) {
-        let locked = self.db_result.lock();
-        let events = &locked.0;
-        let version = locked.1;
-        let hit_end = locked.2;
+        let mut locked = self.db_result.lock();
+        let latest_db_version = self.aptos_db.get_latest_ledger_info_version().unwrap_or(0);
+        // lazy init db_result
+        if locked.is_none() {
+            if let Err(e) = self.refresh_db_result(&mut locked, latest_db_version) {
+                warn!(
+                    error = ?e, "[leader reputation] Fail to initialize db result",
+                );
+                return (vec![], HashValue::zero());
+            }
+        }
+        let (events, version, hit_end) = {
+            // locked is somenthing
+            #[allow(clippy::unwrap_used)]
+            let result = locked.as_ref().unwrap();
+            (&result.0, result.1, result.2)
+        };
 
         let has_larger = events.first().map_or(false, |e| {
             (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
         });
-        let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
         if !has_larger && version < latest_db_version {
-            let fresh_db_result = self.refresh_db_result(locked, latest_db_version);
+            let fresh_db_result = self.refresh_db_result(&mut locked, latest_db_version);
             match fresh_db_result {
                 Ok((events, _version, hit_end)) => {
                     self.get_from_db_result(target_epoch, target_round, &events, hit_end)
@@ -286,16 +308,8 @@ impl NewBlockEventAggregation {
 
             &history[start..]
         } else {
-            if !history.is_empty() {
-                assert!(
-                    (
-                        history.first().unwrap().epoch(),
-                        history.first().unwrap().round()
-                    ) >= (
-                        history.last().unwrap().epoch(),
-                        history.last().unwrap().round()
-                    )
-                );
+            if let (Some(first), Some(last)) = (history.first(), history.last()) {
+                assert!((first.epoch(), first.round()) >= (last.epoch(), last.round()));
             }
             let end = if history.len() > window_size {
                 window_size
@@ -584,7 +598,10 @@ impl LeaderReputation {
         history: &[NewBlockEvent],
         round: Round,
     ) -> VotingPowerRatio {
-        let candidates = self.epoch_to_proposers.get(&self.epoch).unwrap();
+        let candidates = self
+            .epoch_to_proposers
+            .get(&self.epoch)
+            .expect("Epoch should always map to proposers");
         // use f64 counter, as total voting power is u128
         let total_voting_power = self.voting_powers.iter().map(|v| *v as f64).sum();
         CHAIN_HEALTH_TOTAL_VOTING_POWER.set(total_voting_power);

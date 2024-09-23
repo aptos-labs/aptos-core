@@ -1,0 +1,12 @@
+processed 2 tasks
+
+task 1 'run'. lines 13-13:
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(1),
+    location: 0xc0ffee::m,
+    indices: redacted,
+    offsets: redacted,
+}
+
+==> Compiler v2 delivered same results!

@@ -10,9 +10,9 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        AbilitySet, Bytecode, CodeUnit, CompiledModule, CompiledScript, FunctionDefinition,
-        FunctionHandle, Signature, SignatureIndex, SignatureToken, StructDefinition,
-        StructFieldInformation, StructTypeParameter, TableIndex,
+        AbilitySet, Bytecode, CodeUnit, CompiledModule, CompiledScript, FieldDefinition,
+        FunctionDefinition, FunctionHandle, Signature, SignatureIndex, SignatureToken,
+        StructDefinition, StructFieldInformation, StructTypeParameter, TableIndex,
     },
     file_format_common::VERSION_6,
     IndexKind,
@@ -84,30 +84,60 @@ impl<'a> SignatureChecker<'a> {
 
     fn verify_fields(&self, struct_defs: &[StructDefinition]) -> PartialVMResult<()> {
         for (struct_def_idx, struct_def) in struct_defs.iter().enumerate() {
-            let fields = match &struct_def.field_information {
-                StructFieldInformation::Native => continue,
-                StructFieldInformation::Declared(fields) => fields,
+            match &struct_def.field_information {
+                StructFieldInformation::Native => {},
+                StructFieldInformation::Declared(fields) => {
+                    self.verify_fields_of_struct(struct_def_idx, struct_def, None, fields.iter())?
+                },
+                StructFieldInformation::DeclaredVariants(variants) => {
+                    variants
+                        .iter()
+                        .enumerate()
+                        .try_for_each(|(variant_offset, variant)| {
+                            self.verify_fields_of_struct(
+                                struct_def_idx,
+                                struct_def,
+                                Some(variant_offset),
+                                variant.fields.iter(),
+                            )
+                        })?
+                },
             };
-            let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
-            let err_handler = |err: PartialVMError, idx| {
-                err.at_index(IndexKind::FieldDefinition, idx as TableIndex)
-                    .at_index(IndexKind::StructDefinition, struct_def_idx as TableIndex)
-            };
-            for (field_offset, field_def) in fields.iter().enumerate() {
-                self.check_signature_token(&field_def.signature.0)
-                    .map_err(|err| err_handler(err, field_offset))?;
-                let type_param_constraints: Vec<_> =
-                    struct_handle.type_param_constraints().collect();
-                self.check_type_instantiation(&field_def.signature.0, &type_param_constraints)
-                    .map_err(|err| err_handler(err, field_offset))?;
+        }
+        Ok(())
+    }
 
-                self.check_phantom_params(
-                    &field_def.signature.0,
-                    false,
-                    &struct_handle.type_parameters,
-                )
-                .map_err(|err| err_handler(err, field_offset))?;
+    fn verify_fields_of_struct<'l>(
+        &self,
+        struct_def_idx: usize,
+        struct_def: &StructDefinition,
+        variant: Option<usize>,
+        fields: impl Iterator<Item = &'l FieldDefinition>,
+    ) -> Result<(), PartialVMError> {
+        let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
+        let err_handler = |err: PartialVMError, offset| {
+            let err = err
+                .at_index(IndexKind::FieldDefinition, offset as TableIndex)
+                .at_index(IndexKind::StructDefinition, struct_def_idx as TableIndex);
+            if let Some(variant) = variant {
+                err.at_index(IndexKind::VariantDefinition, variant as TableIndex)
+            } else {
+                err
             }
+        };
+        for (field_offset, field_def) in fields.enumerate() {
+            self.check_signature_token(&field_def.signature.0)
+                .map_err(|err| err_handler(err, field_offset))?;
+            let type_param_constraints: Vec<_> = struct_handle.type_param_constraints().collect();
+            self.check_type_instantiation(&field_def.signature.0, &type_param_constraints)
+                .map_err(|err| err_handler(err, field_offset))?;
+
+            self.check_phantom_params(
+                &field_def.signature.0,
+                false,
+                &struct_handle.type_parameters,
+            )
+            .map_err(|err| err_handler(err, field_offset))?;
         }
         Ok(())
     }
@@ -166,10 +196,39 @@ impl<'a> SignatureChecker<'a> {
                         type_parameters,
                     )
                 },
+                PackVariantGeneric(idx) | UnpackVariantGeneric(idx) | TestVariantGeneric(idx) => {
+                    let variant_inst = self.resolver.struct_variant_instantiation_at(*idx)?;
+                    let variant_handle = self
+                        .resolver
+                        .struct_variant_handle_at(variant_inst.handle)?;
+                    let struct_def = self.resolver.struct_def_at(variant_handle.struct_index)?;
+                    let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
+                    let type_arguments =
+                        &self.resolver.signature_at(variant_inst.type_parameters).0;
+                    self.check_signature_tokens(type_arguments)?;
+                    self.check_generic_instance(
+                        type_arguments,
+                        struct_handle.type_param_constraints(),
+                        type_parameters,
+                    )
+                },
                 ImmBorrowFieldGeneric(idx) | MutBorrowFieldGeneric(idx) => {
                     let field_inst = self.resolver.field_instantiation_at(*idx)?;
                     let field_handle = self.resolver.field_handle_at(field_inst.handle)?;
                     let struct_def = self.resolver.struct_def_at(field_handle.owner)?;
+                    let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
+                    let type_arguments = &self.resolver.signature_at(field_inst.type_parameters).0;
+                    self.check_signature_tokens(type_arguments)?;
+                    self.check_generic_instance(
+                        type_arguments,
+                        struct_handle.type_param_constraints(),
+                        type_parameters,
+                    )
+                },
+                ImmBorrowVariantFieldGeneric(idx) | MutBorrowVariantFieldGeneric(idx) => {
+                    let field_inst = self.resolver.variant_field_instantiation_at(*idx)?;
+                    let field_handle = self.resolver.variant_field_handle_at(field_inst.handle)?;
+                    let struct_def = self.resolver.struct_def_at(field_handle.struct_index)?;
                     let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
                     let type_arguments = &self.resolver.signature_at(field_inst.type_parameters).0;
                     self.check_signature_tokens(type_arguments)?;
@@ -202,14 +261,70 @@ impl<'a> SignatureChecker<'a> {
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.
-                Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_) | LdU8(_) | LdU16(_) | LdU32(_)
-                | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_) | CastU8 | CastU16 | CastU32
-                | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | Call(_) | Pack(_)
-                | Unpack(_) | ReadRef | WriteRef | FreezeRef | Add | Sub | Mul | Mod | Div
-                | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le
-                | Ge | CopyLoc(_) | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_)
-                | MutBorrowField(_) | ImmBorrowField(_) | MutBorrowGlobal(_)
-                | ImmBorrowGlobal(_) | Exists(_) | MoveTo(_) | MoveFrom(_) | Abort | Nop => Ok(()),
+                Pop
+                | Ret
+                | Branch(_)
+                | BrTrue(_)
+                | BrFalse(_)
+                | LdU8(_)
+                | LdU16(_)
+                | LdU32(_)
+                | LdU64(_)
+                | LdU128(_)
+                | LdU256(_)
+                | LdConst(_)
+                | CastU8
+                | CastU16
+                | CastU32
+                | CastU64
+                | CastU128
+                | CastU256
+                | LdTrue
+                | LdFalse
+                | Call(_)
+                | Pack(_)
+                | Unpack(_)
+                | PackVariant(_)
+                | UnpackVariant(_)
+                | TestVariant(_)
+                | ReadRef
+                | WriteRef
+                | FreezeRef
+                | Add
+                | Sub
+                | Mul
+                | Mod
+                | Div
+                | BitOr
+                | BitAnd
+                | Xor
+                | Shl
+                | Shr
+                | Or
+                | And
+                | Not
+                | Eq
+                | Neq
+                | Lt
+                | Gt
+                | Le
+                | Ge
+                | CopyLoc(_)
+                | MoveLoc(_)
+                | StLoc(_)
+                | MutBorrowLoc(_)
+                | ImmBorrowLoc(_)
+                | MutBorrowField(_)
+                | ImmBorrowField(_)
+                | MutBorrowVariantField(_)
+                | ImmBorrowVariantField(_)
+                | MutBorrowGlobal(_)
+                | ImmBorrowGlobal(_)
+                | Exists(_)
+                | MoveTo(_)
+                | MoveFrom(_)
+                | Abort
+                | Nop => Ok(()),
             };
             result.map_err(|err| {
                 err.append_message_with_separator(' ', format!("at offset {} ", offset))

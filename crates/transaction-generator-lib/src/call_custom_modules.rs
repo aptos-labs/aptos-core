@@ -6,14 +6,14 @@ use crate::{
     create_account_transaction, publishing::publish_util::PackageHandler, RootAccountHandle,
     TransactionGenerator, TransactionGeneratorCreator,
 };
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::{rngs::StdRng, SeedableRng};
-use std::sync::{Arc, atomic::AtomicU64};
+use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
+use std::{borrow::Borrow, sync::{Arc, atomic::AtomicU64}};
 use move_core_types::identifier::Identifier;
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
@@ -173,7 +173,7 @@ impl CustomModulesDelegationGeneratorCreator {
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
-        packages: &mut Vec<(Package, LocalAccount)>,
+        packages: &mut [(Package, LocalAccount)],
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Arc<TransactionGeneratorWorker> {
         let mut rng = StdRng::from_entropy();
@@ -233,7 +233,7 @@ impl CustomModulesDelegationGeneratorCreator {
             let publisher = LocalAccount::generate(&mut rng);
             let publisher_address = publisher.address();
             requests_create.push(create_account_transaction(
-                root_account.get_root_account(),
+                root_account.get_root_account().borrow(),
                 publisher_address,
                 &init_txn_factory,
                 publisher_balance,
@@ -248,18 +248,31 @@ impl CustomModulesDelegationGeneratorCreator {
             packages.push((package, publisher));
         }
         info!("Creating {} publisher accounts", requests_create.len());
-        txn_executor
-            .execute_transactions(&requests_create)
-            .await
-            .unwrap();
-
-        info!("Publishing {} packages", requests_publish.len());
-        if publish_packages {
+        // all publishers are created from root account, split it up.
+        for req_chunk in requests_create.chunks(100) {
             txn_executor
-                .execute_transactions(&requests_publish)
+                .execute_transactions(req_chunk)
                 .await
+                .inspect_err(|err| {
+                    error!(
+                        "Failed to execute creation of publisher accounts: {:#}",
+                        err
+                    )
+                })
                 .unwrap();
         }
+
+        info!(
+            "Publishing {} copies of package {}",
+            requests_publish.len(),
+            package_name
+        );
+        txn_executor
+            .execute_transactions(&requests_publish)
+            .await
+            .inspect_err(|err| error!("Failed to publish test package {}: {:#}", package_name, err))
+            .unwrap();
+
         info!("Done publishing {} packages", packages.len());
 
         packages

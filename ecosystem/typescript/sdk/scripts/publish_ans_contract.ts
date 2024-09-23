@@ -3,7 +3,7 @@ require("dotenv").config();
 
 /**
  * TS SDK supports ANS. Since ANS contract is not part of aptos-framework
- * we need to get the ANS contract, publish it to local testnet and test against it.
+ * we need to get the ANS contract, publish it to localnet and test against it.
  * This script clones the aptos-names-contracts repo {@link https://github.com/aptos-labs/aptos-names-contracts},
  * uses a pre created account address and private key to fund that account and
  * then publish the contract under that account.

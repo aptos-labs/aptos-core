@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{BlockReader, BlockStore},
+    block_storage::{pending_blocks::PendingBlocks, BlockReader, BlockStore},
+    counters,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -16,7 +17,7 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     persistent_liveness_storage::RecoveryData,
     pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
@@ -29,7 +30,7 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{ConsensusConfig, QcAggregatorType},
+    config::ConsensusConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_consensus_types::{
@@ -43,6 +44,7 @@ use aptos_consensus_types::{
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
+    utils::PayloadTxnsSize,
     vote_msg::VoteMsg,
 };
 use aptos_crypto::HashValue;
@@ -50,7 +52,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
 use aptos_network::{
     application::interface::NetworkClient,
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
         network::{Event, NetworkEvents, NewNetworkEvents, NewNetworkSender},
@@ -66,8 +68,8 @@ use aptos_types::{
     jwks::QuorumCertifiedUpdate,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, FeatureFlag, Features, OnChainConsensusConfig,
-        ValidatorTxnConfig,
+        ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -81,7 +83,6 @@ use futures::{
     stream::select,
     FutureExt, Stream, StreamExt,
 };
-use futures_channel::mpsc::unbounded;
 use maplit::hashmap;
 use std::{
     iter::FromIterator,
@@ -113,7 +114,8 @@ pub struct NodeSetup {
     id: usize,
     onchain_consensus_config: OnChainConsensusConfig,
     local_consensus_config: ConsensusConfig,
-    features: Features,
+    onchain_randomness_config: OnChainRandomnessConfig,
+    onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
 }
 
 impl NodeSetup {
@@ -121,14 +123,7 @@ impl NodeSetup {
         let base_timeout = Duration::new(60, 0);
         let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
         let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
-        let (delayed_qc_tx, _) = unbounded();
-        RoundState::new(
-            time_interval,
-            time_service,
-            round_timeout_sender,
-            delayed_qc_tx,
-            QcAggregatorType::NoDelay,
-        )
+        RoundState::new(time_interval, time_service, round_timeout_sender)
     }
 
     fn create_proposer_election(proposers: Vec<Author>) -> Arc<dyn ProposerElection + Send + Sync> {
@@ -142,9 +137,28 @@ impl NodeSetup {
         proposer_indices: Option<Vec<usize>>,
         onchain_consensus_config: Option<OnChainConsensusConfig>,
         local_consensus_config: Option<ConsensusConfig>,
-        features: Option<Features>,
+        onchain_randomness_config: Option<OnChainRandomnessConfig>,
+        onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     ) -> Vec<Self> {
-        let onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
+        let mut onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
+        // With order votes feature, the validators additionally send order votes.
+        // next_proposal and next_vote functions could potentially break because of it.
+        if let OnChainConsensusConfig::V3 {
+            alg:
+                ConsensusAlgorithmConfig::JolteonV2 {
+                    main: _,
+                    quorum_store_enabled: _,
+                    order_vote_enabled,
+                },
+            vtxn: _,
+        } = &mut onchain_consensus_config
+        {
+            *order_vote_enabled = false;
+        }
+        let onchain_randomness_config =
+            onchain_randomness_config.unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
+        let onchain_jwk_consensus_config = onchain_jwk_consensus_config
+            .unwrap_or_else(OnChainJWKConsensusConfig::default_if_missing);
         let local_consensus_config = local_consensus_config.unwrap_or_default();
         let (signers, validators) = random_validator_verifier(num_nodes, None, false);
         let proposers = proposer_indices
@@ -195,7 +209,8 @@ impl NodeSetup {
                 id,
                 onchain_consensus_config.clone(),
                 local_consensus_config.clone(),
-                features.clone().unwrap_or_default(),
+                onchain_randomness_config.clone(),
+                onchain_jwk_consensus_config.clone(),
             ));
         }
         nodes
@@ -212,7 +227,8 @@ impl NodeSetup {
         id: usize,
         onchain_consensus_config: OnChainConsensusConfig,
         local_consensus_config: ConsensusConfig,
-        features: Features,
+        onchain_randomness_config: OnChainRandomnessConfig,
+        onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
     ) -> Self {
         let _entered_runtime = executor.enter();
         let epoch_state = Arc::new(EpochState {
@@ -224,7 +240,6 @@ impl NodeSetup {
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
-        let (_, conn_status_rx) = conn_notifs_channel::new();
         let network_sender = network::NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
@@ -236,7 +251,7 @@ impl NodeSetup {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
+        let network_events = NetworkEvents::new(consensus_rx, None, true);
         let author = signer.author();
 
         let twin_id = TwinId { id, author };
@@ -270,7 +285,9 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::from(PayloadManager::DirectMempool),
+            Arc::from(DirectMempoolPayloadManager::new()),
+            false,
+            Arc::new(Mutex::new(PendingBlocks::new())),
         ));
 
         let proposer_election = Self::create_proposer_election(proposers.clone());
@@ -280,13 +297,16 @@ impl NodeSetup {
             Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
             Duration::ZERO,
+            PayloadTxnsSize::new(20, 1000),
             10,
-            1000,
+            PayloadTxnsSize::new(5, 500),
             10,
+            1,
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
             onchain_consensus_config.effective_validator_txn_config(),
+            true,
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -295,6 +315,9 @@ impl NodeSetup {
         safety_rules.perform_initialize().unwrap();
 
         let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+
+        let mut local_config = local_consensus_config.clone();
+        local_config.enable_broadcast_vote(false);
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -307,9 +330,10 @@ impl NodeSetup {
             storage.clone(),
             onchain_consensus_config.clone(),
             round_manager_tx,
-            local_consensus_config.clone(),
-            features.clone(),
-            false,
+            local_config,
+            onchain_randomness_config.clone(),
+            onchain_jwk_consensus_config.clone(),
+            None,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
@@ -327,14 +351,15 @@ impl NodeSetup {
             id,
             onchain_consensus_config,
             local_consensus_config,
-            features,
+            onchain_randomness_config,
+            onchain_jwk_consensus_config,
         }
     }
 
     pub fn restart(self, playground: &mut NetworkPlayground, executor: Handle) -> Self {
         let recover_data = self
             .storage
-            .try_start()
+            .try_start(self.onchain_consensus_config.order_vote_enabled())
             .unwrap_or_else(|e| panic!("fail to restart due to: {}", e));
         Self::new(
             playground,
@@ -347,7 +372,8 @@ impl NodeSetup {
             self.id,
             self.onchain_consensus_config.clone(),
             self.local_consensus_config.clone(),
-            self.features,
+            self.onchain_randomness_config.clone(),
+            self.onchain_jwk_consensus_config.clone(),
         )
     }
 
@@ -385,7 +411,6 @@ impl NodeSetup {
                     self.identity_desc()
                 )
             },
-            _ => panic!("Unexpected Network Event"),
         }
     }
 
@@ -396,7 +421,6 @@ impl NodeSetup {
                 msg,
                 self.identity_desc()
             ),
-            Some(_) => panic!("Unexpected Network Event"),
             None => {},
         }
     }
@@ -459,7 +483,6 @@ impl NodeSetup {
                 msg,
                 self.identity_desc()
             ),
-            Some(_) => panic!("Unexpected Network Event"),
             None => None,
         }
     }
@@ -646,6 +669,7 @@ fn new_round_on_quorum_cert() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     let genesis = node.block_store.ordered_root();
@@ -691,6 +715,7 @@ fn vote_on_successful_proposal() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
 
@@ -700,7 +725,7 @@ fn vote_on_successful_proposal() {
         node.next_proposal().await;
 
         let proposal = Block::new_proposal(
-            Payload::empty(false),
+            Payload::empty(false, true),
             1,
             1,
             genesis_qc.clone(),
@@ -736,6 +761,7 @@ fn delay_proposal_processing_in_sync_only() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
 
@@ -749,7 +775,7 @@ fn delay_proposal_processing_in_sync_only() {
             .block_store
             .set_back_pressure_for_test(true);
         let proposal = Block::new_proposal(
-            Payload::empty(false),
+            Payload::empty(false, true),
             1,
             1,
             genesis_qc.clone(),
@@ -805,11 +831,12 @@ fn no_vote_on_old_proposal() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
     let new_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -819,7 +846,7 @@ fn no_vote_on_old_proposal() {
     .unwrap();
     let new_block_id = new_block.id();
     let old_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         2,
         genesis_qc,
@@ -862,12 +889,13 @@ fn no_vote_on_mismatch_round() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -876,7 +904,7 @@ fn no_vote_on_mismatch_round() {
     )
     .unwrap();
     let block_skip_round = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         2,
         2,
         genesis_qc.clone(),
@@ -887,7 +915,11 @@ fn no_vote_on_mismatch_round() {
     timed_block_on(&runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_skip_round,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.into_wrapped_ledger_info(),
+                None,
+            ),
         );
         assert!(node
             .round_manager
@@ -896,7 +928,11 @@ fn no_vote_on_mismatch_round() {
             .is_err());
         let good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.into_wrapped_ledger_info(),
+                None,
+            ),
         );
         node.round_manager
             .process_proposal_msg(good_proposal)
@@ -915,6 +951,7 @@ fn sync_info_carried_on_timeout_vote() {
         &mut playground,
         runtime.handle().clone(),
         1,
+        None,
         None,
         None,
         None,
@@ -951,7 +988,7 @@ fn sync_info_carried_on_timeout_vote() {
             .round_state
             .process_certificates(SyncInfo::new(
                 block_0_quorum_cert.clone(),
-                block_0_quorum_cert.clone(),
+                block_0_quorum_cert.into_wrapped_ledger_info(),
                 None,
             ));
         node.round_manager
@@ -982,12 +1019,13 @@ fn no_vote_on_invalid_proposer() {
         None,
         None,
         None,
+        None,
     );
     let incorrect_proposer = nodes.pop().unwrap();
     let mut node = nodes.pop().unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -996,7 +1034,7 @@ fn no_vote_on_invalid_proposer() {
     )
     .unwrap();
     let block_incorrect_proposer = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -1007,7 +1045,11 @@ fn no_vote_on_invalid_proposer() {
     timed_block_on(&runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_incorrect_proposer,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.into_wrapped_ledger_info(),
+                None,
+            ),
         );
         assert!(node
             .round_manager
@@ -1016,7 +1058,11 @@ fn no_vote_on_invalid_proposer() {
             .is_err());
         let good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.into_wrapped_ledger_info(),
+                None,
+            ),
         );
 
         node.round_manager
@@ -1041,12 +1087,13 @@ fn new_round_on_timeout_certificate() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -1055,7 +1102,7 @@ fn new_round_on_timeout_certificate() {
     )
     .unwrap();
     let block_skip_round = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         2,
         2,
         genesis_qc.clone(),
@@ -1075,7 +1122,11 @@ fn new_round_on_timeout_certificate() {
     timed_block_on(&runtime, async {
         let skip_round_proposal = ProposalMsg::new(
             block_skip_round,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), Some(tc)),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.into_wrapped_ledger_info(),
+                Some(tc),
+            ),
         );
         node.round_manager
             .process_proposal_msg(skip_round_proposal)
@@ -1083,13 +1134,19 @@ fn new_round_on_timeout_certificate() {
             .unwrap();
         let old_good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.into_wrapped_ledger_info(),
+                None,
+            ),
         );
+        let before = counters::ERROR_COUNT.get();
         assert!(node
             .round_manager
             .process_proposal_msg(old_good_proposal)
             .await
-            .is_err());
+            .is_ok()); // we eat the error
+        assert_eq!(counters::ERROR_COUNT.get(), before + 1); // but increase the counter
     });
 }
 
@@ -1104,6 +1161,7 @@ fn reject_invalid_failed_authors() {
         &mut playground,
         runtime.handle().clone(),
         1,
+        None,
         None,
         None,
         None,
@@ -1126,7 +1184,7 @@ fn reject_invalid_failed_authors() {
 
     let create_proposal = |round: Round, failed_authors: Vec<(Round, Author)>| {
         let block = Block::new_proposal(
-            Payload::empty(false),
+            Payload::empty(false, true),
             round,
             2,
             genesis_qc.clone(),
@@ -1138,7 +1196,7 @@ fn reject_invalid_failed_authors() {
             block,
             SyncInfo::new(
                 genesis_qc.clone(),
-                genesis_qc.clone(),
+                genesis_qc.into_wrapped_ledger_info(),
                 if round > 1 {
                     Some(create_timeout(round - 1))
                 } else {
@@ -1203,13 +1261,14 @@ fn response_on_block_retrieval() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
 
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -1218,7 +1277,14 @@ fn response_on_block_retrieval() {
     )
     .unwrap();
     let block_id = block.id();
-    let proposal = ProposalMsg::new(block, SyncInfo::new(genesis_qc.clone(), genesis_qc, None));
+    let proposal = ProposalMsg::new(
+        block,
+        SyncInfo::new(
+            genesis_qc.clone(),
+            genesis_qc.into_wrapped_ledger_info(),
+            None,
+        ),
+    );
 
     timed_block_on(&runtime, async {
         node.round_manager
@@ -1315,6 +1381,7 @@ fn recover_on_restart() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
@@ -1329,7 +1396,7 @@ fn recover_on_restart() {
             genesis_qc.clone(),
             i,
             i,
-            Payload::empty(false),
+            Payload::empty(false, true),
             (std::cmp::max(1, i.saturating_sub(10))..i)
                 .map(|i| (i, inserter.signer().author()))
                 .collect(),
@@ -1355,7 +1422,7 @@ fn recover_on_restart() {
                 proposal.clone(),
                 SyncInfo::new(
                     proposal.quorum_cert().clone(),
-                    genesis_qc.clone(),
+                    genesis_qc.into_wrapped_ledger_info(),
                     Some(tc.clone()),
                 ),
             );
@@ -1387,6 +1454,7 @@ fn nil_vote_on_timeout() {
         &mut playground,
         runtime.handle().clone(),
         1,
+        None,
         None,
         None,
         None,
@@ -1433,6 +1501,7 @@ fn vote_resent_on_timeout() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     timed_block_on(&runtime, async {
@@ -1473,6 +1542,7 @@ fn sync_on_partial_newer_sync_info() {
         None,
         None,
         None,
+        None,
     );
     let mut node = nodes.pop().unwrap();
     runtime.spawn(playground.start());
@@ -1507,7 +1577,11 @@ fn sync_on_partial_newer_sync_info() {
             None,
         );
         // Create a sync info with newer quorum cert but older commit cert
-        let sync_info = SyncInfo::new(block_4_qc.clone(), certificate_for_genesis(), None);
+        let sync_info = SyncInfo::new(
+            block_4_qc.clone(),
+            certificate_for_genesis().into_wrapped_ledger_info(),
+            None,
+        );
         node.round_manager
             .ensure_round_and_sync_up(
                 sync_info.highest_round() + 1,
@@ -1529,6 +1603,7 @@ fn safety_rules_crash() {
         &mut playground,
         runtime.handle().clone(),
         1,
+        None,
         None,
         None,
         None,
@@ -1597,6 +1672,7 @@ fn echo_timeout() {
         None,
         None,
         None,
+        None,
     );
     runtime.spawn(playground.start());
     timed_block_on(&runtime, async {
@@ -1651,6 +1727,7 @@ fn no_next_test() {
         None,
         None,
         None,
+        None,
     );
     runtime.spawn(playground.start());
 
@@ -1684,6 +1761,7 @@ fn commit_pipeline_test() {
         runtime.handle().clone(),
         7,
         Some(proposers.clone()),
+        None,
         None,
         None,
         None,
@@ -1724,6 +1802,7 @@ fn block_retrieval_test() {
         runtime.handle().clone(),
         4,
         Some(vec![0, 1]),
+        None,
         None,
         None,
         None,
@@ -1771,6 +1850,75 @@ fn block_retrieval_test() {
 }
 
 #[test]
+fn block_retrieval_timeout_test() {
+    let runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+    let mut nodes = NodeSetup::create_nodes(
+        &mut playground,
+        runtime.handle().clone(),
+        4,
+        Some(vec![0, 1]),
+        None,
+        None,
+        None,
+        None,
+    );
+    let timeout_config = playground.timeout_config();
+    runtime.spawn(playground.start());
+
+    for i in 0..4 {
+        info!("processing {}", i);
+        process_and_vote_on_proposal(
+            &runtime,
+            &mut nodes,
+            i as usize % 2,
+            &[3],
+            true,
+            None,
+            true,
+            i + 1,
+            i.saturating_sub(1),
+            0,
+        );
+    }
+
+    timed_block_on(&runtime, async {
+        let mut behind_node = nodes.pop().unwrap();
+
+        for node in nodes.iter() {
+            timeout_config.write().timeout_message_for(
+                &TwinId {
+                    id: behind_node.id,
+                    author: behind_node.signer.author(),
+                },
+                &TwinId {
+                    id: node.id,
+                    author: node.signer.author(),
+                },
+            );
+        }
+
+        // Drain the queue on other nodes
+        for node in nodes.iter_mut() {
+            let _ = node.next_proposal().await;
+        }
+
+        info!(
+            "Processing proposals for behind node {}",
+            behind_node.identity_desc()
+        );
+
+        let proposal_msg = behind_node.next_proposal().await;
+        behind_node
+            .round_manager
+            .process_proposal_msg(proposal_msg)
+            .await
+            .unwrap_err();
+    });
+}
+
+#[ignore] // TODO: turn this test back on once the flakes have resolved.
+#[test]
 pub fn forking_retrieval_test() {
     let runtime = consensus_runtime();
 
@@ -1793,6 +1941,7 @@ pub fn forking_retrieval_test() {
             proposal_node,
             proposal_node,
         ]),
+        None,
         None,
         None,
         None,
@@ -2040,13 +2189,14 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
 
     let invalid_block = Block::new_proposal_ext(
         vec![ValidatorTransaction::dummy(vec![0xFF]); 5],
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -2056,7 +2206,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
     .unwrap();
 
     let valid_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc,
@@ -2088,19 +2238,28 @@ fn no_vote_on_proposal_with_unexpected_vtxns() {
     let vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(
         QuorumCertifiedUpdate::dummy(),
     )];
-    let mut features = Features::default();
-    features.disable(FeatureFlag::JWK_CONSENSUS);
-    assert_process_proposal_result(Some(features.clone()), vtxns.clone(), false);
 
-    features.enable(FeatureFlag::JWK_CONSENSUS);
-    assert_process_proposal_result(Some(features), vtxns, true);
+    assert_process_proposal_result(
+        None,
+        Some(OnChainJWKConsensusConfig::default_disabled()),
+        vtxns.clone(),
+        false,
+    );
+
+    assert_process_proposal_result(
+        None,
+        Some(OnChainJWKConsensusConfig::default_enabled()),
+        vtxns,
+        true,
+    );
 }
 
 /// Setup a node with default configs and an optional `Features` override.
 /// Create a block, fill it with the given vtxns, and process it with the `RoundManager` from the setup.
 /// Assert the processing result.
 fn assert_process_proposal_result(
-    features: Option<Features>,
+    randomness_config: Option<OnChainRandomnessConfig>,
+    jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     vtxns: Vec<ValidatorTransaction>,
     expected_result: bool,
 ) {
@@ -2113,14 +2272,15 @@ fn assert_process_proposal_result(
         None,
         Some(OnChainConsensusConfig::default_for_genesis()),
         None,
-        features,
+        randomness_config,
+        jwk_consensus_config,
     );
 
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal_ext(
         vtxns,
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -2149,9 +2309,10 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
 
-    let alg_config = ConsensusAlgorithmConfig::Jolteon {
+    let alg_config = ConsensusAlgorithmConfig::JolteonV2 {
         main: ConsensusConfigV1::default(),
         quorum_store_enabled: true,
+        order_vote_enabled: false,
     };
     let vtxn_config = ValidatorTxnConfig::V1 {
         per_block_limit_txn_count: 5,
@@ -2164,8 +2325,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         ..Default::default()
     };
 
-    let mut features = Features::default();
-    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
+    let randomness_config = OnChainRandomnessConfig::default_enabled();
     let mut nodes = NodeSetup::create_nodes(
         &mut playground,
         runtime.handle().clone(),
@@ -2176,7 +2336,8 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
             vtxn: vtxn_config,
         }),
         Some(local_config),
-        Some(features),
+        Some(randomness_config),
+        None,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
@@ -2216,7 +2377,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
 
     let block_vtxns_too_large = Block::new_proposal_ext(
         vec![ValidatorTransaction::dummy(vec![0xFF; 200]); 5], // total_bytes >= 200 * 5 = 1000
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),

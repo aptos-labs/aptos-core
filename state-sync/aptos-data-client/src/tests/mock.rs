@@ -191,8 +191,13 @@ impl MockNetwork {
             connected_peers: Default::default(),
             distance_from_validators: OsRng.gen(),
         };
-        let peer_monitoring_metadata =
-            PeerMonitoringMetadata::new(Some(OsRng.gen()), Some(network_info_response), None, None);
+        let peer_monitoring_metadata = PeerMonitoringMetadata::new(
+            Some(OsRng.gen()),
+            None,
+            Some(network_info_response),
+            None,
+            None,
+        );
         self.peers_and_metadata
             .update_peer_monitoring_metadata(peer_network_id, peer_monitoring_metadata)
             .unwrap();

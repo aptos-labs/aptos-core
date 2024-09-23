@@ -1,0 +1,18 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    private fun test(): u64 {
+        if false {
+          {
+            let i: u64 = 0;
+            i: u64 = Add<u64>(i, 1);
+            return i
+          }
+        } else {
+          Tuple()
+        };
+        0
+    }
+} // end 0xc0ffee::m
+
+
+============ bytecode verification succeeded ========

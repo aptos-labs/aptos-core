@@ -11,5 +11,6 @@ publish = false
 
 [dev-dependencies]
 move-cli = { path = "../tools/move-cli" }
+move-stdlib = { path = "../move-stdlib" }
 
 [features]

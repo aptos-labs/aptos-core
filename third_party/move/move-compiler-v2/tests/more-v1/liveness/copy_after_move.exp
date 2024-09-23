@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/liveness/copy_after_move.move:4:9
+  │
+4 │         move x;
+  │         ^^^^^^ attempted to move here
+5 │         copy x;
+  │         ------ used here

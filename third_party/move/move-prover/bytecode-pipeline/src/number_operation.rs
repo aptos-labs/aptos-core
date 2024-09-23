@@ -268,7 +268,8 @@ impl GlobalNumberOperationState {
 
         // Obtain positions that are marked as Bitwise by analyzing the pragma
         let para_sym = &struct_env.module_env.env.symbol_pool().make(BV_PARAM_PROP);
-        let bv_struct_opt = struct_env.get_spec().properties.get(para_sym);
+        let struct_spec = struct_env.get_spec();
+        let bv_struct_opt = struct_spec.properties.get(para_sym);
         let field_idx_vec = Self::extract_bv_vars(bv_struct_opt);
 
         let mid = struct_env.module_env.get_id();
@@ -276,11 +277,10 @@ impl GlobalNumberOperationState {
         let struct_env = struct_env.module_env.env.get_module(mid).into_struct(sid);
         let mut field_oper_map = BTreeMap::new();
 
-        for (i, field) in struct_env.get_fields().enumerate() {
-            if field_idx_vec.contains(&i) {
-                field_oper_map.insert(field.get_id(), Bitwise);
-            } else {
-                let field_ty = field.get_type();
+        let update_field_map =
+            |field_ty: Type,
+             field_id: FieldId,
+             field_oper_map: &mut BTreeMap<FieldId, NumOperation>| {
                 let arith_flag = if let Type::Reference(_, tr) = field_ty {
                     tr.is_number()
                 } else if let Type::Vector(tr) = field_ty {
@@ -289,13 +289,47 @@ impl GlobalNumberOperationState {
                     field_ty.is_number()
                 };
                 if arith_flag {
-                    field_oper_map.insert(field.get_id(), Arithmetic);
+                    field_oper_map.insert(field_id, Arithmetic);
                 } else {
-                    field_oper_map.insert(field.get_id(), Bottom);
+                    field_oper_map.insert(field_id, Bottom);
+                }
+            };
+
+        if !struct_env.has_variants() {
+            for (i, field) in struct_env.get_fields().enumerate() {
+                if field_idx_vec.contains(&i) {
+                    field_oper_map.insert(field.get_id(), Bitwise);
+                } else {
+                    update_field_map(field.get_type(), field.get_id(), &mut field_oper_map);
                 }
             }
+            self.struct_operation_map.insert((mid, sid), field_oper_map);
+        } else {
+            if !field_idx_vec.is_empty() {
+                let loc = if let Some(loc) = &struct_env.get_spec().loc {
+                    loc.clone()
+                } else {
+                    struct_env.get_loc()
+                };
+                // enum does support "pragma bv"
+                struct_env.module_env.env.warning(
+                    &loc,
+                    "pragma bv is currently not support in enum types and will be ignored",
+                );
+            }
+            for variant in struct_env.get_variants() {
+                for field in struct_env.get_fields_of_variant(variant) {
+                    let pool = struct_env.symbol_pool();
+                    let new_field_id =
+                        FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                            pool.string(variant).as_str(),
+                            pool.string(field.get_name()).as_str(),
+                        )));
+                    update_field_map(field.get_type(), new_field_id, &mut field_oper_map);
+                }
+            }
+            self.struct_operation_map.insert((mid, sid), field_oper_map);
         }
-        self.struct_operation_map.insert((mid, sid), field_oper_map);
     }
 
     /// Updates the number operation for the given node id.
@@ -313,6 +347,19 @@ impl GlobalNumberOperationState {
             *oper = num_oper;
             true
         }
+    }
+
+    pub fn get_num_operation_field(
+        &self,
+        mid: &ModuleId,
+        sid: &StructId,
+        field_id: &FieldId,
+    ) -> &NumOperation {
+        self.struct_operation_map
+            .get(&(*mid, *sid))
+            .expect("struct must have a struct operation state")
+            .get(field_id)
+            .expect("expect to get the state")
     }
 
     /// Gets the number operation of the given node.

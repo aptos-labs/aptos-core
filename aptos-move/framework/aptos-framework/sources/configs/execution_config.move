@@ -4,6 +4,7 @@ module aptos_framework::execution_config {
     use aptos_framework::config_buffer;
     use std::error;
     use std::vector;
+    use aptos_framework::chain_status;
 
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
@@ -24,6 +25,8 @@ module aptos_framework::execution_config {
     /// TODO: update all the tests that reference this function, then disable this function.
     public fun set(account: &signer, config: vector<u8>) acquires ExecutionConfig {
         system_addresses::assert_aptos_framework(account);
+        chain_status::assert_genesis();
+
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
 
         if (exists<ExecutionConfig>(@aptos_framework)) {
@@ -49,10 +52,15 @@ module aptos_framework::execution_config {
     }
 
     /// Only used in reconfigurations to apply the pending `ExecutionConfig`, if there is any.
-    public(friend) fun on_new_epoch() acquires ExecutionConfig {
+    public(friend) fun on_new_epoch(framework: &signer) acquires ExecutionConfig {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ExecutionConfig>()) {
             let config = config_buffer::extract<ExecutionConfig>();
-            *borrow_global_mut<ExecutionConfig>(@aptos_framework) = config;
+            if (exists<ExecutionConfig>(@aptos_framework)) {
+                *borrow_global_mut<ExecutionConfig>(@aptos_framework) = config;
+            } else {
+                move_to(framework, config);
+            };
         }
     }
 }

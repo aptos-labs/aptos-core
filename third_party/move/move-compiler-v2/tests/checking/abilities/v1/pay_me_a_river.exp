@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: type `&mut Payments` is missing required ability `key` (type was inferred)
+   ┌─ tests/checking/abilities/v1/pay_me_a_river.move:13:9
+   │
+13 │         move_to(&asigner, payments);
+   │         ^^^^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`

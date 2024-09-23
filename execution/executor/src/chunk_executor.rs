@@ -14,10 +14,11 @@ use crate::{
     metrics::{
         APTOS_CHUNK_EXECUTOR_OTHER_SECONDS, APTOS_EXECUTOR_APPLY_CHUNK_SECONDS,
         APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS, APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS,
-        APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS,
+        APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS, CONCURRENCY_GAUGE,
     },
 };
 use anyhow::{anyhow, ensure, Result};
+use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
@@ -26,7 +27,7 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_metrics_core::TimerHelper;
+use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
     state_delta::StateDelta, DbReaderWriter, ExecutedTrees,
@@ -35,6 +36,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
+    proof::TransactionInfoListWithProof,
     state_store::StateViewId,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
@@ -48,7 +50,15 @@ use fail::fail_point;
 use itertools::multizip;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::{iter::once, marker::PhantomData, sync::Arc};
+use std::{
+    iter::once,
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Instant,
+};
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -79,6 +89,25 @@ impl<V: VMExecutor> ChunkExecutor<V> {
         }
         Ok(())
     }
+
+    fn with_inner<F, T>(&self, f: F) -> Result<T>
+    where
+        F: FnOnce(&ChunkExecutorInner<V>) -> Result<T>,
+    {
+        let locked = self.inner.read();
+        let inner = locked.as_ref().expect("not reset");
+
+        let has_pending_pre_commit = inner.has_pending_pre_commit.load(Ordering::Acquire);
+        f(inner).map_err(|error| {
+            if has_pending_pre_commit {
+                panic!(
+                    "Hit error with pending pre-committed ledger, panicking. {:?}",
+                    error,
+                );
+            }
+            error
+        })
+    }
 }
 
 impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
@@ -88,12 +117,16 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "enqueue_by_execution"]);
+
         self.maybe_initialize()?;
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .enqueue_chunk_by_execution(txn_list_with_proof, verified_target_li, epoch_change_li)
+        self.with_inner(|inner| {
+            inner.enqueue_chunk_by_execution(
+                txn_list_with_proof,
+                verified_target_li,
+                epoch_change_li,
+            )
+        })
     }
 
     fn enqueue_chunk_by_transaction_outputs(
@@ -102,39 +135,39 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .enqueue_chunk_by_transaction_outputs(
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "enqueue_by_outputs"]);
+
+        self.with_inner(|inner| {
+            inner.enqueue_chunk_by_transaction_outputs(
                 txn_output_list_with_proof,
                 verified_target_li,
                 epoch_change_li,
             )
+        })
     }
 
     fn update_ledger(&self) -> Result<()> {
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .update_ledger()
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "update_ledger"]);
+
+        self.with_inner(|inner| inner.update_ledger())
     }
 
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .commit_chunk()
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "commit_chunk"]);
+
+        self.with_inner(|inner| inner.commit_chunk())
     }
 
     fn reset(&self) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "reset"]);
+
         *self.inner.write() = Some(ChunkExecutorInner::new(self.db.clone())?);
         Ok(())
     }
 
     fn finish(&self) {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "finish"]);
+
         *self.inner.write() = None;
     }
 }
@@ -142,15 +175,23 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 struct ChunkExecutorInner<V> {
     db: DbReaderWriter,
     commit_queue: Mutex<ChunkCommitQueue>,
+    has_pending_pre_commit: AtomicBool,
     _phantom: PhantomData<V>,
 }
 
 impl<V: VMExecutor> ChunkExecutorInner<V> {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
-        let commit_queue = Mutex::new(ChunkCommitQueue::new_from_db(&db.reader)?);
+        let commit_queue = ChunkCommitQueue::new_from_db(&db.reader)?;
+
+        let next_pre_committed_version = commit_queue.expecting_version();
+        let next_synced_version = db.reader.get_synced_version()?.map_or(0, |v| v + 1);
+        assert!(next_synced_version <= next_pre_committed_version);
+        let has_pending_pre_commit = next_synced_version < next_pre_committed_version;
+
         Ok(Self {
             db,
-            commit_queue,
+            commit_queue: Mutex::new(commit_queue),
+            has_pending_pre_commit: AtomicBool::new(has_pending_pre_commit),
             _phantom: PhantomData,
         })
     }
@@ -164,6 +205,25 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             latest_state.current.clone(),
             Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
         )?)
+    }
+
+    fn verify_extends_ledger(
+        &self,
+        proof: &TransactionInfoListWithProof,
+        first_version: Version,
+        my_root_hash: HashValue,
+    ) -> Result<()> {
+        // In consensus-only mode, we cannot verify the proof against the executed output,
+        // because the proof returned by the remote peer is an empty one.
+        if cfg!(feature = "consensus-only-perf-test") {
+            return Ok(());
+        }
+
+        let num_overlap =
+            proof.verify_extends_ledger(first_version, my_root_hash, Some(first_version))?;
+        assert_eq!(num_overlap, 0, "overlapped chunks");
+
+        Ok(())
     }
 
     fn commit_chunk_impl(&self) -> Result<ExecutedChunk> {
@@ -418,12 +478,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         } = chunk;
 
         let first_version = parent_accumulator.num_leaves();
-        let num_overlap = txn_infos_with_proof.verify_extends_ledger(
+        self.verify_extends_ledger(
+            &txn_infos_with_proof,
             first_version,
             parent_accumulator.root_hash(),
-            Some(first_version),
         )?;
-        assert_eq!(num_overlap, 0, "overlapped chunks");
 
         let (ledger_update_output, to_discard, to_retry) = {
             let _timer =
@@ -464,6 +523,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
         let _timer = APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS.start_timer();
         let executed_chunk = self.commit_chunk_impl()?;
+        self.has_pending_pre_commit.store(false, Ordering::Release);
 
         let commit_notification = {
             let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
@@ -511,6 +571,8 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "replay"]);
+
         self.maybe_initialize()?;
         self.inner.read().as_ref().expect("not reset").replay(
             transactions,
@@ -522,6 +584,8 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
     }
 
     fn commit(&self) -> Result<ExecutedChunk> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "commit"]);
+
         self.inner.read().as_ref().expect("not reset").commit()
     }
 }
@@ -535,9 +599,11 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         mut event_vecs: Vec<Vec<ContractEvent>>,
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()> {
+        let started = Instant::now();
+        let num_txns = transactions.len();
         let mut latest_view = self.commit_queue.lock().expect_latest_view()?;
         let chunk_begin = latest_view.num_transactions() as Version;
-        let chunk_end = chunk_begin + transactions.len() as Version; // right-exclusive
+        let chunk_end = chunk_begin + num_txns as Version; // right-exclusive
 
         // Find epoch boundaries.
         let mut epochs = Vec::new();
@@ -573,11 +639,28 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
         self.commit_queue
             .lock()
-            .enqueue_chunk_to_commit_directly(executed_chunk.expect("Nothing to commit."))
+            .enqueue_chunk_to_commit_directly(executed_chunk.expect("Nothing to commit."))?;
+        info!(
+            num_txns = num_txns,
+            tps = (num_txns as f64 / started.elapsed().as_secs_f64()),
+            "TransactionReplayer::replay() OK"
+        );
+
+        Ok(())
     }
 
     fn commit(&self) -> Result<ExecutedChunk> {
-        self.commit_chunk_impl()
+        let started = Instant::now();
+
+        let chunk = self.commit_chunk_impl()?;
+
+        let num_committed = chunk.transactions_to_commit().len();
+        info!(
+            num_committed = num_committed,
+            tps = num_committed as f64 / started.elapsed().as_secs_f64(),
+            "TransactionReplayer::commit() OK"
+        );
+        Ok(chunk)
     }
 }
 

@@ -4,7 +4,10 @@
 
 use crate::{
     account_address::AccountAddress,
-    keyless::{EphemeralCertificate, KeylessPublicKey, KeylessSignature, TransactionAndProof},
+    keyless::{
+        EphemeralCertificate, FederatedKeylessPublicKey, KeylessPublicKey, KeylessSignature,
+        TransactionAndProof,
+    },
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
@@ -358,6 +361,9 @@ impl TransactionAuthenticator {
                 AccountAuthenticator::MultiKey { authenticator } => {
                     single_key_authenticators.extend(authenticator.to_single_key_authenticators()?);
                 },
+                AccountAuthenticator::NoAccountAuthenticator => {
+                    //  This case adds no single key authenticators to the vector.
+                },
             };
         }
         Ok(single_key_authenticators)
@@ -449,6 +455,7 @@ pub enum Scheme {
     MultiEd25519 = 1,
     SingleKey = 2,
     MultiKey = 3,
+    NoScheme = 250,
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
@@ -468,6 +475,7 @@ impl fmt::Display for Scheme {
             Scheme::MultiEd25519 => "MultiEd25519",
             Scheme::SingleKey => "SingleKey",
             Scheme::MultiKey => "MultiKey",
+            Scheme::NoScheme => "NoScheme",
             Scheme::DeriveAuid => "DeriveAuid",
             Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
@@ -502,6 +510,7 @@ pub enum AccountAuthenticator {
     MultiKey {
         authenticator: MultiKeyAuthenticator,
     },
+    NoAccountAuthenticator,
     // ... add more schemes here
 }
 
@@ -513,6 +522,7 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { .. } => Scheme::MultiEd25519,
             Self::SingleKey { .. } => Scheme::SingleKey,
             Self::MultiKey { .. } => Scheme::MultiKey,
+            Self::NoAccountAuthenticator => Scheme::NoScheme,
         }
     }
 
@@ -558,6 +568,7 @@ impl AccountAuthenticator {
             } => signature.verify(message, public_key),
             Self::SingleKey { authenticator } => authenticator.verify(message),
             Self::MultiKey { authenticator } => authenticator.verify(message),
+            Self::NoAccountAuthenticator => bail!("No signature to verify."),
         }
     }
 
@@ -568,6 +579,7 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { public_key, .. } => public_key.to_bytes().to_vec(),
             Self::SingleKey { authenticator } => authenticator.public_key_bytes(),
             Self::MultiKey { authenticator } => authenticator.public_key_bytes(),
+            Self::NoAccountAuthenticator => vec![],
         }
     }
 
@@ -578,12 +590,20 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { signature, .. } => signature.to_bytes().to_vec(),
             Self::SingleKey { authenticator } => authenticator.signature_bytes(),
             Self::MultiKey { authenticator } => authenticator.signature_bytes(),
+            Self::NoAccountAuthenticator => vec![],
         }
     }
 
     /// Return an authentication key derived from `self`'s public key and scheme id
-    pub fn authentication_key(&self) -> AuthenticationKey {
-        AuthenticationKey::from_preimage(self.public_key_bytes(), self.scheme())
+    pub fn authentication_key(&self) -> Option<AuthenticationKey> {
+        if let Self::NoAccountAuthenticator = self {
+            None
+        } else {
+            Some(AuthenticationKey::from_preimage(
+                self.public_key_bytes(),
+                self.scheme(),
+            ))
+        }
     }
 
     /// Return the number of signatures included in this account authenticator.
@@ -593,6 +613,7 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { signature, .. } => signature.signatures().len(),
             Self::SingleKey { .. } => 1,
             Self::MultiKey { authenticator } => authenticator.signatures.len(),
+            Self::NoAccountAuthenticator => 0,
         }
     }
 }
@@ -637,11 +658,18 @@ impl AuthenticationKey {
     }
 
     /// Construct a preimage from a transaction-derived AUID as (txn_hash || auid_scheme_id)
-    pub fn auid(txn_hash: Vec<u8>, auid_counter: u64) -> Self {
-        let mut hash_arg = Vec::new();
-        hash_arg.extend(txn_hash);
-        hash_arg.extend(auid_counter.to_le_bytes().to_vec());
-        Self::from_preimage(hash_arg, Scheme::DeriveAuid)
+    pub fn auid(mut txn_hash: Vec<u8>, auid_counter: u64) -> Self {
+        txn_hash.extend(auid_counter.to_le_bytes().to_vec());
+        Self::from_preimage(txn_hash, Scheme::DeriveAuid)
+    }
+
+    pub fn object_address_from_object(
+        source: &AccountAddress,
+        derive_from: &AccountAddress,
+    ) -> AuthenticationKey {
+        let mut bytes = source.to_vec();
+        bytes.append(&mut derive_from.to_vec());
+        Self::from_preimage(bytes, Scheme::DeriveObjectAddressFromObject)
     }
 
     /// Create an authentication key from an Ed25519 public key
@@ -991,6 +1019,15 @@ impl AnySignature {
         Self::Keyless { signature }
     }
 
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ed25519 { .. } => "Ed25519",
+            Self::Secp256k1Ecdsa { .. } => "Secp256k1Ecdsa",
+            Self::WebAuthn { .. } => "WebAuthn",
+            Self::Keyless { .. } => "Keyless",
+        }
+    }
+
     pub fn verify<T: Serialize + CryptoHash>(
         &self,
         public_key: &AnyPublicKey,
@@ -1005,35 +1042,56 @@ impl AnySignature {
             },
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
             (Self::Keyless { signature }, AnyPublicKey::Keyless { public_key: _ }) => {
-                // Verifies the ephemeral signature on the TXN and, if present, the ZKP. The rest of
-                // the verification, i.e., [ZKPoK of] OpenID signature verification is done in
-                // `AptosVM::run_prologue`.
-                //
-                // This is because the JWK, under which the [ZKPoK of an] OpenID signature verifies,
-                // can only be fetched from on chain inside the `AptosVM`.
-                //
-                // This deferred verification is what actually ensures the `signature.ephemeral_pubkey`
-                // used below is the right pubkey signed by the OIDC provider.
-
-                let mut txn_and_zkp = TransactionAndProof {
-                    message,
-                    proof: None,
-                };
-
-                // Add the ZK proof into the `txn_and_zkp` struct, if we are in the ZK path
-                match &signature.cert {
-                    EphemeralCertificate::ZeroKnowledgeSig(proof) => {
-                        txn_and_zkp.proof = Some(proof.proof)
-                    },
-                    EphemeralCertificate::OpenIdSig(_) => {},
-                }
-
-                signature
-                    .ephemeral_signature
-                    .verify(&txn_and_zkp, &signature.ephemeral_pubkey)
+                Self::verify_keyless_ephemeral_signature(message, signature)
+            },
+            (Self::Keyless { signature }, AnyPublicKey::FederatedKeyless { public_key: _ }) => {
+                Self::verify_keyless_ephemeral_signature(message, signature)
             },
             _ => bail!("Invalid key, signature pairing"),
         }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
+    }
+
+    fn verify_keyless_ephemeral_signature<T: Serialize + CryptoHash>(
+        message: &T,
+        signature: &KeylessSignature,
+    ) -> Result<()> {
+        // Verifies the ephemeral signature on (TXN [+ ZKP]). The rest of the verification,
+        // i.e., [ZKPoK of] OpenID signature verification is done in
+        // `AptosVM::run_prologue`.
+        //
+        // This is because the JWK, under which the [ZKPoK of an] OpenID signature verifies,
+        // can only be fetched from on chain inside the `AptosVM`.
+        //
+        // This deferred verification is what actually ensures the `signature.ephemeral_pubkey`
+        // used below is the right pubkey signed by the OIDC provider.
+
+        let mut txn_and_zkp = TransactionAndProof {
+            message,
+            proof: None,
+        };
+
+        // Add the ZK proof into the `txn_and_zkp` struct, if we are in the ZK path
+        match &signature.cert {
+            EphemeralCertificate::ZeroKnowledgeSig(proof) => txn_and_zkp.proof = Some(proof.proof),
+            EphemeralCertificate::OpenIdSig(_) => {},
+        }
+
+        signature
+            .ephemeral_signature
+            .verify(&txn_and_zkp, &signature.ephemeral_pubkey)
+    }
+}
+
+impl TryFrom<&[u8]> for AnySignature {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<AnySignature>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
@@ -1050,6 +1108,9 @@ pub enum AnyPublicKey {
     },
     Keyless {
         public_key: KeylessPublicKey,
+    },
+    FederatedKeyless {
+        public_key: FederatedKeylessPublicKey,
     },
 }
 
@@ -1070,10 +1131,24 @@ impl AnyPublicKey {
         Self::Keyless { public_key }
     }
 
+    pub fn federated_keyless(public_key: FederatedKeylessPublicKey) -> Self {
+        Self::FederatedKeyless { public_key }
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
     }
 }
+
+impl TryFrom<&[u8]> for AnyPublicKey {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<AnyPublicKey>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EphemeralSignature {
     Ed25519 {
@@ -1100,6 +1175,27 @@ impl EphemeralSignature {
             },
             (Self::WebAuthn { signature }, EphemeralPublicKey::Secp256r1Ecdsa { public_key }) => {
                 signature.verify(message, &AnyPublicKey::secp256r1_ecdsa(public_key.clone()))
+            },
+            _ => {
+                bail!("Unsupported ephemeral signature and public key combination");
+            },
+        }
+    }
+
+    pub fn verify_arbitrary_msg(
+        &self,
+        message: &[u8],
+        public_key: &EphemeralPublicKey,
+    ) -> Result<()> {
+        match (self, public_key) {
+            (Self::Ed25519 { signature }, EphemeralPublicKey::Ed25519 { public_key }) => {
+                signature.verify_arbitrary_msg(message, public_key)
+            },
+            (Self::WebAuthn { signature }, EphemeralPublicKey::Secp256r1Ecdsa { public_key }) => {
+                signature.verify_arbitrary_msg(
+                    message,
+                    &AnyPublicKey::secp256r1_ecdsa(public_key.clone()),
+                )
             },
             _ => {
                 bail!("Unsupported ephemeral signature and public key combination");
@@ -1164,12 +1260,20 @@ impl<'de> Deserialize<'de> for EphemeralPublicKey {
             #[derive(::serde::Deserialize)]
             #[serde(rename = "EphemeralPublicKey")]
             enum Value {
-                Ed25519 { public_key: Ed25519PublicKey },
+                Ed25519 {
+                    public_key: Ed25519PublicKey,
+                },
+                Secp256r1Ecdsa {
+                    public_key: secp256r1_ecdsa::PublicKey,
+                },
             }
 
             let value = Value::deserialize(deserializer)?;
             Ok(match value {
                 Value::Ed25519 { public_key } => EphemeralPublicKey::Ed25519 { public_key },
+                Value::Secp256r1Ecdsa { public_key } => {
+                    EphemeralPublicKey::Secp256r1Ecdsa { public_key }
+                },
             })
         }
     }

@@ -22,8 +22,6 @@ variable "BUILT_VIA_BUILDKIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
-variable "GCP_DOCKER_ARTIFACT_REPO_US" {}
-
 variable "AWS_ECR_ACCOUNT_NUM" {}
 
 variable "TARGET_REGISTRY" {
@@ -71,7 +69,7 @@ target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
     # Run `docker buildx imagetools inspect debian:bullseye` to find the latest multi-platform hash
-    debian = "docker-image://debian:bullseye@sha256:171478fbe347a3cfe45058dae333b6ed848fd8ce89f3104c89fa94c245086db1"
+    debian = "docker-image://debian:bullseye@sha256:8ccc486c29a3ad02ad5af7f1156e2152dff3ba5634eec9be375269ef123457d8"
   }
 }
 
@@ -80,8 +78,8 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    # Run `docker buildx imagetools inspect rust:1.75.0-bullseye` to find the latest multi-platform hash
-    rust = "docker-image://rust:1.74.1-bullseye@sha256:41e5ac5baf626dcf190cfe6adf9bf3f17c72a677641ae2de6a1f36a6db883aca"
+    # Run `docker buildx imagetools inspect rust:1.78.0-bullseye` to find the latest multi-platform hash
+    rust = "docker-image://rust:1.78.0-bullseye@sha256:c8f85185bd2e482d88e1b8a90705435309ca9d54ccc3bcccf24a32378b8ff1a8"
   }
   args = {
     PROFILE            = "${PROFILE}"
@@ -231,16 +229,12 @@ function "generate_tags" {
   result = TARGET_REGISTRY == "remote-all" ? [
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
-    "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
-    "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
     "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
     ] : (
     TARGET_REGISTRY == "gcp" || TARGET_REGISTRY == "remote" ? [
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
-      "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
-      "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
       ] : [ // "local" or any other value
       "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
       "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",

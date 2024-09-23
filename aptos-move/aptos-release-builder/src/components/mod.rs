@@ -2,26 +2,40 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::framework::FrameworkReleaseConfig;
-use crate::{aptos_core_path, aptos_framework_path, components::feature_flags::Features};
+use crate::{
+    aptos_core_path, aptos_framework_path,
+    components::{
+        feature_flags::Features, oidc_providers::OidcProviderOp,
+        randomness_config::ReleaseFriendlyRandomnessConfig,
+    },
+};
 use anyhow::{anyhow, bail, Context, Result};
 use aptos::governance::GenerateExecutionHash;
+use aptos_crypto::HashValue;
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
+use aptos_infallible::duration_since_epoch;
 use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{
-        ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2, OnChainConfig,
-        OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType, Version,
+        AptosVersion, ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2,
+        OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, TransactionShufflerType,
     },
 };
 use futures::executor::block_on;
 use handlebars::Handlebars;
-use serde::{Deserialize, Serialize};
+use move_binary_format::file_format_common::VERSION_6;
+use once_cell::sync::Lazy;
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::HashMap,
-    fs::File,
+    fs::{self, File},
     io::{Read, Write},
     path::{Path, PathBuf},
+    thread::sleep,
+    time::Duration,
 };
 use url::Url;
 
@@ -30,6 +44,9 @@ pub mod execution_config;
 pub mod feature_flags;
 pub mod framework;
 pub mod gas;
+pub mod jwk_consensus_config;
+pub mod oidc_providers;
+pub mod randomness_config;
 pub mod transaction_fee;
 pub mod version;
 
@@ -58,13 +75,15 @@ impl Proposal {
                     features_diff.squash(feature_flags.clone())
                 },
                 ReleaseEntry::Framework(_)
-                | ReleaseEntry::CustomGas(_)
-                | ReleaseEntry::DefaultGas
-                | ReleaseEntry::DefaultGasWithOverride(_)
+                | ReleaseEntry::Gas { .. }
                 | ReleaseEntry::Version(_)
                 | ReleaseEntry::Consensus(_)
                 | ReleaseEntry::Execution(_)
+                | ReleaseEntry::JwkConsensus(_)
+                | ReleaseEntry::Randomness(_)
                 | ReleaseEntry::RawScript(_) => ret.push(entry.clone()),
+                // Deprecated by `JwkConsensus`.
+                ReleaseEntry::OidcProviderOps(_) => {},
             }
         }
 
@@ -96,6 +115,13 @@ pub enum ExecutionMode {
     RootSigner,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum GasScheduleLocator {
+    LocalFile(String),
+    RemoteFile(Url),
+    Current,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct GasOverride {
     name: String,
@@ -105,18 +131,91 @@ pub struct GasOverride {
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub enum ReleaseEntry {
     Framework(FrameworkReleaseConfig),
-    CustomGas(GasScheduleV2),
-    DefaultGas,
-    DefaultGasWithOverride(Vec<GasOverride>),
-    Version(Version),
+    Gas {
+        old: Option<GasScheduleLocator>,
+        new: GasScheduleLocator,
+    },
+    Version(AptosVersion),
     FeatureFlag(Features),
     Consensus(OnChainConsensusConfig),
     Execution(OnChainExecutionConfig),
     RawScript(PathBuf),
+    /// Deprecated by `OnChainJwkConsensusConfig`.
+    OidcProviderOps(Vec<OidcProviderOp>),
+    JwkConsensus(OnChainJWKConsensusConfig),
+    Randomness(ReleaseFriendlyRandomnessConfig),
+}
+
+impl Serialize for GasScheduleLocator {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            GasScheduleLocator::LocalFile(path) => serializer.serialize_str(path),
+            GasScheduleLocator::RemoteFile(url) => serializer.serialize_str(url.as_str()),
+            GasScheduleLocator::Current => serializer.serialize_str("current"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for GasScheduleLocator {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct GasScheduleLocatorVisitor;
+
+        impl<'de> Visitor<'de> for GasScheduleLocatorVisitor {
+            type Value = GasScheduleLocator;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(
+                    "a valid gas schedule locator (path to local file, url to remote file or `current`)",
+                )
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<GasScheduleLocator, E>
+            where
+                E: serde::de::Error,
+            {
+                if value == "current" {
+                    Ok(GasScheduleLocator::Current)
+                } else if let Ok(url) = Url::parse(value) {
+                    Ok(GasScheduleLocator::RemoteFile(url))
+                } else {
+                    Ok(GasScheduleLocator::LocalFile(value.to_string()))
+                }
+            }
+        }
+
+        deserializer.deserialize_str(GasScheduleLocatorVisitor)
+    }
+}
+
+impl GasScheduleLocator {
+    async fn fetch_gas_schedule(&self) -> Result<GasScheduleV2> {
+        println!("{:?}", self);
+        match self {
+            GasScheduleLocator::LocalFile(path) => {
+                let file_contents = fs::read_to_string(path)?;
+                let gas_schedule: GasScheduleV2 = serde_json::from_str(&file_contents)?;
+                Ok(gas_schedule)
+            },
+            GasScheduleLocator::RemoteFile(url) => {
+                let response = reqwest::get(url.as_str()).await?;
+                let gas_schedule: GasScheduleV2 = response.json().await?;
+                Ok(gas_schedule)
+            },
+            GasScheduleLocator::Current => Ok(aptos_gas_schedule_updator::current_gas_schedule(
+                LATEST_GAS_FEATURE_VERSION,
+            )),
+        }
+    }
 }
 
 impl ReleaseEntry {
-    pub fn generate_release_script(
+    pub async fn generate_release_script(
         &self,
         client: Option<&Client>,
         result: &mut Vec<(String, String)>,
@@ -135,63 +234,72 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )
                     .unwrap(),
                 );
             },
-            ReleaseEntry::CustomGas(gas_schedule) => {
-                if !fetch_and_equals::<GasScheduleV2>(client, gas_schedule)? {
+            ReleaseEntry::Gas { old, new } => {
+                let new_gas_schedule = new
+                    .fetch_gas_schedule()
+                    .await
+                    .map_err(|err| anyhow!("Failed to fetch new gas schedule: {}", err))?;
+                let old_gas_schedule = match old {
+                    Some(old) => Some(
+                        old.fetch_gas_schedule()
+                            .await
+                            .map_err(|err| anyhow!("Failed to fetch old gas schedule: {}", err))?,
+                    ),
+                    None => {
+                        match client {
+                            Some(_client) => {
+                                // We could return `Some(fetch_config::<GasScheduleV2>(client)?)`,
+                                // but this makes certain test scenarios flaky, so just return
+                                // None here
+                                None
+                            },
+                            None => {
+                                println!("!!! WARNING !!!");
+                                println!("Generating gas schedule upgrade without a base for comparison.");
+                                println!("It is strongly recommended you specify an old gas schedule or a remote end point where it can be fetched.");
+                                println!("!!! WARNING !!!");
+                                None
+                            },
+                        }
+                    },
+                };
+
+                if old_gas_schedule
+                    .as_ref()
+                    .map(|old| old != &new_gas_schedule)
+                    .unwrap_or(true)
+                {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
-                        gas_schedule,
+                        old_gas_schedule.as_ref(),
+                        &new_gas_schedule,
                         is_testnet,
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
-                    )?);
-                }
-            },
-            ReleaseEntry::DefaultGas => {
-                let gas_schedule = aptos_gas_schedule_updator::current_gas_schedule();
-                if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
-                    result.append(&mut gas::generate_gas_upgrade_proposal(
-                        &gas_schedule,
-                        is_testnet,
-                        if is_multi_step {
-                            get_execution_hash(result)
-                        } else {
-                            "".to_owned().into_bytes()
-                        },
-                    )?);
-                }
-            },
-            ReleaseEntry::DefaultGasWithOverride(gas_overrides) => {
-                let gas_schedule = gas_override_default(gas_overrides)?;
-                if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
-                    result.append(&mut gas::generate_gas_upgrade_proposal(
-                        &gas_schedule,
-                        is_testnet,
-                        if is_multi_step {
-                            get_execution_hash(result)
-                        } else {
-                            "".to_owned().into_bytes()
-                        },
+                        is_multi_step,
                     )?);
                 }
             },
             ReleaseEntry::Version(version) => {
-                if !fetch_and_equals::<Version>(client, version)? {
+                if !fetch_and_equals::<AptosVersion>(client, version)? {
                     result.append(&mut version::generate_version_upgrade_proposal(
                         version,
                         is_testnet,
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?);
                 }
             },
@@ -218,8 +326,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?);
                 }
             },
@@ -231,8 +340,9 @@ impl ReleaseEntry {
                         if is_multi_step {
                             get_execution_hash(result)
                         } else {
-                            "".to_owned().into_bytes()
+                            None
                         },
+                        is_multi_step,
                     )?);
                 }
             },
@@ -245,11 +355,24 @@ impl ReleaseEntry {
                             if is_multi_step {
                                 get_execution_hash(result)
                             } else {
-                                "".to_owned().into_bytes()
+                                None
                             },
+                            is_multi_step,
                         )?,
                     );
                 }
+            },
+            ReleaseEntry::OidcProviderOps(ops) => {
+                result.append(&mut oidc_providers::generate_oidc_provider_ops_proposal(
+                    ops,
+                    is_testnet,
+                    if is_multi_step {
+                        get_execution_hash(result)
+                    } else {
+                        None
+                    },
+                    is_multi_step,
+                )?);
             },
             ReleaseEntry::RawScript(script_path) => {
                 let base_path = aptos_core_path().join(script_path.as_path());
@@ -292,35 +415,52 @@ impl ReleaseEntry {
                     result.push((file_name, file_content));
                 }
             },
+            ReleaseEntry::JwkConsensus(config) => {
+                result.append(
+                    &mut jwk_consensus_config::generate_jwk_consensus_config_update_proposal(
+                        config,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            None
+                        },
+                        is_multi_step,
+                    )?,
+                );
+            },
+            ReleaseEntry::Randomness(config) => {
+                result.append(
+                    &mut randomness_config::generate_randomness_config_update_proposal(
+                        config,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            None
+                        },
+                        is_multi_step,
+                    )?,
+                );
+            },
         }
         Ok(())
     }
 
-    pub fn validate_upgrade(&self, client: &Client) -> Result<()> {
+    pub async fn validate_upgrade(&self, client: &Client) -> Result<()> {
         let client_opt = Some(client);
         match self {
             ReleaseEntry::Framework(_) => (),
             ReleaseEntry::RawScript(_) => (),
-            ReleaseEntry::CustomGas(gas_schedule) => {
-                if !fetch_and_equals(client_opt, gas_schedule)? {
-                    bail!("Gas schedule config mismatch: Expected {:?}", gas_schedule);
-                }
-            },
-            ReleaseEntry::DefaultGas => {
-                if !fetch_and_equals(
-                    client_opt,
-                    &aptos_gas_schedule_updator::current_gas_schedule(),
-                )? {
-                    bail!("Gas schedule config mismatch: Expected Default");
-                }
-            },
-            ReleaseEntry::DefaultGasWithOverride(gas_overrides) => {
-                if !fetch_and_equals(client_opt, &gas_override_default(gas_overrides)?)? {
+            ReleaseEntry::Gas { old: _old, new } => {
+                let new_gas_schedule = new.fetch_gas_schedule().await?;
+
+                if !wait_until_equals(client_opt, &new_gas_schedule, Duration::from_secs(60)) {
                     bail!("Gas schedule config mismatch: Expected Default");
                 }
             },
             ReleaseEntry::Version(version) => {
-                if !fetch_and_equals(client_opt, version)? {
+                if !wait_until_equals(client_opt, version, Duration::from_secs(60)) {
                     bail!("Version config mismatch: Expected {:?}", version);
                 }
             },
@@ -355,39 +495,34 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::Consensus(consensus_config) => {
-                if !fetch_and_equals(client_opt, consensus_config)? {
+                if !wait_until_equals(client_opt, consensus_config, *MAX_ASYNC_RECONFIG_TIME) {
                     bail!("Consensus config mismatch: Expected {:?}", consensus_config);
                 }
             },
             ReleaseEntry::Execution(execution_config) => {
-                if !fetch_and_equals(client_opt, execution_config)? {
+                if !wait_until_equals(client_opt, execution_config, *MAX_ASYNC_RECONFIG_TIME) {
                     bail!("Consensus config mismatch: Expected {:?}", execution_config);
+                }
+            },
+            ReleaseEntry::OidcProviderOps(_) => {},
+            ReleaseEntry::JwkConsensus(jwk_consensus_config) => {
+                if !wait_until_equals(client_opt, jwk_consensus_config, *MAX_ASYNC_RECONFIG_TIME) {
+                    bail!(
+                        "JWK consensus config mismatch: Expected {:?}",
+                        jwk_consensus_config
+                    );
+                }
+            },
+            ReleaseEntry::Randomness(config) => {
+                let expected_on_chain =
+                    RandomnessConfigMoveStruct::from(OnChainRandomnessConfig::from(config.clone()));
+                if !wait_until_equals(client_opt, &expected_on_chain, *MAX_ASYNC_RECONFIG_TIME) {
+                    bail!("randomness config mismatch: Expected {:?}", config);
                 }
             },
         }
         Ok(())
     }
-}
-
-fn gas_override_default(gas_overrides: &[GasOverride]) -> Result<GasScheduleV2> {
-    let mut gas_schedule = aptos_gas_schedule_updator::current_gas_schedule();
-    for gas_override in gas_overrides {
-        let mut found = false;
-        for (name, value) in &mut gas_schedule.entries {
-            if name == &gas_override.name {
-                *value = gas_override.value;
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            bail!(
-                "Gas override config mismatch: Expected {:?} to be in the gas schedule",
-                gas_override.name
-            );
-        }
-    }
-    Ok(gas_schedule)
 }
 
 // Compare the current on chain config with the value recorded on chain. Return false if there's a difference.
@@ -403,6 +538,21 @@ fn fetch_and_equals<T: OnChainConfig + PartialEq>(
         },
         None => Ok(false),
     }
+}
+
+fn wait_until_equals<T: OnChainConfig + PartialEq>(
+    client: Option<&Client>,
+    expected: &T,
+    time_limit: Duration,
+) -> bool {
+    let deadline = duration_since_epoch() + time_limit;
+    while duration_since_epoch() < deadline {
+        if matches!(fetch_and_equals(client, expected), Ok(true)) {
+            return true;
+        }
+        sleep(Duration::from_secs(1));
+    }
+    false
 }
 
 pub fn fetch_config<T: OnChainConfig>(client: &Client) -> Result<T> {
@@ -426,7 +576,7 @@ pub fn fetch_config<T: OnChainConfig>(client: &Client) -> Result<T> {
 }
 
 impl ReleaseConfig {
-    pub fn generate_release_proposal_scripts(&self, base_path: &Path) -> Result<()> {
+    pub async fn generate_release_proposal_scripts(&self, base_path: &Path) -> Result<()> {
         let client = self
             .remote_endpoint
             .as_ref()
@@ -479,20 +629,24 @@ impl ReleaseConfig {
             let mut result: Vec<(String, String)> = vec![];
             if let ExecutionMode::MultiStep = &proposal.execution_mode {
                 for entry in proposal.update_sequence.iter().rev() {
-                    entry.generate_release_script(
-                        client.as_ref(),
-                        &mut result,
-                        proposal.execution_mode,
-                    )?;
+                    entry
+                        .generate_release_script(
+                            client.as_ref(),
+                            &mut result,
+                            proposal.execution_mode,
+                        )
+                        .await?;
                 }
                 result.reverse();
             } else {
                 for entry in proposal.update_sequence.iter() {
-                    entry.generate_release_script(
-                        client.as_ref(),
-                        &mut result,
-                        proposal.execution_mode,
-                    )?;
+                    entry
+                        .generate_release_script(
+                            client.as_ref(),
+                            &mut result,
+                            proposal.execution_mode,
+                        )
+                        .await?;
                 }
             }
 
@@ -559,10 +713,10 @@ impl ReleaseConfig {
     }
 
     // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
-    pub fn validate_upgrade(&self, endpoint: &Url, proposal: &Proposal) -> Result<()> {
+    pub async fn validate_upgrade(&self, endpoint: &Url, proposal: &Proposal) -> Result<()> {
         let client = Client::new(endpoint.clone());
         for entry in proposal.consolidated_side_effects() {
-            entry.validate_upgrade(&client)?;
+            entry.validate_upgrade(&client).await?;
         }
         Ok(())
     }
@@ -579,7 +733,7 @@ impl Default for ReleaseConfig {
                     metadata: ProposalMetadata::default(),
                     name: "framework".to_string(),
                     update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
-                        bytecode_version: 6, // TODO: remove explicit bytecode version from sources
+                        bytecode_version: VERSION_6,
                         git_hash: None,
                     })],
                 },
@@ -587,7 +741,10 @@ impl Default for ReleaseConfig {
                     execution_mode: ExecutionMode::MultiStep,
                     metadata: ProposalMetadata::default(),
                     name: "gas".to_string(),
-                    update_sequence: vec![ReleaseEntry::DefaultGas],
+                    update_sequence: vec![ReleaseEntry::Gas {
+                        old: None,
+                        new: GasScheduleLocator::Current,
+                    }],
                 },
                 Proposal {
                     execution_mode: ExecutionMode::MultiStep,
@@ -606,9 +763,9 @@ impl Default for ReleaseConfig {
                             transaction_shuffler_type:
                                 TransactionShufflerType::DeprecatedSenderAwareV1(32),
                         })),
-                        ReleaseEntry::RawScript(PathBuf::from(
-                            "data/proposals/empty_multi_step.move",
-                        )),
+                        //ReleaseEntry::RawScript(PathBuf::from(
+                        //    "data/proposals/empty_multi_step.move",
+                        //)),
                     ],
                 },
             ],
@@ -616,9 +773,9 @@ impl Default for ReleaseConfig {
     }
 }
 
-pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
+pub fn get_execution_hash(result: &[(String, String)]) -> Option<HashValue> {
     if result.is_empty() {
-        "vector::empty<u8>()".to_owned().into_bytes()
+        None
     } else {
         let temp_script_path = TempPath::new();
         temp_script_path.create_as_file().unwrap();
@@ -639,7 +796,7 @@ pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
         }
         .generate_hash()
         .unwrap();
-        hash.to_vec()
+        Some(hash)
     }
 }
 
@@ -679,3 +836,14 @@ impl Default for ProposalMetadata {
         }
     }
 }
+
+fn get_signer_arg(is_testnet: bool, next_execution_hash: &Option<HashValue>) -> &str {
+    if is_testnet && next_execution_hash.is_none() {
+        "framework_signer"
+    } else {
+        "&framework_signer"
+    }
+}
+
+/// Estimated async reconfiguration time.
+static MAX_ASYNC_RECONFIG_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(60));

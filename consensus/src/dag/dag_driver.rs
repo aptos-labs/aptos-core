@@ -21,12 +21,15 @@ use crate::{
         },
         DAGRpcResult, RpcHandler,
     },
-    payload_client::PayloadClient,
+    payload_client::{PayloadClient, PayloadPullParameters},
 };
 use anyhow::{bail, ensure};
 use aptos_collections::BoundedVecDeque;
 use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
+use aptos_consensus_types::{
+    common::{Author, Payload, PayloadFilter},
+    utils::PayloadTxnsSize,
+};
 use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
@@ -60,6 +63,7 @@ pub(crate) struct DagDriver {
     payload_config: DagPayloadConfig,
     health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
+    allow_batches_without_pos_in_proposal: bool,
 }
 
 impl DagDriver {
@@ -80,6 +84,7 @@ impl DagDriver {
         payload_config: DagPayloadConfig,
         health_backoff: HealthBackoff,
         quorum_store_enabled: bool,
+        allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -104,6 +109,7 @@ impl DagDriver {
             payload_config,
             health_backoff,
             quorum_store_enabled,
+            allow_batches_without_pos_in_proposal,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -252,22 +258,36 @@ impl DagDriver {
         let (validator_txns, payload) = match self
             .payload_client
             .pull_payload(
-                Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
-                max_txns,
-                max_size_bytes,
+                PayloadPullParameters {
+                    max_poll_time: Duration::from_millis(
+                        self.payload_config.payload_pull_max_poll_time_ms,
+                    ),
+                    max_txns: PayloadTxnsSize::new(max_txns, max_size_bytes),
+                    max_txns_after_filtering: max_txns,
+                    soft_max_txns_after_filtering: max_txns,
+                    max_inline_txns: PayloadTxnsSize::new(100, 100 * 1024),
+                    opt_batch_txns_pct: 0,
+                    user_txn_filter: payload_filter,
+                    pending_ordering: false,
+                    pending_uncommitted_blocks: 0,
+                    recent_max_fill_fraction: 0.0,
+                    block_timestamp: self.time_service.now_unix_time(),
+                },
                 sys_payload_filter,
-                payload_filter,
                 Box::pin(async {}),
-                false,
-                0,
-                0.0,
             )
             .await
         {
             Ok(payload) => payload,
             Err(e) => {
                 error!("error pulling payload: {}", e);
-                (vec![], Payload::empty(self.quorum_store_enabled))
+                (
+                    vec![],
+                    Payload::empty(
+                        self.quorum_store_enabled,
+                        self.allow_batches_without_pos_in_proposal,
+                    ),
+                )
             },
         };
 
@@ -314,7 +334,9 @@ impl DagDriver {
             debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
 
             defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
-            rb.broadcast(node, signature_builder).await
+            rb.broadcast(node, signature_builder)
+                .await
+                .expect("Broadcast cannot fail")
         };
         let certified_broadcast = async move {
             let Ok(certificate) = rx.await else {
@@ -334,7 +356,9 @@ impl DagDriver {
                 certified_node,
                 latest_ledger_info.get_latest_ledger_info(),
             );
-            rb2.broadcast(certified_node_msg, cert_ack_set).await
+            rb2.broadcast(certified_node_msg, cert_ack_set)
+                .await
+                .expect("Broadcast cannot fail until cancelled")
         };
         let core_task = join(node_broadcast, certified_broadcast);
         let author = self.author;

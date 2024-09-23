@@ -45,7 +45,7 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         history: &Vec<String>,
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
-        let mut accounts_to_use =
+        let accounts_to_use =
             self.source_accounts_pool
                 .take_from_pool(num_to_create, true, &mut self.rng);
         if accounts_to_use.is_empty() {
@@ -55,7 +55,6 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
             .iter_mut()
             .flat_map(|account| self.generator.generate_transactions(account, 1, &Vec::new(), false))
             .collect();
-
         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
             destination_accounts_pool.add_to_pool(accounts_to_use);
         }

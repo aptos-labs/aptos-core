@@ -35,8 +35,11 @@ use aptos_rosetta::{
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
-    on_chain_config::GasScheduleV2, transaction::SignedTransaction,
+    account_address::AccountAddress,
+    account_config::CORE_CODE_ADDRESS,
+    chain_id::ChainId,
+    on_chain_config::{GasScheduleV2, OnChainRandomnessConfig},
+    transaction::SignedTransaction,
 };
 use serde_json::json;
 use std::{
@@ -79,6 +82,7 @@ async fn setup_test(
     let (swarm, cli, faucet) = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = EPOCH_DURATION_S;
+            genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
         }))
         .with_init_config(config_fn)
         .with_aptos()
@@ -109,7 +113,6 @@ async fn setup_test(
         Some(aptos_rest_client::Client::new(
             validator.rest_api_endpoint(),
         )),
-        cli.addresses(),
     )
     .await
     .unwrap();
@@ -238,7 +241,7 @@ async fn test_network() {
 
 #[tokio::test]
 async fn test_account_balance() {
-    let (mut swarm, cli, _faucet, rosetta_client) = setup_simple_test(3).await;
+    let (swarm, cli, _faucet, rosetta_client) = setup_simple_test(3).await;
 
     let account_1 = cli.account_id(0);
     let account_2 = cli.account_id(1);
@@ -463,7 +466,7 @@ async fn test_account_balance() {
 }
 
 async fn create_staking_contract(
-    info: &AptosPublicInfo<'_>,
+    info: &AptosPublicInfo,
     account: &mut LocalAccount,
     operator: AccountAddress,
     voter: AccountAddress,
@@ -487,7 +490,7 @@ async fn create_staking_contract(
 }
 
 async fn unlock_stake(
-    info: &AptosPublicInfo<'_>,
+    info: &AptosPublicInfo,
     account: &mut LocalAccount,
     operator: AccountAddress,
     amount: u64,
@@ -505,7 +508,7 @@ async fn unlock_stake(
 }
 
 async fn create_delegation_pool(
-    info: &AptosPublicInfo<'_>,
+    info: &AptosPublicInfo,
     account: &mut LocalAccount,
     commission_percentage: u64,
     sequence_number: u64,
@@ -583,7 +586,7 @@ async fn wait_for_rosetta_block(node_clients: &NodeClients<'_>, block_height: u6
 
 #[tokio::test]
 async fn test_transfer() {
-    let (mut swarm, cli, _faucet, rosetta_client) = setup_simple_test(1).await;
+    let (swarm, cli, _faucet, rosetta_client) = setup_simple_test(1).await;
     let chain_id = swarm.chain_id();
     let client = swarm.aptos_public_info().client().clone();
     let sender = cli.account_id(0);
@@ -724,7 +727,7 @@ async fn test_block() {
         .into_inner();
     let feature_version = gas_schedule.feature_version;
     let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
-        &gas_schedule.to_btree_map(),
+        &gas_schedule.into_btree_map(),
         feature_version,
     )
     .unwrap();
@@ -1099,6 +1102,13 @@ async fn parse_block_transactions(
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::StateCheckpoint(_)
+                ));
+                assert!(transaction.operations.is_empty());
+            },
+            TransactionType::BlockEpilogue => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::BlockEpilogue(_)
                 ));
                 assert!(transaction.operations.is_empty());
             },
@@ -2081,7 +2091,7 @@ async fn create_account_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         txn_expiry_duration.unwrap_or(DEFAULT_MAX_WAIT_DURATION),
@@ -2105,7 +2115,7 @@ async fn simple_transfer_and_wait(
     sender_key: &Ed25519PrivateKey,
     receiver: AccountAddress,
     amount: u64,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     transfer_and_wait(
         node_clients,
         sender_key,
@@ -2128,7 +2138,7 @@ async fn transfer_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         txn_expiry_duration.unwrap_or(DEFAULT_MAX_WAIT_DURATION),
@@ -2153,7 +2163,7 @@ async fn set_operator_and_wait(
     sender_key: &Ed25519PrivateKey,
     old_operator: Option<AccountAddress>,
     new_operator: AccountAddress,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2178,7 +2188,7 @@ async fn set_voter_and_wait(
     sender_key: &Ed25519PrivateKey,
     operator: Option<AccountAddress>,
     new_voter: AccountAddress,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2205,7 +2215,7 @@ async fn create_stake_pool_and_wait(
     voter: Option<AccountAddress>,
     stake_amount: Option<u64>,
     commission_percentage: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2231,7 +2241,7 @@ async fn reset_lockup_and_wait(
     node_clients: &NodeClients<'_>,
     sender_key: &Ed25519PrivateKey,
     operator: Option<AccountAddress>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2255,7 +2265,7 @@ async fn update_commission_and_wait(
     sender_key: &Ed25519PrivateKey,
     operator: Option<AccountAddress>,
     new_commission_percentage: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2280,7 +2290,7 @@ async fn unlock_stake_and_wait(
     sender_key: &Ed25519PrivateKey,
     operator: Option<AccountAddress>,
     amount: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2305,7 +2315,7 @@ async fn distribute_staking_rewards_and_wait(
     sender_key: &Ed25519PrivateKey,
     operator: AccountAddress,
     staker: AccountAddress,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     submit_transaction(
         node_clients.rest_client,
         DEFAULT_MAX_WAIT_DURATION,
@@ -2332,7 +2342,7 @@ async fn submit_transaction<
     rest_client: &aptos_rest_client::Client,
     txn_expiry_duration: Duration,
     transaction_builder: F,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
 
     let txn_hash = transaction_builder(expiry_time.as_secs())
@@ -2348,7 +2358,7 @@ async fn wait_for_transaction(
     rest_client: &aptos_rest_client::Client,
     expiry_time: Duration,
     txn_hash: String,
-) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+) -> Result<UserTransaction, UserTransaction> {
     let hash_value = HashValue::from_str(&txn_hash).unwrap();
     let response = rest_client
         .wait_for_transaction_by_hash(
@@ -2399,7 +2409,7 @@ async fn add_delegated_stake_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
         .add_delegated_stake(
@@ -2432,7 +2442,7 @@ async fn unlock_delegated_stake_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
         .unlock_delegated_stake(
@@ -2464,7 +2474,7 @@ async fn withdraw_undelegated_stake_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, ErrorWrapper> {
+) -> Result<UserTransaction, ErrorWrapper> {
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
         .withdraw_undelegated_stake(
@@ -2490,7 +2500,7 @@ async fn withdraw_undelegated_stake_and_wait(
 async fn test_delegation_pool_operations() {
     const NUM_TXNS_PER_PAGE: u16 = 2;
 
-    let (mut swarm, cli, _, rosetta_client) = setup_test(
+    let (swarm, cli, _, rosetta_client) = setup_test(
         2,
         Arc::new(|_, config, _| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
     )
@@ -2699,5 +2709,5 @@ async fn test_delegation_pool_operations() {
 #[derive(Debug)]
 pub enum ErrorWrapper {
     BeforeSubmission(anyhow::Error),
-    AfterSubmission(Box<UserTransaction>),
+    AfterSubmission(UserTransaction),
 }

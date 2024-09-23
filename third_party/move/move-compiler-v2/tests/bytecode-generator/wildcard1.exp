@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: tuple type `(u64, u64)` is not allowed as a type argument
+  ┌─ tests/bytecode-generator/wildcard1.move:7:13
+  │
+7 │         let _ = tup();
+  │             ^

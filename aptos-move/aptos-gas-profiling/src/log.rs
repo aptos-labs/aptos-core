@@ -87,6 +87,13 @@ pub struct WriteStorage {
     pub refund: Fee,
 }
 
+/// Struct representing the transient (IO) cost of an event.
+#[derive(Debug, Clone)]
+pub struct EventTransient {
+    pub ty: TypeTag,
+    pub cost: InternalGas,
+}
+
 #[derive(Debug, Clone)]
 /// Struct representing the storage cost of an event.
 pub struct EventStorage {
@@ -110,8 +117,11 @@ pub struct ExecutionAndIOCosts {
     pub total: InternalGas,
 
     pub intrinsic_cost: InternalGas,
+    pub keyless_cost: InternalGas,
     pub dependencies: Vec<Dependency>,
     pub call_graph: CallFrame,
+    pub transaction_transient: Option<InternalGas>,
+    pub events_transient: Vec<EventTransient>,
     pub write_set_transient: Vec<WriteTransient>,
 }
 
@@ -229,6 +239,7 @@ impl ExecutionAndIOCosts {
         let mut total = InternalGas::zero();
 
         total += self.intrinsic_cost;
+        total += self.keyless_cost;
 
         for dep in &self.dependencies {
             total += dep.cost;
@@ -242,6 +253,14 @@ impl ExecutionAndIOCosts {
                 | LoadResource { cost, .. }
                 | CreateTy { cost, .. } => total += *cost,
             }
+        }
+
+        if let Some(cost) = self.transaction_transient {
+            total += cost;
+        }
+
+        for event in &self.events_transient {
+            total += event.cost;
         }
 
         for write in &self.write_set_transient {

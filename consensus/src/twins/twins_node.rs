@@ -8,7 +8,7 @@ use crate::{
     network::NetworkTask,
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::PayloadManager,
+    payload_manager::DirectMempoolPayloadManager,
     pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
     rand::rand_gen::storage::in_memory::InMemRandDb,
@@ -27,7 +27,7 @@ use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListen
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_network::{
     application::interface::{NetworkClient, NetworkServiceEvents},
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
         network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
@@ -87,7 +87,6 @@ impl SMRNode {
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
-        let (_, conn_notifs_channel) = conn_notifs_channel::new();
         let network_sender = network::NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
@@ -99,7 +98,7 @@ impl SMRNode {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel, None);
+        let network_events = NetworkEvents::new(consensus_rx, None, true);
         let network_service_events =
             NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
 
@@ -119,7 +118,7 @@ impl SMRNode {
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
-        let _commit_notifier = Arc::from(PayloadManager::DirectMempool);
+        let _commit_notifier = Arc::from(DirectMempoolPayloadManager::new());
         let mut configs = HashMap::new();
         configs.insert(
             ValidatorSet::CONFIG_ID,
@@ -164,6 +163,7 @@ impl SMRNode {
             aptos_time_service::TimeService::real(),
             vtxn_pool,
             Arc::new(InMemRandDb::new()),
+            None,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);

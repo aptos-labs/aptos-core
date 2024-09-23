@@ -34,29 +34,70 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
      var $t5: u64
      var $t6: u64
      # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
   0: $t4 := borrow_local($t0)
      # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `vec`] at line 9
+     #
   1: $t3 := vector::length<#0>($t4)
      # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
   2: $t5 := 1
      # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t5
+     # refs: []
+     #
   3: $t2 := >($t3, $t5)
      # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
   4: if ($t2) goto 5 else goto 9
      # abort state: {aborts}
+     # live vars: $t0
+     # refs: []
+     #
   5: label L0
      # abort state: {aborts}
+     # live vars:
+     # refs: []
+     #
   6: $t6 := 1
      # abort state: {aborts}
+     # live vars: $t6
+     # refs: []
+     #
   7: abort($t6)
      # abort state: {returns}
+     # live vars: $t0
   8: goto 10
      # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
   9: label L1
      # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
  10: label L2
      # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
  11: $t1 := pack m::Option<#0>($t0)
      # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
  12: return $t1
 }

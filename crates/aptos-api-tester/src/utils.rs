@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     consts::{
@@ -15,7 +16,7 @@ use aptos_logger::{error, info};
 use aptos_rest_client::{error::RestError, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
-use std::{env, num::ParseIntError, str::FromStr};
+use std::{env, fmt::Display, num::ParseIntError, str::FromStr};
 
 // Test failure
 
@@ -70,14 +71,14 @@ impl TestName {
     }
 }
 
-impl ToString for TestName {
-    fn to_string(&self) -> String {
+impl Display for TestName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            TestName::NewAccount => "new_account".to_string(),
-            TestName::CoinTransfer => "coin_transfer".to_string(),
-            TestName::TokenV1Transfer => "tokenv1_transfer".to_string(),
-            TestName::PublishModule => "publish_module".to_string(),
-            TestName::ViewFunction => "view_function".to_string(),
+            TestName::NewAccount => write!(f, "new_account"),
+            TestName::CoinTransfer => write!(f, "coin_transfer"),
+            TestName::TokenV1Transfer => write!(f, "tokenv1_transfer"),
+            TestName::PublishModule => write!(f, "publish_module"),
+            TestName::ViewFunction => write!(f, "view_function"),
         }
     }
 }
@@ -90,11 +91,11 @@ pub enum NetworkName {
     Devnet,
 }
 
-impl ToString for NetworkName {
-    fn to_string(&self) -> String {
+impl Display for NetworkName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            NetworkName::Testnet => "testnet".to_string(),
-            NetworkName::Devnet => "devnet".to_string(),
+            NetworkName::Testnet => write!(f, "testnet"),
+            NetworkName::Devnet => write!(f, "devnet"),
         }
     }
 }

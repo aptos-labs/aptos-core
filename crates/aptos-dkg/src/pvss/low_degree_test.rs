@@ -1,4 +1,6 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /// Low-degree test from the SCRAPE paper that checks whether $n$ evaluations encode a degree $\le t-1$
 /// polynomial.
 use crate::{
@@ -190,7 +192,7 @@ impl<'a> LowDegreeTest<'a> {
     /// [CD17e] SCRAPE: Scalable Randomness Attested by Public Entities; by Ignacio Cascudo and
     /// Bernardo David; in Cryptology ePrint Archive, Report 2017/216; 2017;
     /// https://eprint.iacr.org/2017/216
-    fn dual_code_word(self) -> Vec<Scalar> {
+    pub fn dual_code_word(self) -> Vec<Scalar> {
         // println!("dual_code_word   > t: {t}, n: {n}, includes_zero: {includes_zero}");
 
         // Accounts for the size of `f` being the `n` evaluations of f(X) at the roots-of-unity and f(0)

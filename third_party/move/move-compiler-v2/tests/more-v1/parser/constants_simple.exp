@@ -1,0 +1,45 @@
+
+Diagnostics:
+error: Not a valid constant expression.
+  ┌─ tests/more-v1/parser/constants_simple.move:5:21
+  │
+5 │     const C1: u64 = u();
+  │                     ^^^
+  │                     │
+  │                     Invalid call or operation in constant
+
+error: Invalid expression in `const`. Operator `-` result value out of range for `u64`
+  ┌─ tests/more-v1/parser/constants_simple.move:6:21
+  │
+6 │     const C2: u64 = 0 + 1 * 2 % 3 / 4 - 5 >> 6 << 7;
+  │                     ^^^^^^^^^^^^^^^^^^^^^
+
+error: Not a valid constant expression.
+  ┌─ tests/more-v1/parser/constants_simple.move:7:22
+  │
+7 │     const C3: bool = loop ();
+  │                      ^^^^^^^
+  │                      │
+  │                      Invalid statement or expression in constant
+
+error: undeclared `cond`
+  ┌─ tests/more-v1/parser/constants_simple.move:8:24
+  │
+8 │     const C4: u8 = if (cond) 0 else 1;
+  │                        ^^^^
+
+error: Not a valid constant expression.
+  ┌─ tests/more-v1/parser/constants_simple.move:8:20
+  │
+8 │     const C4: u8 = if (cond) 0 else 1;
+  │                    ^^^^^^^^^^^^^^^^^^
+  │                    │
+  │                    Invalid statement or expression in constant
+
+error: Not a valid constant expression.
+  ┌─ tests/more-v1/parser/constants_simple.move:9:38
+  │
+9 │     const C5: vector<vector<bool>> = abort 0;
+  │                                      ^^^^^^^
+  │                                      │
+  │                                      Invalid call or operation in constant

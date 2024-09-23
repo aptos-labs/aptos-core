@@ -22,8 +22,9 @@ module aptos_framework::randomness {
 
     const DST: vector<u8> = b"APTOS_RANDOMNESS";
 
-    /// Randomness APIs calls must originate from a private entry function. Otherwise, test-and-abort attacks are possible.
-    const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
+    /// Randomness APIs calls must originate from a private entry function with
+    /// `#[randomness]` annotation. Otherwise, malicious users can bias randomness result.
+    const E_API_USE_IS_BIASIBLE: u64 = 1;
 
     const MAX_U256: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
 
@@ -44,11 +45,13 @@ module aptos_framework::randomness {
     /// Must be called in tests to initialize the `PerBlockRandomness` resource.
     public fun initialize(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
-        move_to(framework, PerBlockRandomness {
-            epoch: 0,
-            round: 0,
-            seed: option::none(),
-        });
+        if (!exists<PerBlockRandomness>(@aptos_framework)) {
+            move_to(framework, PerBlockRandomness {
+                epoch: 0,
+                round: 0,
+                seed: option::none(),
+            });
+        }
     }
 
     #[test_only]
@@ -71,7 +74,7 @@ module aptos_framework::randomness {
     /// Generate the next 32 random bytes. Repeated calls will yield different results (assuming the collision-resistance
     /// of the hash function).
     fun next_32_bytes(): vector<u8> acquires PerBlockRandomness {
-        assert!(is_safe_call(), E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT);
+        assert!(is_unbiasable(), E_API_USE_IS_BIASIBLE);
 
         let input = DST;
         let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
@@ -89,7 +92,7 @@ module aptos_framework::randomness {
         let c = 0;
         while (c < n) {
             let blob = next_32_bytes();
-            vector::append(&mut v, blob);
+            vector::reverse_append(&mut v, blob);
 
             c = c + 32;
         };
@@ -164,11 +167,6 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u128 = 0;
         while (i < 16) {
-            spec {
-                // TODO: Prove these with proper loop invaraints.
-                assume ret * 256 + 255 <= MAX_U256;
-                assume len(raw) > 0;
-            };
             ret = ret * 256 + (vector::pop_back(&mut raw) as u128);
             i = i + 1;
         };
@@ -190,11 +188,6 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u256 = 0;
         while (i < 32) {
-            spec {
-                // TODO: Prove these with proper loop invaraints.
-                assume ret * 256 + 255 <= MAX_U256;
-                assume len(raw) > 0;
-            };
             ret = ret * 256 + (vector::pop_back(&mut raw) as u256);
             i = i + 1;
         };
@@ -306,6 +299,8 @@ module aptos_framework::randomness {
     /// Generate a permutation of `[0, 1, ..., n-1]` uniformly at random.
     /// If n is 0, returns the empty vector.
     public fun permutation(n: u64): vector<u64> acquires PerBlockRandomness {
+        event::emit(RandomnessGeneratedEvent {});
+
         let values = vector[];
 
         if(n == 0) {
@@ -344,8 +339,6 @@ module aptos_framework::randomness {
             tail = tail - 1;
         };
 
-        event::emit(RandomnessGeneratedEvent {});
-
         values
     }
 
@@ -357,14 +350,14 @@ module aptos_framework::randomness {
     }
 
     /// Compute `(a + b) % m`, assuming `m >= 1, 0 <= a < m, 0<= b < m`.
-    inline fun safe_add_mod(a: u256, b: u256, m: u256): u256 {
+    fun safe_add_mod(a: u256, b: u256, m: u256): u256 {
+        let a_clone = a;
         let neg_b = m - b;
-        if (a < neg_b) {
-            a + b
-        } else {
-            a - neg_b
-        }
+        let a_less = a < neg_b;
+        take_first(if (a_less) { a + b } else { a_clone - neg_b }, if (!a_less) { a_clone - neg_b } else { a + b })
     }
+
+    fun take_first(x: u256, _y: u256 ): u256 { x }
 
     #[verify_only]
     fun safe_add_mod_for_verification(a: u256, b: u256, m: u256): u256 {
@@ -377,12 +370,14 @@ module aptos_framework::randomness {
     }
 
     /// Fetches and increments a transaction-specific 32-byte randomness-related counter.
+    /// Aborts with `E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT` if randomness is not unbiasable.
     native fun fetch_and_increment_txn_counter(): vector<u8>;
 
-    /// Called in each randomness generation function to ensure certain safety invariants.
-    ///  1. Ensure that the TXN that led to the call of this function had a private (or friend) entry function as its TXN payload.
-    ///  2. TBA
-    native fun is_safe_call(): bool;
+    /// Called in each randomness generation function to ensure certain safety invariants, namely:
+    ///  1. The transaction that led to the call of this function had a private (or friend) entry
+    ///     function as its payload.
+    ///  2. The entry function had `#[randomness]` annotation.
+    native fun is_unbiasable(): bool;
 
     #[test]
     fun test_safe_add_mod() {
@@ -403,8 +398,8 @@ module aptos_framework::randomness {
     fun randomness_smoke_test(fx: signer) acquires PerBlockRandomness {
         initialize(&fx);
         set_seed(x"0000000000000000000000000000000000000000000000000000000000000000");
-        // Test cases should always be a safe place to do a randomness call from.
-        assert!(is_safe_call(), 0);
+        // Test cases should always have no bias for any randomness call.
+        assert!(is_unbiasable(), 0);
         let num = u64_integer();
         debug::print(&num);
     }

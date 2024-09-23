@@ -169,7 +169,7 @@ impl DependencyGraph {
         }
     }
 
-    /// Set up [`DepGraph`] with the initial state generated in this universe.
+    /// Set up `DepGraph` with the initial state generated in this universe.
     pub fn setup(&self, executor: &mut FakeExecutor) {
         for node in self.graph.raw_nodes().iter() {
             executor.add_account_data(&node.weight.account_data);

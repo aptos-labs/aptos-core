@@ -10,6 +10,8 @@ use prometheus::{register_int_counter_vec, IntCounterVec};
 pub enum IndexerGrpcStep {
     // [Data Service] New request received.
     DataServiceNewRequestReceived,
+    // [Data Service] Fetching data from in-memory cache.
+    DataServiceFetchingDataFromInMemoryCache,
     // [Data Service] Waiting for data from cache.
     DataServiceWaitingForCacheData,
     // [Data Service] Fetched data from Redis cache.
@@ -56,6 +58,8 @@ pub enum IndexerGrpcStep {
     TableInfoProcessedBatch,
     // [Indexer Table Info] Processed transactions from fullnode
     TableInfoProcessed,
+    // [Indexer Indices] Processed transactions from AptosDB
+    InternalIndexerDBProcessed,
 }
 
 impl IndexerGrpcStep {
@@ -63,6 +67,7 @@ impl IndexerGrpcStep {
         match self {
             // Data service steps
             IndexerGrpcStep::DataServiceNewRequestReceived => "1",
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache => "2.0.0",
             IndexerGrpcStep::DataServiceWaitingForCacheData => "2.0",
             IndexerGrpcStep::DataServiceDataFetchedCache => "2.1",
             IndexerGrpcStep::DataServiceDataFetchedFilestore => "2.2",
@@ -88,6 +93,7 @@ impl IndexerGrpcStep {
             // Table info service steps
             IndexerGrpcStep::TableInfoProcessedBatch => "1",
             IndexerGrpcStep::TableInfoProcessed => "2",
+            IndexerGrpcStep::InternalIndexerDBProcessed => "1",
         }
     }
 
@@ -96,6 +102,9 @@ impl IndexerGrpcStep {
             // Data service steps
             IndexerGrpcStep::DataServiceNewRequestReceived => {
                 "[Data Service] New request received."
+            }
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache => {
+                "[Data Service] Fetching data from in-memory cache."
             }
             IndexerGrpcStep::DataServiceWaitingForCacheData => {
                 "[Data Service] Waiting for data from cache."
@@ -129,6 +138,9 @@ impl IndexerGrpcStep {
             }
             IndexerGrpcStep::TableInfoProcessed => {
                 "[Indexer Table Info] Processed successfully"
+            }
+            IndexerGrpcStep::InternalIndexerDBProcessed => {
+                "[Indexer DB indices] Processed successfully"
             }
         }
     }
@@ -272,12 +284,12 @@ pub fn log_grpc_step(
             duration_in_secs,
             size_in_bytes,
             // Request metadata variables
-            request_name = &request_metadata.processor_name,
-            request_email = &request_metadata.request_email,
-            request_api_key_name = &request_metadata.request_api_key_name,
             processor_name = &request_metadata.processor_name,
+            request_identifier_type = &request_metadata.request_identifier_type,
+            request_identifier = &request_metadata.request_identifier,
+            request_email = &request_metadata.request_email,
+            request_application_name = &request_metadata.request_application_name,
             connection_id = &request_metadata.request_connection_id,
-            request_user_classification = &request_metadata.request_user_classification,
             service_type,
             step = step.get_step(),
             "{}",

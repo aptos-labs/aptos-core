@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::BoundedExecutor;
 use futures::{
@@ -34,6 +35,7 @@ where
 }
 
 #[rustversion::since(1.75)]
+#[allow(dead_code)]
 pub trait ConcurrentStream: Stream {
     fn concurrent_map<Fut, F>(
         self,

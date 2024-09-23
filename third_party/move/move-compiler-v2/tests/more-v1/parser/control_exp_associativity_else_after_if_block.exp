@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/more-v1/parser/control_exp_associativity_else_after_if_block.move:13:28
+   │
+13 │         if (cond) { s1 }.f else s2.f
+   │                            ^^^^
+   │                            │
+   │                            Unexpected 'else'
+   │                            Expected ';'

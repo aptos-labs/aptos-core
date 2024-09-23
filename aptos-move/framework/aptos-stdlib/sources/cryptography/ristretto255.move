@@ -907,7 +907,7 @@ module aptos_std::ristretto255 {
 
     #[test(fx = @std)]
     fun test_basepoint_double_mul(fx: signer) {
-        features::change_feature_flags(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
         let expected = option::extract(&mut new_point_from_bytes(x"be5d615d8b8f996723cdc6e1895b8b6d312cc75d1ffb0259873b99396a38c05a"));
 

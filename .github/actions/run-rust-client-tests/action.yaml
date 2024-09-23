@@ -13,10 +13,10 @@ runs:
   using: composite
   steps:
     # Run a local testnet.
-    - uses: ./.github/actions/run-local-testnet
+    - uses: aptos-labs/actions/run-local-testnet@main
       with:
-        IMAGE_TAG: ${{ inputs.NETWORK }}
-        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+        DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+        CLI_GIT_REF: ${{ inputs.NETWORK }}
         WITH_INDEXER_API: "false"
 
     # Run the tests.

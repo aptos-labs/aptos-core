@@ -1,13 +1,11 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    on_chain_config::CurrentTimeMicroseconds,
-    transaction::{
-        authenticator::{
-            AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
-        },
-        SignedTransaction,
+use crate::transaction::{
+    authenticator::{
+        AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
     },
+    SignedTransaction,
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
@@ -41,6 +39,7 @@ pub use bn254_circom::{
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Proof, Groth16ProofAndStatement, ZeroKnowledgeSig};
 pub use groth16_vk::Groth16VerificationKey;
+use move_core_types::account_address::AccountAddress;
 pub use openid_sig::{Claims, OpenIdSig};
 pub use zkp_sig::ZKP;
 
@@ -98,7 +97,7 @@ pub struct KeylessSignature {
     /// A short lived public key used to verify the `ephemeral_signature`.
     pub ephemeral_pubkey: EphemeralPublicKey,
 
-    /// A signature ove the transaction and, if present, the ZKP, under `ephemeral_pubkey`.
+    /// A signature over the transaction and, if present, the ZKP, under `ephemeral_pubkey`.
     /// The ZKP is included in this signature to prevent malleability attacks.
     pub ephemeral_signature: EphemeralSignature,
 }
@@ -132,7 +131,7 @@ pub struct JWTHeader {
 }
 
 impl KeylessSignature {
-    /// A reasonable upper bound for the number of bytes we expect in a keyless public key. This is
+    /// A reasonable upper bound for the number of bytes we expect in a keyless signature. This is
     /// enforced by our full nodes when they receive TXNs.
     pub const MAX_LEN: usize = 4000;
 
@@ -141,8 +140,8 @@ impl KeylessSignature {
         Ok(header)
     }
 
-    pub fn verify_expiry(&self, current_time: &CurrentTimeMicroseconds) -> anyhow::Result<()> {
-        let block_time = UNIX_EPOCH + Duration::from_micros(current_time.microseconds);
+    pub fn verify_expiry(&self, current_time_microseconds: u64) -> anyhow::Result<()> {
+        let block_time = UNIX_EPOCH + Duration::from_micros(current_time_microseconds);
         let expiry_time = seconds_from_epoch(self.exp_date_secs);
 
         if block_time > expiry_time {
@@ -154,18 +153,16 @@ impl KeylessSignature {
 }
 
 /// The pepper is used to create a _hiding_ identity commitment (IDC) when deriving a keyless address.
-/// We fix its size at `poseidon_bn254::BYTES_PACKED_PER_SCALAR` to avoid extra hashing work when
+/// We fix its size at `poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR` to avoid extra hashing work when
 /// computing the public inputs hash.
 ///
 /// This value should **NOT* be changed since on-chain addresses are based on it (e.g.,
 /// hashing with a larger pepper would lead to a different address).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Pepper(pub(crate) [u8; poseidon_bn254::BYTES_PACKED_PER_SCALAR]);
+pub struct Pepper(pub(crate) [u8; poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR]);
 
 impl Pepper {
-    // TODO(keyless) Account address uses Self::LENGTH instead of Self::NUM_BYTES. Consider
-    // renaming to be consistent?
-    pub const NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const NUM_BYTES: usize = poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR;
 
     pub fn new(bytes: [u8; Self::NUM_BYTES]) -> Self {
         Self(bytes)
@@ -251,13 +248,16 @@ impl IdCommitment {
         uid_key: &str,
         uid_val: &str,
     ) -> anyhow::Result<Self> {
-        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, Self::MAX_AUD_VAL_BYTES)?;
+        let aud_val_hash =
+            poseidon_bn254::keyless::pad_and_hash_string(aud, Self::MAX_AUD_VAL_BYTES)?;
         // println!("aud_val_hash: {}", aud_val_hash);
-        let uid_key_hash = poseidon_bn254::pad_and_hash_string(uid_key, Self::MAX_UID_KEY_BYTES)?;
+        let uid_key_hash =
+            poseidon_bn254::keyless::pad_and_hash_string(uid_key, Self::MAX_UID_KEY_BYTES)?;
         // println!("uid_key_hash: {}", uid_key_hash);
-        let uid_val_hash = poseidon_bn254::pad_and_hash_string(uid_val, Self::MAX_UID_VAL_BYTES)?;
+        let uid_val_hash =
+            poseidon_bn254::keyless::pad_and_hash_string(uid_val, Self::MAX_UID_VAL_BYTES)?;
         // println!("uid_val_hash: {}", uid_val_hash);
-        let pepper_scalar = poseidon_bn254::pack_bytes_to_one_scalar(pepper.0.as_slice())?;
+        let pepper_scalar = poseidon_bn254::keyless::pack_bytes_to_one_scalar(pepper.0.as_slice())?;
         // println!("Pepper Fr: {}", pepper_scalar);
 
         let fr = poseidon_bn254::hash_scalars(vec![
@@ -293,7 +293,7 @@ impl TryFrom<&[u8]> for IdCommitment {
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct KeylessPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
-    /// e.g., https://accounts.google.com
+    /// e.g., <https://accounts.google.com>
     pub iss_val: String,
 
     /// SNARK-friendly commitment to:
@@ -304,6 +304,59 @@ pub struct KeylessPublicKey {
     /// e.g., H(aud || uid_key || uid_val || pepper), where `pepper` is the commitment's randomness used to hide
     ///  `aud` and `sub`.
     pub idc: IdCommitment,
+}
+
+/// Unlike a normal keyless account, a "federated" keyless account will accept JWKs published at a
+/// specific contract address.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct FederatedKeylessPublicKey {
+    pub jwk_addr: AccountAddress,
+    pub pk: KeylessPublicKey,
+}
+
+impl FederatedKeylessPublicKey {
+    /// A reasonable upper bound for the number of bytes we expect in a federated keyless public key.
+    /// This is enforced by our full nodes when they receive TXNs.
+    pub const MAX_LEN: usize = AccountAddress::LENGTH + KeylessPublicKey::MAX_LEN;
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
+    }
+}
+
+impl TryFrom<&[u8]> for FederatedKeylessPublicKey {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bcs::from_bytes::<FederatedKeylessPublicKey>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum AnyKeylessPublicKey {
+    Normal(KeylessPublicKey),
+    Federated(FederatedKeylessPublicKey),
+}
+
+impl AnyKeylessPublicKey {
+    pub fn inner_keyless_pk(&self) -> &KeylessPublicKey {
+        match self {
+            AnyKeylessPublicKey::Normal(pk) => pk,
+            AnyKeylessPublicKey::Federated(fed_pk) => &fed_pk.pk,
+        }
+    }
+}
+
+impl From<AnyKeylessPublicKey> for AnyPublicKey {
+    fn from(apk: AnyKeylessPublicKey) -> Self {
+        match apk {
+            AnyKeylessPublicKey::Normal(pk) => AnyPublicKey::Keyless { public_key: pk },
+            AnyKeylessPublicKey::Federated(fed_pk) => {
+                AnyPublicKey::FederatedKeyless { public_key: fed_pk }
+            },
+        }
+    }
 }
 
 impl KeylessPublicKey {
@@ -319,25 +372,41 @@ impl KeylessPublicKey {
 impl TryFrom<&[u8]> for KeylessPublicKey {
     type Error = CryptoMaterialError;
 
-    fn try_from(_value: &[u8]) -> Result<Self, Self::Error> {
-        bcs::from_bytes::<KeylessPublicKey>(_value)
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bcs::from_bytes::<KeylessPublicKey>(bytes)
             .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
 pub fn get_authenticators(
     transaction: &SignedTransaction,
-) -> anyhow::Result<Vec<(KeylessPublicKey, KeylessSignature)>> {
+) -> anyhow::Result<Vec<(AnyKeylessPublicKey, KeylessSignature)>> {
     // Check all the signers in the TXN
     let single_key_authenticators = transaction
         .authenticator_ref()
         .to_single_key_authenticators()?;
     let mut authenticators = Vec::with_capacity(MAX_NUM_OF_SIGS);
     for authenticator in single_key_authenticators {
-        if let (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) =
-            (authenticator.public_key(), authenticator.signature())
-        {
-            authenticators.push((public_key.clone(), signature.clone()))
+        match (authenticator.public_key(), authenticator.signature()) {
+            (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) => {
+                authenticators.push((
+                    AnyKeylessPublicKey::Normal(public_key.clone()),
+                    signature.clone(),
+                ))
+            },
+            (
+                AnyPublicKey::FederatedKeyless { public_key },
+                AnySignature::Keyless { signature },
+            ) => authenticators.push((
+                AnyKeylessPublicKey::Federated(FederatedKeylessPublicKey {
+                    jwk_addr: public_key.jwk_addr,
+                    pk: public_key.pk.clone(),
+                }),
+                signature.clone(),
+            )),
+            _ => {
+                // ignore.
+            },
         }
     }
     Ok(authenticators)

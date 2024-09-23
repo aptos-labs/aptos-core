@@ -7,6 +7,7 @@ pub mod direct_mempool_quorum_store;
 
 pub(crate) mod batch_coordinator;
 pub(crate) mod batch_generator;
+pub(crate) mod batch_proof_queue;
 pub(crate) mod batch_requester;
 pub(crate) mod batch_store;
 pub(crate) mod network_listener;

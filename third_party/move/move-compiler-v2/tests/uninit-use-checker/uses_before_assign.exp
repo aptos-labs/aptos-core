@@ -13,10 +13,8 @@ fun <SELF>_0::main() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-     var $t3: u64
-  0: $t3 := +($t0, $t1)
-  1: $t2 := infer($t3)
-  2: return ()
+  0: $t2 := +($t0, $t1)
+  1: return ()
 }
 
 
@@ -40,11 +38,8 @@ fun <SELF>_0::main() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-     var $t3: u64
-     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t2 }
-  0: $t3 := +($t0, $t1)
      # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
-  1: $t2 := infer($t3)
+  0: $t2 := +($t0, $t1)
      # before: { no: $t0, $t1 }, after: { no: $t0, $t1 }
-  2: return ()
+  1: return ()
 }

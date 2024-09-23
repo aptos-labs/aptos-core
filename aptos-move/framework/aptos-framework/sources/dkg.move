@@ -4,6 +4,7 @@ module aptos_framework::dkg {
     use std::option;
     use std::option::Option;
     use aptos_framework::event::emit;
+    use aptos_framework::randomness_config::RandomnessConfig;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::validator_consensus_info::ValidatorConsensusInfo;
@@ -16,6 +17,7 @@ module aptos_framework::dkg {
     /// This can be considered as the public input of DKG.
     struct DKGSessionMetadata has copy, drop, store {
         dealer_epoch: u64,
+        randomness_config: RandomnessConfig,
         dealer_validator_set: vector<ValidatorConsensusInfo>,
         target_validator_set: vector<ValidatorConsensusInfo>,
     }
@@ -43,25 +45,29 @@ module aptos_framework::dkg {
     /// Called in genesis to initialize on-chain states.
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        move_to<DKGState>(
-            aptos_framework,
-            DKGState {
-                last_completed: std::option::none(),
-                in_progress: std::option::none(),
-            }
-        );
+        if (!exists<DKGState>(@aptos_framework)) {
+            move_to<DKGState>(
+                aptos_framework,
+                DKGState {
+                    last_completed: std::option::none(),
+                    in_progress: std::option::none(),
+                }
+            );
+        }
     }
 
     /// Mark on-chain DKG state as in-progress. Notify validators to start DKG.
     /// Abort if a DKG is already in progress.
     public(friend) fun start(
         dealer_epoch: u64,
+        randomness_config: RandomnessConfig,
         dealer_validator_set: vector<ValidatorConsensusInfo>,
         target_validator_set: vector<ValidatorConsensusInfo>,
     ) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
         let new_session_metadata = DKGSessionMetadata {
             dealer_epoch,
+            randomness_config,
             dealer_validator_set,
             target_validator_set,
         };

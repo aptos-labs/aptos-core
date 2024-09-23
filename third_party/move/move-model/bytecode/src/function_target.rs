@@ -269,7 +269,18 @@ impl<'env> FunctionTarget<'env> {
     /// should produce correct English whether a name is available or not.
     pub fn get_local_name_for_error_message(&self, temp: TempIndex) -> String {
         if let Some(sym) = self.data.local_names.get(&temp) {
-            format!("local `{}`", sym.display(self.global_env().symbol_pool()))
+            let sym_str = sym.display(self.global_env().symbol_pool()).to_string();
+            if sym_str == "return" {
+                "return value".to_owned()
+            } else if let Some(mut number_str) = sym_str.strip_prefix("return[") {
+                if number_str.ends_with(']') {
+                    number_str = &number_str[0..number_str.len() - 1]
+                }
+                let num = number_str.parse::<usize>().unwrap_or_default();
+                format!("return value {}", num + 1)
+            } else {
+                format!("local `{}`", sym.display(self.global_env().symbol_pool()))
+            }
         } else {
             "value".to_owned()
         }
@@ -381,19 +392,29 @@ impl<'env> FunctionTarget<'env> {
         res
     }
 
-    /// Get the set of locals that have been borrowed in the function.
-    pub fn get_borrowed_locals(&self) -> BTreeSet<TempIndex> {
-        self.get_bytecode()
-            .iter()
-            .filter_map(|bc| {
-                if let Bytecode::Call(_, _, Operation::BorrowLoc, srcs, _) = bc {
-                    // BorrowLoc should have only one source.
-                    srcs.first().cloned()
-                } else {
-                    None
-                }
-            })
-            .collect()
+    /// Get the set of locals which need to be pinned (cannot be eliminated) as they are borrowed
+    /// from or used in specs. If `include_drop` is true, we also include temps which are dropped.
+    pub fn get_pinned_temps(&self, include_drop: bool) -> BTreeSet<TempIndex> {
+        let mut result = BTreeSet::new();
+        for bc in self.get_bytecode() {
+            match bc {
+                Bytecode::Call(_, _, Operation::BorrowLoc, args, _) => {
+                    result.insert(args[0]);
+                },
+                Bytecode::Call(_, _, Operation::Drop, args, _) if include_drop => {
+                    result.insert(args[0]);
+                },
+                Bytecode::SpecBlock(_, spec) => {
+                    // All Temporaries used in specs need to be pinned.
+                    result.append(&mut spec.used_temporaries());
+                },
+                Bytecode::Prop(_, _, exp) => {
+                    result.append(&mut exp.used_temporaries());
+                },
+                _ => {},
+            }
+        }
+        result
     }
 
     /// Returns all the mentioned locals (in non-spec-only bytecode instructions).

@@ -8,5 +8,5 @@ error[E03002]: unbound module
   ┌─ tests/move_check/naming/unbound_module.move:4:9
   │
 4 │         X::foo();
-  │         ^ Unbound module alias 'X'
+  │         ^ Unbound module or type alias 'X'
 

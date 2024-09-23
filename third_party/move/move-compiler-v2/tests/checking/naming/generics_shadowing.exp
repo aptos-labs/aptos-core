@@ -12,13 +12,4 @@ module 0x2::M {
           }
         }
     }
-    spec fun $foo<S>(s: #0): #0 {
-        {
-          let s: #0 = s;
-          {
-            let s: #0 = s;
-            s
-          }
-        }
-    }
 } // end 0x2::M

@@ -3,10 +3,11 @@
 
 use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     error::error_kind,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    payload_manager::PayloadManager,
+    payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
         batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
@@ -24,7 +25,9 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
-use aptos_consensus_types::{common::Author, request_response::GetPayloadCommand};
+use aptos_consensus_types::{
+    common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
+};
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -46,13 +49,16 @@ pub enum QuorumStoreBuilder {
 impl QuorumStoreBuilder {
     pub fn init_payload_manager(
         &mut self,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
-        Arc<PayloadManager>,
+        Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => inner.init_payload_manager(),
-            QuorumStoreBuilder::QuorumStore(inner) => inner.init_payload_manager(),
+            QuorumStoreBuilder::QuorumStore(inner) => {
+                inner.init_payload_manager(consensus_publisher)
+            },
         }
     }
 
@@ -94,10 +100,10 @@ impl DirectMempoolInnerBuilder {
     fn init_payload_manager(
         &mut self,
     ) -> (
-        Arc<PayloadManager>,
+        Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
-        (Arc::from(PayloadManager::DirectMempool), None)
+        (Arc::from(DirectMempoolPayloadManager::new()), None)
     }
 
     fn start(self) {
@@ -122,6 +128,7 @@ pub struct InnerBuilder {
     aptos_db: Arc<dyn DbReader>,
     network_sender: NetworkSender,
     verifier: ValidatorVerifier,
+    proof_cache: ProofCache,
     backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
@@ -155,6 +162,7 @@ impl InnerBuilder {
         aptos_db: Arc<dyn DbReader>,
         network_sender: NetworkSender,
         verifier: ValidatorVerifier,
+        proof_cache: ProofCache,
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
@@ -193,6 +201,7 @@ impl InnerBuilder {
             aptos_db,
             network_sender,
             verifier,
+            proof_cache,
             backend,
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
@@ -259,6 +268,7 @@ impl InnerBuilder {
         batch_reader
     }
 
+    #[allow(clippy::unwrap_used)]
     fn spawn_quorum_store(
         mut self,
     ) -> (
@@ -311,6 +321,8 @@ impl InnerBuilder {
             let batch_coordinator = BatchCoordinator::new(
                 self.author,
                 self.network_sender.clone(),
+                self.proof_manager_cmd_tx.clone(),
+                self.batch_generator_cmd_tx.clone(),
                 self.batch_store.clone().unwrap(),
                 self.config.receiver_max_batch_txns as u64,
                 self.config.receiver_max_batch_bytes as u64,
@@ -331,6 +343,7 @@ impl InnerBuilder {
             self.author,
             self.batch_reader.clone().unwrap(),
             self.batch_generator_cmd_tx.clone(),
+            self.proof_cache,
             self.broadcast_proofs,
         );
         spawn_named!(
@@ -350,6 +363,9 @@ impl InnerBuilder {
                 .back_pressure
                 .backlog_per_validator_batch_limit_count
                 * self.num_validators,
+            self.batch_store.clone().unwrap(),
+            self.config.allow_batches_without_pos_in_proposal,
+            self.config.enable_opt_quorum_store,
         );
         spawn_named!(
             "proof_manager",
@@ -416,17 +432,20 @@ impl InnerBuilder {
 
     fn init_payload_manager(
         &mut self,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
-        Arc<PayloadManager>,
+        Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
         let batch_reader = self.create_batch_store();
 
         (
-            Arc::from(PayloadManager::InQuorumStore(
+            Arc::from(QuorumStorePayloadManager::new(
                 batch_reader,
                 // TODO: remove after splitting out clean requests
                 self.coordinator_tx.clone(),
+                consensus_publisher,
+                self.verifier.get_ordered_account_addresses(),
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

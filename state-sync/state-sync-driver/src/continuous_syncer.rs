@@ -203,11 +203,8 @@ impl<
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
     ) -> Result<(), Error> {
-        for _ in 0..self
-            .driver_configuration
-            .config
-            .max_consecutive_stream_notifications
-        {
+        let state_sync_driver_config = &self.driver_configuration.config;
+        for _ in 0..state_sync_driver_config.max_consecutive_stream_notifications {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
@@ -268,7 +265,7 @@ impl<
 
     /// Returns the highest synced version and epoch in storage
     fn get_highest_synced_version_and_epoch(&self) -> Result<(Version, Epoch), Error> {
-        let highest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
+        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
         let highest_synced_epoch = utils::fetch_latest_epoch_state(self.storage.clone())?.epoch;
 
         Ok((highest_synced_version, highest_synced_epoch))

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     algebra::{lagrange::lagrange_coefficients, polynomials::get_powers_of_tau},
@@ -137,7 +138,7 @@ impl WeightedVUF for PinkasWUF {
             [&pks_combined, &pp.g_hat.neg()].into_iter(),
         ) != Gt::identity()
         {
-            bail!("RPKs were not correctly randomized.");
+            panic!("RPKs were not correctly randomized.");
         }
 
         Ok((delta, pk))

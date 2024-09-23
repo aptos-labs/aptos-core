@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{GroupNetEm, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetEm, Test};
+use aptos_forge::{
+    GroupNetEm, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos,
+    SwarmNetEm, Test,
+};
 use aptos_logger::info;
 use aptos_types::PeerId;
+use async_trait::async_trait;
 use itertools::{self, EitherOrBoth, Itertools};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 /// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv
 /// The four regions were hand-picked from the dataset to simulate a multi-region setup
@@ -120,25 +124,39 @@ impl InterRegionNetEmConfig {
         let group_netems: Vec<GroupNetEm> = peer_groups
             .iter()
             .combinations(2)
-            .map(|comb| {
+            .flat_map(|comb| {
                 let (from_region, from_chunk, stats) = &comb[0];
                 let (to_region, to_chunk, _) = &comb[1];
 
-                let (bandwidth, latency) = stats.get(to_region).unwrap();
-                let netem = GroupNetEm {
-                    name: format!("{}-to-{}-netem", from_region, to_region),
-                    source_nodes: from_chunk.to_vec(),
-                    target_nodes: to_chunk.to_vec(),
-                    delay_latency_ms: *latency as u64,
-                    delay_jitter_ms: self.delay_jitter_ms,
-                    delay_correlation_percentage: self.delay_correlation_percentage,
-                    loss_percentage: self.loss_percentage,
-                    loss_correlation_percentage: self.loss_correlation_percentage,
-                    rate_in_mbps: *bandwidth / 1e6 as u64,
-                };
-                info!("inter-region netem {:?}", netem);
+                let (bandwidth, rtt_latency) = stats.get(to_region).unwrap();
+                let hop_latency = rtt_latency / 2.0;
+                let netems = [
+                    GroupNetEm {
+                        name: format!("{}-to-{}-netem", from_region, to_region),
+                        source_nodes: from_chunk.to_vec(),
+                        target_nodes: to_chunk.to_vec(),
+                        delay_latency_ms: hop_latency as u64,
+                        delay_jitter_ms: self.delay_jitter_ms,
+                        delay_correlation_percentage: self.delay_correlation_percentage,
+                        loss_percentage: self.loss_percentage,
+                        loss_correlation_percentage: self.loss_correlation_percentage,
+                        rate_in_mbps: *bandwidth / 1e6 as u64,
+                    },
+                    GroupNetEm {
+                        name: format!("{}-to-{}-netem", to_region, from_region),
+                        source_nodes: to_chunk.to_vec(),
+                        target_nodes: from_chunk.to_vec(),
+                        delay_latency_ms: hop_latency as u64,
+                        delay_jitter_ms: self.delay_jitter_ms,
+                        delay_correlation_percentage: self.delay_correlation_percentage,
+                        loss_percentage: self.loss_percentage,
+                        loss_correlation_percentage: self.loss_correlation_percentage,
+                        rate_in_mbps: *bandwidth / 1e6 as u64,
+                    },
+                ];
+                info!("inter-region netem {:?}", netems);
 
-                netem
+                netems
             })
             .collect();
 
@@ -237,9 +255,16 @@ impl MultiRegionNetworkEmulationTest {
     /// Creates a new SwarmNetEm to be injected via chaos. Note: network
     /// emulation is only done for the validators in the swarm (and not
     /// the fullnodes).
-    fn create_netem_chaos(&self, swarm: &mut dyn Swarm) -> SwarmNetEm {
-        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
-        let all_vfns = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+    async fn create_netem_chaos(
+        &self,
+        swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+    ) -> SwarmNetEm {
+        let (all_validators, all_vfns) = {
+            let swarm = swarm.read().await;
+            let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+            let all_vfns = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+            (all_validators, all_vfns)
+        };
 
         let all_pairs: Vec<_> = all_validators
             .iter()
@@ -295,26 +320,34 @@ pub fn create_multi_region_swarm_network_chaos(
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for MultiRegionNetworkEmulationTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        let chaos = self.create_netem_chaos(ctx.swarm);
-        ctx.runtime
-            .block_on(ctx.swarm.inject_chaos(SwarmChaos::NetEm(chaos)))?;
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
+        let chaos = self.create_netem_chaos(ctx.swarm.clone()).await;
+        ctx.swarm
+            .write()
+            .await
+            .inject_chaos(SwarmChaos::NetEm(chaos))
+            .await?;
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
-        let chaos = self.create_netem_chaos(ctx.swarm);
-        ctx.runtime
-            .block_on(ctx.swarm.remove_chaos(SwarmChaos::NetEm(chaos)))?;
+    async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
+        let chaos = self.create_netem_chaos(ctx.swarm.clone()).await;
+        ctx.swarm
+            .write()
+            .await
+            .remove_chaos(SwarmChaos::NetEm(chaos))
+            .await?;
         Ok(())
     }
 }
 
+#[async_trait]
 impl NetworkTest for MultiRegionNetworkEmulationTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }
 
