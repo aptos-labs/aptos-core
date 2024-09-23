@@ -360,8 +360,7 @@ impl LedgerInfoWithVerifiedSignatures {
         &self,
         verifier: &ValidatorVerifier,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        let aggregated_sig =
-            verifier.aggregate_signatures(self.partial_sigs.signatures_iter())?;
+        let aggregated_sig = verifier.aggregate_signatures(self.partial_sigs.signatures_iter())?;
         Ok(LedgerInfoWithSignatures::new(
             self.ledger_info.clone(),
             aggregated_sig,
@@ -485,7 +484,7 @@ impl LedgerInfoWithUnverifiedSignatures {
             .signatures_iter()
             .chain(self.unverified_signatures.signatures_iter());
 
-        Ok(epoch_state.verifier.aggregate_signatures(all_signatures)?)
+        epoch_state.verifier.aggregate_signatures(all_signatures)
     }
 
     /// Merge unverified signatures into verified signatures if they are valid.

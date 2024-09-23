@@ -84,7 +84,9 @@ fn sign_ledger_info(
             .map(|s| (s.author(), s.sign(ledger_info).unwrap()))
             .collect(),
     );
-    verifier.aggregate_signatures(partial_sig.signatures_iter()).unwrap()
+    verifier
+        .aggregate_signatures(partial_sig.signatures_iter())
+        .unwrap()
 }
 
 fn mock_ledger_info(
