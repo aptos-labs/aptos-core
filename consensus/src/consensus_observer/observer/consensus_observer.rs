@@ -640,16 +640,16 @@ impl ConsensusObserver {
         // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
         if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
-            if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to verify ordered proof! Ignoring: {:?}, Error: {:?}",
-                        ordered_block.proof_block_info(),
-                        error
-                    ))
-                );
-                return;
-            }
+            // if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
+            //     warn!(
+            //         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+            //             "Failed to verify ordered proof! Ignoring: {:?}, Error: {:?}",
+            //             ordered_block.proof_block_info(),
+            //             error
+            //         ))
+            //     );
+            //     return;
+            // }
         } else {
             // Drop the block and log an error (the block should always be for the current epoch)
             error!(
