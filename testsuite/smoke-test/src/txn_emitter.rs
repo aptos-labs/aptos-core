@@ -7,8 +7,9 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_forge::{
-    args::TransactionTypeArg, emitter::NumAccountsMode, EmitJobMode, EmitJobRequest, EntryPoints,
-    NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats, WorkflowProgress,
+    args::TransactionTypeArg, emitter::NumAccountsMode, EconiaFlowType, EmitJobMode,
+    EmitJobRequest, EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats,
+    WorkflowKind, WorkflowProgress,
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use rand::{rngs::OsRng, SeedableRng};
@@ -63,10 +64,16 @@ async fn test_txn_emmitter() {
         vec![
             vec![(
                 TransactionType::Workflow {
-                    workflow_kind: WorkflowKind::Econia { num_users: 100 },
+                    workflow_kind: WorkflowKind::Econia {
+                        num_users: 100,
+                        flow_type: EconiaFlowType::Basic,
+                        num_markets: 1,
+                        reuse_accounts_for_orders: false,
+                        publish_packages: false,
+                    },
                     num_modules: 1,
-                    move_stages_by_phase: true,
                     use_account_pool: true,
+                    progress_type: WorkflowProgress::MoveByPhases,
                 },
                 1,
             )],

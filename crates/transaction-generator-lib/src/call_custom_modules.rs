@@ -12,9 +12,11 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use std::{borrow::Borrow, sync::{Arc, atomic::AtomicU64}};
-use move_core_types::identifier::Identifier;
+use rand::{rngs::StdRng, SeedableRng};
+use std::{
+    borrow::Borrow,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
@@ -25,7 +27,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &TransactionFactory,
         &mut StdRng,
         u64,
-        &Vec<String>,
+        &[String],
         bool,
     ) -> Vec<SignedTransaction>
     + Send
@@ -91,13 +93,14 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
         &mut self,
         account: &LocalAccount,
         _num_to_create: usize,
-        history: &Vec<String>,
+        history: &[String],
         market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let mut all_requests = Vec::with_capacity(self.packages.len());
 
         for (package, publisher) in self.packages.iter() {
-            self.txn_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.txn_counter
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let mut requests = (self.txn_generator)(
                 account,
                 package,
@@ -106,7 +109,7 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
                 &mut self.rng,
                 self.txn_counter.load(std::sync::atomic::Ordering::Relaxed),
                 history,
-                market_maker
+                market_maker,
             );
             all_requests.append(&mut requests);
         }
@@ -215,7 +218,10 @@ impl CustomModulesDelegationGeneratorCreator {
         publisher_balance: Option<u64>,
         publish_packages: bool,
     ) -> Vec<(Package, LocalAccount)> {
-        let mut rng = StdRng::from_seed([51,25,26,63,61,14,94,14,11,18,13,43,16,13,54,72,147,18,102,97,45,71,35,58,28,59,8,1,5,23,98,90]);
+        let mut rng = StdRng::from_seed([
+            51, 25, 26, 63, 61, 14, 94, 14, 11, 18, 13, 43, 16, 13, 54, 72, 147, 18, 102, 97, 45,
+            71, 35, 58, 28, 59, 8, 1, 5, 23, 98, 90,
+        ]);
         let mut requests_create = Vec::with_capacity(num_modules);
         let mut requests_publish = Vec::with_capacity(num_modules);
         let mut package_handler = PackageHandler::new(package_name);
@@ -262,25 +268,32 @@ impl CustomModulesDelegationGeneratorCreator {
                 .unwrap();
         }
 
-        info!(
-            "Publishing {} copies of package {}",
-            requests_publish.len(),
-            package_name
-        );
-        txn_executor
-            .execute_transactions(&requests_publish)
-            .await
-            .inspect_err(|err| error!("Failed to publish test package {}: {:#}", package_name, err))
-            .unwrap();
+        if publish_packages {
+            info!(
+                "Publishing {} copies of package {}",
+                requests_publish.len(),
+                package_name
+            );
+            txn_executor
+                .execute_transactions(&requests_publish)
+                .await
+                .inspect_err(|err| {
+                    error!("Failed to publish test package {}: {:#}", package_name, err)
+                })
+                .unwrap();
 
-        info!("Done publishing {} packages", packages.len());
+            info!("Done publishing {} packages", packages.len());
+        }
 
         packages
     }
 }
 
 impl TransactionGeneratorCreator for CustomModulesDelegationGeneratorCreator {
-    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(
+        &self,
+        txn_counter: Arc<AtomicU64>,
+    ) -> Box<dyn TransactionGenerator> {
         Box::new(CustomModulesDelegationGenerator::new(
             StdRng::from_entropy(),
             self.txn_factory.clone(),

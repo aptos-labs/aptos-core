@@ -11,7 +11,6 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use move_core_types::identifier::Identifier;
 use args::TransactionTypeArg;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
@@ -20,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicUsize, AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
     time::Duration,
@@ -32,13 +31,13 @@ pub mod args;
 mod batch_transfer;
 mod bounded_batch_wrapper;
 mod call_custom_modules;
+pub mod econia_order_generator;
 mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
 mod transaction_mix_generator;
 mod workflow_delegator;
-pub mod econia_order_generator;
 
 use self::{
     account_generator::AccountGeneratorCreator,
@@ -95,6 +94,7 @@ pub enum EconiaFlowType {
     Mixed,
     Market,
     Real,
+}
 
 #[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
 pub enum AccountType {
@@ -105,7 +105,10 @@ pub enum AccountType {
 
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
-    CreateMintBurn { count: usize, creation_balance: u64 },
+    CreateMintBurn {
+        count: usize,
+        creation_balance: u64,
+    },
     // Places bid and ask limit orders at random price
     Econia {
         num_users: usize,
@@ -143,14 +146,17 @@ pub trait TransactionGenerator: Sync + Send {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-        history: &Vec<String>,
+        history: &[String],
         market_maker: bool,
     ) -> Vec<SignedTransaction>;
 }
 
 #[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
-    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator>;
+    fn create_transaction_generator(
+        &self,
+        txn_counter: Arc<AtomicU64>,
+    ) -> Box<dyn TransactionGenerator>;
 }
 
 pub struct CounterState {

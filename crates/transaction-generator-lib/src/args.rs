@@ -168,17 +168,10 @@ impl TransactionTypeArg {
             TransactionTypeArg::AccountResource10KB => {
                 call_custom_module(EntryPoints::BytesMakeOrChange {
                     data_length: Some(10 * 1024),
-                },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+                })
             },
             TransactionTypeArg::EmitEvents => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::EmitEvents { count: 10000 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
-            TransactionTypeArg::ModifyGlobalResource => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::IncGlobal,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -358,7 +351,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -370,7 +365,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -382,7 +379,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -394,7 +393,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -406,7 +407,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: false,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -418,7 +421,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: false,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -430,7 +435,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: false,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -442,7 +449,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: false,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -454,7 +463,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -466,7 +477,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -478,7 +491,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -490,11 +505,13 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::EconiaReal => TransactionType::Workflow { 
+            TransactionTypeArg::EconiaReal => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
                     num_users: 20000,
                     flow_type: crate::EconiaFlowType::Real,
@@ -502,7 +519,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -514,7 +533,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -526,7 +547,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -538,7 +561,9 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -550,45 +575,59 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 60,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::EconiaMarket1MarketReuseAccountsNoPublish => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::Econia {
-                    num_users: 20000,
-                    flow_type: crate::EconiaFlowType::Market,
-                    num_markets: 1,
-                    reuse_accounts_for_orders: true,
-                    publish_packages: false,
-                },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::EconiaMarket1MarketReuseAccountsNoPublish => {
+                TransactionType::Workflow {
+                    workflow_kind: WorkflowKind::Econia {
+                        num_users: 20000,
+                        flow_type: crate::EconiaFlowType::Market,
+                        num_markets: 1,
+                        reuse_accounts_for_orders: true,
+                        publish_packages: false,
+                    },
+                    progress_type: WorkflowProgress::WhenDone {
+                        delay_between_stages_s: 60,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
             },
-            TransactionTypeArg::EconiaMarket10MarketReuseAccountsNoPublish => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::Econia {
-                    num_users: 200000,
-                    flow_type: crate::EconiaFlowType::Market,
-                    num_markets: 10,
-                    reuse_accounts_for_orders: true,
-                    publish_packages: false,
-                },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::EconiaMarket10MarketReuseAccountsNoPublish => {
+                TransactionType::Workflow {
+                    workflow_kind: WorkflowKind::Econia {
+                        num_users: 200000,
+                        flow_type: crate::EconiaFlowType::Market,
+                        num_markets: 10,
+                        reuse_accounts_for_orders: true,
+                        publish_packages: false,
+                    },
+                    progress_type: WorkflowProgress::WhenDone {
+                        delay_between_stages_s: 60,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
             },
-            TransactionTypeArg::EconiaMarket100MarketReuseAccountsNoPublish => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::Econia {
-                    num_users: 2000000,
-                    flow_type: crate::EconiaFlowType::Market,
-                    num_markets: 100,
-                    reuse_accounts_for_orders: true,
-                    publish_packages: false,
-                },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
+            TransactionTypeArg::EconiaMarket100MarketReuseAccountsNoPublish => {
+                TransactionType::Workflow {
+                    workflow_kind: WorkflowKind::Econia {
+                        num_users: 2000000,
+                        flow_type: crate::EconiaFlowType::Market,
+                        num_markets: 100,
+                        reuse_accounts_for_orders: true,
+                        publish_packages: false,
+                    },
+                    progress_type: WorkflowProgress::WhenDone {
+                        delay_between_stages_s: 60,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
             },
             TransactionTypeArg::DeserializeU256 => call_custom_module(EntryPoints::DeserializeU256),
         }

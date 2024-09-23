@@ -809,7 +809,8 @@ impl TxnEmitter {
             let accounts = all_accounts.split_off(all_accounts.len() - 1);
             let stop = stop.clone();
             let stats = Arc::clone(&stats);
-            let txn_generator = txn_generator_creator.create_transaction_generator(txn_counter.clone());
+            let txn_generator =
+                txn_generator_creator.create_transaction_generator(txn_counter.clone());
             let worker_index = submission_workers.len();
 
             let worker = SubmissionWorker::new(

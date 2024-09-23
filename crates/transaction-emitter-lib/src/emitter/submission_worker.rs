@@ -322,8 +322,12 @@ impl SubmissionWorker {
         accounts
             .into_iter()
             .flat_map(|account| {
-                self.txn_generator
-                    .generate_transactions(account.borrow(), self.params.transactions_per_account, &Vec::new(), false)
+                self.txn_generator.generate_transactions(
+                    account.borrow(),
+                    self.params.transactions_per_account,
+                    &Vec::new(),
+                    false,
+                )
             })
             .collect()
     }

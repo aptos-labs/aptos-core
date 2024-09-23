@@ -7,9 +7,8 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use std::sync::atomic::AtomicU64;
 use rand::{rngs::StdRng, SeedableRng};
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
 
 pub struct BatchTransferTransactionGenerator {
     rng: StdRng,
@@ -42,7 +41,7 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-        history: &Vec<String>,
+        _history: &[String],
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -88,7 +87,10 @@ impl BatchTransferTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for BatchTransferTransactionGeneratorCreator {
-    fn create_transaction_generator(&self, _txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(
+        &self,
+        _txn_counter: Arc<AtomicU64>,
+    ) -> Box<dyn TransactionGenerator> {
         Box::new(BatchTransferTransactionGenerator::new(
             StdRng::from_entropy(),
             self.batch_size,

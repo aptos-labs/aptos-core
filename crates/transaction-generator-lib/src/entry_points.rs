@@ -90,27 +90,36 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             _ => None,
         };
 
-        Arc::new(move |account, package, publisher, txn_factory, rng, _txn_counter, _prev_orders, _market_maker| {
-            let payload = entry_point.create_payload(
-                package.get_module_id(entry_point.module_name()),
-                Some(rng),
-                Some(&publisher.address()),
-            );
-            let builder = txn_factory.payload(payload);
+        Arc::new(
+            move |account,
+                  package,
+                  publisher,
+                  txn_factory,
+                  rng,
+                  _txn_counter,
+                  _prev_orders,
+                  _market_maker| {
+                let payload = entry_point.create_payload(
+                    package.get_module_id(entry_point.module_name()),
+                    Some(rng),
+                    Some(&publisher.address()),
+                );
+                let builder = txn_factory.payload(payload);
 
-            vec![match entry_point.multi_sig_additional_num() {
-                MultiSigConfig::None => account.sign_with_transaction_builder(builder),
-                MultiSigConfig::Random(_) => account.sign_multi_agent_with_transaction_builder(
-                    additional_signers.as_ref().unwrap().iter().collect(),
-                    builder,
-                ),
-                MultiSigConfig::Publisher => {
-                    account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)
-                },
-                MultiSigConfig::FeePayerPublisher => {
-                    account.sign_fee_payer_with_transaction_builder(vec![], publisher, builder)
-                },
-            }]
-        })
+                vec![match entry_point.multi_sig_additional_num() {
+                    MultiSigConfig::None => account.sign_with_transaction_builder(builder),
+                    MultiSigConfig::Random(_) => account.sign_multi_agent_with_transaction_builder(
+                        additional_signers.as_ref().unwrap().iter().collect(),
+                        builder,
+                    ),
+                    MultiSigConfig::Publisher => {
+                        account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)
+                    },
+                    MultiSigConfig::FeePayerPublisher => {
+                        account.sign_fee_payer_with_transaction_builder(vec![], publisher, builder)
+                    },
+                }]
+            },
+        )
     }
 }

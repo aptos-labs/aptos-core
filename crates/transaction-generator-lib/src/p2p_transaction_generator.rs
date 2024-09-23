@@ -260,7 +260,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-        _history: &Vec<String>,
+        _history: &[String],
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -336,7 +336,10 @@ impl P2PTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
-    fn create_transaction_generator(&self, _txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(
+        &self,
+        _txn_counter: Arc<AtomicU64>,
+    ) -> Box<dyn TransactionGenerator> {
         let rng = StdRng::from_entropy();
         let sampler: Box<dyn Sampler<AccountAddress>> = match self.sampling_mode {
             SamplingMode::Basic => Box::new(BasicSampler::new()),

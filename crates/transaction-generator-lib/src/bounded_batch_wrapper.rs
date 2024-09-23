@@ -3,7 +3,7 @@
 
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
-use std::sync::{Arc, atomic::AtomicU64};
+use std::sync::{atomic::AtomicU64, Arc};
 
 struct BoundedBatchWrapperTransactionGenerator {
     batch_size: usize,
@@ -15,11 +15,15 @@ impl TransactionGenerator for BoundedBatchWrapperTransactionGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
-        _history: &Vec<String>,
+        _history: &[String],
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
-        self.generator
-            .generate_transactions(account, num_to_create.min(self.batch_size), &Vec::new(), false)
+        self.generator.generate_transactions(
+            account,
+            num_to_create.min(self.batch_size),
+            &Vec::new(),
+            false,
+        )
     }
 }
 
@@ -39,10 +43,15 @@ impl BoundedBatchWrapperTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for BoundedBatchWrapperTransactionGeneratorCreator {
-    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(
+        &self,
+        txn_counter: Arc<AtomicU64>,
+    ) -> Box<dyn TransactionGenerator> {
         Box::new(BoundedBatchWrapperTransactionGenerator {
             batch_size: self.batch_size,
-            generator: self.generator_creator.create_transaction_generator(txn_counter),
+            generator: self
+                .generator_creator
+                .create_transaction_generator(txn_counter),
         })
     }
 }
