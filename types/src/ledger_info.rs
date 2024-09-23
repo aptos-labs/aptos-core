@@ -202,7 +202,7 @@ pub fn generate_ledger_info_with_sig(
     LedgerInfoWithSignatures::new(
         ledger_info,
         validator_verifier
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(partial_sig.signatures_iter())
             .unwrap(),
     )
 }
@@ -360,7 +360,7 @@ impl LedgerInfoWithVerifiedSignatures {
         &self,
         verifier: &ValidatorVerifier,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        let aggregated_sig = verifier.aggregate_signatures(&self.partial_sigs)?;
+        let aggregated_sig = verifier.aggregate_signatures(self.partial_sigs.signatures_iter())?;
         Ok(LedgerInfoWithSignatures::new(
             self.ledger_info.clone(),
             aggregated_sig,
@@ -376,9 +376,9 @@ impl LedgerInfoWithVerifiedSignatures {
     }
 }
 
-pub enum SignatureWithStatus {
-    Verified(bls12381::Signature),
-    Unverified(bls12381::Signature),
+pub enum VerificationStatus {
+    Verified,
+    Unverified,
 }
 
 /// This data structure is used to support the optimistic signature verification feature.
@@ -439,32 +439,26 @@ impl LedgerInfoWithUnverifiedSignatures {
     pub fn add_signature(
         &mut self,
         validator: AccountAddress,
-        signature_with_status: SignatureWithStatus,
+        signature: bls12381::Signature,
+        verification_status: VerificationStatus,
     ) {
-        match signature_with_status {
-            SignatureWithStatus::Verified(signature) => {
-                self.add_verified_signature(validator, signature)
-            },
-            SignatureWithStatus::Unverified(signature) => {
-                self.add_unverified_signature(validator, signature)
-            },
+        match verification_status {
+            VerificationStatus::Verified => self.add_verified_signature(validator, signature),
+            VerificationStatus::Unverified => self.add_unverified_signature(validator, signature),
         };
     }
 
-    pub fn verified_voters(&self) -> Vec<&AccountAddress> {
-        self.verified_signatures.signatures().keys().collect_vec()
+    pub fn verified_voters(&self) -> impl Iterator<Item = &AccountAddress> {
+        self.verified_signatures.signatures().keys()
     }
 
-    pub fn unverified_voters(&self) -> Vec<&AccountAddress> {
-        self.unverified_signatures.signatures().keys().collect_vec()
+    pub fn unverified_voters(&self) -> impl Iterator<Item = &AccountAddress> {
+        self.unverified_signatures.signatures().keys()
     }
 
     // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
     pub fn all_voters(&self) -> impl Iterator<Item = &AccountAddress> {
-        self.verified_signatures
-            .signatures()
-            .keys()
-            .chain(self.unverified_signatures.signatures().keys())
+        self.verified_voters().chain(self.unverified_voters())
     }
 
     pub fn check_voting_power(
@@ -476,81 +470,72 @@ impl LedgerInfoWithUnverifiedSignatures {
         verifier.check_voting_power(all_voters, check_super_majority)
     }
 
-    // Aggregates all the signatures, verifies the aggregate signature, and returns the aggregate signature.
+    fn try_aggregate(
+        &mut self,
+        epoch_state: &EpochState,
+    ) -> Result<AggregateSignature, VerifyError> {
+        self.check_voting_power(&epoch_state.verifier, true)?;
+
+        let all_signatures = self
+            .verified_signatures
+            .signatures_iter()
+            .chain(self.unverified_signatures.signatures_iter());
+
+        epoch_state.verifier.aggregate_signatures(all_signatures)
+    }
+
+    /// Merge unverified signatures into verified signatures if they are valid.
+    fn merge_signatures(&mut self, verifier: &ValidatorVerifier, need_verify: bool) {
+        let unverified_signatures =
+            mem::replace(&mut self.unverified_signatures, PartialSignatures::empty()).unpack();
+        let valid_signatures: Vec<_> = unverified_signatures
+            .into_par_iter()
+            .flat_map(|(account_address, signature)| {
+                if !need_verify
+                    || verifier
+                        .verify(account_address, self.ledger_info(), &signature)
+                        .is_ok()
+                {
+                    Some((account_address, signature))
+                } else {
+                    verifier.add_pessimistic_verify_set(account_address);
+                    None
+                }
+            })
+            .collect();
+        for (account_address, signature) in valid_signatures {
+            self.verified_signatures
+                .add_signature(account_address, signature);
+        }
+    }
+
+    /// Try to aggregate all signatures if the voting power is enough. If the aggregated signature is
+    /// valid, return the LedgerInfoWithSignatures. Also merge valid unverified signatures into verified.
     pub fn aggregate_and_verify(
         &mut self,
         epoch_state: Arc<EpochState>,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        self.check_voting_power(&epoch_state.verifier, true)?;
-
-        let mut all_signatures = self.verified_signatures.clone();
-        for (author, signature) in self.unverified_signatures.signatures() {
-            all_signatures.add_signature(*author, signature.clone());
-        }
-
-        let aggregated_sig = epoch_state.verifier.aggregate_signatures(&all_signatures)?;
+        let aggregated_sig = self.try_aggregate(&epoch_state)?;
 
         match epoch_state
             .verifier
             .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
         {
             Ok(_) => {
-                for (account_address, signature) in
-                    mem::replace(&mut self.unverified_signatures, PartialSignatures::empty())
-                        .signatures()
-                {
-                    self.verified_signatures
-                        .add_signature(*account_address, signature.clone());
-                }
+                self.merge_signatures(&epoch_state.verifier, false);
                 Ok(LedgerInfoWithSignatures::new(
                     self.ledger_info.clone(),
                     aggregated_sig,
                 ))
             },
             Err(_) => {
-                // Question: How to add counters to keep track of the total time spent in the parallel threads?
-                let verified = self
-                    .unverified_signatures
-                    .signatures()
-                    .into_par_iter()
-                    .flat_map(|(account_address, signature)| {
-                        if epoch_state
-                            .verifier
-                            .verify(*account_address, self.ledger_info(), signature)
-                            .is_ok()
-                        {
-                            return Some(*account_address);
-                        }
-                        None
-                    })
-                    .collect::<Vec<_>>();
-                for account_address in verified {
-                    if let Some(signature) =
-                        self.unverified_signatures.remove_signature(account_address)
-                    {
-                        self.verified_signatures
-                            .add_signature(account_address, signature);
-                    }
-                }
+                self.merge_signatures(&epoch_state.verifier, true);
 
-                // For these authors, we will not use optimistic signature verification in the future.
-                for author in
-                    mem::replace(&mut self.unverified_signatures, PartialSignatures::empty())
-                        .signatures()
-                        .keys()
-                {
-                    epoch_state.verifier.add_pessimistic_verify_set(*author);
-                }
-
-                match self.check_voting_power(&epoch_state.verifier, true) {
-                    Ok(_) => Ok(LedgerInfoWithSignatures::new(
-                        self.ledger_info.clone(),
-                        epoch_state
-                            .verifier
-                            .aggregate_signatures(&self.verified_signatures)?,
-                    )),
-                    Err(e) => Err(e),
-                }
+                let aggregate_sig = self.try_aggregate(&epoch_state)?;
+                Ok(LedgerInfoWithSignatures::new(
+                    self.ledger_info.clone(),
+                    aggregate_sig,
+                ))
             },
         }
     }
@@ -589,7 +574,9 @@ impl Arbitrary for LedgerInfoWithV0 {
                     let signature = dummy_signature.clone();
                     partial_sig.add_signature(signer.author(), signature);
                 }
-                let aggregated_sig = verifier.aggregate_signatures(&partial_sig).unwrap();
+                let aggregated_sig = verifier
+                    .aggregate_signatures(partial_sig.signatures_iter())
+                    .unwrap();
                 Self {
                     ledger_info,
                     signatures: aggregated_sig,
@@ -631,7 +618,7 @@ mod tests {
                 .expect("Incorrect quorum size.");
 
         let mut aggregated_signature = validator_verifier
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(partial_sig.signatures_iter())
             .unwrap();
 
         let ledger_info_with_signatures =
@@ -644,7 +631,7 @@ mod tests {
         }
 
         aggregated_signature = validator_verifier
-            .aggregate_signatures(&partial_sig)
+            .aggregate_signatures(partial_sig.signatures_iter())
             .unwrap();
 
         let ledger_info_with_signatures_reversed =
@@ -692,7 +679,8 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[0].author(),
-            SignatureWithStatus::Verified(validator_signers[0].sign(&ledger_info).unwrap()),
+            validator_signers[0].sign(&ledger_info).unwrap(),
+            VerificationStatus::Verified,
         );
         partial_sig.add_signature(
             validator_signers[0].author(),
@@ -701,7 +689,8 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[1].author(),
-            SignatureWithStatus::Unverified(validator_signers[1].sign(&ledger_info).unwrap()),
+            validator_signers[1].sign(&ledger_info).unwrap(),
+            VerificationStatus::Unverified,
         );
         partial_sig.add_signature(
             validator_signers[1].author(),
@@ -710,7 +699,8 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[2].author(),
-            SignatureWithStatus::Verified(validator_signers[2].sign(&ledger_info).unwrap()),
+            validator_signers[2].sign(&ledger_info).unwrap(),
+            VerificationStatus::Verified,
         );
         partial_sig.add_signature(
             validator_signers[2].author(),
@@ -719,7 +709,8 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[3].author(),
-            SignatureWithStatus::Unverified(validator_signers[3].sign(&ledger_info).unwrap()),
+            validator_signers[3].sign(&ledger_info).unwrap(),
+            VerificationStatus::Unverified,
         );
         partial_sig.add_signature(
             validator_signers[3].author(),
@@ -751,7 +742,8 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[4].author(),
-            SignatureWithStatus::Unverified(bls12381::Signature::dummy_signature()),
+            bls12381::Signature::dummy_signature(),
+            VerificationStatus::Unverified,
         );
 
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
@@ -801,7 +793,8 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[5].author(),
-            SignatureWithStatus::Unverified(validator_signers[5].sign(&ledger_info).unwrap()),
+            validator_signers[5].sign(&ledger_info).unwrap(),
+            VerificationStatus::Unverified,
         );
         partial_sig.add_signature(
             validator_signers[5].author(),
@@ -832,7 +825,7 @@ mod tests {
         let aggregate_sig = LedgerInfoWithSignatures::new(
             ledger_info.clone(),
             validator_verifier
-                .aggregate_signatures(&partial_sig)
+                .aggregate_signatures(partial_sig.signatures_iter())
                 .unwrap(),
         );
         assert_eq!(
@@ -859,7 +852,8 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[6].author(),
-            SignatureWithStatus::Unverified(bls12381::Signature::dummy_signature()),
+            bls12381::Signature::dummy_signature(),
+            VerificationStatus::Unverified,
         );
 
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 6);
