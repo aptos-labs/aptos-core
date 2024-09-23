@@ -200,7 +200,7 @@ TESTS = [
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed1-market"), expected_stages=10, included_in=Flow.ECONIA),
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed10-market"), expected_stages=10, included_in=Flow.ECONIA),
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed100-market"), expected_stages=10, included_in=Flow.ECONIA),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market10-market-reuse-accounts"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market10-market-reuse-accounts"), included_in=Flow.ECONIA),
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), expected_stages=10, included_in=Flow.ECONIA),
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
