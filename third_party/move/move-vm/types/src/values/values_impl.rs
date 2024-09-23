@@ -604,7 +604,6 @@ impl Container {
                 let l = &l.borrow();
                 let r = &r.borrow();
 
-                // Does this need to be aligned with vector comparison?
                 if l.len() != r.len() {
                     return Ok(false);
                 }
@@ -655,15 +654,16 @@ impl Container {
                 let l = &l.borrow();
                 let r = &r.borrow();
 
-                let len_cmp = l.len().cmp(&r.len());
-                if len_cmp.is_ne() {
-                    return Ok(len_cmp);
-                }
                 for (v1, v2) in l.iter().zip(r.iter()) {
                     let value_cmp = v1.compare(v2)?;
                     if value_cmp.is_ne() {
                         return Ok(value_cmp);
                     }
+                }
+
+                let len_cmp = l.len().cmp(&r.len());
+                if len_cmp.is_ne() {
+                    return Ok(len_cmp);
                 }
                 Ordering::Equal
             },
