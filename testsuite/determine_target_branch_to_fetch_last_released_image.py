@@ -77,10 +77,10 @@ def main() -> None:
     try:
         # Determine the target branch
         target_branch = determine_target_branch(base_branch)
-        # Write the target branch to GitHub output
-        write_github_output(GithubOutput(GH_OUTPUT_KEY, target_branch))
-        log.info(f"Successfully wrote target branch to GitHub output: {target_branch}")
-        print(f"Target branch: {target_branch}")
+        if target_branch is not None:
+            # Write the target branch to GitHub output
+            write_github_output(GithubOutput(GH_OUTPUT_KEY, target_branch))
+            log.info(f"Successfully wrote target branch to GitHub output: {target_branch}")
     except Exception as e:
         log.error(
             f"Error determining target branch and writing to GitHub output: {e}\n"
