@@ -259,12 +259,12 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
-        if self.indexer_reader.is_some() {
-            let ledger_info = self.get_latest_internal_indexer_ledger_version_and_ledger_info()?;
-            Ok(ledger_info)
-        } else {
-            self.get_latest_storage_ledger_info()
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            if indexer_reader.is_internal_indexer_enabled() {
+                return self.get_latest_internal_indexer_ledger_info();
+            }
         }
+        self.get_latest_storage_ledger_info()
     }
 
     pub fn get_latest_ledger_info_and_verify_lookup_version<E: StdApiError>(
@@ -292,9 +292,7 @@ impl Context {
         Ok((latest_ledger_info, requested_ledger_version))
     }
 
-    pub fn get_latest_internal_indexer_ledger_version_and_ledger_info<
-        E: ServiceUnavailableError,
-    >(
+    pub fn get_latest_internal_indexer_ledger_info<E: ServiceUnavailableError>(
         &self,
     ) -> Result<LedgerInfo, E> {
         if let Some(indexer_reader) = self.indexer_reader.as_ref() {
