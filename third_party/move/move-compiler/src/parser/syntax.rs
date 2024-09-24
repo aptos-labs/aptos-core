@@ -109,7 +109,7 @@ fn require_language_version(
                 loc,
                 format!(
                     "Move language construct `{}` is not enabled until version {}",
-                    description, min_language_varsion
+                    description, min_language_version
                 )
             )
         ));
