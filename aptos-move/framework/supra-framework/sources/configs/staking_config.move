@@ -343,10 +343,10 @@ module supra_framework::staking_config {
         staking_rewards_config.rewards_rate_decrease_rate = rewards_rate_decrease_rate;
     }
 
-    public fun enable_validator_set_change(supra_framework: &signer) acquires StakingConfig {
+    public fun update_allow_validator_set_change(supra_framework: &signer, value: bool) acquires StakingConfig {
         system_addresses::assert_supra_framework(supra_framework);
         let staking_config = borrow_global_mut<StakingConfig>(signer::address_of(supra_framework));
-        staking_config.allow_validator_set_change = true;
+        staking_config.allow_validator_set_change = value;
     }
     /// Update the joining limit %.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
@@ -408,7 +408,7 @@ module supra_framework::staking_config {
         update_recurring_lockup_duration_secs(&supra_framework, 10000);
         update_rewards_rate(&supra_framework, 10, 100);
         update_voting_power_increase_limit(&supra_framework, 10);
-        enable_validator_set_change(&supra_framework);
+        update_allow_validator_set_change(&supra_framework,true);
 
         let config = borrow_global<StakingConfig>(@supra_framework);
         assert!(config.minimum_stake == 100, 0);
@@ -418,6 +418,7 @@ module supra_framework::staking_config {
         assert!(config.rewards_rate_denominator == 100, 4);
         assert!(config.voting_power_increase_limit == 10, 5);
         assert!(config.allow_validator_set_change==true, 6);
+
     }
 
     #[test(supra_framework = @supra_framework)]
