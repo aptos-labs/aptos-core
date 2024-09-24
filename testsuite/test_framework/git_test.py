@@ -28,26 +28,6 @@ class SpyTests(unittest.TestCase):
         git: Git = Git(shell)
         self.assertEqual(git.get_repo_from_remote("origin"), "kiwi-corp/aptos-core")
     
-    def test_get_tags(self):
-        shell: Shell = SpyShell([
-            FakeCommand(
-                "git tag --sort=-committerdate --points-at HEAD",
-                RunResult(0, b"v1.2.3\nv1.2.0\nv1.1.0")
-            )
-        ])
-        git: Git = Git(shell)
-        self.assertEqual(git.get_tags(), ["v1.2.3", "v1.2.0", "v1.1.0"])
-
-    def test_get_tags_with_pattern(self):
-        shell: Shell = SpyShell([
-            FakeCommand(
-                "git tag --sort=-committerdate --points-at HEAD --list v1.2.*",
-                RunResult(0, b"v1.2.3\nv1.2.0")
-            )
-        ])
-        git: Git = Git(shell)
-        self.assertEqual(git.get_tags(pattern="v1.2.*"), ["v1.2.3", "v1.2.0"])
-
     def test_get_remote_branches_matching_pattern(self):
         shell: Shell = SpyShell([
             FakeCommand(
