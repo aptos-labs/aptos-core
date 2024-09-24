@@ -21,6 +21,8 @@ pub enum Order {
 }
 
 pub trait IndexerReader: Send + Sync {
+    fn is_internal_indexer_enabled(&self) -> bool;
+
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>>;
 
     fn get_events(
