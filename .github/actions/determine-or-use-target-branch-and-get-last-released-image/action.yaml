@@ -15,10 +15,6 @@ inputs:
   branch:
     description: "Use this branch directly if set"
     required: false
-  if-need-to-determine-target-branch:
-    description: "Set to true if need to determine target branch based on base branch"
-    required: false
-    default: "false"
   variants:
     description: "The variants to check, as a space-separated string, e.g. 'performance failpoints'"
     required: false
@@ -35,20 +31,10 @@ runs:
   using: composite
   steps:
     # Checkout repository based on base branch or target branch
-    - name: Checkout base branch
-      if: ${{ inputs.if-need-to-determine-target-branch == 'true' }}
+    - name: Checkout branch
       uses: actions/checkout@v4
       with:
-        ref: ${{ inputs.base-branch }}
-        path: checkout_branch
-        fetch-depth: 0
-
-    # If using the target branch directly
-    - name: Checkout target branch
-      if: ${{ inputs.if-need-to-determine-target-branch == 'false' }}
-      uses: actions/checkout@v3
-      with:
-        ref: ${{ inputs.branch }}
+        ref: ${{ inputs.base-branch || inputs.branch }}
         path: checkout_branch
         fetch-depth: 0
 
@@ -61,8 +47,7 @@ runs:
     - name: Set target branch
       id: set-target-branch
       run: |
-        if [[ "${{ inputs.if-need-to-determine-target-branch }}" == "true" 
-              && -n "${{ inputs.base-branch }}" ]]; then
+        if [[ -n "${{ inputs.base-branch }}" ]]; then
           base_branch="${{ inputs.base-branch }}"
           echo "Determining target branch from base branch: $base_branch"
           ./testrun determine_target_branch_to_fetch_last_released_image.py "$base_branch"
