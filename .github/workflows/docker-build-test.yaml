@@ -308,11 +308,6 @@ jobs:
         with:
           fetch-depth: 0  # Fetch all history for all branches and tags
 
-      # To test the compat test against the last released docker image, we need to get the last released docker image tag.
-      # This step determines appropriate branch to fetch the latest docker image tag from based on the current branch.
-      # Determine the IMAGE_TAG based on the latest release R and check for images built on branch R - 1:
-      # - ex. For commits on the aptos-release-v1.19 branch, the IMAGE_TAG should be the latest commit built on aptos-release-v1.18
-      # - For commits on the main branch, the IMAGE_TAG should be the latest commit on the max release aptos-release-v<MAX> branch
       - name: Determine target branch
         uses: ./.github/actions/determine-branch-to-fetch-last-released-image
         id: determine-target-branch
