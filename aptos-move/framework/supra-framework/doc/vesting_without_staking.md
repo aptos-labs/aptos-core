@@ -1283,7 +1283,7 @@ Unlock any vested portion of the grant.
        <b>let</b> last_completed_period =
            (<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() - vesting_schedule.start_timestamp_secs) / vesting_schedule.period_duration;
        // Index is 0-based <b>while</b> period is 1-based so we need <b>to</b> subtract 1.
-       <b>while</b>(last_completed_period&gt;=next_period_to_vest) {
+       <b>while</b>(last_completed_period&gt;=next_period_to_vest && vesting_record.left_amount &gt; 0) {
            <b>let</b> schedule_index = next_period_to_vest - 1;
            <b>let</b> vesting_fraction = <b>if</b> (schedule_index &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule)) {
                *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, schedule_index)
@@ -1295,6 +1295,7 @@ Unlock any vested portion of the grant.
            //<b>update</b> last_vested_period for the shareholder
            vesting_record.last_vested_period = next_period_to_vest;
            next_period_to_vest = next_period_to_vest + 1;
+
            emit_event(
                &<b>mut</b> vesting_contract.vest_events,
                <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestEvent">VestEvent</a> {
