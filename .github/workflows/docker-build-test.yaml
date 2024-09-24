@@ -328,7 +328,6 @@ jobs:
         id: get-docker-image-tag
         with:
           base-branch: ${{ github.base_ref }}
-          if-need-to-determine-target-branch: "true"
           variants: "failpoints performance"
       
       - name: Add Image Tag to Step Summary
