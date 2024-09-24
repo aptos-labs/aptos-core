@@ -183,14 +183,6 @@ fn consume_token_(
     }
 }
 
-// let unexp_loc = current_token_loc(tokens);
-// let unexp_msg = format!("Unexpected {}", current_token_error_string(tokens));
-
-// let end_loc = tokens.previous_end_loc();
-// let addr_loc = make_loc(tokens.file_hash(), start_loc, end_loc);
-// let exp_msg = format!("Expected '::' {}", case);
-// Err(vec![(unexp_loc, unexp_msg), (addr_loc, exp_msg)])
-
 // Check for the identifier token with specified value and return an error if it does not match.
 fn consume_identifier(tokens: &mut Lexer, value: &str) -> Result<(), Box<Diagnostic>> {
     if tokens.peek() == Tok::Identifier && tokens.content() == value {
