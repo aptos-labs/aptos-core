@@ -1177,17 +1177,13 @@ module aptos_framework::atomic_bridge_counterparty {
 
     /// Completes a bridge transfer by revealing the pre-image.
     ///
-    /// @param caller The signer representing the bridge operator.
     /// @param bridge_transfer_id The unique identifier for the bridge transfer.
     /// @param pre_image The pre-image that matches the hash lock to complete the transfer.
     /// @abort If the caller is not the bridge operator or the hash lock validation fails.
     public entry fun complete_bridge_transfer(
-        caller: &signer,
         bridge_transfer_id: vector<u8>,
         pre_image: vector<u8>,
     ) {
-        bridge_configuration::assert_is_caller_operator(caller);
-
         let (recipient, amount) = bridge_store::complete_counterparty(
             bridge_transfer_id,
             create_hashlock(pre_image)
@@ -1301,7 +1297,7 @@ module aptos_framework::atomic_bridge_counterparty {
             hash_lock,
             time_lock, recipient, amount);
 
-        complete_bridge_transfer(aptos_framework, bridge_transfer_id, plain_secret());
+        complete_bridge_transfer(bridge_transfer_id, plain_secret());
 
         assert!(
             event::was_event_emitted<BridgeTransferCompletedEvent>(
@@ -1330,7 +1326,7 @@ module aptos_framework::atomic_bridge_counterparty {
             hash_lock,
             time_lock, recipient, amount);
 
-        complete_bridge_transfer(aptos_framework, bridge_transfer_id, b"not the secret");
+        complete_bridge_transfer(bridge_transfer_id, b"not the secret");
     }
 }
 
