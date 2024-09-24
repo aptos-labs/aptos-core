@@ -44,16 +44,6 @@ impl SignatureVerifiedTransaction {
         }
     }
 
-    pub fn sequence_number(&self) -> Option<u64> {
-        match self {
-            SignatureVerifiedTransaction::Valid(txn) => match txn {
-                Transaction::UserTransaction(txn) => Some(txn.sequence_number()),
-                _ => None,
-            },
-            SignatureVerifiedTransaction::Invalid(_) => None,
-        }
-    }
-
     pub fn hash(&self) -> HashValue {
         match self {
             SignatureVerifiedTransaction::Valid(txn) => txn.hash(),
