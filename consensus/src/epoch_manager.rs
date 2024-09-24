@@ -1454,20 +1454,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         payload_manager,
                         pending_blocks,
                     );
-                    // Self::forward_event_to(
-                    //     round_manager_tx,
-                    //     (
-                    //         peer_id,
-                    //         discriminant(&VerifiedEvent::OrderVoteMsg(
-                    //             order_vote.clone(),
-                    //         )),
-                    //     ),
-                    //     (
-                    //         peer_id,
-                    //         VerifiedEvent::OrderVoteMsg(order_vote.clone()),
-                    //     ),
-                    // )
-                    // .context("round manager sending unverified order vote to round manager")?;
                     return Ok(());
                 }
             }
@@ -1487,32 +1473,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 .observe(start_time.elapsed().as_secs_f64());
                             match result {
                                 Ok(()) => {
-                                    // if let Err(e) =
                                     Self::forward_event(
                                         quorum_store_msg_tx,
                                         round_manager_tx,
                                         buffered_proposal_tx,
                                         peer_id,
-                                        VerifiedEvent::VoteMsg(vote.clone()),
+                                        VerifiedEvent::VoteMsg(vote),
                                         payload_manager,
                                         pending_blocks,
                                     );
-
-                                    //  Self::forward_event_to(
-                                    //     round_manager_tx,
-                                    //     (
-                                    //         peer_id,
-                                    //         discriminant(&VerifiedEvent::VoteMsg(
-                                    //             vote.clone(),
-                                    //         )),
-                                    //     ),
-                                    //     (peer_id, VerifiedEvent::VoteMsg(vote)),
-                                    // )
-                                    // .context(
-                                    //     "round manager sending unverified vote to round manager",
-                                    // ) {
-                                    //     warn!("Failed to forward unverified event: {}", e);
-                                    // };
                                 },
                                 Err(e) => {
                                     error!(

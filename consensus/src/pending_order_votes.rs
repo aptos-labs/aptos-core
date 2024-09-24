@@ -132,6 +132,9 @@ impl PendingOrderVotes {
                                     ledger_info_with_sig,
                                 ))
                             },
+                            Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => {
+                                OrderVoteReceptionResult::VoteAdded(voting_power)
+                            },
                             Err(e) => OrderVoteReceptionResult::ErrorAggregatingSignature(e),
                         }
                     },
@@ -179,11 +182,8 @@ mod tests {
     use aptos_consensus_types::{order_vote::OrderVote, quorum_cert::QuorumCert};
     use aptos_crypto::{bls12381, HashValue};
     use aptos_types::{
-        aggregate_signature::PartialSignatures,
-        block_info::BlockInfo,
-        epoch_state::EpochState,
-        ledger_info::LedgerInfo,
-        validator_verifier::{random_validator_verifier, VerifyError},
+        aggregate_signature::PartialSignatures, block_info::BlockInfo, epoch_state::EpochState,
+        ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
     };
     use std::sync::Arc;
 
@@ -350,12 +350,7 @@ mod tests {
         assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 0);
         assert_eq!(
             pending_order_votes.insert_order_vote(&vote_2, epoch_state.clone(), None),
-            OrderVoteReceptionResult::ErrorAggregatingSignature(
-                VerifyError::TooLittleVotingPower {
-                    voting_power: 2,
-                    expected_voting_power: 3
-                }
-            )
+            OrderVoteReceptionResult::VoteAdded(2)
         );
         assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
 
