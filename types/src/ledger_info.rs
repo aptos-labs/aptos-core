@@ -384,11 +384,10 @@ pub enum VerificationStatus {
     Unverified,
 }
 
-#[derive(Clone, Debug, Derivative, Serialize)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(PartialEq, Eq)]
 pub struct SignatureWithStatus {
     signature: bls12381::Signature,
-    #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     status: Arc<RwLock<VerificationStatus>>,
 }
@@ -408,6 +407,15 @@ impl SignatureWithStatus {
             signature,
             status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
         }
+    }
+}
+
+impl Serialize for SignatureWithStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.signature.serialize(serializer)
     }
 }
 
@@ -639,21 +647,53 @@ mod tests {
 
     // Write a test case to serialize and deserialize SignatureWithStatus
     #[test]
-    fn test_signature_with_status_serde() {
+    fn test_signature_with_status_bcs() {
         let signature = bls12381::Signature::dummy_signature();
-        let signature_with_status = SignatureWithStatus {
+        let signature_with_status_1 = SignatureWithStatus {
             signature: signature.clone(),
             status: Arc::new(RwLock::new(VerificationStatus::Verified)),
         };
-        let serialized_signature_with_status =
-            bcs::to_bytes(&signature_with_status).expect("Failed to serialize signature");
+        let signature_with_status_2 = SignatureWithStatus {
+            signature: signature.clone(),
+            status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+        };
+        let serialized_signature_with_status_1 =
+            bcs::to_bytes(&signature_with_status_1).expect("Failed to serialize signature");
+        let serialized_signature_with_status_2 =
+            bcs::to_bytes(&signature_with_status_2).expect("Failed to serialize signature");
+        assert!(serialized_signature_with_status_1 == serialized_signature_with_status_2);
+
         let deserialized_signature_with_status: SignatureWithStatus =
-            bcs::from_bytes(&serialized_signature_with_status)
+            bcs::from_bytes(&serialized_signature_with_status_1)
                 .expect("Failed to deserialize signature");
+        assert_eq!(*deserialized_signature_with_status.signature(), signature);
         assert_eq!(
-            deserialized_signature_with_status.signature(),
-            signature_with_status.signature()
+            *deserialized_signature_with_status.status.read(),
+            VerificationStatus::Unverified
         );
+    }
+
+    #[test]
+    fn test_signature_with_status_serde() {
+        let signature = bls12381::Signature::dummy_signature();
+        let signature_with_status_1 = SignatureWithStatus {
+            signature: signature.clone(),
+            status: Arc::new(RwLock::new(VerificationStatus::Verified)),
+        };
+        let signature_with_status_2 = SignatureWithStatus {
+            signature: signature.clone(),
+            status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+        };
+        let serialized_signature_with_status_1 =
+            serde_json::to_string(&signature_with_status_1).expect("Failed to serialize signature");
+        let serialized_signature_with_status_2 =
+            serde_json::to_string(&signature_with_status_2).expect("Failed to serialize signature");
+        assert!(serialized_signature_with_status_1 == serialized_signature_with_status_2);
+
+        let deserialized_signature_with_status: SignatureWithStatus =
+            serde_json::from_str(&serialized_signature_with_status_1)
+                .expect("Failed to deserialize signature");
+        assert_eq!(*deserialized_signature_with_status.signature(), signature);
         assert_eq!(
             *deserialized_signature_with_status.status.read(),
             VerificationStatus::Unverified
