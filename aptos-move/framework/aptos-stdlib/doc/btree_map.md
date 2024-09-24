@@ -13,11 +13,12 @@ more metadata into one node, which is more disk friendly (and gas friendly).
 -  [Struct `Node`](#0x1_btree_map_Node)
 -  [Enum `Child`](#0x1_btree_map_Child)
 -  [Enum `Iterator`](#0x1_btree_map_Iterator)
--  [Struct `BTreeMap`](#0x1_btree_map_BTreeMap)
+-  [Enum `BTreeMap`](#0x1_btree_map_BTreeMap)
 -  [Constants](#@Constants_0)
 -  [Function `new`](#0x1_btree_map_new)
 -  [Function `new_with_config`](#0x1_btree_map_new_with_config)
 -  [Function `destroy_empty`](#0x1_btree_map_destroy_empty)
+-  [Function `init_max_degrees`](#0x1_btree_map_init_max_degrees)
 -  [Function `insert`](#0x1_btree_map_insert)
 -  [Function `upsert`](#0x1_btree_map_upsert)
 -  [Function `remove`](#0x1_btree_map_remove)
@@ -48,13 +49,16 @@ more metadata into one node, which is more disk friendly (and gas friendly).
 -  [Function `new_iter`](#0x1_btree_map_new_iter)
 -  [Function `find_leaf`](#0x1_btree_map_find_leaf)
 -  [Function `binary_search`](#0x1_btree_map_binary_search)
+-  [Function `get_max_degree`](#0x1_btree_map_get_max_degree)
 -  [Function `insert_at`](#0x1_btree_map_insert_at)
 -  [Function `update_key`](#0x1_btree_map_update_key)
 -  [Function `remove_at`](#0x1_btree_map_remove_at)
 
 
-<pre><code><b>use</b> <a href="cmp.md#0x1_cmp">0x1::cmp</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="cmp.md#0x1_cmp">0x1::cmp</a>;
 <b>use</b> <a href="debug.md#0x1_debug">0x1::debug</a>;
+<b>use</b> <a href="math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
 <b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
@@ -258,14 +262,22 @@ An iterator to iterate all keys in the BTreeMap.
 
 <a id="0x1_btree_map_BTreeMap"></a>
 
-## Struct `BTreeMap`
+## Enum `BTreeMap`
 
 The BTreeMap data structure.
 
 
-<pre><code><b>struct</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K: store, V: store&gt; <b>has</b> store
+<pre><code>enum <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K: store, V: store&gt; <b>has</b> store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -286,12 +298,6 @@ The BTreeMap data structure.
 
 </dd>
 <dt>
-<code>order: u8</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
 <code>min_leaf_index: u64</code>
 </dt>
 <dd>
@@ -303,8 +309,24 @@ The BTreeMap data structure.
 <dd>
 
 </dd>
+<dt>
+<code>inner_max_degree: u16</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>leaf_max_degree: u16</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -313,11 +335,29 @@ The BTreeMap data structure.
 ## Constants
 
 
-<a id="0x1_btree_map_DEFAULT_ORDER"></a>
+<a id="0x1_btree_map_DEFAULT_INNER_MIN_DEGREE"></a>
 
 
 
-<pre><code><b>const</b> <a href="btree_map.md#0x1_btree_map_DEFAULT_ORDER">DEFAULT_ORDER</a>: u8 = 32;
+<pre><code><b>const</b> <a href="btree_map.md#0x1_btree_map_DEFAULT_INNER_MIN_DEGREE">DEFAULT_INNER_MIN_DEGREE</a>: u16 = 4;
+</code></pre>
+
+
+
+<a id="0x1_btree_map_DEFAULT_LEAF_MIN_DEGREE"></a>
+
+
+
+<pre><code><b>const</b> <a href="btree_map.md#0x1_btree_map_DEFAULT_LEAF_MIN_DEGREE">DEFAULT_LEAF_MIN_DEGREE</a>: u16 = 2;
+</code></pre>
+
+
+
+<a id="0x1_btree_map_DEFAULT_TARGET_NODE_SIZE"></a>
+
+
+
+<pre><code><b>const</b> <a href="btree_map.md#0x1_btree_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a>: u64 = 2048;
 </code></pre>
 
 
@@ -358,6 +398,15 @@ The BTreeMap data structure.
 
 
 
+<a id="0x1_btree_map_MAX_DEGREE"></a>
+
+
+
+<pre><code><b>const</b> <a href="btree_map.md#0x1_btree_map_MAX_DEGREE">MAX_DEGREE</a>: u64 = 4096;
+</code></pre>
+
+
+
 <a id="0x1_btree_map_NULL_INDEX"></a>
 
 
@@ -384,7 +433,7 @@ Returns a new BTreeMap with the default configuration.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new">new</a>&lt;K: store, V: store&gt;(): <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt; {
-    <a href="btree_map.md#0x1_btree_map_new_with_config">new_with_config</a>(<a href="btree_map.md#0x1_btree_map_DEFAULT_ORDER">DEFAULT_ORDER</a>)
+    <a href="btree_map.md#0x1_btree_map_new_with_config">new_with_config</a>(0, 0)
 }
 </code></pre>
 
@@ -396,10 +445,11 @@ Returns a new BTreeMap with the default configuration.
 
 ## Function `new_with_config`
 
-Returns a new BTreeMap with the provided order (the maximum # of children a node can have).
+Returns a new BTreeMap with the provided max degree consts (the maximum # of children a node can have).
+If 0 is passed, then it is dynamically computed based on size of first key and value.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_with_config">new_with_config</a>&lt;K: store, V: store&gt;(order: u8): <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_with_config">new_with_config</a>&lt;K: store, V: store&gt;(inner_max_degree: u16, leaf_max_degree: u16): <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;
 </code></pre>
 
 
@@ -408,18 +458,20 @@ Returns a new BTreeMap with the provided order (the maximum # of children a node
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_with_config">new_with_config</a>&lt;K: store, V: store&gt;(order: u8): <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt; {
-    <b>assert</b>!(order &gt;= 5, <a href="btree_map.md#0x1_btree_map_E_INVALID_PARAMETER">E_INVALID_PARAMETER</a>);
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_with_config">new_with_config</a>&lt;K: store, V: store&gt;(inner_max_degree: u16, leaf_max_degree: u16): <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt; {
+    <b>assert</b>!(inner_max_degree == 0 || inner_max_degree &gt;= <a href="btree_map.md#0x1_btree_map_DEFAULT_INNER_MIN_DEGREE">DEFAULT_INNER_MIN_DEGREE</a>, <a href="btree_map.md#0x1_btree_map_E_INVALID_PARAMETER">E_INVALID_PARAMETER</a>);
+    <b>assert</b>!(leaf_max_degree == 0 || leaf_max_degree &gt;= <a href="btree_map.md#0x1_btree_map_DEFAULT_LEAF_MIN_DEGREE">DEFAULT_LEAF_MIN_DEGREE</a>, <a href="btree_map.md#0x1_btree_map_E_INVALID_PARAMETER">E_INVALID_PARAMETER</a>);
     <b>let</b> root_node = <a href="btree_map.md#0x1_btree_map_new_node">new_node</a>(/*is_leaf=*/<b>true</b>, /*parent=*/<a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>);
     <b>let</b> nodes = <a href="table_with_length.md#0x1_table_with_length_new">table_with_length::new</a>();
     <b>let</b> root_index = 1;
-    <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> nodes, root_index, root_node);
-    <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a> {
+    nodes.add(root_index, root_node);
+    BTreeMap::V1 {
         root_index: root_index,
         nodes: nodes,
-        order: order,
         min_leaf_index: root_index,
         max_leaf_index: root_index,
+        inner_max_degree: inner_max_degree,
+        leaf_max_degree: leaf_max_degree
     }
 }
 </code></pre>
@@ -435,7 +487,7 @@ Returns a new BTreeMap with the provided order (the maximum # of children a node
 Destroys the tree if it's empty, otherwise aborts.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_empty">destroy_empty</a>&lt;K: store, V: store&gt;(tree: <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_empty">destroy_empty</a>&lt;K: store, V: store&gt;(self: <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;)
 </code></pre>
 
 
@@ -444,12 +496,47 @@ Destroys the tree if it's empty, otherwise aborts.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_empty">destroy_empty</a>&lt;K: store, V: store&gt;(tree: <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;) {
-    <b>let</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a> { nodes, root_index, order: _, min_leaf_index: _, max_leaf_index: _ } = tree;
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_empty">destroy_empty</a>&lt;K: store, V: store&gt;(self: <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;) {
+    <b>let</b> BTreeMap::V1 { nodes, root_index, min_leaf_index: _, max_leaf_index: _, inner_max_degree: _, leaf_max_degree: _ } = self;
     aptos_std::debug::print(&nodes);
-    <b>assert</b>!(<a href="table_with_length.md#0x1_table_with_length_length">table_with_length::length</a>(&nodes) == 1, <a href="btree_map.md#0x1_btree_map_E_TREE_NOT_EMPTY">E_TREE_NOT_EMPTY</a>);
-    <a href="btree_map.md#0x1_btree_map_destroy_empty_node">destroy_empty_node</a>(<a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> nodes, root_index));
-    <a href="table_with_length.md#0x1_table_with_length_destroy_empty">table_with_length::destroy_empty</a>(nodes);
+    <b>assert</b>!(nodes.length() == 1, <a href="btree_map.md#0x1_btree_map_E_TREE_NOT_EMPTY">E_TREE_NOT_EMPTY</a>);
+    nodes.<a href="btree_map.md#0x1_btree_map_remove">remove</a>(root_index).<a href="btree_map.md#0x1_btree_map_destroy_empty_node">destroy_empty_node</a>();
+    nodes.<a href="btree_map.md#0x1_btree_map_destroy_empty">destroy_empty</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_btree_map_init_max_degrees"></a>
+
+## Function `init_max_degrees`
+
+
+
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_init_max_degrees">init_max_degrees</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: &K, value: &V)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_init_max_degrees">init_max_degrees</a>&lt;K: store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: &K, value: &V) {
+    <b>if</b> (self.inner_max_degree == 0 || self.leaf_max_degree == 0) {
+        <b>let</b> key_size = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialized_size">bcs::serialized_size</a>(key);
+
+        <b>if</b> (self.inner_max_degree == 0) {
+            self.inner_max_degree = max(<b>min</b>(<a href="btree_map.md#0x1_btree_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="btree_map.md#0x1_btree_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / key_size), <a href="btree_map.md#0x1_btree_map_DEFAULT_INNER_MIN_DEGREE">DEFAULT_INNER_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
+        };
+
+        <b>if</b> (self.leaf_max_degree == 0) {
+            <b>let</b> value_size = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialized_size">bcs::serialized_size</a>(value);
+            self.leaf_max_degree = max(<b>min</b>(<a href="btree_map.md#0x1_btree_map_MAX_DEGREE">MAX_DEGREE</a>, <a href="btree_map.md#0x1_btree_map_DEFAULT_TARGET_NODE_SIZE">DEFAULT_TARGET_NODE_SIZE</a> / (key_size + value_size)), <a href="btree_map.md#0x1_btree_map_DEFAULT_LEAF_MIN_DEGREE">DEFAULT_LEAF_MIN_DEGREE</a> <b>as</b> u64) <b>as</b> u16;
+        };
+    };
 }
 </code></pre>
 
@@ -465,7 +552,7 @@ Inserts the key/value into the BTreeMap.
 Aborts if the key is already in the tree.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_insert">insert</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K, value: V)
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_insert">insert</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K, value: V)
 </code></pre>
 
 
@@ -474,23 +561,27 @@ Aborts if the key is already in the tree.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_insert">insert</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K, value: V) {
-    <b>let</b> leaf = <a href="btree_map.md#0x1_btree_map_find_leaf">find_leaf</a>(tree, key);
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_insert">insert</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K, value: V) {
+    <b>if</b> (self.inner_max_degree == 0 || self.leaf_max_degree == 0) {
+        self.<a href="btree_map.md#0x1_btree_map_init_max_degrees">init_max_degrees</a>(&key, &value);
+    };
+
+    <b>let</b> leaf = self.<a href="btree_map.md#0x1_btree_map_find_leaf">find_leaf</a>(key);
 
     <b>if</b> (leaf == <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
         // In this case, the key is greater than all keys in the tree.
-        leaf = tree.max_leaf_index;
-        <b>let</b> current = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&tree.nodes, leaf).parent;
+        leaf = self.max_leaf_index;
+        <b>let</b> current = self.nodes.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(leaf).parent;
         <b>while</b> (current != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-            <b>let</b> current_node = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, current);
-            <b>let</b> last_index = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&current_node.children) - 1;
-            <b>let</b> last_element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> current_node.children, last_index);
+            <b>let</b> current_node = self.nodes.<a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>(current);
+            <b>let</b> last_index = current_node.children.length() - 1;
+            <b>let</b> last_element = current_node.children.<a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>(last_index);
             last_element.max_key = key;
             current = current_node.parent;
         }
     };
 
-    <a href="btree_map.md#0x1_btree_map_insert_at">insert_at</a>(tree, leaf, <a href="btree_map.md#0x1_btree_map_new_leaf_child">new_leaf_child</a>(key, value));
+    self.<a href="btree_map.md#0x1_btree_map_insert_at">insert_at</a>(leaf, <a href="btree_map.md#0x1_btree_map_new_leaf_child">new_leaf_child</a>(key, value));
 }
 </code></pre>
 
@@ -506,7 +597,7 @@ If the key doesn't exist in the tree, inserts the key/value, and returns none.
 Otherwise updates the value under the given key, and returns the old value.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_upsert">upsert</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K, value: V): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;V&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_upsert">upsert</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K, value: V): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;V&gt;
 </code></pre>
 
 
@@ -515,13 +606,17 @@ Otherwise updates the value under the given key, and returns the old value.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_upsert">upsert</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K, value: V): Option&lt;V&gt; {
-    <b>let</b> iter = <a href="btree_map.md#0x1_btree_map_find">find</a>(tree, key);
-    <b>if</b> (<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(tree, &iter)) {
-        <a href="btree_map.md#0x1_btree_map_insert">insert</a>(tree, key, value);
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_upsert">upsert</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K, value: V): Option&lt;V&gt; {
+    <b>if</b> (self.inner_max_degree == 0 || self.leaf_max_degree == 0) {
+        self.<a href="btree_map.md#0x1_btree_map_init_max_degrees">init_max_degrees</a>(&key, &value);
+    };
+
+    <b>let</b> iter = self.<a href="btree_map.md#0x1_btree_map_find">find</a>(key);
+    <b>if</b> (<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(self, &iter)) {
+        self.<a href="btree_map.md#0x1_btree_map_insert">insert</a>(key, value);
         <b>return</b> <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
-        <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, iter.node_index);
+        <b>let</b> node = self.nodes.<a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>(iter.node_index);
         <b>let</b> children = &<b>mut</b> node.children;
 
         // Field swap doesn't compile.
@@ -534,7 +629,7 @@ Otherwise updates the value under the given key, and returns the old value.
         <b>let</b> Child::Leaf {
             max_key: old_max_key,
             value: old_value,
-        } = <a href="../../move-stdlib/doc/vector.md#0x1_vector_replace">vector::replace</a>(children, iter.child_index, Child::Leaf { max_key: key, value: value });
+        } = children.replace(iter.child_index, Child::Leaf { max_key: key, value: value });
         <b>assert</b>!(old_max_key == key, <a href="btree_map.md#0x1_btree_map_E_INTERNAL">E_INTERNAL</a>);
         <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(old_value)
     }
@@ -553,7 +648,7 @@ Removes the entry from BTreeMap and returns the value which <code>key</code> map
 Aborts if there is no entry for <code>key</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_remove">remove</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): V
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_remove">remove</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): V
 </code></pre>
 
 
@@ -562,14 +657,14 @@ Aborts if there is no entry for <code>key</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_remove">remove</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): V {
-    <b>let</b> iter = <a href="btree_map.md#0x1_btree_map_find">find</a>(tree, key);
-    <b>assert</b>!(!<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(tree, &iter), <a href="btree_map.md#0x1_btree_map_E_INTERNAL">E_INTERNAL</a>);
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_remove">remove</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): V {
+    <b>let</b> iter = self.<a href="btree_map.md#0x1_btree_map_find">find</a>(key);
+    <b>assert</b>!(!<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(self, &iter), <a href="btree_map.md#0x1_btree_map_E_INTERNAL">E_INTERNAL</a>);
 
     <b>let</b> Child::Leaf {
         value,
         max_key: _,
-    } = <a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>(tree, iter.node_index, key);
+    } = self.<a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>(iter.node_index, key);
 
     value
 }
@@ -663,7 +758,7 @@ Returns an iterator pointing to the first element that is greater or equal to th
 key, or an end iterator if such element doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_lower_bound">lower_bound</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): <a href="btree_map.md#0x1_btree_map_Iterator">btree_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_lower_bound">lower_bound</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): <a href="btree_map.md#0x1_btree_map_Iterator">btree_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -672,24 +767,24 @@ key, or an end iterator if such element doesn't exist.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_lower_bound">lower_bound</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): <a href="btree_map.md#0x1_btree_map_Iterator">Iterator</a>&lt;K&gt; {
-    <b>let</b> leaf = <a href="btree_map.md#0x1_btree_map_find_leaf">find_leaf</a>(tree, key);
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_lower_bound">lower_bound</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): <a href="btree_map.md#0x1_btree_map_Iterator">Iterator</a>&lt;K&gt; {
+    <b>let</b> leaf = self.<a href="btree_map.md#0x1_btree_map_find_leaf">find_leaf</a>(key);
     <b>if</b> (leaf == <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-        <b>return</b> <a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>(tree)
+        <b>return</b> self.<a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>()
     };
 
-    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&tree.nodes, leaf);
+    <b>let</b> node = self.nodes.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(leaf);
     <b>assert</b>!(node.is_leaf, <a href="btree_map.md#0x1_btree_map_E_INTERNAL">E_INTERNAL</a>);
 
     <b>let</b> keys = &node.children;
 
-    <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(keys);
+    <b>let</b> len = keys.length();
 
     <b>let</b> index = <a href="btree_map.md#0x1_btree_map_binary_search">binary_search</a>(key, keys, 0, len);
     <b>if</b> (index == len) {
-        <a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>(tree)
+        self.<a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>()
     } <b>else</b> {
-        <a href="btree_map.md#0x1_btree_map_new_iter">new_iter</a>(leaf, index, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(keys, index).max_key)
+        <a href="btree_map.md#0x1_btree_map_new_iter">new_iter</a>(leaf, index, keys.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(index).max_key)
     }
 }
 </code></pre>
@@ -706,7 +801,7 @@ Returns an iterator pointing to the element that equals to the provided key, or 
 iterator if the key is not found.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_find">find</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): <a href="btree_map.md#0x1_btree_map_Iterator">btree_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_find">find</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): <a href="btree_map.md#0x1_btree_map_Iterator">btree_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -715,14 +810,14 @@ iterator if the key is not found.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_find">find</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): <a href="btree_map.md#0x1_btree_map_Iterator">Iterator</a>&lt;K&gt; {
-    <b>let</b> lower_bound = <a href="btree_map.md#0x1_btree_map_lower_bound">lower_bound</a>(tree, key);
-    <b>if</b> (<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(tree, &lower_bound)) {
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_find">find</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): <a href="btree_map.md#0x1_btree_map_Iterator">Iterator</a>&lt;K&gt; {
+    <b>let</b> lower_bound = self.<a href="btree_map.md#0x1_btree_map_lower_bound">lower_bound</a>(key);
+    <b>if</b> (<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(self, &lower_bound)) {
         lower_bound
     } <b>else</b> <b>if</b> (lower_bound.key == key) {
         lower_bound
     } <b>else</b> {
-        <a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>(tree)
+        self.<a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>()
     }
 }
 </code></pre>
@@ -738,7 +833,7 @@ iterator if the key is not found.
 Returns true iff the key exists in the tree.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_contains">contains</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): bool
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_contains">contains</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): bool
 </code></pre>
 
 
@@ -747,9 +842,9 @@ Returns true iff the key exists in the tree.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_contains">contains</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): bool {
-    <b>let</b> lower_bound = <a href="btree_map.md#0x1_btree_map_lower_bound">lower_bound</a>(tree, key);
-    <b>if</b> (<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(tree, &lower_bound)) {
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_contains">contains</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): bool {
+    <b>let</b> lower_bound = self.<a href="btree_map.md#0x1_btree_map_lower_bound">lower_bound</a>(key);
+    <b>if</b> (<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(self, &lower_bound)) {
         <b>false</b>
     } <b>else</b> <b>if</b> (lower_bound.key == key) {
         <b>true</b>
@@ -796,7 +891,7 @@ Returns the key of the given iterator.
 Returns a reference to the element with its key, aborts if the key is not found.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_borrow">borrow</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): &V
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_borrow">borrow</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): &V
 </code></pre>
 
 
@@ -805,12 +900,12 @@ Returns a reference to the element with its key, aborts if the key is not found.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_borrow">borrow</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): &V {
-    <b>let</b> iter = <a href="btree_map.md#0x1_btree_map_find">find</a>(tree, key);
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_borrow">borrow</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): &V {
+    <b>let</b> iter = self.<a href="btree_map.md#0x1_btree_map_find">find</a>(key);
 
-    <b>assert</b>!(<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(tree, &iter), <a href="btree_map.md#0x1_btree_map_E_INVALID_PARAMETER">E_INVALID_PARAMETER</a>);
-    <b>let</b> children = &<a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&tree.nodes, iter.node_index).children;
-    &<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, iter.child_index).value
+    <b>assert</b>!(<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(self, &iter), <a href="btree_map.md#0x1_btree_map_E_INVALID_PARAMETER">E_INVALID_PARAMETER</a>);
+    <b>let</b> children = &self.nodes.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(iter.node_index).children;
+    &children.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(iter.child_index).value
 }
 </code></pre>
 
@@ -825,7 +920,7 @@ Returns a reference to the element with its key, aborts if the key is not found.
 Returns a mutable reference to the element with its key at the given index, aborts if the key is not found.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): &<b>mut</b> V
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): &<b>mut</b> V
 </code></pre>
 
 
@@ -834,12 +929,12 @@ Returns a mutable reference to the element with its key at the given index, abor
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): &<b>mut</b> V {
-    <b>let</b> iter = <a href="btree_map.md#0x1_btree_map_find">find</a>(tree, key);
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): &<b>mut</b> V {
+    <b>let</b> iter = self.<a href="btree_map.md#0x1_btree_map_find">find</a>(key);
 
-    <b>assert</b>!(<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(tree, &iter), <a href="btree_map.md#0x1_btree_map_E_INVALID_PARAMETER">E_INVALID_PARAMETER</a>);
-    <b>let</b> children = &<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, iter.node_index).children;
-    &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(children, iter.child_index).value
+    <b>assert</b>!(<a href="btree_map.md#0x1_btree_map_is_end_iter">is_end_iter</a>(self, &iter), <a href="btree_map.md#0x1_btree_map_E_INVALID_PARAMETER">E_INVALID_PARAMETER</a>);
+    <b>let</b> children = &<b>mut</b> self.nodes.<a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>(iter.node_index).children;
+    &<b>mut</b> children.<a href="btree_map.md#0x1_btree_map_borrow_mut">borrow_mut</a>(iter.child_index).value
 }
 </code></pre>
 
@@ -854,7 +949,7 @@ Returns a mutable reference to the element with its key at the given index, abor
 Returns the number of elements in the BTreeMap.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_size">size</a>&lt;K: store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_size">size</a>&lt;K: store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;): u64
 </code></pre>
 
 
@@ -863,8 +958,8 @@ Returns the number of elements in the BTreeMap.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_size">size</a>&lt;K: store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;): u64 {
-    <a href="btree_map.md#0x1_btree_map_size_for_node">size_for_node</a>(tree, tree.root_index)
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_size">size</a>&lt;K: store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;): u64 {
+    self.<a href="btree_map.md#0x1_btree_map_size_for_node">size_for_node</a>(self.root_index)
 }
 </code></pre>
 
@@ -878,7 +973,7 @@ Returns the number of elements in the BTreeMap.
 
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_size_for_node">size_for_node</a>&lt;K: store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, node_index: u64): u64
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_size_for_node">size_for_node</a>&lt;K: store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, node_index: u64): u64
 </code></pre>
 
 
@@ -887,15 +982,15 @@ Returns the number of elements in the BTreeMap.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_size_for_node">size_for_node</a>&lt;K: store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, node_index: u64): u64 {
-    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&tree.nodes, node_index);
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_size_for_node">size_for_node</a>&lt;K: store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, node_index: u64): u64 {
+    <b>let</b> node = self.nodes.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(node_index);
     <b>if</b> (node.is_leaf) {
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&node.children)
+        node.children.length()
     } <b>else</b> {
         <b>let</b> size = 0;
 
-        for (i in 0..<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&node.children)) {
-            size = size + <a href="btree_map.md#0x1_btree_map_size_for_node">size_for_node</a>(tree, node.children[i].node_index);
+        for (i in 0..node.children.length()) {
+            size = size + self.<a href="btree_map.md#0x1_btree_map_size_for_node">size_for_node</a>(node.children[i].node_index);
         };
         size
     }
@@ -913,7 +1008,7 @@ Returns the number of elements in the BTreeMap.
 Returns true iff the BTreeMap is empty.
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_empty">empty</a>&lt;K: store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;): bool
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_empty">empty</a>&lt;K: store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -922,10 +1017,10 @@ Returns true iff the BTreeMap is empty.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_empty">empty</a>&lt;K: store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;): bool {
-    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&tree.nodes, tree.min_leaf_index);
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_empty">empty</a>&lt;K: store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;): bool {
+    <b>let</b> node = self.nodes.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(self.min_leaf_index);
 
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&node.children)
+    node.children.is_empty()
 }
 </code></pre>
 
@@ -940,7 +1035,7 @@ Returns true iff the BTreeMap is empty.
 Return the begin iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;): <a href="btree_map.md#0x1_btree_map_Iterator">btree_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;): <a href="btree_map.md#0x1_btree_map_Iterator">btree_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -949,15 +1044,15 @@ Return the begin iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b> + store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;): <a href="btree_map.md#0x1_btree_map_Iterator">Iterator</a>&lt;K&gt; {
-    <b>if</b> (<a href="btree_map.md#0x1_btree_map_empty">empty</a>(tree)) {
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b> + store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;): <a href="btree_map.md#0x1_btree_map_Iterator">Iterator</a>&lt;K&gt; {
+    <b>if</b> (self.<a href="btree_map.md#0x1_btree_map_empty">empty</a>()) {
         <b>return</b> Iterator::End;
     };
 
-    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&tree.nodes, tree.min_leaf_index);
-    <b>let</b> key = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&node.children, 0).max_key;
+    <b>let</b> node = self.nodes.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(self.min_leaf_index);
+    <b>let</b> key = node.children.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(0).max_key;
 
-    <a href="btree_map.md#0x1_btree_map_new_iter">new_iter</a>(tree.min_leaf_index, 0, key)
+    <a href="btree_map.md#0x1_btree_map_new_iter">new_iter</a>(self.min_leaf_index, 0, key)
 }
 </code></pre>
 
@@ -972,7 +1067,7 @@ Return the begin iterator.
 Return the end iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(_tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;): <a href="btree_map.md#0x1_btree_map_Iterator">btree_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;): <a href="btree_map.md#0x1_btree_map_Iterator">btree_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -981,7 +1076,7 @@ Return the end iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b> + store, V: store&gt;(_tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;): <a href="btree_map.md#0x1_btree_map_Iterator">Iterator</a>&lt;K&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="btree_map.md#0x1_btree_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b> + store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;): <a href="btree_map.md#0x1_btree_map_Iterator">Iterator</a>&lt;K&gt; {
     Iterator::End
 }
 </code></pre>
@@ -1150,7 +1245,7 @@ Requires the tree is not changed after the input iterator is generated.
 
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_inner_child">destroy_inner_child</a>&lt;K: drop, store, V: store&gt;(child: <a href="btree_map.md#0x1_btree_map_Child">btree_map::Child</a>&lt;K, V&gt;)
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_inner_child">destroy_inner_child</a>&lt;K: drop, store, V: store&gt;(self: <a href="btree_map.md#0x1_btree_map_Child">btree_map::Child</a>&lt;K, V&gt;)
 </code></pre>
 
 
@@ -1159,11 +1254,11 @@ Requires the tree is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_inner_child">destroy_inner_child</a>&lt;K: drop + store, V: store&gt;(child: <a href="btree_map.md#0x1_btree_map_Child">Child</a>&lt;K, V&gt;) {
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_inner_child">destroy_inner_child</a>&lt;K: drop + store, V: store&gt;(self: <a href="btree_map.md#0x1_btree_map_Child">Child</a>&lt;K, V&gt;) {
     <b>let</b> Child::Inner {
         max_key: _,
         node_index: _,
-    } = child;
+    } = self;
 }
 </code></pre>
 
@@ -1177,7 +1272,7 @@ Requires the tree is not changed after the input iterator is generated.
 
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_empty_node">destroy_empty_node</a>&lt;K: store, V: store&gt;(node: <a href="btree_map.md#0x1_btree_map_Node">btree_map::Node</a>&lt;K, V&gt;)
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_empty_node">destroy_empty_node</a>&lt;K: store, V: store&gt;(self: <a href="btree_map.md#0x1_btree_map_Node">btree_map::Node</a>&lt;K, V&gt;)
 </code></pre>
 
 
@@ -1186,10 +1281,10 @@ Requires the tree is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_empty_node">destroy_empty_node</a>&lt;K: store, V: store&gt;(node: <a href="btree_map.md#0x1_btree_map_Node">Node</a>&lt;K, V&gt;) {
-    <b>let</b> <a href="btree_map.md#0x1_btree_map_Node">Node</a> { children, is_leaf: _, parent: _, prev: _, next: _ } = node;
-    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&children), <a href="btree_map.md#0x1_btree_map_E_TREE_NOT_EMPTY">E_TREE_NOT_EMPTY</a>);
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(children);
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_destroy_empty_node">destroy_empty_node</a>&lt;K: store, V: store&gt;(self: <a href="btree_map.md#0x1_btree_map_Node">Node</a>&lt;K, V&gt;) {
+    <b>let</b> <a href="btree_map.md#0x1_btree_map_Node">Node</a> { children, is_leaf: _, parent: _, prev: _, next: _ } = self;
+    <b>assert</b>!(children.is_empty(), <a href="btree_map.md#0x1_btree_map_E_TREE_NOT_EMPTY">E_TREE_NOT_EMPTY</a>);
+    children.<a href="btree_map.md#0x1_btree_map_destroy_empty">destroy_empty</a>();
 }
 </code></pre>
 
@@ -1345,7 +1440,7 @@ Requires the tree is not changed after the input iterator is generated.
 
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_find_leaf">find_leaf</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): u64
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_find_leaf">find_leaf</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, key: K): u64
 </code></pre>
 
 
@@ -1354,21 +1449,21 @@ Requires the tree is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_find_leaf">find_leaf</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): u64 {
-    <b>let</b> current = tree.root_index;
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_find_leaf">find_leaf</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, key: K): u64 {
+    <b>let</b> current = self.root_index;
     <b>while</b> (current != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-        <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&tree.nodes, current);
+        <b>let</b> node = self.nodes.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(current);
         <b>if</b> (node.is_leaf) {
             <b>return</b> current
         };
-        <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&node.children);
-        <b>if</b> (<a href="cmp.md#0x1_cmp_compare">cmp::compare</a>(&<a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&node.children, len - 1).max_key, &key).is_less_than()) {
+        <b>let</b> len = node.children.length();
+        <b>if</b> (<a href="cmp.md#0x1_cmp_compare">cmp::compare</a>(&node.children.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(len - 1).max_key, &key).is_less_than()) {
             <b>return</b> <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>
         };
 
         <b>let</b> index = <a href="btree_map.md#0x1_btree_map_binary_search">binary_search</a>(key, &node.children, 0, len);
 
-        current = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&node.children, index).node_index;
+        current = node.children.<a href="btree_map.md#0x1_btree_map_borrow">borrow</a>(index).node_index;
     };
 
     <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>
@@ -1413,13 +1508,13 @@ Requires the tree is not changed after the input iterator is generated.
 
 </details>
 
-<a id="0x1_btree_map_insert_at"></a>
+<a id="0x1_btree_map_get_max_degree"></a>
 
-## Function `insert_at`
+## Function `get_max_degree`
 
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_insert_at">insert_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, node_index: u64, child: <a href="btree_map.md#0x1_btree_map_Child">btree_map::Child</a>&lt;K, V&gt;)
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_get_max_degree">get_max_degree</a>&lt;K: store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, leaf: bool): u64
 </code></pre>
 
 
@@ -1428,14 +1523,48 @@ Requires the tree is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_insert_at">insert_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, node_index: u64, child: <a href="btree_map.md#0x1_btree_map_Child">Child</a>&lt;K, V&gt;) {
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_get_max_degree">get_max_degree</a>&lt;K: store, V: store&gt;(self: &<a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, leaf: bool): u64 {
+    <b>if</b> (leaf) {
+        self.leaf_max_degree <b>as</b> u64
+    } <b>else</b> {
+        self.inner_max_degree <b>as</b> u64
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_btree_map_insert_at"></a>
+
+## Function `insert_at`
+
+
+
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_insert_at">insert_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, node_index: u64, child: <a href="btree_map.md#0x1_btree_map_Child">btree_map::Child</a>&lt;K, V&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_insert_at">insert_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, node_index: u64, child: <a href="btree_map.md#0x1_btree_map_Child">Child</a>&lt;K, V&gt;) {
     <b>let</b> current_size = {
-        <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, node_index);
+        <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, node_index);
         <b>let</b> children = &<b>mut</b> node.children;
         <b>let</b> current_size = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(children);
         <b>let</b> key = child.max_key;
 
-        <b>if</b> (current_size &lt; (tree.order <b>as</b> u64)) {
+        <b>let</b> max_degree = <b>if</b> (node.is_leaf) {
+            self.leaf_max_degree <b>as</b> u64
+        } <b>else</b> {
+            self.inner_max_degree <b>as</b> u64
+        };
+
+        <b>if</b> (current_size &lt; max_degree) {
             <b>let</b> index = <a href="btree_map.md#0x1_btree_map_binary_search">binary_search</a>(key, children, 0, current_size);
             <b>assert</b>!(index &gt;= current_size || children[index].max_key != key, <a href="btree_map.md#0x1_btree_map_E_INTERNAL">E_INTERNAL</a>); // key cannot already be inside.
             <a href="../../move-stdlib/doc/vector.md#0x1_vector_insert">vector::insert</a>(children, index, child);
@@ -1445,7 +1574,7 @@ Requires the tree is not changed after the input iterator is generated.
     };
 
     // # of children in the current node exceeds the threshold, need <b>to</b> split into two nodes.
-    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> tree.nodes, node_index);
+    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> self.nodes, node_index);
     <b>let</b> parent_index = node.parent;
     <b>let</b> is_leaf = &<b>mut</b> node.is_leaf;
     <b>let</b> next = &<b>mut</b> node.next;
@@ -1453,25 +1582,30 @@ Requires the tree is not changed after the input iterator is generated.
     <b>let</b> children = &<b>mut</b> node.children;
     <b>let</b> key = child.max_key;
 
-    <b>let</b> target_size = ((tree.order <b>as</b> u64) + 1) / 2;
+    <b>let</b> max_degree = <b>if</b> (*is_leaf) {
+        self.leaf_max_degree <b>as</b> u64
+    } <b>else</b> {
+        self.inner_max_degree <b>as</b> u64
+    };
+    <b>let</b> target_size = (max_degree + 1) / 2;
 
     <b>let</b> l = <a href="btree_map.md#0x1_btree_map_binary_search">binary_search</a>(key, children, 0, current_size);
 
-    <b>let</b> left_node_index = <a href="table_with_length.md#0x1_table_with_length_length">table_with_length::length</a>(&tree.nodes) + 2;
+    <b>let</b> left_node_index = <a href="table_with_length.md#0x1_table_with_length_length">table_with_length::length</a>(&self.nodes) + 2;
 
     <b>if</b> (parent_index == <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
         // Splitting root now, need <b>to</b> create a new root.
-        parent_index = <a href="table_with_length.md#0x1_table_with_length_length">table_with_length::length</a>(&tree.nodes) + 3;
+        parent_index = <a href="table_with_length.md#0x1_table_with_length_length">table_with_length::length</a>(&self.nodes) + 3;
         node.parent = parent_index;
 
-        tree.root_index = parent_index;
+        self.root_index = parent_index;
         <b>let</b> parent_node = <a href="btree_map.md#0x1_btree_map_new_node">new_node</a>(/*is_leaf=*/<b>false</b>, /*parent=*/<a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>);
         <b>let</b> max_element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, current_size - 1).max_key;
         <b>if</b> (<a href="cmp.md#0x1_cmp_compare">cmp::compare</a>(&max_element, &key).is_less_than()) {
             max_element = key;
         };
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> parent_node.children, <a href="btree_map.md#0x1_btree_map_new_inner_child">new_inner_child</a>(max_element, node_index));
-        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> tree.nodes, parent_index, parent_node);
+        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> self.nodes, parent_index, parent_node);
     };
 
     <b>let</b> new_node_children = <b>if</b> (l &lt; target_size) {
@@ -1489,25 +1623,25 @@ Requires the tree is not changed after the input iterator is generated.
     *next = node_index;
     right_node.prev = left_node_index;
     <b>if</b> (*prev != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-        <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, *prev).next = left_node_index;
+        <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, *prev).next = left_node_index;
     };
 
     <b>if</b> (!*is_leaf) {
         <b>let</b> i = 0;
         <b>while</b> (i &lt; target_size) {
-            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, i).node_index).parent = left_node_index;
+            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, i).node_index).parent = left_node_index;
             i = i + 1;
         };
     };
 
     <b>let</b> split_key = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, target_size - 1).max_key;
 
-    <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> tree.nodes, left_node_index, node);
-    <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> tree.nodes, node_index, right_node);
-    <b>if</b> (node_index == tree.min_leaf_index) {
-        tree.min_leaf_index = left_node_index;
+    <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> self.nodes, left_node_index, node);
+    <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> self.nodes, node_index, right_node);
+    <b>if</b> (node_index == self.min_leaf_index) {
+        self.min_leaf_index = left_node_index;
     };
-    <a href="btree_map.md#0x1_btree_map_insert_at">insert_at</a>(tree, parent_index, <a href="btree_map.md#0x1_btree_map_new_inner_child">new_inner_child</a>(split_key, left_node_index));
+    <a href="btree_map.md#0x1_btree_map_insert_at">insert_at</a>(self, parent_index, <a href="btree_map.md#0x1_btree_map_new_inner_child">new_inner_child</a>(split_key, left_node_index));
 }
 </code></pre>
 
@@ -1521,7 +1655,7 @@ Requires the tree is not changed after the input iterator is generated.
 
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, node_index: u64, old_key: K, new_key: K)
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, node_index: u64, old_key: K, new_key: K)
 </code></pre>
 
 
@@ -1530,12 +1664,12 @@ Requires the tree is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, node_index: u64, old_key: K, new_key: K) {
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, node_index: u64, old_key: K, new_key: K) {
     <b>if</b> (node_index == <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
         <b>return</b>
     };
 
-    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, node_index);
+    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, node_index);
     <b>let</b> keys = &<b>mut</b> node.children;
     <b>let</b> current_size = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(keys);
 
@@ -1545,7 +1679,7 @@ Requires the tree is not changed after the input iterator is generated.
     <b>move</b> keys;
 
     <b>if</b> (index == current_size - 1) {
-        <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>(tree, node.parent, old_key, new_key);
+        <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>(self, node.parent, old_key, new_key);
     };
 }
 </code></pre>
@@ -1560,7 +1694,7 @@ Requires the tree is not changed after the input iterator is generated.
 
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, node_index: u64, key: K): <a href="btree_map.md#0x1_btree_map_Child">btree_map::Child</a>&lt;K, V&gt;
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">btree_map::BTreeMap</a>&lt;K, V&gt;, node_index: u64, key: K): <a href="btree_map.md#0x1_btree_map_Child">btree_map::Child</a>&lt;K, V&gt;
 </code></pre>
 
 
@@ -1569,16 +1703,16 @@ Requires the tree is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(tree: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, node_index: u64, key: K): <a href="btree_map.md#0x1_btree_map_Child">Child</a>&lt;K, V&gt; {
+<pre><code><b>fun</b> <a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="btree_map.md#0x1_btree_map_BTreeMap">BTreeMap</a>&lt;K, V&gt;, node_index: u64, key: K): <a href="btree_map.md#0x1_btree_map_Child">Child</a>&lt;K, V&gt; {
     <b>let</b> (old_child, current_size) = {
-        <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, node_index);
+        <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, node_index);
 
         <b>let</b> children = &<b>mut</b> node.children;
         <b>let</b> current_size = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(children);
 
-        <b>if</b> (current_size == 1) {
+        <b>if</b> (current_size == 1 && !node.is_leaf) {
             // Remove the only element at root node.
-            <b>assert</b>!(node_index == tree.root_index, <a href="btree_map.md#0x1_btree_map_E_INTERNAL">E_INTERNAL</a>);
+            <b>assert</b>!(node_index == self.root_index, <a href="btree_map.md#0x1_btree_map_E_INTERNAL">E_INTERNAL</a>);
             <b>assert</b>!(key == <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, 0).max_key, <a href="btree_map.md#0x1_btree_map_E_INTERNAL">E_INTERNAL</a>);
             <b>return</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(children);
         };
@@ -1593,21 +1727,22 @@ Requires the tree is not changed after the input iterator is generated.
         <b>let</b> old_child = <a href="../../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(children, index);
         current_size = current_size - 1;
 
-        <b>let</b> big_enough = current_size * 2 &gt;= (tree.order <b>as</b> u64);
+        // always look at inner degree on reduction
+        <b>let</b> big_enough = current_size * 2 &gt;= (self.inner_max_degree <b>as</b> u64);
         <b>if</b> (!max_key_updated && big_enough) {
             <b>return</b> old_child;
         };
 
-        <b>if</b> (!big_enough && node_index == tree.root_index) {
+        <b>if</b> (!big_enough && node_index == self.root_index) {
             // promote only child <b>to</b> root, and drop current root.
             <b>if</b> (current_size == 1 && !is_leaf) {
                 <b>let</b> Child::Inner {
                     node_index: inner_child_index,
                     max_key: _,
                 } = <a href="../../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(children);
-                tree.root_index = inner_child_index;
-                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, tree.root_index).parent = <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>;
-                <a href="btree_map.md#0x1_btree_map_destroy_empty_node">destroy_empty_node</a>(<a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> tree.nodes, node_index));
+                self.root_index = inner_child_index;
+                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, self.root_index).parent = <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>;
+                <a href="btree_map.md#0x1_btree_map_destroy_empty_node">destroy_empty_node</a>(<a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> self.nodes, node_index));
             } <b>else</b> {
                 // nothing <b>to</b> change
             };
@@ -1618,7 +1753,7 @@ Requires the tree is not changed after the input iterator is generated.
             <b>let</b> new_max_key = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, current_size - 1).max_key;
             <b>let</b> parent = node.parent;
 
-            <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>(tree, parent, key, new_max_key);
+            <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>(self, parent, key, new_max_key);
 
             <b>if</b> (big_enough) {
                 <b>return</b> old_child;
@@ -1630,7 +1765,7 @@ Requires the tree is not changed after the input iterator is generated.
 
     // We need <b>to</b> <b>update</b> tree beyond the current node
 
-    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> tree.nodes, node_index);
+    <b>let</b> node = <a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> self.nodes, node_index);
 
     <b>let</b> prev = node.prev;
     <b>let</b> next = node.next;
@@ -1642,35 +1777,36 @@ Requires the tree is not changed after the input iterator is generated.
     // Children size is below threshold, we need <b>to</b> rebalance
 
     <b>let</b> brother_index = next;
-    <b>if</b> (brother_index == <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a> || <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&tree.nodes, brother_index).parent != parent) {
+    <b>if</b> (brother_index == <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a> || <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&self.nodes, brother_index).parent != parent) {
         brother_index = prev;
     };
-    <b>let</b> brother_node = <a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> tree.nodes, brother_index);
+    <b>let</b> brother_node = <a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> self.nodes, brother_index);
     <b>let</b> brother_children = &<b>mut</b> brother_node.children;
     <b>let</b> brother_size = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(brother_children);
 
-    <b>if</b> ((brother_size - 1) * 2 &gt;= (tree.order <b>as</b> u64)) {
+    // always look at inner degree on reduction
+    <b>if</b> ((brother_size - 1) * 2 &gt;= (self.inner_max_degree <b>as</b> u64)) {
         // The brother node <b>has</b> enough elements, borrow an element from the brother node.
         brother_size = brother_size - 1;
         <b>if</b> (brother_index == next) {
             <b>let</b> borrowed_element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(brother_children, 0);
             <b>if</b> (borrowed_element is Child::Inner&lt;K, V&gt;) {
-                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, borrowed_element.node_index).parent = node_index;
+                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, borrowed_element.node_index).parent = node_index;
             };
             <b>let</b> borrowed_max_key = borrowed_element.max_key;
             <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(children, borrowed_element);
-            <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>(tree, parent, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, current_size - 2).max_key, borrowed_max_key);
+            <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>(self, parent, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, current_size - 2).max_key, borrowed_max_key);
         } <b>else</b> {
             <b>let</b> borrowed_element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(brother_children);
             <b>if</b> (borrowed_element is Child::Inner&lt;K, V&gt;) {
-                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, borrowed_element.node_index).parent = node_index;
+                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, borrowed_element.node_index).parent = node_index;
             };
             <a href="../../move-stdlib/doc/vector.md#0x1_vector_insert">vector::insert</a>(children, 0, borrowed_element);
-            <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>(tree, parent, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, 0).max_key, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(brother_children, brother_size - 1).max_key);
+            <a href="btree_map.md#0x1_btree_map_update_key">update_key</a>(self, parent, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, 0).max_key, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(brother_children, brother_size - 1).max_key);
         };
 
-        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> tree.nodes, node_index, node);
-        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> tree.nodes, brother_index, brother_node);
+        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> self.nodes, node_index, node);
+        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> self.nodes, brother_index, brother_node);
         <b>return</b> old_child;
     };
 
@@ -1680,7 +1816,7 @@ Requires the tree is not changed after the input iterator is generated.
             <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(children);
             <b>let</b> i = 0;
             <b>while</b> (i &lt; len) {
-                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, i).node_index).parent = brother_index;
+                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(children, i).node_index).parent = brother_index;
                 i = i + 1;
             };
         };
@@ -1692,26 +1828,26 @@ Requires the tree is not changed after the input iterator is generated.
         <b>move</b> children;
 
         <b>if</b> (node.next != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, node.next).prev = brother_index;
+            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, node.next).prev = brother_index;
         };
         <b>if</b> (node.prev != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, node.prev).next = brother_index;
+            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, node.prev).next = brother_index;
         };
 
-        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> tree.nodes, brother_index, node);
-        <b>if</b> (tree.min_leaf_index == node_index) {
-            tree.min_leaf_index = brother_index;
+        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> self.nodes, brother_index, node);
+        <b>if</b> (self.min_leaf_index == node_index) {
+            self.min_leaf_index = brother_index;
         };
 
         <b>if</b> (parent != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-            <a href="btree_map.md#0x1_btree_map_destroy_inner_child">destroy_inner_child</a>(<a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>(tree, parent, key_to_remove));
+            <a href="btree_map.md#0x1_btree_map_destroy_inner_child">destroy_inner_child</a>(<a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>(self, parent, key_to_remove));
         };
     } <b>else</b> {
         <b>if</b> (!is_leaf) {
             <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(brother_children);
             <b>let</b> i = 0;
             <b>while</b> (i &lt; len) {
-                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(brother_children, i).node_index).parent = node_index;
+                <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(brother_children, i).node_index).parent = node_index;
                 i = i + 1;
             };
         };
@@ -1723,19 +1859,19 @@ Requires the tree is not changed after the input iterator is generated.
         <b>move</b> brother_children;
 
         <b>if</b> (brother_node.next != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, brother_node.next).prev = node_index;
+            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, brother_node.next).prev = node_index;
         };
         <b>if</b> (brother_node.prev != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> tree.nodes, brother_node.prev).next = node_index;
+            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.nodes, brother_node.prev).next = node_index;
         };
 
-        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> tree.nodes, node_index, brother_node);
-        <b>if</b> (tree.min_leaf_index == brother_index) {
-            tree.min_leaf_index = node_index;
+        <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> self.nodes, node_index, brother_node);
+        <b>if</b> (self.min_leaf_index == brother_index) {
+            self.min_leaf_index = node_index;
         };
 
         <b>if</b> (parent != <a href="btree_map.md#0x1_btree_map_NULL_INDEX">NULL_INDEX</a>) {
-            <a href="btree_map.md#0x1_btree_map_destroy_inner_child">destroy_inner_child</a>(<a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>(tree, parent, key_to_remove));
+            <a href="btree_map.md#0x1_btree_map_destroy_inner_child">destroy_inner_child</a>(<a href="btree_map.md#0x1_btree_map_remove_at">remove_at</a>(self, parent, key_to_remove));
         };
     };
     old_child
