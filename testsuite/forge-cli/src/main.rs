@@ -62,11 +62,7 @@ use aptos_testcases::{
 };
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use futures::{
-    future,
-    stream::{FuturesUnordered, StreamExt},
-    FutureExt,
-};
+use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
@@ -260,6 +256,12 @@ struct Create {
     enable_haproxy: bool,
     #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
     enable_indexer: bool,
+    #[clap(
+        long,
+        help = "Override the image tag used for indexer",
+        requires = "enable_indexer"
+    )]
+    indexer_image_tag: Option<String>,
 }
 
 // common metrics thresholds:
@@ -437,51 +439,48 @@ fn main() -> Result<()> {
             OperatorCommand::Create(create) => {
                 let kube_client = runtime.block_on(create_k8s_client())?;
                 let era = generate_new_era();
+                let indexer_image_tag = create
+                    .indexer_image_tag
+                    .or(Some(create.validator_image_tag.clone()))
+                    .expect("Expected indexer or validator image tag to use");
                 let config: Value = serde_json::from_value(json!({
                     "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
                     "era": era.clone(),
                     "namespace": create.namespace.clone(),
+                    "indexer-grpc-values": {
+                        "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, &indexer_image_tag),
+                        "fullnodeConfig": {
+                            "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, &indexer_image_tag),
+                        }
+                    },
                 }))?;
 
-                let deploy_testnet_fut = async {
-                    install_testnet_resources(
-                        era.clone(),
+                runtime.block_on(install_testnet_resources(
+                    era.clone(),
+                    create.namespace.clone(),
+                    create.num_validators,
+                    create.num_fullnodes,
+                    create.validator_image_tag,
+                    create.testnet_image_tag,
+                    create.move_modules_dir,
+                    false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
+                    create.enable_haproxy,
+                    create.enable_indexer,
+                    None,
+                    None,
+                    true,
+                ))?;
+
+                if create.enable_indexer {
+                    let indexer_deployer = ForgeDeployerManager::new(
+                        kube_client.clone(),
                         create.namespace.clone(),
-                        create.num_validators,
-                        create.num_fullnodes,
-                        create.validator_image_tag,
-                        create.testnet_image_tag,
-                        create.move_modules_dir,
-                        false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
-                        create.enable_haproxy,
-                        create.enable_indexer,
+                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
                         None,
-                        None,
-                        true,
-                    )
-                    .await?;
-                    Ok(())
+                    );
+                    runtime.block_on(indexer_deployer.start(config))?;
+                    runtime.block_on(indexer_deployer.wait_completed())?;
                 }
-                .boxed();
-
-                let deploy_indexer_fut = async {
-                    if create.enable_indexer {
-                        let indexer_deployer = ForgeDeployerManager::new(
-                            kube_client.clone(),
-                            create.namespace.clone(),
-                            FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
-                            None,
-                        );
-                        indexer_deployer.start(config).await?;
-                        indexer_deployer.wait_completed().await
-                    } else {
-                        Ok(())
-                    }
-                }
-                .boxed();
-
-                runtime.block_on(future::try_join(deploy_testnet_fut, deploy_indexer_fut))?;
-
                 Ok(())
             },
         },

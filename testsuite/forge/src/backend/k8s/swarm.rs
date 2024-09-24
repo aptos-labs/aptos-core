@@ -462,7 +462,7 @@ pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
 
 pub fn k8s_wait_indexer_strategy() -> impl Iterator<Item = Duration> {
     // retry every 10 seconds for 20 minutes
-    fixed_retry_strategy(10 * 1000, 30)
+    fixed_retry_strategy(10 * 1000, 120)
 }
 
 async fn list_stateful_sets(client: K8sClient, kube_namespace: &str) -> Result<Vec<StatefulSet>> {

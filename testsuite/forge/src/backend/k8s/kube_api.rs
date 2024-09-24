@@ -3,12 +3,11 @@
 
 use async_trait::async_trait;
 use kube::{
-    api::{Api, PostParams},
+    api::{Api, ListParams, PostParams},
     client::Client as K8sClient,
     Error as KubeError, Resource as ApiResource,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
 
 // Create kube API wrapper traits such that they are testable
 
@@ -41,6 +40,8 @@ where
 pub trait ReadWrite<K>: Send + Sync {
     async fn get(&self, name: &str) -> Result<K, KubeError>;
     async fn create(&self, pp: &PostParams, k: &K) -> Result<K, KubeError>;
+    async fn get_status(&self, name: &str) -> Result<K, KubeError>;
+    async fn list(&self, lp: &ListParams) -> Result<Vec<K>, KubeError>;
 }
 
 // Implement the traits for K8sApi
@@ -48,7 +49,7 @@ pub trait ReadWrite<K>: Send + Sync {
 #[async_trait]
 impl<K> ReadWrite<K> for K8sApi<K>
 where
-    K: k8s_openapi::Resource + Send + Sync + Clone + DeserializeOwned + Serialize + Debug,
+    K: k8s_openapi::Resource + Send + Sync + Clone + DeserializeOwned + Serialize + std::fmt::Debug,
 {
     async fn get(&self, name: &str) -> Result<K, KubeError> {
         self.api.get(name).await
@@ -56,6 +57,14 @@ where
 
     async fn create(&self, pp: &PostParams, k: &K) -> Result<K, KubeError> {
         self.api.create(pp, k).await
+    }
+
+    async fn get_status(&self, name: &str) -> Result<K, KubeError> {
+        self.api.get_status(name).await
+    }
+    async fn list(&self, lp: &ListParams) -> Result<Vec<K>, KubeError> {
+        let list = self.api.list(lp).await?;
+        Ok(list.items)
     }
 }
 
@@ -68,7 +77,7 @@ pub mod mocks {
     use hyper::StatusCode;
     use k8s_openapi::Metadata;
     use kube::{
-        api::{ObjectMeta, PostParams},
+        api::{ListParams, ObjectMeta, PostParams},
         error::ErrorResponse,
         Error as KubeError,
     };
@@ -177,6 +186,14 @@ pub mod mocks {
             );
             Ok(resource.clone())
         }
+
+        async fn get_status(&self, _name: &str) -> Result<T, KubeError> {
+            todo!()
+        }
+
+        async fn list(&self, _lp: &ListParams) -> Result<Vec<T>, KubeError> {
+            todo!()
+        }
     }
 
     // Mock API that always fails to create a new Namespace
@@ -212,6 +229,26 @@ pub mod mocks {
                 status: status.to_string(),
                 code: status.as_u16(),
                 message: "Failed to create resource".to_string(),
+                reason: "Failed to parse error data".into(),
+            }))
+        }
+
+        async fn get_status(&self, _name: &str) -> Result<T, KubeError> {
+            let status = StatusCode::from_u16(self.status_code).unwrap();
+            Err(KubeError::Api(ErrorResponse {
+                status: status.to_string(),
+                code: status.as_u16(),
+                message: "Failed to get resource status".to_string(),
+                reason: "Failed to parse error data".into(),
+            }))
+        }
+
+        async fn list(&self, _lp: &ListParams) -> Result<Vec<T>, KubeError> {
+            let status = StatusCode::from_u16(self.status_code).unwrap();
+            Err(KubeError::Api(ErrorResponse {
+                status: status.to_string(),
+                code: status.as_u16(),
+                message: "Failed to list resources".to_string(),
                 reason: "Failed to parse error data".into(),
             }))
         }

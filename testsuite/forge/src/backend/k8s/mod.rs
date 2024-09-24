@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
+use crate::{
+    Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version,
+    INDEXER_GRPC_DOCKER_IMAGE_REPO, VALIDATOR_DOCKER_IMAGE_REPO,
+};
 use anyhow::bail;
 use aptos_logger::info;
 use futures::{future, FutureExt};
@@ -204,6 +207,12 @@ impl Factory for K8sFactory {
                         "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
                         "era": new_era.clone(),
                         "namespace": self.kube_namespace.clone(),
+                        "indexer-grpc-values": {
+                            "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, init_version),
+                            "fullnodeConfig": {
+                                "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, init_version),
+                            }
+                        },
                     }))?;
 
                     let indexer_deployer = ForgeDeployerManager::new(

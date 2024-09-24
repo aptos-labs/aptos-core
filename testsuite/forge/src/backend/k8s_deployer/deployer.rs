@@ -5,8 +5,7 @@ use super::{
     DEFAULT_FORGE_DEPLOYER_IMAGE_TAG, FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME,
     FORGE_DEPLOYER_VALUES_ENV_VAR_NAME,
 };
-use crate::{k8s_wait_indexer_strategy, maybe_create_k8s_resource, K8sApi, ReadWrite, Result};
-use anyhow::bail;
+use crate::{k8s_wait_indexer_strategy, maybe_create_k8s_resource, wait_log_job, K8sApi, ReadWrite, Result};
 use aptos_logger::info;
 use k8s_openapi::api::{
     batch::v1::Job,
@@ -58,7 +57,6 @@ impl ForgeDeployerManager {
             kube_client.clone(),
             Some(namespace.clone()),
         ));
-
         // ensure it lives long enough between async
         Self {
             jobs_api,
@@ -169,11 +167,11 @@ impl ForgeDeployerManager {
         self.ensure_namespace_prepared().await?;
         let config_map = self.build_forge_deployer_k8s_config_map(config)?;
         let job = self.build_forge_deployer_k8s_job(config_map.name())?;
-        info!("Creating forge deployer configmap: {:?}", config_map);
+        info!("Creating forge deployer configmap: {}", config_map.name());
         self.config_maps_api
             .create(&PostParams::default(), &config_map)
             .await?;
-        info!("Creating forge deployer job: {:?}", job);
+        info!("Creating forge deployer job: {}", job.name());
         self.jobs_api.create(&PostParams::default(), &job).await?;
         Ok(())
     }
@@ -223,10 +221,13 @@ impl ForgeDeployerManager {
     async fn ensure_namespace_prepared(&self) -> Result<()> {
         info!("Ensuring namespace is prepared");
         let namespace = self.build_namespace();
-        info!("Creating namespace: {:?}", namespace);
+        info!("Creating namespace: {}", &namespace.name());
         maybe_create_k8s_resource(self.namespace_api.clone(), namespace.clone()).await?;
-        info!("Creating service account and role binding");
         let service_account = self.build_service_account();
+        info!(
+            "Creating service account and role binding: {}",
+            &service_account.name()
+        );
         maybe_create_k8s_resource(self.serviceaccount_api.clone(), service_account).await?;
         let role_binding = self.build_role_binding();
         maybe_create_k8s_resource(self.rolebinding_api.clone(), role_binding).await?;
@@ -237,28 +238,7 @@ impl ForgeDeployerManager {
      * Wait for the deployer job to complete.
      */
     pub async fn wait_completed(&self) -> Result<()> {
-        aptos_retrier::retry_async(k8s_wait_indexer_strategy(), || {
-            Box::pin(async move {
-                let job_name: String = self.get_name();
-                let job = self.jobs_api.get(&job_name).await?;
-                let completed = job
-                    .status
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("Failed to get job status"))?
-                    .succeeded
-                    .ok_or_else(|| anyhow::anyhow!("Failed to get job succeeded number"))
-                    .map(|succeeded| succeeded > 0)
-                    .unwrap_or(false);
-                if completed {
-                    Ok(())
-                } else {
-                    // log and bail both
-                    info!("Job {} not completed yet: {:?}", job_name, job);
-                    bail!("Job {} not completed yet", job_name);
-                }
-            })
-        })
-        .await
+        wait_log_job(self.jobs_api.clone(), &self.namespace, self.get_name(), k8s_wait_indexer_strategy()).await
     }
 }
 

@@ -3,14 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn,
-    K8sApi, K8sNode, NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME,
-    DEFAULT_FORGE_DEPLOYER_PROFILE, DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME,
-    FORGE_KEY_SEED, FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX,
-    FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_RELEASE_NAME, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
-    NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
-    VALIDATOR_SERVICE_SUFFIX,
+    get_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck, wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_FORGE_DEPLOYER_PROFILE, DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED, FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
@@ -29,17 +22,14 @@ use kube::{
 };
 use rand::Rng;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
     env,
     fmt::Debug,
-    fs,
-    fs::File,
+    fs::{self, File},
     io::Write,
     net::TcpListener,
-    path::Path,
     process::{Command, Stdio},
     str,
     sync::Arc,
@@ -47,7 +37,12 @@ use std::{
 };
 use tempfile::TempDir;
 use thiserror::Error;
-use tokio::time::Duration;
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    time::Duration,
+};
+
+use super::GENESIS_HELM_RELEASE_NAME;
 
 /// Gets a free port
 pub fn get_free_port() -> u32 {
@@ -70,41 +65,67 @@ pub fn dump_string_to_file(
     Ok(file_path_str)
 }
 
-/// Waits for the testnet's genesis job to complete, while tailing the job's logs
-async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &str) -> Result<()> {
-    aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
-        let jobs: Api<Job> = Api::namespaced(kube_client.clone(), kube_namespace);
+/// Waits for a job to complete, while tailing the job's logs
+pub async fn wait_log_job(
+    jobs_api: Arc<dyn ReadWrite<Job>>,
+    job_namespace: &str,
+    job_name: String,
+    retry_strategy: impl Iterator<Item = Duration>,
+) -> Result<()> {
+    aptos_retrier::retry_async(retry_strategy, || {
+        let jobs_api = jobs_api.clone();
+        let job_name = job_name.clone();
         Box::pin(async move {
-            let job_name = format!("{}-aptos-genesis-e{}", GENESIS_HELM_RELEASE_NAME, era);
-
-            let genesis_job = jobs.get_status(&job_name).await.unwrap();
+            let genesis_job = jobs_api.get_status(&job_name).await.unwrap();
 
             let status = genesis_job.status.unwrap();
-            info!("Genesis status: {:?}", status);
+            info!("Job {} status: {:?}", &job_name, status);
             match status.active {
                 Some(_) => {
                     // try tailing the logs of the genesis job
                     // by the time this is done, we can re-evalulate its status
-                    Command::new(KUBECTL_BIN)
+                    let mut command = tokio::process::Command::new(KUBECTL_BIN)
                         .args([
                             "-n",
-                            kube_namespace,
+                            job_namespace,
                             "logs",
+                            "--tail=10", // in case of connection reset we only want the last few lines to avoid spam
                             "-f",
                             format!("job/{}", &job_name).as_str(),
                         ])
-                        .status()
-                        .expect("Failed to tail genesis logs");
+                        .stdout(Stdio::piped())
+                        .spawn()?;
+                    // Ensure the command has stdout
+                    let stdout = command
+                        .stdout
+                        .take()
+                        .ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
+
+                    // Create a BufReader to read the output asynchronously, line by line
+                    let mut reader = BufReader::new(stdout).lines();
+
+                    // Iterate over the lines as they come
+                    while let Some(line) = reader.next_line().await.transpose() {
+                        match line {
+                            Ok(line) => {
+                                info!("[{}]: {}", &job_name, line); // Add a prefix to each line
+                            },
+                            Err(e) => {
+                                bail!("Error reading line: {}", e);
+                            },
+                        }
+                    }
+                    command.wait().await?;
                 },
-                None => info!("Genesis completed running"),
+                None => info!("Job {} completed running", &job_name),
             }
-            info!("Genesis status: {:?}", status);
+            info!("Job {} status: {:?}", &job_name, status);
             match status.succeeded {
                 Some(_) => {
-                    info!("Genesis done");
+                    info!("Job {} done", &job_name);
                     Ok(())
                 },
-                None => bail!("Genesis did not succeed"),
+                None => bail!("Job {} did not succeed", &job_name),
             }
         })
     })
@@ -424,6 +445,59 @@ pub async fn check_persistent_volumes(
     Ok(())
 }
 
+/// Get the existing helm values for a release
+fn get_default_helm_release_values_from_cluster(helm_release_name: &str) -> Result<serde_yaml::Value> {
+    let status_args = [
+        "status",
+        helm_release_name,
+        "--namespace",
+        "default",
+        "-o",
+        "yaml",
+    ];
+    info!("{:?}", status_args);
+    let raw_helm_values = Command::new(HELM_BIN)
+        .args(status_args)
+        .output()
+        .unwrap_or_else(|_| panic!("Failed to helm status {}", helm_release_name));
+
+    let helm_values = String::from_utf8(raw_helm_values.stdout).unwrap();
+    let j: serde_yaml::Value = serde_yaml::from_str(&helm_values).map_err(|e| {
+        format_err!(
+            "Failed to deserialize helm values. Check if release {} exists: {}",
+            helm_release_name,
+            e
+        )
+    })?;
+    // get .config or anyhow bail!
+    let config = j.get("config").ok_or_else(|| anyhow!("Failed to get helm values"))?;
+    Ok(config.clone())
+}
+
+/// Merges two YAML values in place, with `b` taking precedence over `a`
+/// This simulates helm's behavior of merging default values (values.yaml) with overridden values specified (-f file or --set)
+/// Source: https://stackoverflow.com/questions/67727239/how-to-combine-including-nested-array-values-two-serde-yamlvalue-objects
+fn merge_yaml(a: &mut serde_yaml::Value, b: serde_yaml::Value) {
+    match (a, b) {
+        (a @ &mut serde_yaml::Value::Mapping(_), serde_yaml::Value::Mapping(b)) => {
+            let a = a.as_mapping_mut().unwrap();
+            for (k, v) in b {
+                if v.is_sequence() && a.contains_key(&k) && a[&k].is_sequence() {
+                    let mut _b = a.get(&k).unwrap().as_sequence().unwrap().to_owned();
+                    _b.append(&mut v.as_sequence().unwrap().to_owned());
+                    a[&k] = serde_yaml::Value::from(_b);
+                    continue;
+                }
+                if !a.contains_key(&k) {a.insert(k.to_owned(), v.to_owned());}
+                else { merge_yaml(&mut a[&k], v); }
+
+            }
+
+        }
+        (a, b) => *a = b,
+    }
+}
+
 /// Installs a testnet in a k8s namespace by first running genesis, and the installing the aptos-nodes via helm
 /// Returns all validators and fullnodes by collecting the running nodes
 pub async fn install_testnet_resources(
@@ -445,8 +519,12 @@ pub async fn install_testnet_resources(
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await?;
 
-    // get forge override helm values and cache it
-    let mut aptos_node_forge_helm_values_yaml = construct_node_helm_values(
+    // get existing helm values from the cluster
+    // if the release doesn't exist, return an empty mapping, which may work, especially as we move away from this pattern and instead having default values baked into the deployer
+    let mut aptos_node_helm_values = get_default_helm_release_values_from_cluster(APTOS_NODE_HELM_RELEASE_NAME).unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
+    let mut genesis_helm_values = get_default_helm_release_values_from_cluster(GENESIS_HELM_RELEASE_NAME).unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
+
+    let aptos_node_helm_values_override = construct_node_helm_values_from_input(
         node_helm_config_fn,
         fs::read_to_string(get_node_default_helm_path())
             .expect("Not able to read default value file"),
@@ -457,12 +535,8 @@ pub async fn install_testnet_resources(
         node_image_tag,
         enable_haproxy,
     )?;
-    // disable uploading genesis to blob storage since indexer requires it in the cluster
-    if enable_indexer {
-        aptos_node_forge_helm_values_yaml["genesis_blob_upload_url"] = "".into();
-    }
 
-    let mut genesis_forge_helm_values_yaml = construct_genesis_helm_values(
+    let genesis_helm_values_override = construct_genesis_helm_values_from_input(
         genesis_helm_config_fn,
         kube_namespace.clone(),
         new_era.clone(),
@@ -470,21 +544,29 @@ pub async fn install_testnet_resources(
         genesis_image_tag,
         enable_haproxy,
     )?;
+
+    merge_yaml(&mut aptos_node_helm_values, aptos_node_helm_values_override);
+    merge_yaml(&mut genesis_helm_values, genesis_helm_values_override);
+
+    // disable uploading genesis to blob storage since indexer requires it in the cluster
+    if enable_indexer {
+        aptos_node_helm_values["genesis_blob_upload_url"] = "".into();
+    }
     // run genesis from this directory in the image
     if let Some(genesis_modules_path) = genesis_modules_path {
-        genesis_forge_helm_values_yaml["genesis"]["moveModulesDir"] = genesis_modules_path.into();
+        genesis_helm_values["genesis"]["moveModulesDir"] = genesis_modules_path.into();
     }
     // disable uploading genesis to blob storage since indexer requires it in the cluster
     if enable_indexer {
-        genesis_forge_helm_values_yaml["genesis"]["genesis_blob_upload_url"] = "".into();
+        genesis_helm_values["genesis"]["genesis_blob_upload_url"] = "".into();
     }
 
-    let config: Value = serde_json::from_value(serde_json::json!({
+    let config: serde_json::Value = serde_json::from_value(serde_json::json!({
         "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
         "era": new_era,
         "namespace": kube_namespace.clone(),
-        "testnet-values": aptos_node_forge_helm_values_yaml,
-        "genesis-values": genesis_forge_helm_values_yaml,
+        "testnet-values": aptos_node_helm_values,
+        "genesis-values": genesis_helm_values,
     }))?;
 
     let testnet_deployer = ForgeDeployerManager::new(
@@ -495,11 +577,11 @@ pub async fn install_testnet_resources(
     );
 
     testnet_deployer.start(config).await?;
+    testnet_deployer.wait_completed().await?;
 
     if skip_collecting_running_nodes {
         Ok((HashMap::new(), HashMap::new()))
     } else {
-        wait_genesis_job(&kube_client, &new_era, &kube_namespace).await?;
         let (validators, fullnodes) = collect_running_nodes(
             &kube_client,
             kube_namespace,
@@ -511,7 +593,7 @@ pub async fn install_testnet_resources(
     }
 }
 
-pub fn construct_node_helm_values(
+pub fn construct_node_helm_values_from_input(
     node_helm_config_fn: Option<NodeConfigFn>,
     base_helm_values: String,
     kube_namespace: String,
@@ -542,7 +624,7 @@ pub fn construct_node_helm_values(
     Ok(value)
 }
 
-pub fn construct_genesis_helm_values(
+pub fn construct_genesis_helm_values_from_input(
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     kube_namespace: String,
     era: String,
@@ -964,7 +1046,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_construct_node_helm_values() {
-        let node_helm_values = construct_node_helm_values(
+        let node_helm_values = construct_node_helm_values_from_input(
             None,
             "{}".to_string(),
             "forge-123".to_string(),
@@ -997,7 +1079,7 @@ labels:
 
     #[tokio::test]
     async fn test_construct_genesis_helm_values() {
-        let genesis_helm_values = construct_genesis_helm_values(
+        let genesis_helm_values = construct_genesis_helm_values_from_input(
             Some(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 60.into();
             })),
@@ -1106,5 +1188,43 @@ labels:
             "foo".to_string(),
             time_since_the_epoch
         ));
+    }
+
+    #[test]
+    fn test_merge_yaml_values() {
+
+        let yaml1 = r#"
+        foo:
+          bar: 1
+          baz:
+            qux: hello
+        "#;
+
+        let yaml2 = r#"
+        foo:
+          bar: 2
+          baz:
+            quux: world
+        extra: something
+        "#;
+
+        let mut value1: serde_yaml::Value = serde_yaml::from_str(yaml1).unwrap();
+        let value2: serde_yaml::Value = serde_yaml::from_str(yaml2).unwrap();
+
+        let merged_with_serde_merge_tmerge: serde_yaml::Value = serde_merge::tmerge(&mut value1, &value2).unwrap();
+        merge_yaml(&mut value1, value2); // this is an in-place merge
+        let merged_with_crate = value1;
+
+        let expected: serde_yaml::Value = serde_yaml::from_str(r#"
+        foo:
+          bar: 2
+          baz:
+            qux: hello
+            quux: world
+        extra: something
+        "#).unwrap();
+
+        assert_ne!(merged_with_serde_merge_tmerge, expected);
+        assert_eq!(merged_with_crate, expected);
     }
 }
