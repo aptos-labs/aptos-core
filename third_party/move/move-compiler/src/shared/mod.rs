@@ -611,6 +611,7 @@ impl Flags {
     pub fn set_language_version(self, language_version: LanguageVersion) -> Self {
         Self {
             language_version,
+            lang_v2: language_version >= LanguageVersion::V2,
             ..self
         }
     }

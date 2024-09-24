@@ -118,7 +118,6 @@ pub fn run_model_builder_in_compiler_mode(
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)
-            .set_lang_v2(language_version != LanguageVersion::V1)
             .set_language_version(match language_version {
                 LanguageVersion::V1 => CompilerLanguageVersion::V1,
                 LanguageVersion::V2_0 => CompilerLanguageVersion::V2_0,
