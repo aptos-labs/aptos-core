@@ -115,7 +115,6 @@ jobs:
         id: get-last-released-image-tag-for-compat-test
         with:
           base-branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
-          if-need-to-determine-target-branch: "true"
           variants: "failpoints performance"
 
       - name: Write summary
