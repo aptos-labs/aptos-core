@@ -3,16 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters,
     counters::{
-        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
+        self, PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
-    scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
+    scheduler::{
+        DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, ValidationMode, Wave,
+    },
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
@@ -155,23 +156,27 @@ where
         signature_verified_block: &[T],
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
+        is_backup: bool,
+        called_after_commit: bool,
         shared_sync_params: &SharedSyncParams<'_, T, E, S>,
         executor: &E,
         worker_id: usize,
         profiling_enabled: bool,
         start_delayed_field_id_counter: u32,
-    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<Option<ValidationMode>, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
+        let mut is_backup_validated = is_backup;
 
+        let last_input_output = shared_sync_params.last_input_output;
+        let versioned_cache = shared_sync_params.versioned_cache;
+        let scheduler = shared_sync_params.scheduler;
         let parallel_state = ParallelState::new(
-            shared_sync_params.versioned_cache,
-            shared_sync_params.scheduler,
+            versioned_cache,
+            scheduler,
             start_delayed_field_id_counter,
             shared_sync_params.delayed_field_id_counter,
         );
-        let last_input_output = shared_sync_params.last_input_output;
-        let versioned_cache = shared_sync_params.versioned_cache;
 
         // VM execution.
         let sync_view = LatestView::new(
@@ -179,13 +184,52 @@ where
             ViewState::Sync(parallel_state),
             idx_to_execute,
             incarnation,
+            is_backup,
             worker_id,
             profiling_enabled, // profile view callbacks.
         );
-        let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        let execute_result =
+            executor.execute_transaction(&sync_view, txn, idx_to_execute, incarnation, is_backup);
 
         if profiling_enabled {
             sync_view.log_callback_profiling_info();
+        }
+
+        let mut read_set = sync_view.take_parallel_reads();
+
+        let mut ret_mode = ValidationMode::SelfOnly;
+
+        if !called_after_commit {
+            let validation_function = if is_backup {
+                None
+            } else {
+                Some(|| -> bool {
+                    !read_set.is_incorrect_use()
+                        && read_set.validate_data_reads(versioned_cache.data(), idx_to_execute)
+                        && read_set
+                            .validate_group_reads(versioned_cache.group_data(), idx_to_execute)
+                        && matches!(
+                            read_set.validate_delayed_field_reads(
+                                versioned_cache.delayed_fields(),
+                                idx_to_execute
+                            ),
+                            Ok(true)
+                        )
+                })
+            };
+
+            ret_mode = if let Some(is_validated) =
+                scheduler.try_set_execution_flag_writing(idx_to_execute, validation_function)
+            {
+                if is_validated {
+                    is_backup_validated = true;
+                    ValidationMode::None
+                } else {
+                    ValidationMode::SelfOnly
+                }
+            } else {
+                return Ok(None);
+            };
         }
 
         let mut prev_modified_keys = last_input_output
@@ -196,13 +240,10 @@ where
             .delayed_field_keys(idx_to_execute)
             .map_or(HashSet::new(), |keys| keys.collect());
 
-        let mut read_set = sync_view.take_parallel_reads();
-
         // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
         // May happen, for instance, when the recent execution wrote outside of the previous write/delta
         // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
         // (since those resource group validations rely on estimates).
-        let mut needs_suffix_validation = false;
         let mut apply_updates = |output: &E::Output| -> Result<
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
             PanicError,
@@ -212,7 +253,7 @@ where
             {
                 if prev_modified_keys.remove(&group_key).is_none() {
                     // Previously no write to the group at all.
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
 
                 if versioned_cache.data().write_metadata(
@@ -221,7 +262,7 @@ where
                     incarnation,
                     group_metadata_op,
                 ) {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 if versioned_cache.group_data().write(
                     group_key,
@@ -229,7 +270,7 @@ where
                     incarnation,
                     group_ops.into_iter(),
                 ) {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
             }
 
@@ -243,7 +284,7 @@ where
                     .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
             ) {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache
                     .data()
@@ -252,7 +293,7 @@ where
 
             for (k, v) in output.module_write_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache.modules().write(k, idx_to_execute, v);
             }
@@ -260,7 +301,7 @@ where
             // Then, apply deltas.
             for (k, d) in output.aggregator_v1_delta_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    needs_suffix_validation = true;
+                    ret_mode = ret_mode.add_suffix();
                 }
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
@@ -366,8 +407,7 @@ where
                     // triggering suffix re-validation, a later transaction might
                     // end up with the incorrect read result (corresponding to the
                     // removed group information from an incorrect speculative state).
-                    needs_suffix_validation = true;
-
+                    ret_mode = ret_mode.add_suffix();
                     versioned_cache.data().remove(&k, idx_to_execute);
                     versioned_cache.group_data().remove(&k, idx_to_execute);
                 },
@@ -378,7 +418,14 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if !last_input_output.record(idx_to_execute, read_set, result, resource_write_set) {
+        if !last_input_output.record(
+            idx_to_execute,
+            incarnation,
+            is_backup_validated,
+            read_set,
+            result,
+            resource_write_set,
+        ) {
             // Module R/W is an expected fallback behavior, no alert is required.
             debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
 
@@ -386,7 +433,7 @@ where
                 ParallelBlockExecutionError::ModulePathReadWriteError,
             ));
         }
-        Ok(needs_suffix_validation)
+        Ok(Some(ret_mode))
     }
 
     fn validate(
@@ -395,10 +442,22 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
     ) -> Result<bool, PanicError> {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
-        let read_set = last_input_output
-            .read_set(idx_to_validate)
+
+        let recorded_input = last_input_output
+            .recorded_input(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
+        if recorded_input.as_ref().is_backup_validated {
+            // The execution with this input was either backup, or a concurrent execution
+            // that passed validation and won against the backup. In both cases, validation
+            // is not required. Note: this is not just performance optimization, as currently
+            // validation may fail due to delayed fields incorrect use (TODO: audit and fix).
+            // But for backup execution, there is no need to abort, as the rolling commit
+            // will re-execute the transaction in the correct setting.
+            return Ok(true);
+        }
+
+        let read_set = &recorded_input.input;
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(
                 "Incorrect use detected in CapturedReads",
@@ -427,7 +486,7 @@ where
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
         // Any logs from the aborted execution should be cleared and not reported.
-        clear_speculative_txn_logs(txn_idx as usize);
+        clear_speculative_txn_logs(txn_idx as usize, false);
 
         // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
         if let Some(keys) = last_input_output.modified_keys(txn_idx) {
@@ -483,18 +542,18 @@ where
         }
     }
 
-    fn validate_commit_ready(
+    fn validate_and_commit_delayed_fields(
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
     ) -> Result<bool, PanicError> {
-        let read_set = last_input_output
-            .read_set(txn_idx)
+        let recorded_input = last_input_output
+            .recorded_input(txn_idx)
             .expect("Read set must be recorded");
 
+        let read_set = &recorded_input.input;
         let mut execution_still_valid =
             read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?;
-
         if execution_still_valid {
             if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
                 if let Err(e) = versioned_cache
@@ -532,26 +591,36 @@ where
         scheduler_task: &mut SchedulerTask,
         executor: &E,
         config: &ParallelExecutionConfig,
-    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<Option<u32>, PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_sync_params.shared_commit_state.acquire();
 
         let scheduler = shared_sync_params.scheduler;
         let versioned_cache = shared_sync_params.versioned_cache;
         let last_input_output = shared_sync_params.last_input_output;
 
-        while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
-            if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
-                // Transaction needs to be re-executed, one final time.
+        let mut last_commit_idx: Option<u32> = None;
 
+        while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
+            last_commit_idx = Some(txn_idx);
+
+            if !Self::validate_and_commit_delayed_fields(
+                txn_idx,
+                versioned_cache,
+                last_input_output,
+            )? {
+                // Transaction needs to be re-executed, one final time.
                 Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
                 // Because of that, we can also ignore _needs_suffix_validation result.
-                let _needs_suffix_validation = Self::execute(
+                let _validation_mode = Self::execute(
                     block,
                     txn_idx,
                     incarnation + 1,
+                    // TODO: merge these parameters.
+                    false,
+                    true,
                     shared_sync_params,
                     executor,
                     worker_id,
@@ -564,8 +633,12 @@ where
                 let validation_result =
                     Self::validate(txn_idx, last_input_output, versioned_cache)?;
                 if !validation_result
-                    || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
-                        .unwrap_or(false)
+                    || !Self::validate_and_commit_delayed_fields(
+                        txn_idx,
+                        versioned_cache,
+                        last_input_output,
+                    )
+                    .unwrap_or(false)
                 {
                     return Err(code_invariant_error(format!(
                         "Validation after re-execution failed for {} txn, validate() = {}",
@@ -669,10 +742,10 @@ where
                     )
                     .into()));
                 }
-                return Ok(());
+                return Ok(None);
             }
         }
-        Ok(())
+        Ok(last_commit_idx)
     }
 
     fn materialize_aggregator_v1_delta_writes(
@@ -743,11 +816,15 @@ where
             start_delayed_field_id_counter,
             shared_sync_params.delayed_field_id_counter,
         );
+        let recorded_output = last_input_output
+            .txn_output(txn_idx)
+            .ok_or_else(|| code_invariant_error("Output must be set during materialize commit"))?;
         let latest_view = LatestView::new(
             shared_sync_params.base_view,
             ViewState::Sync(parallel_state),
             txn_idx,
-            0, // dummy incarnation
+            recorded_output.incarnation,
+            false,
             worker_id,
             false, // profile view callbacks
         );
@@ -789,7 +866,7 @@ where
             materialized_events,
         )?;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
-            match last_input_output.txn_output(txn_idx).unwrap().as_ref() {
+            match &recorded_output.status {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     txn_commit_listener.on_transaction_committed(txn_idx, output);
                 },
@@ -802,9 +879,10 @@ where
                 },
             }
         }
+        drop(recorded_output);
 
         let mut final_results = shared_sync_params.final_results.acquire();
-        match last_input_output.take_output(txn_idx) {
+        match last_input_output.take_output(txn_idx).status {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
             },
@@ -848,10 +926,10 @@ where
             }
             Ok(())
         };
-
         loop {
+            let mut last_commit_idx = None;
             while scheduler.should_coordinate_commits() {
-                self.prepare_and_queue_commit_ready_txns(
+                if let Some(last_idx) = self.prepare_and_queue_commit_ready_txns(
                     block,
                     worker_id,
                     &self.config.onchain.block_gas_limit_type,
@@ -859,12 +937,50 @@ where
                     &mut scheduler_task,
                     &executor,
                     config,
-                )?;
+                )? {
+                    last_commit_idx.replace(last_idx);
+                };
                 scheduler.queueing_commits_mark_done();
             }
 
             if config.worker_should_backup(&scheduler_task) {
-                // TODO: back-up logic - next PR.
+                if let Some(last_commit_idx) = last_commit_idx {
+                    let next_commit_idx = last_commit_idx + 1;
+                    if let Some(incarnation) = scheduler.try_backup(next_commit_idx) {
+                        if let Some(validation_mode) = Self::execute(
+                            block,
+                            next_commit_idx,
+                            incarnation,
+                            true,
+                            false,
+                            shared_sync_params,
+                            &executor,
+                            worker_id,
+                            config.profiling_enabled,
+                            config.start_delayed_field_id_counter,
+                        )? {
+                            // fallback won, no need to validate
+                            scheduler.finish_execution(
+                                next_commit_idx,
+                                incarnation,
+                                validation_mode,
+                            )?;
+                        } else {
+                            // fallback lost, clear the corresponding speculative log slot.
+                            clear_speculative_txn_logs(next_commit_idx as usize, true);
+                        }
+
+                        match scheduler_task {
+                            SchedulerTask::ValidationTask(txn_idx, _, _)
+                            | SchedulerTask::ExecutionTask(txn_idx, _, _) => {
+                                if txn_idx <= next_commit_idx {
+                                    scheduler_task = SchedulerTask::Retry;
+                                }
+                            },
+                            SchedulerTask::Retry | SchedulerTask::Done => {},
+                        }
+                    }
+                };
             }
 
             drain_commit_queue()?;
@@ -887,17 +1003,25 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    let needs_suffix_validation = Self::execute(
+                    if let Some(validation_mode) = Self::execute(
                         block,
                         txn_idx,
                         incarnation,
+                        false,
+                        false,
                         shared_sync_params,
                         &executor,
                         worker_id,
                         config.profiling_enabled,
                         config.start_delayed_field_id_counter,
-                    )?;
-                    scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
+                    )? {
+                        scheduler.finish_execution(txn_idx, incarnation, validation_mode)?
+                    } else {
+                        // lost to fallback, clear the corresponding speculative log slot.
+                        clear_speculative_txn_logs(txn_idx as usize, false);
+
+                        SchedulerTask::Retry
+                    }
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     {
@@ -905,7 +1029,9 @@ where
 
                         // Mark dependency resolved.
                         let mut lock = lock.lock();
-                        *lock = DependencyStatus::Resolved;
+                        if matches!(*lock, DependencyStatus::Unresolved) {
+                            *lock = DependencyStatus::Resolved;
+                        }
                         // Wake up the process waiting for dependency.
                         cvar.notify_one();
                     }
@@ -1119,7 +1245,7 @@ where
         let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
-        let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
+        let mut block_limit_processor: BlockGasLimitProcessor<T> = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
         );
@@ -1132,11 +1258,12 @@ where
                 base_view,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
-                0,     // incarnation
+                0,
+                false, // incarnation
                 0,     // worker id
                 false, // profile view callbacks
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex, 0, true); //no need to validate
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {

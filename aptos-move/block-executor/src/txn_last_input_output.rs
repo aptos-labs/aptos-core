@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_aggregator::types::code_invariant_error;
 use aptos_logger::error;
-use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
+use aptos_mvhashmap::types::{Incarnation, TxnIndex, ValueWithLayout};
 use aptos_types::{
     delayed_fields::PanicError, fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
@@ -34,7 +34,7 @@ macro_rules! forward_on_success_or_skip_rest {
         $self.outputs[$txn_idx as usize]
             .load()
             .as_ref()
-            .map_or(vec![], |txn_output| match txn_output.as_ref() {
+            .map_or(vec![], |txn_output| match &txn_output.status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.$f(),
                 ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
@@ -49,8 +49,42 @@ pub(crate) enum KeyKind {
     Group,
 }
 
+#[derive(Debug)]
+pub(crate) struct RecordedOutput<O, E> {
+    pub(crate) status: ExecutionStatus<O, E>,
+    pub(crate) incarnation: Incarnation,
+}
+
+pub(crate) struct RecordedInput<T: Transaction> {
+    pub(crate) input: TxnInput<T>,
+    pub(crate) is_backup_validated: bool,
+}
+
+impl<O, E> RecordedOutput<O, E> {
+    pub(crate) fn new(status: ExecutionStatus<O, E>, incarnation: Incarnation) -> Self {
+        Self {
+            status,
+            incarnation,
+        }
+    }
+
+    pub(crate) fn take(self) -> (ExecutionStatus<O, E>, Incarnation) {
+        (self.status, self.incarnation)
+    }
+}
+
+impl<T: Transaction> RecordedInput<T> {
+    pub(crate) fn new(input: TxnInput<T>, is_backup_validated: bool) -> Self {
+        Self {
+            input,
+            is_backup_validated,
+        }
+    }
+}
+
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
+    // txn_idx -> RecordedInput
+    inputs: Vec<CachePadded<ArcSwapOption<RecordedInput<T>>>>,
     // Set once when the group outputs are committed sequentially, to be processed later by
     // concurrent materialization / output preparation.
     finalized_groups: Vec<
@@ -59,8 +93,8 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
         >,
     >,
 
-    // TODO: Consider breaking down the outputs when storing (avoid traversals, cache below).
-    outputs: Vec<CachePadded<ArcSwapOption<ExecutionStatus<O, E>>>>, // txn_idx -> output.
+    // txn_idx -> RecordedOutput
+    outputs: Vec<CachePadded<ArcSwapOption<RecordedOutput<O, E>>>>,
     // Cache to avoid expensive clones of data.
     // TODO(clean-up): be consistent with naming resource writes: here it means specifically
     // individual writes, but in some contexts it refers to all writes (e.g. including group writes)
@@ -128,6 +162,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        is_backup_validated: bool,
         input: CapturedReads<T>,
         output: ExecutionStatus<O, E>,
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
@@ -148,8 +184,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
 
         *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
-        self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
-        self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
+        self.inputs[txn_idx as usize].store(Some(Arc::new(RecordedInput::new(
+            input,
+            is_backup_validated,
+        ))));
+        self.outputs[txn_idx as usize]
+            .store(Some(Arc::new(RecordedOutput::new(output, incarnation))));
 
         true
     }
@@ -164,16 +204,16 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             || Self::append_and_check(module_writes_keys, &self.module_writes, &self.module_reads)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
+    pub(crate) fn recorded_input(&self, txn_idx: TxnIndex) -> Option<Arc<RecordedInput<T>>> {
         self.inputs[txn_idx as usize].load_full()
     }
 
     /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
     pub(crate) fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
-        match self.outputs[txn_idx as usize]
+        match &self.outputs[txn_idx as usize]
             .load_full()
 	    .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
-            .as_ref()
+            .status
         {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Some(output.fee_statement())
@@ -183,11 +223,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn output_approx_size(&self, txn_idx: TxnIndex) -> Option<u64> {
-        match self.outputs[txn_idx as usize]
+        match &self.outputs[txn_idx as usize]
             .load_full()
             .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
-            .as_ref()
-        {
+            .status        {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Some(output.output_approx_size())
             },
@@ -198,10 +237,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     /// Does a transaction at txn_idx have SkipRest or Abort status.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
-            self.outputs[txn_idx as usize]
+            &self.outputs[txn_idx as usize]
                 .load_full()
                 .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
-                .as_ref(),
+                .status,
             ExecutionStatus::SkipRest(_)
         )
     }
@@ -210,8 +249,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Result<(), ParallelBlockExecutionError> {
-        if let Some(status) = self.outputs[txn_idx as usize].load_full() {
-            if let ExecutionStatus::Abort(err) = status.as_ref() {
+        if let Some(recorded_output) = self.outputs[txn_idx as usize].load_full() {
+            if let ExecutionStatus::Abort(err) = &recorded_output.status {
                 error!(
                     "FatalVMError from parallel execution {:?} at txn {}",
                     err, txn_idx
@@ -226,8 +265,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Result<(), PanicError> {
-        if let Some(status) = self.outputs[txn_idx as usize].load_full() {
-            match status.as_ref() {
+        if let Some(recorded_output) = self.outputs[txn_idx as usize].load_full() {
+            match &recorded_output.status {
                 ExecutionStatus::Success(_) | ExecutionStatus::SkipRest(_) => Ok(()),
                 // Transaction cannot be committed with below statuses, as:
                 // - Speculative error must have failed validation.
@@ -258,14 +297,17 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
         // check_execution_status_during_commit must be used for checks re:status.
         // Hence, since the status is not SkipRest, it must be Success.
-        if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
-            self.outputs[txn_idx as usize].store(Some(Arc::new(ExecutionStatus::SkipRest(output))));
+        if let (ExecutionStatus::Success(output), incarnation) = self.take_output(txn_idx).take() {
+            self.outputs[txn_idx as usize].store(Some(Arc::new(RecordedOutput::new(
+                ExecutionStatus::SkipRest(output),
+                incarnation,
+            ))));
         } else {
             unreachable!("Unexpected status, must be Success");
         }
     }
 
-    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<ExecutionStatus<O, E>>> {
+    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<RecordedOutput<O, E>>> {
         self.outputs[txn_idx as usize].load_full()
     }
 
@@ -277,7 +319,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     ) -> Option<impl Iterator<Item = (T::Key, KeyKind)>> {
         self.outputs[txn_idx as usize]
             .load_full()
-            .and_then(|txn_output| match txn_output.as_ref() {
+            .and_then(|txn_output| match &txn_output.status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_iter()
@@ -314,7 +356,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize]
             .load()
             .as_ref()
-            .and_then(|txn_output| match txn_output.as_ref() {
+            .and_then(|txn_output| match &txn_output.status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     Some(t.delayed_field_change_set().into_keys())
                 },
@@ -355,7 +397,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     ) -> Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
             Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>()),
-            |txn_output| match txn_output.as_ref() {
+            |txn_output| match &txn_output.status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
                     Box::new(events.into_iter())
@@ -401,10 +443,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
     ) -> Result<(), PanicError> {
-        match self.outputs[txn_idx as usize]
+        match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
-            .as_ref()
+            .status
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 t.incorporate_materialized_txn_output(
@@ -421,7 +463,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {
-        let read_set = self.read_set(txn_idx).expect("Read set must be recorded");
+        let read_set = &self
+            .recorded_input(txn_idx)
+            .expect("Read set must be recorded")
+            .input;
 
         let reads = read_set.get_read_summary();
         let writes = self.get_write_summary(txn_idx);
@@ -432,10 +477,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
-        match self.outputs[txn_idx as usize]
+        match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
-            .as_ref()
+            .status
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.get_write_summary(),
             ExecutionStatus::Abort(_)
@@ -446,7 +491,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
-    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<O, E> {
+    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> RecordedOutput<O, E> {
         let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
             .expect("[BlockSTM]: Output must be recorded after execution");

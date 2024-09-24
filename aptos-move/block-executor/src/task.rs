@@ -6,7 +6,7 @@ use crate::types::InputOutputKey;
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::{
     delayed_fields::PanicError,
     fee_statement::FeeStatement,
@@ -85,6 +85,8 @@ pub trait ExecutorTask: Sync {
         >),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        is_backup: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;

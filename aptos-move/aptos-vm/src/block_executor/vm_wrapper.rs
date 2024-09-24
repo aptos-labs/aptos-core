@@ -5,7 +5,7 @@
 use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::{
     state_store::{StateView, StateViewId},
     transaction::{
@@ -46,12 +46,14 @@ impl ExecutorTask for AptosExecutorTask {
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
+        _incarnation: Incarnation,
+        is_backup: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
-        let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
+        let log_context = AdapterLogSchema::new(self.id, txn_idx as usize, is_backup);
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);

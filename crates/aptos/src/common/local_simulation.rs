@@ -20,7 +20,7 @@ pub fn run_transaction_using_debugger(
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let state_view = debugger.state_view_at_version(version);
     let vm = AptosVM::new(&state_view);
-    let log_context = AdapterLogSchema::new(state_view.id(), 0);
+    let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
 
     let resolver = state_view.as_move_resolver();
     let (vm_status, vm_output) = vm.execute_user_transaction(&resolver, &transaction, &log_context);
@@ -36,7 +36,7 @@ pub fn benchmark_transaction_using_debugger(
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let state_view = debugger.state_view_at_version(version);
     let vm = AptosVM::new(&state_view);
-    let log_context = AdapterLogSchema::new(state_view.id(), 0);
+    let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
 
     let resolver = state_view.as_move_resolver();
     let (vm_status, vm_output) = vm.execute_user_transaction(&resolver, &transaction, &log_context);
@@ -49,7 +49,7 @@ pub fn benchmark_transaction_using_debugger(
             // Create a new VM each time so to include code loading as part of the
             // total running time.
             let vm = AptosVM::new(&state_view);
-            let log_context = AdapterLogSchema::new(state_view.id(), 0);
+            let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
 
             let t1 = Instant::now();
             std::hint::black_box(vm.execute_user_transaction(

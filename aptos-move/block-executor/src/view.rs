@@ -464,14 +464,35 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         &self,
         key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<Arc<T::Value>, MVModulesError> {
+        incarnation: Incarnation,
+        base_f: &impl Fn() -> PartialVMResult<Option<StateValue>>,
+    ) -> PartialVMResult<Option<StateValue>> {
+        use MVModulesError::*;
+
         // Record for the R/W path intersection fallback for modules.
         self.captured_reads
             .borrow_mut()
             .module_reads
             .push(key.clone());
 
-        self.versioned_map.modules().fetch_module(key, txn_idx)
+        if self
+            .scheduler
+            .has_lost_execution_flag_writing(txn_idx, incarnation)
+        {
+            return Err(PartialVMError::new(
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+            ));
+        }
+
+        match self.versioned_map.modules().fetch_module(key, txn_idx) {
+            Ok(v) => Ok(v.as_state_value()),
+            Err(NotFound) => base_f(),
+            Err(Dependency(_)) => {
+                // Return anything (e.g. module does not exist) to avoid waiting,
+                // because parallel execution will fall back to sequential anyway.
+                Ok(None)
+            },
+        }
     }
 
     fn read_group_size(
@@ -965,6 +986,7 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     pub(crate) latest_view: ViewState<'a, T>,
     txn_idx: TxnIndex,
     incarnation: Incarnation,
+    is_backup: bool,
     worker_id: usize,
     maybe_profiler_state: Option<RefCell<ViewProfilerState>>,
 }
@@ -975,6 +997,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         latest_view: ViewState<'a, T>,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
+        is_backup: bool,
         worker_id: usize,
         profile_callbacks: bool,
     ) -> Self {
@@ -983,6 +1006,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             latest_view,
             txn_idx,
             incarnation,
+            is_backup,
             worker_id,
             maybe_profiler_state: profile_callbacks.then(|| RefCell::new(ViewProfilerState::new())),
         }
@@ -1048,7 +1072,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
             // Thus, this critical error log and count does not need to be buffered.
-            let log_context = AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+            let log_context =
+                AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize, self.is_backup);
             alert!(
                 log_context,
                 "[VM, StateView] Error getting data from storage for {:?}",
@@ -1071,8 +1096,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 match res {
                     Ok((value, _)) => Some(value),
                     Err(err) => {
-                        let log_context =
-                            AdapterLogSchema::new(self.base_view.id(), self.txn_idx as usize);
+                        let log_context = AdapterLogSchema::new(
+                            self.base_view.id(),
+                            self.txn_idx as usize,
+                            self.is_backup,
+                        );
                         alert!(
                             log_context,
                             "[VM, ResourceView] Error during value to id replacement: {}",
@@ -1561,17 +1589,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView
 
         match &self.latest_view {
             ViewState::Sync(state) => {
-                use MVModulesError::*;
+                let base_f = || -> PartialVMResult<Option<StateValue>> {
+                    let ret = self.base_view.get_state_value(state_key);
 
-                match state.fetch_module(state_key, self.txn_idx) {
-                    Ok(v) => Ok(v.as_state_value()),
-                    Err(Dependency(_)) => {
-                        // Return anything (e.g. module does not exist) to avoid waiting,
-                        // because parallel execution will fall back to sequential anyway.
-                        Ok(None)
-                    },
-                    Err(NotFound) => self.get_raw_base_value(state_key),
-                }
+                    if ret.is_err() {
+                        // Reading from base view should not return an error.
+                        // Thus, this critical error log and count does not need to be buffered.
+                        let log_context =
+                            AdapterLogSchema::new(self.base_view.id(), 0, self.is_backup);
+                        alert!(
+                            log_context,
+                            "[VM, StateView] Error getting data from storage for {:?}",
+                            state_key
+                        );
+                    }
+
+                    ret.map_err(|e| {
+                        PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                            "Unexpected storage error for {:?}: {:?}",
+                            state_key, e
+                        ))
+                    })
+                };
+
+                state.fetch_module(state_key, self.txn_idx, self.incarnation, &base_f)
             },
             ViewState::Unsync(state) => {
                 state
@@ -2475,6 +2516,7 @@ mod test {
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
             0,
+            false,
             0,
             false,
         );
@@ -2763,6 +2805,7 @@ mod test {
             ViewState::Unsync(sequential_state),
             1,
             0,
+            false,
             0,
             false,
         )
@@ -2807,6 +2850,7 @@ mod test {
                 )),
                 1,
                 0,
+                false,
                 0,
                 false,
             );

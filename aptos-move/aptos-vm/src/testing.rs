@@ -76,7 +76,7 @@ impl AptosVM {
         use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 
         let txn_data = TransactionMetadata::new(txn);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0, false);
 
         let vm_gas_params = self
             .gas_params()
