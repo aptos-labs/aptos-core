@@ -8,7 +8,7 @@ See spec source:
 - [HTML in doc/spec.html](doc/spec.html).
 
 ## Regenerating docs / code based on API changes
-With our API setup, the spec files (`api/doc/spec.yaml` / `api/doc/spec.json`) are generated from the API in code, and the TS SDK client (`ecosystem/typescript/sdk`) is generated from that spec. We have CI that ensures that all of these are updated together. As such, if you want to make a change to the API, do it in this order.
+With our API setup, the spec files (`api/doc/spec.yaml` / `api/doc/spec.json`) are generated from the API in code. We have CI that ensures that all of these are updated together. As such, if you want to make a change to the API, do it in this order.
 
 ![API + spec + TS SDK generation diagram](doc/api_spec_ts_sdk_diagram.png)
 
