@@ -3,7 +3,7 @@
 
 //! Do a few checks of functions and function calls.
 
-use crate::Options;
+use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
@@ -17,17 +17,44 @@ type QualifiedFunId = QualifiedId<FunId>;
 
 /// check that non-inline function parameters do not have function type.
 pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
+    let options = env
+        .get_extension::<Options>()
+        .expect("Options is available");
+    let lambda_params_ok = options.experiment_on(Experiment::LAMBDA_PARAMS);
+    let lambda_return_ok = options.experiment_on(Experiment::LAMBDA_RESULTS);
+    if lambda_params_ok && lambda_return_ok {
+        return;
+    }
+
     for caller_module in env.get_modules() {
         if caller_module.is_primary_target() {
             for caller_func in caller_module.get_functions() {
+                // Check that no functions have function return type
+                if !lambda_return_ok {
+                    let caller_name = caller_func.get_full_name_str();
+                    let return_type = caller_func.get_result_type();
+                    let has_function_value =
+                        return_type.clone().flatten().iter().any(Type::is_function);
+                    if has_function_value {
+                        let type_display_ctx = caller_func.get_type_display_ctx();
+                        env.diag(
+                            Severity::Error,
+                            &caller_func.get_id_loc(),
+                            &format!("Functions may not return function-typed values, but function `{}` return type is `{}`:",
+                                     caller_name,
+                                     return_type.display(&type_display_ctx)),
+                        );
+                    }
+                }
                 // Check that non-inline function parameters don't have function type
-                if !caller_func.is_inline() {
+                if !caller_func.is_inline() && !lambda_params_ok {
                     let parameters = caller_func.get_parameters();
                     let bad_params: Vec<_> = parameters
                         .iter()
                         .filter(|param| matches!(param.1, Type::Fun(_, _)))
                         .collect();
                     if !bad_params.is_empty() {
+                        let type_display_ctx = caller_func.get_type_display_ctx();
                         let caller_name = caller_func.get_full_name_str();
                         let reasons: Vec<(Loc, String)> = bad_params
                             .iter()
@@ -35,8 +62,9 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
                                 (
                                     param.2.clone(),
                                     format!(
-                                        "Parameter `{}` has a function type.",
+                                        "Parameter `{}` has function-valued type `{}`.",
                                         param.0.display(env.symbol_pool()),
+                                        param.1.display(&type_display_ctx)
                                     ),
                                 )
                             })

@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x42::m {
     struct S {
-        x: #0,
+        x: T,
     }
     private fun id<T>(self: S<T>): S<T> {
         self

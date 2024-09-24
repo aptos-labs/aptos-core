@@ -101,7 +101,7 @@ impl<'a> RecursiveStructChecker<'a> {
                         self.report_invalid_field(&struct_env, &field_env);
                     }
                 },
-                Type::Primitive(_) | Type::TypeParameter(_) => {},
+                Type::Primitive(_) | Type::TypeParameter(_) | Type::Fun(..) => {},
                 _ => unreachable!("invalid field type"),
             }
             path.pop();

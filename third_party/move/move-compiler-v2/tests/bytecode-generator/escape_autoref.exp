@@ -10,7 +10,7 @@ module 0x42::m {
         Abort(0)
     }
     private fun owner_correct(o: Object): address
-        acquires 0x42::m::ObjectCore(*)
+        acquires ObjectCore(*)
      {
         {
           let addr: address = select m::Object.inner<Object>(o);
@@ -18,7 +18,7 @@ module 0x42::m {
         }
     }
     private fun owner_read_ref_missing(o: Object): address
-        acquires 0x42::m::ObjectCore(*)
+        acquires ObjectCore(*)
      {
         select m::ObjectCore.owner<&ObjectCore>(BorrowGlobal(Immutable)<ObjectCore>(select m::Object.inner<Object>(o)))
     }

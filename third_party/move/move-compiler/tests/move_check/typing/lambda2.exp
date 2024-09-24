@@ -1,0 +1,30 @@
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda2.move:77:18
+   │
+77 │         let _x = |i| i + 1; // expected lambda not allowed
+   │                  ^^^^^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda2.move:81:12
+   │
+81 │         f: |u64|u64, // expected lambda not allowed
+   │            ^^^^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda2.move:84:46
+   │
+84 │     public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
+   │                                              ^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda2.move:86:58
+   │
+86 │     public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+   │                                                          ^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda2.move:89:49
+   │
+89 │     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+   │                                                 ^^^^^ function type only allowed for inline function arguments
+

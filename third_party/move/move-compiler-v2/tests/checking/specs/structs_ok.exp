@@ -4,11 +4,11 @@ module 0x42::M {
         x: u64,
     }
     struct G {
-        x: #0,
+        x: T,
         y: bool,
     }
     struct R {
-        s: 0x42::M::S,
+        s: S,
     }
     struct S {
         x: u64,

@@ -1,11 +1,11 @@
 // -- Model dump before bytecode pipeline
 module 0x815::m {
     struct MyMap {
-        table: 0x815::m::Table<address, 0x815::m::ValueWrap>,
+        table: Table<address, ValueWrap>,
     }
     struct Table {
-        x: #0,
-        y: #1,
+        x: T1,
+        y: T2,
     }
     struct ValueWrap {
         val: u64,
@@ -17,7 +17,7 @@ module 0x815::m {
         Tuple()
     }
     public fun add_when_missing(key: address,val: u64)
-        acquires 0x815::m::MyMap(*)
+        acquires MyMap(*)
      {
         {
           let my_map: &mut MyMap = BorrowGlobal(Mutable)<MyMap>(0x815);

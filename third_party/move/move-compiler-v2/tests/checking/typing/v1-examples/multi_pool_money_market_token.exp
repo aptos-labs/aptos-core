@@ -19,7 +19,7 @@ warning: unused type parameter
 // -- Model dump before bytecode pipeline
 module 0x2::Token {
     struct Coin {
-        type: #0,
+        type: AssetType,
         value: u64,
     }
     public fun create<ATy>(type: ATy,value: u64): Coin<ATy> {
@@ -85,22 +85,22 @@ module 0x3::OneToOneMarket {
     use 0x2::Map; // resolved as: 0x2::Map
     use 0x2::Token; // resolved as: 0x2::Token
     struct BorrowRecord {
-        record: 0x2::Map::T<address, u64>,
+        record: Map::T<address, u64>,
     }
     struct DepositRecord {
-        record: 0x2::Map::T<address, u64>,
+        record: Map::T<address, u64>,
     }
     struct Pool {
-        coin: 0x2::Token::Coin<#0>,
+        coin: Token::Coin<AssetType>,
     }
     struct Price {
         price: u64,
     }
     public fun borrow<In,Out>(account: &signer,pool_owner: address,amount: u64): Token::Coin<Out>
-        acquires 0x3::OneToOneMarket::Price(*)
-        acquires 0x3::OneToOneMarket::Pool(*)
-        acquires 0x3::OneToOneMarket::DepositRecord(*)
-        acquires 0x3::OneToOneMarket::BorrowRecord(*)
+        acquires Price(*)
+        acquires Pool(*)
+        acquires DepositRecord(*)
+        acquires BorrowRecord(*)
      {
         if Le<u64>(amount, OneToOneMarket::max_borrow_amount<In, Out>(account, pool_owner)) {
           Tuple()
@@ -114,8 +114,8 @@ module 0x3::OneToOneMarket {
         }
     }
     public fun deposit<In,Out>(account: &signer,pool_owner: address,coin: Token::Coin<In>)
-        acquires 0x3::OneToOneMarket::Pool(*)
-        acquires 0x3::OneToOneMarket::DepositRecord(*)
+        acquires Pool(*)
+        acquires DepositRecord(*)
      {
         {
           let amount: u64 = Token::value<In>(Borrow(Immutable)(coin));
@@ -138,7 +138,7 @@ module 0x3::OneToOneMarket {
         }
     }
     private fun borrowed_amount<In,Out>(account: &signer,pool_owner: address): u64
-        acquires 0x3::OneToOneMarket::BorrowRecord(*)
+        acquires BorrowRecord(*)
      {
         {
           let sender: address = signer::address_of(account);
@@ -158,7 +158,7 @@ module 0x3::OneToOneMarket {
         }
     }
     private fun deposited_amount<In,Out>(account: &signer,pool_owner: address): u64
-        acquires 0x3::OneToOneMarket::DepositRecord(*)
+        acquires DepositRecord(*)
      {
         {
           let sender: address = signer::address_of(account);
@@ -178,10 +178,10 @@ module 0x3::OneToOneMarket {
         }
     }
     private fun max_borrow_amount<In,Out>(account: &signer,pool_owner: address): u64
-        acquires 0x3::OneToOneMarket::Price(*)
-        acquires 0x3::OneToOneMarket::Pool(*)
-        acquires 0x3::OneToOneMarket::DepositRecord(*)
-        acquires 0x3::OneToOneMarket::BorrowRecord(*)
+        acquires Price(*)
+        acquires Pool(*)
+        acquires DepositRecord(*)
+        acquires BorrowRecord(*)
      {
         {
           let input_deposited: u64 = OneToOneMarket::deposited_amount<In, Out>(account, pool_owner);
@@ -217,7 +217,7 @@ module 0x3::OneToOneMarket {
         MoveTo<Price<In, Out>>(account, pack OneToOneMarket::Price<In, Out>(price))
     }
     private fun update_borrow_record<In,Out>(account: &signer,pool_owner: address,amount: u64)
-        acquires 0x3::OneToOneMarket::BorrowRecord(*)
+        acquires BorrowRecord(*)
      {
         {
           let sender: address = signer::address_of(account);
@@ -242,7 +242,7 @@ module 0x3::OneToOneMarket {
         }
     }
     private fun update_deposit_record<In,Out>(account: &signer,pool_owner: address,amount: u64)
-        acquires 0x3::OneToOneMarket::DepositRecord(*)
+        acquires DepositRecord(*)
      {
         {
           let sender: address = signer::address_of(account);
@@ -274,7 +274,7 @@ module 0x70dd::ToddNickels {
         dummy_field: bool,
     }
     struct Wallet {
-        nickels: 0x2::Token::Coin<0x70dd::ToddNickels::T>,
+        nickels: Token::Coin<T>,
     }
     public fun init(account: &signer) {
         if Eq<address>(signer::address_of(account), 0x70dd) {
@@ -285,7 +285,7 @@ module 0x70dd::ToddNickels {
         MoveTo<Wallet>(account, pack ToddNickels::Wallet(Token::create<T>(pack ToddNickels::T(false), 0)))
     }
     public fun destroy(c: Token::Coin<T>)
-        acquires 0x70dd::ToddNickels::Wallet(*)
+        acquires Wallet(*)
      {
         Token::deposit<T>(Borrow(Mutable)(select ToddNickels::Wallet.nickels<&mut Wallet>(BorrowGlobal(Mutable)<Wallet>(0x70dd))), c)
     }

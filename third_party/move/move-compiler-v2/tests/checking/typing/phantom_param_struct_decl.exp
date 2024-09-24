@@ -4,18 +4,18 @@ module 0x42::M1 {
         a: u64,
     }
     struct S2 {
-        a: 0x42::M1::S1<#0>,
-        b: vector<0x42::M1::S1<#0>>,
+        a: S1<T>,
+        b: vector<S1<T>>,
     }
     struct S3 {
-        a: #1,
-        b: #3,
+        a: T2,
+        b: T4,
     }
     struct S4 {
         a: u64,
     }
     struct S5 {
-        a: 0x42::M1::S4<#0>,
+        a: S4<T>,
     }
 } // end 0x42::M1
 

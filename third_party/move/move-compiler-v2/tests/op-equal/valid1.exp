@@ -4,7 +4,7 @@ module 0x42::test {
         0: u256,
     }
     struct Wrapper {
-        0: #0,
+        0: T,
     }
     private fun bitand_vec_coin_new(x: vector<Coin>,index: u64) {
         {
@@ -49,7 +49,7 @@ module 0x42::test {
         Tuple()
     }
     private fun shr_coin_at(addr: address)
-        acquires 0x42::test::Coin(*)
+        acquires Coin(*)
      {
         {
           let coin: &mut Coin = BorrowGlobal(Mutable)<Coin>(addr);

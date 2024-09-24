@@ -18,7 +18,7 @@ module 0x42::move_function_in_spec {
         }
     }
     public fun no_change(target: address,new_addr: address): bool
-        acquires 0x42::move_function_in_spec::TypeInfo(*)
+        acquires TypeInfo(*)
      {
         {
           let ty: &TypeInfo = BorrowGlobal(Immutable)<TypeInfo>(target);

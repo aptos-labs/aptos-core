@@ -10,7 +10,7 @@ module 0x42::test {
         }
         C {
             x: u8,
-            y: 0x42::test::S1,
+            y: S1,
         }
     }
     struct S0 {
@@ -21,23 +21,23 @@ module 0x42::test {
     }
     struct S2 {
         0: bool,
-        1: 0x42::test::S0,
+        1: S0,
     }
     struct S3 {
         x: bool,
         y: u8,
     }
     struct S4 {
-        x: #0,
-        y: 0x42::test::S3,
+        x: T,
+        y: S3,
     }
     struct S5 {
-        0: #0,
-        1: #1,
+        0: T,
+        1: U,
     }
     struct S6 {
-        x: #0,
-        y: #1,
+        x: T,
+        y: U,
     }
     struct S7 {
         0: u8,

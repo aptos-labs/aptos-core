@@ -10,7 +10,7 @@ module 0x42::M {
         dummy_field: bool,
     }
     private fun foo()
-        acquires 0x42::M::B<0x42::M::CupC<0x42::M::R>>(*)
+        acquires B<CupC<R>>(*)
      {
         Abort(0)
     }

@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
-        f: #0,
+        f: T,
     }
     private fun f<T>() {
         M::g<S<T>>()
