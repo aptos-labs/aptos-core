@@ -277,14 +277,15 @@ where
                 let deduped_transactions = {
                     let _timer = APTOS_EXECUTOR_NONCE_DUDEUP_SECONDS.start_timer();
                     match transactions {
-                        ExecutableTransactions::Unsharded(txns) => ExecutableTransactions::Unsharded(
-                            txns.into_iter()
+                        ExecutableTransactions::Unsharded(txns) => {
+                            info!("Txns before nonce dedup: {:?}", txns.len());
+                            let deduped_txns = txns.into_iter()
                                 .filter(|txn| match txn {
                                     SignatureVerifiedTransaction::Valid(txn) => {
                                         if let Transaction::UserTransaction(txn) = txn {
                                             let sender = txn.sender();
                                             let sequence_number = txn.sequence_number();
-                                            if nonce_table.get(&(sender, sequence_number)).is_some() {
+                                            if nonce_table.contains_key(&(sender, sequence_number)) {
                                                 return false;
                                             }
                                         }
@@ -292,8 +293,10 @@ where
                                     },
                                     SignatureVerifiedTransaction::Invalid(_) => false,
                                 })
-                                .collect::<Vec<_>>(),
-                        ),
+                                .collect::<Vec<_>>();
+                                info!("Txns after nonce dedup: {:?}", deduped_txns.len());
+                                ExecutableTransactions::Unsharded(deduped_txns)
+                            },
                         ExecutableTransactions::Sharded(txns) => ExecutableTransactions::Sharded(txns),
                     }
                 };
