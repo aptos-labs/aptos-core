@@ -24,6 +24,15 @@ impl<T: Transaction> ReadWriteSummary<T> {
         Self { reads, writes }
     }
 
+    pub fn get_summary(
+        self,
+    ) -> (
+        HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>,
+        HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>,
+    ) {
+        (self.reads, self.writes)
+    }
+
     pub fn conflicts_with_previous(&self, previous: &Self) -> bool {
         !self.reads.is_disjoint(&previous.writes)
     }

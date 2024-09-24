@@ -892,6 +892,7 @@ where
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
+            num_workers,
         ));
         let shared_maybe_error = AtomicBool::new(false);
 
@@ -1055,6 +1056,7 @@ where
         let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
+            1,
         );
 
         let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =

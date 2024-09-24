@@ -245,6 +245,13 @@ pub enum BlockGasLimitType {
 }
 
 impl BlockGasLimitType {
+    pub fn is_simulation(&self) -> bool {
+        match self {
+            BlockGasLimitType::Simulation { .. } => true,
+            _ => false,
+        }
+    }
+
     pub fn block_gas_limit(&self) -> Option<u64> {
         match self {
             BlockGasLimitType::NoLimit => None,

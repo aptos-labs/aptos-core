@@ -11,91 +11,250 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
     transaction::{block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction},
+    validator_txn::Topic,
 };
 use claims::{assert_le, assert_none};
 use std::{
-    collections::{BinaryHeap, HashMap, HashSet},
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap},
     time::Instant,
 };
 
 pub enum ObjectStatus {
-    NotWrittenYet,
-    Estimate,
+    Empty,
+    Written,
     Waiting,
-    Finalized,
 }
 
 pub struct ObjectData {
     status: ObjectStatus,
-    to_fail: Vec<TxnIndex>,
-    to_notify: Vec<TxnIndex>,
-    waiting: Vec<TxnIndex>,
+    failed_txns: Vec<TxnIndex>,
+    waiting_txns: Vec<TxnIndex>,
 }
 
-pub enum Event<T: Transaction> {
+impl ObjectData {
+    pub fn new() -> Self {
+        Self {
+            status: ObjectStatus::Empty,
+            failed_txns: Vec::new(),
+            waiting_txns: Vec::new(),
+        }
+    }
+}
+
+pub enum Event {
     END,
-    READ(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex),
-    WRITE(InputOutputKey<T::Key, T::Tag, T::Identifier>),
+    READ(u32),
+    WRITE(u32),
 }
 
-pub struct OrderedEvent<T: Transaction> {
-    event_gas: u64,
-    txn_idx: TxnIndex,
-    event: Event<T>,
-}
+pub struct Simulation<T: Transaction> {
+    accumulated_effective_block_gas: u64,
 
-pub struct SimulationData<T: Transaction> {
-    versioned_objects:
-        HashMap<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex), ObjectData>,
-    objects: HashMap<InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex>,
+    num_objects: u32,
+    objects: Vec<ObjectData>,
+
+    object_indexes: HashMap<InputOutputKey<T::Key, T::Tag, T::Identifier>, u32>,
     // each transaction keeps vector of all events, sorted by gas
-    events: Vec<Vec<(u64, Event<T>)>>,
-
-    //need to compute events from the following reads/writes, maybe be forced to keep them
-    //reads: Vec<HashSet<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex)>>,
-    //writes: Vec<HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>>,
-    to_be_notified: Vec<HashSet<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex)>>,
-    reads_for_validation: Vec<HashSet<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex)>>,
-    writes_for_validation: Vec<HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>>,
-    to_validate: Vec<TxnIndex>,
+    events: Vec<Vec<(u64, Event)>>,
+    // need to compute events from the following reads/writes, maybe be forced to keep them
+    // reads: Vec<HashSet<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex)>>,
+    // writes: Vec<HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>>>,
     transaction_pq: BinaryHeap<TxnIndex>,
-    //this allows to track by how much should gas be shifted by the current transaction
-    origin_gas: Vec<u64>,
+    // this allows to track by how much should gas be shifted by the current transaction
+    offset_gas: Vec<u64>,
     //next event to be added to PQ
     cur_event: Vec<usize>,
-    //are we really using incarnations at all?
-    //whenever element is removed, set origin to current gas
-    //insert first even t only in the event_pq
+    // are we really using incarnations at all?
+    // whenever element is removed of txn_pq,
+    // insert its first event in the event_pq
     txn_pq: BinaryHeap<TxnIndex>,
-    //only keep  at most one event from each transaction
-    //whenever removed, use origin_gas and cur_event to insert next event from the same transaction
-    event_pq: BinaryHeap<OrderedEvent<T>>,
-    num_workers: usize,
+    // only keep  at most one event from each transaction
+    // whenever removed, use offset_gas and cur_event to insert next event from the same transaction
+    event_pq: BinaryHeap<Reverse<(u64, TxnIndex)>>,
+
+    total_num_workers: usize,
+    total_num_txns: u32,
+    cur_num_txns: u32,
 }
 
-pub enum AccumulatedEffectiveBlockGasData<T: Transaction> {
-    TxnReadWriteSummaries(Vec<ReadWriteSummary<T>>),
-    Simulation(SimulationData<T>),
+impl<T: Transaction> Simulation<T> {
+    fn new(init_size: usize, num_workers: usize) -> Self {
+        Self {
+            // versioned_objects: HashMap<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex), ObjectData>::new(),
+            accumulated_effective_block_gas: 0,
+            num_objects: 0,
+            objects: Vec::new(),
+            object_indexes: HashMap::new(),
+            events: Vec::with_capacity(init_size),
+            transaction_pq: BinaryHeap::new(),
+            offset_gas: vec![0u64; init_size],
+            cur_event: vec![0; init_size],
+            txn_pq: BinaryHeap::new(),
+            event_pq: BinaryHeap::new(),
+            total_num_workers: num_workers,
+            total_num_txns: init_size as u32,
+            cur_num_txns: 0,
+        }
+    }
+
+    fn compute_objects_and_events(
+        &mut self,
+        fee_statement: FeeStatement,
+        txn_read_write_summary: ReadWriteSummary<T>,
+        txn_idx: TxnIndex,
+    ) {
+        let (reads, writes) = txn_read_write_summary.get_summary();
+
+        for key in reads {
+            if let Some(object_index) = self.object_indexes.get(&key) {
+                self.events[txn_idx as usize].push((0, Event::READ(*object_index)));
+            }
+        }
+
+        let exec_gas = fee_statement.execution_gas_used();
+        for key in writes {
+            self.object_indexes.insert(key, self.num_objects);
+            self.events[txn_idx as usize].push((exec_gas, Event::WRITE(self.num_objects)));
+            self.objects.push(ObjectData::new());
+            self.num_objects += 1;
+        }
+
+        self.events[txn_idx as usize].push((exec_gas, Event::END));
+    }
+
+    fn run_simulation(&mut self) {
+        while true {
+            if let Some(top_event) = self.event_pq.pop() {}
+        }
+    }
+
+    fn update(
+        &mut self,
+        fee_statement: FeeStatement,
+        txn_read_write_summary: ReadWriteSummary<T>,
+    ) -> u64 {
+        assert!(self.cur_num_txns < self.total_num_txns);
+        let txn_idx = self.cur_num_txns;
+        self.cur_num_txns += 1;
+
+        self.compute_objects_and_events(fee_statement, txn_read_write_summary, txn_idx);
+
+        self.txn_pq.push(txn_idx);
+        if self.cur_num_txns < self.total_num_workers as u32 {
+            return 0;
+        }
+
+        if self.cur_num_txns == self.total_num_workers as u32 {
+            //initial phase, populate event_pq
+            for i in 0..self.total_num_workers {
+                self.event_pq.push(Reverse((self.events[i][0].0, txn_idx)));
+            }
+        } else {
+            //insert new transacation in txn_pq
+            self.txn_pq.push(txn_idx);
+        }
+
+        self.run_simulation();
+        self.accumulated_effective_block_gas
+    }
 }
 
-pub struct AccumulatedEffectiveBlockGas<T: Transaction> {
-    gas_value: u64,
-    data: AccumulatedEffectiveBlockGasData<T>,
+struct Heuristics<T: Transaction> {
+    accumulated_effective_block_gas: u64,
+    txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
 }
 
-impl<T: Transaction> AccumulatedEffectiveBlockGas<T> {
-    fn new_simulation(init_size: usize, num_workers: usize) {
-        Self { gas_value: 0 }
+impl<T: Transaction> Heuristics<T> {
+    fn new(init_size: usize) -> Self {
+        Self {
+            // versioned_objects: HashMap<(InputOutputKey<T::Key, T::Tag, T::Identifier>, TxnIndex), ObjectData>::new(),
+            accumulated_effective_block_gas: 0,
+            txn_read_write_summaries: Vec::with_capacity(init_size),
+        }
+    }
+
+    fn compute_conflict_multiplier(&self, conflict_overlap_length: usize) -> u64 {
+        let start = self
+            .txn_read_write_summaries
+            .len()
+            .saturating_sub(conflict_overlap_length);
+        let end = self.txn_read_write_summaries.len() - 1;
+
+        let mut conflict_count = 0;
+        let current = &self.txn_read_write_summaries[end];
+        for prev in &self.txn_read_write_summaries[start..end] {
+            if current.conflicts_with_previous(prev) {
+                conflict_count += 1;
+            }
+        }
+        assert_le!(conflict_count + 1, conflict_overlap_length);
+        (conflict_count + 1) as u64
+    }
+
+    fn update(
+        &mut self,
+        block_gas_limit_type: &BlockGasLimitType,
+        fee_statement: FeeStatement,
+        txn_read_write_summary: Option<ReadWriteSummary<T>>,
+        module_rw_conflict: bool,
+    ) -> u64 {
+        let conflict_multiplier =
+            if let Some(conflict_overlap_length) = block_gas_limit_type.conflict_penalty_window() {
+                let txn_read_write_summary = txn_read_write_summary.expect(
+                    "txn_read_write_summary needs to be computed if conflict_penalty_window is set",
+                );
+                self.txn_read_write_summaries.push(
+                    if block_gas_limit_type.use_granular_resource_group_conflicts() {
+                        txn_read_write_summary
+                    } else {
+                        txn_read_write_summary.collapse_resource_group_conflicts()
+                    },
+                );
+                if module_rw_conflict {
+                    conflict_overlap_length as u64
+                } else {
+                    self.compute_conflict_multiplier(conflict_overlap_length as usize)
+                }
+            } else {
+                assert_none!(txn_read_write_summary);
+                1
+            };
+
+        // When the accumulated execution and io gas of the committed txns exceeds
+        // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage fee does not count towards
+        // the per block gas limit, as we measure execution related cost here.
+        self.accumulated_effective_block_gas += conflict_multiplier
+            * (fee_statement.execution_gas_used()
+                * block_gas_limit_type.execution_gas_effective_multiplier()
+                + fee_statement.io_gas_used() * block_gas_limit_type.io_gas_effective_multiplier());
+
+        self.accumulated_effective_block_gas
+    }
+}
+
+enum AccumulatedEffectiveBlockGasCalculator<T: Transaction> {
+    UseHeuristics(Heuristics<T>),
+    UseSimulation(Simulation<T>),
+}
+
+impl<T: Transaction> AccumulatedEffectiveBlockGasCalculator<T> {
+    fn new_simulation(init_size: usize, num_workers: usize) -> Self {
+        Self::UseSimulation(Simulation::new(init_size, num_workers))
+    }
+
+    fn new_heuristics(init_size: usize) -> Self {
+        Self::UseHeuristics(Heuristics::new(init_size))
     }
 }
 
 pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
-    accumulated_effective_block_gas: AccumulatedEffectiveBlockGas<T>,
+    accumulated_effective_block_gas: u64,
+    accumulated_effective_block_gas_calculator: AccumulatedEffectiveBlockGasCalculator<T>,
     accumulated_approx_output_size: u64,
     accumulated_fee_statement: FeeStatement,
     txn_fee_statements: Vec<FeeStatement>,
-    txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     module_rw_conflict: bool,
     start_time: Instant,
 }
@@ -106,16 +265,69 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         init_size: usize,
         num_workers: usize,
     ) -> Self {
+        let is_simulation = block_gas_limit_type.is_simulation();
         Self {
             block_gas_limit_type,
-            accumulated_effective_block_gas: if block_gas_limit_type.is_simulation() { AccumulatedEffectiveBlockGas::new_simulation(init_size, num_workers)}; } else {},
+            accumulated_effective_block_gas: 0,
+            accumulated_effective_block_gas_calculator: if is_simulation {
+                AccumulatedEffectiveBlockGasCalculator::new_simulation(init_size, num_workers)
+            } else {
+                AccumulatedEffectiveBlockGasCalculator::new_heuristics(init_size)
+            },
             accumulated_approx_output_size: 0,
             accumulated_fee_statement: FeeStatement::zero(),
             txn_fee_statements: Vec::with_capacity(init_size),
-            txn_read_write_summaries: Vec::with_capacity(init_size),
             module_rw_conflict: false,
             start_time: Instant::now(),
         }
+    }
+
+    #[cfg(test)]
+    fn compute_conflict_multiplier(&self, conflict_overlap_length: usize) -> u64 {
+        match &self.accumulated_effective_block_gas_calculator {
+            AccumulatedEffectiveBlockGasCalculator::UseHeuristics(heuristics) => {
+                heuristics.compute_conflict_multiplier(conflict_overlap_length)
+            },
+            AccumulatedEffectiveBlockGasCalculator::UseSimulation(_) => {
+                unreachable!("simulation does not use conflict multiplier");
+            },
+        }
+    }
+
+    fn update_accumulated_effective_block_gas(
+        &mut self,
+        fee_statement: FeeStatement,
+        txn_read_write_summary: Option<ReadWriteSummary<T>>,
+    ) {
+        self.accumulated_effective_block_gas = match &mut self
+            .accumulated_effective_block_gas_calculator
+        {
+            AccumulatedEffectiveBlockGasCalculator::UseHeuristics(heuristics) => heuristics.update(
+                &self.block_gas_limit_type,
+                fee_statement,
+                txn_read_write_summary,
+                self.module_rw_conflict,
+            ),
+            AccumulatedEffectiveBlockGasCalculator::UseSimulation(simulation) => {
+                assert!(
+                    txn_read_write_summary.is_some(),
+                    "simulation needs read/write summary"
+                );
+                if self
+                    .block_gas_limit_type
+                    .use_granular_resource_group_conflicts()
+                {
+                    simulation.update(fee_statement, txn_read_write_summary.unwrap())
+                } else {
+                    simulation.update(
+                        fee_statement,
+                        txn_read_write_summary
+                            .unwrap()
+                            .collapse_resource_group_conflicts(),
+                    )
+                }
+            },
+        };
     }
 
     pub(crate) fn accumulate_fee_statement(
@@ -128,42 +340,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             .add_fee_statement(&fee_statement);
         self.txn_fee_statements.push(fee_statement);
 
-        let conflict_multiplier = if let Some(conflict_overlap_length) =
-            self.block_gas_limit_type.conflict_penalty_window()
-        {
-            let txn_read_write_summary = txn_read_write_summary.expect(
-                "txn_read_write_summary needs to be computed if conflict_penalty_window is set",
-            );
-            self.txn_read_write_summaries.push(
-                if self
-                    .block_gas_limit_type
-                    .use_granular_resource_group_conflicts()
-                {
-                    txn_read_write_summary
-                } else {
-                    txn_read_write_summary.collapse_resource_group_conflicts()
-                },
-            );
-            if self.module_rw_conflict {
-                conflict_overlap_length as u64
-            } else {
-                self.compute_conflict_multiplier(conflict_overlap_length as usize)
-            }
-        } else {
-            assert_none!(txn_read_write_summary);
-            1
-        };
-
-        // When the accumulated execution and io gas of the committed txns exceeds
-        // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage fee does not count towards
-        // the per block gas limit, as we measure execution related cost here.
-        self.accumulated_effective_block_gas += conflict_multiplier
-            * (fee_statement.execution_gas_used()
-                * self
-                    .block_gas_limit_type
-                    .execution_gas_effective_multiplier()
-                + fee_statement.io_gas_used()
-                    * self.block_gas_limit_type.io_gas_effective_multiplier());
+        self.update_accumulated_effective_block_gas(fee_statement, txn_read_write_summary);
 
         if self.block_gas_limit_type.block_output_limit().is_some() {
             self.accumulated_approx_output_size += approx_output_size
@@ -174,6 +351,10 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     }
 
     pub(crate) fn process_module_rw_conflict(&mut self) {
+        if self.block_gas_limit_type.is_simulation() {
+            return;
+        }
+
         if self.module_rw_conflict
             || !self
                 .block_gas_limit_type
@@ -250,24 +431,6 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
 
     fn get_accumulated_approx_output_size(&self) -> u64 {
         self.accumulated_approx_output_size
-    }
-
-    fn compute_conflict_multiplier(&self, conflict_overlap_length: usize) -> u64 {
-        let start = self
-            .txn_read_write_summaries
-            .len()
-            .saturating_sub(conflict_overlap_length);
-        let end = self.txn_read_write_summaries.len() - 1;
-
-        let mut conflict_count = 0;
-        let current = &self.txn_read_write_summaries[end];
-        for prev in &self.txn_read_write_summaries[start..end] {
-            if current.conflicts_with_previous(prev) {
-                conflict_count += 1;
-            }
-        }
-        assert_le!(conflict_count + 1, conflict_overlap_length);
-        (conflict_count + 1) as u64
     }
 
     fn finish_update_counters_and_log_info(
@@ -384,7 +547,7 @@ mod test {
 
     #[test]
     fn test_output_limit_not_used() {
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(DEFAULT_COMPLEX_LIMIT, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(DEFAULT_COMPLEX_LIMIT, 10, 1);
         // Assert passing none here doesn't panic.
         processor.accumulate_fee_statement(FeeStatement::zero(), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -408,7 +571,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10, 1);
 
         processor.accumulate_fee_statement(execution_fee(10), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -432,7 +595,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10, 1);
 
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
         assert_eq!(processor.accumulated_approx_output_size, 10);
@@ -472,7 +635,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10, 1);
 
         processor.accumulate_fee_statement(
             execution_fee(10),
@@ -534,7 +697,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10, 1);
 
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(
@@ -576,7 +739,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10);
+        let mut processor = BlockGasLimitProcessor::<TestTxn>::new(block_gas_limit, 10, 1);
         processor.accumulate_fee_statement(
             execution_fee(10),
             Some(ReadWriteSummary::new(
