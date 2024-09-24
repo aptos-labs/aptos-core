@@ -52,7 +52,7 @@ use move_ir_types::{ast::ConstantName, location::Spanned};
 use regex::Regex;
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     default::Default,
     fmt,
 };
@@ -875,6 +875,95 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+        if !self.parent.env.language_version().is_at_least(version_min) {
+            self.parent.env.error(
+                loc,
+                &format!(
+                    "not supported before language version `{}`: {}",
+                    version_min, feature
+                ),
+            )
+        }
+    }
+
+    fn analyze_constant(
+        &mut self,
+        key: &PA::ConstantName,
+        constant_map: &UniqueMap<PA::ConstantName, EA::Constant>,
+        visiting: &mut HashSet<PA::ConstantName>,
+        visited: &mut HashSet<PA::ConstantName>,
+        compiled_module: &Option<BytecodeModule>,
+    ) {
+        let qsym = self.qualified_by_module_from_name(&key.0);
+        let loc = self
+            .parent
+            .const_table
+            .get(&qsym)
+            .expect("constant declared")
+            .loc
+            .clone();
+        if visited.contains(key) {
+            return;
+        }
+        if visiting.contains(key) {
+            return;
+        }
+        visiting.insert(*key);
+        if let Some(exp) = constant_map.get(key) {
+            let names = exp.value.value.get_names_for_const_exp();
+            for name in names {
+                let const_name = PA::ConstantName(name);
+                let qsym = self.qualified_by_module_from_name(&name);
+                if !self.parent.const_table.contains_key(&qsym) {
+                    continue;
+                }
+                self.check_language_version(
+                    &loc,
+                    "Referring to other constants",
+                    LanguageVersion::V2_0,
+                );
+                if visited.contains(&const_name) {
+                    return;
+                }
+                if visiting.contains(&const_name) {
+                    self.parent
+                        .env
+                        .error(&loc, "Found recursive definition of a constant");
+                    return;
+                }
+                self.analyze_constant(
+                    &const_name,
+                    constant_map,
+                    visiting,
+                    visited,
+                    compiled_module,
+                );
+            }
+            self.def_ana_constant(key, exp, compiled_module);
+            visited.insert(*key);
+            visiting.remove(key);
+        }
+    }
+
+    fn analyze_constants(
+        &mut self,
+        module_def: &EA::ModuleDefinition,
+        compiled_module: &Option<BytecodeModule>,
+    ) {
+        let mut visited = HashSet::new();
+        let mut visiting = HashSet::new();
+        for (name, _) in module_def.constants.key_cloned_iter() {
+            self.analyze_constant(
+                &name,
+                &module_def.constants,
+                &mut visiting,
+                &mut visited,
+                compiled_module,
+            );
+        }
+    }
+
     fn def_ana(
         &mut self,
         module_def: &EA::ModuleDefinition,
@@ -886,9 +975,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
 
         // Analyze all constants.
-        for (name, def) in module_def.constants.key_cloned_iter() {
-            self.def_ana_constant(&name, def, compiled_module);
-        }
+        self.analyze_constants(module_def, compiled_module);
 
         // Analyze all schemas. This must be done before other things because schemas need to be
         // ready for inclusion. We also must do this recursively, so use a visited set to detect

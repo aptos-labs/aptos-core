@@ -21,7 +21,7 @@ use move_binary_format::file_format;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
     fmt,
     hash::Hash,
 };
@@ -547,6 +547,44 @@ pub enum Exp_ {
     UnresolvedError,
 }
 pub type Exp = Spanned<Exp_>;
+
+impl Exp_ {
+    /// Get all names from an expression
+    /// only perform on expression supported in constant definition.
+    pub fn get_names_for_const_exp(&self) -> HashSet<Name> {
+        let mut names = HashSet::new();
+        let mut add_names = |v: &Exp| {
+            let set = v.value.get_names_for_const_exp();
+            for n in set.iter() {
+                names.insert(*n);
+            }
+        };
+        match self {
+            Self::Name(access, _) => {
+                names.insert(*access.value.get_name());
+            },
+            Self::Call(_, _, _, exp_vec) | Self::Vector(_, _, exp_vec) => {
+                let _ = exp_vec.value.iter().map(&mut add_names);
+            },
+            Self::UnaryExp(_, exp) => {
+                add_names(exp);
+            },
+            Self::BinopExp(exp1, _, exp2) => {
+                add_names(exp1);
+                add_names(exp2);
+            },
+            Self::Block(seq) => {
+                for s in seq.iter() {
+                    if let SequenceItem_::Seq(exp) = &s.value {
+                        add_names(exp);
+                    }
+                }
+            },
+            _ => {},
+        }
+        names
+    }
+}
 
 pub type Sequence = VecDeque<SequenceItem>;
 #[derive(Debug, Clone, PartialEq)]
