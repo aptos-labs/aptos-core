@@ -1,12 +1,9 @@
 spec aptos_framework::bridge_store {
     spec initialize {
         let addr = signer::address_of(aptos_framework);
-
-        aborts_if !system_addresses::is_aptos_framework_address(addr);
-        aborts_if exists<Nonce>(addr);
-        aborts_if exists<BridgeTransferStore>(addr);
         ensures exists<Nonce>(addr);
-        ensures exists<BridgeTransferStore>(addr);
+        ensures exists<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<address, EthereumAddress>>>>(addr);
+        ensures exists<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<EthereumAddress, address>>>>(addr);
     }
 
     spec schema TimeLockAbortsIf {
@@ -15,15 +12,15 @@ spec aptos_framework::bridge_store {
         aborts_if !exists<CurrentTimeMicroseconds>(@aptos_framework);
         aborts_if time_lock > MAX_U64 - timestamp::spec_now_seconds();
     }
+
     spec create_time_lock {
         include TimeLockAbortsIf;
         ensures result == timestamp::spec_now_seconds() + time_lock;
         /// If the sum of `now()` and `lock` does not overflow, the result is the sum of `now()` and `lock`.
         ensures (timestamp::spec_now_seconds() + time_lock <= 0xFFFFFFFFFFFFFFFF) ==> result == timestamp::spec_now_seconds() + time_lock;
-
     }
 
-    spec create_details<Initiator, Recipient>(initiator: Initiator, recipient: Recipient, amount: u64, hash_lock: vector<u8>, time_lock: u64)
+    spec create_details<Initiator: store, Recipient: store>(initiator: Initiator, recipient: Recipient, amount: u64, hash_lock: vector<u8>, time_lock: u64)
     : BridgeTransferDetails<AddressPair<Initiator, Recipient>> {
         include TimeLockAbortsIf;
         aborts_if amount == 0;
@@ -42,25 +39,23 @@ spec aptos_framework::bridge_store {
 
     spec schema AddAbortsIf<T> {
         bridge_transfer_id: vector<u8>;
-        table: smart_table::SmartTable<vector<u8>, T>;
+        table: SmartTable<vector<u8>, T>;
 
-        aborts_if !exists<BridgeTransferStore>(@aptos_framework);
         aborts_if len(bridge_transfer_id) != 32;
         aborts_if smart_table::spec_contains(table, bridge_transfer_id);
     }
 
-    spec add_initiator(bridge_transfer_id: vector<u8>, details: BridgeTransferDetails<AddressPair<address, EthereumAddress>>) {
-        let table = global<BridgeTransferStore>(@aptos_framework).initiators;
-        include AddAbortsIf<BridgeTransferDetails<AddressPair<address, EthereumAddress>>>;
+    spec add<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: BridgeTransferDetails<AddressPair<Initiator, Recipient>>) {
+        let table = global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework).inner;
+        include AddAbortsIf<BridgeTransferDetails<AddressPair<Initiator, Recipient>>>;
 
-        ensures smart_table::spec_contains(global<BridgeTransferStore>(@aptos_framework).initiators, bridge_transfer_id);
-    }
+        aborts_if !exists<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework);
+        aborts_if smart_table::spec_contains(table, bridge_transfer_id);
 
-    spec add_counterparty {
-        let table = global<BridgeTransferStore>(@aptos_framework).counterparties;
-        include AddAbortsIf<BridgeTransferDetails<AddressPair<EthereumAddress, address>>>;
+        ensures smart_table::spec_contains(global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework).inner, bridge_transfer_id);
 
-        ensures smart_table::spec_contains(borrow_global<BridgeTransferStore>(@aptos_framework).counterparties, bridge_transfer_id);
+        ensures smart_table::spec_len(global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework).inner) ==
+            old(smart_table::spec_len(global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework).inner)) + 1;
     }
 
     spec schema HashLockAbortsIf {
@@ -77,30 +72,16 @@ spec aptos_framework::bridge_store {
         aborts_if details.hash_lock != hash_lock;
     }
 
-    spec schema BridgeTransferStoreAbortsIf<T> {
-        bridge_transfer_id: vector<u8>;
-        table: smart_table::SmartTable<vector<u8>, T>;
+    spec complete_details<Initiator: store, Recipient: store + copy>(hash_lock: vector<u8>, details: &mut BridgeTransferDetails<AddressPair<Initiator, Recipient>>) : (Recipient, u64) {
+        include BridgetTransferDetailsAbortsIf<AddressPair<Initiator, Recipient>>;
+    }
 
-        aborts_if !exists<BridgeTransferStore>(@aptos_framework);
+    spec complete_transfer<Initiator: store, Recipient: copy + store>(bridge_transfer_id: vector<u8>, hash_lock: vector<u8>) : (Recipient, u64) {
+        let table = global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework).inner;
+        aborts_if !exists<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework);
         aborts_if !smart_table::spec_contains(table, bridge_transfer_id);
-    }
-
-    spec complete_details<_, Recipient: copy>(hash_lock: vector<u8>, details: &mut BridgeTransferDetails<AddressPair<_, Recipient>>) : (Recipient, u64) {
-        include BridgetTransferDetailsAbortsIf<AddressPair<_, Recipient>>;
-    }
-
-    spec complete_counterparty {
-        let table = global<BridgeTransferStore>(@aptos_framework).counterparties;
-        include BridgeTransferStoreAbortsIf<BridgeTransferDetails<AddressPair<EthereumAddress, address>>>;
         let details = smart_table::spec_get(table, bridge_transfer_id);
-        include BridgetTransferDetailsAbortsIf<AddressPair<EthereumAddress, address>>;
-    }
-
-    spec complete_initiator {
-        let table = global<BridgeTransferStore>(@aptos_framework).initiators;
-        include BridgeTransferStoreAbortsIf<BridgeTransferDetails<AddressPair<address, EthereumAddress>>>;
-        let details = smart_table::spec_get(table, bridge_transfer_id);
-        include BridgetTransferDetailsAbortsIf<AddressPair<address, EthereumAddress>>;
+        include BridgetTransferDetailsAbortsIf<AddressPair<Initiator, Recipient>>;
     }
 
     spec schema AbortBridgetTransferDetailsAbortsIf<T> {
@@ -112,8 +93,8 @@ spec aptos_framework::bridge_store {
         ensures details.state == CANCELLED_TRANSACTION;
     }
 
-    spec cancel_details<Initiator: copy, _> (details: &mut BridgeTransferDetails<AddressPair<Initiator, _>>) : (Initiator, u64) {
-        include AbortBridgetTransferDetailsAbortsIf<AddressPair<Initiator, _>>;
+    spec cancel_details<Initiator: store + copy, Recipient: store> (details: &mut BridgeTransferDetails<AddressPair<Initiator, Recipient>>) : (Initiator, u64) {
+        include AbortBridgetTransferDetailsAbortsIf<AddressPair<Initiator, Recipient>>;
     }
 
     spec create_hashlock {
@@ -133,17 +114,17 @@ spec aptos_framework::bridge_store {
 
 spec aptos_framework::bridge_configuration {
     spec initialize(aptos_framework: &signer) {
-        aborts_if !system_addresses::is_aptos_framework_address(address_of(aptos_framework));
-        aborts_if exists<BridgeConfig>(address_of(aptos_framework));
+        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
+        aborts_if exists<BridgeConfig>(signer::address_of(aptos_framework));
 
-        ensures global<BridgeConfig>(address_of(aptos_framework)).bridge_operator == address_of(aptos_framework);
+        ensures global<BridgeConfig>(signer::address_of(aptos_framework)).bridge_operator == signer::address_of(aptos_framework);
     }
 
     spec update_bridge_operator(aptos_framework: &signer, new_operator: address) {
-        aborts_if !system_addresses::is_aptos_framework_address(address_of(aptos_framework));
-        aborts_if !exists<BridgeConfig>(address_of(aptos_framework));
-        aborts_if global<BridgeConfig>(address_of(aptos_framework)).bridge_operator == new_operator;
+        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
+        aborts_if !exists<BridgeConfig>(signer::address_of(aptos_framework));
+        aborts_if global<BridgeConfig>(signer::address_of(aptos_framework)).bridge_operator == new_operator;
 
-        ensures global<BridgeConfig>(address_of(aptos_framework)).bridge_operator == new_operator;
+        ensures global<BridgeConfig>(signer::address_of(aptos_framework)).bridge_operator == new_operator;
     }
 }
