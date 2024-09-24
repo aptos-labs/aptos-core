@@ -310,7 +310,8 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.ref }}
-    # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
+      
+      # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
         with:
@@ -347,7 +348,7 @@ jobs:
       - rust-images
       - rust-images-failpoints
       - rust-images-performance
-      # - rust-images-consensus-only-perf-test
+      - rust-images-consensus-only-perf-test
       - file_change_determinator
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
@@ -391,7 +392,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }} #aptos-node-v1.20
+      IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
