@@ -1532,7 +1532,7 @@ impl RoundManager {
                             Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
                             Err(e) => {
                                 counters::ERROR_COUNT.inc();
-                                warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
+                                warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
                             }
                         }
                     }
@@ -1580,7 +1580,7 @@ impl RoundManager {
                         Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
                         Err(e) => {
                             counters::ERROR_COUNT.inc();
-                            warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
+                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
                         }
                     }
                 },
