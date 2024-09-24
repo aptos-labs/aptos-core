@@ -31,7 +31,7 @@ runs:
     # Run the rust unit tests
     - name: Run all unit tests
       run: |
-        cargo nextest run \
+        RUST_BACKTRACE=1 cargo nextest run \
           --profile ci \
           --cargo-profile ci \
           --locked \
