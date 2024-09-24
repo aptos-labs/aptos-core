@@ -59,7 +59,6 @@ use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     block_info::BlockInfo,
     epoch_state::EpochState,
-    ledger_info::VerificationStatus,
     on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
@@ -204,8 +203,6 @@ pub enum VerifiedEvent {
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
-    UnverifiedVoteMsg(Box<VoteMsg>),
-    UnverifiedOrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -1071,11 +1068,7 @@ impl RoundManager {
         Ok(vote)
     }
 
-    async fn process_order_vote_msg(
-        &mut self,
-        order_vote_msg: OrderVoteMsg,
-        verification_status: VerificationStatus,
-    ) -> anyhow::Result<()> {
+    async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {
         if self.onchain_config.order_vote_enabled() {
             fail_point!("consensus::process_order_vote_msg", |_| {
                 Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
@@ -1118,14 +1111,12 @@ impl RoundManager {
                     self.pending_order_votes.insert_order_vote(
                         order_vote_msg.order_vote(),
                         self.epoch_state.clone(),
-                        verification_status,
                         Some(order_vote_msg.quorum_cert().clone()),
                     )
                 } else {
                     self.pending_order_votes.insert_order_vote(
                         order_vote_msg.order_vote(),
                         self.epoch_state.clone(),
-                        verification_status,
                         None,
                     )
                 };
@@ -1193,11 +1184,7 @@ impl RoundManager {
     /// potential attacks).
     /// 2. Add the vote to the pending votes and check whether it finishes a QC.
     /// 3. Once the QC/TC successfully formed, notify the RoundState.
-    pub async fn process_vote_msg(
-        &mut self,
-        vote_msg: VoteMsg,
-        verification_status: VerificationStatus,
-    ) -> anyhow::Result<()> {
+    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> anyhow::Result<()> {
         fail_point!("consensus::process_vote_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_vote_msg"))
         });
@@ -1211,7 +1198,7 @@ impl RoundManager {
             .await
             .context("[RoundManager] Stop processing vote")?
         {
-            self.process_vote(vote_msg.vote(), verification_status)
+            self.process_vote(vote_msg.vote())
                 .await
                 .context("[RoundManager] Add a new vote")?;
         }
@@ -1222,11 +1209,7 @@ impl RoundManager {
     /// If a new QC / TC is formed then
     /// 1) fetch missing dependencies if required, and then
     /// 2) call process_certificates(), which will start a new round in return.
-    async fn process_vote(
-        &mut self,
-        vote: &Vote,
-        verification_status: VerificationStatus,
-    ) -> anyhow::Result<()> {
+    async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
 
         if vote.is_timeout() {
@@ -1271,9 +1254,7 @@ impl RoundManager {
         {
             return Ok(());
         }
-        let vote_reception_result =
-            self.round_state
-                .insert_vote(vote, self.epoch_state.clone(), verification_status);
+        let vote_reception_result = self.round_state.insert_vote(vote, self.epoch_state.clone());
         self.process_vote_reception_result(vote, vote_reception_result)
             .await
     }
@@ -1583,16 +1564,10 @@ impl RoundManager {
                 (peer_id, event) = event_rx.select_next_some() => {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
-                            monitor!("process_vote", self.process_vote_msg(*vote_msg, VerificationStatus::Verified).await)
+                            monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
                         }
                         VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
-                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg, VerificationStatus::Verified).await)
-                        }
-                        VerifiedEvent::UnverifiedVoteMsg(vote_msg) => {
-                            monitor!("process_unverified_vote", self.process_vote_msg(*vote_msg, VerificationStatus::Unverified).await)
-                        }
-                        VerifiedEvent::UnverifiedOrderVoteMsg(order_vote_msg) => {
-                            monitor!("process_unverified_order_vote", self.process_order_vote_msg(*order_vote_msg, VerificationStatus::Unverified).await)
+                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(

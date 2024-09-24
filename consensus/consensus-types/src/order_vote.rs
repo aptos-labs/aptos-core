@@ -6,7 +6,10 @@ use crate::common::Author;
 use anyhow::{ensure, Context};
 use aptos_crypto::{bls12381, HashValue};
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{ledger_info::LedgerInfo, validator_verifier::ValidatorVerifier};
+use aptos_types::{
+    ledger_info::{LedgerInfo, SignatureWithStatus},
+    validator_verifier::ValidatorVerifier,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 
@@ -16,8 +19,8 @@ pub struct OrderVote {
     author: Author,
     /// LedgerInfo of a block that is going to be ordered in case this vote gathers QC.
     ledger_info: LedgerInfo,
-    /// Signature of the LedgerInfo.
-    signature: bls12381::Signature,
+    /// Signature on the LedgerInfo along with a status on whether the signature is verified.
+    signature: SignatureWithStatus,
 }
 
 impl Display for OrderVote {
@@ -48,7 +51,7 @@ impl OrderVote {
         Self {
             author,
             ledger_info,
-            signature,
+            signature: SignatureWithStatus::from(signature),
         }
     }
 
@@ -60,7 +63,7 @@ impl OrderVote {
         &self.ledger_info
     }
 
-    pub fn signature(&self) -> &bls12381::Signature {
+    pub fn signature(&self) -> &SignatureWithStatus {
         &self.signature
     }
 
@@ -80,8 +83,10 @@ impl OrderVote {
     /// Verifies the signature on the LedgerInfo.
     pub fn verify_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
-            .verify(self.author(), &self.ledger_info, &self.signature)
-            .context("Failed to verify OrderVote")
+            .verify(self.author(), &self.ledger_info, self.signature.signature())
+            .context("Failed to verify OrderVote")?;
+        self.signature.set_verified();
+        Ok(())
     }
 
     /// Performs full verification including the signature verification.

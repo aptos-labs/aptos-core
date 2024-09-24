@@ -14,6 +14,8 @@ use crate::{
 };
 use aptos_crypto::{bls12381, hash::HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_infallible::RwLock;
+use derivative::Derivative;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -376,9 +378,50 @@ impl LedgerInfoWithVerifiedSignatures {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum VerificationStatus {
     Verified,
     Unverified,
+}
+
+#[derive(Clone, Debug, Derivative, Serialize)]
+#[derivative(PartialEq, Eq)]
+pub struct SignatureWithStatus {
+    signature: bls12381::Signature,
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    status: Arc<RwLock<VerificationStatus>>,
+}
+
+impl SignatureWithStatus {
+    pub fn set_verified(&self) {
+        let mut status = self.status.write();
+        *status = VerificationStatus::Verified;
+    }
+
+    pub fn signature(&self) -> &bls12381::Signature {
+        &self.signature
+    }
+
+    pub fn from(signature: bls12381::Signature) -> Self {
+        Self {
+            signature,
+            status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SignatureWithStatus {
+    fn deserialize<D>(deserializer: D) -> Result<SignatureWithStatus, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let signature = bls12381::Signature::deserialize(deserializer)?;
+        Ok(SignatureWithStatus {
+            signature,
+            status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+        })
+    }
 }
 
 /// This data structure is used to support the optimistic signature verification feature.
@@ -439,12 +482,15 @@ impl LedgerInfoWithUnverifiedSignatures {
     pub fn add_signature(
         &mut self,
         validator: AccountAddress,
-        signature: bls12381::Signature,
-        verification_status: VerificationStatus,
+        signature_with_status: SignatureWithStatus,
     ) {
-        match verification_status {
-            VerificationStatus::Verified => self.add_verified_signature(validator, signature),
-            VerificationStatus::Unverified => self.add_unverified_signature(validator, signature),
+        match *signature_with_status.status.read() {
+            VerificationStatus::Verified => {
+                self.add_verified_signature(validator, signature_with_status.signature)
+            },
+            VerificationStatus::Unverified => {
+                self.add_unverified_signature(validator, signature_with_status.signature)
+            },
         };
     }
 
@@ -591,6 +637,29 @@ mod tests {
     use super::*;
     use crate::{validator_signer::ValidatorSigner, validator_verifier::ValidatorConsensusInfo};
 
+    // Write a test case to serialize and deserialize SignatureWithStatus
+    #[test]
+    fn test_signature_with_status_serde() {
+        let signature = bls12381::Signature::dummy_signature();
+        let signature_with_status = SignatureWithStatus {
+            signature: signature.clone(),
+            status: Arc::new(RwLock::new(VerificationStatus::Verified)),
+        };
+        let serialized_signature_with_status =
+            bcs::to_bytes(&signature_with_status).expect("Failed to serialize signature");
+        let deserialized_signature_with_status: SignatureWithStatus =
+            bcs::from_bytes(&serialized_signature_with_status)
+                .expect("Failed to deserialize signature");
+        assert_eq!(
+            deserialized_signature_with_status.signature(),
+            signature_with_status.signature()
+        );
+        assert_eq!(
+            *deserialized_signature_with_status.status.read(),
+            VerificationStatus::Unverified
+        );
+    }
+
     #[test]
     fn test_signatures_hash() {
         let ledger_info = LedgerInfo::new(BlockInfo::empty(), HashValue::random());
@@ -679,8 +748,10 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[0].author(),
-            validator_signers[0].sign(&ledger_info).unwrap(),
-            VerificationStatus::Verified,
+            SignatureWithStatus {
+                signature: validator_signers[0].sign(&ledger_info).unwrap(),
+                status: Arc::new(RwLock::new(VerificationStatus::Verified)),
+            },
         );
         partial_sig.add_signature(
             validator_signers[0].author(),
@@ -689,8 +760,10 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[1].author(),
-            validator_signers[1].sign(&ledger_info).unwrap(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus {
+                signature: validator_signers[1].sign(&ledger_info).unwrap(),
+                status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+            },
         );
         partial_sig.add_signature(
             validator_signers[1].author(),
@@ -699,8 +772,10 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[2].author(),
-            validator_signers[2].sign(&ledger_info).unwrap(),
-            VerificationStatus::Verified,
+            SignatureWithStatus {
+                signature: validator_signers[2].sign(&ledger_info).unwrap(),
+                status: Arc::new(RwLock::new(VerificationStatus::Verified)),
+            },
         );
         partial_sig.add_signature(
             validator_signers[2].author(),
@@ -709,8 +784,10 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[3].author(),
-            validator_signers[3].sign(&ledger_info).unwrap(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus {
+                signature: validator_signers[3].sign(&ledger_info).unwrap(),
+                status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+            },
         );
         partial_sig.add_signature(
             validator_signers[3].author(),
@@ -742,8 +819,10 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[4].author(),
-            bls12381::Signature::dummy_signature(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus {
+                signature: bls12381::Signature::dummy_signature(),
+                status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+            },
         );
 
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
@@ -793,8 +872,10 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[5].author(),
-            validator_signers[5].sign(&ledger_info).unwrap(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus {
+                signature: validator_signers[5].sign(&ledger_info).unwrap(),
+                status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+            },
         );
         partial_sig.add_signature(
             validator_signers[5].author(),
@@ -852,8 +933,10 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[6].author(),
-            bls12381::Signature::dummy_signature(),
-            VerificationStatus::Unverified,
+            SignatureWithStatus {
+                signature: bls12381::Signature::dummy_signature(),
+                status: Arc::new(RwLock::new(VerificationStatus::Unverified)),
+            },
         );
 
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 6);

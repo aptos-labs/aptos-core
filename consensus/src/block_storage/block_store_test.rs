@@ -23,7 +23,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{HashValue, PrivateKey};
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::VerificationStatus, validator_signer::ValidatorSigner,
+    epoch_state::EpochState, validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
 };
 use proptest::prelude::*;
@@ -302,14 +302,14 @@ async fn test_insert_vote() {
             voter,
         )
         .unwrap();
-        let vote_res =
-            pending_votes.insert_vote(&vote, epoch_state.clone(), VerificationStatus::Verified);
+        vote.signature().set_verified();
+        let vote_res = pending_votes.insert_vote(&vote, epoch_state.clone());
 
         // first vote of an author is accepted
         assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u128));
         // filter out duplicates
         assert_eq!(
-            pending_votes.insert_vote(&vote, epoch_state.clone(), VerificationStatus::Verified),
+            pending_votes.insert_vote(&vote, epoch_state.clone()),
             VoteReceptionResult::DuplicateVote,
         );
         // qc is still not there
@@ -332,7 +332,8 @@ async fn test_insert_vote() {
         final_voter,
     )
     .unwrap();
-    match pending_votes.insert_vote(&vote, epoch_state.clone(), VerificationStatus::Verified) {
+    vote.signature().set_verified();
+    match pending_votes.insert_vote(&vote, epoch_state.clone()) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());
             block_store

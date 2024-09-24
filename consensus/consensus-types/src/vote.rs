@@ -9,7 +9,8 @@ use anyhow::{ensure, Context};
 use aptos_crypto::{bls12381, hash::CryptoHash, CryptoMaterialError};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
-    ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
+    ledger_info::{LedgerInfo, SignatureWithStatus},
+    validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
@@ -27,8 +28,8 @@ pub struct Vote {
     author: Author,
     /// LedgerInfo of a block that is going to be committed in case this vote gathers QC.
     ledger_info: LedgerInfo,
-    /// Signature of the LedgerInfo
-    signature: bls12381::Signature,
+    /// Signature on the LedgerInfo along with a status on whether the signature is verified.
+    signature: SignatureWithStatus,
     /// The 2-chain timeout and corresponding signature.
     two_chain_timeout: Option<(TwoChainTimeout, bls12381::Signature)>,
 }
@@ -83,7 +84,7 @@ impl Vote {
             vote_data,
             author,
             ledger_info,
-            signature,
+            signature: SignatureWithStatus::from(signature),
             two_chain_timeout: None,
         }
     }
@@ -108,7 +109,7 @@ impl Vote {
     }
 
     /// Return the signature of the vote
-    pub fn signature(&self) -> &bls12381::Signature {
+    pub fn signature(&self) -> &SignatureWithStatus {
         &self.signature
     }
 
@@ -163,8 +164,9 @@ impl Vote {
     /// Verifies the signature on the LedgerInfo.
     pub fn verify_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
-            .verify(self.author(), &self.ledger_info, &self.signature)
+            .verify(self.author(), &self.ledger_info, self.signature.signature())
             .context("Failed to verify Vote signature")?;
+        self.signature.set_verified();
         Ok(())
     }
 
