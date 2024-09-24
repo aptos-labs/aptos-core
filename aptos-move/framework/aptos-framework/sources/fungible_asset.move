@@ -196,21 +196,30 @@ module aptos_framework::fungible_asset {
 
     #[event]
     /// Emitted when fungible assets are deposited into a store.
-    struct Deposit has drop, store {
+    struct StoreDeposit has drop, store {
+        owner: address,
+        metadata: address,
+        is_primary: bool,
         store: address,
         amount: u64,
     }
 
     #[event]
     /// Emitted when fungible assets are withdrawn from a store.
-    struct Withdraw has drop, store {
+    struct StoreWithdraw has drop, store {
+        owner: address,
+        metadata: address,
+        is_primary: bool,
         store: address,
         amount: u64,
     }
 
     #[event]
     /// Emitted when a store's frozen status is updated.
-    struct Frozen has drop, store {
+    struct StoreFrozen has drop, store {
+        owner: address,
+        metadata: address,
+        is_primary: bool,
         store: address,
         frozen: bool,
     }
@@ -865,9 +874,17 @@ module aptos_framework::fungible_asset {
         frozen: bool
     ) acquires FungibleStore {
         let store_addr = object::object_address(&store);
-        borrow_global_mut<FungibleStore>(store_addr).frozen = frozen;
-
-        event::emit(Frozen { store: store_addr, frozen });
+        let owner = object::owner(store);
+        let store = borrow_global_mut<FungibleStore>(store_addr);
+        let metadata = object::object_address(&store.metadata);
+        store.frozen = frozen;
+        event::emit(StoreFrozen {
+            owner,
+            metadata,
+            is_primary: store_addr == object::create_user_derived_object_address(owner, metadata),
+            store: store_addr,
+            frozen
+        });
     }
 
     /// Burns a fungible asset
@@ -1019,7 +1036,11 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    public(friend) fun deposit_internal(store_addr: address, fa: FungibleAsset) acquires FungibleStore, ConcurrentFungibleBalance {
+    public(friend) fun deposit_internal(
+        store_addr: address,
+        fa: FungibleAsset
+    ) acquires FungibleStore, ConcurrentFungibleBalance {
+        let owner = object::owner(object::address_to_object<FungibleStore>(store_addr));
         let FungibleAsset { metadata, amount } = fa;
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         let store = borrow_global_mut<FungibleStore>(store_addr);
@@ -1034,7 +1055,14 @@ module aptos_framework::fungible_asset {
             store.balance = store.balance + amount;
         };
 
-        event::emit(Deposit { store: store_addr, amount });
+        let metadata = object::object_address(&store.metadata);
+        event::emit(StoreDeposit {
+            owner,
+            metadata,
+            is_primary: store_addr == object::create_user_derived_object_address(owner, metadata),
+            store: store_addr,
+            amount
+        });
     }
 
     /// Extract `amount` of the fungible asset from `store`.
@@ -1042,6 +1070,7 @@ module aptos_framework::fungible_asset {
         store_addr: address,
         amount: u64,
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
+        let owner = object::owner(object::address_to_object<FungibleStore>(store_addr));
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
 
         let store = borrow_global_mut<FungibleStore>(store_addr);
@@ -1058,7 +1087,14 @@ module aptos_framework::fungible_asset {
                 store.balance = store.balance - amount;
             };
 
-            event::emit<Withdraw>(Withdraw { store: store_addr, amount });
+            let metadata_addr = object::object_address(&store.metadata);
+            event::emit(StoreWithdraw {
+                owner,
+                metadata: metadata_addr,
+                is_primary: store_addr == object::create_user_derived_object_address(owner, metadata_addr),
+                store: store_addr,
+                amount
+            });
         };
         FungibleAsset { metadata, amount }
     }
@@ -1668,6 +1704,30 @@ module aptos_framework::fungible_asset {
 
     #[deprecated]
     struct FrozenEvent has drop, store {
+        frozen: bool,
+    }
+
+    #[deprecated]
+    #[event]
+    /// Emitted when fungible assets are deposited into a store.
+    struct Deposit has drop, store {
+        store: address,
+        amount: u64,
+    }
+
+    #[deprecated]
+    #[event]
+    /// Emitted when fungible assets are withdrawn from a store.
+    struct Withdraw has drop, store {
+        store: address,
+        amount: u64,
+    }
+
+    #[deprecated]
+    #[event]
+    /// Emitted when a store's frozen status is updated.
+    struct Frozen has drop, store {
+        store: address,
         frozen: bool,
     }
 }

@@ -20,13 +20,16 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `TransferRef`](#0x1_fungible_asset_TransferRef)
 -  [Struct `BurnRef`](#0x1_fungible_asset_BurnRef)
 -  [Struct `MutateMetadataRef`](#0x1_fungible_asset_MutateMetadataRef)
--  [Struct `Deposit`](#0x1_fungible_asset_Deposit)
--  [Struct `Withdraw`](#0x1_fungible_asset_Withdraw)
--  [Struct `Frozen`](#0x1_fungible_asset_Frozen)
+-  [Struct `StoreDeposit`](#0x1_fungible_asset_StoreDeposit)
+-  [Struct `StoreWithdraw`](#0x1_fungible_asset_StoreWithdraw)
+-  [Struct `StoreFrozen`](#0x1_fungible_asset_StoreFrozen)
 -  [Resource `FungibleAssetEvents`](#0x1_fungible_asset_FungibleAssetEvents)
 -  [Struct `DepositEvent`](#0x1_fungible_asset_DepositEvent)
 -  [Struct `WithdrawEvent`](#0x1_fungible_asset_WithdrawEvent)
 -  [Struct `FrozenEvent`](#0x1_fungible_asset_FrozenEvent)
+-  [Struct `Deposit`](#0x1_fungible_asset_Deposit)
+-  [Struct `Withdraw`](#0x1_fungible_asset_Withdraw)
+-  [Struct `Frozen`](#0x1_fungible_asset_Frozen)
 -  [Constants](#@Constants_0)
 -  [Function `default_to_concurrent_fungible_supply`](#0x1_fungible_asset_default_to_concurrent_fungible_supply)
 -  [Function `allow_upgrade_to_concurrent_fungible_balance`](#0x1_fungible_asset_allow_upgrade_to_concurrent_fungible_balance)
@@ -559,15 +562,15 @@ MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
 
 </details>
 
-<a id="0x1_fungible_asset_Deposit"></a>
+<a id="0x1_fungible_asset_StoreDeposit"></a>
 
-## Struct `Deposit`
+## Struct `StoreDeposit`
 
 Emitted when fungible assets are deposited into a store.
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Deposit">Deposit</a> <b>has</b> drop, store
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_StoreDeposit">StoreDeposit</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -577,6 +580,24 @@ Emitted when fungible assets are deposited into a store.
 
 
 <dl>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>metadata: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>is_primary: bool</code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>store: <b>address</b></code>
 </dt>
@@ -594,15 +615,15 @@ Emitted when fungible assets are deposited into a store.
 
 </details>
 
-<a id="0x1_fungible_asset_Withdraw"></a>
+<a id="0x1_fungible_asset_StoreWithdraw"></a>
 
-## Struct `Withdraw`
+## Struct `StoreWithdraw`
 
 Emitted when fungible assets are withdrawn from a store.
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a> <b>has</b> drop, store
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_StoreWithdraw">StoreWithdraw</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -612,6 +633,24 @@ Emitted when fungible assets are withdrawn from a store.
 
 
 <dl>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>metadata: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>is_primary: bool</code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>store: <b>address</b></code>
 </dt>
@@ -629,15 +668,15 @@ Emitted when fungible assets are withdrawn from a store.
 
 </details>
 
-<a id="0x1_fungible_asset_Frozen"></a>
+<a id="0x1_fungible_asset_StoreFrozen"></a>
 
-## Struct `Frozen`
+## Struct `StoreFrozen`
 
 Emitted when a store's frozen status is updated.
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Frozen">Frozen</a> <b>has</b> drop, store
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_StoreFrozen">StoreFrozen</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -647,6 +686,24 @@ Emitted when a store's frozen status is updated.
 
 
 <dl>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>metadata: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>is_primary: bool</code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>store: <b>address</b></code>
 </dt>
@@ -778,6 +835,114 @@ Emitted when a store's frozen status is updated.
 
 
 <dl>
+<dt>
+<code>frozen: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_Deposit"></a>
+
+## Struct `Deposit`
+
+Emitted when fungible assets are deposited into a store.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+#[deprecated]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Deposit">Deposit</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>store: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_Withdraw"></a>
+
+## Struct `Withdraw`
+
+Emitted when fungible assets are withdrawn from a store.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+#[deprecated]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>store: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_Frozen"></a>
+
+## Struct `Frozen`
+
+Emitted when a store's frozen status is updated.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+#[deprecated]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Frozen">Frozen</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>store: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>frozen: bool</code>
 </dt>
@@ -2915,9 +3080,17 @@ Enable/disable a store's ability to do direct transfers of the fungible asset.
     frozen: bool
 ) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
     <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
-    <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).frozen = frozen;
-
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Frozen">Frozen</a> { store: store_addr, frozen });
+    <b>let</b> owner = <a href="object.md#0x1_object_owner">object::owner</a>(store);
+    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
+    <b>let</b> metadata = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store.metadata);
+    store.frozen = frozen;
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_StoreFrozen">StoreFrozen</a> {
+        owner,
+        metadata,
+        is_primary: store_addr == <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(owner, metadata),
+        store: store_addr,
+        frozen
+    });
 }
 </code></pre>
 
@@ -3329,7 +3502,11 @@ Destroy an empty fungible asset.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>(store_addr: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>(
+    store_addr: <b>address</b>,
+    fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
+    <b>let</b> owner = <a href="object.md#0x1_object_owner">object::owner</a>(<a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr));
     <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata, amount } = fa;
     <b>assert</b>!(<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_STORE_EXISTENCE">EFUNGIBLE_STORE_EXISTENCE</a>));
     <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
@@ -3344,7 +3521,14 @@ Destroy an empty fungible asset.
         store.balance = store.balance + amount;
     };
 
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Deposit">Deposit</a> { store: store_addr, amount });
+    <b>let</b> metadata = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store.metadata);
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_StoreDeposit">StoreDeposit</a> {
+        owner,
+        metadata,
+        is_primary: store_addr == <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(owner, metadata),
+        store: store_addr,
+        amount
+    });
 }
 </code></pre>
 
@@ -3372,6 +3556,7 @@ Extract <code>amount</code> of the fungible asset from <code>store</code>.
     store_addr: <b>address</b>,
     amount: u64,
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
+    <b>let</b> owner = <a href="object.md#0x1_object_owner">object::owner</a>(<a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr));
     <b>assert</b>!(<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_STORE_EXISTENCE">EFUNGIBLE_STORE_EXISTENCE</a>));
 
     <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
@@ -3388,7 +3573,14 @@ Extract <code>amount</code> of the fungible asset from <code>store</code>.
             store.balance = store.balance - amount;
         };
 
-        <a href="event.md#0x1_event_emit">event::emit</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a>&gt;(<a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a> { store: store_addr, amount });
+        <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store.metadata);
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_StoreWithdraw">StoreWithdraw</a> {
+            owner,
+            metadata: metadata_addr,
+            is_primary: store_addr == <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(owner, metadata_addr),
+            store: store_addr,
+            amount
+        });
     };
     <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata, amount }
 }
