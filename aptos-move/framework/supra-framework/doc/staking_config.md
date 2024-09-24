@@ -24,6 +24,7 @@ Provides the configuration for staking and rewards
 -  [Function `update_recurring_lockup_duration_secs`](#0x1_staking_config_update_recurring_lockup_duration_secs)
 -  [Function `update_rewards_rate`](#0x1_staking_config_update_rewards_rate)
 -  [Function `update_rewards_config`](#0x1_staking_config_update_rewards_config)
+-  [Function `update_allow_validator_set_change`](#0x1_staking_config_update_allow_validator_set_change)
 -  [Function `update_voting_power_increase_limit`](#0x1_staking_config_update_voting_power_increase_limit)
 -  [Function `validate_required_stake`](#0x1_staking_config_validate_required_stake)
 -  [Function `validate_rewards_config`](#0x1_staking_config_validate_rewards_config)
@@ -52,6 +53,7 @@ Provides the configuration for staking and rewards
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/math_fixed64.md#0x1_math_fixed64">0x1::math_fixed64</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 </code></pre>
@@ -424,7 +426,7 @@ Return the reward rate of this epoch as a tuple (numerator, denominator).
 ## Function `initialize_rewards`
 
 Initialize rewards configurations.
-Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_initialize_rewards">initialize_rewards</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, rewards_rate_period_in_secs: u64, last_rewards_rate_period_start_in_secs: u64, rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
@@ -722,7 +724,7 @@ Calculate and return the up-to-date StakingRewardsConfig.
 ## Function `update_required_stake`
 
 Update the min and max stake amounts.
-Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_required_stake">update_required_stake</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, minimum_stake: u64, maximum_stake: u64)
@@ -874,6 +876,32 @@ Can only be called as part of the Aptos governance proposal process established 
     staking_rewards_config.min_rewards_rate = min_rewards_rate;
     staking_rewards_config.rewards_rate_period_in_secs = rewards_rate_period_in_secs;
     staking_rewards_config.rewards_rate_decrease_rate = rewards_rate_decrease_rate;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_staking_config_update_allow_validator_set_change"></a>
+
+## Function `update_allow_validator_set_change`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_allow_validator_set_change">update_allow_validator_set_change</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, value: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_allow_validator_set_change">update_allow_validator_set_change</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, value: bool) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
+    <b>let</b> <a href="staking_config.md#0x1_staking_config">staking_config</a> = <b>borrow_global_mut</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework));
+    <a href="staking_config.md#0x1_staking_config">staking_config</a>.allow_validator_set_change = <b>true</b>;
 }
 </code></pre>
 
