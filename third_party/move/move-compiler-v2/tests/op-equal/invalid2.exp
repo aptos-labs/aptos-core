@@ -11,3 +11,9 @@ error: cannot use `bool` with an operator which expects a value of type `integer
   │
 9 │         x += true;
   │         ^
+
+error: cannot use `bool` with an operator which expects a value of type `integer`
+   ┌─ tests/op-equal/invalid2.move:14:14
+   │
+14 │         x += false;
+   │              ^^^^^

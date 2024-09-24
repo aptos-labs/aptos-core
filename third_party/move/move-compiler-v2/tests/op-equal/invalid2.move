@@ -8,4 +8,9 @@ module 0x42::test {
         let x = false;
         x += true;
     }
+
+    fun test2() {
+        let x = 1;
+        x += false;
+    }
 }
