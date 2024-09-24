@@ -138,7 +138,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST }} #aptos-node-v1.20
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST }}
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: framework_upgrade
@@ -279,7 +279,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300 # Run for 5 minutes
       # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST }} #aptos-node-v1.20
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_FOR_COMPAT_TEST }}
       GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
       POST_TO_SLACK: true
 
