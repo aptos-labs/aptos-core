@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge_vec, Histogram, HistogramVec, IntCounter,
-    IntCounterVec, IntGaugeVec,
+    exponential_buckets, op_counters::DurationHistogram, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -51,6 +51,26 @@ pub static APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
+});
+
+pub static APTOS_EXECUTOR_NONCE_DUDEUP_SECONDS: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_executor_nonce_dudeup_seconds",
+            "The time spent in seconds of nonce dudeup in Aptos executor",
+        )
+        .unwrap(),
+    )
+});
+
+pub static APTOS_EXECUTOR_NONCE_UPDATE_SECONDS: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_executor_nonce_update_seconds",
+            "The time spent in seconds of nonce update in Aptos executor",
+        )
+        .unwrap(),
+    )
 });
 
 pub static APTOS_EXECUTOR_OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
