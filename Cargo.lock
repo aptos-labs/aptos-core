@@ -4456,6 +4456,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "ouroboros",
+ "parking_lot 0.12.1",
  "proptest",
  "rand 0.7.3",
  "rand_core 0.5.1",

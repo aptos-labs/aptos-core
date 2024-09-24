@@ -40,6 +40,7 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
+use parking_lot::RwLock;
 use rayon::ThreadPool;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -380,6 +381,26 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 }
 
+// TODO(loader_v2): Only for TPS testing, no env update and no limits on cached names/types.
+static ENV: Lazy<RwLock<Option<AptosEnvironment>>> = Lazy::new(|| RwLock::new(None));
+
+fn get_or_create_environment(state_view: &impl StateView) -> AptosEnvironment {
+    if let Some(env) = &*ENV.read() {
+        return env.clone();
+    }
+
+    let mut maybe_env = ENV.write();
+    if let Some(env) = &*maybe_env {
+        return env.clone();
+    }
+
+    let env = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
+    *maybe_env = Some(env.clone());
+    drop(maybe_env);
+
+    env
+}
+
 pub struct BlockAptosVM;
 
 impl BlockAptosVM {
@@ -410,7 +431,7 @@ impl BlockAptosVM {
             ExecutableTestType,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
-        let environment = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
+        let environment = get_or_create_environment(state_view);
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {
