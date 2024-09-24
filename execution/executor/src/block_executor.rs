@@ -245,105 +245,104 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
-        let (state, epoch_state, state_checkpoint_output) = if parent_block_id != committed_block_id
-            && parent_output.has_reconfiguration()
-        {
-            // ignore reconfiguration suffix, even if the block is non-empty
-            info!(
-                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                "reconfig_descendant_block_received"
-            );
-            (
-                parent_output.state().clone(),
-                parent_output.epoch_state().clone(),
-                StateCheckpointOutput::default(),
-            )
-        } else {
-            let state_view = {
-                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                    .with_label_values(&["verified_state_view"])
-                    .start_timer();
-                info!("next_version: {}", parent_output.next_version());
-                CachedStateView::new(
-                    StateViewId::BlockExecution { block_id },
-                    Arc::clone(&self.db.reader),
-                    parent_output.next_version(),
-                    parent_output.state().current.clone(),
-                    Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-                )?
-            };
+        let (state, epoch_state, state_checkpoint_output) = 
+            if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
+                // ignore reconfiguration suffix, even if the block is non-empty
+                info!(
+                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                    "reconfig_descendant_block_received"
+                );
+                (
+                    parent_output.state().clone(),
+                    parent_output.epoch_state().clone(),
+                    StateCheckpointOutput::default(),
+                )
+            } else {
+                let state_view = {
+                    let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                        .with_label_values(&["verified_state_view"])
+                        .start_timer();
+                    info!("next_version: {}", parent_output.next_version());
+                    CachedStateView::new(
+                        StateViewId::BlockExecution { block_id },
+                        Arc::clone(&self.db.reader),
+                        parent_output.next_version(),
+                        parent_output.state().current.clone(),
+                        Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                    )?
+                };
 
-            let nonce_table = self.nonce_table.read();
-            info!("Size of nonce table: {:?}", nonce_table.len());
-            let deduped_transactions = {
-                let _timer = APTOS_EXECUTOR_NONCE_DUDEUP_SECONDS.start_timer();
-                match transactions {
-                    ExecutableTransactions::Unsharded(txns) => ExecutableTransactions::Unsharded(
-                        txns.into_iter()
-                            .filter(|txn| match txn {
-                                SignatureVerifiedTransaction::Valid(txn) => {
-                                    if let Transaction::UserTransaction(txn) = txn {
-                                        let sender = txn.sender();
-                                        let sequence_number = txn.sequence_number();
-                                        if nonce_table.get(&(sender, sequence_number)).is_some() {
-                                            return false;
+                let nonce_table = self.nonce_table.read();
+                info!("Size of nonce table: {:?}", nonce_table.len());
+                let deduped_transactions = {
+                    let _timer = APTOS_EXECUTOR_NONCE_DUDEUP_SECONDS.start_timer();
+                    match transactions {
+                        ExecutableTransactions::Unsharded(txns) => ExecutableTransactions::Unsharded(
+                            txns.into_iter()
+                                .filter(|txn| match txn {
+                                    SignatureVerifiedTransaction::Valid(txn) => {
+                                        if let Transaction::UserTransaction(txn) = txn {
+                                            let sender = txn.sender();
+                                            let sequence_number = txn.sequence_number();
+                                            if nonce_table.get(&(sender, sequence_number)).is_some() {
+                                                return false;
+                                            }
                                         }
-                                    }
-                                    true
-                                },
-                                SignatureVerifiedTransaction::Invalid(_) => false,
-                            })
-                            .collect::<Vec<_>>(),
-                    ),
-                    ExecutableTransactions::Sharded(txns) => ExecutableTransactions::Sharded(txns),
-                }
-            };
+                                        true
+                                    },
+                                    SignatureVerifiedTransaction::Invalid(_) => false,
+                                })
+                                .collect::<Vec<_>>(),
+                        ),
+                        ExecutableTransactions::Sharded(txns) => ExecutableTransactions::Sharded(txns),
+                    }
+                };
 
-            let chunk_output = {
-                let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
-                fail_point!("executor::vm_execute_block", |_| {
-                    Err(ExecutorError::from(anyhow::anyhow!(
-                        "Injected error in vm_execute_block"
-                    )))
-                });
-                V::execute_transaction_block(
-                    deduped_transactions,
-                    state_view,
-                    onchain_config.clone(),
-                )?
-            };
+                let chunk_output = {
+                    let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
+                    fail_point!("executor::vm_execute_block", |_| {
+                        Err(ExecutorError::from(anyhow::anyhow!(
+                            "Injected error in vm_execute_block"
+                        )))
+                    });
+                    V::execute_transaction_block(
+                        deduped_transactions,
+                        state_view,
+                        onchain_config.clone(),
+                    )?
+                };
 
-            {
-                let _timer = APTOS_EXECUTOR_NONCE_UPDATE_SECONDS.start_timer();
-                let mut nonce_table = self.nonce_table.write();
-                let now = Instant::now();
-                for (i, txn) in chunk_output.transactions.iter().enumerate() {
-                    if let Transaction::UserTransaction(txn) = txn {
-                        if chunk_output
-                            .transaction_outputs
-                            .get(i)
-                            .unwrap()
-                            .status()
-                            .is_keep()
-                        {
-                            nonce_table.insert((txn.sender(), txn.sequence_number()), now);
+                {
+                    let _timer = APTOS_EXECUTOR_NONCE_UPDATE_SECONDS.start_timer();
+                    let mut nonce_table = self.nonce_table.write();
+                    let now = Instant::now();
+                    for (i, txn) in chunk_output.transactions.iter().enumerate() {
+                        if let Transaction::UserTransaction(txn) = txn {
+                            if chunk_output
+                                .transaction_outputs
+                                .get(i)
+                                .unwrap()
+                                .status()
+                                .is_keep()
+                            {
+                                nonce_table.insert((txn.sender(), txn.sequence_number()), now);
+                            }
                         }
                     }
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(2)),
+                        nonce_table.retain(|_, insertion_time| insertion_time.elapsed().as_secs() < 65)
+                    );
                 }
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(2)),
-                    nonce_table.retain(|_, insertion_time| insertion_time.elapsed().as_secs() < 65)
-                );
-            }
 
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["state_checkpoint"])
-                .start_timer();
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["state_checkpoint"])
+                    .start_timer();
 
-            THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
-            })?
-        };
+                THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
+                })?
+            };
 
         let _ = self.block_tree.add_block(
             parent_block_id,
