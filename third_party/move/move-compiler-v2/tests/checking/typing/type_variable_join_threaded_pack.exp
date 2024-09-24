@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x2::Container {
     struct T {
-        f: #0,
+        f: V,
     }
     public fun get<V>(_self: &Container::T<#0>): #0 {
         Abort(0)
@@ -16,8 +16,8 @@ module 0x2::Container {
 module 0x2::M {
     use 0x2::Container; // resolved as: 0x2::Container
     struct Box {
-        f1: #0,
-        f2: #0,
+        f1: T,
+        f2: T,
     }
     private fun t0(): M::Box<u64> {
         {

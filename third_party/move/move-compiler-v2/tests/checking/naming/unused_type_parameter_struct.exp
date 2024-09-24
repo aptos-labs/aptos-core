@@ -49,16 +49,16 @@ module 0x42::test {
         dummy_field: bool,
     }
     struct S2 {
-        f: test::S3<#1>,
+        f: test::S3<T2>,
     }
     struct S3 {
         dummy_field: bool,
     }
     struct S4 {
-        f: vector<#0>,
+        f: vector<T>,
     }
     struct S5 {
-        f: vector<#0>,
-        g: vector<#1>,
+        f: vector<T>,
+        g: vector<U>,
     }
 } // end 0x42::test

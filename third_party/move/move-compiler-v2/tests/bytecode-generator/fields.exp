@@ -4,7 +4,7 @@ module 0x42::fields {
         h: u64,
     }
     struct G {
-        f: #0,
+        f: X,
     }
     struct S {
         f: u64,

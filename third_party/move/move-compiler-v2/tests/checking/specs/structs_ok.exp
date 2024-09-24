@@ -4,7 +4,7 @@ module 0x42::M {
         x: u64,
     }
     struct G {
-        x: #0,
+        x: T,
         y: bool,
     }
     struct R {

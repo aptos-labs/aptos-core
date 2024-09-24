@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x2::Token {
     struct Coin {
-        type: #0,
+        type: AssetType,
         value: u64,
     }
     public fun create<ATy>(type: #0,value: u64): Token::Coin<#0> {
@@ -93,7 +93,7 @@ module 0xb055::OneToOneMarket {
         record: u64,
     }
     struct Pool {
-        coin: Token::Coin<#0>,
+        coin: Token::Coin<AssetType>,
     }
     struct Price {
         price: u64,

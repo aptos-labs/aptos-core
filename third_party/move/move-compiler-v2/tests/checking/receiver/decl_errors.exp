@@ -39,8 +39,8 @@ module 0x42::n {
 module 0x42::m {
     use 0x42::n::{T}; // resolved as: 0x42::n
     struct G {
-        x: #0,
-        y: #1,
+        x: T,
+        y: R,
     }
     struct S {
         x: u64,

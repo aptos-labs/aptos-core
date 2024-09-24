@@ -406,9 +406,12 @@ impl<'env> Generator<'env> {
                         ),
                     );
                 }
-                self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
-                    lhs_temp, rhs_temp,
-                ])
+                self.emit_call(
+                    *id,
+                    targets,
+                    BytecodeOperation::WriteRef,
+                    vec![lhs_temp, rhs_temp],
+                )
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),
             ExpData::Return(id, exp) => {
@@ -476,9 +479,16 @@ impl<'env> Generator<'env> {
                     .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
-            ExpData::Invoke(id, _, _) | ExpData::Lambda(id, _, _) => {
-                self.internal_error(*id, format!("not yet implemented: {:?}", exp))
-            },
+            // TODO(LAMBDA)
+            ExpData::Lambda(id, _, _) => self.error(
+                *id,
+                "Function-typed values not yet supported except as parameters to calls to inline functions",
+            ),
+            // TODO(LAMBDA)
+            ExpData::Invoke(_, exp, _) => self.error(
+                exp.as_ref().node_id(),
+                "Calls to function values other than inline function parameters not yet supported",
+            ),
             ExpData::Quant(id, _, _, _, _, _) => {
                 self.internal_error(*id, "unsupported specification construct")
             },
@@ -803,7 +813,11 @@ impl<'env> Generator<'env> {
 
             Operation::NoOp => {}, // do nothing
 
-            Operation::Closure(..) => self.internal_error(id, "closure not yet implemented"),
+            // TODO(LAMBDA)
+            Operation::Closure(..) => self.error(
+                id,
+                "Function-typed values not yet supported except as parameters to calls to inline functions",
+            ),
 
             // Non-supported specification related operations
             Operation::Exists(Some(_))

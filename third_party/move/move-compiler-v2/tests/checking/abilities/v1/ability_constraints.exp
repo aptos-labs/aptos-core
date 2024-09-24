@@ -1,11 +1,11 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
     struct Box {
-        f: #0,
+        f: T,
     }
     struct Pair {
-        f1: #0,
-        f2: #1,
+        f1: T1,
+        f2: T2,
     }
     struct R {
         dummy_field: bool,

@@ -1,8 +1,8 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
     struct Box {
-        f1: #0,
-        f2: #0,
+        f1: T,
+        f2: T,
     }
     private fun t0() {
         {

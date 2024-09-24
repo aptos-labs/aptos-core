@@ -42,7 +42,7 @@ module 0xc0ffee::m {
     enum Option {
         None,
         Some {
-            value: #0,
+            value: A,
         }
     }
     enum Outer {

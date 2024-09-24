@@ -4,11 +4,11 @@ module 0x42::simple_map {
     use std::option;
     use std::vector;
     struct Element {
-        key: #0,
-        value: #1,
+        key: Key,
+        value: Value,
     }
     struct SimpleMap {
-        data: vector<simple_map::Element<#0, #1>>,
+        data: vector<simple_map::Element<Key, Value>>,
     }
     public fun borrow<Key,Value>(map: &simple_map::SimpleMap<#0, #1>,key: &#0): &#1 {
         {

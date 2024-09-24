@@ -1,8 +1,8 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct Box {
-        f1: #0,
-        f2: #0,
+        f1: T,
+        f2: T,
     }
     private fun new<T>(): M::Box<#0> {
         Abort(0)

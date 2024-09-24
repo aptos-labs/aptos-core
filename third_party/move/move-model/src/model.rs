@@ -1870,7 +1870,8 @@ impl GlobalEnv {
         let data = FunctionData {
             name,
             loc: loc.clone(),
-            id_loc: loc,
+            id_loc: loc.clone(),
+            result_type_loc: loc,
             def_idx: None,
             handle_idx: None,
             visibility,
@@ -2368,7 +2369,6 @@ impl GlobalEnv {
 
     pub fn internal_dump_env(&self, all: bool) -> String {
         let spool = self.symbol_pool();
-        let tctx = &self.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         for module in self.get_modules() {
             if !all && !module.is_target() {
@@ -2422,6 +2422,7 @@ impl GlobalEnv {
                 emitln!(writer, "{}", self.display(&*module_spec));
             }
             for str in module.get_structs() {
+                let tctx = str.get_type_display_ctx();
                 if str.has_variants() {
                     emitln!(writer, "enum {} {{", str.get_name().display(spool));
                     writer.indent();
@@ -2432,7 +2433,7 @@ impl GlobalEnv {
                             emitln!(writer, " {");
                             writer.indent();
                             for fld in fields {
-                                emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                                emitln!(writer, "{},", self.dump_field(&tctx, &fld))
                             }
                             writer.unindent();
                             emitln!(writer, "}")
@@ -2444,7 +2445,7 @@ impl GlobalEnv {
                     emitln!(writer, "struct {} {{", str.get_name().display(spool));
                     writer.indent();
                     for fld in str.get_fields() {
-                        emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                        emitln!(writer, "{},", self.dump_field(&tctx, &fld))
                     }
                 }
                 writer.unindent();
@@ -2455,7 +2456,8 @@ impl GlobalEnv {
                 }
             }
             for fun in module.get_functions() {
-                self.dump_fun_internal(&writer, tctx, &fun);
+                let tctx = fun.get_type_display_ctx();
+                self.dump_fun_internal(&writer, &tctx, &fun);
             }
             for (_, fun) in module.get_spec_funs() {
                 emit!(
@@ -3977,6 +3979,9 @@ pub struct FunctionData {
     /// Location of the function identifier, suitable for error messages alluding to the function.
     pub(crate) id_loc: Loc,
 
+    /// Location of the function result type, suitable for error messages alluding to the result type.
+    pub(crate) result_type_loc: Loc,
+
     /// The definition index of this function in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
     pub(crate) def_idx: Option<FunctionDefinitionIndex>,
@@ -4117,6 +4122,11 @@ impl<'env> FunctionEnv<'env> {
     /// Returns the location of the function identifier.
     pub fn get_id_loc(&self) -> Loc {
         self.data.id_loc.clone()
+    }
+
+    /// Returns the location of the function identifier.
+    pub fn get_result_type_loc(&self) -> Loc {
+        self.data.result_type_loc.clone()
     }
 
     /// Returns the attributes of this function.

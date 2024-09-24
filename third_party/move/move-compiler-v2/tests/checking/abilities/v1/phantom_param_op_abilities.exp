@@ -1,22 +1,22 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
     struct HasCopy {
-        a: #1,
+        a: T2,
     }
     struct HasDrop {
-        a: #1,
+        a: T2,
     }
     struct HasKey {
-        a: #1,
+        a: T2,
     }
     struct HasStore {
-        a: #1,
+        a: T2,
     }
     struct NoAbilities {
         dummy_field: bool,
     }
     struct RequireStore {
-        a: #0,
+        a: T,
     }
     private fun f1(ref: &mut M::HasDrop<M::NoAbilities, u64>) {
         ref = pack M::HasDrop<M::NoAbilities, u64>(1);
