@@ -2,6 +2,7 @@
 module supra_framework::staking_config {
     use std::error;
     use std::features;
+    use std::signer;
 
     use supra_framework::system_addresses;
     use supra_framework::timestamp;
@@ -141,7 +142,7 @@ module supra_framework::staking_config {
     }
 
     /// Initialize rewards configurations.
-    /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+    /// Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
     public fun initialize_rewards(
         supra_framework: &signer,
         rewards_rate: FixedPoint64,
@@ -259,7 +260,7 @@ module supra_framework::staking_config {
     }
 
     /// Update the min and max stake amounts.
-    /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+    /// Can only be called as part of the Supra governance proposal process established by the SupraGovernance module.
     public fun update_required_stake(
         supra_framework: &signer,
         minimum_stake: u64,
@@ -342,6 +343,11 @@ module supra_framework::staking_config {
         staking_rewards_config.rewards_rate_decrease_rate = rewards_rate_decrease_rate;
     }
 
+    public fun enable_validator_set_change(supra_framework: &signer) acquires StakingConfig {
+        system_addresses::assert_supra_framework(supra_framework);
+        let staking_config = borrow_global_mut<StakingConfig>(signer::address_of(supra_framework));
+        staking_config.allow_validator_set_change = true;
+    }
     /// Update the joining limit %.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_voting_power_increase_limit(
@@ -393,6 +399,7 @@ module supra_framework::staking_config {
     #[test_only]
     use aptos_std::fixed_point64::{equal, create_from_rational};
 
+    
     #[test(supra_framework = @supra_framework)]
     public entry fun test_change_staking_configs(supra_framework: signer) acquires StakingConfig {
         initialize(&supra_framework, 0, 1, 1, false, 1, 1, 1);
@@ -401,6 +408,7 @@ module supra_framework::staking_config {
         update_recurring_lockup_duration_secs(&supra_framework, 10000);
         update_rewards_rate(&supra_framework, 10, 100);
         update_voting_power_increase_limit(&supra_framework, 10);
+        enable_validator_set_change(&supra_framework);
 
         let config = borrow_global<StakingConfig>(@supra_framework);
         assert!(config.minimum_stake == 100, 0);
@@ -409,6 +417,7 @@ module supra_framework::staking_config {
         assert!(config.rewards_rate == 10, 4);
         assert!(config.rewards_rate_denominator == 100, 4);
         assert!(config.voting_power_increase_limit == 10, 5);
+        assert!(config.allow_validator_set_change==true, 6);
     }
 
     #[test(supra_framework = @supra_framework)]
