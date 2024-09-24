@@ -666,16 +666,13 @@ impl OutboundRpcs {
                         FAILED_LABEL,
                     )
                     .inc();
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(10)),
-                        warn!(
-                            NetworkSchema::new(network_context).remote_peer(peer_id),
-                            "[sampled] {} Error making outbound RPC request to {} (request_id {}). Error: {}",
-                            network_context,
-                            peer_id.short_str(),
-                            request_id,
-                            error
-                        )
+                    warn!(
+                        NetworkSchema::new(network_context).remote_peer(peer_id),
+                        "{} Error making outbound RPC request to {} (request_id {}). Error: {}",
+                        network_context,
+                        peer_id.short_str(),
+                        request_id,
+                        error
                     );
                 }
             },

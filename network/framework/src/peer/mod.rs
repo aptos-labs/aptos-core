@@ -639,17 +639,14 @@ where
                     .outbound_rpcs
                     .handle_outbound_request(request, write_reqs_tx)
                 {
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(10)),
-                        warn!(
-                            NetworkSchema::new(&self.network_context)
-                                .connection_metadata(&self.connection_metadata),
-                            error = %e,
-                            "[sampled] Failed to send outbound rpc request for protocol {} to peer: {}. Error: {}",
-                            protocol_id,
-                            self.remote_peer_id().short_str(),
-                            e,
-                        )
+                    warn!(
+                        NetworkSchema::new(&self.network_context)
+                            .connection_metadata(&self.connection_metadata),
+                        error = %e,
+                        "Failed to send outbound rpc request for protocol {} to peer: {}. Error: {}",
+                        protocol_id,
+                        self.remote_peer_id().short_str(),
+                        e,
                     );
                 }
             },
