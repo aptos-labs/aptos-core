@@ -81,21 +81,6 @@ class Git:
         return f"{remote_match.group('org_name')}/{remote_match.group('repo_name')}"
    
 
-    def get_tags(self, ref: str = "HEAD", pattern: str = None) -> list[str]:
-        """
-        Get tags pointing to the specified ref, optionally filtered by a pattern.
-        If no ref is specified, defaults to HEAD.
-        """
-        command = ["tag", "--sort=-committerdate", "--points-at", ref]
-        if pattern:
-            command.extend(["--list", pattern])
-        
-        result = self.run(command)
-        if not result.succeeded():
-            raise Exception(f"Failed to get tags: {result.unwrap().decode()}")
-        
-        return result.unwrap().decode().strip().split('\n')
-
     def get_remote_branches_matching_pattern(self, remote: str, pattern: str, regex: str) -> list[str]:
         """
         Get remote branches that match a specific pattern (e.g. aptos-release-v*).
