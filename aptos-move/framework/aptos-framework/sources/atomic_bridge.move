@@ -1111,8 +1111,9 @@ module aptos_framework::atomic_bridge_counterparty {
 
     #[event]
     /// An event triggered upon locking assets for a bridge transfer
-    struct BridgeTransferAssetsLockedEvent has store, drop {
+    struct BridgeTransferLockedEvent has store, drop {
         bridge_transfer_id: vector<u8>,
+        initiator: vector<u8>,
         recipient: address,
         amount: u64,
         hash_lock: vector<u8>,
@@ -1165,8 +1166,9 @@ module aptos_framework::atomic_bridge_counterparty {
         bridge_store::add_counterparty(bridge_transfer_id, details);
 
         event::emit(
-            BridgeTransferAssetsLockedEvent {
+            BridgeTransferLockedEvent {
                 bridge_transfer_id,
+                initiator,
                 recipient,
                 amount,
                 hash_lock,
@@ -1238,9 +1240,10 @@ module aptos_framework::atomic_bridge_counterparty {
                                     time_lock, recipient, amount);
 
         assert!(
-            event::was_event_emitted<BridgeTransferAssetsLockedEvent>(
-                &BridgeTransferAssetsLockedEvent {
+            event::was_event_emitted<BridgeTransferLockedEvent>(
+                &BridgeTransferLockedEvent {
                     bridge_transfer_id,
+                    initiator,
                     recipient,
                     amount,
                     hash_lock,
