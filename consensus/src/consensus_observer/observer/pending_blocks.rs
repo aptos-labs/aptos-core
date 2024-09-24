@@ -10,6 +10,7 @@ use crate::consensus_observer::{
     observer::payload_store::BlockPayloadStore,
 };
 use aptos_config::config::ConsensusObserverConfig;
+use aptos_consensus_types::block::Block;
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
 use aptos_types::block_info::Round;
@@ -26,6 +27,11 @@ pub struct PendingBlockStore {
     // A map of ordered blocks that are without payloads. The key is
     // the (epoch, round) of the first block in the ordered block.
     blocks_without_payloads: BTreeMap<(u64, Round), OrderedBlock>,
+
+    // A map of block proposal that are without payloads. The key is
+    // the (epoch, round) of the block.
+    // Used for pre-execution in consensus observer.
+    proposals_without_payloads: BTreeMap<(u64, Round), Block>,
 }
 
 impl PendingBlockStore {
@@ -33,12 +39,18 @@ impl PendingBlockStore {
         Self {
             consensus_observer_config,
             blocks_without_payloads: BTreeMap::new(),
+            proposals_without_payloads: BTreeMap::new(),
         }
     }
 
     /// Clears all missing blocks from the store
     pub fn clear_missing_blocks(&mut self) {
         self.blocks_without_payloads.clear();
+    }
+
+    /// Clears all missing proposals from the store
+    pub fn clear_missing_proposals(&mut self) {
+        self.proposals_without_payloads.clear();
     }
 
     /// Returns true iff the store contains an entry for the given ordered block
@@ -50,6 +62,15 @@ impl PendingBlockStore {
         // Check if the block is already in the store
         self.blocks_without_payloads
             .contains_key(&first_block_epoch_round)
+    }
+
+    pub fn existing_pending_proposal(&self, block: &Block) -> bool {
+        // Get the epoch and round of the block
+        let block_epoch_round = (block.epoch(), block.round());
+
+        // Check if the block is already in the store
+        self.proposals_without_payloads
+            .contains_key(&block_epoch_round)
     }
 
     /// Inserts a block (without payloads) into the store
@@ -79,6 +100,32 @@ impl PendingBlockStore {
         self.garbage_collect_pending_blocks();
     }
 
+    /// Inserts a block proposal (without payloads) into the store
+    pub fn insert_pending_proposal(&mut self, proposal: Block) {
+        // Get the epoch and round of the proposal
+        let block_epoch_round = (proposal.epoch(), proposal.round());
+
+        // Insert the block into the store
+        match self.proposals_without_payloads.entry(block_epoch_round) {
+            Entry::Occupied(_) => {
+                // The block is already in the store
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "A pending block proposal was already found for the given epoch and round: {:?}",
+                        block_epoch_round
+                    ))
+                );
+            },
+            Entry::Vacant(entry) => {
+                // Insert the block into the store
+                entry.insert(proposal);
+            },
+        }
+
+        // Perform garbage collection if the store is too large
+        self.garbage_collect_pending_proposals();
+    }
+
     /// Garbage collects the pending blocks store by removing
     /// the oldest blocks if the store is too large.
     fn garbage_collect_pending_blocks(&mut self) {
@@ -94,6 +141,27 @@ impl PendingBlockStore {
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "The pending block store is too large: {:?} blocks. Removing the block for the oldest epoch and round: {:?}",
                         num_pending_blocks, oldest_epoch_round
+                    ))
+                );
+            }
+        }
+    }
+
+    /// Garbage collects the pending proposals store by removing
+    /// the oldest proposals if the store is too large.
+    fn garbage_collect_pending_proposals(&mut self) {
+        // Calculate the number of proposals to remove
+        let num_pending_proposals = self.proposals_without_payloads.len() as u64;
+        let max_pending_proposals = self.consensus_observer_config.max_num_pending_proposals;
+        let num_proposals_to_remove = num_pending_proposals.saturating_sub(max_pending_proposals);
+
+        // Remove the oldest proposals if the store is too large
+        for _ in 0..num_proposals_to_remove {
+            if let Some((oldest_epoch_round, _)) = self.proposals_without_payloads.pop_first() {
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "The pending proposal store is too large: {:?} proposals. Removing the proposal for the oldest epoch and round: {:?}",
+                        num_pending_proposals, oldest_epoch_round
                     ))
                 );
             }
@@ -152,6 +220,58 @@ impl PendingBlockStore {
         ready_block
     }
 
+    /// Removes and returns the proposal from the store that is now ready
+    /// to be processed (after the new payload has been received).
+    pub fn remove_ready_proposal(
+        &mut self,
+        received_payload_epoch: u64,
+        received_payload_round: Round,
+        block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+    ) -> Option<Block> {
+        // Calculate the round at which to split the proposals
+        let split_round = received_payload_round.saturating_add(1);
+
+        // Split the proposals at the epoch and round
+        let mut proposals_at_higher_rounds = self
+            .proposals_without_payloads
+            .split_off(&(received_payload_epoch, split_round));
+
+        // Check if the last proposal is ready (this should be the only ready proposal).
+        // Any earlier proposals are considered out-of-date and will be dropped.
+        let mut ready_proposal = None;
+        if let Some((epoch_and_round, proposal)) = self.proposals_without_payloads.pop_last() {
+            // If all payloads exist for the proposal, then the proposal is ready
+            if block_payload_store
+                .lock()
+                .all_payloads_exist_for_proposal(&proposal)
+            {
+                ready_proposal = Some(proposal);
+            } else {
+                // Otherwise, check if we're still waiting for higher payloads for the proposal
+                if proposal.round() > received_payload_round {
+                    proposals_at_higher_rounds.insert(epoch_and_round, proposal);
+                }
+            }
+        }
+
+        // Check if any out-of-date proposals were dropped
+        if !self.proposals_without_payloads.is_empty() {
+            info!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Dropped {:?} out-of-date pending proposals before epoch and round: {:?}",
+                    self.proposals_without_payloads.len(),
+                    (received_payload_epoch, received_payload_round)
+                ))
+            );
+        }
+
+        // Update the pending proposals to only include the proposals at higher rounds
+        self.proposals_without_payloads = proposals_at_higher_rounds;
+
+        // Return the ready proposal (if one exists)
+        ready_proposal
+    }
+
     /// Updates the metrics for the pending blocks
     pub fn update_pending_blocks_metrics(&self) {
         // Update the number of pending block entries
@@ -183,6 +303,40 @@ impl PendingBlockStore {
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
             metrics::PENDING_BLOCKS_LABEL,
+            highest_pending_round,
+        );
+    }
+
+    /// Updates the metrics for the pending proposals
+    pub fn update_pending_proposals_metrics(&self) {
+        // Update the number of pending proposal entries
+        let num_entries = self.proposals_without_payloads.len() as u64;
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_NUM_PROCESSED_PROPOSALS,
+            metrics::PENDING_PROPOSAL_ENTRIES_LABEL,
+            num_entries,
+        );
+
+        // Update the total number of pending proposals
+        let num_pending_proposals = self
+            .proposals_without_payloads
+            .values()
+            .len() as u64;
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_NUM_PROCESSED_PROPOSALS,
+            metrics::PENDING_PROPOSALS_LABEL,
+            num_pending_proposals,
+        );
+
+        // Update the highest round for the pending proposals
+        let highest_pending_round = self
+            .proposals_without_payloads
+            .last_key_value()
+            .map(|(_, proposal)| proposal.round())
+            .unwrap_or(0);
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_PROCESSED_PROPOSAL_ROUNDS,
+            metrics::PENDING_PROPOSALS_LABEL,
             highest_pending_round,
         );
     }

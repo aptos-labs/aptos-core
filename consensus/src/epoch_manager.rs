@@ -764,6 +764,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         validator: Arc<RwLock<PooledVMValidator>>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -900,6 +901,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_jwk_consensus_config,
             fast_rand_config,
             execution_futures,
+            consensus_publisher,
         );
 
         round_manager.init(last_vote).await;
@@ -1219,6 +1221,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config,
                 rand_msg_rx,
                 self.validator.clone(),
+                self.consensus_publisher.clone(),
             )
             .await
         }
@@ -1269,6 +1272,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         validator: Arc<RwLock<PooledVMValidator>>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) {
         match self.storage.start(consensus_config.order_vote_enabled()) {
             LivenessStorageData::FullRecoveryData(initial_data) => {
@@ -1288,6 +1292,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     fast_rand_config,
                     rand_msg_rx,
                     validator,
+                    consensus_publisher,
                 )
                 .await
             },

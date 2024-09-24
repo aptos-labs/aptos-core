@@ -6,12 +6,9 @@ use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore, NeedFetchResult,
-    },
-    counters::{
+    }, consensus_observer::{network::observer_message::ConsensusObserverMessage, publisher::consensus_publisher::ConsensusPublisher}, counters::{
         self, NUM_PRE_COMMIT_VOTED_BLOCKS, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS, PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT, QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT
-    },
-    error::{error_kind, VerifyError},
-    liveness::{
+    }, error::{error_kind, VerifyError}, liveness::{
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
@@ -22,7 +19,7 @@ use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block, block_data::BlockType, common::{Author, Round}, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
+    block::{self, Block}, block_data::BlockType, common::{Author, Round}, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::{checked, duration_since_epoch, Mutex};
@@ -222,6 +219,7 @@ pub struct RoundManager {
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
     execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
 
 impl RoundManager {
@@ -242,6 +240,7 @@ impl RoundManager {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
         execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -273,6 +272,7 @@ impl RoundManager {
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
             execution_futures,
+            consensus_publisher,
         }
     }
 
@@ -969,7 +969,7 @@ impl RoundManager {
         let proposal_round = proposal.round();
         let require_randomness = proposal.require_randomness();
         let (vote, pipelined_block) = self
-            .vote_block(proposal)
+            .vote_block(proposal.clone())
             .await
             .context("[RoundManager] Process proposal")?;
         self.round_state.record_vote(vote.clone());
@@ -984,6 +984,10 @@ impl RoundManager {
                     .execution_client()
                     .pre_execute(&pipelined_block)
                     .await;
+                if let Some(consensus_publisher) = &self.consensus_publisher {
+                    let message = ConsensusObserverMessage::new_block_proposal_message(proposal);
+                    consensus_publisher.publish_message(message);
+                }
             }
         }
 
