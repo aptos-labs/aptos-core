@@ -5,10 +5,11 @@ use crate::view::{LatestView, ViewState};
 use aptos_mvhashmap::versioned_module_storage::{ModuleStorageRead, ModuleVersion};
 use aptos_types::{
     executable::{Executable, ModulePath},
-    state_store::{state_value::StateValueMetadata, TStateView},
+    state_store::{state_key::StateKey, state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
 };
+use aptos_vm_environment::environment_cache::CrossBlockModuleCache;
 use aptos_vm_types::module_and_script_storage::{
     code_storage::TAptosCodeStorage, module_storage::TAptosModuleStorage,
 };
@@ -248,6 +249,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         key: &T::Key,
     ) -> VMResult<Option<Arc<ModuleStorageEntry>>> {
+        let state_key = key.as_state_key();
+        if let Some(entry) = CrossBlockModuleCache::get_from_cross_block_module_cache(state_key) {
+            return Ok(Some(entry));
+        }
+
         self.get_raw_base_value(key)
             .map_err(|e| e.finish(Location::Undefined))?
             .map(|s| {
@@ -390,6 +396,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 .build_verified_module(locally_verified_module, &verified_dependencies)?,
         );
         let verified_entry = Arc::new(entry.make_verified(module.clone()));
+        if version.is_err() {
+            CrossBlockModuleCache::store_to_cross_block_module_cache(
+                StateKey::module(address, module_name),
+                verified_entry.clone(),
+            );
+        }
 
         // Finally, change the entry in the module storage to the verified one, in order to
         // make sure that everyone sees the verified module.

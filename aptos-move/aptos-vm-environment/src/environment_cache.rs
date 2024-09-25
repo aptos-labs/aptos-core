@@ -1,15 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// use std::collections::HashMap;
-// use std::sync::Arc;
 use crate::environment::AptosEnvironment;
-use aptos_types::state_store::StateView;
+use aptos_types::{
+    state_store::{state_key::StateKey, StateView},
+    vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
+};
 use bytes::Bytes;
 use once_cell::sync::Lazy;
-use parking_lot::Mutex;
-// use aptos_types::state_store::state_key::StateKey;
-// use aptos_types::vm::modules::ModuleStorageEntry;
+use parking_lot::{Mutex, RwLock};
+use std::{collections::HashMap, sync::Arc};
 
 /// Represents a unique identifier for an [AptosEnvironment] instance based on the features, gas
 /// feature version, and other configs.
@@ -71,58 +71,64 @@ impl EnvironmentCache {
             }
         }
 
-        // let flush_cross_block_module_cache = cache.is_some();
+        let flush_cross_block_module_cache = cache.is_some();
         *cache = Some((id, env.clone()));
         drop(cache);
-        //
-        // if flush_cross_block_module_cache {
-        //     CrossBlockModuleCache::flush_cross_block_module_cache();
-        // }
+        if flush_cross_block_module_cache {
+            CrossBlockModuleCache::flush_cross_block_module_cache();
+        }
         env
     }
 }
 
 /// Long-living environment cache to be used across blocks.
 static ENVIRONMENT_CACHE: Lazy<EnvironmentCache> = Lazy::new(EnvironmentCache::empty);
-// pub struct CrossBlockModuleCache {
-//     modules: RwLock<HashMap<StateKey, Arc<ModuleStorageEntry>>>,
-// }
-//
-// impl CrossBlockModuleCache {
-//     pub fn fetch_module_from_cross_block_module_cache(state_key: &StateKey) -> Option<Arc<ModuleStorageEntry>> {
-//         MODULE_CACHE.get_module_storage_entry(state_key)
-//     }
-//
-//     pub fn sync_cross_block_module_cache(entries: impl Iterator<Item = (StateKey, Arc<ModuleStorageEntry>)>) {
-//         MODULE_CACHE.store_module_storage_entries(entries)
-//     }
-//
-//     pub fn flush_cross_block_module_cache() {
-//         MODULE_CACHE.flush()
-//     }
-//
-//
-//     /// Returns new module cache.
-//     fn empty() -> Self {
-//         Self {
-//             modules: RwLock::new(HashMap::new()),
-//         }
-//     }
-//
-//     fn flush(&self) {
-//         self.modules.write().clear()
-//     }
-//
-//     fn get_module_storage_entry(&self, state_key: &StateKey) -> Option<Arc<ModuleStorageEntry>> {
-//         self.modules.read().get(state_key).cloned()
-//     }
-//
-//     fn store_module_storage_entries(&self, entries: impl Iterator<Item = (StateKey, Arc<ModuleStorageEntry>)>) {
-//         let mut modules = self.modules.write();
-//         for (state_key, entry) in entries {
-//             modules.insert(state_key, entry);
-//         }
-//     }
-// }
-//
-// static MODULE_CACHE: Lazy<CrossBlockModuleCache> = Lazy::new(CrossBlockModuleCache::empty);
+
+pub struct CrossBlockModuleCache {
+    // TODO: some eviction policy?
+    modules: RwLock<HashMap<StateKey, Arc<ModuleStorageEntry>>>,
+}
+
+impl CrossBlockModuleCache {
+    pub fn get_from_cross_block_module_cache(
+        state_key: &StateKey,
+    ) -> Option<Arc<ModuleStorageEntry>> {
+        MODULE_CACHE.get_module_storage_entry(state_key)
+    }
+
+    pub fn store_to_cross_block_module_cache(state_key: StateKey, entry: Arc<ModuleStorageEntry>) {
+        MODULE_CACHE.store_module_storage_entry(state_key, entry)
+    }
+
+    pub fn flush_cross_block_module_cache() {
+        MODULE_CACHE.flush()
+    }
+
+    /// Returns new module cache.
+    fn empty() -> Self {
+        Self {
+            modules: RwLock::new(HashMap::new()),
+        }
+    }
+
+    fn flush(&self) {
+        self.modules.write().clear()
+    }
+
+    fn get_module_storage_entry(&self, state_key: &StateKey) -> Option<Arc<ModuleStorageEntry>> {
+        self.modules.read().get(state_key).cloned()
+    }
+
+    fn store_module_storage_entry(&self, state_key: StateKey, entry: Arc<ModuleStorageEntry>) {
+        let needs_update = match self.modules.read().get(&state_key) {
+            None => true,
+            Some(existing_entry) => existing_entry.hash() != entry.hash(),
+        };
+        if needs_update {
+            let mut modules = self.modules.write();
+            modules.insert(state_key, entry);
+        }
+    }
+}
+
+static MODULE_CACHE: Lazy<CrossBlockModuleCache> = Lazy::new(CrossBlockModuleCache::empty);

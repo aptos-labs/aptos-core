@@ -677,6 +677,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-mvhashmap",
  "aptos-types",
+ "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
  "arc-swap",

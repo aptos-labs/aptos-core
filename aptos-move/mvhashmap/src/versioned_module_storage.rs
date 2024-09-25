@@ -105,11 +105,12 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
     /// the queried index, again the same [ModuleStorageRead::DoesNotExist] is returned as all
     /// pending publishes are treated as non-existent modules.
     pub fn get(&self, key: &K, txn_idx: TxnIndex) -> ModuleStorageRead<M> {
-        let v = self
-            .entries
-            .entry(key.clone())
-            .or_insert_with(VersionedEntry::empty);
-        v.get(txn_idx).unwrap_or(ModuleStorageRead::DoesNotExist)
+        if let Some(v) = self.entries.get(key) {
+            if let Some(read) = v.get(txn_idx) {
+                return read;
+            }
+        }
+        ModuleStorageRead::DoesNotExist
     }
 
     /// Similar to [VersionedModuleStorage::get]. The difference is that if the module does not
@@ -124,15 +125,22 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
     where
         F: FnOnce() -> VMResult<Option<Arc<M>>>,
     {
+        // Short-cut for reading.
+        if let Some(v) = self.entries.get(key) {
+            if let Some(read) = v.get(txn_idx) {
+                return Ok(read);
+            }
+        }
+
         let mut v = self
             .entries
             .entry(key.clone())
             .or_insert_with(VersionedEntry::empty);
 
         // Module entry exists in versioned entry, return it.
-        if let Some(result) = v.get(txn_idx) {
-            return Ok(result);
-        }
+        // if let Some(result) = v.get(txn_idx) {
+        //     return Ok(result);
+        // }
 
         // Otherwise, use the passed closure to compute the base storage value.
         let maybe_entry = init_func()?;
