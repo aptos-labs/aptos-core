@@ -247,7 +247,7 @@ pub(crate) mod test {
     use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
         executable::ModulePath,
-        state_store::state_value::StateValue,
+        state_store::{state_key::StateKey, state_value::StateValue},
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
@@ -270,6 +270,10 @@ pub(crate) mod test {
             _address: &AccountAddress,
             _module_name: &IdentStr,
         ) -> Self {
+            unreachable!("Irrelevant for test")
+        }
+
+        fn as_state_key(&self) -> &StateKey {
             unreachable!("Irrelevant for test")
         }
     }

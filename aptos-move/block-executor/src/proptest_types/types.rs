@@ -18,6 +18,7 @@ use aptos_types::{
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{
         errors::StateviewError,
+        state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -161,6 +162,10 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
     }
 
     fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
+        unimplemented!()
+    }
+
+    fn as_state_key(&self) -> &StateKey {
         unimplemented!()
     }
 }

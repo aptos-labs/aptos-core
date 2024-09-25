@@ -1,11 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// use std::collections::HashMap;
+// use std::sync::Arc;
 use crate::environment::AptosEnvironment;
 use aptos_types::state_store::StateView;
 use bytes::Bytes;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+// use aptos_types::state_store::state_key::StateKey;
+// use aptos_types::vm::modules::ModuleStorageEntry;
 
 /// Represents a unique identifier for an [AptosEnvironment] instance based on the features, gas
 /// feature version, and other configs.
@@ -39,11 +43,9 @@ impl EnvironmentID {
 
 /// A cache of different environment that can be persisted across blocks. Used by block executor
 /// only.
-pub struct EnvironmentCache(Mutex<lru::LruCache<EnvironmentID, AptosEnvironment>>);
+pub struct EnvironmentCache(Mutex<Option<(EnvironmentID, AptosEnvironment)>>);
 
 impl EnvironmentCache {
-    const CACHE_SIZE: usize = 32;
-
     /// Returns the cached environment if it exists and has the same configuration as if it was
     /// created based on the current state, or creates a new one and caches it. Should only be
     /// called at the block boundaries.
@@ -57,20 +59,70 @@ impl EnvironmentCache {
 
     /// Returns new environment cache.
     fn empty() -> Self {
-        Self(Mutex::new(lru::LruCache::new(Self::CACHE_SIZE)))
+        Self(Mutex::new(None))
     }
 
     /// Returns the newly created environment, or the cached one.
     fn get_or_fetch(&self, id: EnvironmentID, env: AptosEnvironment) -> AptosEnvironment {
         let mut cache = self.0.lock();
-        if let Some(cached_env) = cache.get(&id) {
-            return cached_env.clone();
+        if let Some((cached_id, cached_env)) = cache.as_ref() {
+            if &id == cached_id {
+                return cached_env.clone();
+            }
         }
 
-        cache.push(id, env.clone());
+        // let flush_cross_block_module_cache = cache.is_some();
+        *cache = Some((id, env.clone()));
+        drop(cache);
+        //
+        // if flush_cross_block_module_cache {
+        //     CrossBlockModuleCache::flush_cross_block_module_cache();
+        // }
         env
     }
 }
 
 /// Long-living environment cache to be used across blocks.
 static ENVIRONMENT_CACHE: Lazy<EnvironmentCache> = Lazy::new(EnvironmentCache::empty);
+// pub struct CrossBlockModuleCache {
+//     modules: RwLock<HashMap<StateKey, Arc<ModuleStorageEntry>>>,
+// }
+//
+// impl CrossBlockModuleCache {
+//     pub fn fetch_module_from_cross_block_module_cache(state_key: &StateKey) -> Option<Arc<ModuleStorageEntry>> {
+//         MODULE_CACHE.get_module_storage_entry(state_key)
+//     }
+//
+//     pub fn sync_cross_block_module_cache(entries: impl Iterator<Item = (StateKey, Arc<ModuleStorageEntry>)>) {
+//         MODULE_CACHE.store_module_storage_entries(entries)
+//     }
+//
+//     pub fn flush_cross_block_module_cache() {
+//         MODULE_CACHE.flush()
+//     }
+//
+//
+//     /// Returns new module cache.
+//     fn empty() -> Self {
+//         Self {
+//             modules: RwLock::new(HashMap::new()),
+//         }
+//     }
+//
+//     fn flush(&self) {
+//         self.modules.write().clear()
+//     }
+//
+//     fn get_module_storage_entry(&self, state_key: &StateKey) -> Option<Arc<ModuleStorageEntry>> {
+//         self.modules.read().get(state_key).cloned()
+//     }
+//
+//     fn store_module_storage_entries(&self, entries: impl Iterator<Item = (StateKey, Arc<ModuleStorageEntry>)>) {
+//         let mut modules = self.modules.write();
+//         for (state_key, entry) in entries {
+//             modules.insert(state_key, entry);
+//         }
+//     }
+// }
+//
+// static MODULE_CACHE: Lazy<CrossBlockModuleCache> = Lazy::new(CrossBlockModuleCache::empty);
