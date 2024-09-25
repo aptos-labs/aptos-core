@@ -54,6 +54,7 @@ use move_core_types::{
     move_resource::MoveResource,
 };
 use serde::Serialize;
+use core::panic;
 use std::{
     cmp::Reverse,
     collections::{BTreeMap, HashMap},
@@ -324,7 +325,7 @@ impl Context {
                 ));
             }
         }
-
+        panic!("debugging");
         Err(E::service_unavailable_with_code_no_info(
             "Indexer reader doesn't exist, or doesn't have data.",
             AptosErrorCode::InternalError,
