@@ -54,4 +54,4 @@ To release a new version of the SDK do the following.
    a. Look closely at the output of the command. {ay close attention to what is packaged. Make sure we're not including some files that were included accidentally. For example `.aptos`. Add those to .npmignore if needed.
    b. Compare the summary with the public npm package summary on npmjs. The number of files and sizes should not vary too much.
 10. Run `NODE_AUTH_TOKEN=<token> pnpm checked-publish`.
-11. Double check that the release worked by visitng npmjs: https://www.npmjs.com/package/aptos.
+11. Double check that the release worked by visiting npmjs: https://www.npmjs.com/package/aptos.
