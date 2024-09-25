@@ -523,7 +523,7 @@ impl BlockTransactionPayload {
                 self.verify_opt_batches(opt_qs_payload.opt_batches())?;
 
                 // Verify the transaction limit
-                self.verify_transaction_limit(opt_qs_payload.max_txns_to_execute())?;
+                // self.verify_transaction_limit(opt_qs_payload.max_txns_to_execute())?;
             },
         }
 
