@@ -110,10 +110,10 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
         &self,
         compiled_script: Arc<CompiledScript>,
     ) -> VMResult<Arc<Script>> {
-        let partially_compiled_script = self
+        let locally_verified_script = self
             .module_storage
             .runtime_environment()
-            .build_partially_verified_script(compiled_script.clone())?;
+            .build_locally_verified_script(compiled_script.clone())?;
         let immediate_dependencies = compiled_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
@@ -126,7 +126,7 @@ impl<M: ModuleStorage> UnsyncCodeStorage<M> {
         Ok(Arc::new(
             self.module_storage
                 .runtime_environment()
-                .build_verified_script(partially_compiled_script, &immediate_dependencies)?,
+                .build_verified_script(locally_verified_script, &immediate_dependencies)?,
         ))
     }
 }
