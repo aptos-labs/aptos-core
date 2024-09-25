@@ -104,13 +104,13 @@ impl RuntimeEnvironment {
         self.vm_config.delayed_field_optimization_enabled = true;
     }
 
-    /// Creates a partially verified compiled script by running:
+    /// Creates a locally verified compiled script by running:
     ///   1. Move bytecode verifier,
     ///   2. Verifier extension, if provided.
-    pub fn build_partially_verified_script(
+    pub fn build_locally_verified_script(
         &self,
         compiled_script: Arc<CompiledScript>,
-    ) -> VMResult<PartiallyVerifiedScript> {
+    ) -> VMResult<LocallyVerifiedScript> {
         move_bytecode_verifier::verify_script_with_config(
             &self.vm_config().verifier_config,
             compiled_script.as_ref(),
@@ -118,39 +118,38 @@ impl RuntimeEnvironment {
         if let Some(verifier) = &self.verifier_extension {
             verifier.verify_script(compiled_script.as_ref())?;
         }
-        Ok(PartiallyVerifiedScript(compiled_script))
+        Ok(LocallyVerifiedScript(compiled_script))
     }
 
-    /// Creates a fully verified script by running dependency verification pass. The caller must
-    /// provide verified module dependencies.
+    /// Creates a verified script by running dependency verification pass over locally verified
+    /// script. The caller must provide verified module dependencies.
     pub fn build_verified_script(
         &self,
-        partially_verified_script: PartiallyVerifiedScript,
+        locally_verified_script: LocallyVerifiedScript,
         immediate_dependencies: &[Arc<Module>],
     ) -> VMResult<Script> {
         dependencies::verify_script(
-            partially_verified_script.0.as_ref(),
+            locally_verified_script.0.as_ref(),
             immediate_dependencies.iter().map(|m| m.module()),
         )?;
-        Script::new(partially_verified_script.0, self.struct_name_index_map())
+        Script::new(locally_verified_script.0, self.struct_name_index_map())
             .map_err(|e| e.finish(Location::Script))
     }
 
-    /// Creates a partially verified compiled module by running:
+    /// Creates a locally verified compiled module by running:
     ///   1. Move bytecode verifier,
     ///   2. Verifier extension, if provided.
-    pub fn build_partially_verified_module(
+    pub fn build_locally_verified_module(
         &self,
         compiled_module: Arc<CompiledModule>,
         module_size: usize,
         module_hash: &[u8; 32],
-    ) -> VMResult<PartiallyVerifiedModule> {
+    ) -> VMResult<LocallyVerifiedModule> {
         if !VERIFIED_MODULES_V2.contains(module_hash) {
-            // For regular execution, we cache already verified modules. Note
-            // that this even caches verification for the published modules.
-            // This should be ok because as long as the hash is the same, the
-            // deployed bytecode and any dependencies are the same, and so the
-            // cached verification result can be used.
+            // For regular execution, we cache already verified modules. Note that this even caches
+            // verification for the published modules. This should be ok because as long as the
+            // hash is the same, the deployed bytecode and any dependencies are the same, and so
+            // the cached verification result can be used.
             move_bytecode_verifier::verify_module_with_config(
                 &self.vm_config().verifier_config,
                 compiled_module.as_ref(),
@@ -164,24 +163,24 @@ impl RuntimeEnvironment {
             VERIFIED_MODULES_V2.put(*module_hash);
         }
 
-        Ok(PartiallyVerifiedModule(compiled_module, module_size))
+        Ok(LocallyVerifiedModule(compiled_module, module_size))
     }
 
-    /// Creates a fully verified module by running dependency verification pass. The caller must
-    /// provide verified module dependencies.
+    /// Creates a verified module by running dependency verification pass for a locally verified
+    /// module. The caller must provide verified module dependencies.
     pub fn build_verified_module(
         &self,
-        partially_verified_module: PartiallyVerifiedModule,
+        locally_verified_module: LocallyVerifiedModule,
         immediate_dependencies: &[Arc<Module>],
     ) -> VMResult<Module> {
         dependencies::verify_module(
-            partially_verified_module.0.as_ref(),
+            locally_verified_module.0.as_ref(),
             immediate_dependencies.iter().map(|m| m.module()),
         )?;
         let result = Module::new(
             &self.natives,
-            partially_verified_module.1,
-            partially_verified_module.0,
+            locally_verified_module.1,
+            locally_verified_module.0,
             self.struct_name_index_map(),
         );
 
@@ -272,7 +271,6 @@ impl RuntimeEnvironment {
 impl Clone for RuntimeEnvironment {
     /// Returns the cloned environment. Struct re-indexing map and type caches are cloned and no
     /// longer shared with the original environment.
-
     fn clone(&self) -> Self {
         Self {
             vm_config: self.vm_config.clone(),
@@ -290,11 +288,11 @@ pub trait WithRuntimeEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment;
 }
 
-/// Wrapper around partially verified compiled module, i.e., one that passed local bytecode
-/// verification, but not the dependency checks yet. Also carries module size in bytes.
-pub struct PartiallyVerifiedModule(Arc<CompiledModule>, usize);
+///Compiled module that passed local bytecode verification, but not the linking checks yet for its
+/// dependencies. Also carries module size in bytes.
+pub struct LocallyVerifiedModule(Arc<CompiledModule>, usize);
 
-impl PartiallyVerifiedModule {
+impl LocallyVerifiedModule {
     pub fn immediate_dependencies_iter(
         &self,
     ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
@@ -302,11 +300,10 @@ impl PartiallyVerifiedModule {
     }
 }
 
-/// Wrapper around partially verified compiled script, i.e., one that passed local bytecode
-/// verification, but not the dependency checks yet.
-pub struct PartiallyVerifiedScript(Arc<CompiledScript>);
+/// Compiled script that passed local bytecode verification, but not the linking checks.
+pub struct LocallyVerifiedScript(Arc<CompiledScript>);
 
-impl PartiallyVerifiedScript {
+impl LocallyVerifiedScript {
     pub fn immediate_dependencies_iter(
         &self,
     ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {

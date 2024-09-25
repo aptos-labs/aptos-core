@@ -114,12 +114,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         };
 
         // Locally verify the script.
-        let partially_verified_script = self
+        let locally_verified_script = self
             .runtime_environment
-            .build_partially_verified_script(compiled_script)?;
+            .build_locally_verified_script(compiled_script)?;
 
         // Verify the script by also looking at its dependencies.
-        let immediate_dependencies = partially_verified_script
+        let immediate_dependencies = locally_verified_script
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
                 self.fetch_verified_module(addr, name)
@@ -129,7 +129,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
             .collect::<VMResult<Vec<_>>>()?;
         let script = self
             .runtime_environment
-            .build_verified_script(partially_verified_script, &immediate_dependencies)?;
+            .build_verified_script(locally_verified_script, &immediate_dependencies)?;
         let script = Arc::new(script);
 
         match &self.latest_view {
@@ -349,14 +349,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
         let size = entry.size_in_bytes();
         let hash = entry.hash();
-        let partially_verified_module = self
+        let locally_verified_module = self
             .runtime_environment
-            .build_partially_verified_module(cm, size, hash)?;
+            .build_locally_verified_module(cm, size, hash)?;
 
         // Next, before we complete the verification by checking immediate dependencies, we need
         // to make sure all of them are also verified.
         let mut verified_dependencies = vec![];
-        for (addr, name) in partially_verified_module.immediate_dependencies_iter() {
+        for (addr, name) in locally_verified_module.immediate_dependencies_iter() {
             // A verified dependency, continue early.
             let (dep_ver, dep_entry) =
                 self.get_existing_module_storage_entry_with_version(addr, name)?;
@@ -387,7 +387,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         // and construct a verified module.
         let module = Arc::new(
             self.runtime_environment
-                .build_verified_module(partially_verified_module, &verified_dependencies)?,
+                .build_verified_module(locally_verified_module, &verified_dependencies)?,
         );
         let verified_entry = Arc::new(entry.make_verified(module.clone()));
 

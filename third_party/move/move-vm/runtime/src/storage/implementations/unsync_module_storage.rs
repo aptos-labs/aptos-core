@@ -201,7 +201,7 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
         };
 
         // Step 1: verify compiled module locally.
-        let partially_verified_module = self.runtime_environment.build_partially_verified_module(
+        let locally_verified_module = self.runtime_environment.build_locally_verified_module(
             module,
             module_size,
             &module_hash,
@@ -209,7 +209,7 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
 
         // Step 2: visit all dependencies and collect them for later verification.
         let mut verified_immediate_dependencies = vec![];
-        for (addr, name) in partially_verified_module.immediate_dependencies_iter() {
+        for (addr, name) in locally_verified_module.immediate_dependencies_iter() {
             // Check if the module has been already visited and verified.
             let dep_entry = self.fetch_existing_module_storage_entry(addr, name)?;
             if let Some(dep_module) = dep_entry.into_verified() {
@@ -231,11 +231,10 @@ impl<'a, S: ModuleBytesStorage> UnsyncModuleStorage<'a, S> {
         }
 
         // Step 3: verify module with dependencies.
-        let module =
-            Arc::new(self.runtime_environment.build_verified_module(
-                partially_verified_module,
-                &verified_immediate_dependencies,
-            )?);
+        let module = Arc::new(
+            self.runtime_environment
+                .build_verified_module(locally_verified_module, &verified_immediate_dependencies)?,
+        );
 
         // Step 4: update storage representation to fully verified one.
         let mut module_storage = self.module_storage.borrow_mut();
