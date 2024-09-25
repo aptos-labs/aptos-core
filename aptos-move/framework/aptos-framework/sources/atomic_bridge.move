@@ -888,7 +888,8 @@ module aptos_framework::bridge_configuration {
         );
     }
 
-    public fun set_initiator_time_lock_duration(time_lock: u64) acquires BridgeConfig {
+    public fun set_initiator_time_lock_duration(aptos_framework: &signer, time_lock: u64) acquires BridgeConfig {
+        system_addresses::assert_aptos_framework(aptos_framework);
         borrow_global_mut<BridgeConfig>(@aptos_framework).initiator_time_lock = time_lock;
 
         event::emit(
@@ -898,7 +899,8 @@ module aptos_framework::bridge_configuration {
         );
     }
 
-    public fun set_counterparty_time_lock_duration(time_lock: u64) acquires BridgeConfig {
+    public fun set_counterparty_time_lock_duration(aptos_framework: &signer, time_lock: u64) acquires BridgeConfig {
+        system_addresses::assert_aptos_framework(aptos_framework);
         borrow_global_mut<BridgeConfig>(@aptos_framework).counterparty_time_lock = time_lock;
 
         event::emit(
@@ -979,6 +981,38 @@ module aptos_framework::bridge_configuration {
     fun test_is_not_valid_operator(aptos_framework: &signer, bad: &signer) acquires BridgeConfig {
         initialize(aptos_framework);
         assert_is_caller_operator(bad);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    /// Tests we can update the initiator time lock
+    fun test_update_initiator_time_lock(aptos_framework: &signer) acquires BridgeConfig {
+        initialize(aptos_framework);
+        set_initiator_time_lock_duration(aptos_framework, 1);
+        assert!(initiator_timelock_duration() == 1, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    /// Tests we can update the initiator time lock
+    fun test_update_counterparty_time_lock(aptos_framework: &signer) acquires BridgeConfig {
+        initialize(aptos_framework);
+        set_counterparty_time_lock_duration(aptos_framework, 1);
+        assert!(counterparty_timelock_duration() == 1, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework, bad = @0xbad)]
+    #[expected_failure(abort_code = 0x50003, location = 0x1::system_addresses)]
+    /// Tests that an incorrect signer cannot update the initiator time lock
+    fun test_not_able_to_set_initiator_time_lock(aptos_framework: &signer, bad: &signer) acquires BridgeConfig {
+        initialize(aptos_framework);
+        set_initiator_time_lock_duration(bad, 1);
+    }
+
+    #[test(aptos_framework = @aptos_framework, bad = @0xbad)]
+    #[expected_failure(abort_code = 0x50003, location = 0x1::system_addresses)]
+    /// Tests that an incorrect signer cannot update the counterparty time lock
+    fun test_not_able_to_set_counterparty_time_lock(aptos_framework: &signer, bad: &signer) acquires BridgeConfig {
+        initialize(aptos_framework);
+        set_counterparty_time_lock_duration(bad, 1);
     }
 }
 
