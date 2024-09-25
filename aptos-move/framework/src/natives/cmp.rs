@@ -7,6 +7,7 @@
 
 //! Implementation of native functions for utf8 strings.
 
+use aptos_gas_schedule::gas_params::natives::aptos_framework::{CMP_COMPARE_BASE, CMP_COMPARE_PER_ABS_VAL_UNIT};
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
@@ -33,7 +34,7 @@ use std::collections::VecDeque;
  *
  **************************************************************************************************/
 fn native_compare_impl(
-    _context: &mut SafeNativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
@@ -44,8 +45,11 @@ fn native_compare_impl(
         )));
     }
 
-    // TODO: how to charge same cost as equality?
-    // context.charge()?;
+    let cost = CMP_COMPARE_BASE
+            + CMP_COMPARE_PER_ABS_VAL_UNIT
+                * (context.abs_val_size_dereferenced(&args[0])
+                    + context.abs_val_size_dereferenced(&args[1]));
+    context.charge(cost)?;
 
     let ordering = args[0].compare(&args[1])?;
     let result = match ordering {

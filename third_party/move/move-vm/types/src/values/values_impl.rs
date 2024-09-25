@@ -661,11 +661,7 @@ impl Container {
                     }
                 }
 
-                let len_cmp = l.len().cmp(&r.len());
-                if len_cmp.is_ne() {
-                    return Ok(len_cmp);
-                }
-                Ordering::Equal
+                l.len().cmp(&r.len())
             },
             (VecU8(l), VecU8(r)) => l.borrow().cmp(&*r.borrow()),
             (VecU16(l), VecU16(r)) => l.borrow().cmp(&*r.borrow()),
@@ -839,7 +835,7 @@ impl IndexedRef {
             (VecBool(r1), VecBool(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
             (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
 
-            // Equality between a generic and a specialized container.
+            // Comparison between a generic and a specialized container.
             (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => r1.borrow()[self.idx]
                 .as_value_ref::<u8>()?
                 .cmp(&r2.borrow()[other.idx]),
