@@ -57,6 +57,9 @@ impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, 
 ///      invariants such as cyclic dependencies.
 #[ouroboros::self_referencing]
 pub struct StagingModuleStorage<'a, M: 'a> {
+    // TODO(loader_v2):
+    //   Avoid clone and instead stage runtime environment so that higher order indices are
+    //   resolved through some temporary data structure.
     runtime_environment: RuntimeEnvironment,
     #[borrows(runtime_environment)]
     #[covariant]

@@ -122,7 +122,7 @@ impl LoaderV2 {
         &self,
         code_storage: &impl CodeStorage,
         serialized_script: &[u8],
-        ty_args: &[TypeTag],
+        ty_tag_args: &[TypeTag],
     ) -> VMResult<LoadedFunction> {
         // Step 1: Load script. During the loading process, if script has not been previously
         // cached, it will be verified.
@@ -130,9 +130,9 @@ impl LoaderV2 {
 
         // Step 2: Load & verify types used as type arguments passed to this script. Note that
         // arguments for scripts are verified on the client side.
-        let ty_args = ty_args
+        let ty_args = ty_tag_args
             .iter()
-            .map(|ty| self.load_ty(code_storage, ty))
+            .map(|ty_tag| self.load_ty(code_storage, ty_tag))
             .collect::<PartialVMResult<Vec<_>>>()
             // Note: Loader V1 implementation returns undefined here, causing some tests to fail.
             .map_err(|e| e.finish(Location::Undefined))?;
