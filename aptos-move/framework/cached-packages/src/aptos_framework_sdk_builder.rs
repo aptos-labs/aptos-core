@@ -316,7 +316,7 @@ pub enum EntryFunctionCall {
     /// @param amount The amount of assets to be locked.
     /// @abort If the caller is not the bridge operator.
     AtomicBridgeCounterpartyLockBridgeTransferAssets {
-        initiator: Vec<u8>,
+        originator: Vec<u8>,
         bridge_transfer_id: Vec<u8>,
         hash_lock: Vec<u8>,
         time_lock: u64,
@@ -1226,14 +1226,14 @@ impl EntryFunctionCall {
                 recipient, hash_lock, time_lock, amount,
             ),
             AtomicBridgeCounterpartyLockBridgeTransferAssets {
-                initiator,
+                originator,
                 bridge_transfer_id,
                 hash_lock,
                 time_lock,
                 recipient,
                 amount,
             } => atomic_bridge_counterparty_lock_bridge_transfer_assets(
-                initiator,
+                originator,
                 bridge_transfer_id,
                 hash_lock,
                 time_lock,
@@ -2457,7 +2457,7 @@ pub fn atomic_bridge_initiator_initiate_bridge_transfer(
 /// @param amount The amount of assets to be locked.
 /// @abort If the caller is not the bridge operator.
 pub fn atomic_bridge_counterparty_lock_bridge_transfer_assets(
-    initiator: Vec<u8>,
+    originator: Vec<u8>,
     bridge_transfer_id: Vec<u8>,
     hash_lock: Vec<u8>,
     time_lock: u64,
@@ -2475,7 +2475,7 @@ pub fn atomic_bridge_counterparty_lock_bridge_transfer_assets(
         ident_str!("lock_bridge_transfer_assets").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&initiator).unwrap(),
+            bcs::to_bytes(&originator).unwrap(),
             bcs::to_bytes(&bridge_transfer_id).unwrap(),
             bcs::to_bytes(&hash_lock).unwrap(),
             bcs::to_bytes(&time_lock).unwrap(),
@@ -5214,7 +5214,7 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::AtomicBridgeCounterpartyLockBridgeTransferAssets {
-                    initiator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    originator: bcs::from_bytes(script.args().get(0)?).ok()?,
                     bridge_transfer_id: bcs::from_bytes(script.args().get(1)?).ok()?,
                     hash_lock: bcs::from_bytes(script.args().get(2)?).ok()?,
                     time_lock: bcs::from_bytes(script.args().get(3)?).ok()?,
