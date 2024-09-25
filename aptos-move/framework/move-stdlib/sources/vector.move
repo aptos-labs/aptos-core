@@ -122,6 +122,22 @@ module std::vector {
         pragma intrinsic = true;
     }
 
+    /// Splits the collection into two at the given index.
+    /// Returns a newly allocated vector containing the elements in the range [at, len).
+    /// After the call, the original vector will be left containing the elements [0, at)
+    /// with its previous capacity unchanged.
+    public fun split_off<Element>(self: &mut vector<Element>, at: u64): vector<Element> {
+        let len = length(self);
+        assert!(at <= len, EINDEX_OUT_OF_BOUNDS);
+        let other = empty();
+        while (len > at) {
+            push_back(&mut other, pop_back(self));
+            len = len - 1;
+        };
+        reverse(&mut other);
+        other
+    }
+
     /// Trim a vector to a smaller size, returning the evicted elements in order
     public fun trim<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
         let res = trim_reverse(self, new_len);
@@ -264,6 +280,17 @@ module std::vector {
     }
     spec swap_remove {
         pragma intrinsic = true;
+    }
+
+    /// Replace the `i`th element of the vector `self` with the given value, and return
+    /// to the caller the value that was there before.
+    /// Aborts if `i` is out of bounds.
+    public fun replace<Element>(self: &mut vector<Element>, i: u64, val: Element): Element {
+        let last_idx = length(self);
+        assert!(i < last_idx, EINDEX_OUT_OF_BOUNDS);
+        push_back(self, val);
+        swap(self, i, last_idx);
+        pop_back(self)
     }
 
     /// Apply the function to each element in the vector, consuming it.
