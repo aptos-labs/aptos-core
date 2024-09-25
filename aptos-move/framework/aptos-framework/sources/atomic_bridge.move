@@ -561,8 +561,8 @@ module aptos_framework::bridge_store {
     }
 
     /// Details on the transfer
-    struct BridgeTransferDetails<Direction> has store, copy {
-        addresses: Direction,
+    struct BridgeTransferDetails<Initiator: store, Recipient: store> has store, copy {
+        addresses: AddressPair<Initiator, Recipient>,
         amount: u64,
         hash_lock: vector<u8>,
         time_lock: u64,
@@ -582,13 +582,13 @@ module aptos_framework::bridge_store {
             inner: 0,
         });
 
-        let initiators = SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<address, EthereumAddress>>> {
+        let initiators = SmartTableWrapper<vector<u8>, BridgeTransferDetails<address, EthereumAddress>> {
             inner: smart_table::new(),
         };
 
         move_to(aptos_framework, initiators);
 
-        let counterparties = SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<EthereumAddress, address>>> {
+        let counterparties = SmartTableWrapper<vector<u8>, BridgeTransferDetails<EthereumAddress, address>> {
             inner: smart_table::new(),
         };
 
@@ -622,7 +622,7 @@ module aptos_framework::bridge_store {
     /// @return A `BridgeTransferDetails` object.
     /// @abort If the amount is zero or locks are invalid.
     public fun create_details<Initiator: store, Recipient: store>(initiator: Initiator, recipient: Recipient, amount: u64, hash_lock: vector<u8>, time_lock: u64)
-        : BridgeTransferDetails<AddressPair<Initiator, Recipient>> {
+        : BridgeTransferDetails<Initiator, Recipient> {
         assert!(amount > 0, EZERO_AMOUNT);
         assert_valid_hash_lock(&hash_lock);
         time_lock = create_time_lock(time_lock);
@@ -643,9 +643,9 @@ module aptos_framework::bridge_store {
     ///
     /// @param bridge_transfer_id Bridge transfer ID.
     /// @param details The bridge transfer details
-    public fun add<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: BridgeTransferDetails<AddressPair<Initiator, Recipient>>) acquires SmartTableWrapper {
+    public fun add<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: BridgeTransferDetails<Initiator, Recipient>) acquires SmartTableWrapper {
         assert_valid_bridge_transfer_id(&bridge_transfer_id);
-        let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework);
+        let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
         smart_table::add(&mut table.inner, bridge_transfer_id, details);
     }
 
@@ -661,7 +661,7 @@ module aptos_framework::bridge_store {
     ///
     /// @param details The bridge transfer details to check.
     /// @abort If the state is not pending.
-    public fun assert_pending<T>(details: &BridgeTransferDetails<T>) {
+    public fun assert_pending<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
         assert!(details.state == PENDING_TRANSACTION, ENOT_PENDING_TRANSACTION)
     }
 
@@ -695,7 +695,7 @@ module aptos_framework::bridge_store {
     /// @param details The bridge transfer details.
     /// @param hash_lock The hash lock to compare.
     /// @abort If the hash lock is incorrect.
-    public fun assert_correct_hash_lock<T>(details: &BridgeTransferDetails<T>, hash_lock: vector<u8>) {
+    public fun assert_correct_hash_lock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>, hash_lock: vector<u8>) {
         assert!(&hash_lock == &details.hash_lock, EINVALID_PRE_IMAGE);
     }
 
@@ -703,21 +703,21 @@ module aptos_framework::bridge_store {
     ///
     /// @param details The bridge transfer details.
     /// @abort If the time lock has not expired.
-    public fun assert_timed_out_lock<T>(details: &BridgeTransferDetails<T>) {
+    public fun assert_timed_out_lock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
         assert!(now() > details.time_lock, ENOT_EXPIRED);
     }
 
     /// Completes the bridge transfer.
     ///
     /// @param details The bridge transfer details to complete.
-    public fun complete<T>(details: &mut BridgeTransferDetails<T>) {
+    public fun complete<Initiator: store, Recipient: store>(details: &mut BridgeTransferDetails<Initiator, Recipient>) {
         details.state = COMPLETED_TRANSACTION;
     }
 
     /// Cancels the bridge transfer.
     ///
     /// @param details The bridge transfer details to cancel.
-    public fun cancel<T>(details: &mut BridgeTransferDetails<T>) {
+    public fun cancel<Initiator: store, Recipient: store>(details: &mut BridgeTransferDetails<Initiator, Recipient>) {
         details.state = CANCELLED_TRANSACTION;
     }
 
@@ -727,7 +727,7 @@ module aptos_framework::bridge_store {
     /// @param details The mutable reference to the bridge transfer details to be completed.
     /// @return A tuple containing the recipient and the amount of the transfer.
     /// @abort If the hash lock is invalid, the transfer is not pending, or the hash lock does not match.
-    fun complete_details<Initiator: store, Recipient: store + copy>(hash_lock: vector<u8>, details: &mut BridgeTransferDetails<AddressPair<Initiator, Recipient>>) : (Recipient, u64) {
+    fun complete_details<Initiator: store, Recipient: store + copy>(hash_lock: vector<u8>, details: &mut BridgeTransferDetails<Initiator, Recipient>) : (Recipient, u64) {
         assert_valid_hash_lock(&hash_lock);
         assert_pending(details);
         assert_correct_hash_lock(details, hash_lock);
@@ -744,7 +744,7 @@ module aptos_framework::bridge_store {
     /// @return A tuple containing the recipient of the transfer and the amount transferred.
     /// @abort If the bridge transfer details are not found or if the completion checks in `complete_details` fail.
     public fun complete_transfer<Initiator: store, Recipient: copy + store>(bridge_transfer_id: vector<u8>, hash_lock: vector<u8>) : (Recipient, u64) acquires SmartTableWrapper {
-        let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework);
+        let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
 
         let details = smart_table::borrow_mut(
             &mut table.inner,
@@ -758,7 +758,7 @@ module aptos_framework::bridge_store {
     /// @param details A mutable reference to the bridge transfer details to be canceled.
     /// @return A tuple containing the initiator of the transfer and the amount to be refunded.
     /// @abort If the transfer is not in a pending state or the time lock has not expired.
-    fun cancel_details<Initiator: store + copy, Recipient: store>(details: &mut BridgeTransferDetails<AddressPair<Initiator, Recipient>>) : (Initiator, u64) {
+    fun cancel_details<Initiator: store + copy, Recipient: store>(details: &mut BridgeTransferDetails<Initiator, Recipient>) : (Initiator, u64) {
         assert_pending(details);
         assert_timed_out_lock(details);
 
@@ -773,7 +773,7 @@ module aptos_framework::bridge_store {
     /// @return A tuple containing the initiator of the transfer and the amount to be refunded.
     /// @abort If the bridge transfer details are not found or if the cancellation conditions in `cancel_details` fail.
     public fun cancel_transfer<Initiator: store + copy, Recipient: store>(bridge_transfer_id: vector<u8>) : (Initiator, u64) acquires SmartTableWrapper {
-        let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<AddressPair<Initiator, Recipient>>>>(@aptos_framework);
+        let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
 
         let details = smart_table::borrow_mut(
             &mut table.inner,
@@ -786,7 +786,7 @@ module aptos_framework::bridge_store {
     ///
     /// @param details The bridge transfer details.
     /// @return The generated bridge transfer ID.
-    public fun bridge_transfer_id<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<AddressPair<Initiator, Recipient>>) : vector<u8> acquires Nonce {
+    public fun bridge_transfer_id<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) : vector<u8> acquires Nonce {
         let nonce = borrow_global_mut<Nonce>(@aptos_framework);
         let combined_bytes = vector::empty<u8>();
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.initiator));
