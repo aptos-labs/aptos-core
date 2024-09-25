@@ -79,7 +79,7 @@ def main() -> None:
         target_branch = determine_target_branch(base_branch)
         if target_branch is not None:
             # Write the target branch to GitHub output
-            write_github_output(GithubOutput(GH_OUTPUT_KEY, target_branch))
+            write_github_output(GithubOutput(GH_OUTPUT_KEY, str(target_branch)))
             log.info(f"Successfully wrote target branch to GitHub output: {target_branch}")
     except Exception as e:
         log.error(
