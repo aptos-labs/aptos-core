@@ -964,4 +964,39 @@ module std::vector_tests {
         assert!(&v == &vector[3, 6], 0);
         assert!(&w == &vector[1, 4, 5, 2], 0);
     }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
+    fun test_replace_empty_abort() {
+        let v = vector[];
+        let MoveOnly {} = vector::replace(&mut v, 0, MoveOnly {});
+        vector::destroy_empty(v);
+    }
+
+    #[test]
+    fun test_replace() {
+        let v = vector[1, 2, 3, 4];
+        vector::replace(&mut v, 1, 17);
+        assert!(v == vector[1, 17, 3, 4], 0);
+    }
+
+    #[test]
+    fun test_split_off() {
+        let v = vector[1, 2, 3, 4, 5, 6];
+        let other = vector::split_off(&mut v, 4);
+        assert!(v == vector[1, 2, 3, 4], 0);
+        assert!(other == vector[5, 6], 1);
+
+        let other_empty = vector::split_off(&mut v, 4);
+        assert!(v == vector[1, 2, 3, 4], 2);
+        assert!(other_empty == vector[], 3);
+
+    }
+
+    #[test]
+    #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
+    fun test_split_off_abort() {
+        let v = vector[1, 2, 3];
+        vector::split_off(&mut v, 4);
+    }
 }
