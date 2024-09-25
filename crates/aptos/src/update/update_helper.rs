@@ -48,10 +48,7 @@ pub fn build_updater(
     let target = format!("{}-{}", arch_str, target);
 
     let install_dir = match install_dir.clone() {
-        Some(dir) => {
-            println!("dir:{:?}", dir);
-            dir
-        },
+        Some(dir) => dir,
         None => {
             let dir = get_additional_binaries_dir();
             // Make the directory if it doesn't already exist.
@@ -65,12 +62,6 @@ pub fn build_updater(
         Some(version) => version,
         None => "0.0.0",
     };
-
-    println!(
-        "install_dir:{:?}, is directory:{}",
-        install_dir,
-        install_dir.is_dir()
-    );
 
     Update::configure()
         .bin_install_dir(install_dir)

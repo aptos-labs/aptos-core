@@ -77,12 +77,12 @@ impl ProverDependencyInstaller {
         set_env::set(env_var, install_path.to_string_lossy())
             .map_err(|e| CliError::UnexpectedError(format!("Failed to set {}: {}", env_var, e)))?;
         println!(
-            "Added {} to environment with value: {}.",
+            "Added {} to environment with value: {} to the profile.",
             env_var,
             install_path.to_string_lossy()
         );
         if env::var(env_var).is_err() {
-            println!("Please use the `source` command or reboot the terminal to check whether {} is set with the correct value. \
+            eprintln!("Please use the `source` command or reboot the terminal to check whether {} is set with the correct value. \
             If not, please set it manually.", env_var);
         }
         Ok(())

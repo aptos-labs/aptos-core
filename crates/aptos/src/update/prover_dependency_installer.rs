@@ -13,20 +13,28 @@ use std::path::PathBuf;
 /// Update Prover dependency.
 #[derive(Debug)]
 pub struct DependencyInstaller {
+    /// Binary name, such as `boogie` or `z3`
     pub binary_name: String,
 
+    /// Actual executable name such as `boogie.exe` in Windows
     pub exe_name: String,
 
+    /// Environment variable to be updated
     pub env_var: String,
 
+    /// The string output by the tool before the version
     pub version_match_string: String,
 
+    /// The option string to be passed to the command such as "/" or "--"
     pub version_option_string: String,
 
+    /// The version to be installed
     pub target_version: String,
 
+    /// The directory to install the binary
     pub install_dir: Option<PathBuf>,
 
+    /// Whether to check availability of a newer version
     pub check: bool,
 }
 
@@ -57,7 +65,7 @@ impl DependencyInstaller {
 
 impl BinaryUpdater for DependencyInstaller {
     fn check(&self) -> bool {
-        false
+        self.check
     }
 
     fn pretty_name(&self) -> String {
