@@ -47,5 +47,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         [mem_swap_base: InternalGas, { RELEASE_V1_22.. => "mem.swap.base" }, 367],
         [mem_swap_per_abs_val_unit: InternalGasPerAbstractValueUnit, { RELEASE_V1_22.. => "mem.swap.per_abs_val_unit"}, 14],
+
+        [cmp_compare_base: InternalGas, { RELEASE_V1_22.. => "cmp.compare.base" }, 367],
+        [cmp_compare_per_abs_val_unit: InternalGasPerAbstractValueUnit, { RELEASE_V1_22.. => "cmp.cper_abs_val_unit"}, 14],
     ]
 );
