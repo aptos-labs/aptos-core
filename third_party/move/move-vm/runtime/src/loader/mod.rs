@@ -53,7 +53,9 @@ mod type_loader;
 use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
-    storage::{loader::LoaderV2, struct_name_index_map::StructNameIndexMap},
+    storage::{
+        loader::LoaderV2, struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
+    },
 };
 pub use function::LoadedFunction;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
@@ -148,7 +150,7 @@ impl Loader {
     pub(crate) fn v1(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
-            type_cache: RwLock::new(TypeCache::empty()),
+            type_cache: StructInfoCache::empty(),
             name_cache: StructNameIndexMap::empty(),
             natives,
             invalidated: RwLock::new(false),
@@ -167,7 +169,10 @@ impl Loader {
             let mut invalidated = loader.invalidated.write();
             if *invalidated {
                 *loader.scripts.write() = ScriptCache::new();
-                *loader.type_cache.write() = TypeCache::empty();
+                #[allow(deprecated)]
+                loader.type_cache.flush();
+                #[allow(deprecated)]
+                loader.name_cache.flush();
                 *invalidated = false;
             }
         }
@@ -340,7 +345,7 @@ impl Loader {
 // The `pub(crate)` API is what a Loader offers to the runtime.
 pub(crate) struct LoaderV1 {
     scripts: RwLock<ScriptCache>,
-    type_cache: RwLock<TypeCache>,
+    type_cache: StructInfoCache,
     natives: NativeFunctions,
     pub(crate) name_cache: StructNameIndexMap,
 
@@ -381,7 +386,7 @@ impl Clone for LoaderV1 {
     fn clone(&self) -> Self {
         Self {
             scripts: RwLock::new(self.scripts.read().clone()),
-            type_cache: RwLock::new(self.type_cache.read().clone()),
+            type_cache: self.type_cache.clone(),
             natives: self.natives.clone(),
             name_cache: self.name_cache.clone(),
             invalidated: RwLock::new(*self.invalidated.read()),
@@ -1611,50 +1616,6 @@ impl<'a> Resolver<'a> {
     }
 }
 
-#[derive(Clone)]
-struct StructLayoutInfoCacheItem {
-    struct_layout: MoveTypeLayout,
-    node_count: u64,
-    has_identifier_mappings: bool,
-}
-
-//
-// Cache for data associated to a Struct, used for de/serialization and more
-//
-#[derive(Clone)]
-struct StructInfoCache {
-    struct_tag: Option<(StructTag, u64)>,
-    struct_layout_info: Option<StructLayoutInfoCacheItem>,
-    annotated_struct_layout: Option<MoveTypeLayout>,
-    annotated_node_count: Option<u64>,
-}
-
-impl StructInfoCache {
-    fn new() -> Self {
-        Self {
-            struct_tag: None,
-            struct_layout_info: None,
-            annotated_struct_layout: None,
-            annotated_node_count: None,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub(crate) struct TypeCache {
-    structs: hashbrown::HashMap<StructNameIndex, hashbrown::HashMap<Vec<Type>, StructInfoCache>>,
-    depth_formula: hashbrown::HashMap<StructNameIndex, (DepthFormula, std::thread::ThreadId)>,
-}
-
-impl TypeCache {
-    pub(crate) fn empty() -> Self {
-        Self {
-            structs: hashbrown::HashMap::new(),
-            depth_formula: hashbrown::HashMap::new(),
-        }
-    }
-}
-
 /// Maximal depth of a value in terms of type depth.
 pub const VALUE_DEPTH_MAX: u64 = 128;
 
@@ -1698,13 +1659,9 @@ impl Loader {
             Self::V2(_) => module_storage.runtime_environment().ty_cache(),
         };
 
-        if let Some(struct_map) = ty_cache.read().structs.get(&struct_name_idx) {
-            if let Some(struct_info) = struct_map.get(ty_args) {
-                if let Some((struct_tag, gas)) = &struct_info.struct_tag {
-                    gas_context.charge(*gas)?;
-                    return Ok(struct_tag.clone());
-                }
-            }
+        if let Some((struct_tag, gas)) = ty_cache.get_struct_tag(&struct_name_idx, ty_args) {
+            gas_context.charge(gas)?;
+            return Ok(struct_tag.clone());
         }
 
         let cur_cost = gas_context.cost;
@@ -1723,15 +1680,12 @@ impl Loader {
         let size =
             (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
         gas_context.charge(size * gas_context.cost_per_byte)?;
-        ty_cache
-            .write()
-            .structs
-            .entry(struct_name_idx)
-            .or_default()
-            .entry(ty_args.to_vec())
-            .or_insert_with(StructInfoCache::new)
-            .struct_tag = Some((struct_tag.clone(), gas_context.cost - cur_cost));
-
+        ty_cache.store_struct_tag(
+            struct_name_idx,
+            ty_args.to_vec(),
+            struct_tag.clone(),
+            gas_context.cost - cur_cost,
+        );
         Ok(struct_tag)
     }
 
@@ -1788,16 +1742,11 @@ impl Loader {
             Self::V2(_) => module_storage.runtime_environment().ty_cache(),
         };
 
-        if let Some(struct_map) = ty_cache.read().structs.get(&struct_name_idx) {
-            if let Some(struct_info) = struct_map.get(ty_args) {
-                if let Some(struct_layout_info) = &struct_info.struct_layout_info {
-                    *count += struct_layout_info.node_count;
-                    return Ok((
-                        struct_layout_info.struct_layout.clone(),
-                        struct_layout_info.has_identifier_mappings,
-                    ));
-                }
-            }
+        if let Some((struct_layout, node_count, has_identifier_mappings)) =
+            ty_cache.get_struct_layout_info(&struct_name_idx, ty_args)
+        {
+            *count += node_count;
+            return Ok((struct_layout, has_identifier_mappings));
         }
 
         let count_before = *count;
@@ -1889,19 +1838,13 @@ impl Loader {
         };
 
         let field_node_count = *count - count_before;
-        let mut cache = ty_cache.write();
-        let info = cache
-            .structs
-            .entry(struct_name_idx)
-            .or_default()
-            .entry(ty_args.to_vec())
-            .or_insert_with(StructInfoCache::new);
-        info.struct_layout_info = Some(StructLayoutInfoCacheItem {
-            struct_layout: layout.clone(),
-            node_count: field_node_count,
+        ty_cache.store_struct_layout_info(
+            struct_name_idx,
+            ty_args.to_vec(),
+            layout.clone(),
+            field_node_count,
             has_identifier_mappings,
-        });
-
+        );
         Ok((layout, has_identifier_mappings))
     }
 
@@ -2058,15 +2001,11 @@ impl Loader {
             Self::V2(_) => module_storage.runtime_environment().ty_cache(),
         };
 
-        if let Some(struct_map) = ty_cache.read().structs.get(&struct_name_idx) {
-            if let Some(struct_info) = struct_map.get(ty_args) {
-                if let Some(annotated_node_count) = &struct_info.annotated_node_count {
-                    *count += *annotated_node_count
-                }
-                if let Some(layout) = &struct_info.annotated_struct_layout {
-                    return Ok(layout.clone());
-                }
-            }
+        if let Some((layout, annotated_node_count)) =
+            ty_cache.get_annotated_struct_layout_info(&struct_name_idx, ty_args)
+        {
+            *count += annotated_node_count;
+            return Ok(layout);
         }
 
         let struct_type =
@@ -2120,16 +2059,12 @@ impl Loader {
             MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
         let field_node_count = *count - count_before;
 
-        let mut cache = ty_cache.write();
-        let info = cache
-            .structs
-            .entry(struct_name_idx)
-            .or_default()
-            .entry(ty_args.to_vec())
-            .or_insert_with(StructInfoCache::new);
-        info.annotated_struct_layout = Some(struct_layout.clone());
-        info.annotated_node_count = Some(field_node_count);
-
+        ty_cache.store_annotated_struct_layout_info(
+            struct_name_idx,
+            ty_args.to_vec(),
+            struct_layout.clone(),
+            field_node_count,
+        );
         Ok(struct_layout)
     }
 
@@ -2213,8 +2148,8 @@ impl Loader {
             Self::V2(_) => module_storage.runtime_environment().ty_cache(),
         };
 
-        if let Some(depth_formula) = ty_cache.read().depth_formula.get(&struct_name_idx) {
-            return Ok(depth_formula.0.clone());
+        if let Some(depth_formula) = ty_cache.get_depth_formula(&struct_name_idx) {
+            return Ok(depth_formula);
         }
 
         let struct_type =
@@ -2236,29 +2171,12 @@ impl Loader {
         };
 
         let formula = DepthFormula::normalize(formulas);
-        let prev = ty_cache.write().depth_formula.insert(
-            struct_name_idx,
-            (formula.clone(), std::thread::current().id()),
-        );
-        if let Some((_, thread_id)) = prev {
-            // Same thread has put this entry previously, which means there is a recursion (as
-            // otherwise we would have exited early when reading the cached formula).
-            if thread_id == std::thread::current().id() {
-                let struct_name_index_map = match self {
-                    Self::V1(loader) => &loader.name_cache,
-                    Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
-                };
-                let struct_name = struct_name_index_map.idx_to_struct_name_ref(struct_name_idx);
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                        format!(
-                            "Depth formula for struct '{}' is already cached by the same thread (recursive type?)",
-                            struct_name.as_ref(),
-                        ),
-                    ),
-                );
-            }
-        }
+
+        let struct_name_index_map = match self {
+            Self::V1(loader) => &loader.name_cache,
+            Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
+        };
+        ty_cache.store_depth_formula(struct_name_idx, struct_name_index_map, &formula)?;
         Ok(formula)
     }
 
