@@ -146,47 +146,50 @@ CALIBRATED_TPS_INDEX = -1
 CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	min_ratio	max_ratio	median
+# (or if from log:
+#    transaction_type module_working_set_size executor_type  block_size expected_tps tps
+# )
 CALIBRATION = """
-no-op	1	VM	0.900	1.031	33440.0
-no-op	1000	VM	0.926	1.020	20420.9
-apt-fa-transfer	1	VM	0.860	1.030	25331.5
-account-generation	1	VM	0.892	1.036	20798.2
-account-resource32-b	1	VM	0.896	1.046	29796.4
-modify-global-resource	1	VM	0.932	1.009	2870.9
-modify-global-resource	10	VM	0.931	1.016	16886.3
-publish-package	1	VM	0.932	1.031	149.5
-mix_publish_transfer	1	VM	0.956	1.099	2259.6
-batch100-transfer	1	VM	0.859	1.023	784.5
-vector-picture30k	1	VM	0.954	1.021	112.2
-vector-picture30k	20	VM	0.879	1.036	1119.0
-smart-table-picture30-k-with200-change	1	VM	0.950	1.044	21.8
-smart-table-picture30-k-with200-change	20	VM	0.946	1.056	185.9
-modify-global-resource-agg-v2	1	VM	0.877	1.050	29796.4
-modify-global-flag-agg-v2	1	VM	0.964	1.022	5294.9
-modify-global-bounded-agg-v2	1	VM	0.938	1.076	8866.4
-modify-global-milestone-agg-v2	1	VM	0.907	1.026	24885.0
-resource-groups-global-write-tag1-kb	1	VM	0.941	1.043	9039.0
-resource-groups-global-write-and-read-tag1-kb	1	VM	0.936	1.020	6221.0
-resource-groups-sender-write-tag1-kb	1	VM	0.893	1.047	20798.2
-resource-groups-sender-multi-change1-kb	1	VM	0.906	1.054	16553.6
-token-v1ft-mint-and-transfer	1	VM	0.899	1.041	1276.2
-token-v1ft-mint-and-transfer	20	VM	0.879	1.011	11483.9
-token-v1nft-mint-and-transfer-sequential	1	VM	0.899	1.024	812.9
-token-v1nft-mint-and-transfer-sequential	20	VM	0.883	1.012	7732.8
-coin-init-and-mint	1	VM	0.845	1.026	27205.9
-coin-init-and-mint	20	VM	0.815	1.033	23591.6
-fungible-asset-mint	1	VM	0.848	1.018	21180.4
-fungible-asset-mint	20	VM	0.874	1.043	19680.6
-no-op5-signers	1	VM	0.884	1.041	33440.0
-token-v2-ambassador-mint	1	VM	0.840	1.028	15320.8
-token-v2-ambassador-mint	20	VM	0.866	1.016	15320.8
-liquidity-pool-swap	1	VM	0.909	1.028	975.7
-liquidity-pool-swap	20	VM	0.895	1.010	8194.6
-liquidity-pool-swap-stable	1	VM	0.899	1.016	957.5
-liquidity-pool-swap-stable	20	VM	0.917	1.022	7881.5
-deserialize-u256	1	VM	0.850	1.039	33440.0
-no-op-fee-payer	1	VM	0.907	1.018	2216.5
-no-op-fee-payer	50	VM	0.837	1.011	25786.3
+no-op	1	VM	10000	33440	39558
+no-op	1000	VM	10000	20420.9	23305
+apt-fa-transfer	1	VM	10000	25331.5	27648
+account-generation	1	VM	10000	20798.2	22905
+account-resource32-b	1	VM	10000	29796.4	32938
+modify-global-resource	1	VM	2870	2870.9	2846
+modify-global-resource	10	VM	10000	16886.3	18041
+publish-package	1	VM	149	149.5	144
+mix_publish_transfer	1	VM	2259	2259.6	2178
+batch100-transfer	1	VM	784	784.5	773
+vector-picture30k	1	VM	112	112.2	113
+vector-picture30k	20	VM	1119	1119	1145
+smart-table-picture30-k-with200-change	1	VM	21	21.8	22
+smart-table-picture30-k-with200-change	20	VM	185	185.9	190
+modify-global-resource-agg-v2	1	VM	10000	29796.4	34840
+modify-global-flag-agg-v2	1	VM	5294	5294.9	5219
+modify-global-bounded-agg-v2	1	VM	8866	8866.4	8900
+modify-global-milestone-agg-v2	1	VM	10000	24885	27233
+resource-groups-global-write-tag1-kb	1	VM	9039	9039	9168
+resource-groups-global-write-and-read-tag1-kb	1	VM	6221	6221	6293
+resource-groups-sender-write-tag1-kb	1	VM	10000	20798.2	20711
+resource-groups-sender-multi-change1-kb	1	VM	10000	16553.6	16039
+token-v1ft-mint-and-transfer	1	VM	1276	1276.2	1280
+token-v1ft-mint-and-transfer	20	VM	10000	11483.9	12096
+token-v1nft-mint-and-transfer-sequential	1	VM	812	812.9	806
+token-v1nft-mint-and-transfer-sequential	20	VM	7732	7732.8	7854
+coin-init-and-mint	1	VM	10000	27205.9	30500
+coin-init-and-mint	20	VM	10000	23591.6	23968
+fungible-asset-mint	1	VM	10000	21180.4	23240
+fungible-asset-mint	20	VM	10000	19680.6	21859
+no-op5-signers	1	VM	10000	33440	37990
+token-v2-ambassador-mint	1	VM	10000	15320.8	16797
+token-v2-ambassador-mint	20	VM	10000	15320.8	16356
+liquidity-pool-swap	1	VM	975	975.7	998
+liquidity-pool-swap	20	VM	8194	8194.6	8497
+liquidity-pool-swap-stable	1	VM	957	957.5	955
+liquidity-pool-swap-stable	20	VM	7881	7881.5	8103
+deserialize-u256	1	VM	10000	33440	37601
+no-op-fee-payer	1	VM	2216	2216.5	2158
+no-op-fee-payer	50	VM	10000	25786.3	27457
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
