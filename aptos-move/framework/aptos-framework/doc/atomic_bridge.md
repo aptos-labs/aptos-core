@@ -7,6 +7,7 @@
 
 -  [Struct `EthereumAddress`](#0x1_ethereum_EthereumAddress)
 -  [Constants](#@Constants_0)
+-  [Function `to_inner`](#0x1_ethereum_to_inner)
 -  [Function `ethereum_address`](#0x1_ethereum_ethereum_address)
 -  [Function `to_lowercase`](#0x1_ethereum_to_lowercase)
 -  [Function `to_eip55_checksumed_address`](#0x1_ethereum_to_eip55_checksumed_address)
@@ -88,6 +89,30 @@ Constants for ASCII character codes
 </code></pre>
 
 
+
+<a id="0x1_ethereum_to_inner"></a>
+
+## Function `to_inner`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_to_inner">to_inner</a>(ethereum_address: &<a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">ethereum::EthereumAddress</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_to_inner">to_inner</a>(ethereum_address: &<a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a>) : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    ethereum_address.inner
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_ethereum_ethereum_address"></a>
 
@@ -1296,6 +1321,7 @@ Generates a unique bridge transfer ID based on transfer details and nonce.
         nonce.inner = nonce.inner + 1;  // Safe <b>to</b> increment without overflow
     };
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&nonce.inner));
+
     keccak256(combined_bytes)
 }
 </code></pre>
@@ -2195,7 +2221,7 @@ Burns a specified amount of AptosCoin from an address.
 
 
 
--  [Struct `BridgeTransferAssetsLockedEvent`](#0x1_atomic_bridge_counterparty_BridgeTransferAssetsLockedEvent)
+-  [Struct `BridgeTransferLockedEvent`](#0x1_atomic_bridge_counterparty_BridgeTransferLockedEvent)
 -  [Struct `BridgeTransferCompletedEvent`](#0x1_atomic_bridge_counterparty_BridgeTransferCompletedEvent)
 -  [Struct `BridgeTransferCancelledEvent`](#0x1_atomic_bridge_counterparty_BridgeTransferCancelledEvent)
 -  [Function `lock_bridge_transfer_assets`](#0x1_atomic_bridge_counterparty_lock_bridge_transfer_assets)
@@ -2212,15 +2238,15 @@ Burns a specified amount of AptosCoin from an address.
 
 
 
-<a id="0x1_atomic_bridge_counterparty_BridgeTransferAssetsLockedEvent"></a>
+<a id="0x1_atomic_bridge_counterparty_BridgeTransferLockedEvent"></a>
 
-## Struct `BridgeTransferAssetsLockedEvent`
+## Struct `BridgeTransferLockedEvent`
 
 An event triggered upon locking assets for a bridge transfer
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_BridgeTransferAssetsLockedEvent">BridgeTransferAssetsLockedEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_BridgeTransferLockedEvent">BridgeTransferLockedEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -2232,6 +2258,12 @@ An event triggered upon locking assets for a bridge transfer
 <dl>
 <dt>
 <code>bridge_transfer_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>originator: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -2345,7 +2377,7 @@ Locks assets for a bridge transfer by the initiator.
 @abort If the caller is not the bridge operator.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_lock_bridge_transfer_assets">lock_bridge_transfer_assets</a>(caller: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, initiator: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bridge_transfer_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, hash_lock: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, time_lock: u64, recipient: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_lock_bridge_transfer_assets">lock_bridge_transfer_assets</a>(caller: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, originator: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, bridge_transfer_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, hash_lock: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, time_lock: u64, recipient: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -2356,7 +2388,7 @@ Locks assets for a bridge transfer by the initiator.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_lock_bridge_transfer_assets">lock_bridge_transfer_assets</a>(
     caller: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    initiator: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    originator: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     bridge_transfer_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     hash_lock: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     time_lock: u64,
@@ -2364,7 +2396,7 @@ Locks assets for a bridge transfer by the initiator.
     amount: u64
 ) {
     <a href="atomic_bridge.md#0x1_bridge_configuration_assert_is_caller_operator">bridge_configuration::assert_is_caller_operator</a>(caller);
-    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address">ethereum::ethereum_address</a>(initiator);
+    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address">ethereum::ethereum_address</a>(originator);
 
     <b>let</b> details = <a href="atomic_bridge.md#0x1_bridge_store_create_details">bridge_store::create_details</a>(
         ethereum_address,
@@ -2377,8 +2409,9 @@ Locks assets for a bridge transfer by the initiator.
     <a href="atomic_bridge.md#0x1_bridge_store_add_counterparty">bridge_store::add_counterparty</a>(bridge_transfer_id, details);
 
     <a href="event.md#0x1_event_emit">event::emit</a>(
-        <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_BridgeTransferAssetsLockedEvent">BridgeTransferAssetsLockedEvent</a> {
+        <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_BridgeTransferLockedEvent">BridgeTransferLockedEvent</a> {
             bridge_transfer_id,
+            originator,
             recipient,
             amount,
             hash_lock,
@@ -2398,13 +2431,12 @@ Locks assets for a bridge transfer by the initiator.
 
 Completes a bridge transfer by revealing the pre-image.
 
-@param caller The signer representing the bridge operator.
 @param bridge_transfer_id The unique identifier for the bridge transfer.
 @param pre_image The pre-image that matches the hash lock to complete the transfer.
 @abort If the caller is not the bridge operator or the hash lock validation fails.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_complete_bridge_transfer">complete_bridge_transfer</a>(caller: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, bridge_transfer_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, pre_image: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_complete_bridge_transfer">complete_bridge_transfer</a>(bridge_transfer_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, pre_image: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -2414,11 +2446,9 @@ Completes a bridge transfer by revealing the pre-image.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_complete_bridge_transfer">complete_bridge_transfer</a>(
-    caller: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     bridge_transfer_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     pre_image: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) {
-    <a href="atomic_bridge.md#0x1_bridge_configuration_assert_is_caller_operator">bridge_configuration::assert_is_caller_operator</a>(caller);
     <b>let</b> (recipient, amount) = <a href="atomic_bridge.md#0x1_bridge_store_complete_counterparty">bridge_store::complete_counterparty</a>(
         bridge_transfer_id,
         create_hashlock(pre_image)
