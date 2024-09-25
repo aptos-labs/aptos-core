@@ -250,6 +250,16 @@ This is meant to emitted as a module event.
 ## Constants
 
 
+<a id="0x1_transaction_fee_ENO_LONGER_SUPPORTED"></a>
+
+No longer supported.
+
+
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>: u64 = 4;
+</code></pre>
+
+
+
 <a id="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
 
 Gas fees are already being collected and the struct holding
@@ -276,16 +286,6 @@ The burn percentage is out of range [0, 100].
 
 
 <pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>: u64 = 3;
-</code></pre>
-
-
-
-<a id="0x1_transaction_fee_ENO_LONGER_SUPPORTED"></a>
-
-No longer supported.
-
-
-<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>: u64 = 4;
 </code></pre>
 
 

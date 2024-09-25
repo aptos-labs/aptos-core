@@ -6,7 +6,7 @@
 
 use crate::account::AccountData;
 use aptos_types::{
-    account_config::CoinInfoResource,
+    account_config::{CoinInfoResource, CoinSupplyResource},
     on_chain_config::{Features, OnChainConfig},
     state_store::{
         errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
@@ -106,9 +106,11 @@ impl FakeDataStore {
 
     /// Adds CoinInfo to this data store.
     pub fn add_coin_info(&mut self) {
-        let coin_info = CoinInfoResource::<AptosCoinType>::random(u128::MAX);
-        let write_set = coin_info.to_writeset(0).expect("access path in test");
-        self.add_write_set(&write_set)
+        let coin_info = CoinInfoResource::<AptosCoinType>::new_apt();
+        self.add_write_set(&coin_info.to_writeset().expect("access path in test"));
+
+        let coin_supply = CoinSupplyResource::<AptosCoinType>::new(0);
+        self.add_write_set(&coin_supply.to_writeset().expect("access path in test"));
     }
 
     /// Adds a `CompiledModule` to this data store.

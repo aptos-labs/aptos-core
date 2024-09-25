@@ -50,7 +50,7 @@
             "next_idx": 2,
             "table": {
               "inner": {
-                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+                "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
               },
               "length": "2"
             }
@@ -111,7 +111,7 @@
       },
       {
         "state_key_hash": "",
-        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
         "key": "0x01000000",
         "value": "0x4e9016838657edfae09cb9a71eb219025c4c87a67c4aaa86f20ac0aa792bc121010000000000000001000000000000000100000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef0020a1070000000000",
         "data": {

@@ -1,14 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::aggregator::{AggregatorV1Resource, OptionalAggregatorV1Resource};
+use super::aggregator::{AggregatorResource, OptionalAggregatorV1Resource};
 use crate::{
     state_store::state_key::StateKey,
     write_set::{WriteOp, WriteSet, WriteSetMut},
     CoinType,
 };
 use move_core_types::{
-    account_address::AccountAddress,
     ident_str,
     identifier::IdentStr,
     language_storage::TypeTag,
@@ -51,20 +50,11 @@ impl<C: CoinType> CoinInfoResource<C> {
         &self.supply
     }
 
-    /// Returns a new CoinInfo instance. Aggregator that tracks supply is
-    /// initialized with random handle/key. This function is useful if we
-    /// want to add CoinInfo to the fake data store.
-    pub fn random(limit: u128) -> Self {
-        let handle = AccountAddress::random();
-        let key = AccountAddress::random();
-        Self::new(handle, key, limit)
-    }
-
     /// Returns a new CoinInfo instance. This function is useful if we want to
     /// add CoinInfo to the fake data store.
-    pub fn new(handle: AccountAddress, key: AccountAddress, limit: u128) -> Self {
+    pub fn new_apt() -> Self {
         let aggregator = OptionalAggregatorV1Resource {
-            aggregator: Some(AggregatorV1Resource::new(handle, key, limit)),
+            aggregator: None,
             integer: None,
         };
         Self {
@@ -78,27 +68,54 @@ impl<C: CoinType> CoinInfoResource<C> {
 
     /// Returns a writeset corresponding to the creation of CoinInfo in Move.
     /// This can be passed to data store for testing total supply.
-    pub fn to_writeset(&self, supply: u128) -> anyhow::Result<WriteSet> {
-        let value_state_key = self
-            .supply
-            .as_ref()
-            .unwrap()
-            .aggregator
-            .as_ref()
-            .unwrap()
-            .state_key();
-
+    pub fn to_writeset(&self) -> anyhow::Result<WriteSet> {
         // We store CoinInfo and aggregatable value separately.
-        let write_set = vec![
-            (
-                StateKey::resource_typed::<Self>(&C::coin_info_address())?,
-                WriteOp::legacy_modification(bcs::to_bytes(&self).unwrap().into()),
-            ),
-            (
-                value_state_key,
-                WriteOp::legacy_modification(bcs::to_bytes(&supply).unwrap().into()),
-            ),
-        ];
+        let write_set = vec![(
+            StateKey::resource_typed::<Self>(&C::coin_info_address())?,
+            WriteOp::legacy_modification(bcs::to_bytes(&self).unwrap().into()),
+        )];
+        Ok(WriteSetMut::new(write_set).freeze().unwrap())
+    }
+}
+
+// Separate out typed info that goes with "key", to not require CoinInfoResource to be typed when not needed
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CoinSupplyResource<C: CoinType> {
+    supply: AggregatorResource<u128>,
+    phantom_data: PhantomData<C>,
+}
+impl<C: CoinType> MoveStructType for CoinSupplyResource<C> {
+    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("CoinSupply");
+
+    fn type_args() -> Vec<TypeTag> {
+        vec![C::type_tag()]
+    }
+}
+
+impl<C: CoinType> MoveResource for CoinSupplyResource<C> {}
+
+impl<C: CoinType> CoinSupplyResource<C> {
+    pub fn new(supply: u128) -> Self {
+        Self {
+            supply: AggregatorResource::new(supply, u128::MAX),
+            phantom_data: PhantomData,
+        }
+    }
+
+    pub fn get(&self) -> u128 {
+        *self.supply.get()
+    }
+
+    pub fn set(&mut self, new_supply: u128) {
+        self.supply.set(new_supply);
+    }
+
+    pub fn to_writeset(&self) -> anyhow::Result<WriteSet> {
+        let write_set = vec![(
+            StateKey::resource_typed::<CoinSupplyResource<C>>(&C::coin_info_address())?,
+            WriteOp::legacy_modification(bcs::to_bytes(&self).unwrap().into()),
+        )];
         Ok(WriteSetMut::new(write_set).freeze().unwrap())
     }
 }

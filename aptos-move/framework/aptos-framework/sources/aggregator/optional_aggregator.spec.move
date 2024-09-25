@@ -114,12 +114,8 @@ spec aptos_framework::optional_aggregator {
         ensures integer.value == old(integer.value) - value;
     }
 
-    spec new(limit: u128, parallelizable: bool): OptionalAggregator {
-        aborts_if parallelizable && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
-        ensures parallelizable ==> is_parallelizable(result);
-        ensures !parallelizable ==> !is_parallelizable(result);
-        ensures optional_aggregator_value(result) == 0;
-        ensures optional_aggregator_value(result) <= optional_aggregator_limit(result);
+    spec new_empty(): OptionalAggregator {
+        ensures is_empty(result);
     }
 
     spec destroy(optional_aggregator: OptionalAggregator) {
