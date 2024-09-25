@@ -6,7 +6,6 @@ pub mod account;
 pub mod aggregator_natives;
 pub mod code;
 pub mod consensus_config;
-pub mod cmp;
 pub mod create_signer;
 pub mod cryptography;
 pub mod debug;
@@ -53,7 +52,6 @@ pub fn all_natives(
     }
 
     add_natives_from_module!("account", account::make_all(builder));
-    add_natives_from_module!("cmp", cmp::make_all(builder));
     add_natives_from_module!("create_signer", create_signer::make_all(builder));
     add_natives_from_module!("ed25519", ed25519::make_all(builder));
     add_natives_from_module!("crypto_algebra", cryptography::algebra::make_all(builder));
