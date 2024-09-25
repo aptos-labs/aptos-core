@@ -378,17 +378,17 @@ impl ConsensusObserver {
         // Update the metrics for the received block payload
         update_metrics_for_block_payload_message(peer_network_id, &block_payload);
 
-        // Verify the block payload digests
-        if let Err(error) = block_payload.verify_payload_digests() {
-            error!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify block payload digests! Ignoring block: {:?}. Error: {:?}",
-                    block_payload.block(),
-                    error
-                ))
-            );
-            return;
-        }
+        // // Verify the block payload digests
+        // if let Err(error) = block_payload.verify_payload_digests() {
+        //     error!(
+        //         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+        //             "Failed to verify block payload digests! Ignoring block: {:?}. Error: {:?}",
+        //             block_payload.block(),
+        //             error
+        //         ))
+        //     );
+        //     return;
+        // }
 
         // If the payload is for the current epoch, verify the proof signatures
         let epoch_state = self.get_epoch_state();

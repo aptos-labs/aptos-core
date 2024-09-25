@@ -17,11 +17,10 @@ use crate::{
         CONCURRENCY_GAUGE,
     },
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
-    BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult,
+    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -316,6 +315,10 @@ where
         let current_output = block_vec.pop().expect("Must exist").unwrap();
         parent_block.ensure_has_child(block_id)?;
         if current_output.output.has_ledger_update() {
+            info!(
+                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                "ledger_update_already_computed"
+            );
             return Ok(current_output
                 .output
                 .get_ledger_update()

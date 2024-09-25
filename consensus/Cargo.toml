@@ -63,6 +63,7 @@ futures = { workspace = true }
 futures-channel = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+lazy_static = { workspace = true }
 lru = { workspace = true }
 maplit = { workspace = true }
 mini-moka = { workspace = true }

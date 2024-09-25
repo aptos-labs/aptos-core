@@ -22,6 +22,7 @@ use aptos_consensus_types::{
     block::{self, Block}, block_data::BlockType, common::{Author, Round}, order_vote_msg::OrderVoteMsg, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg, wrapped_ledger_info::WrappedLedgerInfo
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_executor_types::ExecutorError;
 use aptos_infallible::{checked, duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]

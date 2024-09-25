@@ -1339,6 +1339,15 @@ pub static NUM_PRE_COMMIT_VOTED_BLOCKS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the number of preexecuted blocks sent to precommit.
+pub static NUM_PREEXECUTED_BLOCKS_SENT_TO_PRECOMMIT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_preexecuted_blocks_sent_to_precommit_count",
+        "Count of the number of preexecuted blocks sent to precommit."
+    )
+    .unwrap()
+});
+
 /// Count of the number of re-executed blocks.
 pub static NUM_RE_EXECUTED_BLOCKS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

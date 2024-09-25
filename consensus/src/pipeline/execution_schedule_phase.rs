@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::{NUM_NON_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS, NUM_RE_EXECUTED_BLOCKS}, pipeline::{
+    counters::{NUM_NON_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS_SENT_TO_PRECOMMIT, NUM_RE_EXECUTED_BLOCKS}, pipeline::{
         execution_wait_phase::ExecutionWaitRequest,
-        pipeline_phase::{CountedRequest, StatelessPipeline},
+        pipeline_phase::{CountedRequest, StatelessPipeline}, pre_execution_phase::ExecutionType,
     }, state_computer::{StateComputeResultFut, SyncStateComputeResultFut}, state_replication::StateComputer
 };
-use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_consensus_types::{pipeline_execution_result::PipelineExecutionResult, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::{debug, info};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use futures::TryFutureExt;
+use futures::{FutureExt, TryFutureExt};
 use std::{
     collections::HashMap, fmt::{Debug, Display, Formatter}, pin::Pin, sync::Arc
 };
@@ -90,7 +90,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                     info!("[PreExecution] block was not pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                     let fut = self
                         .execution_proxy
-                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
+                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()), ExecutionType::Execution)
                         .await;
                     entry.insert(fut);
                     NUM_NON_PREEXECUTED_BLOCKS.inc();
@@ -102,7 +102,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         let execution_proxy = self.execution_proxy.clone();
 
         // In the future being returned, wait for the compute results in order.
-        let fut = tokio::task::spawn(async move {
+        let fut = async move {
             let mut results = vec![];
             // wait for all futs so that lifetime_guard is guaranteed to be dropped only
             // after all executor calls are over
@@ -110,16 +110,28 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                 debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 match execution_futures.entry(block.id()) {
                     dashmap::mapref::entry::Entry::Occupied(mut entry) => {
-                        let fut = entry.get().clone();
+                        let fut = entry.get_mut();
                         let result = match fut.await {
-                            Ok(result) => Ok(result),
+                            Ok(mut result) => {
+                                if result.pre_commit_fut.is_some() {
+                                    Ok(result)
+                                } else {
+                                    info!("[PreExecution] pre-executed block directly forward to pre-commit, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                                    NUM_PREEXECUTED_BLOCKS_SENT_TO_PRECOMMIT.inc();
+                                    let pre_commit_fut = execution_proxy
+                                        .schedule_pre_commit(block.id(), block.parent_id(), lifetime_guard.spawn(()))
+                                        .await;
+                                    result.set_pre_commit_fut(pre_commit_fut.clone());
+                                    Ok(result)
+                                }
+                            },
                             Err(e) => {
-                                info!("[Execution] block is re-executed due to error {:?}, epoch {} round {} id {}", e, block.epoch(), block.round(), block.id());
+                                info!("[PreExecution] block is re-executed due to error {:?}, epoch {} round {} id {}", e, block.epoch(), block.round(), block.id());
+                                NUM_RE_EXECUTED_BLOCKS.inc();
                                 let fut = execution_proxy
-                                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
+                                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()), ExecutionType::Execution)
                                     .await;
                                 entry.insert(fut.clone());
-                                NUM_RE_EXECUTED_BLOCKS.inc();
                                 fut.await
                             }
                         };
@@ -135,18 +147,17 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             }
             let results = itertools::zip_eq(ordered_blocks, results)
                 .map(|(block, res)| {
+                    info!("[Execution] set execution result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                     Ok(block.set_execution_result(res?))
                 })
                 .collect::<ExecutorResult<Vec<_>>>()?;
             drop(lifetime_guard);
             Ok(results)
-        })
-        .map_err(ExecutorError::internal_err)
-        .and_then(|res| async { res });
+        }.boxed();
 
         ExecutionWaitRequest {
             block_id,
-            fut: Box::pin(fut),
+            fut,
         }
     }
 }

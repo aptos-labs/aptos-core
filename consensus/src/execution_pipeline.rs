@@ -7,22 +7,23 @@ use crate::{
     block_preparer::BlockPreparer,
     counters::{self, log_executor_error_occurred},
     monitor,
-    pipeline::pipeline_phase::CountedRequest,
+    pipeline::{pipeline_phase::CountedRequest, pre_execution_phase::ExecutionType},
     state_computer::{StateComputeResultFut, SyncBoxFuture, SyncStateComputeResultFut},
 };
-use aptos_consensus_types::{block::Block, pipeline_execution_result::PipelineExecutionResult};
+use aptos_consensus_types::{block::Block, pipeline_execution_result::PipelineExecutionResult, pipelined_block::SyncPreCommitResultFut};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
+    state_checkpoint_output::{self, StateCheckpointOutput}, BlockExecutorTrait, ExecutorError,
     ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
 use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata_ext::BlockMetadataExt,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, ExecutionError, SignedTransaction
     },
 };
 use fail::fail_point;
@@ -31,10 +32,10 @@ use futures::FutureExt;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
-    sync::Arc,
-    time::{Duration, Instant},
+    collections::HashMap, sync::Arc, time::{Duration, Instant}
 };
 use tokio::sync::{mpsc, oneshot};
+use lazy_static::lazy_static;
 
 #[allow(clippy::unwrap_used)]
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -47,8 +48,15 @@ pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     )
 });
 
+const CACHE_SIZE: usize = 1_000;
+
+lazy_static! {
+    static ref PREPARED_BLOCKS: Mutex<lru::LruCache<HashValue, (Vec<SignedTransaction>, Vec<SignatureVerifiedTransaction>)>> =
+        Mutex::new(lru::LruCache::new(CACHE_SIZE));
+}
 pub struct ExecutionPipeline {
     prepare_block_tx: mpsc::UnboundedSender<PrepareBlockCommand>,
+    pre_commit_tx: mpsc::UnboundedSender<PreCommitCommand>,
 }
 
 impl ExecutionPipeline {
@@ -73,13 +81,13 @@ impl ExecutionPipeline {
         ));
         runtime.spawn(Self::ledger_apply_stage(
             ledger_apply_rx,
-            pre_commit_tx,
+            pre_commit_tx.clone(),
             executor.clone(),
             enable_pre_commit,
         ));
         runtime.spawn(Self::pre_commit_stage(pre_commit_rx, executor));
 
-        Self { prepare_block_tx }
+        Self { prepare_block_tx, pre_commit_tx }
     }
 
     pub async fn queue(
@@ -90,6 +98,7 @@ impl ExecutionPipeline {
         txn_generator: BlockPreparer,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         lifetime_guard: CountedRequest<()>,
+        execution_type: ExecutionType,
     ) -> SyncStateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         let block_id = block.id();
@@ -103,9 +112,38 @@ impl ExecutionPipeline {
                 result_tx,
                 command_creation_time: Instant::now(),
                 lifetime_guard,
+                execution_type,
             })
             .expect("Failed to send block to execution pipeline.");
 
+        async move {
+            result_rx
+                .await
+                .map_err(|err| ExecutorError::InternalError {
+                    error: format!(
+                        "Failed to receive execution result for block {}: {:?}.",
+                        block_id, err
+                    ),
+                })?
+        }.boxed().shared()
+    }
+
+    // For pipeline to skip execution and directly go to pre_commit stage.
+    pub async fn pre_commit_queue(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+        lifetime_guard: CountedRequest<()>,
+    ) -> SyncPreCommitResultFut {
+        let (result_tx, result_rx) = oneshot::channel();
+        self.pre_commit_tx
+        .send(PreCommitCommand {
+            block_id,
+            parent_block_id,
+            result_tx,
+            lifetime_guard,
+        })
+        .expect("Failed to send block to pre_commit stage.");
         async move {
             result_rx
                 .await
@@ -131,33 +169,13 @@ impl ExecutionPipeline {
             result_tx,
             command_creation_time,
             lifetime_guard,
+            execution_type,
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer.prepare_block(&block).await;
-        if let Err(e) = input_txns {
-            result_tx
-                .send(Err(e))
-                .unwrap_or_else(log_failed_to_send_result("prepare_block", block.id()));
-            return;
-        }
-        let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-        let input_txns = input_txns.expect("input_txns must be Some.");
-        tokio::task::spawn_blocking(move || {
-            let txns_to_execute =
-                Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
-            let sig_verification_start = Instant::now();
-            let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
-                SIG_VERIFY_POOL.install(|| {
-                    let num_txns = txns_to_execute.len();
-                    txns_to_execute
-                        .into_par_iter()
-                        .with_min_len(optimal_min_len(num_txns, 32))
-                        .map(|t| t.into())
-                        .collect::<Vec<_>>()
-                });
-            counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
-                .observe_duration(sig_verification_start.elapsed());
+
+        if PREPARED_BLOCKS.lock().contains(&block.id()) {
+            let (input_txns, sig_verified_txns) = PREPARED_BLOCKS.lock().get(&block.id()).unwrap().clone();
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
@@ -165,13 +183,53 @@ impl ExecutionPipeline {
                     parent_block_id,
                     block_executor_onchain_config,
                     result_tx,
-                    command_creation_time: Instant::now(),
+                    command_creation_time,
                     lifetime_guard,
+                    execution_type,
                 })
                 .expect("Failed to send block to execution pipeline.");
-        })
-        .await
-        .expect("Failed to spawn_blocking.");
+        } else {
+            let input_txns = block_preparer.prepare_block(&block).await;
+            if let Err(e) = input_txns {
+                result_tx
+                    .send(Err(e))
+                    .unwrap_or_else(log_failed_to_send_result("prepare_block", block.id()));
+                return;
+            }
+            let validator_txns = block.validator_txns().cloned().unwrap_or_default();
+            let input_txns = input_txns.expect("input_txns must be Some.");
+            tokio::task::spawn_blocking(move || {
+                let txns_to_execute =
+                    Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
+                let sig_verification_start = Instant::now();
+                let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
+                    SIG_VERIFY_POOL.install(|| {
+                        let num_txns = txns_to_execute.len();
+                        txns_to_execute
+                            .into_par_iter()
+                            .with_min_len(optimal_min_len(num_txns, 32))
+                            .map(|t| t.into())
+                            .collect::<Vec<_>>()
+                    });
+                PREPARED_BLOCKS.lock().put(block.id(), (input_txns.clone(), sig_verified_txns.clone()));
+                counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
+                    .observe_duration(sig_verification_start.elapsed());
+                execute_block_tx
+                    .send(ExecuteBlockCommand {
+                        input_txns,
+                        block: (block.id(), sig_verified_txns).into(),
+                        parent_block_id,
+                        block_executor_onchain_config,
+                        result_tx,
+                        command_creation_time: Instant::now(),
+                        lifetime_guard,
+                        execution_type,
+                    })
+                    .expect("Failed to send block to execution pipeline.");
+            })
+            .await
+            .expect("Failed to spawn_blocking.");
+        }
     }
 
     async fn prepare_block_stage(
@@ -200,6 +258,7 @@ impl ExecutionPipeline {
             result_tx,
             command_creation_time,
             lifetime_guard,
+            execution_type,
         }) = block_rx.recv().await
         {
             counters::EXECUTE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
@@ -236,6 +295,7 @@ impl ExecutionPipeline {
                     result_tx,
                     command_creation_time: Instant::now(),
                     lifetime_guard,
+                    execution_type,
                 })
                 .expect("Failed to send block to ledger_apply stage.");
         }
@@ -252,16 +312,17 @@ impl ExecutionPipeline {
             input_txns,
             block_id,
             parent_block_id,
-            state_checkpoint_output: execution_result,
+            state_checkpoint_output,
             result_tx,
             command_creation_time,
             lifetime_guard,
+            execution_type,
         }) = block_rx.recv().await
         {
             counters::APPLY_LEDGER_WAIT_TIME.observe_duration(command_creation_time.elapsed());
             debug!("ledger_apply stage received block {}.", block_id);
             let res = async {
-                let (state_checkpoint_output, execution_duration) = execution_result?;
+                let (state_checkpoint_output, execution_duration) = state_checkpoint_output?;
                 let executor = executor.clone();
                 monitor!(
                     "ledger_apply",
@@ -274,40 +335,49 @@ impl ExecutionPipeline {
                 .map(|output| (output, execution_duration))
             }
             .await;
-            let pipeline_res = res.map(|(output, execution_duration)| {
-                let pre_commit_fut: SyncBoxFuture<'static, ExecutorResult<()>> =
-                    if output.epoch_state().is_some() || !enable_pre_commit {
-                        // hack: it causes issue if pre-commit is finished at an epoch ending, and
-                        // we switch to state sync, so we do the pre-commit only after we actually
-                        // decide to commit (in the commit phase)
-                        let executor = executor.clone();
-                        async move {
-                            tokio::task::spawn_blocking(move || {
-                                executor.pre_commit_block(block_id, parent_block_id)
-                            })
-                            .await
-                            .expect("failed to spawn_blocking")
-                        }.boxed().shared()
-                    } else {
-                        // kick off pre-commit right away
-                        let (pre_commit_result_tx, pre_commit_result_rx) = oneshot::channel();
-                        // schedule pre-commit
-                        pre_commit_tx
-                            .send(PreCommitCommand {
-                                block_id,
-                                parent_block_id,
-                                result_tx: pre_commit_result_tx,
-                                lifetime_guard,
-                            })
-                            .expect("Failed to send block to pre_commit stage.");
-                        async {
-                            pre_commit_result_rx
-                                .await
-                                .map_err(ExecutorError::internal_err)?
-                        }.boxed().shared()
-                    };
 
-                PipelineExecutionResult::new(input_txns, output, execution_duration, pre_commit_fut)
+            let pipeline_res = res.map(|(output, execution_duration)| {
+                let maybe_pre_commit_fut: Option<SyncPreCommitResultFut> = match execution_type {
+                    ExecutionType::Execution => {
+                        if output.epoch_state().is_some() || !enable_pre_commit {
+                            // hack: it causes issue if pre-commit is finished at an epoch ending, and
+                            // we switch to state sync, so we do the pre-commit only after we actually
+                            // decide to commit (in the commit phase)
+                            let executor = executor.clone();
+                            Some(async move {
+                                tokio::task::spawn_blocking(move || {
+                                    executor.pre_commit_block(block_id, parent_block_id)
+                                })
+                                .await
+                                .expect("failed to spawn_blocking")
+                            }.boxed().shared())
+                        } else {
+                            // kick off pre-commit right away
+                            let (pre_commit_result_tx, pre_commit_result_rx) = oneshot::channel();
+                            // schedule pre-commit
+                            pre_commit_tx
+                                .send(PreCommitCommand {
+                                    block_id,
+                                    parent_block_id,
+                                    result_tx: pre_commit_result_tx,
+                                    lifetime_guard,
+                                })
+                                .expect("Failed to send block to pre_commit stage.");
+                            Some(async {
+                                pre_commit_result_rx
+                                    .await
+                                    .map_err(ExecutorError::internal_err)?
+                            }.boxed().shared())
+                        }
+                    },
+                    ExecutionType::PreExecution => {
+                        // The block should not be pre-committed during pre-execution.
+                        // Only pre-commit after ordering.
+                        None
+                    },
+                };
+
+                PipelineExecutionResult::new(input_txns, output, execution_duration, maybe_pre_commit_fut)
             });
             result_tx
                 .send(pipeline_res)
@@ -359,6 +429,7 @@ struct PrepareBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    execution_type: ExecutionType,
 }
 
 struct ExecuteBlockCommand {
@@ -369,6 +440,7 @@ struct ExecuteBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    execution_type: ExecutionType,
 }
 
 struct LedgerApplyCommand {
@@ -379,6 +451,7 @@ struct LedgerApplyCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    execution_type: ExecutionType,
 }
 
 struct PreCommitCommand {

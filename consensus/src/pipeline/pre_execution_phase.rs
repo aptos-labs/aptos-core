@@ -16,6 +16,12 @@ use futures::TryFutureExt;
 use once_cell::sync::OnceCell;
 use std::sync::{atomic::AtomicU64, Arc};
 
+#[derive(Eq, PartialEq)]
+pub enum ExecutionType {
+    PreExecution,
+    Execution,
+}
+
 pub struct PreExecutionRequest {
     pub block: PipelinedBlock,
     pub lifetime_guard: CountedRequest<()>,
@@ -54,7 +60,7 @@ impl StatelessPipeline for PreExecutionPhase {
                 info!("[PreExecution] pre-execute block of epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 let fut = self
                     .execution_proxy
-                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
+                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()), ExecutionType::PreExecution)
                     .await;
                 entry.insert(fut);
             }

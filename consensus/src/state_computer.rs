@@ -10,7 +10,7 @@ use crate::{
     execution_pipeline::ExecutionPipeline,
     monitor,
     payload_manager::TPayloadManager,
-    pipeline::pipeline_phase::CountedRequest,
+    pipeline::{pipeline_phase::CountedRequest, pre_execution_phase::ExecutionType},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
@@ -21,7 +21,7 @@ use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
     block::Block, block_data::BlockData, common::Round, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::PipelinedBlock,
+    pipelined_block::{PipelinedBlock, SyncPreCommitResultFut},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult};
@@ -162,6 +162,7 @@ impl StateComputer for ExecutionProxy {
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
         lifetime_guard: CountedRequest<()>,
+        execution_type: ExecutionType,
     ) -> SyncStateComputeResultFut {
         let block_id = block.id();
         debug!(
@@ -210,6 +211,7 @@ impl StateComputer for ExecutionProxy {
                 transaction_generator,
                 block_executor_onchain_config,
                 lifetime_guard,
+                execution_type,
             )
             .await;
         observe_block(timestamp, BlockStage::EXECUTION_PIPELINE_INSERTED);
@@ -330,6 +332,23 @@ impl StateComputer for ExecutionProxy {
 
         *latest_logical_time = logical_time;
         Ok(())
+    }
+
+    async fn schedule_pre_commit(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+        lifetime_guard: CountedRequest<()>,
+    ) -> SyncPreCommitResultFut {
+        let fut = self
+            .execution_pipeline
+            .pre_commit_queue(
+                block_id,
+                parent_block_id,
+                lifetime_guard,
+            )
+            .await;
+        fut
     }
 
     /// Synchronize to a commit that not present locally.
