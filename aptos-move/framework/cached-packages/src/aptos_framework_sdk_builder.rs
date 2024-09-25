@@ -510,6 +510,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Destroys capabilities from the account, so that the user no longer has access to mint or burn.
+    ManagedCoinDestroyCaps {
+        coin_type: TypeTag,
+    },
+
     /// Initialize new coin `CoinType` in Aptos Blockchain.
     /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
     ManagedCoinInitialize {
@@ -1341,6 +1346,7 @@ impl EntryFunctionCall {
                 n_vec,
             } => jwks_update_federated_jwk_set(iss, kid_vec, alg_vec, e_vec, n_vec),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
+            ManagedCoinDestroyCaps { coin_type } => managed_coin_destroy_caps(coin_type),
             ManagedCoinInitialize {
                 coin_type,
                 name,
@@ -2980,6 +2986,22 @@ pub fn managed_coin_burn(coin_type: TypeTag, amount: u64) -> TransactionPayload 
         ident_str!("burn").to_owned(),
         vec![coin_type],
         vec![bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Destroys capabilities from the account, so that the user no longer has access to mint or burn.
+pub fn managed_coin_destroy_caps(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("managed_coin").to_owned(),
+        ),
+        ident_str!("destroy_caps").to_owned(),
+        vec![coin_type],
+        vec![],
     ))
 }
 
@@ -5498,6 +5520,16 @@ mod decoder {
         }
     }
 
+    pub fn managed_coin_destroy_caps(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ManagedCoinDestroyCaps {
+                coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinInitialize {
@@ -6800,6 +6832,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "managed_coin_burn".to_string(),
             Box::new(decoder::managed_coin_burn),
+        );
+        map.insert(
+            "managed_coin_destroy_caps".to_string(),
+            Box::new(decoder::managed_coin_destroy_caps),
         );
         map.insert(
             "managed_coin_initialize".to_string(),
