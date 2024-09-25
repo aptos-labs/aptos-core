@@ -294,8 +294,7 @@ No longer supported.
 
 ## Function `initialize_fee_collection_and_distribution`
 
-Initializes the resource storing information about gas fees collection and
-distribution. Should be called by on-chain governance.
+DEPRECATED
 
 
 <pre><code>#[deprecated]
@@ -321,10 +320,11 @@ distribution. Should be called by on-chain governance.
 
 ## Function `upgrade_burn_percentage`
 
-Sets the burn percentage for collected fees to a new value. Should be called by on-chain governance.
+DEPRECATED
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _new_burn_percentage: u8)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _new_burn_percentage: u8)
 </code></pre>
 
 

@@ -86,13 +86,13 @@ module aptos_framework::transaction_fee {
     }
 
     #[deprecated]
-    /// Initializes the resource storing information about gas fees collection and
-    /// distribution. Should be called by on-chain governance.
+    /// DEPRECATED
     public fun initialize_fee_collection_and_distribution(_aptos_framework: &signer, _burn_percentage: u8) {
         abort error::not_implemented(ENO_LONGER_SUPPORTED)
     }
 
-    /// Sets the burn percentage for collected fees to a new value. Should be called by on-chain governance.
+    #[deprecated]
+    /// DEPRECATED
     public fun upgrade_burn_percentage(
         _aptos_framework: &signer,
         _new_burn_percentage: u8
