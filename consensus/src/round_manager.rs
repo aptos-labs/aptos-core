@@ -1003,7 +1003,7 @@ impl RoundManager {
             .await
             .context("[RoundManager] Process proposal")?;
 
-        fail_point!("consensus::create_vote", |_| {
+        fail_point!("consensus::create_invalid_vote", |_| {
             use aptos_crypto::bls12381;
             let faulty_vote = Vote::new_with_signature(
                 vote.vote_data().clone(),
@@ -1178,7 +1178,7 @@ impl RoundManager {
             block.block()
         ))?;
 
-        fail_point!("consensus::create_order_vote", |_| {
+        fail_point!("consensus::create_invalid_order_vote", |_| {
             use aptos_crypto::bls12381;
             let faulty_order_vote = OrderVote::new_with_signature(
                 order_vote.author(),

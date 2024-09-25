@@ -236,12 +236,12 @@ async fn test_faulty_votes() {
                 vec![
                     (
                         cycle % num_validators,
-                        "consensus::create_vote".to_string(),
+                        "consensus::create_invalid_vote".to_string(),
                         format!("{}%return", 50),
                     ),
                     (
                         (cycle + 1) % num_validators,
-                        "consensus::process_order_vote".to_string(),
+                        "consensus::create_invalid_order_vote".to_string(),
                         format!("{}%return", 50),
                     ),
                 ],
