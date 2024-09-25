@@ -1184,6 +1184,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "status-line",
+ "tokio",
 ]
 
 [[package]]
