@@ -39,7 +39,9 @@ use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
     common::{Author, Round},
+    order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
+    pipelined_block::PipelinedBlock,
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -995,12 +997,28 @@ impl RoundManager {
         }
     }
 
-    pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
-        let proposal_round = proposal.round();
+    async fn create_vote(&mut self, proposal: Block) -> anyhow::Result<Vote> {
         let vote = self
             .vote_block(proposal)
             .await
             .context("[RoundManager] Process proposal")?;
+
+        fail_point!("consensus::create_vote", |_| {
+            use aptos_crypto::bls12381;
+            let faulty_vote = Vote::new_with_signature(
+                vote.vote_data().clone(),
+                vote.author(),
+                vote.ledger_info().clone(),
+                bls12381::Signature::dummy_signature(),
+            );
+            Ok(faulty_vote)
+        });
+        Ok(vote)
+    }
+
+    pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
+        let proposal_round = proposal.round();
+        let vote = self.create_vote(proposal).await?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
@@ -1145,6 +1163,33 @@ impl RoundManager {
         Ok(())
     }
 
+    async fn create_order_vote(
+        &mut self,
+        block: Arc<PipelinedBlock>,
+        qc: Arc<QuorumCert>,
+    ) -> anyhow::Result<OrderVote> {
+        let order_vote_proposal = block.order_vote_proposal(qc);
+        let order_vote_result = self
+            .safety_rules
+            .lock()
+            .construct_and_sign_order_vote(&order_vote_proposal);
+        let order_vote = order_vote_result.context(format!(
+            "[RoundManager] SafetyRules Rejected {} for order vote",
+            block.block()
+        ))?;
+
+        fail_point!("consensus::create_order_vote", |_| {
+            use aptos_crypto::bls12381;
+            let faulty_order_vote = OrderVote::new_with_signature(
+                order_vote.author(),
+                order_vote.ledger_info().clone(),
+                bls12381::Signature::dummy_signature(),
+            );
+            Ok(faulty_order_vote)
+        });
+        Ok(order_vote)
+    }
+
     async fn broadcast_order_vote(
         &mut self,
         vote: &Vote,
@@ -1152,22 +1197,16 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
             // Generate an order vote with ledger_info = proposed_block
-            let order_vote_proposal = proposed_block.order_vote_proposal(qc.clone());
-            let order_vote_result = self
-                .safety_rules
-                .lock()
-                .construct_and_sign_order_vote(&order_vote_proposal);
-            let order_vote = order_vote_result.context(format!(
-                "[RoundManager] SafetyRules Rejected {} for order vote",
-                proposed_block.block()
-            ))?;
+            let order_vote = self
+                .create_order_vote(proposed_block.clone(), qc.clone())
+                .await?;
             if !proposed_block.block().is_nil_block() {
                 observe_block(
                     proposed_block.block().timestamp_usecs(),
                     BlockStage::ORDER_VOTED,
                 );
             }
-            let order_vote_msg = OrderVoteMsg::new(order_vote.clone(), qc.as_ref().clone());
+            let order_vote_msg = OrderVoteMsg::new(order_vote, qc.as_ref().clone());
             info!(
                 self.new_log(LogEvent::BroadcastOrderVote),
                 "{}", order_vote_msg
