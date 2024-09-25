@@ -472,12 +472,13 @@ async fn list_stateful_sets(client: K8sClient, kube_namespace: &str) -> Result<V
     Ok(stateful_sets)
 }
 
-fn stateful_set_name_matches(sts: &StatefulSet, suffix: &str) -> bool {
-    if let Some(s) = sts.metadata.name.as_ref() {
-        s.contains(suffix)
-    } else {
-        false
+/// Check if the stateful set labels match the given labels
+fn stateful_set_labels_matches(sts: &StatefulSet, labels: &BTreeMap<String, String>) -> bool {
+    if sts.metadata.labels.is_none() {
+        return false;
     }
+    let sts_labels = sts.metadata.labels.as_ref().expect("Failed to get StatefulSet labels");
+    labels.iter().all(|(k, v)| sts_labels.get(k).map_or(false, |val| val == v))
 }
 
 fn parse_service_name_from_stateful_set_name(
@@ -567,7 +568,10 @@ pub(crate) async fn get_validators(
     let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
     let validators = stateful_sets
         .into_iter()
-        .filter(|sts| stateful_set_name_matches(sts, "validator"))
+        .filter(|sts| stateful_set_labels_matches(sts, &BTreeMap::from([
+            ("app.kubernetes.io/name".to_string(), "validator".to_string()),
+            ("app.kubernetes.io/part-of".to_string(), "aptos-node".to_string()),
+        ])))
         .map(|sts| {
             let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
@@ -577,7 +581,7 @@ pub(crate) async fn get_validators(
     Ok(validators)
 }
 
-pub(crate) async fn get_fullnodes(
+pub(crate) async fn get_validator_fullnodes(
     client: K8sClient,
     kube_namespace: &str,
     use_port_forward: bool,
@@ -586,7 +590,10 @@ pub(crate) async fn get_fullnodes(
     let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
     let fullnodes = stateful_sets
         .into_iter()
-        .filter(|sts| stateful_set_name_matches(sts, "fullnode"))
+        .filter(|sts| stateful_set_labels_matches(sts, &BTreeMap::from([
+            ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
+            ("app.kubernetes.io/part-of".to_string(), "aptos-node".to_string()),
+        ])))
         .map(|sts| {
             let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
@@ -795,6 +802,7 @@ impl ChaosExperimentOps for RealChaosExperimentOps {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kube::api::ObjectMeta;
     use crate::chaos_schema::ChaosCondition;
 
     #[test]
@@ -869,5 +877,61 @@ mod tests {
             stress_chaos,
         };
         assert!(chaos_ops.are_chaos_experiments_active().await.unwrap());
+    }
+
+    #[test]
+    fn test_stateful_set_labels_matches() {
+        // Create a StatefulSet with some labels
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "validator".to_string());
+        labels.insert("component".to_string(), "blockchain".to_string());
+
+        let sts = StatefulSet {
+            metadata: ObjectMeta {
+                labels: Some(labels),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // All labels match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "blockchain".to_string());
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // Subset of labels match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // One label doesn't match
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "database".to_string());
+        assert!(!stateful_set_labels_matches(&sts, &match_labels));
+
+        // Extra label in match_labels
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        match_labels.insert("component".to_string(), "blockchain".to_string());
+        match_labels.insert("extra".to_string(), "label".to_string());
+        assert!(!stateful_set_labels_matches(&sts, &match_labels));
+
+        // Empty match_labels
+        let match_labels = BTreeMap::new();
+        assert!(stateful_set_labels_matches(&sts, &match_labels));
+
+        // StatefulSet with no labels
+        let sts_no_labels = StatefulSet {
+            metadata: ObjectMeta {
+                labels: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut match_labels = BTreeMap::new();
+        match_labels.insert("app".to_string(), "validator".to_string());
+        assert!(!stateful_set_labels_matches(&sts_no_labels, &match_labels));
     }
 }

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    get_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck, wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_FORGE_DEPLOYER_PROFILE, DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED, FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX
+    get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck, wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_FORGE_DEPLOYER_PROFILE, DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED, FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
@@ -691,7 +691,7 @@ pub async fn collect_running_nodes(
     }
 
     // get all fullnodes
-    let fullnodes = get_fullnodes(
+    let validator_fullnodes = get_validator_fullnodes(
         kube_client.clone(),
         &kube_namespace,
         use_port_forward,
@@ -700,11 +700,11 @@ pub async fn collect_running_nodes(
     .await
     .unwrap();
 
-    wait_nodes_stateful_set(kube_client, &kube_namespace, &fullnodes).await?;
+    wait_nodes_stateful_set(kube_client, &kube_namespace, &validator_fullnodes).await?;
 
     let nodes = validators
         .values()
-        .chain(fullnodes.values())
+        .chain(validator_fullnodes.values())
         .collect::<Vec<&K8sNode>>();
 
     // start port-forward for each of the nodes
@@ -716,7 +716,7 @@ pub async fn collect_running_nodes(
     }
 
     nodes_healthcheck(nodes).await?;
-    Ok((validators, fullnodes))
+    Ok((validators, validator_fullnodes))
 }
 
 /// Returns a [Config] object reading the KUBECONFIG environment variable or infering from the
