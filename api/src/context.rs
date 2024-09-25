@@ -350,7 +350,7 @@ impl Context {
                 }
             }
         }
-
+        panic!("Internal indexer is not enabled");
         Err(E::service_unavailable_with_code_no_info(
             "Indexer reader doesn't exist",
             AptosErrorCode::InternalError,
