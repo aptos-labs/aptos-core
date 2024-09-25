@@ -3,11 +3,11 @@
 
 use crate::{
     config::VMConfig,
-    loader::{check_natives, TypeCache},
+    loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
-        struct_name_index_map::StructNameIndexMap, verified_module_cache::VERIFIED_MODULES_V2,
-        verifier::VerifierExtension,
+        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
+        verified_module_cache::VERIFIED_MODULES_V2, verifier::VerifierExtension,
     },
     Module, Script,
 };
@@ -25,7 +25,6 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
@@ -60,7 +59,7 @@ pub struct RuntimeEnvironment {
     ///     The design of V2 loader ensures that when modules are published, i.e., staged on top of
     ///     the existing module storage, the runtime environment is cloned. Hence, it is not even
     ///     possible to mutate this global cache speculatively.
-    ty_cache: RwLock<TypeCache>,
+    ty_cache: StructInfoCache,
 }
 
 impl RuntimeEnvironment {
@@ -90,7 +89,7 @@ impl RuntimeEnvironment {
             natives,
             verifier_extension: None,
             struct_name_index_map: StructNameIndexMap::empty(),
-            ty_cache: RwLock::new(TypeCache::empty()),
+            ty_cache: StructInfoCache::empty(),
         }
     }
 
@@ -263,7 +262,7 @@ impl RuntimeEnvironment {
 
     /// Returns the type cache owned by this runtime environment which stores information about
     /// struct layouts, tags and depth formulae.
-    pub(crate) fn ty_cache(&self) -> &RwLock<TypeCache> {
+    pub(crate) fn ty_cache(&self) -> &StructInfoCache {
         &self.ty_cache
     }
 }
@@ -277,7 +276,7 @@ impl Clone for RuntimeEnvironment {
             natives: self.natives.clone(),
             verifier_extension: self.verifier_extension.clone(),
             struct_name_index_map: self.struct_name_index_map.clone(),
-            ty_cache: RwLock::new(self.ty_cache.read().clone()),
+            ty_cache: self.ty_cache.clone(),
         }
     }
 }

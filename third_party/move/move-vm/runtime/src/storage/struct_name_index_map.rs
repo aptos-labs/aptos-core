@@ -27,6 +27,14 @@ impl StructNameIndexMap {
         }))
     }
 
+    /// Flushes the cached struct names and indices for V1 loader.
+    #[deprecated]
+    pub(crate) fn flush(&self) {
+        let mut index_map = self.0.write();
+        index_map.backward_map.clear();
+        index_map.forward_map.clear();
+    }
+
     /// Maps the struct identifier into an index. If the identifier already exists returns the
     /// corresponding index. This function guarantees that for any struct identifiers A and B,
     /// if A == B, they have the same indices.
