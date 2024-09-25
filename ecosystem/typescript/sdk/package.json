@@ -1,0 +1,11 @@
+{
+  "name": "aptos",
+  "version": "0.0.0",
+  "description": "Placeholder",
+  "main": "index.js",
+  "scripts": {
+    "generate-client": "echo \"Generate client is disabled, skipping\""
+  },
+  "author": "",
+  "license": "ISC"
+}
