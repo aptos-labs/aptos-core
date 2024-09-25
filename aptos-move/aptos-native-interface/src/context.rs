@@ -94,6 +94,13 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
             .abstract_value_size(val, self.gas_feature_version)
     }
 
+    /// Computes the abstract size of the input value.
+    pub fn abs_val_size_dereferenced(&self, val: &Value) -> AbstractValueSize {
+        self.misc_gas_params
+            .abs_val
+            .abstract_value_size_dereferenced(val, self.gas_feature_version)
+    }
+
     /// Returns the current gas feature version.
     pub fn gas_feature_version(&self) -> u64 {
         self.gas_feature_version
