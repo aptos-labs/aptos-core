@@ -101,6 +101,7 @@ async fn test_consensus_observer_fullnode_sync() {
 
     // Verify the VFN is up-to-date
     wait_for_all_nodes(&mut swarm).await;
+    panic!("done");
 }
 
 #[tokio::test]

@@ -16,9 +16,13 @@ pub const COMMIT_DECISION_LABEL: &str = "commit_decision";
 pub const COMMITTED_BLOCKS_LABEL: &str = "committed_blocks";
 pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
+pub const PROPOSAL_ENTRIES_LABEL: &str = "proposal_entries";
 pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
+pub const PROPOSAL_LABEL: &str = "proposal";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
+pub const PENDING_PROPOSAL_ENTRIES_LABEL: &str = "pending_proposal_entries";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
+pub const PENDING_PROPOSALS_LABEL: &str = "pending_proposals";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
 
 /// Counter for tracking created subscriptions for the consensus observer
@@ -79,11 +83,31 @@ pub static OBSERVER_NUM_PROCESSED_BLOCKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking the number of processed proposals by the consensus observer
+pub static OBSERVER_NUM_PROCESSED_PROPOSALS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_num_processed_proposals",
+        "Gauge for tracking the number of processed proposals by the consensus observer",
+        &["processed_type"]
+    )
+    .unwrap()
+});
+
 /// Gauge for tracking the processed block rounds by the consensus observer
 pub static OBSERVER_PROCESSED_BLOCK_ROUNDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "consensus_observer_processed_block_rounds",
         "Gauge for tracking the processed block rounds by the consensus observer",
+        &["processed_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the processed proposal rounds by the consensus observer
+pub static OBSERVER_PROCESSED_PROPOSAL_ROUNDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_processed_proposal_rounds",
+        "Gauge for tracking the processed proposal rounds by the consensus observer",
         &["processed_type"]
     )
     .unwrap()

@@ -32,7 +32,7 @@ use aptos_config::{
     config::{ConsensusObserverConfig, NodeConfig},
     network_id::PeerNetworkId,
 };
-use aptos_consensus_types::{pipeline, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{block::Block, pipeline, pipelined_block::PipelinedBlock};
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
@@ -150,6 +150,16 @@ impl ConsensusObserver {
         self.block_payload_store.lock().all_payloads_exist(blocks)
     }
 
+    fn all_payloads_exist_for_proposal(&self, block: &Block) -> bool {
+        // If quorum store is disabled, all payloads exist (they're already in the blocks)
+        if !self.active_observer_state.is_quorum_store_enabled() {
+            return true;
+        }
+
+        // Otherwise, check if all the payloads exist in the payload store
+        self.block_payload_store.lock().all_payloads_exist_for_proposal(block)
+    }
+
     /// Checks the progress of the consensus observer
     async fn check_progress(&mut self) {
         debug!(LogSchema::new(LogEntry::ConsensusObserver)
@@ -187,6 +197,9 @@ impl ConsensusObserver {
 
         // Clear the pending blocks
         self.pending_block_store.lock().clear_missing_blocks();
+
+        // Clear the missing proposals
+        self.pending_block_store.lock().clear_missing_proposals();
 
         // Clear the ordered blocks
         self.ordered_block_store.lock().clear_all_ordered_blocks();
@@ -321,6 +334,21 @@ impl ConsensusObserver {
         }
     }
 
+    /// Process any ready pending block proposal for the given epoch and round
+    async fn process_ready_pending_proposal(&mut self, block_epoch: u64, block_round: Round) {
+        // Get any ready proposal
+        let ready_proposal = self.pending_block_store.lock().remove_ready_proposal(
+            block_epoch,
+            block_round,
+            self.block_payload_store.clone(),
+        );
+
+        // Process the ready proposal (if it exists)
+        if let Some(ready_proposal) = ready_proposal {
+            self.process_proposal(ready_proposal).await;
+        }
+    }
+
     /// Processes the block payload message
     async fn process_block_payload_message(
         &mut self,
@@ -391,6 +419,8 @@ impl ConsensusObserver {
         // be done if the payload has been verified correctly.
         if verified_payload {
             self.order_ready_pending_block(block_epoch, block_round)
+                .await;
+            self.process_ready_pending_proposal(block_epoch, block_round)
                 .await;
         }
     }
@@ -576,6 +606,9 @@ impl ConsensusObserver {
                 self.process_block_payload_message(peer_network_id, block_payload)
                     .await;
             },
+            ConsensusObserverDirectSend::BlockProposal(proposal) => {
+                self.process_block_proposal_message(peer_network_id, proposal).await;
+            },
         }
 
         // Update the metrics for the processed blocks
@@ -699,6 +732,92 @@ impl ConsensusObserver {
         }
     }
 
+    /// Processes the block proposal
+    async fn process_block_proposal_message(
+        &mut self,
+        peer_network_id: PeerNetworkId,
+        proposal: Block,
+    ) {
+        // Verify the proposal before processing
+        if let Err(error) = proposal.verify_well_formed() {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify block proposal! Ignoring: {:?}, Error: {:?}",
+                    proposal.id(),
+                    error
+                ))
+            );
+            return;
+        };
+        if let Err(error) = proposal.validate_signature(&self.active_observer_state.epoch_state().verifier) {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify block proposal! Ignoring: {:?}, Error: {:?}",
+                    proposal.id(),
+                    error
+                ))
+            );
+            return;
+        };
+
+        // Get the epoch and round of the proposal
+        let block_epoch_round = (proposal.epoch(), proposal.round());
+
+        let proposal_pending = self
+            .pending_block_store
+            .lock()
+            .existing_pending_proposal(&proposal);
+
+        // If the proposal is already pending, ignore it
+        if proposal_pending {
+            // Update the metrics for the dropped proposal
+            update_metrics_for_dropped_proposal_message(peer_network_id, &proposal);
+            return;
+        }
+
+        // Update the metrics for the received proposal
+        update_metrics_for_proposal_message(peer_network_id, &proposal);
+
+        // If all payloads exist, process the proposal. Otherwise, store it
+        // in the pending block store and wait for the payloads to arrive.
+        if self.all_payloads_exist_for_proposal(&proposal) {
+            self.process_proposal(proposal).await;
+        } else {
+            self.pending_block_store
+                .lock()
+                .insert_pending_proposal(proposal);
+        }
+    }
+
+    /// Processes the block proposal. This assumes the block proposal
+    /// has been sanity checked and that all payloads exist.
+    async fn process_proposal(&mut self, proposal: Block) {
+        // Verify the block payloads against the proposal
+        if let Err(error) = self
+            .block_payload_store
+            .lock()
+            .verify_payloads_against_block(&proposal)
+        {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to verify block payloads against block proposal! Ignoring: {:?}, Error: {:?}",
+                    proposal.id(),
+                    error
+                ))
+            );
+            return;
+        }
+
+        info!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Forwarding block proposal to the execution pipeline for pre-execution: {}",
+                proposal.id()
+            ))
+        );
+        let pipelined_block = Arc::new(PipelinedBlock::new_ordered(proposal));
+        self.execution_client.pre_execute(&pipelined_block).await;
+    }
+
     /// Processes the sync complete notification for the given epoch and round
     async fn process_sync_notification(&mut self, epoch: u64, round: Round) {
         // Log the sync notification
@@ -741,6 +860,8 @@ impl ConsensusObserver {
             for payload_round in verified_payload_rounds {
                 self.order_ready_pending_block(new_epoch_state.epoch, payload_round)
                     .await;
+                self.process_ready_pending_proposal(new_epoch_state.epoch, payload_round)
+                    .await;
             }
         };
 
@@ -771,6 +892,11 @@ impl ConsensusObserver {
         self.pending_block_store
             .lock()
             .update_pending_blocks_metrics();
+
+        // Update the pending proposal metrics
+        self.pending_block_store
+            .lock()
+            .update_pending_proposals_metrics();
 
         // Update the pending block metrics
         self.ordered_block_store
@@ -1020,6 +1146,29 @@ fn update_metrics_for_dropped_ordered_block_message(
     );
 }
 
+/// Updates the metrics for the dropped proposal message
+fn update_metrics_for_dropped_proposal_message(
+    peer_network_id: PeerNetworkId,
+    proposal: &Block,
+) {
+    // Increment the dropped message counter
+    metrics::increment_counter(
+        &metrics::OBSERVER_DROPPED_MESSAGES,
+        metrics::PROPOSAL_LABEL,
+        &peer_network_id,
+    );
+
+    // Log the dropped proposal message
+    debug!(
+        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+            "Ignoring block proposal message from peer: {:?}! Block epoch and round: ({}, {})",
+            peer_network_id,
+            proposal.epoch(),
+            proposal.round()
+        ))
+    );
+}
+
 /// Updates the metrics for the received ordered block message
 fn update_metrics_for_ordered_block_message(
     peer_network_id: PeerNetworkId,
@@ -1038,5 +1187,26 @@ fn update_metrics_for_ordered_block_message(
         &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
         metrics::ORDERED_BLOCK_LABEL,
         ordered_block.proof_block_info().round(),
+    );
+}
+
+/// Updates the metrics for the received proposal message
+fn update_metrics_for_proposal_message(
+    peer_network_id: PeerNetworkId,
+    proposal: &Block,
+) {
+    // Log the received proposal message
+    let log_message = format!(
+        "Received block proposal: {}, from peer: {}!",
+        proposal.id(),
+        peer_network_id
+    );
+    log_received_message(log_message);
+
+    // Update the metrics for the received proposal
+    metrics::set_gauge_with_label(
+        &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
+        metrics::PROPOSAL_LABEL,
+        proposal.round(),
     );
 }
