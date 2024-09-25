@@ -605,7 +605,7 @@ pub fn setup_environment_and_start_node(
     let mut admin_service = services::start_admin_service(&node_config);
 
     // Set up the storage database and any RocksDB checkpoints
-    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt) =
+    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
 
     admin_service.set_aptos_db(db_rw.clone().into());
@@ -687,7 +687,13 @@ pub fn setup_environment_and_start_node(
         indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
-    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id, indexer_db_opt)?;
+    ) = services::bootstrap_api_and_indexer(
+        &node_config,
+        db_rw.clone(),
+        chain_id,
+        indexer_db_opt,
+        update_receiver,
+    )?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
