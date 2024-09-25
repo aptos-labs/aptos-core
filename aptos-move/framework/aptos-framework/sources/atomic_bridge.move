@@ -142,6 +142,9 @@ module aptos_framework::atomic_bridge_initiator {
     #[test_only]
     use aptos_framework::timestamp;
 
+    /// Initiator time lock duration is 48 hours in seconds
+    const INITIATOR_TIME_LOCK_DUARTION: u64 = 48 * 60 * 60;
+
     #[event]
     struct BridgeTransferInitiatedEvent has store, drop {
         bridge_transfer_id: vector<u8>,
@@ -170,12 +173,11 @@ module aptos_framework::atomic_bridge_initiator {
         initiator: &signer,
         recipient: vector<u8>,
         hash_lock: vector<u8>,
-        time_lock: u64,
         amount: u64
     ) {
         let ethereum_address = ethereum::ethereum_address(recipient);
         let initiator_address = signer::address_of(initiator);
-        let time_lock = bridge_store::create_time_lock(time_lock);
+        let time_lock = bridge_store::create_time_lock(INITIATOR_TIME_LOCK_DUARTION);
 
         let details =
             bridge_store::create_details(
@@ -245,7 +247,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1000;
+        let time_lock = INITIATOR_TIME_LOCK_DUARTION;
         let amount = 1000;
 
         // Mint some coins
@@ -257,7 +259,6 @@ module aptos_framework::atomic_bridge_initiator {
             sender,
             recipient,
             hash_lock,
-            time_lock,
             amount
         );
 
@@ -285,14 +286,12 @@ module aptos_framework::atomic_bridge_initiator {
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1000;
         let amount = 1000;
 
         initiate_bridge_transfer(
             sender,
             recipient,
             hash_lock,
-            time_lock,
             amount
         );
     }
@@ -309,7 +308,6 @@ module aptos_framework::atomic_bridge_initiator {
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1000;
         let amount = 1000;
 
         let account_balance = amount + 1;
@@ -323,7 +321,6 @@ module aptos_framework::atomic_bridge_initiator {
             sender,
             recipient,
             hash_lock,
-            time_lock,
             amount
         );
 
@@ -357,7 +354,6 @@ module aptos_framework::atomic_bridge_initiator {
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1000;
         let amount = 1000;
         let account_balance = amount + 1;
 
@@ -370,7 +366,6 @@ module aptos_framework::atomic_bridge_initiator {
             sender,
             recipient,
             hash_lock,
-            time_lock,
             amount
         );
 
@@ -396,7 +391,6 @@ module aptos_framework::atomic_bridge_initiator {
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1000;
         let amount = 1000;
         let account_balance = amount + 1;
 
@@ -409,7 +403,6 @@ module aptos_framework::atomic_bridge_initiator {
             sender,
             recipient,
             hash_lock,
-            time_lock,
             amount
         );
 
@@ -455,7 +448,6 @@ module aptos_framework::atomic_bridge_initiator {
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1000;
         let amount = 1000;
 
         let account_balance = amount + 1;
@@ -468,7 +460,6 @@ module aptos_framework::atomic_bridge_initiator {
             sender,
             recipient,
             hash_lock,
-            time_lock,
             amount
         );
 
@@ -476,7 +467,7 @@ module aptos_framework::atomic_bridge_initiator {
 
         let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
 
-        timestamp::fast_forward_seconds(time_lock + 1);
+        timestamp::fast_forward_seconds(INITIATOR_TIME_LOCK_DUARTION + 1);
 
         refund_bridge_transfer(sender, bridge_transfer_id);
 
@@ -503,7 +494,6 @@ module aptos_framework::atomic_bridge_initiator {
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1000;
         let amount = 1000;
 
         let account_balance = amount + 1;
@@ -516,7 +506,6 @@ module aptos_framework::atomic_bridge_initiator {
             sender,
             recipient,
             hash_lock,
-            time_lock,
             amount
         );
 
@@ -1076,6 +1065,9 @@ module aptos_framework::atomic_bridge_counterparty {
     #[test_only]
     use aptos_framework::timestamp;
 
+    /// Counterparty time lock duration is 24 hours in seconds
+    const COUNTERPARTY_TIME_LOCK_DUARTION: u64 = 24 * 60 * 60;
+
     #[event]
     /// An event triggered upon locking assets for a bridge transfer
     struct BridgeTransferLockedEvent has store, drop {
@@ -1115,13 +1107,12 @@ module aptos_framework::atomic_bridge_counterparty {
         initiator: vector<u8>,
         bridge_transfer_id: vector<u8>,
         hash_lock: vector<u8>,
-        time_lock: u64,
         recipient: address,
         amount: u64
     ) {
         bridge_configuration::assert_is_caller_operator(caller);
         let ethereum_address = ethereum::ethereum_address(initiator);
-
+        let time_lock = bridge_store::create_time_lock(COUNTERPARTY_TIME_LOCK_DUARTION);
         let details = bridge_store::create_details(
             ethereum_address,
             recipient,
@@ -1197,7 +1188,6 @@ module aptos_framework::atomic_bridge_counterparty {
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1;
         let recipient = @0xcafe;
         let amount = 1;
 
@@ -1205,7 +1195,8 @@ module aptos_framework::atomic_bridge_counterparty {
                                     initiator,
                                     bridge_transfer_id,
                                     hash_lock,
-                                    time_lock, recipient, amount);
+                                    recipient,
+                                    amount);
 
         assert!(
             event::was_event_emitted<BridgeTransferLockedEvent>(
@@ -1215,7 +1206,7 @@ module aptos_framework::atomic_bridge_counterparty {
                     recipient,
                     amount,
                     hash_lock,
-                    time_lock,
+                    time_lock: COUNTERPARTY_TIME_LOCK_DUARTION,
                 }
             ), 0);
     }
@@ -1227,7 +1218,6 @@ module aptos_framework::atomic_bridge_counterparty {
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1;
         let recipient = @0xcafe;
         let amount = 1;
 
@@ -1235,9 +1225,10 @@ module aptos_framework::atomic_bridge_counterparty {
             initiator,
             bridge_transfer_id,
             hash_lock,
-            time_lock, recipient, amount);
+            recipient,
+            amount);
 
-        timestamp::update_global_time_for_test(2_000_000);
+        timestamp::fast_forward_seconds(COUNTERPARTY_TIME_LOCK_DUARTION + 1);
         abort_bridge_transfer(aptos_framework, bridge_transfer_id);
 
         assert!(
@@ -1255,7 +1246,6 @@ module aptos_framework::atomic_bridge_counterparty {
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1;
         let recipient = @0xcafe;
         let amount = 1;
 
@@ -1266,7 +1256,8 @@ module aptos_framework::atomic_bridge_counterparty {
             initiator,
             bridge_transfer_id,
             hash_lock,
-            time_lock, recipient, amount);
+            recipient,
+            amount);
 
         complete_bridge_transfer(bridge_transfer_id, plain_secret());
 
@@ -1287,7 +1278,6 @@ module aptos_framework::atomic_bridge_counterparty {
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
-        let time_lock = 1;
         let recipient = @0xcafe;
         let amount = 1;
 
@@ -1295,7 +1285,8 @@ module aptos_framework::atomic_bridge_counterparty {
             initiator,
             bridge_transfer_id,
             hash_lock,
-            time_lock, recipient, amount);
+            recipient,
+            amount);
 
         complete_bridge_transfer(bridge_transfer_id, b"not the secret");
     }
