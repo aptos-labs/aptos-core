@@ -272,10 +272,10 @@ where
                     )?
                 };
 
-                let nonce_table = self.nonce_table.read();
-                info!("Size of nonce table: {:?}", nonce_table.len());
                 let deduped_transactions = {
                     let _timer = APTOS_EXECUTOR_NONCE_DUDEUP_SECONDS.start_timer();
+                    let nonce_table = self.nonce_table.read();
+                    info!("Size of nonce table: {:?}", nonce_table.len());    
                     match transactions {
                         ExecutableTransactions::Unsharded(txns) => {
                             info!("Txns before nonce dedup: {:?}", txns.len());
