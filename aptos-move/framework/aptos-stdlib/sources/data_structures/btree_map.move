@@ -99,15 +99,20 @@ module aptos_std::btree_map {
 
     /// Returns a new BTreeMap with the default configuration.
     public fun new<K: store, V: store>(): BTreeMap<K, V> {
-        new_with_config(0, 0)
+        new_with_config(0, 0, false, 0)
     }
 
     /// Returns a new BTreeMap with the provided max degree consts (the maximum # of children a node can have).
     /// If 0 is passed, then it is dynamically computed based on size of first key and value.
-    public fun new_with_config<K: store, V: store>(inner_max_degree: u16, leaf_max_degree: u16): BTreeMap<K, V> {
+    public fun new_with_config<K: store, V: store>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, num_to_preallocate: u64): BTreeMap<K, V> {
         assert!(inner_max_degree == 0 || inner_max_degree >= DEFAULT_INNER_MIN_DEGREE, E_INVALID_PARAMETER);
         assert!(leaf_max_degree == 0 || leaf_max_degree >= DEFAULT_LEAF_MIN_DEGREE, E_INVALID_PARAMETER);
-        let nodes = slots_storage::new_storage_slots();
+        let nodes = if (reuse_slots) {
+            slots_storage::new_reuse_storage_slots(num_to_preallocate)
+        } else {
+            assert!(num_to_preallocate == 0, E_INVALID_PARAMETER);
+            slots_storage::new_storage_slots()
+        };
         let root_index = nodes.add(new_node(/*is_leaf=*/true, /*parent=*/NULL_INDEX));
         BTreeMap::V1 {
             root_index: root_index,
@@ -809,7 +814,7 @@ module aptos_std::btree_map {
             };
 
             self.nodes.add_transient_slot(brother_slot, node);
-            node_slot.destroy_transient_slot();
+            self.nodes.destroy_transient_slot(node_slot);
             if (self.min_leaf_index == node_index) {
                 self.min_leaf_index = brother_index;
             };
@@ -841,7 +846,7 @@ module aptos_std::btree_map {
             };
 
             self.nodes.add_transient_slot(node_slot, brother_node);
-            brother_slot.destroy_transient_slot();
+            self.nodes.destroy_transient_slot(brother_slot);
             if (self.min_leaf_index == brother_index) {
                 self.min_leaf_index = node_index;
             };
@@ -947,7 +952,7 @@ module aptos_std::btree_map {
 
     #[test]
     fun test_smart_tree() {
-        let tree = new_with_config(5, 3);
+        let tree = new_with_config(5, 3, true, 2);
         print_tree(&tree);
         insert(&mut tree, 1, 1); print_tree(&tree);
         insert(&mut tree, 2, 2); print_tree(&tree);
@@ -971,7 +976,7 @@ module aptos_std::btree_map {
 
     #[test]
     fun test_deleting_and_creating_nodes() {
-        let tree = new_with_config(4, 3);
+        let tree = new_with_config(4, 3, true, 2);
 
         for (i in 0..50) {
             tree.upsert(i, i);
@@ -1018,7 +1023,7 @@ module aptos_std::btree_map {
 
     #[test]
     fun test_iterator() {
-        let tree = new_with_config(5, 5);
+        let tree = new_with_config(5, 5, true, 2);
 
         let data = vector[1, 7, 5, 8, 4, 2, 6, 3, 9, 0];
         while (vector::length(&data) != 0) {
@@ -1040,7 +1045,7 @@ module aptos_std::btree_map {
 
     #[test]
     fun test_find() {
-        let tree = new_with_config(5, 5);
+        let tree = new_with_config(5, 5, true, 2);
 
         let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 0, 10];
 
@@ -1069,7 +1074,7 @@ module aptos_std::btree_map {
 
     #[test]
     fun test_lower_bound() {
-        let tree = new_with_config(5, 5);
+        let tree = new_with_config(5, 5, true, 2);
 
         let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 12, 10];
 
@@ -1105,8 +1110,8 @@ module aptos_std::btree_map {
     }
 
     #[test_only]
-    fun test_large_data_set_helper(inner_max_degree: u16, leaf_max_degree: u16) {
-        let tree = new_with_config(inner_max_degree, leaf_max_degree);
+    fun test_large_data_set_helper(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool) {
+        let tree = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots, if (reuse_slots) {4} else {0});
         let data = vector[383, 886, 777, 915, 793, 335, 386, 492, 649, 421, 362, 27, 690, 59, 763, 926, 540, 426, 172, 736, 211, 368, 567, 429, 782, 530, 862, 123, 67, 135, 929, 802, 22, 58, 69, 167, 393, 456, 11, 42, 229, 373, 421, 919, 784, 537, 198, 324, 315, 370, 413, 526, 91, 980, 956, 873, 862, 170, 996, 281, 305, 925, 84, 327, 336, 505, 846, 729, 313, 857, 124, 895, 582, 545, 814, 367, 434, 364, 43, 750, 87, 808, 276, 178, 788, 584, 403, 651, 754, 399, 932, 60, 676, 368, 739, 12, 226, 586, 94, 539, 795, 570, 434, 378, 467, 601, 97, 902, 317, 492, 652, 756, 301, 280, 286, 441, 865, 689, 444, 619, 440, 729, 31, 117, 97, 771, 481, 675, 709, 927, 567, 856, 497, 353, 586, 965, 306, 683, 219, 624, 528, 871, 732, 829, 503, 19, 270, 368, 708, 715, 340, 149, 796, 723, 618, 245, 846, 451, 921, 555, 379, 488, 764, 228, 841, 350, 193, 500, 34, 764, 124, 914, 987, 856, 743, 491, 227, 365, 859, 936, 432, 551, 437, 228, 275, 407, 474, 121, 858, 395, 29, 237, 235, 793, 818, 428, 143, 11, 928, 529];
 
         let shuffled_data = vector[895, 228, 530, 784, 624, 335, 729, 818, 373, 456, 914, 226, 368, 750, 428, 956, 437, 586, 763, 235, 567, 91, 829, 690, 434, 178, 584, 426, 228, 407, 237, 497, 764, 135, 124, 421, 537, 270, 11, 367, 378, 856, 529, 276, 729, 618, 929, 227, 149, 788, 925, 675, 121, 795, 306, 198, 421, 350, 555, 441, 403, 932, 368, 383, 928, 841, 440, 771, 364, 902, 301, 987, 467, 873, 921, 11, 365, 340, 739, 492, 540, 386, 919, 723, 539, 87, 12, 782, 324, 862, 689, 395, 488, 793, 709, 505, 582, 814, 245, 980, 936, 736, 619, 69, 370, 545, 764, 886, 305, 551, 19, 865, 229, 432, 29, 754, 34, 676, 43, 846, 451, 491, 871, 500, 915, 708, 586, 60, 280, 652, 327, 172, 856, 481, 796, 474, 219, 651, 170, 281, 84, 97, 715, 857, 353, 862, 393, 567, 368, 777, 97, 315, 526, 94, 31, 167, 123, 413, 503, 193, 808, 649, 143, 42, 444, 317, 67, 926, 434, 211, 379, 570, 683, 965, 732, 927, 429, 859, 313, 528, 996, 117, 492, 336, 22, 399, 275, 802, 743, 124, 846, 58, 858, 286, 756, 601, 27, 59, 362, 793];
@@ -1137,56 +1142,67 @@ module aptos_std::btree_map {
 
     #[test]
     fun test_large_data_set_order_5() {
-        test_large_data_set_helper(5, 5);
+        test_large_data_set_helper(5, 5, false);
+        test_large_data_set_helper(5, 5, true);
     }
 
     #[test]
     fun test_large_data_set_order_4_3() {
-        test_large_data_set_helper(4, 3);
+        test_large_data_set_helper(4, 3, false);
+        test_large_data_set_helper(4, 3, true);
     }
 
     #[test]
     fun test_large_data_set_order_4_4() {
-        test_large_data_set_helper(4, 4);
+        test_large_data_set_helper(4, 4, false);
+        test_large_data_set_helper(4, 4, true);
     }
 
     #[test]
     fun test_large_data_set_order_6() {
-        test_large_data_set_helper(6, 6);
+        test_large_data_set_helper(6, 6, false);
+        test_large_data_set_helper(6, 6, true);
     }
 
     #[test]
     fun test_large_data_set_order_6_3() {
-        test_large_data_set_helper(6, 3);
+        test_large_data_set_helper(6, 3, false);
+        test_large_data_set_helper(6, 3, true);
     }
 
     #[test]
     fun test_large_data_set_order_4_6() {
-        test_large_data_set_helper(4, 6);
+        test_large_data_set_helper(4, 6, false);
+        test_large_data_set_helper(4, 6, true);
     }
 
     #[test]
     fun test_large_data_set_order_16() {
-        test_large_data_set_helper(16, 16);
+        test_large_data_set_helper(16, 16, false);
+        test_large_data_set_helper(16, 16, true);
     }
 
     #[test]
     fun test_large_data_set_order_31() {
-        test_large_data_set_helper(31, 31);
+        test_large_data_set_helper(31, 31, false);
+        test_large_data_set_helper(31, 31, true);
     }
 
     #[test]
     fun test_large_data_set_order_31_3() {
-        test_large_data_set_helper(31, 3);
+        test_large_data_set_helper(31, 3, false);
+        test_large_data_set_helper(31, 3, true);
     }
 
     #[test]
     fun test_large_data_set_order_31_5() {
-        test_large_data_set_helper(31, 5);
+        test_large_data_set_helper(31, 5, false);
+        test_large_data_set_helper(31, 5, true);
     }
 
     #[test]
     fun test_large_data_set_order_32() {
-        test_large_data_set_helper(32, 32);
+        test_large_data_set_helper(32, 32, false);
+        test_large_data_set_helper(32, 32, true);
     }
 }
