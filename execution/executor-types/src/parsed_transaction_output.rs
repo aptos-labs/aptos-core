@@ -17,6 +17,7 @@ use std::ops::Deref;
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
+#[derive(Clone)]
 pub struct ParsedTransactionOutput {
     output: TransactionOutput,
     reconfig_events: Vec<ContractEvent>,
@@ -107,6 +108,15 @@ impl TransactionsWithParsedOutput {
             transactions: transaction,
             parsed_output,
         }
+    }
+
+    pub fn new_empty() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, transaction: Transaction, parsed_output: ParsedTransactionOutput) {
+        self.transactions.push(transaction);
+        self.parsed_output.push(parsed_output);
     }
 
     pub fn len(&self) -> usize {

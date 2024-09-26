@@ -1033,10 +1033,14 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             // If we're generating a multi-step proposal
         } else {
             let next_execution_hash_bytes = hex::decode(next_execution_hash)?;
+            let next_execution_hash =
+                HashValue::from_slice(next_execution_hash_bytes).map_err(|_err| {
+                    CliError::CommandArgumentError("Invalid next execution hash".to_string())
+                })?;
             release.generate_script_proposal_multi_step(
                 account,
                 output,
-                next_execution_hash_bytes,
+                Some(next_execution_hash),
             )?;
         };
         Ok(())

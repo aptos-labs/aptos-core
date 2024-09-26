@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unsupported language construct
+  ┌─ tests/checking-lang-v1/expansion/access_specifier_not_supported.move:8:14
+  │
+8 │     fun f2() reads S {
+  │              ^^^^^ Move 2 language construct is not enabled: access specifiers
+
+error: unsupported language construct
+   ┌─ tests/checking-lang-v1/expansion/access_specifier_not_supported.move:11:14
+   │
+11 │     fun f3() writes S {
+   │              ^^^^^^ Move 2 language construct is not enabled: access specifiers

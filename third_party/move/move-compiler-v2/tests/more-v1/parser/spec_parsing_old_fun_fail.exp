@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/spec_parsing_old_fun_fail.move:5:10
+  │
+5 │     spec fun with_aborts_if {
+  │          ^^^
+  │          │
+  │          Unexpected 'fun'
+  │          Expected only 'spec', drop the 'fun' keyword

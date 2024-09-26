@@ -142,8 +142,9 @@ impl KeylessSignature {
     }
 
     pub fn verify_expiry(&self, current_time_microseconds: u64) -> anyhow::Result<()> {
-        let block_time = UNIX_EPOCH + Duration::from_micros(current_time_microseconds);
-        let expiry_time = seconds_from_epoch(self.exp_date_secs);
+        let block_time = UNIX_EPOCH.checked_add(Duration::from_micros(current_time_microseconds))
+            .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + current_time_microseconds when checking exp_date_secs"))?;
+        let expiry_time = seconds_from_epoch(self.exp_date_secs)?;
 
         if block_time > expiry_time {
             bail!("Keyless signature is expired");
@@ -349,6 +350,17 @@ impl AnyKeylessPublicKey {
     }
 }
 
+impl From<AnyKeylessPublicKey> for AnyPublicKey {
+    fn from(apk: AnyKeylessPublicKey) -> Self {
+        match apk {
+            AnyKeylessPublicKey::Normal(pk) => AnyPublicKey::Keyless { public_key: pk },
+            AnyKeylessPublicKey::Federated(fed_pk) => {
+                AnyPublicKey::FederatedKeyless { public_key: fed_pk }
+            },
+        }
+    }
+}
+
 impl KeylessPublicKey {
     /// A reasonable upper bound for the number of bytes we expect in a keyless public key. This is
     /// enforced by our full nodes when they receive TXNs.
@@ -418,8 +430,10 @@ fn base64url_decode_as_str(b64: &str) -> anyhow::Result<String> {
     Ok(str)
 }
 
-fn seconds_from_epoch(secs: u64) -> SystemTime {
-    UNIX_EPOCH + Duration::from_secs(secs)
+fn seconds_from_epoch(secs: u64) -> anyhow::Result<SystemTime> {
+    UNIX_EPOCH
+        .checked_add(Duration::from_secs(secs))
+        .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + secs in seconds_from_epoch"))
 }
 
 #[cfg(test)]

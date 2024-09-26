@@ -312,8 +312,8 @@ impl CommitDecision {
 /// The transaction payload and proof of each block
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PayloadWithProof {
-    pub transactions: Vec<SignedTransaction>,
-    pub proofs: Vec<ProofOfStore>,
+    transactions: Vec<SignedTransaction>,
+    proofs: Vec<ProofOfStore>,
 }
 
 impl PayloadWithProof {
@@ -337,8 +337,8 @@ impl PayloadWithProof {
 /// The transaction payload and proof of each block with a transaction limit
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PayloadWithProofAndLimit {
-    pub payload_with_proof: PayloadWithProof,
-    pub transaction_limit: Option<u64>,
+    payload_with_proof: PayloadWithProof,
+    transaction_limit: Option<u64>,
 }
 
 impl PayloadWithProofAndLimit {
@@ -629,8 +629,8 @@ impl BlockTransactionPayload {
 /// Payload message contains the block and transaction payload
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockPayload {
-    pub block: BlockInfo,
-    pub transaction_payload: BlockTransactionPayload,
+    block: BlockInfo,
+    transaction_payload: BlockTransactionPayload,
 }
 
 impl BlockPayload {
@@ -641,25 +641,72 @@ impl BlockPayload {
         }
     }
 
+    /// Returns a reference to the block info
+    pub fn block(&self) -> &BlockInfo {
+        &self.block
+    }
+
+    /// Returns the epoch of the block info
+    pub fn epoch(&self) -> u64 {
+        self.block.epoch()
+    }
+
+    /// Returns the round of the block info
+    pub fn round(&self) -> Round {
+        self.block.round()
+    }
+
+    /// Returns a reference to the block transaction payload
+    pub fn transaction_payload(&self) -> &BlockTransactionPayload {
+        &self.transaction_payload
+    }
+
     /// Verifies the block payload digests and returns an error if the data is invalid
     pub fn verify_payload_digests(&self) -> Result<(), Error> {
-        // Verify the proof of store digests against the transaction
+        // Get the transactions, payload proofs and inline batches
         let transactions = self.transaction_payload.transactions();
+        let payload_proofs = self.transaction_payload.payload_proofs();
+        let inline_batches = self.transaction_payload.inline_batches();
+
+        // Get the number of transactions, payload proofs and inline batches
+        let num_transactions = transactions.len();
+        let num_payload_proofs = payload_proofs.len();
+        let num_inline_batches = inline_batches.len();
+
+        // Verify the payload proof digests using the transactions
         let mut transactions_iter = transactions.iter();
-        for proof_of_store in &self.transaction_payload.payload_proofs() {
-            reconstruct_and_verify_batch(&mut transactions_iter, proof_of_store.info())?;
+        for proof_of_store in &payload_proofs {
+            reconstruct_and_verify_batch(&mut transactions_iter, proof_of_store.info()).map_err(
+                |error| {
+                    Error::InvalidMessageError(format!(
+                        "Failed to verify payload proof digests! Num transactions: {:?}, \
+                        num batches: {:?}, num inline batches: {:?}, failed batch: {:?}, Error: {:?}",
+                        num_transactions, num_payload_proofs, num_inline_batches, proof_of_store.info(), error
+                    ))
+                },
+            )?;
         }
 
-        // Verify the inline batch digests against the inline batches
-        for batch_info in self.transaction_payload.inline_batches() {
-            reconstruct_and_verify_batch(&mut transactions_iter, batch_info)?;
+        // Verify the inline batch digests using the transactions
+        for batch_info in inline_batches.into_iter() {
+            reconstruct_and_verify_batch(&mut transactions_iter, batch_info).map_err(
+                |error| {
+                    Error::InvalidMessageError(format!(
+                        "Failed to verify inline batch digests! Num transactions: {:?}, \
+                        num batches: {:?}, num inline batches: {:?}, failed batch: {:?}, Error: {:?}",
+                        num_transactions, num_payload_proofs, num_inline_batches, batch_info, error
+                    ))
+                },
+            )?;
         }
 
-        // Verify that there are no transactions remaining
+        // Verify that there are no transactions remaining (all transactions should be consumed)
         let remaining_transactions = transactions_iter.as_slice();
         if !remaining_transactions.is_empty() {
             return Err(Error::InvalidMessageError(format!(
-                "Failed to verify payload transactions! Transactions remaining: {:?}. Expected: 0",
+                "Failed to verify payload transactions! Num transactions: {:?}, \
+                transactions remaining: {:?}. Expected: 0",
+                num_transactions,
                 remaining_transactions.len()
             )));
         }
@@ -720,7 +767,7 @@ fn reconstruct_and_verify_batch(
     let expected_digest = expected_batch_info.digest();
     if batch_digest != *expected_digest {
         return Err(Error::InvalidMessageError(format!(
-            "The reconstructed batch digest does not match the expected digest!\
+            "The reconstructed batch digest does not match the expected digest! \
              Batch: {:?}, Expected digest: {:?}, Reconstructed digest: {:?}",
             expected_batch_info, expected_digest, batch_digest
         )));

@@ -4,6 +4,7 @@
 
 use crate::{
     block_storage::{pending_blocks::PendingBlocks, BlockReader, BlockStore},
+    counters,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -29,7 +30,7 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{ConsensusConfig, QcAggregatorType},
+    config::ConsensusConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_consensus_types::{
@@ -82,7 +83,6 @@ use futures::{
     stream::select,
     FutureExt, Stream, StreamExt,
 };
-use futures_channel::mpsc::unbounded;
 use maplit::hashmap;
 use std::{
     iter::FromIterator,
@@ -123,14 +123,7 @@ impl NodeSetup {
         let base_timeout = Duration::new(60, 0);
         let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
         let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
-        let (delayed_qc_tx, _) = unbounded();
-        RoundState::new(
-            time_interval,
-            time_service,
-            round_timeout_sender,
-            delayed_qc_tx,
-            QcAggregatorType::NoDelay,
-        )
+        RoundState::new(time_interval, time_service, round_timeout_sender)
     }
 
     fn create_proposer_election(proposers: Vec<Author>) -> Arc<dyn ProposerElection + Send + Sync> {
@@ -1147,11 +1140,13 @@ fn new_round_on_timeout_certificate() {
                 None,
             ),
         );
+        let before = counters::ERROR_COUNT.get();
         assert!(node
             .round_manager
             .process_proposal_msg(old_good_proposal)
             .await
-            .is_err());
+            .is_ok()); // we eat the error
+        assert_eq!(counters::ERROR_COUNT.get(), before + 1); // but increase the counter
     });
 }
 

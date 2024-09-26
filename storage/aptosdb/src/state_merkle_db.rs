@@ -3,7 +3,7 @@
 
 use crate::{
     common::NUM_STATE_SHARDS,
-    db_options::{gen_state_merkle_cfds, state_merkle_db_column_families},
+    db_options::gen_state_merkle_cfds,
     lru_node_cache::LruNodeCache,
     metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
     schema::{
@@ -638,7 +638,7 @@ impl StateMerkleDb {
                 &gen_rocksdb_options(state_merkle_db_config, true),
                 path,
                 name,
-                state_merkle_db_column_families(),
+                gen_state_merkle_cfds(state_merkle_db_config),
             )?
         } else {
             DB::open_cf(

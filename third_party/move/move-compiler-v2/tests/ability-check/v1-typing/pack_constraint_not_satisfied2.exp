@@ -1,0 +1,7 @@
+
+Diagnostics:
+bug: unexpected type: _
+  ┌─ tests/ability-check/v1-typing/pack_constraint_not_satisfied2.move:6:9
+  │
+6 │     fun t0() {
+  │         ^^

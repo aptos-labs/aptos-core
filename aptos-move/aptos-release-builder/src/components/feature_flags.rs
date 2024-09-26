@@ -3,6 +3,7 @@
 
 use crate::{components::get_signer_arg, utils::*};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, Features as AptosFeatures};
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
@@ -153,7 +154,8 @@ fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
 pub fn generate_feature_upgrade_proposal(
     features: &Features,
     is_testnet: bool,
-    next_execution_hash: Vec<u8>,
+    next_execution_hash: Option<HashValue>,
+    is_multi_step: bool,
 ) -> Result<Vec<(String, String)>> {
     let signer_arg = get_signer_arg(is_testnet, &next_execution_hash);
     let mut result = vec![];
@@ -182,7 +184,8 @@ pub fn generate_feature_upgrade_proposal(
     let proposal = generate_governance_proposal(
         &writer,
         is_testnet,
-        next_execution_hash.clone(),
+        next_execution_hash,
+        is_multi_step,
         &["std::features"],
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");

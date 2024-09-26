@@ -13,20 +13,27 @@ use crate::consensus_observer::{
             ConsensusObserverMessage, ConsensusObserverRequest, ConsensusObserverResponse,
         },
     },
-    observer::{subscription, subscription::ConsensusObserverSubscription},
+    observer::{subscription::ConsensusObserverSubscription, subscription_utils},
     publisher::consensus_publisher::ConsensusPublisher,
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
-use aptos_logger::{error, info, warn};
+use aptos_infallible::Mutex;
+use aptos_logger::{info, warn};
 use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
+use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
+use tokio::task::JoinHandle;
 
 /// The manager for consensus observer subscriptions
 pub struct SubscriptionManager {
-    // The currently active consensus observer subscription
-    active_observer_subscription: Option<ConsensusObserverSubscription>,
+    // The currently active set of consensus observer subscriptions
+    active_observer_subscriptions:
+        Arc<Mutex<HashMap<PeerNetworkId, ConsensusObserverSubscription>>>,
+
+    // The active subscription creation task (if one is currently running)
+    active_subscription_creation_task: Arc<Mutex<Option<JoinHandle<()>>>>,
 
     // The consensus observer client to send network messages
     consensus_observer_client:
@@ -56,7 +63,8 @@ impl SubscriptionManager {
         time_service: TimeService,
     ) -> Self {
         Self {
-            active_observer_subscription: None,
+            active_observer_subscriptions: Arc::new(Mutex::new(HashMap::new())),
+            active_subscription_creation_task: Arc::new(Mutex::new(None)),
             consensus_observer_client,
             consensus_observer_config,
             consensus_publisher,
@@ -65,244 +73,224 @@ impl SubscriptionManager {
         }
     }
 
-    /// Checks if the active subscription is still healthy. If not, an error is returned.
-    fn check_active_subscription(&mut self) -> Result<(), Error> {
-        let active_observer_subscription = self.active_observer_subscription.take();
-        if let Some(mut active_subscription) = active_observer_subscription {
-            // Check if the peer for the subscription is still connected
-            let peer_network_id = active_subscription.get_peer_network_id();
-            let peer_still_connected = self
-                .get_connected_peers_and_metadata()
-                .map_or(false, |peers_and_metadata| {
-                    peers_and_metadata.contains_key(&peer_network_id)
-                });
-
-            // Verify the peer is still connected
-            if !peer_still_connected {
-                return Err(Error::SubscriptionDisconnected(
-                    "The peer is no longer connected!".to_string(),
-                ));
-            }
-
-            // Verify the subscription has not timed out
-            active_subscription.check_subscription_timeout()?;
-
-            // Verify that the DB is continuing to sync and commit new data
-            active_subscription.check_syncing_progress()?;
-
-            // Verify that the subscription peer is optimal
-            if let Some(peers_and_metadata) = self.get_connected_peers_and_metadata() {
-                active_subscription.check_subscription_peer_optimality(peers_and_metadata)?;
-            }
-
-            // The subscription seems healthy, we can keep it
-            self.active_observer_subscription = Some(active_subscription);
-        }
-
-        Ok(())
-    }
-
-    /// Checks the health of the active subscription. If the subscription is
-    /// unhealthy, it will be terminated and a new subscription will be created.
-    /// This returns true iff a new subscription was created.
-    pub async fn check_and_manage_subscriptions(&mut self) -> bool {
-        // Get the peer ID of the currently active subscription (if any)
-        let active_subscription_peer = self
-            .active_observer_subscription
-            .as_ref()
-            .map(|subscription| subscription.get_peer_network_id());
-
-        // If we have an active subscription, verify that the subscription
-        // is still healthy. If not, the subscription should be terminated.
-        if let Some(active_subscription_peer) = active_subscription_peer {
-            if let Err(error) = self.check_active_subscription() {
-                // Log the subscription termination
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Terminating subscription to peer: {:?}! Error: {:?}",
-                        active_subscription_peer, error
-                    ))
-                );
-
-                // Unsubscribe from the peer
-                self.unsubscribe_from_peer(active_subscription_peer);
-
-                // Update the subscription termination metrics
-                self.update_subscription_termination_metrics(active_subscription_peer, error);
-            }
-        }
-
-        // If we don't have a subscription, we should select a new peer to
-        // subscribe to. If we had a previous subscription (and it was
-        // terminated) it should be excluded from the selection process.
-        if self.active_observer_subscription.is_none() {
-            // Create a new observer subscription
-            self.create_new_observer_subscription(active_subscription_peer)
-                .await;
-
-            // If we successfully created a new subscription, update the metrics
-            if let Some(active_subscription) = &self.active_observer_subscription {
-                // Update the subscription creation metrics
-                self.update_subscription_creation_metrics(
-                    active_subscription.get_peer_network_id(),
-                );
-
-                return true; // A new subscription was created
-            }
-        }
-
-        false // No new subscription was created
-    }
-
-    /// Creates a new observer subscription by sending subscription requests to
-    /// appropriate peers and waiting for a successful response. If `previous_subscription_peer`
-    /// is provided, it will be excluded from the selection process.
-    async fn create_new_observer_subscription(
+    /// Checks if the subscription to the given peer is still healthy.
+    /// If not, an error explaining why it is unhealthy is returned.
+    fn check_subscription_health(
         &mut self,
-        previous_subscription_peer: Option<PeerNetworkId>,
-    ) {
-        // Get a set of sorted peers to service our subscription request
-        let sorted_peers = match self.sort_peers_for_subscription(previous_subscription_peer) {
-            Some(sorted_peers) => sorted_peers,
-            None => {
-                error!(LogSchema::new(LogEntry::ConsensusObserver)
-                    .message("Failed to sort peers for subscription requests!"));
-                return;
+        connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+        peer_network_id: PeerNetworkId,
+    ) -> Result<(), Error> {
+        // Get the active subscription for the peer
+        let mut active_observer_subscriptions = self.active_observer_subscriptions.lock();
+        let active_subscription = active_observer_subscriptions.get_mut(&peer_network_id);
+
+        // Check the health of the subscription
+        match active_subscription {
+            Some(active_subscription) => {
+                active_subscription.check_subscription_health(connected_peers_and_metadata)
             },
-        };
-
-        // Verify that we have potential peers
-        if sorted_peers.is_empty() {
-            warn!(LogSchema::new(LogEntry::ConsensusObserver)
-                .message("There are no peers to subscribe to!"));
-            return;
+            None => Err(Error::UnexpectedError(format!(
+                "The subscription to peer: {:?} is not active!",
+                peer_network_id
+            ))),
         }
-
-        // Go through the sorted peers and attempt to subscribe to a single peer.
-        // The first peer that responds successfully will be the selected peer.
-        for selected_peer in &sorted_peers {
-            info!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Attempting to subscribe to peer: {}!",
-                    selected_peer
-                ))
-            );
-
-            // Send a subscription request to the peer and wait for the response.
-            // Note: it is fine to block here because we assume only a single active subscription.
-            let subscription_request = ConsensusObserverRequest::Subscribe;
-            let request_timeout_ms = self.consensus_observer_config.network_request_timeout_ms;
-            let response = self
-                .consensus_observer_client
-                .send_rpc_request_to_peer(selected_peer, subscription_request, request_timeout_ms)
-                .await;
-
-            // Process the response and update the active subscription
-            match response {
-                Ok(ConsensusObserverResponse::SubscribeAck) => {
-                    info!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Successfully subscribed to peer: {}!",
-                            selected_peer
-                        ))
-                    );
-
-                    // Update the active subscription
-                    let subscription = ConsensusObserverSubscription::new(
-                        self.consensus_observer_config,
-                        self.db_reader.clone(),
-                        *selected_peer,
-                        self.time_service.clone(),
-                    );
-                    self.active_observer_subscription = Some(subscription);
-
-                    return; // Return after successfully subscribing
-                },
-                Ok(response) => {
-                    // We received an invalid response
-                    warn!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Got unexpected response type: {:?}",
-                            response.get_label()
-                        ))
-                    );
-                },
-                Err(error) => {
-                    // We encountered an error while sending the request
-                    error!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "Failed to send subscription request to peer: {}! Error: {:?}",
-                            selected_peer, error
-                        ))
-                    );
-                },
-            }
-        }
-
-        // We failed to connect to any peers
-        warn!(
-            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Failed to subscribe to any peers! Num peers attempted: {:?}",
-                sorted_peers.len()
-            ))
-        );
     }
 
-    /// Gets the connected peers and metadata. If an error occurred,
-    /// it is logged and None is returned.
-    fn get_connected_peers_and_metadata(&self) -> Option<HashMap<PeerNetworkId, PeerMetadata>> {
-        match self
-            .consensus_observer_client
+    /// Checks the health of the active subscriptions. If any subscription is
+    /// unhealthy, it will be terminated and new subscriptions will be created.
+    /// This returns an error iff all subscriptions were unhealthy and terminated.
+    pub async fn check_and_manage_subscriptions(&mut self) -> Result<(), Error> {
+        // Get the subscription and connected peers
+        let initial_subscription_peers = self.get_active_subscription_peers();
+        let connected_peers_and_metadata = self.get_connected_peers_and_metadata();
+
+        // Terminate any unhealthy subscriptions
+        let terminated_subscriptions =
+            self.terminate_unhealthy_subscriptions(&connected_peers_and_metadata);
+
+        // Check if all subscriptions were terminated
+        let num_terminated_subscriptions = terminated_subscriptions.len();
+        let all_subscriptions_terminated = num_terminated_subscriptions > 0
+            && num_terminated_subscriptions == initial_subscription_peers.len();
+
+        // Calculate the number of new subscriptions to create
+        let remaining_subscription_peers = self.get_active_subscription_peers();
+        let max_concurrent_subscriptions =
+            self.consensus_observer_config.max_concurrent_subscriptions as usize;
+        let num_subscriptions_to_create =
+            max_concurrent_subscriptions.saturating_sub(remaining_subscription_peers.len());
+
+        // Update the total subscription metrics
+        update_total_subscription_metrics(&remaining_subscription_peers);
+
+        // Spawn a task to create the new subscriptions (asynchronously)
+        self.spawn_subscription_creation_task(
+            num_subscriptions_to_create,
+            remaining_subscription_peers,
+            terminated_subscriptions,
+            connected_peers_and_metadata,
+        )
+        .await;
+
+        // Return an error if all subscriptions were terminated
+        if all_subscriptions_terminated {
+            Err(Error::SubscriptionsReset(format!(
+                "All {:?} subscriptions were unhealthy and terminated!",
+                num_terminated_subscriptions,
+            )))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Returns the currently active subscription peers
+    fn get_active_subscription_peers(&self) -> Vec<PeerNetworkId> {
+        let active_observer_subscriptions = self.active_observer_subscriptions.lock();
+        active_observer_subscriptions.keys().cloned().collect()
+    }
+
+    /// Gets the connected peers and metadata. If an error
+    /// occurred, it is logged and an empty map is returned.
+    fn get_connected_peers_and_metadata(&self) -> HashMap<PeerNetworkId, PeerMetadata> {
+        self.consensus_observer_client
             .get_peers_and_metadata()
             .get_connected_peers_and_metadata()
-        {
-            Ok(connected_peers_and_metadata) => Some(connected_peers_and_metadata),
-            Err(error) => {
-                error!(
+            .unwrap_or_else(|error| {
+                // Log the error
+                warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Failed to get connected peers and metadata! Error: {:?}",
                         error
                     ))
                 );
-                None
-            },
-        }
+
+                // Return an empty map
+                HashMap::new()
+            })
     }
 
-    /// Produces a list of sorted peers to service our subscription request.
-    /// Note: if `previous_subscription_peer` is provided, it will be excluded
-    /// from the selection process. Likewise, all peers currently subscribed to us
-    /// will be excluded from the selection process.
-    fn sort_peers_for_subscription(
+    /// Spawns a new subscription creation task to create
+    /// the specified number of new subscriptions.
+    async fn spawn_subscription_creation_task(
         &mut self,
-        previous_subscription_peer: Option<PeerNetworkId>,
-    ) -> Option<Vec<PeerNetworkId>> {
-        if let Some(mut peers_and_metadata) = self.get_connected_peers_and_metadata() {
-            // Remove the previous subscription peer (if provided)
-            if let Some(previous_subscription_peer) = previous_subscription_peer {
-                let _ = peers_and_metadata.remove(&previous_subscription_peer);
-            }
-
-            // Remove any peers that are currently subscribed to us
-            if let Some(consensus_publisher) = &self.consensus_publisher {
-                for peer_network_id in consensus_publisher.get_active_subscribers() {
-                    let _ = peers_and_metadata.remove(&peer_network_id);
-                }
-            }
-
-            // Sort the peers by subscription optimality
-            let sorted_peers =
-                subscription::sort_peers_by_subscription_optimality(&peers_and_metadata);
-
-            // Return the sorted peers
-            Some(sorted_peers)
-        } else {
-            None // No connected peers were found
+        num_subscriptions_to_create: usize,
+        active_subscription_peers: Vec<PeerNetworkId>,
+        terminated_subscriptions: Vec<(PeerNetworkId, Error)>,
+        connected_peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
+    ) {
+        // If there are no new subscriptions to create, return early
+        if num_subscriptions_to_create == 0 {
+            return;
         }
+
+        // If there is an active subscription creation task, return early
+        if let Some(subscription_creation_task) = &*self.active_subscription_creation_task.lock() {
+            if !subscription_creation_task.is_finished() {
+                return; // The task is still running
+            }
+        }
+
+        // Clone the shared state for the task
+        let active_observer_subscriptions = self.active_observer_subscriptions.clone();
+        let consensus_observer_config = self.consensus_observer_config;
+        let consensus_observer_client = self.consensus_observer_client.clone();
+        let consensus_publisher = self.consensus_publisher.clone();
+        let db_reader = self.db_reader.clone();
+        let time_service = self.time_service.clone();
+
+        // Spawn a new subscription creation task
+        let subscription_creation_task = tokio::spawn(async move {
+            // Identify the terminated subscription peers
+            let terminated_subscription_peers = terminated_subscriptions
+                .iter()
+                .map(|(peer, _)| *peer)
+                .collect();
+
+            // Create the new subscriptions
+            let new_subscriptions = subscription_utils::create_new_subscriptions(
+                consensus_observer_config,
+                consensus_observer_client,
+                consensus_publisher,
+                db_reader,
+                time_service,
+                connected_peers_and_metadata,
+                num_subscriptions_to_create,
+                active_subscription_peers,
+                terminated_subscription_peers,
+            )
+            .await;
+
+            // Identify the new subscription peers
+            let new_subscription_peers = new_subscriptions
+                .iter()
+                .map(|subscription| subscription.get_peer_network_id())
+                .collect::<Vec<_>>();
+
+            // Add the new subscriptions to the list of active subscriptions
+            for subscription in new_subscriptions {
+                active_observer_subscriptions
+                    .lock()
+                    .insert(subscription.get_peer_network_id(), subscription);
+            }
+
+            // Log a warning if we failed to create as many subscriptions as requested
+            let num_subscriptions_created = new_subscription_peers.len();
+            if num_subscriptions_created < num_subscriptions_to_create {
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Failed to create the requested number of subscriptions! Number of subscriptions \
+                        requested: {:?}, number of subscriptions created: {:?}.",
+                        num_subscriptions_to_create,
+                        num_subscriptions_created
+                    ))
+                );
+            }
+
+            // Update the subscription change metrics
+            update_subscription_change_metrics(new_subscription_peers, terminated_subscriptions);
+        });
+
+        // Update the active subscription creation task
+        *self.active_subscription_creation_task.lock() = Some(subscription_creation_task);
+    }
+
+    /// Terminates any unhealthy subscriptions and returns the list of terminated subscriptions
+    fn terminate_unhealthy_subscriptions(
+        &mut self,
+        connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> Vec<(PeerNetworkId, Error)> {
+        let mut terminated_subscriptions = vec![];
+        for subscription_peer in self.get_active_subscription_peers() {
+            // Check the health of the subscription and terminate it if needed
+            if let Err(error) =
+                self.check_subscription_health(connected_peers_and_metadata, subscription_peer)
+            {
+                // Log the subscription termination error
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Terminating subscription to peer: {:?}! Termination reason: {:?}",
+                        subscription_peer, error
+                    ))
+                );
+
+                // Unsubscribe from the peer and remove the subscription
+                self.unsubscribe_from_peer(subscription_peer);
+
+                // Add the peer to the list of terminated subscriptions
+                terminated_subscriptions.push((subscription_peer, error));
+            }
+        }
+
+        terminated_subscriptions
     }
 
     /// Unsubscribes from the given peer by sending an unsubscribe request
-    fn unsubscribe_from_peer(&self, peer_network_id: PeerNetworkId) {
+    fn unsubscribe_from_peer(&mut self, peer_network_id: PeerNetworkId) {
+        // Remove the peer from the active subscriptions
+        self.active_observer_subscriptions
+            .lock()
+            .remove(&peer_network_id);
+
         // Send an unsubscribe request to the peer and process the response.
         // Note: we execute this asynchronously, as we don't need to wait for the response.
         let consensus_observer_client = self.consensus_observer_client.clone();
@@ -339,7 +327,7 @@ impl SubscriptionManager {
                 },
                 Err(error) => {
                     // We encountered an error while sending the request
-                    error!(
+                    warn!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                             "Failed to send unsubscribe request to peer: {}! Error: {:?}",
                             peer_network_id, error
@@ -350,64 +338,68 @@ impl SubscriptionManager {
         });
     }
 
-    /// Updates the subscription creation metrics for the given peer
-    fn update_subscription_creation_metrics(&self, peer_network_id: PeerNetworkId) {
-        // Set the number of active subscriptions
-        metrics::set_gauge(
-            &metrics::OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS,
-            &peer_network_id.network_id(),
-            1,
-        );
+    /// Verifies that the message is from an active
+    /// subscription. If not, an error is returned.
+    pub fn verify_message_for_subscription(
+        &mut self,
+        message_sender: PeerNetworkId,
+    ) -> Result<(), Error> {
+        // Check if the message is from an active subscription
+        if let Some(active_subscription) = self
+            .active_observer_subscriptions
+            .lock()
+            .get_mut(&message_sender)
+        {
+            // Update the last message receive time and return early
+            active_subscription.update_last_message_receive_time();
+            return Ok(());
+        }
 
-        // Update the number of created subscriptions
-        metrics::increment_request_counter(
+        // Otherwise, the message is not from an active subscription.
+        // Send another unsubscribe request, and return an error.
+        self.unsubscribe_from_peer(message_sender);
+        Err(Error::InvalidMessageError(format!(
+            "Received message from unexpected peer, and not an active subscription: {}!",
+            message_sender
+        )))
+    }
+}
+
+/// Updates the subscription creation and termination metrics
+fn update_subscription_change_metrics(
+    new_subscription_peers: Vec<PeerNetworkId>,
+    terminated_subscription_peers: Vec<(PeerNetworkId, Error)>,
+) {
+    // Update the created subscriptions metrics
+    for peer_network_id in new_subscription_peers {
+        metrics::increment_counter(
             &metrics::OBSERVER_CREATED_SUBSCRIPTIONS,
             metrics::CREATED_SUBSCRIPTION_LABEL,
             &peer_network_id,
         );
     }
 
-    /// Updates the subscription termination metrics for the given peer
-    fn update_subscription_termination_metrics(
-        &self,
-        peer_network_id: PeerNetworkId,
-        error: Error,
-    ) {
-        // Reset the number of active subscriptions
-        metrics::set_gauge(
-            &metrics::OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS,
-            &peer_network_id.network_id(),
-            0,
-        );
-
-        // Update the number of terminated subscriptions
-        metrics::increment_request_counter(
+    // Update the terminated subscriptions metrics
+    for (peer_network_id, termination_reason) in terminated_subscription_peers {
+        metrics::increment_counter(
             &metrics::OBSERVER_TERMINATED_SUBSCRIPTIONS,
-            error.get_label(),
+            termination_reason.get_label(),
             &peer_network_id,
         );
     }
+}
 
-    /// Verifies that the message sender is the currently subscribed peer.
-    /// If the sender is not the subscribed peer, an error is returned.
-    pub fn verify_message_sender(&mut self, message_sender: PeerNetworkId) -> Result<(), Error> {
-        if let Some(active_subscription) = &mut self.active_observer_subscription {
-            active_subscription
-                .verify_message_sender(&message_sender)
-                .map_err(|error| {
-                    // Send another unsubscription request to the peer (in case the previous was lost)
-                    self.unsubscribe_from_peer(message_sender);
-                    error
-                })
-        } else {
-            // Send another unsubscription request to the peer (in case the previous was lost)
-            self.unsubscribe_from_peer(message_sender);
-
-            Err(Error::UnexpectedError(format!(
-                "Received message from unexpected peer: {}! No active subscription found!",
-                message_sender
-            )))
-        }
+/// Updates the total subscription metrics (grouped by network ID)
+fn update_total_subscription_metrics(active_subscription_peers: &[PeerNetworkId]) {
+    for (network_id, active_subscription_peers) in &active_subscription_peers
+        .iter()
+        .chunk_by(|peer_network_id| peer_network_id.network_id())
+    {
+        metrics::set_gauge(
+            &metrics::OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS,
+            &network_id,
+            active_subscription_peers.collect::<Vec<_>>().len() as i64,
+        );
     }
 }
 
@@ -439,7 +431,96 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_check_active_subscription_connected() {
+    async fn test_check_and_manage_subscriptions() {
+        // Create a consensus observer client
+        let network_id = NetworkId::Public;
+        let (peers_and_metadata, consensus_observer_client) =
+            create_consensus_observer_client(&[network_id]);
+
+        // Create a new subscription manager
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let db_reader = create_mock_db_reader();
+        let time_service = TimeService::mock();
+        let mut subscription_manager = SubscriptionManager::new(
+            consensus_observer_client,
+            consensus_observer_config,
+            None,
+            db_reader.clone(),
+            time_service.clone(),
+        );
+
+        // Verify that no subscriptions are active
+        verify_active_subscription_peers(&subscription_manager, vec![]);
+
+        // Check and manage the subscriptions
+        let result = subscription_manager.check_and_manage_subscriptions().await;
+
+        // Verify that no subscriptions were terminated
+        assert!(result.is_ok());
+        verify_active_subscription_peers(&subscription_manager, vec![]);
+
+        // Add a new connected peer and subscription
+        let connected_peer_1 =
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
+        create_observer_subscription(
+            &mut subscription_manager,
+            consensus_observer_config,
+            db_reader.clone(),
+            connected_peer_1,
+            time_service.clone(),
+        );
+
+        // Add another connected peer and subscription
+        let connected_peer_2 =
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 2, None, true);
+        create_observer_subscription(
+            &mut subscription_manager,
+            consensus_observer_config,
+            db_reader.clone(),
+            connected_peer_2,
+            TimeService::mock(), // Use a different time service (to avoid timeouts!)
+        );
+
+        // Check and manage the subscriptions
+        subscription_manager
+            .check_and_manage_subscriptions()
+            .await
+            .unwrap();
+
+        // Verify that the subscriptions are still active
+        verify_active_subscription_peers(&subscription_manager, vec![
+            connected_peer_1,
+            connected_peer_2,
+        ]);
+
+        // Elapse time to simulate a timeout for peer 1
+        let mock_time_service = time_service.into_mock();
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.max_subscription_timeout_ms + 1,
+        ));
+
+        // Check and manage the subscriptions
+        subscription_manager
+            .check_and_manage_subscriptions()
+            .await
+            .unwrap();
+
+        // Verify that the first subscription was terminated
+        verify_active_subscription_peers(&subscription_manager, vec![connected_peer_2]);
+
+        // Disconnect the second peer
+        remove_peer_and_connection(peers_and_metadata.clone(), connected_peer_2);
+
+        // Check and manage the subscriptions
+        let result = subscription_manager.check_and_manage_subscriptions().await;
+
+        // Verify that the second subscription was terminated and an error was returned
+        verify_active_subscription_peers(&subscription_manager, vec![]);
+        assert_matches!(result, Err(Error::SubscriptionsReset(_)));
+    }
+
+    #[tokio::test]
+    async fn test_check_subscription_health_connected() {
         // Create a consensus observer client
         let network_id = NetworkId::Public;
         let (peers_and_metadata, consensus_observer_client) =
@@ -457,20 +538,20 @@ mod test {
         );
 
         // Create a new subscription
-        let observer_subscription = ConsensusObserverSubscription::new(
+        let peer_network_id = PeerNetworkId::random();
+        create_observer_subscription(
+            &mut subscription_manager,
             consensus_observer_config,
             db_reader.clone(),
-            PeerNetworkId::random(),
+            peer_network_id,
             TimeService::mock(),
         );
-        subscription_manager.active_observer_subscription = Some(observer_subscription);
 
-        // Check the active subscription and verify that it is removed (the peer is not connected)
-        assert_matches!(
-            subscription_manager.check_active_subscription(),
-            Err(Error::SubscriptionDisconnected(_))
-        );
-        assert!(subscription_manager.active_observer_subscription.is_none());
+        // Check the active subscription and verify that it unhealthy (the peer is not connected)
+        check_subscription_connection(&mut subscription_manager, peer_network_id, false);
+
+        // Terminate unhealthy subscriptions and verify the subscription was removed
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![peer_network_id]);
 
         // Add a new connected peer
         let connected_peer =
@@ -485,14 +566,18 @@ mod test {
             TimeService::mock(),
         );
 
-        // Check the active subscription and verify that it is still active (the peer is connected)
-        assert!(subscription_manager.check_active_subscription().is_ok());
-        let active_subscription = subscription_manager.active_observer_subscription.unwrap();
-        assert_eq!(active_subscription.get_peer_network_id(), connected_peer);
+        // Check the active subscription is still healthy
+        check_subscription_connection(&mut subscription_manager, connected_peer, true);
+
+        // Terminate unhealthy subscriptions and verify none are removed
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![]);
+
+        // Verify that the active subscription is still present
+        verify_active_subscription_peers(&subscription_manager, vec![connected_peer]);
     }
 
     #[tokio::test]
-    async fn test_check_active_subscription_progress_stopped() {
+    async fn test_check_subscription_health_progress_stopped() {
         // Create a consensus observer config
         let consensus_observer_config = ConsensusObserverConfig {
             max_subscription_timeout_ms: 100_000_000, // Use a large value so that we don't time out
@@ -528,22 +613,30 @@ mod test {
             time_service.clone(),
         );
 
+        // Check the active subscription and verify that it is healthy
+        check_subscription_progress(&mut subscription_manager, connected_peer, true);
+
+        // Terminate unhealthy subscriptions and verify none are removed
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![]);
+
         // Elapse time to simulate a DB progress error
         let mock_time_service = time_service.clone().into_mock();
         mock_time_service.advance(Duration::from_millis(
             consensus_observer_config.max_synced_version_timeout_ms + 1,
         ));
 
-        // Check the active subscription and verify that it is removed (the DB is not syncing)
-        assert_matches!(
-            subscription_manager.check_active_subscription(),
-            Err(Error::SubscriptionProgressStopped(_))
-        );
-        assert!(subscription_manager.active_observer_subscription.is_none());
+        // Check the active subscription and verify that it is unhealthy (the DB is not syncing)
+        check_subscription_progress(&mut subscription_manager, connected_peer, false);
+
+        // Terminate unhealthy subscriptions and verify the subscription was removed
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![connected_peer]);
+
+        // Verify the active subscription is no longer present
+        verify_active_subscription_peers(&subscription_manager, vec![]);
     }
 
     #[tokio::test]
-    async fn test_check_active_subscription_timeout() {
+    async fn test_check_subscription_health_timeout() {
         // Create a consensus observer client
         let network_id = NetworkId::Public;
         let (peers_and_metadata, consensus_observer_client) =
@@ -574,25 +667,34 @@ mod test {
             time_service.clone(),
         );
 
+        // Check the active subscription and verify that it is healthy
+        check_subscription_timeout(&mut subscription_manager, connected_peer, true);
+
+        // Terminate unhealthy subscriptions and verify none are removed
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![]);
+
         // Elapse time to simulate a timeout
         let mock_time_service = time_service.clone().into_mock();
         mock_time_service.advance(Duration::from_millis(
             consensus_observer_config.max_subscription_timeout_ms + 1,
         ));
 
-        // Check the active subscription and verify that it is removed (the subscription timed out)
-        assert_matches!(
-            subscription_manager.check_active_subscription(),
-            Err(Error::SubscriptionTimeout(_))
-        );
-        assert!(subscription_manager.active_observer_subscription.is_none());
+        // Check the active subscription and verify that it is unhealthy (the subscription timed out)
+        check_subscription_timeout(&mut subscription_manager, connected_peer, false);
+
+        // Terminate unhealthy subscriptions and verify the subscription was removed
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![connected_peer]);
+
+        // Verify the active subscription is no longer present
+        verify_active_subscription_peers(&subscription_manager, vec![]);
     }
 
     #[tokio::test]
-    async fn test_check_active_subscription_suboptimal() {
+    async fn test_check_subscription_health_suboptimal() {
         // Create a consensus observer config
         let consensus_observer_config = ConsensusObserverConfig {
             max_subscription_timeout_ms: 100_000_000, // Use a large value so that we don't time out
+            max_concurrent_subscriptions: 1,          // Only allow one subscription
             max_synced_version_timeout_ms: 100_000_000, // Use a large value so that we don't get DB progress errors
             ..ConsensusObserverConfig::default()
         };
@@ -618,7 +720,7 @@ mod test {
 
         // Add a suboptimal validator peer
         let suboptimal_peer =
-            create_peer_and_connection(network_id, peers_and_metadata.clone(), 0, None, true);
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
 
         // Create a new subscription to the suboptimal peer
         create_observer_subscription(
@@ -629,106 +731,175 @@ mod test {
             time_service.clone(),
         );
 
+        // Check the active subscription and verify that it is healthy
+        check_subscription_optimality(&mut subscription_manager, suboptimal_peer, true);
+
+        // Terminate unhealthy subscriptions and verify none are removed
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![]);
+
         // Elapse enough time to trigger the peer optimality check
         let mock_time_service = time_service.clone().into_mock();
         mock_time_service.advance(Duration::from_millis(
             consensus_observer_config.subscription_peer_change_interval_ms + 1,
         ));
 
-        // Check the active subscription and verify that it is removed (the peer is suboptimal)
-        assert_matches!(
-            subscription_manager.check_active_subscription(),
-            Err(Error::SubscriptionSuboptimal(_))
-        );
-        assert!(subscription_manager.active_observer_subscription.is_none());
+        // Check the active subscription and verify that it is unhealthy (the peer is suboptimal)
+        check_subscription_optimality(&mut subscription_manager, suboptimal_peer, false);
+
+        // Elapse enough time to trigger the peer optimality check again
+        let mock_time_service = time_service.clone().into_mock();
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.subscription_refresh_interval_ms + 1,
+        ));
+
+        // Terminate any unhealthy subscriptions and verify the subscription was removed
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![suboptimal_peer]);
+
+        // Verify the active subscription is no longer present
+        verify_active_subscription_peers(&subscription_manager, vec![]);
     }
 
     #[tokio::test]
-    async fn test_sort_peers_for_subscription() {
+    #[allow(clippy::await_holding_lock)] // Required to wait on the subscription creation task
+    async fn test_spawn_subscription_creation_task() {
         // Create a consensus observer client
-        let network_ids = &[NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
-        let (peers_and_metadata, consensus_observer_client) =
-            create_consensus_observer_client(network_ids);
+        let network_id = NetworkId::Public;
+        let (_, consensus_observer_client) = create_consensus_observer_client(&[network_id]);
 
         // Create a new subscription manager
         let consensus_observer_config = ConsensusObserverConfig::default();
         let db_reader = create_mock_db_reader();
+        let time_service = TimeService::mock();
         let mut subscription_manager = SubscriptionManager::new(
             consensus_observer_client,
             consensus_observer_config,
             None,
             db_reader.clone(),
-            TimeService::mock(),
+            time_service.clone(),
         );
 
-        // Sort the peers for a subscription and verify that no peers are returned
-        let sorted_peers = subscription_manager
-            .sort_peers_for_subscription(None)
-            .unwrap();
-        assert!(sorted_peers.is_empty());
+        // Verify that the active subscription creation task is empty
+        verify_subscription_creation_task(&subscription_manager, false);
 
-        // Add a connected validator peer, VFN peer and public peer
-        for network_id in network_ids {
-            let distance_from_validators = match network_id {
-                NetworkId::Validator => 0,
-                NetworkId::Vfn => 1,
-                NetworkId::Public => 2,
-            };
-            create_peer_and_connection(
-                *network_id,
-                peers_and_metadata.clone(),
-                distance_from_validators,
-                None,
-                true,
-            );
+        // Spawn a subscription creation task with 0 subscriptions to create
+        subscription_manager
+            .spawn_subscription_creation_task(0, vec![], vec![], hashmap![])
+            .await;
+
+        // Verify that the active subscription creation task is still empty (no task was spawned)
+        verify_subscription_creation_task(&subscription_manager, false);
+
+        // Spawn a subscription creation task with 1 subscription to create
+        subscription_manager
+            .spawn_subscription_creation_task(1, vec![], vec![], hashmap![])
+            .await;
+
+        // Verify that the active subscription creation task is now populated
+        verify_subscription_creation_task(&subscription_manager, true);
+
+        // Wait for the active subscription creation task to finish
+        if let Some(active_task) = subscription_manager
+            .active_subscription_creation_task
+            .lock()
+            .as_mut()
+        {
+            active_task.await.unwrap();
         }
 
-        // Sort the peers for a subscription and verify the ordering (according to distance)
-        let sorted_peers = subscription_manager
-            .sort_peers_for_subscription(None)
-            .unwrap();
-        assert_eq!(sorted_peers[0].network_id(), NetworkId::Validator);
-        assert_eq!(sorted_peers[1].network_id(), NetworkId::Vfn);
-        assert_eq!(sorted_peers[2].network_id(), NetworkId::Public);
-        assert_eq!(sorted_peers.len(), 3);
+        // Verify that the active subscription creation task is still present
+        verify_subscription_creation_task(&subscription_manager, true);
 
-        // Sort the peers, but mark the validator as the last subscribed peer
-        let previous_subscription_peer = sorted_peers[0];
-        let sorted_peer_subset = subscription_manager
-            .sort_peers_for_subscription(Some(previous_subscription_peer))
-            .unwrap();
-        assert_eq!(sorted_peer_subset[0].network_id(), NetworkId::Vfn);
-        assert_eq!(sorted_peer_subset[1].network_id(), NetworkId::Public);
-        assert_eq!(sorted_peer_subset.len(), 2);
-
-        // Remove all the peers and verify that no peers are returned
-        for peer_network_id in sorted_peers {
-            remove_peer_and_connection(peers_and_metadata.clone(), peer_network_id);
+        // Verify that the active subscription creation task is finished
+        if let Some(active_task) = subscription_manager
+            .active_subscription_creation_task
+            .lock()
+            .as_ref()
+        {
+            assert!(active_task.is_finished());
         }
 
-        // Add multiple validator peers, with different latencies
-        let mut validator_peers = vec![];
-        for ping_latency_secs in [0.9, 0.8, 0.5, 0.1, 0.05] {
-            let validator_peer = create_peer_and_connection(
-                NetworkId::Validator,
-                peers_and_metadata.clone(),
-                0,
-                Some(ping_latency_secs),
-                true,
-            );
-            validator_peers.push(validator_peer);
-        }
+        // Spawn a subscription creation task with 2 subscriptions to create
+        subscription_manager
+            .spawn_subscription_creation_task(2, vec![], vec![], hashmap![])
+            .await;
 
-        // Sort the peers for a subscription and verify the ordering (according to latency)
-        let sorted_peers = subscription_manager
-            .sort_peers_for_subscription(None)
-            .unwrap();
-        let expected_peers = validator_peers.into_iter().rev().collect::<Vec<_>>();
-        assert_eq!(sorted_peers, expected_peers);
+        // Verify the new active subscription creation task is not finished
+        if let Some(active_task) = subscription_manager
+            .active_subscription_creation_task
+            .lock()
+            .as_ref()
+        {
+            assert!(!active_task.is_finished());
+        };
     }
 
     #[tokio::test]
-    async fn test_verify_message_sender() {
+    async fn test_terminate_unhealthy_subscriptions_multiple() {
+        // Create a consensus observer client
+        let network_id = NetworkId::Public;
+        let (peers_and_metadata, consensus_observer_client) =
+            create_consensus_observer_client(&[network_id]);
+
+        // Create a new subscription manager
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let db_reader = create_mock_db_reader();
+        let time_service = TimeService::mock();
+        let mut subscription_manager = SubscriptionManager::new(
+            consensus_observer_client,
+            consensus_observer_config,
+            None,
+            db_reader.clone(),
+            time_service.clone(),
+        );
+
+        // Create two new subscriptions
+        let subscription_peer_1 =
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
+        let subscription_peer_2 =
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
+        for peer in &[subscription_peer_1, subscription_peer_2] {
+            // Create the subscription
+            create_observer_subscription(
+                &mut subscription_manager,
+                consensus_observer_config,
+                db_reader.clone(),
+                *peer,
+                time_service.clone(),
+            );
+        }
+
+        // Terminate unhealthy subscriptions and verify that both subscriptions are still healthy
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![]);
+
+        // Create another subscription
+        let subscription_peer_3 =
+            create_peer_and_connection(network_id, peers_and_metadata.clone(), 1, None, true);
+        create_observer_subscription(
+            &mut subscription_manager,
+            consensus_observer_config,
+            db_reader.clone(),
+            subscription_peer_3,
+            TimeService::mock(), // Use a different time service (to avoid timeouts)
+        );
+
+        // Elapse time to simulate a timeout (on the first two subscriptions)
+        let mock_time_service = time_service.into_mock();
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.max_subscription_timeout_ms + 1,
+        ));
+
+        // Terminate unhealthy subscriptions and verify the first two subscriptions were terminated
+        verify_terminated_unhealthy_subscriptions(&mut subscription_manager, vec![
+            subscription_peer_1,
+            subscription_peer_2,
+        ]);
+
+        // Verify the third subscription is still active
+        verify_active_subscription_peers(&subscription_manager, vec![subscription_peer_3]);
+    }
+
+    #[tokio::test]
+    async fn test_unsubscribe_from_peer() {
         // Create a consensus observer client
         let network_id = NetworkId::Public;
         let (_, consensus_observer_client) = create_consensus_observer_client(&[network_id]);
@@ -744,10 +915,68 @@ mod test {
             TimeService::mock(),
         );
 
-        // Check that message verification fails (we have no active subscription)
-        assert!(subscription_manager
-            .verify_message_sender(PeerNetworkId::random())
-            .is_err());
+        // Verify that no subscriptions are active
+        verify_active_subscription_peers(&subscription_manager, vec![]);
+
+        // Create a new subscription
+        let subscription_peer_1 = PeerNetworkId::random();
+        create_observer_subscription(
+            &mut subscription_manager,
+            consensus_observer_config,
+            db_reader.clone(),
+            subscription_peer_1,
+            TimeService::mock(),
+        );
+
+        // Verify the subscription is active
+        verify_active_subscription_peers(&subscription_manager, vec![subscription_peer_1]);
+
+        // Create another subscription
+        let subscription_peer_2 = PeerNetworkId::random();
+        create_observer_subscription(
+            &mut subscription_manager,
+            consensus_observer_config,
+            db_reader.clone(),
+            subscription_peer_2,
+            TimeService::mock(),
+        );
+
+        // Verify the second subscription is active
+        verify_active_subscription_peers(&subscription_manager, vec![
+            subscription_peer_1,
+            subscription_peer_2,
+        ]);
+
+        // Unsubscribe from the first peer
+        subscription_manager.unsubscribe_from_peer(subscription_peer_1);
+
+        // Verify that the first subscription is no longer active
+        verify_active_subscription_peers(&subscription_manager, vec![subscription_peer_2]);
+    }
+
+    #[tokio::test]
+    async fn test_verify_message_for_subscription() {
+        // Create a consensus observer client
+        let network_id = NetworkId::Public;
+        let (_, consensus_observer_client) = create_consensus_observer_client(&[network_id]);
+
+        // Create a new subscription manager
+        let consensus_observer_config = ConsensusObserverConfig::default();
+        let db_reader = Arc::new(MockDatabaseReader::new());
+        let mut subscription_manager = SubscriptionManager::new(
+            consensus_observer_client,
+            consensus_observer_config,
+            None,
+            db_reader.clone(),
+            TimeService::mock(),
+        );
+
+        // Check that message verification fails (we have no active subscriptions)
+        check_message_verification_result(
+            &mut subscription_manager,
+            PeerNetworkId::random(),
+            false,
+        );
 
         // Create a new subscription
         let subscription_peer = PeerNetworkId::random();
@@ -759,15 +988,125 @@ mod test {
             TimeService::mock(),
         );
 
-        // Check that message verification fails if the peer doesn't match the subscription
-        assert!(subscription_manager
-            .verify_message_sender(PeerNetworkId::random())
-            .is_err());
+        // Check that message verification passes for the subscription
+        check_message_verification_result(&mut subscription_manager, subscription_peer, true);
 
-        // Check that message verification passes if the peer matches the subscription
-        assert!(subscription_manager
-            .verify_message_sender(subscription_peer)
-            .is_ok());
+        // Create another subscription
+        let second_subscription_peer = PeerNetworkId::random();
+        create_observer_subscription(
+            &mut subscription_manager,
+            consensus_observer_config,
+            db_reader.clone(),
+            second_subscription_peer,
+            TimeService::mock(),
+        );
+
+        // Check that message verification passes for the second subscription
+        check_message_verification_result(
+            &mut subscription_manager,
+            second_subscription_peer,
+            true,
+        );
+
+        // Check that message verification fails if the peer doesn't match either subscription
+        check_message_verification_result(
+            &mut subscription_manager,
+            PeerNetworkId::random(),
+            false,
+        );
+    }
+
+    /// Checks the result of verifying a message from a given peer
+    fn check_message_verification_result(
+        subscription_manager: &mut SubscriptionManager,
+        peer_network_id: PeerNetworkId,
+        pass_verification: bool,
+    ) {
+        // Verify the message for the given peer
+        let result = subscription_manager.verify_message_for_subscription(peer_network_id);
+
+        // Ensure the result matches the expected value
+        if pass_verification {
+            assert!(result.is_ok());
+        } else {
+            assert_matches!(result, Err(Error::InvalidMessageError(_)));
+        }
+    }
+
+    /// Checks the health of a subscription and verifies the connection status
+    fn check_subscription_connection(
+        subscription_manager: &mut SubscriptionManager,
+        subscription_peer: PeerNetworkId,
+        expect_connected: bool,
+    ) {
+        // Check the health of the subscription
+        let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
+        let result = subscription_manager
+            .check_subscription_health(&connected_peers_and_metadata, subscription_peer);
+
+        // Check the result based on the expected connection status
+        if expect_connected {
+            assert!(result.is_ok());
+        } else {
+            assert_matches!(result, Err(Error::SubscriptionDisconnected(_)));
+        }
+    }
+
+    /// Checks the health of a subscription and verifies the optimality status
+    fn check_subscription_optimality(
+        subscription_manager: &mut SubscriptionManager,
+        subscription_peer: PeerNetworkId,
+        expect_optimal: bool,
+    ) {
+        // Check the health of the subscription
+        let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
+        let result = subscription_manager
+            .check_subscription_health(&connected_peers_and_metadata, subscription_peer);
+
+        // Check the result based on the expected optimality status
+        if expect_optimal {
+            assert!(result.is_ok());
+        } else {
+            assert_matches!(result, Err(Error::SubscriptionSuboptimal(_)));
+        }
+    }
+
+    /// Checks the health of a subscription and verifies the progress status
+    fn check_subscription_progress(
+        subscription_manager: &mut SubscriptionManager,
+        subscription_peer: PeerNetworkId,
+        expect_progress: bool,
+    ) {
+        // Check the health of the subscription
+        let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
+        let result = subscription_manager
+            .check_subscription_health(&connected_peers_and_metadata, subscription_peer);
+
+        // Check the result based on the expected progress status
+        if expect_progress {
+            assert!(result.is_ok());
+        } else {
+            assert_matches!(result, Err(Error::SubscriptionProgressStopped(_)));
+        }
+    }
+
+    /// Checks the health of a subscription and verifies the timeout status
+    fn check_subscription_timeout(
+        subscription_manager: &mut SubscriptionManager,
+        subscription_peer: PeerNetworkId,
+        expect_timeout: bool,
+    ) {
+        // Check the health of the subscription
+        let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
+        let result = subscription_manager
+            .check_subscription_health(&connected_peers_and_metadata, subscription_peer);
+
+        // Check the result based on the expected timeout status
+        if expect_timeout {
+            assert!(result.is_ok());
+        } else {
+            assert_matches!(result, Err(Error::SubscriptionTimeout(_)));
+        }
     }
 
     /// Creates a new consensus observer client and a peers and metadata container
@@ -808,7 +1147,10 @@ mod test {
             subscription_peer,
             time_service,
         );
-        subscription_manager.active_observer_subscription = Some(observer_subscription);
+        subscription_manager
+            .active_observer_subscriptions
+            .lock()
+            .insert(subscription_peer, observer_subscription);
     }
 
     /// Creates a new peer with the specified connection metadata
@@ -878,5 +1220,54 @@ mod test {
         peers_and_metadata
             .remove_peer_metadata(peer_network_id, connection_id)
             .unwrap();
+    }
+
+    /// Verifies the active subscription peers
+    fn verify_active_subscription_peers(
+        subscription_manager: &SubscriptionManager,
+        expected_active_peers: Vec<PeerNetworkId>,
+    ) {
+        // Get the active subscription peers
+        let active_peers = subscription_manager.get_active_subscription_peers();
+
+        // Verify the active subscription peers
+        for peer in &expected_active_peers {
+            assert!(active_peers.contains(peer));
+        }
+        assert_eq!(active_peers.len(), expected_active_peers.len());
+    }
+
+    /// Verifies the status of the active subscription creation task
+    fn verify_subscription_creation_task(
+        subscription_manager: &SubscriptionManager,
+        expect_active_task: bool,
+    ) {
+        let current_active_task = subscription_manager
+            .active_subscription_creation_task
+            .lock()
+            .is_some();
+        assert_eq!(current_active_task, expect_active_task);
+    }
+
+    /// Verifies the list of terminated unhealthy subscriptions
+    fn verify_terminated_unhealthy_subscriptions(
+        subscription_manager: &mut SubscriptionManager,
+        expected_terminated_peers: Vec<PeerNetworkId>,
+    ) {
+        // Get the connected peers and metadata
+        let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
+
+        // Terminate any unhealthy subscriptions
+        let terminated_subscriptions =
+            subscription_manager.terminate_unhealthy_subscriptions(&connected_peers_and_metadata);
+
+        // Verify the terminated subscriptions
+        for (terminated_subscription_peer, _) in &terminated_subscriptions {
+            assert!(expected_terminated_peers.contains(terminated_subscription_peer));
+        }
+        assert_eq!(
+            terminated_subscriptions.len(),
+            expected_terminated_peers.len()
+        );
     }
 }

@@ -1011,14 +1011,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         if let Some(indexer_reader) = self.indexer_reader.as_ref() {
-            // Attempt to get table_info from the indexer_reader if it exists
-            Ok(indexer_reader.get_table_info(handle)?)
-        } else if self.db.indexer_enabled() {
-            // Attempt to get table_info from the db if indexer is enabled
-            Ok(Some(self.db.get_table_info(handle)?))
-        } else {
-            Ok(None)
+            return Ok(indexer_reader.get_table_info(handle).unwrap_or(None));
         }
+        Ok(None)
     }
 
     fn explain_vm_status(
@@ -1026,7 +1021,13 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         status: &ExecutionStatus,
         txn_aux_data: Option<TransactionAuxiliaryData>,
     ) -> String {
-        match status {
+        let mut status = status.to_owned();
+        status = if let Some(aux_data) = txn_aux_data {
+            ExecutionStatus::aug_with_aux_data(status, &aux_data)
+        } else {
+            status
+        };
+        match &status {
             ExecutionStatus::MoveAbort {
                 location,
                 code,
@@ -1078,17 +1079,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 )
             },
             ExecutionStatus::MiscellaneousError(code) => {
-                if txn_aux_data.is_none() && code.is_none() {
+                if code.is_none() {
                     "Execution failed with miscellaneous error and no status code".to_owned()
-                } else if code.is_some() {
-                    format!("{:#?}", code.unwrap())
                 } else {
-                    let aux_data = txn_aux_data.unwrap();
-                    let vm_details = aux_data.get_detail_error_message();
-                    vm_details.map_or(
-                        "Execution failed with miscellaneous error and no status code".to_owned(),
-                        |e| format!("{:#?}", e.status_code()),
-                    )
+                    format!("{:#?}", code.unwrap())
                 }
             },
         }

@@ -942,7 +942,7 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::Loop(el) => NE::Loop(exp(context, *el)),
         EE::Block(seq) => NE::Block(sequence(context, seq)),
         EE::Lambda(args, body) => {
-            let bind_opt = bind_list(context, args);
+            let bind_opt = bind_typed_list(context, args);
             match bind_opt {
                 None => {
                     assert!(context.env.has_errors());
@@ -1201,6 +1201,10 @@ fn bind_list(context: &mut Context, ls: E::LValueList) -> Option<N::LValueList> 
     lvalue_list(context, LValueCase::Bind, ls)
 }
 
+fn bind_typed_list(context: &mut Context, ls: E::TypedLValueList) -> Option<N::LValueList> {
+    typed_lvalue_list(context, ls)
+}
+
 fn assign_list(context: &mut Context, ls: E::LValueList) -> Option<N::LValueList> {
     lvalue_list(context, LValueCase::Assign, ls)
 }
@@ -1214,6 +1218,30 @@ fn lvalue_list(
         loc,
         b_.into_iter()
             .map(|inner| lvalue(context, case, inner))
+            .collect::<Option<_>>()?,
+    ))
+}
+
+fn typed_lvalue_list(
+    context: &mut Context,
+    sp!(loc, b_): E::TypedLValueList,
+) -> Option<N::LValueList> {
+    let case = LValueCase::Bind;
+    Some(sp(
+        loc,
+        b_.into_iter()
+            .map(|sp!(loc, E::TypedLValue_(inner, opt_ty))| {
+                if opt_ty.is_some() {
+                    context.env.add_diag(diag!(
+                        Syntax::UnsupportedLanguageItem,
+                        (
+                            loc,
+                            "Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond"
+                        )
+                    ))
+                }
+                lvalue(context, case, inner)
+            })
             .collect::<Option<_>>()?,
     ))
 }
