@@ -22,7 +22,7 @@ use std::fmt::{Debug, Display, Formatter};
 /// is gathers QuorumCertificate (see the detailed explanation in the comments of `LedgerInfo`).
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct Vote {
-    /// The data of the vote
+    /// The data of the vote.
     vote_data: VoteData,
     /// The identity of the voter.
     author: Author,
@@ -109,8 +109,20 @@ impl Vote {
     }
 
     /// Return the signature of the vote
-    pub fn signature(&self) -> &SignatureWithStatus {
-        &self.signature
+    pub fn signature(&self) -> &bls12381::Signature {
+        self.signature.signature()
+    }
+
+    /// Returns whether the signature is verified
+    pub fn is_verified(&self) -> bool {
+        self.signature.is_verified()
+    }
+
+    /// Only the verify method in this file can set the signature status verified.
+    /// This method additionally lets the tests to set the status to verified.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_verified(&self) {
+        self.signature.set_verified();
     }
 
     /// Returns the 2-chain timeout.

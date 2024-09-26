@@ -63,8 +63,19 @@ impl OrderVote {
         &self.ledger_info
     }
 
-    pub fn signature(&self) -> &SignatureWithStatus {
-        &self.signature
+    pub fn signature(&self) -> &bls12381::Signature {
+        self.signature.signature()
+    }
+
+    pub fn is_verified(&self) -> bool {
+        self.signature.is_verified()
+    }
+
+    /// Only the verify method in this file can set the signature status verified.
+    /// This method additionally lets the tests to set the status to verified.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_verified(&self) {
+        self.signature.set_verified();
     }
 
     pub fn epoch(&self) -> u64 {

@@ -637,7 +637,7 @@ fn process_and_vote_on_proposal(
     info!("Processing votes on node {}", proposer_node.identity_desc());
     if process_votes {
         for vote_msg in votes {
-            vote_msg.vote().signature().set_verified();
+            vote_msg.vote().set_verified();
             timed_block_on(
                 runtime,
                 proposer_node.round_manager.process_vote_msg(vote_msg),
@@ -689,7 +689,7 @@ fn new_round_on_quorum_cert() {
             .await
             .unwrap();
         let vote_msg = node.next_vote().await;
-        vote_msg.vote().signature().set_verified();
+        vote_msg.vote().set_verified();
         // Adding vote to form a QC
         node.round_manager.process_vote_msg(vote_msg).await.unwrap();
 
@@ -1559,7 +1559,7 @@ fn sync_on_partial_newer_sync_info() {
                 .unwrap();
             let vote_msg = node.next_vote().await;
             if i < 2 {
-                vote_msg.vote().signature().set_verified();
+                vote_msg.vote().set_verified();
             }
             // Adding vote to form a QC
             node.round_manager.process_vote_msg(vote_msg).await.unwrap();
@@ -1657,7 +1657,7 @@ fn safety_rules_crash() {
 
             // sign proposal
             reset_safety_rules(&mut node);
-            vote_msg.vote().signature().set_verified();
+            vote_msg.vote().set_verified();
             node.round_manager.process_vote_msg(vote_msg).await.unwrap();
         }
 
@@ -1698,7 +1698,7 @@ fn echo_timeout() {
         for i in 0..3 {
             let timeout_vote = node_0.next_vote().await;
             if i < 2 {
-                timeout_vote.vote().signature().set_verified();
+                timeout_vote.vote().set_verified();
             }
             let result = node_0.round_manager.process_vote_msg(timeout_vote).await;
             // first and third message should not timeout
@@ -1718,7 +1718,7 @@ fn echo_timeout() {
             // Verifying only some vote messages to check that round manager can accept both
             // verified and unverified votes
             if i < 2 {
-                timeout_vote.vote().signature().set_verified();
+                timeout_vote.vote().set_verified();
             }
             node_1
                 .round_manager
@@ -2041,7 +2041,7 @@ pub fn forking_retrieval_test() {
                 }
 
                 let vote_msg_on_timeout = node.next_vote().await;
-                vote_msg_on_timeout.vote().signature().set_verified();
+                vote_msg_on_timeout.vote().set_verified();
                 assert!(vote_msg_on_timeout.vote().is_timeout());
                 if node.id != behind_node {
                     let result = node

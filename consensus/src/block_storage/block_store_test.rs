@@ -302,7 +302,7 @@ async fn test_insert_vote() {
             voter,
         )
         .unwrap();
-        vote.signature().set_verified();
+        vote.set_verified();
         let vote_res = pending_votes.insert_vote(&vote, epoch_state.clone());
 
         // first vote of an author is accepted
@@ -332,7 +332,7 @@ async fn test_insert_vote() {
         final_voter,
     )
     .unwrap();
-    vote.signature().set_verified();
+    vote.set_verified();
     match pending_votes.insert_vote(&vote, epoch_state.clone()) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());

@@ -110,7 +110,11 @@ impl PendingOrderVotes {
                         order_vote.author()
                     );
                 }
-                li_with_sig.add_signature(order_vote.author(), order_vote.signature().clone());
+                li_with_sig.add_signature(
+                    order_vote.author(),
+                    order_vote.signature().clone(),
+                    order_vote.is_verified(),
+                );
                 match li_with_sig.check_voting_power(&epoch_state.verifier, true) {
                     Ok(aggregated_voting_power) => {
                         assert!(
@@ -214,7 +218,7 @@ mod tests {
         );
 
         // first time a new order vote is added -> OrderVoteAdded
-        order_vote_1_author_0.signature().set_verified();
+        order_vote_1_author_0.set_verified();
         assert_eq!(
             pending_order_votes.insert_order_vote(
                 &order_vote_1_author_0,
@@ -241,7 +245,7 @@ mod tests {
             li2.clone(),
             signers[1].sign(&li2).expect("Unable to sign ledger info"),
         );
-        order_vote_2_author_1.signature().set_verified();
+        order_vote_2_author_1.set_verified();
         assert_eq!(
             pending_order_votes.insert_order_vote(
                 &order_vote_2_author_1,
@@ -259,7 +263,7 @@ mod tests {
             li2.clone(),
             signers[2].sign(&li2).expect("Unable to sign ledger info"),
         );
-        order_vote_2_author_2.signature().set_verified();
+        order_vote_2_author_2.set_verified();
         match pending_order_votes.insert_order_vote(
             &order_vote_2_author_2,
             epoch_state.clone(),
@@ -299,16 +303,14 @@ mod tests {
             li.clone(),
             signers[0].sign(&li).expect("Unable to sign ledger info"),
         );
-        partial_signatures
-            .add_signature(signers[0].author(), vote_0.signature().signature().clone());
+        partial_signatures.add_signature(signers[0].author(), vote_0.signature().clone());
 
         let vote_1 = OrderVote::new_with_signature(
             signers[1].author(),
             li.clone(),
             signers[1].sign(&li).expect("Unable to sign ledger info"),
         );
-        partial_signatures
-            .add_signature(signers[1].author(), vote_1.signature().signature().clone());
+        partial_signatures.add_signature(signers[1].author(), vote_1.signature().clone());
 
         let vote_2 = OrderVote::new_with_signature(
             signers[2].author(),
@@ -321,8 +323,7 @@ mod tests {
             li.clone(),
             signers[3].sign(&li).expect("Unable to sign ledger info"),
         );
-        partial_signatures
-            .add_signature(signers[3].author(), vote_3.signature().signature().clone());
+        partial_signatures.add_signature(signers[3].author(), vote_3.signature().clone());
 
         let vote_4 = OrderVote::new_with_signature(
             signers[4].author(),
@@ -335,13 +336,13 @@ mod tests {
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
-        vote_0.signature().set_verified();
+        vote_0.set_verified();
         assert_eq!(
             pending_order_votes.insert_order_vote(&vote_0, epoch_state.clone(), None),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
-        vote_1.signature().set_verified();
+        vote_1.set_verified();
         assert_eq!(
             pending_order_votes.insert_order_vote(&vote_1, epoch_state.clone(), None),
             OrderVoteReceptionResult::VoteAdded(2)
