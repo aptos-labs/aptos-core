@@ -3,6 +3,11 @@ images:
     platform: "linux"
     arch: "x64"
     ami: "ami-05f29bbd9fcfcca20"
+  aptos-ubuntu-x64-gcloud:
+    platform: "linux"
+    arch: "x64"
+    ami: "ami-09f7d4bfb08b771be" # image for testing, with gcloud sdk and kubectl
+    owner: "058264343338" # aptos-ci AWS account id
   aptos-ubuntu-x64-latest:
     platform: "linux"
     arch: "x64"
