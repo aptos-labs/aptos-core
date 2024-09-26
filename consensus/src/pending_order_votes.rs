@@ -112,7 +112,7 @@ impl PendingOrderVotes {
                 }
                 li_with_sig.add_signature(
                     order_vote.author(),
-                    order_vote.signature().clone(),
+                    order_vote.signature(),
                     order_vote.is_verified(),
                 );
                 match li_with_sig.check_voting_power(&epoch_state.verifier, true) {

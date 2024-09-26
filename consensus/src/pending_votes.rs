@@ -182,11 +182,7 @@ impl PendingVotes {
             },
             VoteStatus::NotEnoughVotes(li_with_sig) => {
                 // add this vote to the ledger info with signatures
-                li_with_sig.add_signature(
-                    vote.author(),
-                    vote.signature().clone(),
-                    vote.is_verified(),
-                );
+                li_with_sig.add_signature(vote.author(), vote.signature(), vote.is_verified());
 
                 // check if we have enough signatures to create a QC
                 match li_with_sig.check_voting_power(&epoch_state.verifier, true) {

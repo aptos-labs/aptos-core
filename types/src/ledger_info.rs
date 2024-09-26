@@ -17,7 +17,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use derivative::Derivative;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -441,8 +441,8 @@ pub struct LedgerInfoWithUnverifiedSignatures {
     ledger_info: LedgerInfo,
     // These signatures are not yet verified. For efficiency, once enough unverified signatures are collected,
     // they will be aggregated and verified.
-    unverified_signatures: PartialSignatures,
-    verified_signatures: PartialSignatures,
+    unverified_signatures: Vec<(AccountAddress, bls12381::Signature)>,
+    verified_signatures: Vec<(AccountAddress, bls12381::Signature)>,
 }
 
 impl Display for LedgerInfoWithUnverifiedSignatures {
@@ -455,8 +455,8 @@ impl LedgerInfoWithUnverifiedSignatures {
     pub fn new(ledger_info: LedgerInfo) -> Self {
         Self {
             ledger_info,
-            unverified_signatures: PartialSignatures::empty(),
-            verified_signatures: PartialSignatures::empty(),
+            unverified_signatures: vec![],
+            verified_signatures: vec![],
         }
     }
 
@@ -467,28 +467,55 @@ impl LedgerInfoWithUnverifiedSignatures {
     fn add_verified_signature(
         &mut self,
         validator: AccountAddress,
-        signature: bls12381::Signature,
+        signature: &bls12381::Signature,
     ) {
-        self.verified_signatures.add_signature(validator, signature);
-        self.unverified_signatures.remove_signature(validator);
+        let mut found = false;
+        for (v, s) in self.verified_signatures.iter_mut() {
+            if v == &validator {
+                *s = signature.clone();
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            self.verified_signatures
+                .push((validator, signature.clone()));
+        }
+
+        self.unverified_signatures.retain(|(v, _)| v != &validator);
     }
 
     fn add_unverified_signature(
         &mut self,
         validator: AccountAddress,
-        signature: bls12381::Signature,
+        signature: &bls12381::Signature,
     ) {
-        if self.verified_signatures.contains_voter(&validator) {
+        if self
+            .verified_signatures
+            .iter()
+            .any(|(v, _)| v == &validator)
+        {
             return;
         }
-        self.unverified_signatures
-            .add_signature(validator, signature);
+
+        let mut found = false;
+        for (v, s) in self.unverified_signatures.iter_mut() {
+            if v == &validator {
+                *s = signature.clone();
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            self.unverified_signatures
+                .push((validator, signature.clone()));
+        }
     }
 
     pub fn add_signature(
         &mut self,
         validator: AccountAddress,
-        signature: bls12381::Signature,
+        signature: &bls12381::Signature,
         // The signature is verified or not.
         // true if the signature is verified. false if the signature is not verified.
         is_verified: bool,
@@ -501,11 +528,11 @@ impl LedgerInfoWithUnverifiedSignatures {
     }
 
     pub fn verified_voters(&self) -> impl Iterator<Item = &AccountAddress> {
-        self.verified_signatures.signatures().keys()
+        self.verified_signatures.iter().map(|(voter, _)| voter)
     }
 
     pub fn unverified_voters(&self) -> impl Iterator<Item = &AccountAddress> {
-        self.unverified_signatures.signatures().keys()
+        self.unverified_signatures.iter().map(|(voter, _)| voter)
     }
 
     // Collecting all the authors from verified signatures, unverified signatures and the aggregated signature.
@@ -530,18 +557,23 @@ impl LedgerInfoWithUnverifiedSignatures {
 
         let all_signatures = self
             .verified_signatures
-            .signatures_iter()
-            .chain(self.unverified_signatures.signatures_iter());
+            .iter()
+            .map(|(voter, sig)| (voter, sig))
+            .chain(
+                self.unverified_signatures
+                    .iter()
+                    .map(|(voter, sig)| (voter, sig)),
+            );
 
         epoch_state.verifier.aggregate_signatures(all_signatures)
     }
 
     /// Merge unverified signatures into verified signatures if they are valid.
     fn merge_signatures(&mut self, verifier: &ValidatorVerifier, need_verify: bool) {
-        let unverified_signatures =
-            mem::replace(&mut self.unverified_signatures, PartialSignatures::empty()).unpack();
+        let unverified_signatures = mem::take(&mut self.unverified_signatures);
         let valid_signatures: Vec<_> = unverified_signatures
             .into_par_iter()
+            .with_min_len(4) // At least 4 signatures are verified in each task
             .flat_map(|(account_address, signature)| {
                 if !need_verify
                     || verifier
@@ -556,8 +588,7 @@ impl LedgerInfoWithUnverifiedSignatures {
             })
             .collect();
         for (account_address, signature) in valid_signatures {
-            self.verified_signatures
-                .add_signature(account_address, signature);
+            self.verified_signatures.push((account_address, signature));
         }
     }
 
@@ -779,7 +810,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[0].author(),
-            validator_signers[0].sign(&ledger_info).unwrap(),
+            &validator_signers[0].sign(&ledger_info).unwrap(),
             true,
         );
         partial_sig.add_signature(
@@ -789,7 +820,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[1].author(),
-            validator_signers[1].sign(&ledger_info).unwrap(),
+            &validator_signers[1].sign(&ledger_info).unwrap(),
             false,
         );
         partial_sig.add_signature(
@@ -799,7 +830,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[2].author(),
-            validator_signers[2].sign(&ledger_info).unwrap(),
+            &validator_signers[2].sign(&ledger_info).unwrap(),
             true,
         );
         partial_sig.add_signature(
@@ -809,7 +840,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[3].author(),
-            validator_signers[3].sign(&ledger_info).unwrap(),
+            &validator_signers[3].sign(&ledger_info).unwrap(),
             false,
         );
         partial_sig.add_signature(
@@ -821,15 +852,11 @@ mod tests {
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
-                .signatures()
                 .len(),
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_mixed_signatures.verified_signatures.len(),
             2
         );
         assert_eq!(
@@ -842,7 +869,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[4].author(),
-            bls12381::Signature::dummy_signature(),
+            &bls12381::Signature::dummy_signature(),
             false,
         );
 
@@ -850,15 +877,11 @@ mod tests {
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
-                .signatures()
                 .len(),
             3
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_mixed_signatures.verified_signatures.len(),
             2
         );
         assert_eq!(
@@ -877,15 +900,11 @@ mod tests {
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
-                .signatures()
                 .len(),
             0
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_mixed_signatures.verified_signatures.len(),
             4
         );
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 4);
@@ -893,7 +912,7 @@ mod tests {
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[5].author(),
-            validator_signers[5].sign(&ledger_info).unwrap(),
+            &validator_signers[5].sign(&ledger_info).unwrap(),
             false,
         );
         partial_sig.add_signature(
@@ -905,15 +924,11 @@ mod tests {
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
-                .signatures()
                 .len(),
             1
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_mixed_signatures.verified_signatures.len(),
             4
         );
         assert_eq!(
@@ -937,22 +952,18 @@ mod tests {
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
-                .signatures()
                 .len(),
             0
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_mixed_signatures.verified_signatures.len(),
             5
         );
         assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[6].author(),
-            bls12381::Signature::dummy_signature(),
+            &bls12381::Signature::dummy_signature(),
             false,
         );
 
@@ -972,15 +983,11 @@ mod tests {
         assert_eq!(
             ledger_info_with_mixed_signatures
                 .unverified_signatures
-                .signatures()
                 .len(),
             0
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .verified_signatures
-                .signatures()
-                .len(),
+            ledger_info_with_mixed_signatures.verified_signatures.len(),
             5
         );
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
