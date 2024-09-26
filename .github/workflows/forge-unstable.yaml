@@ -89,7 +89,7 @@ jobs:
   forge-continuous:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-forge.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}

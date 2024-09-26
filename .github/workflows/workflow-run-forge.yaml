@@ -119,7 +119,7 @@ env:
 # at the call site, and don't need to wrap each step in an if statement?
 jobs:
   forge:
-    runs-on: runs-on,cpu=4,ram=16,family=m7a+m7i-flex,image=aptos-ubuntu-x64-gcloud,run-id=${{ github.run_id }},spot=co
+    runs-on: runs-on,cpu=4,ram=16,family=m7a+m7i-flex,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     steps:
       - uses: actions/checkout@v4
@@ -175,18 +175,6 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
         shell: bash
         run: gcloud config set project aptos-forge-gcp-0
-
-      - name: "Check if kubectl is installed"
-        if: ${{ !inputs.SKIP_JOB }}
-        shell: bash
-        run: |
-          if command -v kubectl &> /dev/null; then
-            echo "kubectl is installed"
-            kubectl version --client
-          else
-            echo "kubectl is not installed"
-            exit 1
-          fi
 
       - name: Run pre-Forge checks
         if: ${{ !inputs.SKIP_JOB }}
