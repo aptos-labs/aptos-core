@@ -52,7 +52,7 @@ use move_ir_types::{ast::ConstantName, location::Spanned};
 use regex::Regex;
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet},
     default::Default,
     fmt,
 };
@@ -895,7 +895,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         key: &PA::ConstantName,
         constant_map: &UniqueMap<PA::ConstantName, EA::Constant>,
         visiting: &mut Vec<(PA::ConstantName, Loc)>, // constants that are being traversed during dfs
-        visited: &mut HashSet<PA::ConstantName>, // constants that are already visited during dfs
+        visited: &mut BTreeSet<PA::ConstantName>, // constants that are already visited during dfs
         compiled_module: &Option<BytecodeModule>,
     ) {
         // Get all names from an expression
@@ -951,7 +951,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.parent.env.diag_with_labels(
                 Severity::Error,
                 &loc,
-                &format!("Found recursive definition of a constant `{}`", key),
+                &format!("Found recursive definition of a constant `{}`; cycle formed by definitions below", key),
                 visiting[index..]
                     .to_vec()
                     .iter()
@@ -997,7 +997,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         module_def: &EA::ModuleDefinition,
         compiled_module: &Option<BytecodeModule>,
     ) {
-        let mut visited = HashSet::new();
+        let mut visited = BTreeSet::new();
         let mut visiting = vec![];
         for (name, _) in module_def.constants.key_cloned_iter() {
             self.eval_constant(

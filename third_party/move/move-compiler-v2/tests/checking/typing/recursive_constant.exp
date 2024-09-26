@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Found recursive definition of a constant `X`
+error: Found recursive definition of a constant `X`; cycle formed by definitions below
   ┌─ tests/checking/typing/recursive_constant.move:3:5
   │
 3 │     const X: u64 = Y;
@@ -10,7 +10,7 @@ error: Found recursive definition of a constant `X`
 4 │     const Y: u64 = X;
   │     ----------------- `Y` is defined here
 
-error: Found recursive definition of a constant `F`
+error: Found recursive definition of a constant `F`; cycle formed by definitions below
   ┌─ tests/checking/typing/recursive_constant.move:6:5
   │
 6 │     const F: u64 = F;
@@ -30,7 +30,7 @@ error: Invalid expression in `const`. Constant folding failed due to incomplete 
 10 │     const A: u64 = B + C;
    │                    ^^^^^
 
-error: Found recursive definition of a constant `A`
+error: Found recursive definition of a constant `A`; cycle formed by definitions below
    ┌─ tests/checking/typing/recursive_constant.move:10:5
    │
  7 │ ╭     const X1: u64 = {
