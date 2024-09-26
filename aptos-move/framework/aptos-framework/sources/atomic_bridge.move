@@ -1040,8 +1040,6 @@ module aptos_framework::atomic_bridge {
     #[test_only]
     use aptos_framework::aptos_coin;
     #[test_only]
-    use aptos_framework::block;
-    #[test_only]
     use aptos_framework::timestamp;
 
     friend aptos_framework::atomic_bridge_counterparty;
@@ -1079,7 +1077,6 @@ module aptos_framework::atomic_bridge {
     public fun initialize_for_test(aptos_framework: &signer) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         account::create_account_for_test(@aptos_framework);
-        block::initialize_for_test(aptos_framework, 1);
 
         initialize(aptos_framework);
 
