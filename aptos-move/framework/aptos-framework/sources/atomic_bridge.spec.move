@@ -1,4 +1,4 @@
-spec aptos_framework::bridge_store {
+spec aptos_framework::atomic_bridge_store {
     spec initialize {
         let addr = signer::address_of(aptos_framework);
         ensures exists<Nonce>(addr);
@@ -112,7 +112,7 @@ spec aptos_framework::bridge_store {
     }
 }
 
-spec aptos_framework::bridge_configuration {
+spec aptos_framework::atomic_bridge_configuration {
     spec initialize(aptos_framework: &signer) {
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
         aborts_if exists<BridgeConfig>(signer::address_of(aptos_framework));
