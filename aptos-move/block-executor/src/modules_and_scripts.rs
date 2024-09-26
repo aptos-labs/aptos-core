@@ -43,7 +43,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosModul
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
         Ok(self
-            .read_module_storage(address, module_name)
+            .read_module_storage(address, module_name, true)
             .map_err(|e| e.to_partial())?
             .into_versioned()
             .map(|(_, entry)| entry.state_value_metadata().clone()))
@@ -51,7 +51,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosModul
 
     fn fetch_module_size_by_state_key(&self, key: &Self::Key) -> PartialVMResult<Option<usize>> {
         Ok(self
-            .read_module_storage_by_key(key)
+            .read_module_storage_by_key(key, true)
             .map_err(|e| e.to_partial())?
             .into_versioned()
             .map(|(_, entry)| entry.bytes().len()))
@@ -155,7 +155,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<bool> {
         let exists = self
-            .read_module_storage(address, module_name)?
+            .read_module_storage(address, module_name, true)?
             .into_versioned()
             .is_some();
         Ok(exists)
@@ -167,7 +167,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
         Ok(self
-            .read_module_storage(address, module_name)?
+            .read_module_storage(address, module_name, true)?
             .into_versioned()
             .map(|(_, entry)| entry.bytes().clone()))
     }
@@ -178,7 +178,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
         Ok(self
-            .read_module_storage(address, module_name)?
+            .read_module_storage(address, module_name, true)?
             .into_versioned()
             .map(|(_, entry)| entry.bytes().len()))
     }
@@ -189,7 +189,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Option<Vec<Metadata>>> {
         Ok(self
-            .read_module_storage(address, module_name)?
+            .read_module_storage(address, module_name, true)?
             .into_versioned()
             .map(|(_, entry)| entry.metadata().to_vec()))
     }
@@ -200,7 +200,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
         Ok(self
-            .read_module_storage(address, module_name)?
+            .read_module_storage(address, module_name, true)?
             .into_versioned()
             .map(|(_, entry)| entry.as_compiled_module()))
     }
@@ -213,7 +213,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         let mut visited = HashSet::new();
 
         let (version, entry) = match self
-            .read_module_storage(address, module_name)?
+            .read_module_storage(address, module_name, true)?
             .into_versioned()
         {
             Some((version, entry)) => (version, entry),
@@ -226,6 +226,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         let module = self.traversed_published_dependencies(
             version,
             entry,
+            true,
             address,
             module_name,
             &mut visited,
@@ -267,6 +268,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn read_module_storage_by_key(
         &self,
         key: &T::Key,
+        capture: bool,
     ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
         match &self.latest_view {
             ViewState::Sync(state) => {
@@ -288,14 +290,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     .get_or_else(key, self.txn_idx, || {
                         self.get_base_module_storage_entry(key)
                     })?;
-                state
-                    .captured_reads
-                    .borrow_mut()
-                    .capture_module_storage_read(key.clone(), read.clone());
+                if capture {
+                    state
+                        .captured_reads
+                        .borrow_mut()
+                        .capture_module_storage_read(key.clone(), read.clone());
+                }
                 Ok(read)
             },
             ViewState::Unsync(state) => {
-                state.read_set.borrow_mut().module_reads.insert(key.clone());
+                if capture {
+                    state.read_set.borrow_mut().module_reads.insert(key.clone());
+                }
                 Ok(match state.unsync_map.fetch_module(key) {
                     // For sequential execution, indices do not matter, but we still return
                     // them to have uniform interfaces.
@@ -315,9 +321,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
+        capture: bool,
     ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
         let key = T::Key::from_address_and_module_name(address, module_name);
-        self.read_module_storage_by_key(&key)
+        self.read_module_storage_by_key(&key, capture)
     }
 
     /// Similar to [LatestView::read_module_storage], but in case the module does not exist,
@@ -327,7 +334,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<(ModuleVersion, Arc<ModuleStorageEntry>)> {
-        self.read_module_storage(address, module_name)?
+        self.read_module_storage(address, module_name, false)?
             .into_versioned()
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
@@ -339,6 +346,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         version: ModuleVersion,
         entry: Arc<ModuleStorageEntry>,
+        capture: bool,
         address: &AccountAddress,
         module_name: &IdentStr,
         visited: &mut HashSet<T::Key>,
@@ -382,7 +390,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
             if visited.insert(dep_key.clone()) {
                 let module =
-                    self.traversed_published_dependencies(dep_ver, dep_entry, addr, name, visited)?;
+                    self.traversed_published_dependencies(dep_ver, dep_entry, false, addr, name, visited)?;
                 verified_dependencies.push(module);
             } else {
                 return Err(module_cyclic_dependency_error!(address, module_name));
@@ -408,13 +416,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         let key = T::Key::from_address_and_module_name(address, module_name);
         match &self.latest_view {
             ViewState::Sync(state) => {
-                state
-                    .captured_reads
-                    .borrow_mut()
-                    .capture_module_storage_read(
-                        key.clone(),
-                        ModuleStorageRead::Versioned(version.clone(), verified_entry.clone()),
-                    );
+                if capture {
+                    state
+                        .captured_reads
+                        .borrow_mut()
+                        .capture_module_storage_read(
+                            key.clone(),
+                            ModuleStorageRead::Versioned(version.clone(), verified_entry.clone()),
+                        );
+                }
                 state
                     .versioned_map
                     .code_storage()
