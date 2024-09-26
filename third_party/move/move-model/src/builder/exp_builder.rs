@@ -2262,6 +2262,61 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         ExpData::Match(id, discr_exp.into_exp(), translate_arms)
     }
 
+    fn translate_typed_lvalue_list(
+        &mut self,
+        list: &EA::TypedLValueList,
+        expected_type: &Type,
+        expected_order: WideningOrder,
+        match_locals: bool,
+        context: &ErrorMessageContext,
+    ) -> Pattern {
+        // Shortcut for single element case
+        if list.value.len() == 1 {
+            return self.translate_typed_lvalue(
+                list.value.first().unwrap(),
+                expected_type,
+                expected_order,
+                match_locals,
+                context,
+            );
+        }
+        let loc = self.to_loc(&list.loc);
+        // Ensure to maximize precision of expected type for elements
+        let expected_type = self.subs.specialize(expected_type);
+        let elem_expected_types = if let Type::Tuple(tys) = expected_type {
+            tys
+        } else {
+            let vars = self.fresh_type_vars(list.value.len());
+            // Just bind the variables
+            self.check_type_with_order(
+                expected_order,
+                &loc,
+                &Type::Tuple(vars.clone()),
+                &expected_type,
+                context,
+            );
+            vars
+        };
+        if elem_expected_types.len() != list.value.len() {
+            self.error(
+                &loc,
+                &context.arity_mismatch(false, elem_expected_types.len(), list.value.len()),
+            );
+            return self.new_error_pat(&loc);
+        }
+        let mut args = vec![];
+        let mut elem_types = vec![];
+        for (lv, expected) in list.value.iter().zip(elem_expected_types.iter()) {
+            let value =
+                self.translate_typed_lvalue(lv, expected, expected_order, match_locals, context);
+            elem_types.push(self.get_node_type(value.node_id()));
+            args.push(value)
+        }
+        let ty = Type::Tuple(elem_types);
+        let id = self.new_node_id_with_type_loc(&ty, &loc);
+        Pattern::Tuple(id, args)
+    }
+
     fn translate_lvalue_list(
         &mut self,
         list: &EA::LValueList,
@@ -2329,6 +2384,33 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     ),
                 )
             }
+        }
+    }
+
+    fn translate_typed_lvalue(
+        &mut self,
+        tlv: &EA::TypedLValue,
+        expected_type: &Type,
+        expected_order: WideningOrder,
+        match_locals: bool,
+        context: &ErrorMessageContext,
+    ) -> Pattern {
+        use move_ir_types::sp;
+        let sp!(loc, EA::TypedLValue_(lv, opt_ty)) = tlv;
+        match opt_ty {
+            Some(ty) => {
+                let loc = self.to_loc(loc);
+                let bound_type = self.translate_type(ty);
+                self.check_type_with_order(
+                    expected_order,
+                    &loc,
+                    &bound_type, // is this arg ordering right?
+                    expected_type,
+                    context,
+                );
+                self.translate_lvalue(lv, &bound_type, expected_order, match_locals, context)
+            },
+            None => self.translate_lvalue(lv, expected_type, expected_order, match_locals, context),
         }
     }
 
@@ -4946,14 +5028,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn translate_lambda(
         &mut self,
         loc: &Loc,
-        args: &EA::LValueList,
+        args: &EA::TypedLValueList,
         body: &EA::Exp,
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
         // Translate the argument list
         let arg_type = self.fresh_type_var();
-        let pat = self.translate_lvalue_list(
+        let pat = self.translate_typed_lvalue_list(
             args,
             &arg_type,
             WideningOrder::LeftToRight,

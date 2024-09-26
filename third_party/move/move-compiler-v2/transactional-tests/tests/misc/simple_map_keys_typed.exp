@@ -1,0 +1,37 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
+- 
+- task 0 'publish'. lines 1-47:
+- Error: error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:13:29
+-    │
+- 13 │         map_ref(&map.data, |e: &Element<Key, Value>| {
+-    │                             ^^^^^^^^^^^^^^^^^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E04010]: cannot infer type
+-    ┌─ TEMPFILE:14:13
+-    │
+- 13 │         map_ref(&map.data, |e: &Element<Key, Value>| {
+-    │                             - Could not infer the type before field access. Try annotating here
+- 14 │             e.key
+-    │             ^^^^^ Unbound field 'key'
+- 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:22:26
+-    │
+- 22 │         for_each_ref(v, |elem: &Element| vector::push_back(&mut result, f(elem)));
+-    │                          ^^^^^^^^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- 
+- 
+- task 1 'run'. lines 49-49:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
+- 
++ processed 2 tasks
++ 

@@ -4,6 +4,15 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [4.2.3] - 2024/09/20
+- Fix the broken indexer in localnet in 4.2.2, which migrates table info from sycn to async ways.
+
+## [4.2.2] - 2024/09/20
+- Fix localnet indexer processors that were emitting spamming logs in 4.2.1.
+
+## [4.2.1] - 2024/09/19
+- Fix localnet indexer processors that were failing to startup in 4.2.0
+
 ## [4.2.0] - 2024/09/16
 - Update latest VM and associated changes
 - Update to latest compiler
