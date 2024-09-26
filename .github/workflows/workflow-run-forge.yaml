@@ -176,6 +176,18 @@ jobs:
         shell: bash
         run: gcloud config set project aptos-forge-gcp-0
 
+      - name: "Check if kubectl is installed"
+        if: ${{ !inputs.SKIP_JOB }}
+        shell: bash
+        run: |
+          if command -v kubectl &> /dev/null; then
+            echo "kubectl is installed"
+            kubectl version --client
+          else
+            echo "kubectl is not installed"
+            exit 1
+          fi
+
       - name: Run pre-Forge checks
         if: ${{ !inputs.SKIP_JOB }}
         shell: bash
