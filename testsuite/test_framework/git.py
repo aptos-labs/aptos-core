@@ -79,9 +79,10 @@ class Git:
         if remote_match is None:
             raise Exception(f"Could not parse remote {remote_name}")
         return f"{remote_match.group('org_name')}/{remote_match.group('repo_name')}"
-   
 
-    def get_remote_branches_matching_pattern(self, remote: str, pattern: str, regex: str) -> list[str]:
+    def get_remote_branches_matching_pattern(
+        self, remote: str, pattern: str, regex: str
+    ) -> list[str]:
         """
         Get remote branches that match a specific pattern (e.g. aptos-release-v*).
         This uses ls-remote and a user-specified regex pattern to filter branches.
@@ -89,12 +90,13 @@ class Git:
         result = self.run(["ls-remote", "--heads", remote, pattern])
 
         if not result.succeeded():
-            raise Exception(f"Failed to fetch remote branches: {result.unwrap().decode()}")
+            raise Exception(
+                f"Failed to fetch remote branches: {result.unwrap().decode()}"
+            )
 
         # Use the user-provided regex pattern to find branches
         branches = re.findall(regex, result.unwrap().decode(), re.MULTILINE)
         return branches
-
 
     def get_commit_hashes(self, branch: str, max_commits: int = 100) -> list[str]:
         """
@@ -102,20 +104,22 @@ class Git:
         This retrieves the hashes from the 'git log'.
         """
         log.info(f"Fetching up to {max_commits} commits from branch {branch}")
-        result = self.run(['log', '-n', str(max_commits), '--format=%H', branch])
+        result = self.run(["log", "-n", str(max_commits), "--format=%H", branch])
 
         if not result.succeeded():
-            raise Exception(f"Failed to fetch commit hashes: {result.unwrap().decode()}")
+            raise Exception(
+                f"Failed to fetch commit hashes: {result.unwrap().decode()}"
+            )
 
-        return result.unwrap().decode().strip().split('\n')
+        return result.unwrap().decode().strip().split("\n")
 
     def get_branch_creation_time(self, branch: str) -> datetime:
         """
         Get the creation time of a branch by retrieving the timestamp of its first commit.
-        
+
         Args:
             branch (str): The name of the branch to retrieve the creation time for.
-        
+
         Returns:
             datetime: The creation time of the branch.
         """
@@ -129,7 +133,12 @@ class Git:
                 raise ValueError(f"Branch {branch} not found locally or remotely")
 
             # Get the first commit hash for the branch
-            first_commit_cmd = ["rev-list", "--first-parent", "--max-count=1", branch_ref]
+            first_commit_cmd = [
+                "rev-list",
+                "--first-parent",
+                "--max-count=1",
+                branch_ref,
+            ]
             first_commit_hash = self.run(first_commit_cmd).unwrap().decode().strip()
 
             # Get the committer date of the first commit
