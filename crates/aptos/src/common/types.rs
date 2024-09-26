@@ -2218,9 +2218,7 @@ impl TryInto<MemberId> for &EntryFunctionArguments {
     fn try_into(self) -> Result<MemberId, Self::Error> {
         self.function_id
             .clone()
-            .ok_or(CliError::CommandArgumentError(
-                "No function ID provided".to_string(),
-            ))
+            .ok_or_else(|| CliError::CommandArgumentError("No function ID provided".to_string()))
     }
 }
 
