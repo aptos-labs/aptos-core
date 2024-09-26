@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/invalid_pack_mname_non_addr.move:4:14
+  │
+4 │         false::M::S { }
+  │              ^^
+  │              │
+  │              Unexpected '::'
+  │              Expected ';'

@@ -152,7 +152,6 @@ impl PendingVotes {
         }
         let validator_voting_power =
             validator_voting_power.expect("Author must exist in the validator set.");
-
         if validator_voting_power == 0 {
             warn!("Received vote with no voting power, from {}", vote.author());
         }

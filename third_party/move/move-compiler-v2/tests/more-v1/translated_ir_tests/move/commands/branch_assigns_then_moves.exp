@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/translated_ir_tests/move/commands/branch_assigns_then_moves.move:7:13
+   │
+ 7 │         y = move x;
+   │             ^^^^^^ attempted to move here
+   ·
+12 │     assert!(x == 5, 42);
+   │             ------ used here

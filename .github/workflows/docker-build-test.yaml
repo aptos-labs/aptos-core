@@ -120,7 +120,7 @@ jobs:
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -132,7 +132,7 @@ jobs:
     outputs:
       run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run the test target determinator
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator
@@ -288,11 +288,61 @@ jobs:
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
-
-  # Run e2e compat test against testnet branch. This is a PR required job.
-  forge-compat-test:
+  
+  # This job determines the last released docker image tag, which is used by forge compat test.
+  fetch-last-released-docker-image-tag:
     needs:
       - permission-check
+    #  runs only when need to run forge-compat-test or forge-framework-upgrade-test
+    if: |
+      !failure() && !cancelled() && needs.permission-check.result == 'success' && (
+        (github.event_name == 'push' && github.ref_name != 'main') ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.ref }}
+      
+      # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Get Docker Image Tag
+        uses: ./.github/actions/determine-or-use-target-branch-and-get-last-released-image
+        id: get-docker-image-tag
+        with:
+          base-branch: ${{ github.base_ref }}
+          variants: "failpoints performance"
+      
+      - name: Add Image Tag to Step Summary
+        run: |
+          echo "## Image Tag for compat tests" >> $GITHUB_STEP_SUMMARY
+          echo "IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "TARGET_BRANCH: ${{ steps.get-docker-image-tag.outputs.TARGET_BRANCH }}" >> $GITHUB_STEP_SUMMARY
+    outputs:
+      IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
+  
+  # Run e2e compat test against testnet branch. This is a PR required job.
+  forge-compat-test:
+    needs: 
+      - permission-check
+      - fetch-last-released-docker-image-tag
       - determine-docker-build-metadata
       - rust-images
       - rust-images-failpoints
@@ -312,16 +362,17 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: 70806ff543496aa6de7807feff49e7e1370efd20 #aptos-node-v1.19.1
+      IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
-
+  
   # Run forge framework upgradability test. This is a PR required job.
   forge-framework-upgrade-test:
     needs:
       - permission-check
+      - fetch-last-released-docker-image-tag
       - determine-docker-build-metadata
       - rust-images
       - rust-images-failpoints
@@ -340,7 +391,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: 70806ff543496aa6de7807feff49e7e1370efd20 #aptos-node-v1.19.1
+      IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}

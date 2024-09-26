@@ -21,6 +21,7 @@ pub enum LintChecker {
     BlocksInConditions,
     NeedlessBool,
     NeedlessDerefRef,
+    NeedlessMutableReference,
     NeedlessRefDeref,
     NeedlessRefInFieldAccess,
     SimplerNumericExpression,

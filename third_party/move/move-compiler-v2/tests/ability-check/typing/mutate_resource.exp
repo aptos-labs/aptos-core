@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: local `r` of type `M::R` does not have the `drop` ability
+  ┌─ tests/ability-check/typing/mutate_resource.move:5:9
+  │
+5 │         *r = R {};
+  │         ^^^^^^^^^ reference content dropped here
+
+error: local `r` of type `T` does not have the `drop` ability
+  ┌─ tests/ability-check/typing/mutate_resource.move:9:9
+  │
+9 │         *r = x;
+  │         ^^^^^^ reference content dropped here
+
+error: local `r` of type `T` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/mutate_resource.move:13:9
+   │
+13 │         *r = x;
+   │         ^^^^^^ reference content dropped here
