@@ -297,11 +297,10 @@ pub enum EntryFunctionCall {
 
     /// Initiate a bridge transfer of ETH from Movement to the base layer
     /// Anyone can initiate a bridge transfer from the source chain
-    /// The amount is transferred from the initiator to aptos_framework
+    /// The amount is burnt from the initiator
     AtomicBridgeInitiatorInitiateBridgeTransfer {
         recipient: Vec<u8>,
         hash_lock: Vec<u8>,
-        time_lock: u64,
         amount: u64,
     },
 
@@ -316,10 +315,9 @@ pub enum EntryFunctionCall {
     /// @param amount The amount of assets to be locked.
     /// @abort If the caller is not the bridge operator.
     AtomicBridgeCounterpartyLockBridgeTransferAssets {
-        originator: Vec<u8>,
+        initiator: Vec<u8>,
         bridge_transfer_id: Vec<u8>,
         hash_lock: Vec<u8>,
-        time_lock: u64,
         recipient: AccountAddress,
         amount: u64,
     },
@@ -1220,23 +1218,18 @@ impl EntryFunctionCall {
             AtomicBridgeInitiatorInitiateBridgeTransfer {
                 recipient,
                 hash_lock,
-                time_lock,
                 amount,
-            } => atomic_bridge_initiator_initiate_bridge_transfer(
-                recipient, hash_lock, time_lock, amount,
-            ),
+            } => atomic_bridge_initiator_initiate_bridge_transfer(recipient, hash_lock, amount),
             AtomicBridgeCounterpartyLockBridgeTransferAssets {
-                originator,
+                initiator,
                 bridge_transfer_id,
                 hash_lock,
-                time_lock,
                 recipient,
                 amount,
             } => atomic_bridge_counterparty_lock_bridge_transfer_assets(
-                originator,
+                initiator,
                 bridge_transfer_id,
                 hash_lock,
-                time_lock,
                 recipient,
                 amount,
             ),
@@ -2420,11 +2413,10 @@ pub fn atomic_bridge_initiator_complete_bridge_transfer(
 
 /// Initiate a bridge transfer of ETH from Movement to the base layer
 /// Anyone can initiate a bridge transfer from the source chain
-/// The amount is transferred from the initiator to aptos_framework
+/// The amount is burnt from the initiator
 pub fn atomic_bridge_initiator_initiate_bridge_transfer(
     recipient: Vec<u8>,
     hash_lock: Vec<u8>,
-    time_lock: u64,
     amount: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -2440,7 +2432,6 @@ pub fn atomic_bridge_initiator_initiate_bridge_transfer(
         vec![
             bcs::to_bytes(&recipient).unwrap(),
             bcs::to_bytes(&hash_lock).unwrap(),
-            bcs::to_bytes(&time_lock).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
     ))
@@ -2457,10 +2448,9 @@ pub fn atomic_bridge_initiator_initiate_bridge_transfer(
 /// @param amount The amount of assets to be locked.
 /// @abort If the caller is not the bridge operator.
 pub fn atomic_bridge_counterparty_lock_bridge_transfer_assets(
-    originator: Vec<u8>,
+    initiator: Vec<u8>,
     bridge_transfer_id: Vec<u8>,
     hash_lock: Vec<u8>,
-    time_lock: u64,
     recipient: AccountAddress,
     amount: u64,
 ) -> TransactionPayload {
@@ -2475,10 +2465,9 @@ pub fn atomic_bridge_counterparty_lock_bridge_transfer_assets(
         ident_str!("lock_bridge_transfer_assets").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&originator).unwrap(),
+            bcs::to_bytes(&initiator).unwrap(),
             bcs::to_bytes(&bridge_transfer_id).unwrap(),
             bcs::to_bytes(&hash_lock).unwrap(),
-            bcs::to_bytes(&time_lock).unwrap(),
             bcs::to_bytes(&recipient).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
@@ -5199,8 +5188,7 @@ mod decoder {
                 EntryFunctionCall::AtomicBridgeInitiatorInitiateBridgeTransfer {
                     recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
                     hash_lock: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    time_lock: bcs::from_bytes(script.args().get(2)?).ok()?,
-                    amount: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    amount: bcs::from_bytes(script.args().get(2)?).ok()?,
                 },
             )
         } else {
@@ -5214,12 +5202,11 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::AtomicBridgeCounterpartyLockBridgeTransferAssets {
-                    originator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    initiator: bcs::from_bytes(script.args().get(0)?).ok()?,
                     bridge_transfer_id: bcs::from_bytes(script.args().get(1)?).ok()?,
                     hash_lock: bcs::from_bytes(script.args().get(2)?).ok()?,
-                    time_lock: bcs::from_bytes(script.args().get(3)?).ok()?,
-                    recipient: bcs::from_bytes(script.args().get(4)?).ok()?,
-                    amount: bcs::from_bytes(script.args().get(5)?).ok()?,
+                    recipient: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    amount: bcs::from_bytes(script.args().get(4)?).ok()?,
                 },
             )
         } else {
