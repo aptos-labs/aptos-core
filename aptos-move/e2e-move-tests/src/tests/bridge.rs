@@ -15,6 +15,8 @@ fn build_scripts() -> BTreeMap<String, Vec<u8>> {
     let package_folder = "bridge.data";
     let package_names = vec![
         "update_operator",
+        "update_initiator_time_lock",
+        "update_counterparty_time_lock",
     ];
     common::build_scripts(package_folder, package_names)
 }
@@ -132,7 +134,6 @@ struct BridgeTransferInitiatedEvent {
 }
 
 #[test]
-// Initialise bridge operator module, this would be to the framework
 // A bridge is initiated with said amount to recipient on the destination chain
 // A relayer confirms that the amount was minted on the destination chain
 fn test_initiator() {
@@ -173,4 +174,84 @@ fn test_initiator() {
                                    MoveValue::vector_u8(bridge_transfer_id.clone()).simple_serialize().unwrap(),
                                    MoveValue::vector_u8(pre_image.to_vec()).simple_serialize().unwrap(),
                                ],));
+}
+
+#[test]
+// Update the initiator time lock duration
+fn test_update_initiator_time_lock() {
+    let mut harness = MoveHarness::new();
+    let core_resources =
+        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+
+    let update_initiator_time_lock_code = BRIDGE_SCRIPTS
+        .get("update_initiator_time_lock")
+        .expect("bridge script should be built");
+
+    let new_time_lock = 42;
+    let txn = harness.create_script(
+        &core_resources,
+        update_initiator_time_lock_code.clone(),
+        vec![],
+        vec![TransactionArgument::U64(new_time_lock)]
+    );
+
+    assert_success!(harness.run(txn));
+
+    let res = harness.execute_view_function(
+                                    str::parse("0x1::atomic_bridge_configuration::initiator_timelock_duration").unwrap(),
+                                    vec![],
+                                    vec![]);
+    let bcs = res.values.unwrap().pop().unwrap();
+    let res = bcs::from_bytes::<u64>(&bcs).unwrap();
+    assert_eq!(res, new_time_lock);
+
+    let imposter = harness.new_account_at(AccountAddress::from_hex_literal("0xFA").unwrap());
+    let txn = harness.create_script(
+        &imposter,
+        update_initiator_time_lock_code.clone(),
+        vec![],
+        vec![TransactionArgument::U64(new_time_lock)]
+    );
+
+    assert_abort!(harness.run(txn), _);
+}
+
+#[test]
+// Update the initiator time lock duration
+fn test_update_counterparty_time_lock() {
+    let mut harness = MoveHarness::new();
+    let core_resources =
+        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+
+    let update_counterparty_time_lock_code = BRIDGE_SCRIPTS
+        .get("update_counterparty_time_lock")
+        .expect("bridge script should be built");
+
+    let new_time_lock = 42;
+    let txn = harness.create_script(
+        &core_resources,
+        update_counterparty_time_lock_code.clone(),
+        vec![],
+        vec![TransactionArgument::U64(new_time_lock)]
+    );
+
+    assert_success!(harness.run(txn));
+
+    let res = harness.execute_view_function(
+        str::parse("0x1::atomic_bridge_configuration::counterparty_timelock_duration").unwrap(),
+        vec![],
+        vec![]);
+    let bcs = res.values.unwrap().pop().unwrap();
+    let res = bcs::from_bytes::<u64>(&bcs).unwrap();
+    assert_eq!(res, new_time_lock);
+
+    let imposter = harness.new_account_at(AccountAddress::from_hex_literal("0xFA").unwrap());
+    let txn = harness.create_script(
+        &imposter,
+        update_counterparty_time_lock_code.clone(),
+        vec![],
+        vec![TransactionArgument::U64(new_time_lock)]
+    );
+
+    assert_abort!(harness.run(txn), _);
 }
