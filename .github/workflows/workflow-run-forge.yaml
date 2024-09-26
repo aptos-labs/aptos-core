@@ -119,7 +119,7 @@ env:
 # at the call site, and don't need to wrap each step in an if statement?
 jobs:
   forge:
-    runs-on: runs-on,cpu=64,family=c7,hdd=1024,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
+    runs-on: runs-on,cpu=64,family=c7,hdd=1024,image=aptos-ubuntu-x64-gcloud,run-id=${{ github.run_id }},spot=co
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     steps:
       - uses: actions/checkout@v4
