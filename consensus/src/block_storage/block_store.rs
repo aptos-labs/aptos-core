@@ -636,6 +636,10 @@ impl BlockReader for BlockStore {
         self.inner.read().commit_root()
     }
 
+    fn window_root(&self) -> Arc<PipelinedBlock> {
+        self.inner.read().window_root()
+    }
+
     fn get_quorum_cert_for_block(&self, block_id: HashValue) -> Option<Arc<QuorumCert>> {
         self.inner.read().get_quorum_cert_for_block(&block_id)
     }
@@ -646,6 +650,10 @@ impl BlockReader for BlockStore {
 
     fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
         self.inner.read().path_from_commit_root(block_id)
+    }
+
+    fn path_from_window_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
+        self.inner.read().path_from_window_root(block_id)
     }
 
     #[cfg(test)]
