@@ -220,7 +220,7 @@ module aptos_framework::atomic_bridge_initiator {
     }
 
     /// Anyone can refund the transfer on the source chain once time lock has passed
-    public fun refund_bridge_transfer(
+    public entry fun refund_bridge_transfer(
         _caller: &signer,
         bridge_transfer_id: vector<u8>,
     ) {
@@ -235,7 +235,7 @@ module aptos_framework::atomic_bridge_initiator {
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
-    public fun test_initiate_bridge_transfer(
+    fun test_initiate_bridge_transfer(
         sender: &signer,
         aptos_framework: &signer,
     ) {
@@ -274,7 +274,7 @@ module aptos_framework::atomic_bridge_initiator {
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     #[expected_failure(abort_code = 0x10006, location = 0x1::coin)] //EINSUFFICIENT_BALANCE
-    public fun test_initiate_bridge_transfer_insufficient_balance(
+    fun test_initiate_bridge_transfer_insufficient_balance(
         sender: &signer,
         aptos_framework: &signer,
     ) {
@@ -296,7 +296,7 @@ module aptos_framework::atomic_bridge_initiator {
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
-    public fun test_complete_bridge_transfer(
+    fun test_complete_bridge_transfer(
         sender: &signer,
         aptos_framework: &signer
     ) {
@@ -342,7 +342,7 @@ module aptos_framework::atomic_bridge_initiator {
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     #[expected_failure(abort_code = 0x1, location = 0x1::atomic_bridge_configuration)] // EINVALID_BRIDGE_OPERATOR
-    public fun test_complete_bridge_transfer_by_sender(
+    fun test_complete_bridge_transfer_by_sender(
         sender: &signer,
         aptos_framework: &signer
     ) {
@@ -379,7 +379,7 @@ module aptos_framework::atomic_bridge_initiator {
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     #[expected_failure(abort_code = 0x1, location = 0x1::atomic_bridge_store)] // EINVALID_PRE_IMAGE
-    public fun test_complete_bridge_transfer_with_invalid_preimage(
+    fun test_complete_bridge_transfer_with_invalid_preimage(
         sender: &signer,
         aptos_framework: &signer
     ) {
@@ -416,7 +416,7 @@ module aptos_framework::atomic_bridge_initiator {
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     #[expected_failure(abort_code = 0x10001, location = 0x1::smart_table)] // ENOT_FOUND
-    public fun test_complete_bridge_with_errorneous_bridge_id_by_operator(
+    fun test_complete_bridge_with_errorneous_bridge_id_by_operator(
         sender: &signer,
         aptos_framework: &signer
     ) {
@@ -436,7 +436,7 @@ module aptos_framework::atomic_bridge_initiator {
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
-    public fun test_refund_bridge_transfer(
+    fun test_refund_bridge_transfer(
         sender: &signer,
         aptos_framework: &signer
     ) {
@@ -482,7 +482,7 @@ module aptos_framework::atomic_bridge_initiator {
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     #[expected_failure(abort_code = 0x4, location = 0x1::atomic_bridge_store)] //ENOT_EXPIRED
-    public fun test_refund_bridge_transfer_before_timelock(
+    fun test_refund_bridge_transfer_before_timelock(
         sender: &signer,
         aptos_framework: &signer
     ) {
@@ -527,6 +527,9 @@ module aptos_framework::atomic_bridge_store {
     use aptos_framework::timestamp;
     use std::signer;
     use aptos_framework::timestamp::CurrentTimeMicroseconds;
+
+    friend aptos_framework::atomic_bridge_counterparty;
+    friend aptos_framework::atomic_bridge_initiator;
 
     #[test_only]
     use std::hash::sha3_256;
@@ -598,7 +601,7 @@ module aptos_framework::atomic_bridge_store {
     /// Returns the current time in seconds.
     ///
     /// @return Current timestamp in seconds.
-    public fun now() : u64 {
+    fun now() : u64 {
         timestamp::now_seconds()
     }
 
@@ -607,7 +610,7 @@ module aptos_framework::atomic_bridge_store {
     /// @param lock The duration to lock.
     /// @return The calculated time lock.
     /// @abort If lock is not above MIN_TIME_LOCK
-    public fun create_time_lock(time_lock: u64) : u64 {
+    public(friend) fun create_time_lock(time_lock: u64) : u64 {
         assert_min_time_lock(time_lock);
         now() + time_lock
     }
@@ -621,7 +624,7 @@ module aptos_framework::atomic_bridge_store {
     /// @param time_lock The time lock for the transfer.
     /// @return A `BridgeTransferDetails` object.
     /// @abort If the amount is zero or locks are invalid.
-    public fun create_details<Initiator: store, Recipient: store>(initiator: Initiator, recipient: Recipient, amount: u64, hash_lock: vector<u8>, time_lock: u64)
+    public(friend) fun create_details<Initiator: store, Recipient: store>(initiator: Initiator, recipient: Recipient, amount: u64, hash_lock: vector<u8>, time_lock: u64)
         : BridgeTransferDetails<Initiator, Recipient> {
         assert!(amount > 0, EZERO_AMOUNT);
         assert_valid_hash_lock(&hash_lock);
@@ -643,7 +646,7 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param bridge_transfer_id Bridge transfer ID.
     /// @param details The bridge transfer details
-    public fun add<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: BridgeTransferDetails<Initiator, Recipient>) acquires SmartTableWrapper {
+    public(friend) fun add<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: BridgeTransferDetails<Initiator, Recipient>) acquires SmartTableWrapper {
         assert_valid_bridge_transfer_id(&bridge_transfer_id);
         let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
         smart_table::add(&mut table.inner, bridge_transfer_id, details);
@@ -653,7 +656,7 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param time_lock
     /// @abort If the time lock is invalid.
-    public fun assert_min_time_lock(time_lock: u64) {
+    fun assert_min_time_lock(time_lock: u64) {
         assert!(time_lock >= MIN_TIME_LOCK, EINVALID_TIME_LOCK);
     }
 
@@ -661,7 +664,7 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param details The bridge transfer details to check.
     /// @abort If the state is not pending.
-    public fun assert_pending<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
+    fun assert_pending<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
         assert!(details.state == PENDING_TRANSACTION, ENOT_PENDING_TRANSACTION)
     }
 
@@ -669,7 +672,7 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param hash_lock The hash lock to validate.
     /// @abort If the hash lock is invalid.
-    public fun assert_valid_hash_lock(hash_lock: &vector<u8>) {
+    fun assert_valid_hash_lock(hash_lock: &vector<u8>) {
         assert!(vector::length(hash_lock) == 32, EINVALID_HASH_LOCK);
     }
 
@@ -677,7 +680,7 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param bridge_transfer_id The bridge transfer ID to validate.
     /// @abort If the ID is invalid.
-    public fun assert_valid_bridge_transfer_id(bridge_transfer_id: &vector<u8>) {
+    public(friend) fun assert_valid_bridge_transfer_id(bridge_transfer_id: &vector<u8>) {
         assert!(vector::length(bridge_transfer_id) == 32, EINVALID_BRIDGE_TRANSFER_ID);
     }
 
@@ -685,7 +688,7 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param pre_image The pre-image to hash.
     /// @return The generated hash lock.
-    public fun create_hashlock(pre_image: vector<u8>) : vector<u8> {
+    public(friend) fun create_hashlock(pre_image: vector<u8>) : vector<u8> {
         assert!(vector::length(&pre_image) > 0, EINVALID_PRE_IMAGE);
         keccak256(pre_image)
     }
@@ -695,7 +698,7 @@ module aptos_framework::atomic_bridge_store {
     /// @param details The bridge transfer details.
     /// @param hash_lock The hash lock to compare.
     /// @abort If the hash lock is incorrect.
-    public fun assert_correct_hash_lock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>, hash_lock: vector<u8>) {
+    fun assert_correct_hash_lock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>, hash_lock: vector<u8>) {
         assert!(&hash_lock == &details.hash_lock, EINVALID_PRE_IMAGE);
     }
 
@@ -703,7 +706,7 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param details The bridge transfer details.
     /// @abort If the time lock has not expired.
-    public fun assert_timed_out_lock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
+    fun assert_timed_out_lock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
         assert!(now() > details.time_lock, ENOT_EXPIRED);
     }
 
@@ -711,21 +714,21 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param details The bridge transfer details.
     /// @abort If the time lock has expired.
-    public fun assert_within_timelock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
+    fun assert_within_timelock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
         assert!(!(now() > details.time_lock), EEXPIRED);
     }
 
     /// Completes the bridge transfer.
     ///
     /// @param details The bridge transfer details to complete.
-    public fun complete<Initiator: store, Recipient: store>(details: &mut BridgeTransferDetails<Initiator, Recipient>) {
+    fun complete<Initiator: store, Recipient: store>(details: &mut BridgeTransferDetails<Initiator, Recipient>) {
         details.state = COMPLETED_TRANSACTION;
     }
 
     /// Cancels the bridge transfer.
     ///
     /// @param details The bridge transfer details to cancel.
-    public fun cancel<Initiator: store, Recipient: store>(details: &mut BridgeTransferDetails<Initiator, Recipient>) {
+    fun cancel<Initiator: store, Recipient: store>(details: &mut BridgeTransferDetails<Initiator, Recipient>) {
         details.state = CANCELLED_TRANSACTION;
     }
 
@@ -752,7 +755,7 @@ module aptos_framework::atomic_bridge_store {
     /// @param hash_lock The hash lock used to validate the transfer.
     /// @return A tuple containing the recipient of the transfer and the amount transferred.
     /// @abort If the bridge transfer details are not found or if the completion checks in `complete_details` fail.
-    public fun complete_transfer<Initiator: store, Recipient: copy + store>(bridge_transfer_id: vector<u8>, hash_lock: vector<u8>) : (Recipient, u64) acquires SmartTableWrapper {
+    public(friend) fun complete_transfer<Initiator: store, Recipient: copy + store>(bridge_transfer_id: vector<u8>, hash_lock: vector<u8>) : (Recipient, u64) acquires SmartTableWrapper {
         let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
 
         let details = smart_table::borrow_mut(
@@ -781,7 +784,7 @@ module aptos_framework::atomic_bridge_store {
     /// @param bridge_transfer_id The ID of the bridge transfer to cancel.
     /// @return A tuple containing the initiator of the transfer and the amount to be refunded.
     /// @abort If the bridge transfer details are not found or if the cancellation conditions in `cancel_details` fail.
-    public fun cancel_transfer<Initiator: store + copy, Recipient: store>(bridge_transfer_id: vector<u8>) : (Initiator, u64) acquires SmartTableWrapper {
+    public(friend) fun cancel_transfer<Initiator: store + copy, Recipient: store>(bridge_transfer_id: vector<u8>) : (Initiator, u64) acquires SmartTableWrapper {
         let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
 
         let details = smart_table::borrow_mut(
@@ -795,7 +798,7 @@ module aptos_framework::atomic_bridge_store {
     ///
     /// @param details The bridge transfer details.
     /// @return The generated bridge transfer ID.
-    public fun bridge_transfer_id<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) : vector<u8> acquires Nonce {
+    public(friend) fun bridge_transfer_id<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) : vector<u8> acquires Nonce {
         let nonce = borrow_global_mut<Nonce>(@aptos_framework);
         let combined_bytes = vector::empty<u8>();
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.initiator));
@@ -831,6 +834,9 @@ module aptos_framework::atomic_bridge_configuration {
     use std::signer;
     use aptos_framework::event;
     use aptos_framework::system_addresses;
+
+    friend aptos_framework::atomic_bridge_counterparty;
+    friend aptos_framework::atomic_bridge_initiator;
 
     /// Error code for invalid bridge operator
     const EINVALID_BRIDGE_OPERATOR: u64 = 0x1;
@@ -943,7 +949,7 @@ module aptos_framework::atomic_bridge_configuration {
     ///
     /// @param caller The signer whose authority is being checked.
     /// @abort If the caller is not the current bridge operator.
-    public fun assert_is_caller_operator(caller: &signer) acquires BridgeConfig {
+    public(friend) fun assert_is_caller_operator(caller: &signer) acquires BridgeConfig {
         assert!(borrow_global<BridgeConfig>(@aptos_framework).bridge_operator == signer::address_of(caller), EINVALID_BRIDGE_OPERATOR);
     }
 
