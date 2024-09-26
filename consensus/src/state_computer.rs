@@ -155,7 +155,7 @@ impl StateComputer for ExecutionProxy {
     async fn schedule_compute(
         &self,
         // The block to be executed.
-        block: &Block,
+        block: &PipelinedBlock,
         block_window: &OrderedBlockWindow,
         // The parent block id.
         parent_block_id: HashValue,
@@ -194,9 +194,11 @@ impl StateComputer for ExecutionProxy {
 
         let timestamp = block.timestamp_usecs();
         let metadata = if is_randomness_enabled {
-            block.new_metadata_with_randomness(&validators, randomness)
+            block
+                .block()
+                .new_metadata_with_randomness(&validators, randomness)
         } else {
-            block.new_block_metadata(&validators).into()
+            block.block().new_block_metadata(&validators).into()
         };
 
         let pipeline_entry_time = Instant::now();
@@ -314,6 +316,7 @@ impl StateComputer for ExecutionProxy {
 
         let blocks_vec = blocks.to_vec();
         let wrapped_callback = move || {
+            payload_manager.notify_commit(block_timestamp, &blocks_vec);
             callback(&blocks_vec, finality_proof);
         };
         self.async_state_sync_notifier
@@ -323,7 +326,6 @@ impl StateComputer for ExecutionProxy {
             .expect("Failed to send async state sync notification");
 
         *latest_logical_time = logical_time;
-        payload_manager.notify_commit(block_timestamp, blocks);
         Ok(())
     }
 

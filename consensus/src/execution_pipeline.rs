@@ -11,8 +11,9 @@ use crate::{
     state_computer::StateComputeResultFut,
 };
 use aptos_consensus_types::{
-    block::Block, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::OrderedBlockWindow,
+    block::Block,
+    pipeline_execution_result::PipelineExecutionResult,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -20,12 +21,20 @@ use aptos_executor_types::{
     ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_logger::{debug, warn};
+use aptos_logger::{debug, info, warn};
 use aptos_types::{
-    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableBlock, ExecutableTransactions},
+    },
     block_metadata_ext::BlockMetadataExt,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        signature_verified_transaction::{
+            SignatureVerifiedTransaction, SignatureVerifiedTransaction::Valid,
+        },
+        SignedTransaction,
+        Transaction::UserTransaction,
+        TransactionStatus,
     },
 };
 use fail::fail_point;
@@ -33,6 +42,8 @@ use futures::future::BoxFuture;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
+    collections::HashSet,
+    iter::zip,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -86,7 +97,7 @@ impl ExecutionPipeline {
 
     pub async fn queue(
         &self,
-        block: Block,
+        block: PipelinedBlock,
         block_window: OrderedBlockWindow,
         metadata: BlockMetadataExt,
         parent_block_id: HashValue,
@@ -95,6 +106,7 @@ impl ExecutionPipeline {
         lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
+        let block_round = block.round();
         let block_id = block.id();
         self.prepare_block_tx
             .send(PrepareBlockCommand {
@@ -111,14 +123,19 @@ impl ExecutionPipeline {
             .expect("Failed to send block to execution pipeline.");
 
         Box::pin(async move {
-            result_rx
+            let result = result_rx
                 .await
                 .map_err(|err| ExecutorError::InternalError {
                     error: format!(
                         "Failed to receive execution result for block {}: {:?}.",
                         block_id, err
                     ),
-                })?
+                })?;
+            info!(
+                "received result_rx for round {} block {}.",
+                block_round, block_id
+            );
+            result
         })
     }
 
@@ -139,7 +156,9 @@ impl ExecutionPipeline {
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer.prepare_block(&block, &block_window).await;
+        let input_txns = block_preparer
+            .prepare_block(block.block(), &block_window)
+            .await;
         if let Err(e) = input_txns {
             result_tx
                 .send(Err(e))
@@ -163,10 +182,13 @@ impl ExecutionPipeline {
                 });
             counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
                 .observe_duration(sig_verification_start.elapsed());
+            let block_id = block.id();
             execute_block_tx
                 .send(ExecuteBlockCommand {
                     input_txns,
-                    block: (block.id(), sig_verified_txns).into(),
+                    pipelined_block: block,
+                    block: (block_id, sig_verified_txns).into(),
+                    block_window,
                     parent_block_id,
                     block_executor_onchain_config,
                     result_tx,
@@ -199,7 +221,9 @@ impl ExecutionPipeline {
     ) {
         while let Some(ExecuteBlockCommand {
             input_txns,
+            pipelined_block,
             block,
+            block_window,
             parent_block_id,
             block_executor_onchain_config,
             result_tx,
@@ -209,7 +233,67 @@ impl ExecutionPipeline {
         {
             counters::EXECUTE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
             let block_id = block.block_id;
-            debug!("execute_stage received block {}.", block_id);
+            info!("execute_stage received block {}.", block_id);
+
+            let now = Instant::now();
+            let mut committed_transactions = HashSet::new();
+
+            // TODO: lots of repeated code here
+            monitor!("execute_wait_for_committed_transactions", {
+                block_window
+                    .pipelined_blocks()
+                    .iter()
+                    .filter(|window_block| window_block.round() == pipelined_block.round() - 1)
+                    .for_each(|b| {
+                        info!(
+                        "Execution: Waiting for committed transactions at block {} for block {}",
+                        b.round(),
+                        pipelined_block.round()
+                    );
+                        for txn_hash in b.wait_for_committed_transactions() {
+                            committed_transactions.insert(*txn_hash);
+                        }
+                    });
+            });
+            info!(
+                "Execution: Waiting for part of committed transactions for round {} took {} ms",
+                pipelined_block.round(),
+                now.elapsed().as_millis()
+            );
+            let prev_input_txns_len = input_txns.len();
+            let input_txns: Vec<_> = input_txns
+                .into_iter()
+                .filter(|txn| !committed_transactions.contains(&txn.committed_hash()))
+                .collect();
+            info!(
+                "Execution: Filtered out {}/{} transactions from the previous block for block {}, in {} ms",
+                prev_input_txns_len - input_txns.len(),
+                prev_input_txns_len,
+                pipelined_block.round(),
+                now.elapsed().as_millis()
+            );
+
+            // TODO: Find a better way to do this.
+            let transactions = match block.transactions {
+                ExecutableTransactions::Unsharded(txns) => {
+                    let transactions: Vec<_> = txns
+                        .into_iter()
+                        .filter(|txn| {
+                            if let Valid(UserTransaction(user_txn)) = txn {
+                                !committed_transactions.contains(&user_txn.committed_hash())
+                            } else {
+                                true
+                            }
+                        })
+                        .collect();
+                    ExecutableTransactions::Unsharded(transactions)
+                },
+                ExecutableTransactions::Sharded(_) => {
+                    unimplemented!("Sharded transactions are not supported yet.")
+                },
+            };
+            let block = ExecutableBlock::new(block.block_id, transactions);
+
             let executor = executor.clone();
             let state_checkpoint_output = monitor!(
                 "execute_block",
@@ -220,17 +304,47 @@ impl ExecutionPipeline {
                         })
                     });
                     let start = Instant::now();
+                    info!("execute_and_state_checkpoint start. {}", block_id);
                     executor
                         .execute_and_state_checkpoint(
                             block,
                             parent_block_id,
                             block_executor_onchain_config,
                         )
-                        .map(|output| (output, start.elapsed()))
+                        .map(|output| {
+                            info!("execute_and_state_checkpoint end. {}", block_id);
+                            (output, start.elapsed())
+                        })
                 })
                 .await
             )
             .expect("Failed to spawn_blocking.");
+
+            if let Ok((output, _)) = &state_checkpoint_output {
+                // Block metadata + validator transactions
+                let num_system_txns = 1 + pipelined_block
+                    .validator_txns()
+                    .map_or(0, |txns| txns.len());
+                let committed_transactions: Vec<_> = zip(
+                    input_txns.iter(),
+                    output
+                        .txns
+                        .statuses_for_input_txns
+                        .iter()
+                        .skip(num_system_txns),
+                )
+                .filter_map(|(input_txn, txn_status)| {
+                    if let TransactionStatus::Keep(_) = txn_status {
+                        Some(input_txn.committed_hash())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+                pipelined_block.set_committed_transactions(committed_transactions);
+            } else {
+                pipelined_block.cancel_committed_transactions();
+            }
 
             ledger_apply_tx
                 .send(LedgerApplyCommand {
@@ -264,7 +378,7 @@ impl ExecutionPipeline {
         }) = block_rx.recv().await
         {
             counters::APPLY_LEDGER_WAIT_TIME.observe_duration(command_creation_time.elapsed());
-            debug!("ledger_apply stage received block {}.", block_id);
+            info!("ledger_apply stage received block {}.", block_id);
             let res = async {
                 let (state_checkpoint_output, execution_duration) = execution_result?;
                 let executor = executor.clone();
@@ -355,7 +469,7 @@ impl ExecutionPipeline {
 }
 
 struct PrepareBlockCommand {
-    block: Block,
+    block: PipelinedBlock,
     block_window: OrderedBlockWindow,
     metadata: BlockMetadataExt,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
@@ -369,7 +483,9 @@ struct PrepareBlockCommand {
 
 struct ExecuteBlockCommand {
     input_txns: Vec<SignedTransaction>,
+    pipelined_block: PipelinedBlock,
     block: ExecutableBlock,
+    block_window: OrderedBlockWindow,
     parent_block_id: HashValue,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,

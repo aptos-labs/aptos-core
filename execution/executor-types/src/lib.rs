@@ -434,6 +434,14 @@ impl StateComputeResult {
         input_txns: Vec<Transaction>,
         block_id: HashValue,
     ) -> Vec<Transaction> {
+        // if !input_txns.is_empty() || !self.compute_status_for_input_txns().is_empty() {
+        //     println!(
+        //         "{:?} vs {:?}, for block_id: {}",
+        //         input_txns.iter().map(|t| t.type_name()).collect::<Vec<_>>(),
+        //         self.compute_status_for_input_txns(),
+        //         block_id
+        //     )
+        // }
         assert_eq!(
             input_txns.len(),
             self.compute_status_for_input_txns().len(),

@@ -312,12 +312,15 @@ impl CommitDecision {
 /// The transaction payload and proof of each block
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PayloadWithProof {
-    transactions: Vec<SignedTransaction>,
-    proofs: Vec<ProofOfStore>,
+    pub transactions: Vec<(Vec<SignedTransaction>, u64)>,
+    pub proofs: Vec<ProofOfStore>,
 }
 
 impl PayloadWithProof {
-    pub fn new(transactions: Vec<SignedTransaction>, proofs: Vec<ProofOfStore>) -> Self {
+    pub fn new(
+        transactions: Vec<(Vec<SignedTransaction>, u64)>,
+        proofs: Vec<ProofOfStore>,
+    ) -> Self {
         Self {
             transactions,
             proofs,
@@ -371,7 +374,7 @@ pub enum BlockTransactionPayload {
 impl BlockTransactionPayload {
     /// Creates a returns a new InQuorumStore transaction payload
     pub fn new_in_quorum_store(
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(Vec<SignedTransaction>, u64)>,
         proofs: Vec<ProofOfStore>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
@@ -380,7 +383,7 @@ impl BlockTransactionPayload {
 
     /// Creates a returns a new InQuorumStoreWithLimit transaction payload
     pub fn new_in_quorum_store_with_limit(
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(Vec<SignedTransaction>, u64)>,
         proofs: Vec<ProofOfStore>,
         limit: Option<u64>,
     ) -> Self {
@@ -391,7 +394,7 @@ impl BlockTransactionPayload {
 
     /// Creates a returns a new QuorumStoreInlineHybrid transaction payload
     pub fn new_quorum_store_inline_hybrid(
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(Vec<SignedTransaction>, u64)>,
         proofs: Vec<ProofOfStore>,
         limit: Option<u64>,
         inline_batches: Vec<BatchInfo>,
@@ -402,7 +405,7 @@ impl BlockTransactionPayload {
     }
 
     pub fn new_opt_quorum_store(
-        transactions: Vec<SignedTransaction>,
+        transactions: Vec<(Vec<SignedTransaction>, u64)>,
         proofs: Vec<ProofOfStore>,
         limit: Option<u64>,
         batch_infos: Vec<BatchInfo>,
@@ -457,7 +460,7 @@ impl BlockTransactionPayload {
     }
 
     /// Returns the transactions in the payload
-    pub fn transactions(&self) -> Vec<SignedTransaction> {
+    pub fn transactions(&self) -> Vec<(Vec<SignedTransaction>, u64)> {
         match self {
             BlockTransactionPayload::InQuorumStore(payload) => payload.transactions.clone(),
             BlockTransactionPayload::InQuorumStoreWithLimit(payload) => {
@@ -664,7 +667,12 @@ impl BlockPayload {
     /// Verifies the block payload digests and returns an error if the data is invalid
     pub fn verify_payload_digests(&self) -> Result<(), Error> {
         // Get the transactions, payload proofs and inline batches
-        let transactions = self.transaction_payload.transactions();
+        let transactions: Vec<_> = self
+            .transaction_payload
+            .transactions()
+            .into_iter()
+            .flat_map(|(txns, _)| txns.into_iter())
+            .collect();
         let payload_proofs = self.transaction_payload.payload_proofs();
         let inline_batches = self.transaction_payload.inline_batches();
 
@@ -1284,7 +1292,8 @@ mod test {
     ) -> BlockPayload {
         // Create the transaction payload
         let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
-            signed_transactions.to_vec(),
+            // TODO: this seems wrong
+            vec![(signed_transactions.to_vec(), 0)],
             proofs.to_vec(),
             None,
             inline_batches.to_vec(),
@@ -1315,7 +1324,7 @@ mod test {
             BlockType::Genesis,
         );
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(
+        Arc::new(PipelinedBlock::new_with_window(
             block,
             OrderedBlockWindow::empty(),
         ))
@@ -1348,7 +1357,7 @@ mod test {
 
         // Create the pipelined block
         let block = Block::new_for_testing(block_info.id(), block_data, None);
-        Arc::new(PipelinedBlock::new_ordered(
+        Arc::new(PipelinedBlock::new_with_window(
             block,
             OrderedBlockWindow::empty(),
         ))
