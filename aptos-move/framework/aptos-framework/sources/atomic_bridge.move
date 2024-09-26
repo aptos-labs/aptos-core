@@ -518,6 +518,7 @@ module aptos_framework::atomic_bridge_initiator {
 
 module aptos_framework::atomic_bridge_store {
     use std::bcs;
+    use std::features;
     use std::vector;
     use aptos_std::aptos_hash::keccak256;
     use aptos_std::smart_table;
@@ -543,6 +544,7 @@ module aptos_framework::atomic_bridge_store {
     const EINVALID_TIME_LOCK : u64 = 0x6;
     const EZERO_AMOUNT : u64 = 0x7;
     const EINVALID_BRIDGE_TRANSFER_ID : u64 = 0x8;
+    const EATOMIC_BRIDGE_NOT_ENABLED : u64 = 0x9;
 
     /// Transaction states
     const PENDING_TRANSACTION: u8 = 0x1;
@@ -647,6 +649,8 @@ module aptos_framework::atomic_bridge_store {
     /// @param bridge_transfer_id Bridge transfer ID.
     /// @param details The bridge transfer details
     public(friend) fun add<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: BridgeTransferDetails<Initiator, Recipient>) acquires SmartTableWrapper {
+        assert!(features::abort_atomic_bridge_enabled(), EATOMIC_BRIDGE_NOT_ENABLED);
+
         assert_valid_bridge_transfer_id(&bridge_transfer_id);
         let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
         smart_table::add(&mut table.inner, bridge_transfer_id, details);
@@ -756,6 +760,8 @@ module aptos_framework::atomic_bridge_store {
     /// @return A tuple containing the recipient of the transfer and the amount transferred.
     /// @abort If the bridge transfer details are not found or if the completion checks in `complete_details` fail.
     public(friend) fun complete_transfer<Initiator: store, Recipient: copy + store>(bridge_transfer_id: vector<u8>, hash_lock: vector<u8>) : (Recipient, u64) acquires SmartTableWrapper {
+        assert!(features::abort_atomic_bridge_enabled(), EATOMIC_BRIDGE_NOT_ENABLED);
+
         let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
 
         let details = smart_table::borrow_mut(
@@ -785,6 +791,8 @@ module aptos_framework::atomic_bridge_store {
     /// @return A tuple containing the initiator of the transfer and the amount to be refunded.
     /// @abort If the bridge transfer details are not found or if the cancellation conditions in `cancel_details` fail.
     public(friend) fun cancel_transfer<Initiator: store + copy, Recipient: store>(bridge_transfer_id: vector<u8>) : (Initiator, u64) acquires SmartTableWrapper {
+        assert!(features::abort_atomic_bridge_enabled(), EATOMIC_BRIDGE_NOT_ENABLED);
+
         let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
 
         let details = smart_table::borrow_mut(
@@ -1053,6 +1061,8 @@ module aptos_framework::atomic_bridge {
     friend aptos_framework::atomic_bridge_initiator;
     friend aptos_framework::genesis;
 
+    const EATOMIC_BRIDGE_NOT_ENABLED : u64 = 0x1;
+
     struct AptosCoinBurnCapability has key {
         burn_cap: BurnCapability<AptosCoin>,
     }
@@ -1084,7 +1094,11 @@ module aptos_framework::atomic_bridge {
     public fun initialize_for_test(aptos_framework: &signer) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         account::create_account_for_test(@aptos_framework);
-
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[features::get_atomic_bridge_feature()],
+            vector[]
+        );
         initialize(aptos_framework);
 
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
@@ -1122,6 +1136,8 @@ module aptos_framework::atomic_bridge {
     /// @param amount The amount of AptosCoin to mint.
     /// @abort If the mint capability is not available.
     public(friend) fun mint(recipient: address, amount: u64) acquires AptosCoinMintCapability {
+        assert!(features::abort_atomic_bridge_enabled(), EATOMIC_BRIDGE_NOT_ENABLED);
+
         coin::deposit(recipient, coin::mint(
             amount,
             &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap
@@ -1134,6 +1150,8 @@ module aptos_framework::atomic_bridge {
     /// @param amount The amount of AptosCoin to burn.
     /// @abort If the burn capability is not available.
     public(friend) fun burn(from: address, amount: u64) acquires AptosCoinBurnCapability {
+        assert!(features::abort_atomic_bridge_enabled(), EATOMIC_BRIDGE_NOT_ENABLED);
+
         coin::burn_from(
             from,
             amount,
