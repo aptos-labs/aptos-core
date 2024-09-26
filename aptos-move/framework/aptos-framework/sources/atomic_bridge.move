@@ -533,11 +533,12 @@ module aptos_framework::bridge_store {
     /// Error codes
     const EINVALID_PRE_IMAGE : u64 = 0x1;
     const ENOT_PENDING_TRANSACTION : u64 = 0x2;
-    const ENOT_EXPIRED : u64 = 0x3;
-    const EINVALID_HASH_LOCK : u64 = 0x4;
-    const EINVALID_TIME_LOCK : u64 = 0x5;
-    const EZERO_AMOUNT : u64 = 0x6;
-    const EINVALID_BRIDGE_TRANSFER_ID : u64 = 0x7;
+    const EEXPIRED : u64 = 0x3;
+    const ENOT_EXPIRED : u64 = 0x4;
+    const EINVALID_HASH_LOCK : u64 = 0x5;
+    const EINVALID_TIME_LOCK : u64 = 0x6;
+    const EZERO_AMOUNT : u64 = 0x7;
+    const EINVALID_BRIDGE_TRANSFER_ID : u64 = 0x8;
 
     /// Transaction states
     const PENDING_TRANSACTION: u8 = 0x1;
@@ -705,6 +706,14 @@ module aptos_framework::bridge_store {
         assert!(now() > details.time_lock, ENOT_EXPIRED);
     }
 
+    /// Asserts we are still within the timelock.
+    ///
+    /// @param details The bridge transfer details.
+    /// @abort If the time lock has expired.
+    public fun assert_within_timelock<Initiator: store, Recipient: store>(details: &BridgeTransferDetails<Initiator, Recipient>) {
+        assert!(!(now() > details.time_lock), EEXPIRED);
+    }
+
     /// Completes the bridge transfer.
     ///
     /// @param details The bridge transfer details to complete.
@@ -729,6 +738,7 @@ module aptos_framework::bridge_store {
         assert_valid_hash_lock(&hash_lock);
         assert_pending(details);
         assert_correct_hash_lock(details, hash_lock);
+        assert_within_timelock(details);
 
         complete(details);
 
