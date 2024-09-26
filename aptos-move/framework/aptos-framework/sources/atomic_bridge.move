@@ -166,7 +166,7 @@ module aptos_framework::atomic_bridge_initiator {
 
     /// Initiate a bridge transfer of ETH from Movement to the base layer
     /// Anyone can initiate a bridge transfer from the source chain
-    /// The amount is transferred from the initiator to aptos_framework
+    /// The amount is burnt from the initiator
     public entry fun initiate_bridge_transfer(
         initiator: &signer,
         recipient: vector<u8>,
