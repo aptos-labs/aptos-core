@@ -1,0 +1,6 @@
+error[E03004]: unbound type
+   ┌─ tests/move_check/verification/cross_module_invalid2.move:24:23
+   │
+24 │     public fun bad(): Foo {
+   │                       ^^^ Unbound type 'Foo' in current scope
+

@@ -513,7 +513,9 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         },
 
         E::Lambda(ll, e) => {
-            lvalues(context, &ll.value);
+            use crate::expansion::ast::TypedLValue_;
+            let mapped = ll.value.iter().map(|sp!(_, TypedLValue_(lv, _opt_ty))| lv);
+            lvalues(context, mapped);
             exp(context, e)
         },
         E::Quant(_, binds, es_vec, eopt, e) => {

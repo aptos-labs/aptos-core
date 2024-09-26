@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/folding/constants_single_quote.move:4:29
+  │
+4 │     const C13: vector<u8> = "foo
+  │                             ^ Invalid character: '"'; string literal must begin with `b"` and closing quote `"` must appear on same line
