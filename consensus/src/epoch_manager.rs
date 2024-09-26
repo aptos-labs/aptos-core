@@ -1440,8 +1440,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .pessimistic_verify_set()
                 .contains(&peer_id);
 
-            if self.config.optimistic_sig_verification_for_order_votes
-                && !perform_pessimistic_verification
+            if self.config.optimistic_sig_verification && !perform_pessimistic_verification
             {
                 if let UnverifiedEvent::OrderVoteMsg(order_vote) = &unverified_event {
                     order_vote.verify_metadata()?;
@@ -1456,11 +1455,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     );
                     return Ok(());
                 }
-            }
 
-            if self.config.optimistic_sig_verification_for_votes
-                && !perform_pessimistic_verification
-            {
                 if let UnverifiedEvent::VoteMsg(vote) = unverified_event.clone() {
                     self.bounded_executor
                         .spawn(async move {
