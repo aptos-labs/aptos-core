@@ -20,7 +20,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
-    ledger_info::LedgerInfoWithPartialSignatures,
+    ledger_info::LedgerInfoWithVerifiedSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::{
@@ -62,7 +62,7 @@ pub struct PendingVotes {
     /// This might keep multiple LedgerInfos for the current round: either due to different proposals (byzantine behavior)
     /// or due to different NIL proposals (clients can have a different view of what block to extend).
     li_digest_to_votes:
-        HashMap<HashValue /* LedgerInfo digest */, (usize, LedgerInfoWithPartialSignatures)>,
+        HashMap<HashValue /* LedgerInfo digest */, (usize, LedgerInfoWithVerifiedSignatures)>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
     maybe_partial_2chain_tc: Option<TwoChainTimeoutWithPartialSignatures>,
     /// Map of Author to (vote, li_digest). This is useful to discard multiple votes.
@@ -138,7 +138,7 @@ impl PendingVotes {
                 // if the ledger info with signatures doesn't exist yet, create it
                 (
                     len,
-                    LedgerInfoWithPartialSignatures::new(
+                    LedgerInfoWithVerifiedSignatures::new(
                         vote.ledger_info().clone(),
                         PartialSignatures::empty(),
                     ),
@@ -264,7 +264,7 @@ impl PendingVotes {
 
     pub fn aggregate_qc_now(
         validator_verifier: &ValidatorVerifier,
-        li_with_sig: &LedgerInfoWithPartialSignatures,
+        li_with_sig: &LedgerInfoWithVerifiedSignatures,
         vote_data: &VoteData,
     ) -> VoteReceptionResult {
         match li_with_sig.aggregate_signatures(validator_verifier) {
@@ -317,7 +317,7 @@ impl PendingVotes {
     pub fn drain_votes(
         &mut self,
     ) -> (
-        Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
+        Vec<(HashValue, LedgerInfoWithVerifiedSignatures)>,
         Option<TwoChainTimeoutWithPartialSignatures>,
     ) {
         for (hash_index, _) in self.li_digest_to_votes.values() {

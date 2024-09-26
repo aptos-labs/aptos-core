@@ -232,7 +232,7 @@ impl ApplyChunkOutput {
                 transaction_outputs.drain(pos..).collect(),
             )
         } else {
-            TransactionsWithParsedOutput::new(vec![], vec![])
+            TransactionsWithParsedOutput::new_empty()
         };
 
         let state_checkpoint_to_add =
@@ -243,59 +243,73 @@ impl ApplyChunkOutput {
 
         let status = keeps_and_discards.chain(retries).collect();
 
-        // Separate transactions with the Keep status out.
-        let (mut to_keep, to_discard) = itertools::zip_eq(transactions, transaction_outputs)
-            .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
-                matches!(o.status(), TransactionStatus::Keep(_))
-            });
+        let to_discard = {
+            let mut res = TransactionsWithParsedOutput::new_empty();
+            for idx in 0..transactions.len() {
+                if transaction_outputs[idx].status().is_discarded() {
+                    res.push(transactions[idx].clone(), transaction_outputs[idx].clone());
+                } else if !res.is_empty() {
+                    transactions[idx - res.len()] = transactions[idx].clone();
+                    transaction_outputs[idx - res.len()] = transaction_outputs[idx].clone();
+                }
+            }
+            if !res.is_empty() {
+                let remaining = transactions.len() - res.len();
+                transactions.truncate(remaining);
+                transaction_outputs.truncate(remaining);
+            }
+            res
+        };
+        let to_keep = {
+            let mut res = TransactionsWithParsedOutput::new(transactions, transaction_outputs);
 
-        // Append the StateCheckpoint transaction to the end of to_keep
-        if let Some(block_id) = state_checkpoint_to_add {
-            let state_checkpoint_txn =
-                block_end_info.map_or(Transaction::StateCheckpoint(block_id), |block_end_info| {
-                    Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
-                        block_id,
-                        block_end_info,
-                    })
-                });
-            let state_checkpoint_txn_output: ParsedTransactionOutput =
-                Into::into(TransactionOutput::new(
-                    WriteSet::default(),
-                    Vec::new(),
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::Success),
-                    TransactionAuxiliaryData::default(),
-                ));
-            to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
-        }
+            // Append the StateCheckpoint transaction to the end of to_keep
+            if let Some(block_id) = state_checkpoint_to_add {
+                let state_checkpoint_txn = block_end_info.map_or(
+                    Transaction::StateCheckpoint(block_id),
+                    |block_end_info| {
+                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
+                            block_id,
+                            block_end_info,
+                        })
+                    },
+                );
+                let state_checkpoint_txn_output: ParsedTransactionOutput =
+                    Into::into(TransactionOutput::new(
+                        WriteSet::default(),
+                        Vec::new(),
+                        0,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                        TransactionAuxiliaryData::default(),
+                    ));
+                res.push(state_checkpoint_txn, state_checkpoint_txn_output);
+            }
+            res
+        };
 
         // Sanity check transactions with the Discard status:
-        let to_discard = to_discard
-            .into_iter()
-            .map(|(t, o)| {
-                // In case a new status other than Retry, Keep and Discard is added:
-                if !matches!(o.status(), TransactionStatus::Discard(_)) {
-                    error!("Status other than Retry, Keep or Discard; Transaction discarded.");
-                }
-                // VM shouldn't have output anything for discarded transactions, log if it did.
-                if !o.write_set().is_empty() || !o.events().is_empty() {
-                    error!(
-                        "Discarded transaction has non-empty write set or events. \
-                     Transaction: {:?}. Status: {:?}.",
-                        t,
-                        o.status(),
-                    );
-                    APTOS_EXECUTOR_ERRORS.inc();
-                }
-                Ok((t, o))
-            })
-            .collect::<Result<Vec<_>>>()?;
+        to_discard.iter().for_each(|(t, o)| {
+            // In case a new status other than Retry, Keep and Discard is added:
+            if !matches!(o.status(), TransactionStatus::Discard(_)) {
+                error!("Status other than Retry, Keep or Discard; Transaction discarded.");
+            }
+            // VM shouldn't have output anything for discarded transactions, log if it did.
+            if !o.write_set().is_empty() || !o.events().is_empty() {
+                error!(
+                    "Discarded transaction has non-empty write set or events. \
+                        Transaction: {:?}. Status: {:?}.",
+                    t,
+                    o.status(),
+                );
+                APTOS_EXECUTOR_ERRORS.inc();
+            }
+        });
 
         Ok((
             new_epoch_marker.is_some(),
             status,
-            to_keep.into(),
-            to_discard.into(),
+            to_keep,
+            to_discard,
             to_retry,
         ))
     }

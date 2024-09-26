@@ -153,9 +153,11 @@ impl NodeManager {
         node_config.indexer_grpc.use_data_service_interface = run_txn_stream;
         node_config.indexer_grpc.address.set_port(txn_stream_port);
 
-        // So long as the indexer relies on storage indexing tables, this must be set
-        // for the indexer GRPC stream on the node to work.
-        node_config.storage.enable_indexer = run_txn_stream;
+        node_config.indexer_table_info.table_info_service_mode = match run_txn_stream {
+            // Localnet should be responsible for backup or restore of table info tables.
+            true => aptos_config::config::TableInfoServiceMode::IndexingOnly,
+            false => aptos_config::config::TableInfoServiceMode::Disabled,
+        };
 
         // Bind to the requested address.
         node_config.api.address.set_ip(IpAddr::V4(bind_to));

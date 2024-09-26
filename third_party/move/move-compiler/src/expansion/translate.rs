@@ -2615,10 +2615,10 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         PE::Loop(ploop) => EE::Loop(exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
         PE::Lambda(pbs, pe) => {
-            let bs_opt = bind_list(context, pbs);
+            let tbs_opt = typed_bind_list(context, pbs);
             let e = exp_(context, *pe);
-            match bs_opt {
-                Some(bs) => EE::Lambda(bs, Box::new(e)),
+            match tbs_opt {
+                Some(tbs) => EE::Lambda(tbs, Box::new(e)),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
@@ -2885,6 +2885,24 @@ fn fields<T>(
 //**************************************************************************************************
 // LValues
 //**************************************************************************************************
+
+fn typed_bind_list(
+    context: &mut Context,
+    sp!(loc, pbs_): P::TypedBindList,
+) -> Option<E::TypedLValueList> {
+    let bs_: Option<Vec<E::TypedLValue>> = pbs_
+        .into_iter()
+        .map(|tpb| typed_bind(context, tpb))
+        .collect();
+    Some(sp(loc, bs_?))
+}
+
+fn typed_bind(context: &mut Context, sp!(loc, tpb_): P::TypedBind) -> Option<E::TypedLValue> {
+    let P::TypedBind_(pb, opt_type) = tpb_;
+    let b = bind(context, pb)?;
+    let ot = opt_type.map(|ty| type_(context, ty));
+    Some(sp(loc, E::TypedLValue_(b, ot)))
+}
 
 fn bind_list(context: &mut Context, sp!(loc, pbs_): P::BindList) -> Option<E::LValueList> {
     let bs_: Option<Vec<E::LValue>> = pbs_.into_iter().map(|pb| bind(context, pb)).collect();
@@ -3234,7 +3252,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Lambda(ls, er) => {
             unbound_names_exp(unbound, er);
             // remove anything in `ls`
-            unbound_names_binds(unbound, ls);
+            unbound_names_typed_binds(unbound, ls);
         },
         EE::Quant(_, rs, trs, cr_opt, er) => {
             unbound_names_exp(unbound, er);
@@ -3309,6 +3327,12 @@ fn unbound_names_binds(unbound: &mut UnboundNames, sp!(_, ls_): &E::LValueList) 
     ls_.iter()
         .rev()
         .for_each(|l| unbound_names_bind(unbound, l))
+}
+
+fn unbound_names_typed_binds(unbound: &mut UnboundNames, sp!(_, ls_): &E::TypedLValueList) {
+    ls_.iter()
+        .rev()
+        .for_each(|sp!(_loc, E::TypedLValue_(l, _opt_ty))| unbound_names_bind(unbound, l))
 }
 
 fn unbound_names_binds_with_range(

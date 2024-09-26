@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: local `s` of type `M::S` does not have the `copy` ability
+   ┌─ tests/ability-check/typing/pack.move:14:29
+   │
+14 │         let n2 = Nat { f: *&s };
+   │                             ^ copy needed here because value is still in use
+15 │         R { s: _, f: _, n1: _, n2: _ } = (R { s, n2, f, n1 }: R);
+   │                                               - used here

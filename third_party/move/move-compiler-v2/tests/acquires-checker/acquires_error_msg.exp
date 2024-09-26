@@ -1,9 +1,0 @@
-
-Diagnostics:
-error: missing acquires annotation for `Test`
-  ┌─ tests/acquires-checker/acquires_error_msg.move:6:16
-  │
-6 │     public fun call_modify_without_acquire() {
-  │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-7 │         modify(); // expect error message here
-  │         -------- acquired by the call to `modify`

@@ -305,7 +305,7 @@ module aptos_framework::voting {
             simple_map::add(&mut metadata, is_multi_step_in_execution_key, to_bytes(&false));
             // If the proposal is a single-step proposal, we check if the metadata passed by the client has the IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY key.
             // If they have the key, we will remove it, because a single-step proposal that doesn't need this key.
-        } else if (simple_map::contains_key(&mut metadata, &is_multi_step_in_execution_key)) {
+        } else if (simple_map::contains_key(&metadata, &is_multi_step_in_execution_key)) {
             simple_map::remove(&mut metadata, &is_multi_step_in_execution_key);
         };
 
