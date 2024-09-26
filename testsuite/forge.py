@@ -845,6 +845,8 @@ class K8sForgeRunner(ForgeRunner):
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
         )
 
+        log.info(f"rendered_forge_test_runner: {rendered}")
+
         with ForgeResult.with_context(context) as forge_result:
             specfile = context.filesystem.mkstemp()
             context.filesystem.write(specfile, rendered.encode())
@@ -1609,7 +1611,7 @@ def test(
         test_args=test_args,
     )
 
-    log.debug("forge_args: %s", forge_args)
+    log.info("forge_args: %s", forge_args)
 
     # use the github actor username if possible
     forge_username = os.getenv("GITHUB_ACTOR") or "unknown-username"

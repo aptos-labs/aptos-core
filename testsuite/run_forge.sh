@@ -19,7 +19,9 @@ if grep -v '^#' testsuite/forge.env | grep -q .; then
 
 fi
 # source the forge.env file to set the environment variables which are used as feature flags for the forge script
+set -a # export all variables when we source the file
 source testsuite/forge.env
+set +a # stop exporting variables
 
 echo "Executing python testsuite/forge.py test $@"
 exec python3 testsuite/forge.py test "$@"
