@@ -875,6 +875,141 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+        if !self.parent.env.language_version().is_at_least(version_min) {
+            self.parent.env.error(
+                loc,
+                &format!(
+                    "not supported before language version `{}`: {}",
+                    version_min, feature
+                ),
+            )
+        }
+    }
+
+    /// Evaluation of constant `key`
+    /// Performed in depth-first way to detect cyclic dependency
+    /// and constants are evaluated according to dependency relation
+    fn eval_constant(
+        &mut self,
+        key: &PA::ConstantName,
+        constant_map: &UniqueMap<PA::ConstantName, EA::Constant>,
+        visiting: &mut Vec<(PA::ConstantName, Loc)>, // constants that are being traversed during dfs
+        visited: &mut BTreeSet<PA::ConstantName>, // constants that are already visited during dfs
+        compiled_module: &Option<BytecodeModule>,
+    ) {
+        // Get all names from an expression
+        // only recursively check on expression types supported in constant definition.
+        fn get_names_from_const_exp(exp: &EA::Exp_) -> BTreeSet<Name> {
+            let mut names = BTreeSet::new();
+            let mut add_names = |v: &EA::Exp| {
+                let set = get_names_from_const_exp(&v.value);
+                for n in set.iter() {
+                    names.insert(*n);
+                }
+            };
+            match exp {
+                EA::Exp_::Name(access, _) => {
+                    names.insert(*access.value.get_name());
+                },
+                EA::Exp_::Call(_, _, _, exp_vec) | EA::Exp_::Vector(_, _, exp_vec) => {
+                    exp_vec.value.iter().for_each(&mut add_names);
+                },
+                EA::Exp_::UnaryExp(_, exp) => {
+                    add_names(exp);
+                },
+                EA::Exp_::BinopExp(exp1, _, exp2) => {
+                    add_names(exp1);
+                    add_names(exp2);
+                },
+                EA::Exp_::Block(seq) => {
+                    for s in seq.iter() {
+                        match &s.value {
+                            EA::SequenceItem_::Seq(exp) | EA::SequenceItem_::Bind(_, exp) => {
+                                add_names(exp);
+                            },
+                            _ => {},
+                        }
+                    }
+                },
+                _ => {},
+            }
+            names
+        }
+        if visited.contains(key) {
+            return;
+        }
+        let qsym = self.qualified_by_module_from_name(&key.0);
+        let loc = self
+            .parent
+            .const_table
+            .get(&qsym)
+            .expect("constant declared")
+            .loc
+            .clone();
+        if let Some(index) = visiting.iter().position(|r| r.0 == *key) {
+            self.parent.env.diag_with_labels(
+                Severity::Error,
+                &loc,
+                &format!("Found recursive definition of a constant `{}`; cycle formed by definitions below", key),
+                visiting[index..]
+                    .to_vec()
+                    .iter()
+                    .map(|(name, loc)| (loc.clone(), format!("`{}` is defined here", name)))
+                    .collect_vec(),
+            );
+            return;
+        }
+        visiting.push((*key, loc.clone()));
+        if let Some(exp) = constant_map.get(key) {
+            let names = get_names_from_const_exp(&exp.value.value);
+            for name in names {
+                let const_name = PA::ConstantName(name);
+                let qsym = self.qualified_by_module_from_name(&name);
+                if !self.parent.const_table.contains_key(&qsym) {
+                    continue;
+                }
+                self.check_language_version(
+                    &loc,
+                    "constant definitions referring to other constants",
+                    LanguageVersion::V2_0,
+                );
+                if visited.contains(&const_name) {
+                    continue;
+                }
+                self.eval_constant(
+                    &const_name,
+                    constant_map,
+                    visiting,
+                    visited,
+                    compiled_module,
+                );
+            }
+            self.def_ana_constant(key, exp, compiled_module);
+        }
+        visited.insert(*key);
+        visiting.pop();
+    }
+
+    /// Evaluation of constants in the module
+    fn analyze_constants(
+        &mut self,
+        module_def: &EA::ModuleDefinition,
+        compiled_module: &Option<BytecodeModule>,
+    ) {
+        let mut visited = BTreeSet::new();
+        let mut visiting = vec![];
+        for (name, _) in module_def.constants.key_cloned_iter() {
+            self.eval_constant(
+                &name,
+                &module_def.constants,
+                &mut visiting,
+                &mut visited,
+                compiled_module,
+            );
+        }
+    }
+
     fn def_ana(
         &mut self,
         module_def: &EA::ModuleDefinition,
@@ -886,9 +1021,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
 
         // Analyze all constants.
-        for (name, def) in module_def.constants.key_cloned_iter() {
-            self.def_ana_constant(&name, def, compiled_module);
-        }
+        self.analyze_constants(module_def, compiled_module);
 
         // Analyze all schemas. This must be done before other things because schemas need to be
         // ready for inclusion. We also must do this recursively, so use a visited set to detect

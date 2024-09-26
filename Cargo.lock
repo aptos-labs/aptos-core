@@ -4287,6 +4287,7 @@ dependencies = [
  "claims",
  "coset",
  "criterion",
+ "dashmap",
  "derivative",
  "fixed",
  "fxhash",
