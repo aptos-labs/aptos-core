@@ -61,15 +61,12 @@ impl<T: Transaction> TxnProvider<T> for BlockingTxnsProvider<T> {
     fn get_txn(&self, idx: TxnIndex) -> Arc<T> {
         let txn = &self.txns[idx as usize];
         let mut status = txn.txn.lock().unwrap();
+        while let BlockingTransactionStatus::Waiting = *status {
+            status = txn.cvar.wait(status).unwrap();
+        }
         match *status {
             BlockingTransactionStatus::Ready(ref txn) => txn.clone(),
-            BlockingTransactionStatus::Waiting => {
-                status = txn.cvar.wait(status).unwrap();
-                match *status {
-                    BlockingTransactionStatus::Ready(ref txn) => txn.clone(),
-                    BlockingTransactionStatus::Waiting => panic!("Unexpected status"),
-                }
-            },
+            BlockingTransactionStatus::Waiting => panic!("Unexpected status"),
         }
     }
 }
