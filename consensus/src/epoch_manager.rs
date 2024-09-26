@@ -105,7 +105,7 @@ use std::{
     hash::Hash,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -1439,60 +1439,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .verifier
                 .pessimistic_verify_set()
                 .contains(&peer_id);
-
-            if self.config.optimistic_sig_verification && !perform_pessimistic_verification
-            {
-                if let UnverifiedEvent::OrderVoteMsg(order_vote) = &unverified_event {
-                    order_vote.verify_metadata()?;
-                    Self::forward_event(
-                        quorum_store_msg_tx,
-                        round_manager_tx,
-                        buffered_proposal_tx,
-                        peer_id,
-                        VerifiedEvent::OrderVoteMsg(order_vote.clone()),
-                        payload_manager,
-                        pending_blocks,
-                    );
-                    return Ok(());
-                }
-
-                if let UnverifiedEvent::VoteMsg(vote) = unverified_event.clone() {
-                    self.bounded_executor
-                        .spawn(async move {
-                            // The verify_metadata function will potentially verify the signature of timeout.
-                            // So, we need to spawn it in a separate task to avoid blocking the main task.
-                            let start_time = Instant::now();
-                            let result = vote.verify_metadata(&epoch_state.verifier);
-                            counters::VERIFY_MSG
-                                .with_label_values(&["vote_verify_metadata"])
-                                .observe(start_time.elapsed().as_secs_f64());
-                            match result {
-                                Ok(()) => {
-                                    Self::forward_event(
-                                        quorum_store_msg_tx,
-                                        round_manager_tx,
-                                        buffered_proposal_tx,
-                                        peer_id,
-                                        VerifiedEvent::VoteMsg(vote),
-                                        payload_manager,
-                                        pending_blocks,
-                                    );
-                                },
-                                Err(e) => {
-                                    error!(
-                                        SecurityEvent::ConsensusInvalidMessage,
-                                        remote_peer = peer_id,
-                                        error = ?e,
-                                        unverified_event = unverified_event
-                                    );
-                                },
-                            }
-                        })
-                        .await;
-                    return Ok(());
-                }
-            }
-
+            let optimistic_sig_verification =
+                self.config.optimistic_sig_verification && !perform_pessimistic_verification;
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -1505,6 +1453,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             peer_id == my_peer_id,
                             max_num_batches,
                             max_batch_expiry_gap_usecs,
+                            optimistic_sig_verification,
                         )
                     ) {
                         Ok(verified_event) => {

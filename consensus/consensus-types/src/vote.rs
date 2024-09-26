@@ -175,7 +175,6 @@ impl Vote {
 
     /// Verifies the signature on the LedgerInfo.
     pub fn verify_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        // TODO: Should we verify only if the status is unverified?
         validator
             .verify(self.author(), &self.ledger_info, self.signature.signature())
             .context("Failed to verify Vote signature")?;

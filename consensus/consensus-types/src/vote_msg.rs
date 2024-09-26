@@ -78,8 +78,15 @@ impl VoteMsg {
     }
 
     /// Verifies the vote message, including the signature verification on the vote.
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify(
+        &self,
+        validator: &ValidatorVerifier,
+        optimistic_signature_verification: bool,
+    ) -> anyhow::Result<()> {
         self.verify_metadata(validator)?;
-        self.vote().verify_signature(validator)
+        if !optimistic_signature_verification {
+            self.vote().verify_signature(validator)?;
+        }
+        Ok(())
     }
 }

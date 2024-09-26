@@ -55,11 +55,17 @@ impl OrderVoteMsg {
 
     /// This function verifies the order_vote component in the order_vote_msg.
     /// The quorum cert is verified in the round manager when the quorum certificate is used.
-    pub fn verify_order_vote(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify_order_vote(
+        &self,
+        validator: &ValidatorVerifier,
+        optimistic_signature_verification: bool,
+    ) -> anyhow::Result<()> {
         self.verify_metadata()?;
-        self.order_vote
-            .verify(validator)
-            .context("[OrderVoteMsg] OrderVote verification failed")?;
+        if !optimistic_signature_verification {
+            self.order_vote
+                .verify_signature(validator)
+                .context("[OrderVoteMsg] OrderVote verification failed")?;
+        }
         Ok(())
     }
 }
