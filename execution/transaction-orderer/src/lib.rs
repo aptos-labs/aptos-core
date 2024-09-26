@@ -25,7 +25,21 @@ pub mod common;
 mod reservation_table;
 pub mod transaction_compressor;
 
-pub struct V3ReorderingPartitioner {}
+pub struct V3ReorderingPartitioner {
+    pub print_debug_stats: bool,
+    pub min_ordered_transaction_before_execution: usize,
+    pub max_window_size: usize,
+}
+
+impl Default for V3ReorderingPartitioner {
+    fn default() -> Self {
+        V3ReorderingPartitioner {
+            print_debug_stats: false,
+            min_ordered_transaction_before_execution: 100,
+            max_window_size: 1000,
+        }
+    }
+}
 
 impl aptos_block_partitioner::BlockPartitioner for V3ReorderingPartitioner {
     fn partition(&self, transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> PartitionedTransactions {
@@ -99,7 +113,7 @@ impl aptos_block_partitioner::BlockPartitioner for V3ReorderingPartitioner {
             })
             .collect();
 
-        PartitionedTransactions::V3(build_partitioning_result(num_shards, txns, shard_idxs))
+        PartitionedTransactions::V3(build_partitioning_result(num_shards, txns, shard_idxs, self.print_debug_stats))
     }
 }
 
@@ -108,6 +122,6 @@ pub struct V3ReorderingPartitionerConfig {}
 
 impl PartitionerConfig for V3ReorderingPartitionerConfig {
     fn build(&self) -> Box<dyn aptos_block_partitioner::BlockPartitioner> {
-        Box::new(V3ReorderingPartitioner{})
+        Box::new(V3ReorderingPartitioner::default())
     }
 }

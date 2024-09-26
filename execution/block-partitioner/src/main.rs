@@ -32,7 +32,9 @@ fn main() {
     aptos_logger::Logger::new().init();
     info!("Starting the block partitioning benchmark");
     let args = Args::parse();
+    info!("Args parsed");
     let block_gen = P2PBlockGenerator::new(args.num_accounts);
+    info!("block_gen created");
     let partitioner = PartitionerV2Config::default()
         .max_partitioning_rounds(4)
         .num_threads(8)

@@ -53,8 +53,10 @@ where
     ) -> Result<Self::ResultStream, Self::Error>;
 }
 
-
-pub struct V3FennelBasedPartitioner {}
+#[derive(Default)]
+pub struct V3FennelBasedPartitioner {
+    pub print_debug_stats: bool,
+}
 
 impl BlockPartitioner for V3FennelBasedPartitioner {
     fn partition(&self, transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> PartitionedTransactions {
@@ -86,7 +88,7 @@ impl BlockPartitioner for V3FennelBasedPartitioner {
         }
 
         let txns = txn_holders.into_iter().map(|holder| holder.unwrap()).collect();
-        PartitionedTransactions::V3(build_partitioning_result(num_shards,txns, shard_idxs_by_txn))
+        PartitionedTransactions::V3(build_partitioning_result(num_shards,txns, shard_idxs_by_txn, self.print_debug_stats))
     }
 }
 
@@ -95,6 +97,6 @@ pub struct V3FennelBasedPartitionerConfig {}
 
 impl PartitionerConfig for V3FennelBasedPartitionerConfig {
     fn build(&self) -> Box<dyn BlockPartitioner> {
-        Box::new(V3FennelBasedPartitioner {})
+        Box::new(V3FennelBasedPartitioner::default())
     }
 }

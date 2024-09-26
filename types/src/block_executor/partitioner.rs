@@ -684,6 +684,33 @@ impl PartitionedTransactions {
             },
         }
     }
+
+    pub fn log_info(&self) {
+        match self {
+            V2(obj) => {
+                for (shard_id, sub_blocks) in obj.sharded_txns.iter().enumerate() {
+                    for (round, sub_block) in sub_blocks.sub_block_iter().enumerate() {
+                        println!(
+                            "Shard {} Round {} has {} transactions",
+                            shard_id,
+                            round,
+                            sub_block.num_txns()
+                        );
+                    }
+                }
+                println!("Global transactions: {}", obj.global_txns.len());
+            },
+            V3(obj) => {
+                for (shard_id, partition) in obj.partitions.iter().enumerate() {
+                    println!(
+                        "Shard {} has {} transactions",
+                        shard_id,
+                        partition.num_txns()
+                    );
+                }
+            },
+        }
+    }
 }
 
 // Represents the transactions in a block that are ready to be executed.

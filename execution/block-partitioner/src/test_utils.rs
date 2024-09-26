@@ -44,19 +44,20 @@ use std::collections::HashMap;
 #[cfg(test)]
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicU64;
 
 #[derive(Debug)]
 pub struct TestAccount {
     pub account_address: AccountAddress,
     pub private_key: Ed25519PrivateKey,
-    pub sequence_number: u64,
+    pub sequence_number: AtomicU64,
 }
 
 pub fn generate_test_account() -> TestAccount {
     TestAccount {
         account_address: AccountAddress::random(),
         private_key: Ed25519PrivateKey::generate_for_testing(),
-        sequence_number: 0,
+        sequence_number: AtomicU64::new(0),
     }
 }
 
@@ -64,7 +65,7 @@ pub fn generate_test_account_for_address(account_address: AccountAddress) -> Tes
     TestAccount {
         account_address,
         private_key: Ed25519PrivateKey::generate_for_testing(),
-        sequence_number: 0,
+        sequence_number: AtomicU64::new(0),
     }
 }
 
@@ -76,7 +77,7 @@ pub fn create_non_conflicting_p2p_transaction() -> AnalyzedTransaction {
 }
 
 pub fn create_signed_p2p_transaction(
-    sender: &mut TestAccount,
+    sender: &TestAccount,
     receivers: Vec<&TestAccount>,
 ) -> Vec<AnalyzedTransaction> {
     let mut transactions = Vec::new();
@@ -91,16 +92,16 @@ pub fn create_signed_p2p_transaction(
             ],
         ));
 
+        let seq_num = sender.sequence_number.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let raw_transaction = RawTransaction::new(
             sender.account_address,
-            sender.sequence_number,
+            seq_num,
             transaction_payload,
             0,
             0,
             0,
             ChainId::new(10),
         );
-        sender.sequence_number += 1;
         let txn = Transaction::UserTransaction(SignedTransaction::new(
             raw_transaction.clone(),
             sender.private_key.public_key().clone(),

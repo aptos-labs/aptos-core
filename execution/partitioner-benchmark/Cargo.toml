@@ -1,0 +1,22 @@
+[package]
+name = "partitioner-benchmark"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aptos-block-partitioner = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-transaction-orderer = { workspace = true }
+aptos-streaming-partitioner = { workspace = true }
+aptos-types = { workspace = true }
+clap = { workspace = true }
+rand = "0.8"
+rand_distr = "0.4"

@@ -132,7 +132,7 @@ members = [
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
-    "execution/graphs",
+    "execution/graphs", "execution/partitioner-benchmark",
     "execution/streaming-partitioner",
     "execution/transaction-orderer",
     "experimental/execution/ptx-executor",
