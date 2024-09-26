@@ -19,6 +19,7 @@ module supra_framework::reconfiguration {
     friend supra_framework::block;
     friend supra_framework::consensus_config;
     friend supra_framework::execution_config;
+    friend supra_framework::supra_config;
     friend supra_framework::gas_schedule;
     friend supra_framework::genesis;
     friend supra_framework::version;

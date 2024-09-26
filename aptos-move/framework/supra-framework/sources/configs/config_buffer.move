@@ -20,6 +20,7 @@ module supra_framework::config_buffer {
 
     friend supra_framework::consensus_config;
     friend supra_framework::execution_config;
+    friend supra_framework::supra_config;
     friend supra_framework::gas_schedule;
     friend supra_framework::jwks;
     friend supra_framework::jwk_consensus_config;

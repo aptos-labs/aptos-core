@@ -41,6 +41,7 @@ spec supra_framework::reconfiguration_with_dkg {
         use supra_framework::jwks;
         use supra_framework::randomness_config;
         use supra_framework::jwk_consensus_config;
+        use supra_framework::supra_config;
         framework: signer;
         requires signer::address_of(framework) == @supra_framework;
         requires chain_status::is_operating();
@@ -53,6 +54,7 @@ spec supra_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;
         include config_buffer::OnNewEpochRequirement<execution_config::ExecutionConfig>;
         include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
+        include config_buffer::OnNewEpochRequirement<supra_config::SupraConfig>;
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
         include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
         include config_buffer::OnNewEpochRequirement<randomness_config_seqnum::RandomnessConfigSeqNum>;

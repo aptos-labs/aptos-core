@@ -15,6 +15,7 @@ module supra_framework::reconfiguration_with_dkg {
     use supra_framework::reconfiguration;
     use supra_framework::reconfiguration_state;
     use supra_framework::stake;
+    use supra_framework::supra_config;
     use supra_framework::system_addresses;
     friend supra_framework::block;
     friend supra_framework::supra_governance;
@@ -48,6 +49,7 @@ module supra_framework::reconfiguration_with_dkg {
         dkg::try_clear_incomplete_session(framework);
         consensus_config::on_new_epoch(framework);
         execution_config::on_new_epoch(framework);
+        supra_config::on_new_epoch(framework);
         gas_schedule::on_new_epoch(framework);
         std::version::on_new_epoch(framework);
         features::on_new_epoch(framework);

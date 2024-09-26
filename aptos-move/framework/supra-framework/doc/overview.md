@@ -62,6 +62,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::storage_gas`](storage_gas.md#0x1_storage_gas)
 -  [`0x1::supra_account`](supra_account.md#0x1_supra_account)
 -  [`0x1::supra_coin`](supra_coin.md#0x1_supra_coin)
+-  [`0x1::supra_config`](supra_config.md#0x1_supra_config)
 -  [`0x1::supra_governance`](supra_governance.md#0x1_supra_governance)
 -  [`0x1::system_addresses`](system_addresses.md#0x1_system_addresses)
 -  [`0x1::timestamp`](timestamp.md#0x1_timestamp)

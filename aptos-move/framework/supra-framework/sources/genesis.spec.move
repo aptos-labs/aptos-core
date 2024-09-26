@@ -80,6 +80,7 @@ spec supra_framework::genesis {
         ensures exists<supra_governance::GovernanceResponsbility>(@supra_framework);
         ensures exists<consensus_config::ConsensusConfig>(@supra_framework);
         ensures exists<execution_config::ExecutionConfig>(@supra_framework);
+        ensures exists<supra_config::SupraConfig>(@supra_framework);
         ensures exists<version::Version>(@supra_framework);
         ensures exists<stake::ValidatorSet>(@supra_framework);
         ensures exists<stake::ValidatorPerformance>(@supra_framework);
