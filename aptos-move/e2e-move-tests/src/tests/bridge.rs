@@ -4,17 +4,16 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tiny_keccak::{Hasher, Keccak};
 use move_core_types::account_address::AccountAddress;
-use move_core_types::language_storage::{ModuleId, TypeTag};
+use move_core_types::language_storage::TypeTag;
 use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::value::MoveValue;
-use crate::{assert_success, MoveHarness};
+use crate::{assert_abort, assert_success, MoveHarness};
 use crate::tests::common;
 
 pub static BRIDGE_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
 fn build_scripts() -> BTreeMap<String, Vec<u8>> {
     let package_folder = "bridge.data";
     let package_names = vec![
-        "initialise_operator",
         "update_operator",
     ];
     common::build_scripts(package_folder, package_names)
@@ -29,19 +28,12 @@ fn keccak256(to_be_hashed: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-// Initialize bridge and update the operator
 // The bridge can only be initialised by @aptos_framework
 // The operator can only be updated by @aptos_framework
 fn test_bridge_operator() {
     let mut harness = MoveHarness::new();
     let core_resources =
         harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
-
-    let initialise_operator_script_code = BRIDGE_SCRIPTS
-        .get("initialise_operator")
-        .expect("bridge script should be built");
-    let txn = harness.create_script(&core_resources, initialise_operator_script_code.clone(), vec![], vec![]);
-    assert_success!(harness.run(txn));
 
     let new_operator = harness.new_account_at(AccountAddress::from_hex_literal("0xCAFE").unwrap());
     let update_operator_script_code = BRIDGE_SCRIPTS
@@ -56,7 +48,7 @@ fn test_bridge_operator() {
     );
 
     assert_success!(harness.run(txn));
-    let bytes = harness.execute_view_function(str::parse("0x1::bridge_configuration::bridge_operator").unwrap(),
+    let bytes = harness.execute_view_function(str::parse("0x1::atomic_bridge_configuration::bridge_operator").unwrap(),
                                   vec![], vec![]).values
         .unwrap()
         .pop()
@@ -66,17 +58,17 @@ fn test_bridge_operator() {
     assert_eq!(*new_operator.address(), bridge_operator);
 
     let false_operator = harness.new_account_at(AccountAddress::from_hex_literal("0xFA").unwrap());
-    let _ = harness.create_script(
+    let txn = harness.create_script(
         &false_operator,
         update_operator_script_code.clone(),
         vec![],
         vec![TransactionArgument::Address(*false_operator.address())]
     );
 
-    // TODO how to assert on an abort, alternative is catch panic in test
-    // assert_abort!(harness.run(txn), ENOT_CORE_RESOURCE_ADDRESS);
+    assert_abort!(harness.run(txn), _);
+
     // Just confirm its the same as before till work out the above
-    let bytes = harness.execute_view_function(str::parse("0x1::bridge_configuration::bridge_operator").unwrap(),
+    let bytes = harness.execute_view_function(str::parse("0x1::atomic_bridge_configuration::bridge_operator").unwrap(),
                                               vec![], vec![]).values
         .unwrap()
         .pop()
@@ -87,22 +79,13 @@ fn test_bridge_operator() {
 }
 
 #[test]
-// Initialise bridge operator module, this would be to the framework
 // The relayer has received a message from the source chain of a successful lock
 // `lock_bridge_transfer_assets` is called with a timelock
 // Wait for the timelock
 // `complete_bridge_transfer` to mint the tokens on the destination chain
 fn test_counterparty() {
     let mut harness = MoveHarness::new();
-    let core_resources =
-        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
 
-    let initialise_operator_script_code = BRIDGE_SCRIPTS
-        .get("initialise_operator")
-        .expect("bridge script should be built");
-    let txn = harness.create_script(&core_resources, initialise_operator_script_code.clone(), vec![], vec![]);
-    assert_success!(harness.run(txn));
-    // After initialisation our bridge operator is the framework
     let bridge_operator = harness.aptos_framework_account();
     let initiator = b"32Be343B94f860124dC4fEe278FDCBD38C102D88".to_vec();
     let pre_image = b"my secret";
@@ -121,7 +104,6 @@ fn test_counterparty() {
                                    MoveValue::vector_u8(initiator).simple_serialize().unwrap(),
                                    MoveValue::vector_u8(bridge_transfer_id.clone()).simple_serialize().unwrap(),
                                    MoveValue::vector_u8(hash_lock).simple_serialize().unwrap(),
-                                    MoveValue::U64(time_lock).simple_serialize().unwrap(),
                                     MoveValue::Address(*recipient.address()).simple_serialize().unwrap(),
                                     MoveValue::U64(amount).simple_serialize().unwrap(),
                                ],));
@@ -155,22 +137,12 @@ struct BridgeTransferInitiatedEvent {
 // A relayer confirms that the amount was minted on the destination chain
 fn test_initiator() {
     let mut harness = MoveHarness::new();
-    let core_resources =
-        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
 
-    let initialise_operator_script_code = BRIDGE_SCRIPTS
-        .get("initialise_operator")
-        .expect("bridge script should be built");
-    let txn = harness.create_script(&core_resources, initialise_operator_script_code.clone(), vec![], vec![]);
-    assert_success!(harness.run(txn));
-
-    // After initialisation our bridge operator is the framework
     let bridge_operator = harness.aptos_framework_account();
 
     let recipient = b"32Be343B94f860124dC4fEe278FDCBD38C102D88".to_vec();
     let initiator = harness.new_account_at(AccountAddress::from_hex_literal("0xCAFE").unwrap());
     let pre_image = b"my secret";
-    let time_lock = 1;
     let amount = 1_000_000; // 0.1
     let hash_lock = keccak256(pre_image);
 
@@ -181,7 +153,6 @@ fn test_initiator() {
                                 vec![
                                     MoveValue::vector_u8(recipient.clone()).simple_serialize().unwrap(),
                                     MoveValue::vector_u8(hash_lock.clone()).simple_serialize().unwrap(),
-                                    MoveValue::U64(time_lock).simple_serialize().unwrap(),
                                     MoveValue::U64(amount).simple_serialize().unwrap(),
                                 ],);
 
