@@ -11,7 +11,7 @@ use crate::{
             SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
             SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_JWT_PAYLOAD_JSON, SAMPLE_PEPPER,
             SAMPLE_PK, SAMPLE_PROOF, SAMPLE_PROOF_FOR_UPGRADED_VK, SAMPLE_PROOF_NO_EXTRA_FIELD,
-            SAMPLE_UID_KEY, SAMPLE_UPGRADED_VK,
+            SAMPLE_UID_KEY, SAMPLE_UID_VAL, SAMPLE_UPGRADED_VK,
         },
         get_public_inputs_hash,
         zkp_sig::ZKP,
@@ -53,7 +53,7 @@ pub fn get_sample_iss() -> String {
 }
 
 pub fn get_sample_aud() -> String {
-    "test-keyless-dapp".to_string()
+    SAMPLE_JWT_PARSED.oidc_claims.aud.clone()
 }
 
 pub fn get_sample_jwk() -> RSA_JWK {
@@ -78,6 +78,10 @@ pub fn get_sample_jwt_header_json() -> String {
 
 pub fn get_sample_uid_key() -> String {
     SAMPLE_UID_KEY.to_string()
+}
+
+pub fn get_sample_uid_val() -> String {
+    SAMPLE_UID_VAL.to_string()
 }
 
 pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
@@ -381,7 +385,8 @@ mod test {
             "exp_horizon_secs": SAMPLE_EXP_HORIZON_SECS,
             "pepper": hex::encode(get_sample_pepper().to_bytes()),
             "uid_key": "sub",
-            "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY
+            "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY,
+            "use_insecure_test_jwk": true,
         });
         make_prover_request(&client, body, "SAMPLE_PROOF").await;
 
@@ -392,7 +397,8 @@ mod test {
             "exp_date_secs": get_sample_exp_date(),
             "exp_horizon_secs": SAMPLE_EXP_HORIZON_SECS,
             "pepper": hex::encode(get_sample_pepper().to_bytes()),
-            "uid_key": "sub"
+            "uid_key": "sub",
+            "use_insecure_test_jwk": true,
         });
         make_prover_request(&client, body, "SAMPLE_PROOF_NO_EXTRA_FIELD").await;
     }
@@ -402,7 +408,7 @@ mod test {
         body: Value,
         test_proof_name: &str,
     ) -> ProverResponse {
-        let url = "http://localhost:8080/v0/prove";
+        let url = "http://localhost:8083/v0/prove";
 
         // Send the POST request and await the response
         let response = client.post(url).json(&body).send().await.unwrap();

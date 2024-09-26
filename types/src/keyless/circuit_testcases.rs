@@ -26,7 +26,7 @@ use ring::signature::RsaKeyPair;
 /// The JWT header, decoded as JSON
 pub(crate) static SAMPLE_JWT_HEADER_JSON: Lazy<String> = Lazy::new(|| {
     format!(
-        r#"{{"alg":"{}","kid":"{}","typ":"JWT"}}"#,
+        r#"{{"alg":"{}","typ":"JWT","kid":"{}"}}"#,
         SAMPLE_JWK.alg.as_str(),
         SAMPLE_JWK.kid.as_str()
     )
@@ -57,7 +57,7 @@ pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
             "iss":"{}",
             "azp":"407408718192.apps.googleusercontent.com",
             "aud":"407408718192.apps.googleusercontent.com",
-            "sub":"113990307082899718775",
+            "sub":"{}",
             "hd":"aptoslabs.com",
             "email":"michael@aptoslabs.com",
             "email_verified":true,
@@ -72,6 +72,7 @@ pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
             "exp":2700259544
          }}"#,
         SAMPLE_TEST_ISS_VALUE,
+        SAMPLE_UID_VAL,
         SAMPLE_JWT_EXTRA_FIELD.as_str(),
         SAMPLE_NONCE.as_str()
     )
@@ -95,6 +96,8 @@ pub(crate) static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(insecure_test_rsa_jwk);
 pub(crate) static SAMPLE_JWK_SK: Lazy<&RsaKeyPair> = Lazy::new(|| &*INSECURE_TEST_RSA_KEY_PAIR);
 
 pub(crate) const SAMPLE_UID_KEY: &str = "sub";
+
+pub(crate) const SAMPLE_UID_VAL: &str = "113990307082899718775";
 
 /// The nonce-committed expiration date (not the JWT `exp`), 12/21/5490
 pub(crate) const SAMPLE_EXP_DATE: u64 = 111_111_111_111;
@@ -138,9 +141,9 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("95030afdb785624d3f305655579775fe216a4780496ccb7abe899dc8a7bcf798").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("08d5814954cb04ac1f80771f783585162abb2cd673203f7ee22ec87a783f431cc649ca449bc1d2d93ba4aaecd382f94306c23003ed1e1c0592a46c64e5cf6504").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("117177343a361982883579c3f49eb30b05d79b7ca1e96556be7ccb2ee88ea391").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("3304cc0defd488d770af0439480ec24c8473b30dbcbfad9fdf99ca62256bd908").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("2f432b9459375ed2032bcb1ff3ccc1dd5d05a752d6956d2bb003f4e3b42d0b242cf4ab4d3dc8dc700ede17bbfeaddedd42033691e3d85ff8d6621663cb2e779a").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("d44ee2772f4b48fdb0dbd8d870d3fb4401cd3a28fbdde535e9c57bac9a263f9c").unwrap()).unwrap(),
     )
 });
 
@@ -151,9 +154,9 @@ pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("62b167d43c33169b96c018deaa4efdc5223e095016dc6ee2cd1ad1e61755d8a5").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("2dd8fcc64014ab9f877c7ba03618cf59c49c69204b981be297dc835f60d4f923192e0f894ad947bd4aee96fd19305eb79ff359e8c341a17e8f6ba470be655e12").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("5e6e3e076e632f1440327758c634a311d83244ad7d32edcdf66458d7e0ed5619").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("bdfda383c9131ab44dd3d8efe65c59842b28e17467e2d07c4020742407c580a7").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("d27b4c0296ec1045dd050894c635095c25ff8d89c8adf5da401b3434639c560550e3da14e5ec953769aac9d256ddc9b2a8071c021f271f0937fd5be404f2b919").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("52a25b0b58013a77f8713105d7e0f817468bbdd25d644e9f2a9b3eabd7d4bc17").unwrap()).unwrap(),
     )
 });
 

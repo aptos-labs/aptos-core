@@ -523,35 +523,38 @@ pub struct KeylessAccount {
 
 impl KeylessAccount {
     pub fn new(
-        iss: String,
-        aud: String,
-        uid_key: String,
-        uid_val: String,
-        jwt_header_json: String,
+        iss: &str,
+        aud: &str,
+        uid_key: &str,
+        uid_val: &str,
+        jwt_header_json: &str,
         ephemeral_key_pair: EphemeralKeyPair,
         pepper: Pepper,
         zk_sig: ZeroKnowledgeSig,
     ) -> Result<Self> {
         let idc = IdCommitment::new_from_preimage(&pepper, &aud, &uid_key, &uid_val)?;
-        let public_key = KeylessPublicKey { iss_val: iss, idc };
+        let public_key = KeylessPublicKey {
+            iss_val: iss.to_owned(),
+            idc,
+        };
         Ok(Self {
             public_key,
             ephemeral_key_pair,
-            uid_key,
-            uid_val,
-            aud,
+            uid_key: uid_key.to_string(),
+            uid_val: uid_val.to_string(),
+            aud: aud.to_string(),
             pepper,
             zk_sig,
-            jwt_header_json,
+            jwt_header_json: jwt_header_json.to_string(),
             jwt: None,
         })
     }
 
-    pub fn new_from_jwt(
-        jwt: String,
+    pub fn derive_account(
+        jwt: &str,
         ephemeral_key_pair: EphemeralKeyPair,
-        pepper: Pepper,
-        zk_sig: ZeroKnowledgeSig,
+        pepper: Option<Pepper>,
+        zk_sig: Option<ZeroKnowledgeSig>,
     ) -> Result<Self> {
         let parts: Vec<&str> = jwt.split('.').collect();
         let header_bytes = base64::decode(parts[0]).unwrap();
@@ -564,14 +567,14 @@ impl KeylessAccount {
         let aud = claims.oidc_claims.aud;
 
         Self::new(
-            claims.oidc_claims.iss,
-            aud,
-            uid_key,
-            uid_val,
-            jwt_header_json,
+            &claims.oidc_claims.iss,
+            &aud,
+            &uid_key,
+            &uid_val,
+            &jwt_header_json,
             ephemeral_key_pair,
-            pepper,
-            zk_sig,
+            pepper.expect("pepper fetch not implemented"),
+            zk_sig.expect("proof fetch not implemented"),
         )
     }
 

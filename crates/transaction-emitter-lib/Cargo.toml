@@ -13,6 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+base64 = { workspace = true }
+serde_json = { workspace = true }
 again = { workspace = true }
 anyhow = { workspace = true }
 aptos-config = { workspace = true }

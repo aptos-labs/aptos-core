@@ -218,6 +218,18 @@ pub struct EmitArgs {
 
     #[clap(long)]
     pub coins_per_account_override: Option<u64>,
+
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, requires = "proof_file_path", requires = "keyless_jwt")]
+    pub keyless_ephem_secret_key: Option<ConfigKey<Ed25519PrivateKey>>,
+
+    #[clap(long)]
+    pub proof_file_path: Option<String>,
+
+    #[clap(long, default_value_t = 2700000000)]
+    pub epk_expiry_date_secs: u64,
+
+    #[clap(long)]
+    pub keyless_jwt: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
@@ -234,6 +246,12 @@ pub struct CreateAccountsArgs {
     /// used and printed.
     #[clap(long)]
     pub account_minter_seed: Option<String>,
+
+    #[clap(long)]
+    pub keyless_jwt: Option<String>,
+
+    #[clap(long)]
+    pub proof_file_path: Option<String>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {
