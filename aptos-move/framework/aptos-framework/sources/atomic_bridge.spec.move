@@ -68,6 +68,8 @@ spec aptos_framework::atomic_bridge_store {
         details: BridgeTransferDetails<Initiator, Recipient>;
         include HashLockAbortsIf;
 
+        aborts_if timestamp::spec_now_seconds() > details.time_lock;
+        aborts_if !exists<CurrentTimeMicroseconds>(@aptos_framework);
         aborts_if details.state != PENDING_TRANSACTION;
         aborts_if details.hash_lock != hash_lock;
     }
@@ -88,7 +90,7 @@ spec aptos_framework::atomic_bridge_store {
         details: BridgeTransferDetails<Initiator, Recipient>;
 
         aborts_if details.state != PENDING_TRANSACTION;
-        aborts_if timestamp::spec_now_seconds() <= details.time_lock;
+        aborts_if !(timestamp::spec_now_seconds() > details.time_lock);
         aborts_if !exists<CurrentTimeMicroseconds>(@aptos_framework);
         ensures details.state == CANCELLED_TRANSACTION;
     }
