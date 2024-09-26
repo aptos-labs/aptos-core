@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos_block_executor::{
-    txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::{default::DefaultTxnProvider, TxnProvider},
-};
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_rest_client::Client;
 use aptos_types::{
@@ -19,6 +16,7 @@ use aptos_types::{
         SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
         Version,
     },
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
     vm_status::VMStatus,
 };
 use aptos_validator_interface::{

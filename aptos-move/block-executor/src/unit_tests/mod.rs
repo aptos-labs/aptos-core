@@ -16,7 +16,6 @@ use crate::{
         DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
     },
     txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
@@ -29,6 +28,7 @@ use aptos_types::{
     contract_event::TransactionEvent,
     executable::{ExecutableTestType, ModulePath},
     state_store::state_value::StateValueMetadata,
+    txn_provider::default::DefaultTxnProvider,
 };
 use claims::assert_matches;
 use fail::FailScenario;

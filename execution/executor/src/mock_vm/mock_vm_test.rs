@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_types::{
     account_address::AccountAddress,
     bytes::NumToBytes,
@@ -12,6 +11,7 @@ use aptos_types::{
         Result, TStateView,
     },
     transaction::signature_verified_transaction::into_signature_verified_block,
+    txn_provider::default::DefaultTxnProvider,
     write_set::WriteOp,
 };
 use aptos_vm::VMExecutor;

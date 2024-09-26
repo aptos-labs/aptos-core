@@ -186,7 +186,6 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
 }
 
 mod test_utils {
-    use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
     use aptos_block_partitioner::BlockPartitioner;
     use aptos_language_e2e_tests::{
         account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
@@ -201,6 +200,7 @@ mod test_utils {
             signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
             TransactionOutput,
         },
+        txn_provider::default::DefaultTxnProvider,
     };
     use aptos_vm::{
         sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},

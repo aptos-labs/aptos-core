@@ -6,7 +6,6 @@ use crate::{
     CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex,
 };
 use anyhow::{format_err, Result};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_rest_client::Client;
 use aptos_types::{
@@ -15,6 +14,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
         TransactionOutput, Version,
     },
+    txn_provider::default::DefaultTxnProvider,
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 use aptos_validator_interface::{AptosValidatorInterface, FilterCondition, RestDebuggerInterface};

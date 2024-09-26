@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::txn_provider::TxnProvider;
-use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::transaction::BlockExecutableTransaction as Transaction;
+use crate::{
+    transaction::BlockExecutableTransaction as Transaction,
+    txn_provider::{TxnIndex, TxnProvider},
+};
 use std::sync::Arc;
 
 pub struct DefaultTxnProvider<T: Transaction> {

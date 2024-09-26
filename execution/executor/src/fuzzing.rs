@@ -7,7 +7,6 @@ use crate::{
     components::chunk_output::ChunkOutput,
 };
 use anyhow::Result;
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_storage_interface::{
@@ -29,6 +28,7 @@ use aptos_types::{
         },
         BlockOutput, Transaction, TransactionOutput, TransactionToCommit, Version,
     },
+    txn_provider::default::DefaultTxnProvider,
     vm_status::VMStatus,
 };
 use aptos_vm::{

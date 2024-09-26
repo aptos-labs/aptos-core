@@ -4,9 +4,10 @@
 mod blocking_txns_provider;
 pub mod default;
 
-use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::transaction::BlockExecutableTransaction as Transaction;
+use crate::transaction::BlockExecutableTransaction as Transaction;
 use std::sync::Arc;
+
+pub type TxnIndex = u32;
 
 pub trait TxnProvider<T: Transaction> {
     /// Get total number of transactions

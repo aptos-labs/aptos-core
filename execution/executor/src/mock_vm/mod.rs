@@ -7,7 +7,6 @@ mod mock_vm_test;
 
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
-use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
@@ -28,6 +27,7 @@ use aptos_types::{
         TransactionArgument, TransactionAuxiliaryData, TransactionOutput, TransactionPayload,
         TransactionStatus, WriteSetPayload,
     },
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };

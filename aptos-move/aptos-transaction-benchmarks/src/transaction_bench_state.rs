@@ -3,10 +3,7 @@
 
 use crate::transactions;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::{
-    txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::{default::DefaultTxnProvider, TxnProvider},
-};
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
@@ -30,6 +27,7 @@ use aptos_types::{
         },
         ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
     },
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
     vm_status::VMStatus,
 };
 use aptos_vm::{

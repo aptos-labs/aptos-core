@@ -44,6 +44,7 @@ pub mod test_helpers;
 pub mod timestamp;
 pub mod transaction;
 pub mod trusted_state;
+pub mod txn_provider;
 pub mod utility_coin;
 pub mod validator_config;
 pub mod validator_info;

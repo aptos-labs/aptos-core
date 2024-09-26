@@ -6,7 +6,6 @@
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
@@ -34,6 +33,7 @@ use aptos_types::{
         BlockOutput, ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
         TransactionStatus,
     },
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;

@@ -14,9 +14,7 @@ use crate::{
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::{
-    txn_commit_hook::NoOpTransactionCommitHook, txn_provider::default::DefaultTxnProvider,
-};
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
@@ -45,6 +43,7 @@ use aptos_types::{
         BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
         TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
+    txn_provider::default::DefaultTxnProvider,
     vm_status::VMStatus,
     write_set::WriteSet,
 };

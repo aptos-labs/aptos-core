@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_language_e2e_tests::{account::AccountData, data_store::FakeDataStore};
 use aptos_types::{
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+    txn_provider::default::DefaultTxnProvider,
     write_set::WriteSet,
 };
 use aptos_vm::{AptosVM, VMExecutor};

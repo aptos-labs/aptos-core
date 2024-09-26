@@ -16,7 +16,6 @@ use crate::{
         ExecutorShardCommand,
     },
 };
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::{
@@ -29,6 +28,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput,
     },
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
