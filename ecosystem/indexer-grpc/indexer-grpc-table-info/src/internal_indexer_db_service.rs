@@ -140,7 +140,7 @@ impl InternalIndexerDBService {
             let next_version = self.db_indexer.process_a_batch(start_version)?;
 
             if next_version == start_version {
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                 continue;
             }
             log_grpc_step(
