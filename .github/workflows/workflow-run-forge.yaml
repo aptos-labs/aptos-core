@@ -119,7 +119,7 @@ env:
 # at the call site, and don't need to wrap each step in an if statement?
 jobs:
   forge:
-    runs-on: ubuntu-latest
+    runs-on: runs-on,cpu=64,family=c7,hdd=1024,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     steps:
       - uses: actions/checkout@v4
@@ -164,13 +164,6 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           GCP_AUTH_DURATION: ${{ steps.calculate-auth-duration.outputs.auth_duration }}
-
-      - name: "Install GCloud SDK"
-        if: ${{ !inputs.SKIP_JOB }}
-        uses: "google-github-actions/setup-gcloud@v2"
-        with:
-          version: ">= 418.0.0"
-          install_components: "kubectl,gke-gcloud-auth-plugin"
 
       - name: "Export GCloud auth token"
         if: ${{ !inputs.SKIP_JOB }}
