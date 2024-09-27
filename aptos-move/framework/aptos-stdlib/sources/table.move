@@ -7,6 +7,7 @@
 
 module aptos_std::table {
     friend aptos_std::table_with_length;
+    friend aptos_std::storage_slots_allocator;
 
     /// Type of tables
     struct Table<phantom K: copy + drop, phantom V> has store {
@@ -87,6 +88,8 @@ module aptos_std::table {
         drop_unchecked_box<K, V, Box<V>>(self)
     }
 
+    /// Table cannot know if it is empty or not, so this method is not public,
+    /// and can be used only in modules that know by themselves that table is empty. 
     public(friend) fun destroy<K: copy + drop, V>(self: Table<K, V>) {
         destroy_empty_box<K, V, Box<V>>(&self);
         drop_unchecked_box<K, V, Box<V>>(self)
