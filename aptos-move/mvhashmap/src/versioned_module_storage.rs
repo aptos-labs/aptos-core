@@ -132,10 +132,10 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
             }
         }
 
-        let mut v = self
-            .entries
-            .entry(key.clone())
-            .or_insert_with(VersionedEntry::empty);
+        // let mut v = self
+        //     .entries
+        //     .entry(key.clone())
+        //     .or_insert_with(VersionedEntry::empty);
 
         // Module entry exists in versioned entry, return it.
         // if let Some(result) = v.get(txn_idx) {
@@ -144,12 +144,13 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
 
         // Otherwise, use the passed closure to compute the base storage value.
         let maybe_entry = init_func()?;
+        #[allow(clippy::let_and_return)]
         let result = Ok(match &maybe_entry {
             Some(entry) => ModuleStorageRead::storage_version(entry.clone()),
             None => ModuleStorageRead::DoesNotExist,
         });
-        v.versions
-            .insert(ShiftedTxnIndex::zero_idx(), CachePadded::new(maybe_entry));
+        // v.versions
+        //     .insert(ShiftedTxnIndex::zero_idx(), CachePadded::new(maybe_entry));
         result
     }
 
