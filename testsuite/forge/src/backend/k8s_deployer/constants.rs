@@ -18,4 +18,4 @@ pub const FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME: &str = "forge";
 /// This is the environment variable that is required to be set in the pod to provide the deployer
 pub const FORGE_DEPLOYER_VALUES_ENV_VAR_NAME: &str = "FORGE_DEPLOY_VALUES_JSON";
 
-pub const DEFAULT_FORGE_DEPLOYER_PROFILE: &str = "large";
+pub const DEFAULT_FORGE_DEPLOYER_PROFILE: &str = "forge";

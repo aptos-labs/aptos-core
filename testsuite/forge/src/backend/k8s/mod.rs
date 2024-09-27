@@ -8,7 +8,6 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_logger::info;
-use futures::{future, FutureExt};
 use rand::rngs::StdRng;
 use serde_json::json;
 use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
@@ -172,72 +171,55 @@ impl Factory for K8sFactory {
                 &new_era, &self.kube_namespace
             );
 
-            let deploy_testnet_fut = async {
-                match install_testnet_resources(
-                    new_era.clone(),
+            // try installing testnet resources, but clean up if it fails
+            let (validators, fullnodes) = match install_testnet_resources(
+                new_era.clone(),
+                self.kube_namespace.clone(),
+                num_validators.get(),
+                num_fullnodes,
+                format!("{}", init_version),
+                format!("{}", genesis_version),
+                genesis_modules_path,
+                self.use_port_forward,
+                self.enable_haproxy,
+                self.enable_indexer,
+                genesis_config_fn,
+                node_config_fn,
+                false,
+            )
+            .await
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    uninstall_testnet_resources(self.kube_namespace.clone()).await?;
+                    bail!(e);
+                },
+            };
+
+
+            if self.enable_indexer {
+                // NOTE: by default, use a deploy profile and no additional configuration values
+                let config = serde_json::from_value(json!({
+                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    "era": new_era.clone(),
+                    "namespace": self.kube_namespace.clone(),
+                    "indexer-grpc-values": {
+                        "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, init_version),
+                        "fullnodeConfig": {
+                            "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, init_version),
+                        }
+                    },
+                }))?;
+
+                let indexer_deployer = ForgeDeployerManager::new(
+                    kube_client.clone(),
                     self.kube_namespace.clone(),
-                    num_validators.get(),
-                    num_fullnodes,
-                    format!("{}", init_version),
-                    format!("{}", genesis_version),
-                    genesis_modules_path,
-                    self.use_port_forward,
-                    self.enable_haproxy,
-                    self.enable_indexer,
-                    genesis_config_fn,
-                    node_config_fn,
-                    false,
-                )
-                .await
-                {
-                    Ok(res) => Ok(res),
-                    Err(e) => {
-                        uninstall_testnet_resources(self.kube_namespace.clone()).await?;
-                        bail!(e);
-                    },
-                }
+                    FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                    None,
+                );
+                indexer_deployer.start(config).await?;
+                indexer_deployer.wait_completed().await?;
             }
-            .boxed();
-
-            // add an indexer too!
-            let deploy_indexer_fut = async {
-                if self.enable_indexer {
-                    // NOTE: by default, use a deploy profile and no additional configuration values
-                    let config = serde_json::from_value(json!({
-                        "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
-                        "era": new_era.clone(),
-                        "namespace": self.kube_namespace.clone(),
-                        "indexer-grpc-values": {
-                            "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, init_version),
-                            "fullnodeConfig": {
-                                "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, init_version),
-                            }
-                        },
-                    }))?;
-
-                    let indexer_deployer = ForgeDeployerManager::new(
-                        kube_client.clone(),
-                        self.kube_namespace.clone(),
-                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
-                        None,
-                    );
-                    indexer_deployer.start(config).await?;
-                    indexer_deployer.wait_completed().await
-                } else {
-                    Ok(())
-                }
-            }
-            .boxed();
-
-            // join on testnet and indexer deployment futures, handling the output from the testnet
-            // deployment
-            let (validators, fullnodes) =
-                match future::try_join(deploy_testnet_fut, deploy_indexer_fut).await {
-                    Ok((deploy_testnet_ret, _)) => deploy_testnet_ret,
-                    Err(e) => {
-                        bail!(e);
-                    },
-                };
 
             (Some(new_era), validators, fullnodes)
         };
