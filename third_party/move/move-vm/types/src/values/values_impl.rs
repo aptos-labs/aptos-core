@@ -903,6 +903,81 @@ impl Reference {
     }
 }
 
+/**************************************************************************************
+ *
+ * Swap reference (Move)
+ *
+ *   Implementation of the Move operation to swap contents of a reference.
+ *
+ *************************************************************************************/
+
+impl ContainerRef {
+    pub fn swap_ref<F>(self, swap_with: F) -> PartialVMResult<()>
+    where
+        F: FnOnce(Value) -> PartialVMResult<Value>,
+    {
+        // same as read_ref, but without consuming self.
+        // But safe because even though we copy here, and temporarily leave a duplicate inside,
+        // we replace it in write_ref below.
+        let old_value = Value(ValueImpl::Container(self.container().copy_value()?));
+        self.write_ref(swap_with(old_value)?)?;
+
+        Ok(())
+    }
+}
+
+impl IndexedRef {
+    pub fn swap_ref<F>(self, swap_with: F) -> PartialVMResult<()>
+    where
+        F: FnOnce(Value) -> PartialVMResult<Value>,
+    {
+        use Container::*;
+
+        // same as read_ref, but without consuming self.
+        // But safe because even though we copy here, and temporarily leave a duplicate inside,
+        // we replace it in write_ref below.
+        let old_value = Value(match self.container_ref.container() {
+            Vec(r) => r.borrow()[self.idx].copy_value()?,
+            Struct(r) => r.borrow()[self.idx].copy_value()?,
+
+            VecU8(r) => ValueImpl::U8(r.borrow()[self.idx]),
+            VecU16(r) => ValueImpl::U16(r.borrow()[self.idx]),
+            VecU32(r) => ValueImpl::U32(r.borrow()[self.idx]),
+            VecU64(r) => ValueImpl::U64(r.borrow()[self.idx]),
+            VecU128(r) => ValueImpl::U128(r.borrow()[self.idx]),
+            VecU256(r) => ValueImpl::U256(r.borrow()[self.idx]),
+            VecBool(r) => ValueImpl::Bool(r.borrow()[self.idx]),
+            VecAddress(r) => ValueImpl::Address(r.borrow()[self.idx]),
+
+            Locals(r) => r.borrow()[self.idx].copy_value()?,
+        });
+
+        self.write_ref(swap_with(old_value)?)?;
+        Ok(())
+    }
+}
+
+impl ReferenceImpl {
+    pub fn swap_ref<F>(self, swap_with: F) -> PartialVMResult<()>
+    where
+        F: FnOnce(Value) -> PartialVMResult<Value>,
+    {
+        match self {
+            Self::ContainerRef(r) => r.swap_ref(swap_with),
+            Self::IndexedRef(r) => r.swap_ref(swap_with),
+        }
+    }
+}
+
+impl Reference {
+    pub fn swap_ref<F>(self, swap_with: F) -> PartialVMResult<()>
+    where
+        F: FnOnce(Value) -> PartialVMResult<Value>,
+    {
+        self.0.swap_ref(swap_with)
+    }
+}
+
 /***************************************************************************************
  *
  * Borrows (Move)
