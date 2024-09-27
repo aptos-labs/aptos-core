@@ -8,20 +8,72 @@ use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{ExpData, Operation, Pattern},
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, QualifiedId},
+    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, Parameter, QualifiedId},
     ty::Type,
 };
-use std::{collections::BTreeSet, iter::Iterator, vec::Vec};
+use std::{collections::BTreeSet, iter::Iterator, ops::Deref, vec::Vec};
 
 type QualifiedFunId = QualifiedId<FunId>;
 
-/// check that non-inline function parameters do not have function type.
+fn type_has_function(ty: &Type) -> bool {
+    match ty {
+        Type::Tuple(tys) => tys.iter().any(|ty| ty.is_function()),
+        Type::Fun(..) => true,
+        _ => false,
+    }
+}
+
+// Takes a list of function types, returns those which have a function type in their argument type
+fn identify_function_types_with_functions_in_args(func_returns: Vec<Type>) -> Vec<Type> {
+    func_returns
+        .into_iter()
+        .filter_map(|ty| {
+            if let Type::Fun(argt, _) = &ty {
+                if type_has_function(argt.deref()) {
+                    Some(ty)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+// Takes a list of function-typed parameters, along with argument and result type
+// Returns a list of any parameters whose result type has a function value, along with that result type.
+fn identify_function_typed_params_with_functions_in_rets<'a>(
+    func_params: Vec<&'a Parameter>,
+) -> Vec<(&'a Parameter, &'a Type)> {
+    func_params
+        .iter()
+        .filter_map(|param| {
+            if let Type::Fun(_argt, rest) = &param.1 {
+                let rest_unboxed = rest.deref();
+                if type_has_function(rest_unboxed) {
+                    Some((*param, rest_unboxed))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// check that function parameters/results do not have function type unless allowed.
+/// (1) is there a function type arg at the top level?  This is allowed for inline or LAMBDA_IN_PARAMS
+/// (2) is there a function type result at the top level?  This is allowed only for LAMBDA_IN_RETURNS
+/// (3) is there *any* function type with function type in an arg? This is allowed only for LAMBDA_IN_PARAMS
+/// (4) is there *any* function type with function type in a result? This is allowed only for LAMBDA_IN_RETURNS
 pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<Options>()
         .expect("Options is available");
-    let lambda_params_ok = options.experiment_on(Experiment::LAMBDA_PARAMS);
-    let lambda_return_ok = options.experiment_on(Experiment::LAMBDA_RESULTS);
+    let lambda_params_ok = options.experiment_on(Experiment::LAMBDA_IN_PARAMS);
+    let lambda_return_ok = options.experiment_on(Experiment::LAMBDA_IN_RETURNS);
     if lambda_params_ok && lambda_return_ok {
         return;
     }
@@ -29,57 +81,112 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     for caller_module in env.get_modules() {
         if caller_module.is_primary_target() {
             for caller_func in caller_module.get_functions() {
-                // Check that no functions have function return type
-                if !lambda_return_ok {
+                if !lambda_params_ok || !lambda_return_ok {
                     let caller_name = caller_func.get_full_name_str();
                     let return_type = caller_func.get_result_type();
-                    let has_function_value =
-                        return_type.clone().flatten().iter().any(Type::is_function);
-                    if has_function_value {
-                        let type_display_ctx = caller_func.get_type_display_ctx();
-                        env.diag(
-                            Severity::Error,
-                            &caller_func.get_id_loc(),
-                            &format!("Functions may not return function-typed values, but function `{}` return type is `{}`:",
-                                     caller_name,
-                                     return_type.display(&type_display_ctx)),
-                        );
-                    }
-                }
-                // Check that non-inline function parameters don't have function type
-                if !caller_func.is_inline() && !lambda_params_ok {
-                    let parameters = caller_func.get_parameters();
-                    let bad_params: Vec<_> = parameters
-                        .iter()
-                        .filter(|param| matches!(param.1, Type::Fun(_, _)))
+                    let func_returns: Vec<_> = return_type
+                        .clone()
+                        .flatten()
+                        .into_iter()
+                        .filter(|t| t.is_function())
                         .collect();
-                    if !bad_params.is_empty() {
-                        let type_display_ctx = caller_func.get_type_display_ctx();
-                        let caller_name = caller_func.get_full_name_str();
-                        let reasons: Vec<(Loc, String)> = bad_params
-                            .iter()
-                            .map(|param| {
-                                (
-                                    param.2.clone(),
-                                    format!(
-                                        "Parameter `{}` has function-valued type `{}`.",
-                                        param.0.display(env.symbol_pool()),
-                                        param.1.display(&type_display_ctx)
-                                    ),
+                    let type_display_ctx = caller_func.get_type_display_ctx();
+                    if !func_returns.is_empty() {
+                        // (2) is there a function type result at the top level?  This is allowed
+                        // only for LAMBDA_IN_RETURNS
+                        if !lambda_return_ok {
+                            if !func_returns.is_empty() {
+                                env.diag(
+                                    Severity::Error,
+                                    &caller_func.get_result_type_loc(),
+                                    &format!("Functions may not return function-typed values, but function `{}` return type is the function type `{}`:",
+                                             &caller_name,
+                                             return_type.display(&type_display_ctx)),
                                 )
-                            })
-                            .collect();
-                        env.diag_with_labels(
-                            Severity::Error,
-                            &caller_func.get_id_loc(),
-                            &format!("Only inline functions may have function-typed parameters, but non-inline function `{}` has {}:",
-                                     caller_name,
-                                     if reasons.len() > 1 { "function parameters" } else { "a function parameter" },
-                            ),
-                            reasons,
-                        );
+                            }
+                        }
+                        if !lambda_params_ok {
+                            // (3) is there *any* function type with function type in an arg? This
+                            // is allowed only for LAMBDA_IN_PARAMS
+                            let bad_returns =
+                                identify_function_types_with_functions_in_args(func_returns);
+                            if !bad_returns.is_empty() {
+                                env.diag(
+                                    Severity::Error,
+                                    &caller_func.get_result_type_loc(),
+                                    &format!("Non-inline functions may not take function-typed parameters, but function `{}` return type is `{}`, which has a function type taking a function parameter:",
+                                             &caller_name,
+                                             return_type.display(&type_display_ctx)),
+                                )
+                            }
+                        }
                     }
-                }
+
+                    let parameters = caller_func.get_parameters_ref();
+                    let func_params: Vec<_> = parameters
+                        .iter()
+                        .filter(|param| matches!(param.1, Type::Fun(..)))
+                        .collect();
+                    if !func_params.is_empty() {
+                        // (1) is there a function type arg at the top level?  This is allowed for
+                        // inline or LAMBDA_IN_PARAMS
+                        if !caller_func.is_inline() && !lambda_params_ok {
+                            let reasons: Vec<(Loc, String)> = func_params
+                                .iter()
+                                .map(|param| {
+                                    (
+                                        param.2.clone(),
+                                        format!(
+                                            "Parameter `{}` has function-valued type `{}`.",
+                                            param.0.display(env.symbol_pool()),
+                                            param.1.display(&type_display_ctx)
+                                        ),
+                                    )
+                                })
+                                .collect();
+                            env.diag_with_labels(
+                                Severity::Error,
+                                &caller_func.get_id_loc(),
+                                &format!("Only inline functions may have function-typed parameters, but non-inline function `{}` has {}:",
+                                         caller_name,
+                                         if reasons.len() > 1 { "function parameters" } else { "a function parameter" },
+                                ),
+                                reasons,
+                            );
+                        }
+                        if !lambda_return_ok {
+                            // (4) is there *any* function type with function type in its result? This is
+                            // allowed only for LAMBDA_IN_RETURNS
+                            let bad_params =
+                                identify_function_typed_params_with_functions_in_rets(func_params);
+                            if !bad_params.is_empty() {
+                                let reasons: Vec<(Loc, String)> = bad_params
+                                    .iter()
+                                    .map(|(param, ty)| {
+                                        (
+                                            param.2.clone(),
+                                            format!(
+                                                "Parameter `{}` has type `{}`, which has function type `{}` as a function result type",
+                                                param.0.display(env.symbol_pool()),
+                                                param.1.display(&type_display_ctx),
+                                                ty.display(&type_display_ctx),
+                                            ),
+                                        )
+                                    })
+                                    .collect();
+                                env.diag_with_labels(
+                                    Severity::Error,
+                                    &caller_func.get_id_loc(),
+                                    &format!("Functions may not return function-typed values, but function `{}` has {} of function type with function-typed result:",
+                                             caller_name,
+                                             if reasons.len() > 1 { "parameters" } else { "a parameter" },
+                                    ),
+                                    reasons,
+                                );
+                            }
+                        }
+                    }
+                };
             }
         }
     }

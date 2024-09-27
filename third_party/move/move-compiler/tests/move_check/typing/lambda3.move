@@ -1,6 +1,6 @@
 module 0x8675309::M {
 
-    // *** NOTE: THIS TEST FILE IS DERIVED FROM lambda.move by commenting out code which has errors
+    // *** NOTE: THIS TEST FILE IS DERIVED FROM lambda2.move by commenting out code which has errors
     //     successfully flagged by move-compiler-v2, so that we can check for errors on other lines
     //     which may be shadowed by those errors.
     //
@@ -81,14 +81,14 @@ module 0x8675309::M {
     //     f: |u64|u64, // expected lambda not allowed
     // }
 
-    public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
+    // public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
 
-    public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-        abort (1)
-    }
-    public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-        abort (1)
-    }
+    // public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+    //     abort (1)
+    // }
+    // public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+    //     abort (1)
+    // }
 }
 
 // module 0x1::XVector {

@@ -1,5 +1,13 @@
 module 0x8675309::M {
-    // use 0x1::XVector;
+
+    // *** NOTE: THIS TEST FILE IS DERIVED FROM lambda.move by commenting out code which has errors
+    //     successfully flagged by move-compiler-v2, so that we can check for errors on other lines
+    //     which may be shadowed by those errors.
+    //
+    //     We keep the commented code so that the error line numbers line up.
+    //
+    //
+    //     ... code removed here to allow above message ...
 
     // public inline fun foreach<T>(v: &vector<T>, action: |&T|) { // expected to be not implemented
     //     let i = 0;
@@ -8,14 +16,6 @@ module 0x8675309::M {
     //         i = i + 1;
     //     }
     // }
-
-    // public inline fun reduce<R, T>(v: vector<T>, accu: R, reducer: |T, R|R): R {
-    //     while (!XVector::is_empty(&v)) {
-    //         accu = reducer(XVector::pop_back(&mut v), accu);
-    //     };
-    //     accu
-    // }
-
 
     // public fun correct_foreach() {
     //     let v = vector[1, 2, 3];
@@ -83,18 +83,17 @@ module 0x8675309::M {
 
     public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
 
-    public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
+    public inline fun inline_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
         abort (1)
     }
     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
         abort (1)
     }
-
 }
 
 // module 0x1::XVector {
-//     public fun length<T>(v: &vector<T>): u64 { abort(1) }
-//     public fun is_empty<T>(v: &vector<T>): bool { abort(1) }
-//     public fun borrow<T>(v: &vector<T>, i: u64): &T { abort(1) }
-//     public fun pop_back<T>(v: &mut vector<T>): T { abort(1) }
+//     public fun length<T>(_v: &vector<T>): u64 { abort(1) }
+//     public fun is_empty<T>(_v: &vector<T>): bool { abort(1) }
+//     public fun borrow<T>(_v: &vector<T>, _i: u64): &T { abort(1) }
+//     public fun pop_back<T>(_v: &mut vector<T>): T { abort(1) }
 // }

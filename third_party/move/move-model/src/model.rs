@@ -1875,9 +1875,11 @@ impl GlobalEnv {
         let called_funs = def.called_funs();
         let data = FunctionData {
             name,
-            loc: loc.clone(),
-            id_loc: loc.clone(),
-            result_type_loc: loc,
+            loc: FunctionLoc {
+                full: loc.clone(),
+                id_loc: loc.clone(),
+                result_type_loc: loc,
+            },
             def_idx: None,
             handle_idx: None,
             visibility,
@@ -4011,19 +4013,26 @@ impl EqIgnoringLoc for Parameter {
     }
 }
 
-#[derive(Debug)]
-pub struct FunctionData {
-    /// Name of this function.
-    pub(crate) name: Symbol,
-
+/// Represents source code locations associated with a function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionLoc {
     /// Location of this function.
-    pub(crate) loc: Loc,
+    pub(crate) full: Loc,
 
     /// Location of the function identifier, suitable for error messages alluding to the function.
     pub(crate) id_loc: Loc,
 
     /// Location of the function result type, suitable for error messages alluding to the result type.
     pub(crate) result_type_loc: Loc,
+}
+
+#[derive(Debug)]
+pub struct FunctionData {
+    /// Name of this function.
+    pub(crate) name: Symbol,
+
+    /// Locations of this function.
+    pub(crate) loc: FunctionLoc,
 
     /// The definition index of this function in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
@@ -4144,7 +4153,7 @@ impl<'env> FunctionEnv<'env> {
 
     /// Get documentation associated with this function.
     pub fn get_doc(&self) -> &str {
-        self.module_env.env.get_doc(&self.data.loc)
+        self.module_env.env.get_doc(&self.data.loc.full)
     }
 
     /// Gets the definition index of this function.
@@ -4159,17 +4168,17 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns the location of this function.
     pub fn get_loc(&self) -> Loc {
-        self.data.loc.clone()
+        self.data.loc.full.clone()
     }
 
     /// Returns the location of the function identifier.
     pub fn get_id_loc(&self) -> Loc {
-        self.data.id_loc.clone()
+        self.data.loc.id_loc.clone()
     }
 
     /// Returns the location of the function identifier.
     pub fn get_result_type_loc(&self) -> Loc {
-        self.data.result_type_loc.clone()
+        self.data.loc.result_type_loc.clone()
     }
 
     /// Returns the attributes of this function.

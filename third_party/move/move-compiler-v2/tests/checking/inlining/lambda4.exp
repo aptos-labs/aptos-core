@@ -1,13 +1,13 @@
 
 Diagnostics:
-error: Functions may not return function-typed values, but function `M::macro_result_lambda_not_allowed` return type is `|u64|`:
-   ┌─ tests/checking/inlining/lambda4.move:86:23
+error: Functions may not return function-typed values, but function `M::macro_result_lambda_not_allowed` return type is the function type `|u64|`:
+   ┌─ tests/checking/inlining/lambda4.move:86:58
    │
 86 │     public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-   │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                                          ^^^^^
 
-error: Functions may not return function-typed values, but function `M::fun_result_lambda_not_allowed` return type is `|u64|`:
-   ┌─ tests/checking/inlining/lambda4.move:89:16
+error: Functions may not return function-typed values, but function `M::fun_result_lambda_not_allowed` return type is the function type `|u64|`:
+   ┌─ tests/checking/inlining/lambda4.move:89:49
    │
 89 │     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                                 ^^^^^

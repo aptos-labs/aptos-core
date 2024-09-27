@@ -1,0 +1,12 @@
+error[E04007]: incompatible types
+   ┌─ tests/move_check/typing/lambda_returning_lambda2.move:10:9
+   │
+ 3 │     public inline fun foreach_caller2<T>(_v: &vector<T>, _action: ||(u64)) {
+   │                                                                     ----- Expected: 'u64'
+   ·
+10 │         foreach_caller2(&v, ||(|e| sum = sum + *e)) // expected to be not implemented
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │         │                     │
+   │         │                     Given: '|&{integer}|()'
+   │         Invalid call of '0x8675309::M::foreach_caller2'. Invalid argument for parameter '_action'
+

@@ -127,9 +127,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
-            stop_after: StopAfter::BytecodeGen,
+            stop_after: StopAfter::BytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
-            dump_bytecode: DumpLevel::None,
+            dump_bytecode: DumpLevel::None, // EndStage,
             dump_bytecode_filter: None,
         },
         // Tests for checking v2 language features only supported if v2
@@ -170,8 +170,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::LAMBDA_FIELDS, true)
-                .set_experiment(Experiment::LAMBDA_PARAMS, true)
-                .set_experiment(Experiment::LAMBDA_RESULTS, true)
+                .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
+                .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
                 .set_experiment(Experiment::LAMBDA_VALUES, true)
                 .set_experiment(Experiment::LAMBDA_LIFTING, true),
             stop_after: StopAfter::AstPipeline,

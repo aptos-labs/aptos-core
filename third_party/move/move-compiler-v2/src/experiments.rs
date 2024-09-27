@@ -122,14 +122,14 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
-            name: Experiment::LAMBDA_PARAMS.to_string(),
+            name: Experiment::LAMBDA_IN_PARAMS.to_string(),
             description: "Turns on or off function values as parameters to non-inline functions"
                 .to_string(),
             default: Given(false),
         },
         Experiment {
-            name: Experiment::LAMBDA_RESULTS.to_string(),
-            description: "Turns on or off function values in function results".to_string(),
+            name: Experiment::LAMBDA_IN_RETURNS.to_string(),
+            description: "Turns on or off function values in function return values".to_string(),
             default: Given(false),
         },
         Experiment {
@@ -297,9 +297,9 @@ impl Experiment {
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_FIELDS: &'static str = "lambda-fields";
+    pub const LAMBDA_IN_PARAMS: &'static str = "lambda-in-params";
+    pub const LAMBDA_IN_RETURNS: &'static str = "lambda-in-returns";
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
-    pub const LAMBDA_PARAMS: &'static str = "lambda-params";
-    pub const LAMBDA_RESULTS: &'static str = "lambda-results";
     pub const LAMBDA_VALUES: &'static str = "lambda-values";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const OPTIMIZE: &'static str = "optimize";

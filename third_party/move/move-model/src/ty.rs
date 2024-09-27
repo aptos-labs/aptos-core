@@ -535,14 +535,14 @@ impl Constraint {
         }
     }
 
-    /// Returns the constraints which need to be satisfied to instantiate the given
-    /// type parameter. This creates NoReference, NoTuple, NoPhantom unless the type parameter is
-    /// phantom, and HasAbilities if any abilities need to be met.
+    /// Returns the constraints which need to be satisfied to instantiate the given type
+    /// parameter. This creates NoReference, NoFunction, NoTuple, NoPhantom unless the type
+    /// parameter is phantom, and HasAbilities if any abilities need to be met.
     pub fn for_type_parameter(param: &TypeParameter) -> Vec<Constraint> {
         let mut result = vec![
             Constraint::NoReference,
             Constraint::NoTuple,
-            Constraint::NoFunction,
+            Constraint::NoFunction, // TODO(LAMBDA) - remove when implement LAMBDA_AS_TYPE_PARAMETERS
         ];
         let TypeParameter(
             _,
@@ -567,7 +567,7 @@ impl Constraint {
             Constraint::NoPhantom,
             Constraint::NoReference,
             Constraint::NoTuple,
-            Constraint::NoFunction,
+            Constraint::NoFunction, // TODO(LAMBDA) - remove when we implement LAMBDA_IN_VECTORS
         ]
     }
 
