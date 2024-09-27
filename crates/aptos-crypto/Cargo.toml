@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
 ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
@@ -61,6 +62,7 @@ typenum = { workspace = true }
 x25519-dalek = { workspace = true }
 
 [dev-dependencies]
+arbitrary = { workspace = true, features = ["derive"]}
 ark-bls12-381 = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-serialize = { workspace = true }
@@ -79,7 +81,7 @@ trybuild = { workspace = true }
 default = []
 assert-private-keys-not-cloneable = []
 cloneable-private-keys = []
-fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys"]
+fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys", "arbitrary"]
 testing = []
 
 [[bench]]

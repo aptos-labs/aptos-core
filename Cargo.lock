@@ -1006,6 +1006,7 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "aptos-crypto-derive",
+ "arbitrary",
  "ark-bls12-381",
  "ark-bn254",
  "ark-ec",
@@ -4273,6 +4274,7 @@ dependencies = [
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-proptest-helpers",
+ "arbitrary",
  "ark-bn254",
  "ark-ff",
  "ark-groth16",
@@ -8353,6 +8355,7 @@ name = "fuzzer-fuzz"
 version = "0.0.0"
 dependencies = [
  "aptos-cached-packages",
+ "aptos-crypto",
  "aptos-framework",
  "aptos-language-e2e-tests",
  "aptos-types",
@@ -8366,6 +8369,8 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "rayon",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -15772,9 +15777,9 @@ dependencies = [
 
 [[package]]
 name = "strum"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d8cec3501a5194c432b2b7976db6b7d10ec95c253208b45f83f7136aa985e29"
+checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
 
 [[package]]
 name = "strum_macros"
@@ -16619,7 +16624,7 @@ dependencies = [
  "prost 0.12.3",
  "rustls-native-certs 0.7.0",
  "rustls-pemfile 2.1.1",
- "strum 0.26.2",
+ "strum 0.26.3",
  "strum_macros 0.26.4",
  "tokio",
  "tokio-rustls 0.26.0",

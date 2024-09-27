@@ -54,11 +54,25 @@ pub enum AssertionSignature {
     },
 }
 
+/// Custom arbitrary implementation for fuzzing
+/// as the `secp256r1_ecdsa::Signature` type is an external dependency
+/// p256::ecdsa::Signature
+#[cfg(feature = "fuzzing")]
+impl<'a> arbitrary::Arbitrary<'a> for AssertionSignature {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let bytes: Vec<u8> = u.arbitrary()?;
+        let signature = aptos_crypto::secp256r1_ecdsa::Signature::try_from(bytes.as_slice())
+            .map_err(|_| arbitrary::Error::IncorrectFormat)?;
+        Ok(AssertionSignature::Secp256r1Ecdsa { signature })
+    }
+}
+
 /// `PartialAuthenticatorAssertionResponse` includes a subset of the fields returned from
 /// an [`AuthenticatorAssertionResponse`](passkey_types::webauthn::AuthenticatorAssertionResponse)
 ///
 /// See <https://www.w3.org/TR/webauthn-3/#authenticatorassertionresponse>
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct PartialAuthenticatorAssertionResponse {
     /// This attribute contains the raw signature returned from the authenticator.
     /// NOTE: Many signatures returned from WebAuthn assertions are not raw signatures.
