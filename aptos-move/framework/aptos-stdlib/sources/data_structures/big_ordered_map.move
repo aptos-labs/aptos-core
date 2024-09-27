@@ -4,12 +4,12 @@
 /// other common search trees like AVL or Red-black tree, a BTree node has more children, and packs
 /// more metadata into one node, which is more disk friendly (and gas friendly).
 
-module aptos_std::btree_map {
+module aptos_std::big_ordered_map {
     use std::option::{Self, Option};
     use std::vector;
     use std::bcs;
     use aptos_std::cmp;
-    use aptos_std::slots_storage::{Self, SlotsStorage};
+    use aptos_std::storage_slots_allocator::{Self, StorageSlotsAllocator};
     use aptos_std::math64::{max, min};
 
     // Internal errors.
@@ -29,7 +29,7 @@ module aptos_std::btree_map {
     const DEFAULT_LEAF_MIN_DEGREE: u16 = 3;
     const MAX_DEGREE: u64 = 4096;
 
-    /// A node of the BTreeMap.
+    /// A node of the BigOrderedMap.
     struct Node<K: store, V: store> has store {
         // Whether this node is a leaf node.
         is_leaf: bool,
@@ -59,7 +59,7 @@ module aptos_std::btree_map {
         }
     }
 
-    /// An iterator to iterate all keys in the BTreeMap.
+    /// An iterator to iterate all keys in the BigOrderedMap.
     enum Iterator<K> has copy, drop {
         End,
         Some {
@@ -72,13 +72,13 @@ module aptos_std::btree_map {
         },
     }
 
-    /// The BTreeMap data structure.
-    enum BTreeMap<K: store, V: store> has store {
-        V1 {
+    /// The BigOrderedMap data structure.
+    enum BigOrderedMap<K: store, V: store> has store {
+        BTreeMap {
             // The node index of the root node.
             root_index: u64,
             // Mapping of node_index -> node.
-            nodes: SlotsStorage<Node<K, V>>,
+            nodes: StorageSlotsAllocator<Node<K, V>>,
             // The node index of the leftmost node.
             min_leaf_index: u64,
             // The node index of the rightmost node.
@@ -95,24 +95,24 @@ module aptos_std::btree_map {
     // Constructors && Destructors //
     /////////////////////////////////
 
-    /// Returns a new BTreeMap with the default configuration.
-    public fun new<K: store, V: store>(): BTreeMap<K, V> {
+    /// Returns a new BigOrderedMap with the default configuration.
+    public fun new<K: store, V: store>(): BigOrderedMap<K, V> {
         new_with_config(0, 0, false, 0)
     }
 
-    /// Returns a new BTreeMap with the provided max degree consts (the maximum # of children a node can have).
+    /// Returns a new BigOrderedMap with the provided max degree consts (the maximum # of children a node can have).
     /// If 0 is passed, then it is dynamically computed based on size of first key and value.
-    public fun new_with_config<K: store, V: store>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, num_to_preallocate: u64): BTreeMap<K, V> {
+    public fun new_with_config<K: store, V: store>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, num_to_preallocate: u64): BigOrderedMap<K, V> {
         assert!(inner_max_degree == 0 || inner_max_degree >= DEFAULT_INNER_MIN_DEGREE, E_INVALID_PARAMETER);
         assert!(leaf_max_degree == 0 || leaf_max_degree >= DEFAULT_LEAF_MIN_DEGREE, E_INVALID_PARAMETER);
         let nodes = if (reuse_slots) {
-            slots_storage::new_reuse_storage_slots(num_to_preallocate)
+            storage_slots_allocator::new_reuse_storage_slots(num_to_preallocate)
         } else {
             assert!(num_to_preallocate == 0, E_INVALID_PARAMETER);
-            slots_storage::new_storage_slots()
+            storage_slots_allocator::new_storage_slots()
         };
         let root_index = nodes.add(new_node(/*is_leaf=*/true, /*parent=*/NULL_INDEX));
-        BTreeMap::V1 {
+        BigOrderedMap::BTreeMap {
             root_index: root_index,
             nodes: nodes,
             min_leaf_index: root_index,
@@ -123,20 +123,20 @@ module aptos_std::btree_map {
     }
 
     /// Destroys the tree if it's empty, otherwise aborts.
-    public fun destroy_empty<K: store, V: store>(self: BTreeMap<K, V>) {
-        let BTreeMap::V1 { nodes, root_index, min_leaf_index: _, max_leaf_index: _, inner_max_degree: _, leaf_max_degree: _ } = self;
+    public fun destroy_empty<K: store, V: store>(self: BigOrderedMap<K, V>) {
+        let BigOrderedMap::BTreeMap { nodes, root_index, min_leaf_index: _, max_leaf_index: _, inner_max_degree: _, leaf_max_degree: _ } = self;
         aptos_std::debug::print(&nodes);
         nodes.remove(root_index).destroy_empty_node();
-        nodes.destroy_empty();
+        nodes.destroy();
     }
 
     ///////////////
     // Modifiers //
     ///////////////
 
-    /// Inserts the key/value into the BTreeMap.
+    /// Inserts the key/value into the BigOrderedMap.
     /// Aborts if the key is already in the tree.
-    public fun add<K: drop + copy + store, V: store>(self: &mut BTreeMap<K, V>, key: K, value: V) {
+    public fun add<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: K, value: V) {
         if (self.inner_max_degree == 0 || self.leaf_max_degree == 0) {
             self.init_max_degrees(&key, &value);
         };
@@ -161,7 +161,7 @@ module aptos_std::btree_map {
 
     /// If the key doesn't exist in the tree, inserts the key/value, and returns none.
     /// Otherwise updates the value under the given key, and returns the old value.
-    public fun upsert<K: drop + copy + store, V: store>(self: &mut BTreeMap<K, V>, key: K, value: V): Option<V> {
+    public fun upsert<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: K, value: V): Option<V> {
         if (self.inner_max_degree == 0 || self.leaf_max_degree == 0) {
             self.init_max_degrees(&key, &value);
         };
@@ -190,9 +190,9 @@ module aptos_std::btree_map {
         }
     }
 
-    /// Removes the entry from BTreeMap and returns the value which `key` maps to.
+    /// Removes the entry from BigOrderedMap and returns the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
-    public fun remove<K: drop + copy + store, V: store>(self: &mut BTreeMap<K, V>, key: K): V {
+    public fun remove<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: K): V {
         let iter = self.find(key);
         assert!(!is_end_iter(self, &iter), E_INTERNAL);
 
@@ -209,7 +209,7 @@ module aptos_std::btree_map {
     ///////////////
 
     // Returns true iff the iterator is a begin iterator.
-    public fun is_begin_iter<K: store, V: store>(tree: &BTreeMap<K, V>, iter: &Iterator<K>): bool {
+    public fun is_begin_iter<K: store, V: store>(tree: &BigOrderedMap<K, V>, iter: &Iterator<K>): bool {
         if (iter is Iterator::End<K>) {
             tree.is_empty()
         } else {
@@ -218,7 +218,7 @@ module aptos_std::btree_map {
     }
 
     // Returns true iff the iterator is an end iterator.
-    public fun is_end_iter<K: store, V: store>(_tree: &BTreeMap<K, V>, iter: &Iterator<K>): bool {
+    public fun is_end_iter<K: store, V: store>(_tree: &BigOrderedMap<K, V>, iter: &Iterator<K>): bool {
         iter is Iterator::End<K>
     }
 
@@ -230,7 +230,7 @@ module aptos_std::btree_map {
 
     /// Returns an iterator pointing to the first element that is greater or equal to the provided
     /// key, or an end iterator if such element doesn't exist.
-    public fun lower_bound<K: drop + copy + store, V: store>(self: &BTreeMap<K, V>, key: K): Iterator<K> {
+    public fun lower_bound<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: K): Iterator<K> {
         let leaf = self.find_leaf(key);
         if (leaf == NULL_INDEX) {
             return self.new_end_iter()
@@ -253,7 +253,7 @@ module aptos_std::btree_map {
 
     /// Returns an iterator pointing to the element that equals to the provided key, or an end
     /// iterator if the key is not found.
-    public fun find<K: drop + copy + store, V: store>(self: &BTreeMap<K, V>, key: K): Iterator<K> {
+    public fun find<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: K): Iterator<K> {
         let lower_bound = self.lower_bound(key);
         if (is_end_iter(self, &lower_bound)) {
             lower_bound
@@ -265,7 +265,7 @@ module aptos_std::btree_map {
     }
 
     /// Returns true iff the key exists in the tree.
-    public fun contains<K: drop + copy + store, V: store>(self: &BTreeMap<K, V>, key: K): bool {
+    public fun contains<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: K): bool {
         let lower_bound = self.lower_bound(key);
         if (is_end_iter(self, &lower_bound)) {
             false
@@ -277,7 +277,7 @@ module aptos_std::btree_map {
     }
 
     /// Returns a reference to the element with its key, aborts if the key is not found.
-    public fun borrow<K: drop + copy + store, V: store>(self: &BTreeMap<K, V>, key: K): &V {
+    public fun borrow<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: K): &V {
         let iter = self.find(key);
 
         assert!(is_end_iter(self, &iter), E_INVALID_PARAMETER);
@@ -286,7 +286,7 @@ module aptos_std::btree_map {
     }
 
     /// Returns a mutable reference to the element with its key at the given index, aborts if the key is not found.
-    public fun borrow_mut<K: drop + copy + store, V: store>(self: &mut BTreeMap<K, V>, key: K): &mut V {
+    public fun borrow_mut<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: K): &mut V {
         let iter = self.find(key);
 
         assert!(is_end_iter(self, &iter), E_INVALID_PARAMETER);
@@ -295,7 +295,7 @@ module aptos_std::btree_map {
     }
 
     /// Return the begin iterator.
-    public fun new_begin_iter<K: copy + store, V: store>(self: &BTreeMap<K, V>): Iterator<K> {
+    public fun new_begin_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): Iterator<K> {
         if (self.is_empty()) {
             return Iterator::End;
         };
@@ -307,13 +307,13 @@ module aptos_std::btree_map {
     }
 
     /// Return the end iterator.
-    public fun new_end_iter<K: copy + store, V: store>(self: &BTreeMap<K, V>): Iterator<K> {
+    public fun new_end_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): Iterator<K> {
         Iterator::End
     }
 
     /// Returns the next iterator, or none if already at the end iterator.
     /// Requires the tree is not changed after the input iterator is generated.
-    public fun next_iter<K: drop + copy + store, V: store>(tree: &BTreeMap<K, V>, iter: Iterator<K>): Option<Iterator<K>> {
+    public fun next_iter<K: drop + copy + store, V: store>(tree: &BigOrderedMap<K, V>, iter: Iterator<K>): Option<Iterator<K>> {
         if (iter is Iterator::End<K>) {
             option::none()
         } else {
@@ -323,7 +323,7 @@ module aptos_std::btree_map {
 
     /// Returns the next iterator, aborts if already at the end iterator.
     /// Requires the tree is not changed after the input iterator is generated.
-    public fun next_iter_or_die<K: drop + copy + store, V: store>(tree: &BTreeMap<K, V>, iter: Iterator<K>): Iterator<K> {
+    public fun next_iter_or_die<K: drop + copy + store, V: store>(tree: &BigOrderedMap<K, V>, iter: Iterator<K>): Iterator<K> {
         assert!(!(iter is Iterator::End<K>), E_INVALID_PARAMETER);
 
         let node_index = iter.node_index;
@@ -349,7 +349,7 @@ module aptos_std::btree_map {
 
     /// Returns the previous iterator, or none if already at the begin iterator.
     /// Requires the tree is not changed after the input iterator is generated.
-    public fun prev_iter<K: drop + copy + store, V: store>(tree: &BTreeMap<K, V>, iter: Iterator<K>): Option<Iterator<K>> {
+    public fun prev_iter<K: drop + copy + store, V: store>(tree: &BigOrderedMap<K, V>, iter: Iterator<K>): Option<Iterator<K>> {
         if (iter.node_index == tree.min_leaf_index && iter.child_index == 0) {
             return option::none()
         };
@@ -359,7 +359,7 @@ module aptos_std::btree_map {
 
     /// Returns the previous iterator, aborts if already at the begin iterator.
     /// Requires the tree is not changed after the input iterator is generated.
-    public fun prev_iter_or_die<K: drop + copy + store, V: store>(tree: &BTreeMap<K, V>, iter: Iterator<K>): Iterator<K> {
+    public fun prev_iter_or_die<K: drop + copy + store, V: store>(tree: &BigOrderedMap<K, V>, iter: Iterator<K>): Iterator<K> {
         let prev_index = if (iter is Iterator::End<K>) {
             tree.max_leaf_index
         } else {
@@ -389,7 +389,7 @@ module aptos_std::btree_map {
     // Internal Implementations //
     //////////////////////////////
 
-    fun init_max_degrees<K: store, V: store>(self: &mut BTreeMap<K, V>, key: &K, value: &V) {
+    fun init_max_degrees<K: store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K, value: &V) {
         if (self.inner_max_degree == 0 || self.leaf_max_degree == 0) {
             let key_size = bcs::serialized_size(key);
 
@@ -459,7 +459,7 @@ module aptos_std::btree_map {
         }
     }
 
-    fun find_leaf<K: drop + copy + store, V: store>(self: &BTreeMap<K, V>, key: K): u64 {
+    fun find_leaf<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: K): u64 {
         let current = self.root_index;
         while (current != NULL_INDEX) {
             let node = self.nodes.borrow(current);
@@ -494,7 +494,7 @@ module aptos_std::btree_map {
         l
     }
 
-    fun get_max_degree<K: store, V: store>(self: &BTreeMap<K, V>, leaf: bool): u64 {
+    fun get_max_degree<K: store, V: store>(self: &BigOrderedMap<K, V>, leaf: bool): u64 {
         if (leaf) {
             self.leaf_max_degree as u64
         } else {
@@ -502,7 +502,7 @@ module aptos_std::btree_map {
         }
     }
 
-    fun add_at<K: drop + copy + store, V: store>(self: &mut BTreeMap<K, V>, node_index: u64, child: Child<K, V>) {
+    fun add_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: u64, child: Child<K, V>) {
         let current_size = {
             let node = self.nodes.borrow_mut(node_index);
             let children = &mut node.children;
@@ -525,7 +525,7 @@ module aptos_std::btree_map {
         };
 
         // # of children in the current node exceeds the threshold, need to split into two nodes.
-        let (right_node_slot, node) = self.nodes.transiently_remove(node_index);
+        let (right_node_slot, node) = self.nodes.remove_and_reserve(node_index);
         let parent_index = node.parent;
         let is_leaf = &mut node.is_leaf;
         let next = &mut node.next;
@@ -572,7 +572,7 @@ module aptos_std::btree_map {
 
         let right_node = new_node_with_children(*is_leaf, parent_index, new_node_children);
 
-        let left_node_slot = self.nodes.create_transient_slot();
+        let left_node_slot = self.nodes.reserve_slot();
         let left_node_index = left_node_slot.get_index();
         right_node.next = *next;
         *next = node_index;
@@ -591,8 +591,8 @@ module aptos_std::btree_map {
 
         let split_key = children.borrow(target_size - 1).max_key;
 
-        self.nodes.add_transient_slot(left_node_slot, node);
-        self.nodes.add_transient_slot(right_node_slot, right_node);
+        self.nodes.fill_reserved_slot(left_node_slot, node);
+        self.nodes.fill_reserved_slot(right_node_slot, right_node);
 
         if (node_index == self.min_leaf_index) {
             self.min_leaf_index = left_node_index;
@@ -600,7 +600,7 @@ module aptos_std::btree_map {
         self.add_at(parent_index, new_inner_child(split_key, left_node_index));
     }
 
-    fun update_key<K: drop + copy + store, V: store>(self: &mut BTreeMap<K, V>, node_index: u64, old_key: K, new_key: K) {
+    fun update_key<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: u64, old_key: K, new_key: K) {
         if (node_index == NULL_INDEX) {
             return
         };
@@ -619,7 +619,7 @@ module aptos_std::btree_map {
         };
     }
 
-    fun remove_at<K: drop + copy + store, V: store>(self: &mut BTreeMap<K, V>, node_index: u64, key: K): Child<K, V> {
+    fun remove_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: u64, key: K): Child<K, V> {
         let (old_child, current_size) = {
             let node = self.nodes.borrow_mut(node_index);
 
@@ -688,7 +688,7 @@ module aptos_std::btree_map {
 
         // We need to update tree beyond the current node
 
-        let (node_slot, node) = self.nodes.transiently_remove(node_index);
+        let (node_slot, node) = self.nodes.remove_and_reserve(node_index);
 
         let prev = node.prev;
         let next = node.next;
@@ -704,7 +704,7 @@ module aptos_std::btree_map {
         if (brother_index == NULL_INDEX || self.nodes.borrow(brother_index).parent != parent) {
             brother_index = prev;
         };
-        let (brother_slot, brother_node) = self.nodes.transiently_remove(brother_index);
+        let (brother_slot, brother_node) = self.nodes.remove_and_reserve(brother_index);
         let brother_children = &mut brother_node.children;
         let brother_size = brother_children.length();
 
@@ -731,8 +731,8 @@ module aptos_std::btree_map {
                 self.update_key(parent, children.borrow(0).max_key, brother_children.borrow(brother_size - 1).max_key);
             };
 
-            self.nodes.add_transient_slot(node_slot, node);
-            self.nodes.add_transient_slot(brother_slot, brother_node);
+            self.nodes.fill_reserved_slot(node_slot, node);
+            self.nodes.fill_reserved_slot(brother_slot, brother_node);
             return old_child;
         };
 
@@ -760,8 +760,8 @@ module aptos_std::btree_map {
                 self.nodes.borrow_mut(node.prev).next = brother_index;
             };
 
-            self.nodes.add_transient_slot(brother_slot, node);
-            self.nodes.destroy_transient_slot(node_slot);
+            self.nodes.fill_reserved_slot(brother_slot, node);
+            self.nodes.free_reserved_slot(node_slot);
             if (self.min_leaf_index == node_index) {
                 self.min_leaf_index = brother_index;
             };
@@ -792,8 +792,8 @@ module aptos_std::btree_map {
                 self.nodes.borrow_mut(brother_node.prev).next = node_index;
             };
 
-            self.nodes.add_transient_slot(node_slot, brother_node);
-            self.nodes.destroy_transient_slot(brother_slot);
+            self.nodes.fill_reserved_slot(node_slot, brother_node);
+            self.nodes.free_reserved_slot(brother_slot);
             if (self.min_leaf_index == brother_index) {
                 self.min_leaf_index = node_index;
             };
@@ -805,12 +805,12 @@ module aptos_std::btree_map {
         old_child
     }
 
-    /// Returns the number of elements in the BTreeMap.
-    fun length<K: store, V: store>(self: &BTreeMap<K, V>): u64 {
+    /// Returns the number of elements in the BigOrderedMap.
+    fun length<K: store, V: store>(self: &BigOrderedMap<K, V>): u64 {
         self.length_for_node(self.root_index)
     }
 
-    fun length_for_node<K: store, V: store>(self: &BTreeMap<K, V>, node_index: u64): u64 {
+    fun length_for_node<K: store, V: store>(self: &BigOrderedMap<K, V>, node_index: u64): u64 {
         let node = self.nodes.borrow(node_index);
         if (node.is_leaf) {
             node.children.length()
@@ -825,13 +825,13 @@ module aptos_std::btree_map {
     }
 
     #[test_only]
-    fun print_tree<K: store, V: store>(self: &BTreeMap<K, V>) {
+    fun print_tree<K: store, V: store>(self: &BigOrderedMap<K, V>) {
         aptos_std::debug::print(self);
         self.print_tree_for_node(self.root_index, 0);
     }
 
     #[test_only]
-    fun print_tree_for_node<K: store, V: store>(self: &BTreeMap<K, V>, node_index: u64, level: u64) {
+    fun print_tree_for_node<K: store, V: store>(self: &BigOrderedMap<K, V>, node_index: u64, level: u64) {
         let node = self.nodes.borrow(node_index);
 
         aptos_std::debug::print(&level);
@@ -844,8 +844,8 @@ module aptos_std::btree_map {
         };
     }
 
-    /// Returns true iff the BTreeMap is empty.
-    fun is_empty<K: store, V: store>(self: &BTreeMap<K, V>): bool {
+    /// Returns true iff the BigOrderedMap is empty.
+    fun is_empty<K: store, V: store>(self: &BigOrderedMap<K, V>): bool {
         let node = self.nodes.borrow(self.min_leaf_index);
 
         node.children.is_empty()
@@ -856,7 +856,7 @@ module aptos_std::btree_map {
     ///////////
 
     #[test_only]
-    fun destroy<K: drop + copy + store, V: drop + store>(self: BTreeMap<K, V>) {
+    fun destroy<K: drop + copy + store, V: drop + store>(self: BigOrderedMap<K, V>) {
         let it = new_begin_iter(&self);
         while (!is_end_iter(&self, &it)) {
             remove(&mut self, it.key);
@@ -869,7 +869,7 @@ module aptos_std::btree_map {
     }
 
     #[test_only]
-    fun validate_iteration<K: drop + copy + store, V: store>(self: &BTreeMap<K, V>) {
+    fun validate_iteration<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
         let expected_num_elements = self.length();
         let num_elements = 0;
         let it = new_begin_iter(self);
@@ -897,7 +897,7 @@ module aptos_std::btree_map {
     }
 
     #[test_only]
-    fun validate_subtree<K: drop + copy + store, V: store>(self: &BTreeMap<K, V>, node_index: u64, expected_max_key: Option<K>, expected_parent: u64) {
+    fun validate_subtree<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, node_index: u64, expected_max_key: Option<K>, expected_parent: u64) {
         let node = self.nodes.borrow(node_index);
         let len = vector::length(&node.children);
         assert!(len <= self.get_max_degree(node.is_leaf), E_INTERNAL);
@@ -938,7 +938,7 @@ module aptos_std::btree_map {
     }
 
     #[test_only]
-    fun validate_tree<K: drop + copy + store, V: store>(self: &BTreeMap<K, V>) {
+    fun validate_tree<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>) {
         self.validate_subtree(self.root_index, option::none(), NULL_INDEX);
         self.validate_iteration();
     }
