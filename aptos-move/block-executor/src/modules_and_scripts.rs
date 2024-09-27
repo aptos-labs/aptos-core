@@ -415,11 +415,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         key.clone(),
                         ModuleStorageRead::Versioned(version.clone(), verified_entry.clone()),
                     );
-                state
-                    .versioned_map
-                    .code_storage()
-                    .module_storage()
-                    .write_if_not_verified(&key, version, verified_entry);
+                if version.is_ok() {
+                    state
+                        .versioned_map
+                        .code_storage()
+                        .module_storage()
+                        .write_if_not_verified(&key, version, verified_entry);
+                }
             },
             ViewState::Unsync(state) => {
                 state
