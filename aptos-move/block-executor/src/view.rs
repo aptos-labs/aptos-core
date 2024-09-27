@@ -962,7 +962,7 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
-    base_view: &'a S,
+    pub(crate) base_view: &'a S,
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T, X>,
     pub(crate) txn_idx: TxnIndex,

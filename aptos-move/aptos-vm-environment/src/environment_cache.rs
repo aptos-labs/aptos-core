@@ -3,13 +3,23 @@
 
 use crate::environment::AptosEnvironment;
 use aptos_types::{
+    executable::ModulePath,
     state_store::{state_key::StateKey, StateView},
     vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
 };
 use bytes::Bytes;
+use move_binary_format::errors::{Location, PartialVMError, VMResult};
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_vm_runtime::{Module, RuntimeEnvironment};
+use move_vm_types::{module_cyclic_dependency_error, module_linker_error};
 use once_cell::sync::Lazy;
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+use aptos_types::state_store::TStateView;
+use move_core_types::vm_status::StatusCode;
 
 /// Represents a unique identifier for an [AptosEnvironment] instance based on the features, gas
 /// feature version, and other configs.
@@ -75,7 +85,7 @@ impl EnvironmentCache {
         *cache = Some((id, env.clone()));
         drop(cache);
         if flush_cross_block_module_cache {
-            CrossBlockModuleCache::flush_cross_block_module_cache();
+            MODULE_CACHE.0.write().flush()
         }
         env
     }
@@ -84,10 +94,102 @@ impl EnvironmentCache {
 /// Long-living environment cache to be used across blocks.
 static ENVIRONMENT_CACHE: Lazy<EnvironmentCache> = Lazy::new(EnvironmentCache::empty);
 
-pub struct CrossBlockModuleCache {
-    // TODO: some eviction policy?
-    modules: RwLock<HashMap<StateKey, Arc<ModuleStorageEntry>>>,
+struct ModuleCache {
+    invalidated: bool,
+    modules: HashMap<StateKey, Arc<ModuleStorageEntry>>,
 }
+
+impl ModuleCache {
+    fn empty() -> Self {
+        Self {
+            invalidated: false,
+            modules: HashMap::new(),
+        }
+    }
+
+    fn flush(&mut self) {
+        self.invalidated = false;
+        self.modules.clear();
+    }
+
+    fn flush_if_invalidated_and_mark_valid(&mut self) {
+        if self.invalidated {
+            self.invalidated = false;
+            self.modules.clear();
+        }
+    }
+
+    pub fn traverse<K: ModulePath>(
+        &mut self,
+        entry: Arc<ModuleStorageEntry>,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+        base_view: &impl TStateView<Key = K>,
+        visited: &mut HashSet<StateKey>,
+        runtime_environment: &RuntimeEnvironment,
+    ) -> VMResult<Arc<Module>> {
+        let cm = entry.as_compiled_module();
+        runtime_environment.paranoid_check_module_address_and_name(
+            cm.as_ref(),
+            address,
+            module_name,
+        )?;
+
+        let size = entry.size_in_bytes();
+        let hash = entry.hash();
+        let locally_verified_module =
+            runtime_environment.build_locally_verified_module(cm, size, hash)?;
+
+        let mut verified_dependencies = vec![];
+        for (addr, name) in locally_verified_module.immediate_dependencies_iter() {
+            let dep_key = StateKey::from_address_and_module_name(addr, name);
+            let dep_entry = match self.modules.get(&dep_key) {
+                Some(dep_entry) => dep_entry.clone(),
+                None => {
+                    let k = K::from_address_and_module_name(addr, name);
+                    let sv = base_view.get_state_value(&k).map_err(|_| {
+                        PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
+                    })?.ok_or_else(|| module_linker_error!(addr, name))?;
+                    ModuleStorageEntry::from_state_value(runtime_environment, sv).map(Arc::new)?
+                },
+            };
+            if let Some(module) = dep_entry.try_as_verified_module() {
+                verified_dependencies.push(module);
+                continue;
+            }
+            assert!(!dep_entry.is_verified());
+
+            if visited.insert(dep_key.clone()) {
+                let module = self.traverse(
+                    dep_entry,
+                    addr,
+                    name,
+                    base_view,
+                    visited,
+                    runtime_environment,
+                )?;
+                verified_dependencies.push(module);
+            } else {
+                return Err(module_cyclic_dependency_error!(address, module_name));
+            }
+        }
+
+        // At this point, all dependencies of the module are verified, so we can run final checks
+        // and construct a verified module.
+        let module = Arc::new(
+            runtime_environment
+                .build_verified_module(locally_verified_module, &verified_dependencies)?,
+        );
+        let verified_entry = Arc::new(entry.make_verified(module.clone()));
+        self.modules.insert(
+            StateKey::from_address_and_module_name(address, module_name),
+            verified_entry,
+        );
+        Ok(module)
+    }
+}
+
+pub struct CrossBlockModuleCache(RwLock<ModuleCache>);
 
 impl CrossBlockModuleCache {
     pub fn get_from_cross_block_module_cache(
@@ -100,34 +202,51 @@ impl CrossBlockModuleCache {
         MODULE_CACHE.store_module_storage_entry(state_key, entry)
     }
 
-    pub fn flush_cross_block_module_cache() {
-        MODULE_CACHE.flush()
+    pub fn traverse<K: ModulePath>(
+        entry: Arc<ModuleStorageEntry>,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+        base_view: &impl TStateView<Key = K>,
+        runtime_environment: &RuntimeEnvironment,
+    ) -> VMResult<Arc<Module>> {
+        let mut cache = MODULE_CACHE.0.write();
+        let mut visited = HashSet::new();
+        cache.traverse(
+            entry,
+            address,
+            module_name,
+            base_view,
+            &mut visited,
+            runtime_environment,
+        )
+    }
+
+    pub fn is_invalidated() -> bool {
+        let cache = MODULE_CACHE.0.read();
+        cache.invalidated
+    }
+
+    pub fn mark_invalid() {
+        let mut cache = MODULE_CACHE.0.write();
+        cache.invalidated = true;
+    }
+
+    pub fn flush_cross_block_module_cache_if_invalidated() {
+        MODULE_CACHE.0.write().flush_if_invalidated_and_mark_valid()
     }
 
     /// Returns new module cache.
     fn empty() -> Self {
-        Self {
-            modules: RwLock::new(HashMap::new()),
-        }
-    }
-
-    fn flush(&self) {
-        self.modules.write().clear()
+        Self(RwLock::new(ModuleCache::empty()))
     }
 
     fn get_module_storage_entry(&self, state_key: &StateKey) -> Option<Arc<ModuleStorageEntry>> {
-        self.modules.read().get(state_key).cloned()
+        self.0.read().modules.get(state_key).cloned()
     }
 
     fn store_module_storage_entry(&self, state_key: StateKey, entry: Arc<ModuleStorageEntry>) {
-        let needs_update = match self.modules.read().get(&state_key) {
-            None => true,
-            Some(existing_entry) => existing_entry.hash() != entry.hash(),
-        };
-        if needs_update {
-            let mut modules = self.modules.write();
-            modules.insert(state_key, entry);
-        }
+        let mut modules = self.0.write();
+        modules.modules.insert(state_key, entry);
     }
 }
 

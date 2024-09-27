@@ -20,7 +20,7 @@ pub struct VersionedCodeStorage<K> {
     /// implementation it is flushed on any module upgrade.
     script_cache: DashMap<[u8; 32], CachePadded<ScriptCacheEntry>>,
     /// Stores modules and pending code publishes observed by the Block-STM.
-    module_storage: VersionedModuleStorage<K, ModuleStorageEntry>,
+    module_storage: VersionedModuleStorage<K>,
 }
 
 impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedCodeStorage<K> {
@@ -93,7 +93,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedCodeStorage<K> {
         Ok(())
     }
 
-    pub fn module_storage(&self) -> &VersionedModuleStorage<K, ModuleStorageEntry> {
+    pub fn module_storage(&self) -> &VersionedModuleStorage<K> {
         &self.module_storage
     }
 }

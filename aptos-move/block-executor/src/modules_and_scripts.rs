@@ -5,7 +5,7 @@ use crate::view::{LatestView, ViewState};
 use aptos_mvhashmap::versioned_module_storage::{ModuleStorageRead, ModuleVersion};
 use aptos_types::{
     executable::{Executable, ModulePath},
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, TStateView},
+    state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
 };
@@ -210,8 +210,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
-        let mut visited = HashSet::new();
-
         let (version, entry) = match self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -223,13 +221,25 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
             return Ok(Some(module));
         }
 
-        let module = self.traversed_published_dependencies(
-            version,
-            entry,
-            address,
-            module_name,
-            &mut visited,
-        )?;
+        let module = if CrossBlockModuleCache::is_invalidated() {
+            let mut visited = HashSet::new();
+            self.traversed_published_dependencies(
+                version,
+                entry,
+                address,
+                module_name,
+                &mut visited,
+            )?
+        } else {
+            CrossBlockModuleCache::traverse(
+                entry,
+                address,
+                module_name,
+                self.base_view,
+                self.runtime_environment,
+            )?
+        };
+
         Ok(Some(module))
     }
 }
@@ -249,11 +259,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         key: &T::Key,
     ) -> VMResult<Option<Arc<ModuleStorageEntry>>> {
-        let state_key = key.as_state_key();
-        if let Some(entry) = CrossBlockModuleCache::get_from_cross_block_module_cache(state_key) {
-            return Ok(Some(entry));
-        }
-
         self.get_raw_base_value(key)
             .map_err(|e| e.finish(Location::Undefined))?
             .map(|s| {
@@ -264,10 +269,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     /// Returns the module storage entry built from the current view. If it is not in
     /// multi-version or non-sync data structures, fetches it from the base view.
-    fn read_module_storage_by_key(
-        &self,
-        key: &T::Key,
-    ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
+    fn read_module_storage_by_key(&self, key: &T::Key) -> VMResult<ModuleStorageRead> {
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // If the module read has been previously cached, return early.
@@ -315,7 +317,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
+    ) -> VMResult<ModuleStorageRead> {
         let key = T::Key::from_address_and_module_name(address, module_name);
         self.read_module_storage_by_key(&key)
     }
@@ -396,12 +398,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 .build_verified_module(locally_verified_module, &verified_dependencies)?,
         );
         let verified_entry = Arc::new(entry.make_verified(module.clone()));
-        if version.is_err() {
-            CrossBlockModuleCache::store_to_cross_block_module_cache(
-                StateKey::module(address, module_name),
-                verified_entry.clone(),
-            );
-        }
 
         // Finally, change the entry in the module storage to the verified one, in order to
         // make sure that everyone sees the verified module.

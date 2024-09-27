@@ -44,6 +44,7 @@ use aptos_types::{
     vm::modules::ModuleStorageEntry,
     write_set::{TransactionWrite, WriteOp},
 };
+use aptos_vm_environment::environment_cache::CrossBlockModuleCache;
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
 use aptos_vm_types::change_set::randomly_check_layout_matches;
 use bytes::Bytes;
@@ -187,6 +188,7 @@ where
                     .write(k, idx_to_execute, incarnation, v, maybe_layout);
             }
 
+            let mut modules_written = false;
             for (k, v) in output.module_write_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
                     needs_suffix_validation = true;
@@ -195,10 +197,14 @@ where
                     versioned_cache
                         .code_storage()
                         .module_storage()
-                        .write_pending(k, idx_to_execute)
+                        .write_pending(k, idx_to_execute);
+                    modules_written = true;
                 } else {
                     versioned_cache.modules().write(k, idx_to_execute, v);
                 }
+            }
+            if modules_written {
+                CrossBlockModuleCache::mark_invalid();
             }
 
             // Then, apply deltas.
@@ -1053,6 +1059,10 @@ where
             None
         };
 
+        if env.runtime_environment().vm_config().use_loader_v2 {
+            CrossBlockModuleCache::flush_cross_block_module_cache_if_invalidated();
+        }
+
         (!shared_maybe_error.load(Ordering::SeqCst))
             .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
             .ok_or(())
@@ -1079,14 +1089,19 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
+        let mut modules_written = false;
         for (key, write_op) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
                 let entry =
                     ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
                 unsync_map.publish_module_storage_entry(key, Arc::new(entry));
+                modules_written = true;
             } else {
                 unsync_map.write_module(key, write_op);
             }
+        }
+        if modules_written {
+            CrossBlockModuleCache::mark_invalid();
         }
 
         let mut second_phase = Vec::new();
@@ -1436,6 +1451,10 @@ where
         } else {
             None
         };
+
+        if env.runtime_environment().vm_config().use_loader_v2 {
+            CrossBlockModuleCache::flush_cross_block_module_cache_if_invalidated();
+        }
 
         Ok(BlockOutput::new(ret, block_end_info))
     }

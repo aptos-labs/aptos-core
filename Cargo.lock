@@ -2911,6 +2911,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-crypto",
  "aptos-types",
+ "aptos-vm-environment",
  "aptos-vm-types",
  "bytes",
  "claims",
