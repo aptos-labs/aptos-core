@@ -10,8 +10,8 @@ use crate::{
     },
     logging::{LogEntry, LogSchema},
     metrics::{
-        CHUNK_OTHER_TIMERS, COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS,
-        SAVE_TRANSACTIONS, TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
+        COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
+        TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
     },
 };
 use anyhow::Result;
@@ -388,7 +388,7 @@ where
     }
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()> {
-        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_ledger"]);
+        let _timer = OTHER_TIMERS.timer_with(&["commit_ledger"]);
 
         let block_id = ledger_info_with_sigs.ledger_info().consensus_block_id();
         info!(
