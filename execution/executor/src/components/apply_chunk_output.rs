@@ -16,7 +16,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput,
     should_forward_to_subscription_service,
-    state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
+    state_checkpoint_output::{StateCheckpointOutput},
     ExecutedChunk, LedgerUpdateOutput, ParsedTransactionOutput,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
@@ -43,29 +43,14 @@ impl ApplyChunkOutput {
     pub fn calculate_state_checkpoint(
         chunk_output: ChunkOutput,
         parent_state: &StateDelta,
-        append_state_checkpoint_to_block: Option<HashValue>,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
         is_block: bool,
     ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         let ChunkOutput {
+            transactions_by_status,
             state_cache,
-            transactions,
-            transaction_outputs,
             block_end_info,
         } = chunk_output;
-        let (new_epoch, statuses_for_input_txns, to_commit, to_discard, to_retry) = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["sort_transactions"])
-                .start_timer();
-            // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
-            // Will return transactions with Retry txns sorted after Keep/Discard txns.
-            Self::sort_transactions_with_state_checkpoint(
-                transactions,
-                transaction_outputs,
-                append_state_checkpoint_to_block,
-                block_end_info.clone(),
-            )?
-        };
 
         // Apply the write set, get the latest state.
         let (
@@ -82,14 +67,14 @@ impl ApplyChunkOutput {
             InMemoryStateCalculatorV2::calculate_for_transactions(
                 parent_state,
                 state_cache,
-                &to_commit,
-                new_epoch,
+                transactions_by_status.to_commit(),
+                transactions_by_status.ends_epoch(),
                 is_block,
             )?
         };
 
         let mut state_checkpoint_output = StateCheckpointOutput::new(
-            TransactionsByStatus::new(statuses_for_input_txns, to_commit, to_discard, to_retry),
+            transactions_by_status,
             state_updates_vec,
             state_checkpoint_hashes,
             state_updates_before_last_checkpoint,
@@ -174,7 +159,6 @@ impl ApplyChunkOutput {
             Self::calculate_state_checkpoint(
                 chunk_output,
                 base_view.state(),
-                None, // append_state_checkpoint_to_block
                 known_state_checkpoint_hashes,
                 /*is_block=*/ false,
             )?;

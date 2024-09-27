@@ -38,12 +38,10 @@ use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use std::{ops::Deref, sync::Arc, time::Duration};
+use aptos_executor_types::state_checkpoint_output::TransactionsByStatus;
 
 pub struct ChunkOutput {
-    /// Input transactions.
-    pub transactions: Vec<Transaction>,
-    /// Raw VM output.
-    pub transaction_outputs: Vec<TransactionOutput>,
+    pub transactions_by_status: TransactionsByStatus,
     /// Carries the frozen base state view, so all in-mem nodes involved won't drop before the
     /// execution result is processed; as well as all the accounts touched during execution, together
     /// with their proofs.
@@ -77,10 +75,13 @@ impl ChunkOutput {
 
         let (transaction_outputs, block_end_info) = block_output.into_inner();
         Ok(Self {
-            transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
-            transaction_outputs,
+            transactions_by_status: TransactionsByStatus::parse(
+                transactions.into_iter().map(|t| t.into_inner()).collect(),
+                transaction_outputs,
+                Some(block.id),
+                block_end_info,
+            ),
             state_cache: state_view.into_state_cache(),
-            block_end_info,
         })
     }
 
@@ -102,11 +103,13 @@ impl ChunkOutput {
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
         Ok(Self {
-            transactions: PartitionedTransactions::flatten(transactions)
-                .into_iter()
-                .map(|t| t.into_txn().into_inner())
-                .collect(),
-            transaction_outputs,
+            transactions_by_status: TransactionsByStatus::parse(
+                PartitionedTransactions::flatten(transactions)
+                    .into_iter()
+                    .map(|t| t.into_txn().into_inner())
+                    .collect(),
+                transaction_outputs,
+            ),
             state_cache: state_view.into_state_cache(),
             block_end_info: None,
         })
@@ -131,12 +134,15 @@ impl ChunkOutput {
         state_view.prime_cache_by_write_set(write_set)?;
 
         Ok(Self {
-            transactions,
-            transaction_outputs,
+            transactions_by_status: TransactionsByStatus::parse(
+                transactions,
+                transaction_outputs,
+            ),
             state_cache: state_view.into_state_cache(),
             block_end_info: None,
         })
     }
+
 
     pub fn apply_to_ledger(
         self,
@@ -165,7 +171,6 @@ impl ChunkOutput {
         ApplyChunkOutput::calculate_state_checkpoint(
             self,
             parent_state,
-            Some(block_id),
             None,
             /*is_block=*/ true,
         )

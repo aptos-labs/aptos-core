@@ -26,6 +26,7 @@ itertools = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+log = "0.4.20"
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }

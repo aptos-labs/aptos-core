@@ -345,7 +345,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             ApplyChunkOutput::calculate_state_checkpoint(
                 chunk_output,
                 &self.commit_queue.lock().latest_state(),
-                None, // append_state_checkpoint_to_block
                 Some(known_state_checkpoints),
                 false, // is_block
             )?;
@@ -430,7 +429,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             ApplyChunkOutput::calculate_state_checkpoint(
                 chunk_output,
                 &self.commit_queue.lock().latest_state(),
-                None, // append_state_checkpoint_to_block
                 Some(known_state_checkpoints),
                 false, // is_block
             )?
@@ -768,9 +766,9 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )?;
         // not `zip_eq`, deliberately
-        for (version, txn_out, txn_info, write_set, events) in multizip((
+        for (version, (_txn, txn_out), txn_info, write_set, events) in multizip((
             begin_version..end_version,
-            chunk_output.transaction_outputs.iter(),
+            chunk_output.transactions_by_status.to_commit().iter(),
             transaction_infos.iter(),
             write_sets.iter(),
             event_vecs.iter(),

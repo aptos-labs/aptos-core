@@ -1547,6 +1547,7 @@ dependencies = [
  "bcs 0.1.4",
  "criterion",
  "itertools 0.13.0",
+ "log",
  "once_cell",
  "serde",
  "thiserror",
