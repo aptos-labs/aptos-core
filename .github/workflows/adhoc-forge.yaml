@@ -31,11 +31,10 @@ on:
         required: false
         type: string
         description: The Forge k8s cluster to be used for test
-      FORGE_ENABLE_HAPROXY:
+      FORGE_ENABLE_INDEXER:
         required: false
-        default: false
         type: boolean
-        description: enable haproxy for the forge test
+        description: Whether to use indexer
       FORGE_NUM_VALIDATORS:
         required: false
         type: string
@@ -68,6 +67,7 @@ jobs:
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
           echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
           echo "FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}"
+          echo "FORGE_ENABLE_INDEXER: ${{ inputs.FORGE_ENABLE_INDEXER }}"
           echo "FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}"
           echo "FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}"
           echo "FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}"
@@ -79,6 +79,7 @@ jobs:
       forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
       forgeClusterName: ${{ inputs.FORGE_CLUSTER_NAME }}
       forgeEnableHaproxy: ${{ inputs.FORGE_ENABLE_HAPROXY }}
+      forgeEnableIndexer: ${{ inputs.FORGE_ENABLE_INDEXER }}
       forgeNumValidators: ${{ inputs.FORGE_NUM_VALIDATORS }}
       forgeNumValidatorFullnodes: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
 
@@ -94,6 +95,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: ${{ fromJSON(needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs) }} # fromJSON converts to integer
       FORGE_CLUSTER_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeClusterName }}
       FORGE_ENABLE_HAPROXY: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableHaproxy }}
+      FORGE_ENABLE_INDEXER: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableIndexer }}
       FORGE_NUM_VALIDATORS: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidators }}
       FORGE_NUM_VALIDATOR_FULLNODES: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidatorFullnodes }}
       FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}

@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_logger::info;
+use futures::{future, FutureExt};
 use rand::rngs::StdRng;
 use serde_json::json;
 use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
@@ -172,31 +173,27 @@ impl Factory for K8sFactory {
             );
 
             // try installing testnet resources, but clean up if it fails
-            let (validators, fullnodes) = match install_testnet_resources(
-                new_era.clone(),
-                self.kube_namespace.clone(),
-                num_validators.get(),
-                num_fullnodes,
-                format!("{}", init_version),
-                format!("{}", genesis_version),
-                genesis_modules_path,
-                self.use_port_forward,
-                self.enable_haproxy,
-                self.enable_indexer,
-                genesis_config_fn,
-                node_config_fn,
-                false,
-            )
-            .await
-            {
-                Ok(res) => res,
-                Err(e) => {
-                    uninstall_testnet_resources(self.kube_namespace.clone()).await?;
-                    bail!(e);
-                },
-            };
+            let deploy_testnet_fut = async {
+                install_testnet_resources(
+                    new_era.clone(),
+                    self.kube_namespace.clone(),
+                    num_validators.get(),
+                    num_fullnodes,
+                    format!("{}", init_version),
+                    format!("{}", genesis_version),
+                    genesis_modules_path,
+                    self.use_port_forward,
+                    self.enable_haproxy,
+                    self.enable_indexer,
+                    genesis_config_fn,
+                    node_config_fn,
+                    false,
+                )
+                .await
+            }
+            .boxed();
 
-
+            let deploy_indexer_fut = async {
             if self.enable_indexer {
                 // NOTE: by default, use a deploy profile and no additional configuration values
                 let config = serde_json::from_value(json!({
@@ -218,8 +215,22 @@ impl Factory for K8sFactory {
                     None,
                 );
                 indexer_deployer.start(config).await?;
-                indexer_deployer.wait_completed().await?;
-            }
+                indexer_deployer.wait_completed().await
+                } else {
+                    Ok(())
+                }
+            }.boxed();
+
+            // join on testnet and indexer deployment futures, handling the output from the testnet
+            // deployment
+            let (validators, fullnodes) =
+                match future::try_join(deploy_testnet_fut, deploy_indexer_fut).await {
+                    Ok((deploy_testnet_ret, _)) => deploy_testnet_ret,
+                    Err(e) => {
+                        uninstall_testnet_resources(self.kube_namespace.clone()).await?;
+                        bail!(e);
+                    },
+                };
 
             (Some(new_era), validators, fullnodes)
         };
