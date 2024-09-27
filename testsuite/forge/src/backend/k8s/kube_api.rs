@@ -62,6 +62,7 @@ where
     async fn get_status(&self, name: &str) -> Result<K, KubeError> {
         self.api.get_status(name).await
     }
+
     async fn list(&self, lp: &ListParams) -> Result<Vec<K>, KubeError> {
         let list = self.api.list(lp).await?;
         Ok(list.items)

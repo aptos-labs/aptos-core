@@ -477,8 +477,14 @@ fn stateful_set_labels_matches(sts: &StatefulSet, labels: &BTreeMap<String, Stri
     if sts.metadata.labels.is_none() {
         return false;
     }
-    let sts_labels = sts.metadata.labels.as_ref().expect("Failed to get StatefulSet labels");
-    labels.iter().all(|(k, v)| sts_labels.get(k).map_or(false, |val| val == v))
+    let sts_labels = sts
+        .metadata
+        .labels
+        .as_ref()
+        .expect("Failed to get StatefulSet labels");
+    labels
+        .iter()
+        .all(|(k, v)| sts_labels.get(k).map_or(false, |val| val == v))
 }
 
 fn parse_service_name_from_stateful_set_name(
@@ -568,10 +574,21 @@ pub(crate) async fn get_validators(
     let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
     let validators = stateful_sets
         .into_iter()
-        .filter(|sts| stateful_set_labels_matches(sts, &BTreeMap::from([
-            ("app.kubernetes.io/name".to_string(), "validator".to_string()),
-            ("app.kubernetes.io/part-of".to_string(), "aptos-node".to_string()),
-        ])))
+        .filter(|sts| {
+            stateful_set_labels_matches(
+                sts,
+                &BTreeMap::from([
+                    (
+                        "app.kubernetes.io/name".to_string(),
+                        "validator".to_string(),
+                    ),
+                    (
+                        "app.kubernetes.io/part-of".to_string(),
+                        "aptos-node".to_string(),
+                    ),
+                ]),
+            )
+        })
         .map(|sts| {
             let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
@@ -590,10 +607,18 @@ pub(crate) async fn get_validator_fullnodes(
     let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
     let fullnodes = stateful_sets
         .into_iter()
-        .filter(|sts| stateful_set_labels_matches(sts, &BTreeMap::from([
-            ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
-            ("app.kubernetes.io/part-of".to_string(), "aptos-node".to_string()),
-        ])))
+        .filter(|sts| {
+            stateful_set_labels_matches(
+                sts,
+                &BTreeMap::from([
+                    ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
+                    (
+                        "app.kubernetes.io/part-of".to_string(),
+                        "aptos-node".to_string(),
+                    ),
+                ]),
+            )
+        })
         .map(|sts| {
             let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
@@ -802,8 +827,8 @@ impl ChaosExperimentOps for RealChaosExperimentOps {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kube::api::ObjectMeta;
     use crate::chaos_schema::ChaosCondition;
+    use kube::api::ObjectMeta;
 
     #[test]
     fn test_parse_service_name_from_stateful_set_name() {

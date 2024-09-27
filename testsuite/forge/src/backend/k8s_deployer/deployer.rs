@@ -5,7 +5,9 @@ use super::{
     DEFAULT_FORGE_DEPLOYER_IMAGE_TAG, FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME,
     FORGE_DEPLOYER_VALUES_ENV_VAR_NAME,
 };
-use crate::{k8s_wait_indexer_strategy, maybe_create_k8s_resource, wait_log_job, K8sApi, ReadWrite, Result};
+use crate::{
+    k8s_wait_indexer_strategy, maybe_create_k8s_resource, wait_log_job, K8sApi, ReadWrite, Result,
+};
 use aptos_logger::info;
 use k8s_openapi::api::{
     batch::v1::Job,
@@ -238,7 +240,13 @@ impl ForgeDeployerManager {
      * Wait for the deployer job to complete.
      */
     pub async fn wait_completed(&self) -> Result<()> {
-        wait_log_job(self.jobs_api.clone(), &self.namespace, self.get_name(), k8s_wait_indexer_strategy()).await
+        wait_log_job(
+            self.jobs_api.clone(),
+            &self.namespace,
+            self.get_name(),
+            k8s_wait_indexer_strategy(),
+        )
+        .await
     }
 }
 

@@ -2,8 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::GENESIS_HELM_RELEASE_NAME;
 use crate::{
-    get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck, wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_FORGE_DEPLOYER_PROFILE, DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED, FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX
+    get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck,
+    wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
+    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_FORGE_DEPLOYER_PROFILE,
+    DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
+    FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX,
+    FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
+    NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
+    VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
@@ -41,8 +49,6 @@ use tokio::{
     io::{AsyncBufReadExt, BufReader},
     time::Duration,
 };
-
-use super::GENESIS_HELM_RELEASE_NAME;
 
 /// Gets a free port
 pub fn get_free_port() -> u32 {
@@ -446,7 +452,9 @@ pub async fn check_persistent_volumes(
 }
 
 /// Get the existing helm values for a release
-fn get_default_helm_release_values_from_cluster(helm_release_name: &str) -> Result<serde_yaml::Value> {
+fn get_default_helm_release_values_from_cluster(
+    helm_release_name: &str,
+) -> Result<serde_yaml::Value> {
     let status_args = [
         "status",
         helm_release_name,
@@ -470,7 +478,9 @@ fn get_default_helm_release_values_from_cluster(helm_release_name: &str) -> Resu
         )
     })?;
     // get .config or anyhow bail!
-    let config = j.get("config").ok_or_else(|| anyhow!("Failed to get helm values"))?;
+    let config = j
+        .get("config")
+        .ok_or_else(|| anyhow!("Failed to get helm values"))?;
     Ok(config.clone())
 }
 
@@ -488,12 +498,13 @@ fn merge_yaml(a: &mut serde_yaml::Value, b: serde_yaml::Value) {
                     a[&k] = serde_yaml::Value::from(_b);
                     continue;
                 }
-                if !a.contains_key(&k) {a.insert(k.to_owned(), v.to_owned());}
-                else { merge_yaml(&mut a[&k], v); }
-
+                if !a.contains_key(&k) {
+                    a.insert(k.to_owned(), v.to_owned());
+                } else {
+                    merge_yaml(&mut a[&k], v);
+                }
             }
-
-        }
+        },
         (a, b) => *a = b,
     }
 }
@@ -521,8 +532,12 @@ pub async fn install_testnet_resources(
 
     // get existing helm values from the cluster
     // if the release doesn't exist, return an empty mapping, which may work, especially as we move away from this pattern and instead having default values baked into the deployer
-    let mut aptos_node_helm_values = get_default_helm_release_values_from_cluster(APTOS_NODE_HELM_RELEASE_NAME).unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
-    let mut genesis_helm_values = get_default_helm_release_values_from_cluster(GENESIS_HELM_RELEASE_NAME).unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
+    let mut aptos_node_helm_values =
+        get_default_helm_release_values_from_cluster(APTOS_NODE_HELM_RELEASE_NAME)
+            .unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
+    let mut genesis_helm_values =
+        get_default_helm_release_values_from_cluster(GENESIS_HELM_RELEASE_NAME)
+            .unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
 
     let aptos_node_helm_values_override = construct_node_helm_values_from_input(
         node_helm_config_fn,
@@ -1192,7 +1207,6 @@ labels:
 
     #[test]
     fn test_merge_yaml_values() {
-
         let yaml1 = r#"
         foo:
           bar: 1
@@ -1211,18 +1225,22 @@ labels:
         let mut value1: serde_yaml::Value = serde_yaml::from_str(yaml1).unwrap();
         let value2: serde_yaml::Value = serde_yaml::from_str(yaml2).unwrap();
 
-        let merged_with_serde_merge_tmerge: serde_yaml::Value = serde_merge::tmerge(&mut value1, &value2).unwrap();
+        let merged_with_serde_merge_tmerge: serde_yaml::Value =
+            serde_merge::tmerge(&mut value1, &value2).unwrap();
         merge_yaml(&mut value1, value2); // this is an in-place merge
         let merged_with_crate = value1;
 
-        let expected: serde_yaml::Value = serde_yaml::from_str(r#"
+        let expected: serde_yaml::Value = serde_yaml::from_str(
+            r#"
         foo:
           bar: 2
           baz:
             qux: hello
             quux: world
         extra: something
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         assert_ne!(merged_with_serde_merge_tmerge, expected);
         assert_eq!(merged_with_crate, expected);
