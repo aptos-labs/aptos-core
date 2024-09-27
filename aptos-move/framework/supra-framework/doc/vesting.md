@@ -4,7 +4,7 @@
 # Module `0x1::vesting`
 
 
-Simple vesting contract that allows specifying how much APT coins should be vesting in each fixed-size period. The
+Simple vesting contract that allows specifying how much SUPRA coins should be vesting in each fixed-size period. The
 vesting contract also comes with staking and allows shareholders to withdraw rewards anytime.
 
 Vesting schedule is represented as a vector of distributions. For example, a vesting schedule of
@@ -2905,8 +2905,8 @@ has already been terminated.
     shareholder: <b>address</b>,
     new_beneficiary: <b>address</b>,
 ) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
-    // Verify that the beneficiary <a href="account.md#0x1_account">account</a> is set up <b>to</b> receive APT. This is a requirement so <a href="vesting.md#0x1_vesting_distribute">distribute</a>() wouldn't
-    // fail and <a href="block.md#0x1_block">block</a> all other accounts from receiving APT <b>if</b> one beneficiary is not registered.
+    // Verify that the beneficiary <a href="account.md#0x1_account">account</a> is set up <b>to</b> receive SUPRA. This is a requirement so <a href="vesting.md#0x1_vesting_distribute">distribute</a>() wouldn't
+    // fail and <a href="block.md#0x1_block">block</a> all other accounts from receiving SUPRA <b>if</b> one beneficiary is not registered.
     assert_account_is_registered_for_apt(new_beneficiary);
 
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
@@ -3201,7 +3201,7 @@ This address should be deterministic for the same admin and vesting contract cre
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, contract_creation_seed);
 
     <b>let</b> (account_signer, signer_cap) = <a href="account.md#0x1_account_create_resource_account">account::create_resource_account</a>(admin, seed);
-    // Register the <a href="vesting.md#0x1_vesting">vesting</a> contract <a href="account.md#0x1_account">account</a> <b>to</b> receive APT <b>as</b> it'll be sent <b>to</b> it when claiming unlocked <a href="stake.md#0x1_stake">stake</a> from
+    // Register the <a href="vesting.md#0x1_vesting">vesting</a> contract <a href="account.md#0x1_account">account</a> <b>to</b> receive SUPRA <b>as</b> it'll be sent <b>to</b> it when claiming unlocked <a href="stake.md#0x1_stake">stake</a> from
     // the underlying staking contract.
     <a href="coin.md#0x1_coin_register">coin::register</a>&lt;SupraCoin&gt;(&account_signer);
 

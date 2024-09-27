@@ -1491,7 +1491,7 @@ The last step of genesis.
 
 <tr>
 <td>3</td>
-<td>The Aptos coin should be initialized during genesis and only the Aptos framework account should own the mint and burn capabilities for the APT token.</td>
+<td>The Aptos coin should be initialized during genesis and only the Aptos framework account should own the mint and burn capabilities for the SUPRA token.</td>
 <td>Critical</td>
 <td>Both mint and burn capabilities are wrapped inside the stake::SupraCoinCapabilities and transaction_fee::SupraCoinCapabilities resources which are stored under the aptos framework account.</td>
 <td>Formally verified via <a href="#high-level-req-3">initialize_supra_coin</a>.</td>

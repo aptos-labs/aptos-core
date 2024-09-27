@@ -136,7 +136,7 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
     T::from_encoded_string(str).map_err(|_| ApiError::deserialization_failed(type_name))
 }
 
-const DEFAULT_COIN: &str = "APT";
+const DEFAULT_COIN: &str = "SUPRA";
 const DEFAULT_DECIMALS: u8 = 8;
 
 pub fn native_coin() -> Currency {

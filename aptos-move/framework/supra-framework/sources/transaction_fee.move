@@ -64,12 +64,12 @@ module supra_framework::transaction_fee {
     ///      charge, while the break down is merely informational.
     ///        - gas charge for execution (CPU time): `execution_gas_units`
     ///        - gas charge for IO (storage random access): `io_gas_units`
-    ///        - storage fee charge (storage space): `storage_fee_octas`, to be included in
+    ///        - storage fee charge (storage space): `storage_fee_quants`, to be included in
     ///          `total_charge_gas_unit`, this number is converted to gas units according to the user
     ///          specified `gas_unit_price` on the transaction.
-    ///    - storage deletion refund: `storage_fee_refund_octas`, this is not included in `gas_used` or
+    ///    - storage deletion refund: `storage_fee_refund_quants`, this is not included in `gas_used` or
     ///      `total_charge_gas_units`, the net charge / refund is calculated by
-    ///      `total_charge_gas_units` * `gas_unit_price` - `storage_fee_refund_octas`.
+    ///      `total_charge_gas_units` * `gas_unit_price` - `storage_fee_refund_quants`.
     ///
     /// This is meant to emitted as a module event.
     struct FeeStatement has drop, store {
@@ -80,9 +80,9 @@ module supra_framework::transaction_fee {
         /// IO gas charge.
         io_gas_units: u64,
         /// Storage fee charge.
-        storage_fee_octas: u64,
+        storage_fee_quants: u64,
         /// Storage fee refund.
-        storage_fee_refund_octas: u64,
+        storage_fee_refund_quants: u64,
     }
 
     /// Initializes the resource storing information about gas fees collection and

@@ -3,7 +3,7 @@
 
 use aptos_gas_algebra::{
     DynamicExpression, Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, NumBytes,
-    Octa,
+    Quant,
 };
 use aptos_gas_meter::GasAlgebra;
 use aptos_gas_schedule::VMGasParameters;
@@ -74,7 +74,7 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
 
     fn charge_storage_fee(
         &mut self,
-        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = Quant>,
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()> {
         self.base

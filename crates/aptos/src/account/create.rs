@@ -7,7 +7,7 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
 
-// 1 APT
+// 1 SUPRA
 pub const DEFAULT_FUNDED_COINS: u64 = 100_000_000;
 
 /// Create a new account on-chain

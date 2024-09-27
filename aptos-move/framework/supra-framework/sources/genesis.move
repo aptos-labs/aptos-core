@@ -675,7 +675,7 @@ module supra_framework::genesis {
     }
 
     #[test_only]
-    const ONE_APT: u64 = 100000000;
+    const ONE_SUPRA: u64 = 100000000;
     #[test_only]
     public fun setup() {
         initialize(
@@ -686,7 +686,7 @@ module supra_framework::genesis {
             x"13",
             1,
             0,
-            1000 * ONE_APT,
+            1000 * ONE_SUPRA,
             1,
             true,
             1,
@@ -780,7 +780,7 @@ module supra_framework::genesis {
         supra_coin::ensure_initialized_with_apt_fa_metadata_for_test();
 
         let core_resources = account::create_account(@core_resources);
-        supra_account::register_supra(&core_resources); // registers APT store
+        supra_account::register_supra(&core_resources); // registers SUPRA store
 
         let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
         assert!(primary_fungible_store::primary_store_exists(@core_resources, apt_metadata), 2);
@@ -817,7 +817,7 @@ module supra_framework::genesis {
         };
         let delegation_pool_creation_seed = x"121341";
         let delegator_addresses = vector[@0x121342, @0x121343];
-        let initial_balance = vector[100 * ONE_APT, 200 * ONE_APT];
+        let initial_balance = vector[100 * ONE_SUPRA, 200 * ONE_SUPRA];
         let i = 0;
         let delegation_percentage = 10;
         let delegator_stakes : vector<u64> = vector::empty();
@@ -864,7 +864,7 @@ module supra_framework::genesis {
                 owner_address: owner1,
                 operator_address: @0x121342,
                 voter_address: @0x121343,
-                stake_amount: 100 * ONE_APT,
+                stake_amount: 100 * ONE_SUPRA,
                 consensus_pubkey: _pk_1,
                 network_addresses: x"222222",
                 full_node_network_addresses: x"333333",
@@ -874,7 +874,7 @@ module supra_framework::genesis {
         };
         let delegation_pool_creation_seed1 = x"121341";
         let delegator_address1 = vector[@0x121342, @0x121343];
-        let initial_balance1 = vector[100 * ONE_APT, 200 * ONE_APT];
+        let initial_balance1 = vector[100 * ONE_SUPRA, 200 * ONE_SUPRA];
         let delegator_stakes1:vector<u64> = vector::empty();
         let delegation_percentage: u64 = 10;
         let i = 0;
@@ -907,7 +907,7 @@ module supra_framework::genesis {
                 owner_address: owner2,
                 operator_address: @0x121345,
                 voter_address: @0x121346,
-                stake_amount: 100 * ONE_APT,
+                stake_amount: 100 * ONE_SUPRA,
                 consensus_pubkey: _pk_2,
                 network_addresses: x"222222",
                 full_node_network_addresses: x"333333",
@@ -917,7 +917,7 @@ module supra_framework::genesis {
         };
         let delegation_pool_creation_seed2 = x"121344";
         let delegator_address2 = vector[@0x121345, @0x121346];
-        let initial_balance2 = vector[300 * ONE_APT, 400 * ONE_APT];
+        let initial_balance2 = vector[300 * ONE_SUPRA, 400 * ONE_SUPRA];
         let j = 0;
         let delegator_stakes2:vector<u64> = vector::empty();
         while (j < vector::length(&delegator_address2)) {
@@ -1019,7 +1019,7 @@ module supra_framework::genesis {
         vector::for_each_ref(&shareholders, |addr| {
             let addr: address = *addr;
             if (!account::exists_at(addr)) {
-                create_account(supra_framework, addr, 100 * ONE_APT);
+                create_account(supra_framework, addr, 100 * ONE_SUPRA);
             };
         });
         let cliff_period_in_seconds = 100;

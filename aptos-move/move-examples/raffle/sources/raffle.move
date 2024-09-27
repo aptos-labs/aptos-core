@@ -18,7 +18,7 @@ module raffle::raffle {
     /// Error code for when the somebody tries to draw an already-closed raffle
     const E_RAFFLE_HAS_CLOSED: u64 = 3;
 
-    /// The minimum price of a raffle ticket, in APT.
+    /// The minimum price of a raffle ticket, in SUPRA.
     const TICKET_PRICE: u64 = 10_000;
 
     /// A raffle: a list of users who bought tickets.

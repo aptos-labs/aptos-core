@@ -591,7 +591,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 ## Function `gas_unit_price`
 
-Returns the gas unit price in Octas which is specified for the current transaction.
+Returns the gas unit price in Quants which is specified for the current transaction.
 This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 

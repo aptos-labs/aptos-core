@@ -27,7 +27,7 @@
     Do you want to publish this package under the resource account's address 3ad2cce668ed2186da580b95796ffe8534566583363cd3b03547bec9542662dc? [yes/no] >
     yes
     package size 2928 bytes
-    Do you want to submit a transaction for a range of [1371100 - 2056600] Octas at a gas unit price of 100 Octas? [yes/no] >
+    Do you want to submit a transaction for a range of [1371100 - 2056600] Quants at a gas unit price of 100 Quants? [yes/no] >
     yes
     {
       "Result": "Success"
@@ -51,7 +51,7 @@
 /// example output:
     /*
     2-Using-Resource-Account % aptos move run --function-id 55328567ff8aa7d242951af7fc1872746fbeeb89dfed0e1ee2ff71b9bf4469d6::create_nft_with_resource_account::mint_event_ticket --profile nft-receiver
-    Do you want to submit a transaction for a range of [502900 - 754300] Octas at a gas unit price of 100 Octas? [yes/no] >
+    Do you want to submit a transaction for a range of [502900 - 754300] Quants at a gas unit price of 100 Quants? [yes/no] >
     yes
     {
       "Result": {

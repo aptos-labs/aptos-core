@@ -12,7 +12,7 @@
 ///    A proposal can execute a list of functions of 3 types. eg: transferring multiple NFTs can be a proposal of multiple offer_nft function:
 ///         a: no-op, no execution happens on chain. Only the proposal and its results are recorded on-chain for DAO
 ///            admin to take actions off-chain
-///         b: Transfer APT funds: from DAO account to the specified destination account.
+///         b: Transfer SUPRA funds: from DAO account to the specified destination account.
 ///         c: Offer NFTs to the specified destination account.
 /// 4. A voter can vote for a proposal of a DAO through `vote`.
 /// 5. Anyone can call the `resolve` to resolve a proposal. A proposal voting duration has to expire and the proposal

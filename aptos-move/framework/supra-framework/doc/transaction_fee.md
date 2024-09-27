@@ -199,12 +199,12 @@ units, so it's possible that the numbers don't add up exactly. -- This number is
 charge, while the break down is merely informational.
 - gas charge for execution (CPU time): <code>execution_gas_units</code>
 - gas charge for IO (storage random access): <code>io_gas_units</code>
-- storage fee charge (storage space): <code>storage_fee_octas</code>, to be included in
+- storage fee charge (storage space): <code>storage_fee_quants</code>, to be included in
 <code>total_charge_gas_unit</code>, this number is converted to gas units according to the user
 specified <code>gas_unit_price</code> on the transaction.
-- storage deletion refund: <code>storage_fee_refund_octas</code>, this is not included in <code>gas_used</code> or
+- storage deletion refund: <code>storage_fee_refund_quants</code>, this is not included in <code>gas_used</code> or
 <code>total_charge_gas_units</code>, the net charge / refund is calculated by
-<code>total_charge_gas_units</code> * <code>gas_unit_price</code> - <code>storage_fee_refund_octas</code>.
+<code>total_charge_gas_units</code> * <code>gas_unit_price</code> - <code>storage_fee_refund_quants</code>.
 
 This is meant to emitted as a module event.
 
@@ -239,13 +239,13 @@ This is meant to emitted as a module event.
  IO gas charge.
 </dd>
 <dt>
-<code>storage_fee_octas: u64</code>
+<code>storage_fee_quants: u64</code>
 </dt>
 <dd>
  Storage fee charge.
 </dd>
 <dt>
-<code>storage_fee_refund_octas: u64</code>
+<code>storage_fee_refund_quants: u64</code>
 </dt>
 <dd>
  Storage fee refund.

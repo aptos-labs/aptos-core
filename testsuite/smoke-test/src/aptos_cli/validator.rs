@@ -1276,7 +1276,7 @@ async fn test_owner_create_and_delegate_flow() {
         .transfer_coins(owner_cli_index, voter_cli_index, voter_initial_coins, None)
         .await
         .unwrap()
-        .octa_spent();
+        .quant_spent();
     owner_gas += cli
         .transfer_coins(
             owner_cli_index,
@@ -1286,7 +1286,7 @@ async fn test_owner_create_and_delegate_flow() {
         )
         .await
         .unwrap()
-        .octa_spent();
+        .quant_spent();
 
     cli.assert_account_balance_now(
         owner_cli_index,

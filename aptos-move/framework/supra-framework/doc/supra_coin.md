@@ -295,7 +295,7 @@ and accounts have been initialized during genesis.
 
 Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
 accounts.
-Expects account and APT store to be registered before calling.
+Expects account and SUPRA store to be registered before calling.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_coin.md#0x1_supra_coin_configure_accounts_for_test">configure_accounts_for_test</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, core_resources: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, mint_cap: <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">supra_coin::SupraCoin</a>&gt;)

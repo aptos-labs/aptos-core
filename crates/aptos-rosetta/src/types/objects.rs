@@ -1849,7 +1849,7 @@ fn get_fee_statement_from_event(events: &[ContractEvent]) -> Vec<FeeStatement> {
         .filter_map(|event| {
             if let Ok(fee_statement_event) = bcs::from_bytes::<FeeStatement>(event.event_data()) {
                 if fee_statement_event.storage_fee_refund() != 0 {
-                    Some(fee_statement_event) // Collect only if storage_fee_refund_octas is non-zero
+                    Some(fee_statement_event) // Collect only if storage_fee_refund_quants is non-zero
                 } else {
                     None
                 }
