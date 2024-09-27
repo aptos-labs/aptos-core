@@ -22,4 +22,5 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
       - shell: bash
         run: |
-          cargo metadata --all-features | gsutil cp - gs://aptos-core-cargo-metadata-public/metadata-${{ github.sha }}.json
+          set -ex
+          cargo metadata --all-features | gcloud storage cp - gs://aptos-core-cargo-metadata-public/metadata-${{ github.sha }}.json
