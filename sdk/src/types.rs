@@ -557,10 +557,10 @@ impl KeylessAccount {
         zk_sig: Option<ZeroKnowledgeSig>,
     ) -> Result<Self> {
         let parts: Vec<&str> = jwt.split('.').collect();
-        let header_bytes = base64::decode(parts[0])?;
+        let header_bytes = base64::decode(parts.get(0).context("jwt malformed")?)?;
         let jwt_header_json = String::from_utf8(header_bytes)?;
         let jwt_payload_json = base64::decode_config(
-            parts.get(1).context("missing jwt payload")?,
+            parts.get(1).context("jwt malformed")?,
             base64::URL_SAFE,
         )?;
         let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
