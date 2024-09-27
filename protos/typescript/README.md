@@ -1,6 +1,6 @@
-# Aptos Protos
+# Supra Protos
 
-This repository contains the protobuf definitions for the Aptos tech stack.
+This repository contains the protobuf definitions for the Supra tech stack.
 
 ## Usage
 Import the generated code like this:

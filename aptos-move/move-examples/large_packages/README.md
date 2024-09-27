@@ -1,4 +1,4 @@
-This package provides an experimental service for uploading very large modules to the Aptos network. To publish using this API, you must divide your metadata and modules across multiple calls into `large_packages::stage_code`. Specifically:
+This package provides an experimental service for uploading very large modules to the Supra network. To publish using this API, you must divide your metadata and modules across multiple calls into `large_packages::stage_code`. Specifically:
 
 * Make sure LargePackages is deployed to your network of choice, you can currently find it on testnet at `0xd20f305e3090a24c00524604dc2a42925a75c67aa6020d33033d516cf0878c4a`
 * Compile your package

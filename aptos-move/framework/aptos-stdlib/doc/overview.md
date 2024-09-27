@@ -1,10 +1,10 @@
 
 <a id="@Aptos_Standard_Library_0"></a>
 
-# Aptos Standard Library
+# Supra Standard Library
 
 
-This is the reference documentation of the Aptos standard library.
+This is the reference documentation of the Supra standard library.
 
 
 <a id="@Index_1"></a>

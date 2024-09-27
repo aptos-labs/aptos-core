@@ -745,7 +745,7 @@ Address of APT Primary Fungible Store
 
 <tr>
 <td>1</td>
-<td>During the creation of an Aptos account the following rules should hold: (1) the authentication key should be 32 bytes in length, (2) an Aptos account should not already exist for that authentication key, and (3) the address of the authentication key should not be equal to a reserved address (0x0, 0x1, or 0x3).</td>
+<td>During the creation of an Supra account the following rules should hold: (1) the authentication key should be 32 bytes in length, (2) an Supra account should not already exist for that authentication key, and (3) the address of the authentication key should not be equal to a reserved address (0x0, 0x1, or 0x3).</td>
 <td>Critical</td>
 <td>The authentication key which is passed in as an argument to create_account should satisfy all necessary conditions.</td>
 <td>Formally verified via <a href="#high-level-req-1">CreateAccountAbortsIf</a>.</td>
@@ -753,7 +753,7 @@ Address of APT Primary Fungible Store
 
 <tr>
 <td>2</td>
-<td>After creating an Aptos account, the account should become registered to receive SupraCoin.</td>
+<td>After creating an Supra account, the account should become registered to receive SupraCoin.</td>
 <td>Critical</td>
 <td>The create_account function creates a new account for the particular address and registers SupraCoin.</td>
 <td>Formally verified via <a href="#high-level-req-2">create_account</a>.</td>
@@ -793,7 +793,7 @@ Address of APT Primary Fungible Store
 
 <tr>
 <td>7</td>
-<td>When performing a batch transfer of Aptos Coin and/or a batch transfer of a custom coin type, it should ensure that the vector containing destination addresses and the vector containing the corresponding amounts are equal in length.</td>
+<td>When performing a batch transfer of Supra Coin and/or a batch transfer of a custom coin type, it should ensure that the vector containing destination addresses and the vector containing the corresponding amounts are equal in length.</td>
 <td>Low</td>
 <td>The batch_transfer and batch_transfer_coins functions verify that the length of the recipient addresses vector matches the length of the amount vector through an assertion.</td>
 <td>Formally verified via <a href="#high-level-req-7">batch_transfer_coins</a>.</td>

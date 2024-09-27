@@ -369,7 +369,7 @@ Return true if <code>addr</code> is a reserved address for the VM to call system
 
 ## Function `is_reserved_address`
 
-Return true if <code>addr</code> is either the VM address or an Aptos Framework address.
+Return true if <code>addr</code> is either the VM address or an Supra Framework address.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="system_addresses.md#0x1_system_addresses_is_reserved_address">is_reserved_address</a>(addr: <b>address</b>): bool
@@ -416,7 +416,7 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 <tr>
 <td>2</td>
-<td>Asserting that a provided address corresponds to the Aptos Framework Resources address should always yield a true result when matched.</td>
+<td>Asserting that a provided address corresponds to the Supra Framework Resources address should always yield a true result when matched.</td>
 <td>High</td>
 <td>The assert_supra_framework function ensures that the provided signer belongs to the @supra_framework account.</td>
 <td>Formally verified via <a href="#high-level-req-2">AbortsIfNotAptosFramework</a>.</td>

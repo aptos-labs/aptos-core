@@ -205,7 +205,7 @@ Main structure representing a coin/token in an account's custody.
 
 Represents a coin with aggregator as its value. This allows to update
 the coin in every transaction avoiding read-modify-write conflicts. Only
-used for gas fees distribution by Aptos Framework (0x1).
+used for gas fees distribution by Supra Framework (0x1).
 
 
 <pre><code><b>struct</b> <a href="coin.md#0x1_coin_AggregatableCoin">AggregatableCoin</a>&lt;CoinType&gt; <b>has</b> store
@@ -2034,7 +2034,7 @@ or disallow upgradability of total supply.
 ## Function `initialize_aggregatable_coin`
 
 Creates a new aggregatable coin with value overflowing on <code>limit</code>. Note that this function can
-only be called by Aptos Framework (0x1) account for now because of <code>create_aggregator</code>.
+only be called by Supra Framework (0x1) account for now because of <code>create_aggregator</code>.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_initialize_aggregatable_coin">initialize_aggregatable_coin</a>&lt;CoinType&gt;(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;CoinType&gt;

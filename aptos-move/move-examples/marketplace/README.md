@@ -1,4 +1,4 @@
-This introduces the core for a potential Aptos standard around marketplace for assets on-chain.
+This introduces the core for a potential Supra standard around marketplace for assets on-chain.
 
 The goals of this package are to
 * Separate core logical components for readability and expansion over time.

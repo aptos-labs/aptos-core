@@ -1,7 +1,7 @@
 # Fuzz Test Suite
 
 ## Introduction
-This directory contains tools and scripts essential for fuzz testing on Aptos Core. Fuzz targets run continuously on daily versions of `main` on Google's OSS-Fuzz infrastructure.
+This directory contains tools and scripts essential for fuzz testing on Supra Core. Fuzz targets run continuously on daily versions of `main` on Google's OSS-Fuzz infrastructure.
 
 ## `fuzz.sh`
 `fuzz.sh` is the main script to perform common fuzzing-related operations.
@@ -39,7 +39,7 @@ The script includes several functions to manage and execute fuzz tests:
 ## Writing Fuzz Targets
 
 ### Setting Up Fuzz Targets
-To set up a fuzz harness in Aptos-core using `cargo-fuzz`:
+To set up a fuzz harness in Supra-core using `cargo-fuzz`:
 #### Initialize Fuzz Target
 Run the following command to initialize the fuzzing target. This creates and edits all the necessary files.
 ```bash

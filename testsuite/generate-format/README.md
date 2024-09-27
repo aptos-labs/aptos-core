@@ -4,7 +4,7 @@ title: Generate Format
 custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/testsuite/generate-format/README.md
 ---
 
-`generate-format` hosts the Aptos core type checker to ensure compatibility and uses 
+`generate-format` hosts the Supra core type checker to ensure compatibility and uses 
 [`serde-reflection`](https://github.com/aptos-labs/serde-reflection) to properly track type changes over time. 
 
 ## How to make a change

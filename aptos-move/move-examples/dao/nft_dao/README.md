@@ -5,7 +5,7 @@ PR: https://github.com/aptos-labs/aptos-core/pull/5918
 
 *Quoted from product specification*
 
-Currently there are no easy ways for projects in the ecosystem to engage with their communities post mint. A key part of building a vibrant NFT community (as well as community of other web3 verticals) is to empower holders and supporters to be included in the decision making process of a project via a DAO. To do this, we must provide easy to use DAO management tooling for projects on Aptos to build a DAO where entry is gated by the ownership of a token in a NFT collection.
+Currently there are no easy ways for projects in the ecosystem to engage with their communities post mint. A key part of building a vibrant NFT community (as well as community of other web3 verticals) is to empower holders and supporters to be included in the decision making process of a project via a DAO. To do this, we must provide easy to use DAO management tooling for projects on Supra to build a DAO where entry is gated by the ownership of a token in a NFT collection.
 
 With the NFT DAO, token holders can 
 
@@ -136,7 +136,7 @@ DAO admin can transfer his admin authority through an offer - claim two step pro
 ### Design principles
 
 - No module deployment/ script compiling for each DAO in V0 to reduce the technical complexity for both users and partners
-- The DAO platform should have a broader coverage of existing popular collections on Aptos
+- The DAO platform should have a broader coverage of existing popular collections on Supra
 - Escrow-less voting to provide a better NFT owner experience and increase the supply of voting tokens
 
 ### Some aligned design choices
@@ -149,7 +149,7 @@ DAO admin can transfer his admin authority through an offer - claim two step pro
     - This is to allow escrow-less voting and accommodating to existing NFTs since most of them are globally unique
 - Relax to globally_unique_**now** from globally_unique_**permanently** as the constraint for **governance token**
     - globally_unique_**now**  requires TokenData to have a maximum = 1 and globally_unique_**permanently** requires TokenData to have a **maximum = 1 && maximum_mutable = false**
-    - we found popular collections (eg Aptos mingo) are globally_unique_now. We want to make sure our tool work for these collections.
+    - we found popular collections (eg Supra mingo) are globally_unique_now. We want to make sure our tool work for these collections.
     - Relaxing the constraint doesn’t increase the risk since only the creator can mint more tokens. If the creator is the malicious entity, there is no way to
 - Not supporting features like mutating the collection maximum requiring creator authority
     - [We don’t support move compiling in v0 for each DAO individually](https://www.notion.so/NFT-DAO-V0-Eng-Design-Doc-139179339c78475e95d1f3bb71df9f9d). This makes it infeasible to acquire the signer of the creator account to perform the operation.

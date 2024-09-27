@@ -1011,7 +1011,7 @@ Native function to initiate module loading, including a list of allowed dependen
 <td>Updating a package should fail if the user is not the owner of it.</td>
 <td>Critical</td>
 <td>The publish_package function may only be able to update the package if the signer is the actual owner of the package.</td>
-<td>The Aptos upgrade native functions have been manually audited.</td>
+<td>The Supra upgrade native functions have been manually audited.</td>
 </tr>
 
 <tr>

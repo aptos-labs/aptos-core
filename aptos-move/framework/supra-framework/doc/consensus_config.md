@@ -271,7 +271,7 @@ Only used in reconfigurations to apply the pending <code><a href="consensus_conf
 
 <tr>
 <td>1</td>
-<td>During genesis, the Aptos framework account should be assigned the consensus config resource.</td>
+<td>During genesis, the Supra framework account should be assigned the consensus config resource.</td>
 <td>Medium</td>
 <td>The consensus_config::initialize function calls the assert_supra_framework function to ensure that the signer is the supra_framework and then assigns the ConsensusConfig resource to it.</td>
 <td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>

@@ -1,6 +1,6 @@
-# Aptos Protos
+# Supra Protos
 
-This repository contains the protobuf definitions for Aptos.
+This repository contains the protobuf definitions for Supra.
 
 ## Usage
 Import generated classes like this:

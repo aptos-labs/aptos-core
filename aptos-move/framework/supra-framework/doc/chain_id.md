@@ -121,7 +121,7 @@ Return the chain ID of this instance.
 
 <tr>
 <td>1</td>
-<td>During genesis, the ChainId resource should be created and moved under the Aptos framework account with the specified chain id.</td>
+<td>During genesis, the ChainId resource should be created and moved under the Supra framework account with the specified chain id.</td>
 <td>Medium</td>
 <td>The chain_id::initialize function is responsible for generating the ChainId resource and then storing it under the supra_framework account.</td>
 <td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
@@ -129,7 +129,7 @@ Return the chain ID of this instance.
 
 <tr>
 <td>2</td>
-<td>The chain id can only be fetched if the chain id resource exists under the Aptos framework account.</td>
+<td>The chain id can only be fetched if the chain id resource exists under the Supra framework account.</td>
 <td>Low</td>
 <td>The chain_id::get function fetches the chain id by borrowing the ChainId resource from the supra_framework account.</td>
 <td>Formally verified via <a href="#high-level-req-2">get</a>.</td>

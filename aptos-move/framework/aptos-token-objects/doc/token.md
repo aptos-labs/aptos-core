@@ -3,7 +3,7 @@
 
 # Module `0x4::token`
 
-This defines an object-based Token. The key differentiating features from the Aptos standard
+This defines an object-based Token. The key differentiating features from the Supra standard
 token are:
 * Decoupled token ownership from token data.
 * Explicit data model for token metadata via adjacent resources
@@ -113,7 +113,7 @@ Represents the common fields to all tokens.
  Was populated until concurrent_token_v2_enabled feature flag was enabled.
 
  The name of the token, which should be unique within the collection; the length of name
- should be smaller than 128, characters, eg: "Aptos Animal #1234"
+ should be smaller than 128, characters, eg: "Supra Animal #1234"
 </dd>
 <dt>
 <code>uri: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
@@ -163,7 +163,7 @@ Started being populated once aggregator_v2_api_enabled was enabled.
 </dt>
 <dd>
  The name of the token, which should be unique within the collection; the length of name
- should be smaller than 128, characters, eg: "Aptos Animal #1234"
+ should be smaller than 128, characters, eg: "Supra Animal #1234"
 </dd>
 </dl>
 

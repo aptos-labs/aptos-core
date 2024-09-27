@@ -424,7 +424,7 @@ Return the reward rate of this epoch as a tuple (numerator, denominator).
 ## Function `initialize_rewards`
 
 Initialize rewards configurations.
-Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_initialize_rewards">initialize_rewards</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, rewards_rate_period_in_secs: u64, last_rewards_rate_period_start_in_secs: u64, rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
@@ -722,7 +722,7 @@ Calculate and return the up-to-date StakingRewardsConfig.
 ## Function `update_required_stake`
 
 Update the min and max stake amounts.
-Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_required_stake">update_required_stake</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, minimum_stake: u64, maximum_stake: u64)
@@ -757,7 +757,7 @@ Can only be called as part of the Aptos governance proposal process established 
 ## Function `update_recurring_lockup_duration_secs`
 
 Update the recurring lockup duration.
-Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_recurring_lockup_duration_secs">update_recurring_lockup_duration_secs</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_recurring_lockup_duration_secs: u64)
@@ -791,7 +791,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 DEPRECATING
 Update the rewards rate.
-Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_rewards_rate">update_rewards_rate</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_rewards_rate: u64, new_rewards_rate_denominator: u64)
@@ -886,7 +886,7 @@ Can only be called as part of the Aptos governance proposal process established 
 ## Function `update_voting_power_increase_limit`
 
 Update the joining limit %.
-Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+Can only be called as part of the Supra governance proposal process established by the AptosGovernance module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_voting_power_increase_limit">update_voting_power_increase_limit</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_voting_power_increase_limit: u64)
@@ -1007,7 +1007,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 <tr>
 <td>1</td>
-<td>The ability to initialize the staking config and staking rewards resources, as well as the ability to update the staking config and staking rewards should only be available to the Aptos framework account.</td>
+<td>The ability to initialize the staking config and staking rewards resources, as well as the ability to update the staking config and staking rewards should only be available to the Supra framework account.</td>
 <td>Medium</td>
 <td>The function initialize and initialize_rewards are used to initialize the StakingConfig and StakingRewardConfig resources. Updating the resources, can be done using the update_required_stake, update_recurring_lockup_duration_secs, update_rewards_rate, update_rewards_config, update_voting_power_increase_limit functions, which ensure that the signer is supra_framework using the assert_supra_framework function.</td>
 <td>Verified via <a href="#high-level-req-1.1">initialize</a>, <a href="#high-level-req-1.2">initialize_rewards</a>, <a href="#high-level-req-1.3">update_required_stake</a>, <a href="#high-level-req-1.4">update_recurring_lockup_duration_secs</a>, <a href="#high-level-req-1.5">update_rewards_rate</a>, <a href="#high-level-req-1.6">update_rewards_config</a>, and <a href="#high-level-req-1.7">update_voting_power_increase_limit</a>.</td>

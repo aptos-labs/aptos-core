@@ -4,7 +4,7 @@
 # Module `0x1::multisig_account`
 
 Supra note: This is customized version of multisig account with timeout setup.
-Enhanced multisig account standard on Aptos. This is different from the native multisig scheme support enforced via
+Enhanced multisig account standard on Supra. This is different from the native multisig scheme support enforced via
 the account's auth key.
 
 This module allows creating a flexible and powerful multisig account with seamless support for updating owners
@@ -15,7 +15,7 @@ The multisig account is a resource account underneath. By default, it has no aut
 the special multisig transaction flow. However, owners can create a transaction to change the auth key to match a
 private key off chain if so desired.
 
-Transactions need to be executed in order of creation, similar to transactions for a normal Aptos account (enforced
+Transactions need to be executed in order of creation, similar to transactions for a normal Supra account (enforced
 with account nonce).
 
 The flow is like below:

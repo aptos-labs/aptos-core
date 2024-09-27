@@ -1,4 +1,4 @@
-# Aptos Release Process
+# Supra Release Process
 
 ## Naming Conventions for Branches and Tags
 
@@ -20,22 +20,22 @@
 All current development occurs on the `main` branch. All new feature developments have a feature flag to gate it off during development. Feature flags are turned on *after* the development is complete and passes Governance.
 
 ### devnet branch
-The `devnet` branch is created on the `main` branch every week. It is used to deploy devnet and allows the Aptos Community to explore the most recent changes to the Aptos node binary and Aptos framework. Follow along in our [#devnet-release](https://discord.com/channels/945856774056083548/956692649430093904) channel on [Discord](https://discord.gg/aptosnetwork).
+The `devnet` branch is created on the `main` branch every week. It is used to deploy devnet and allows the Supra Community to explore the most recent changes to the Supra node binary and Supra framework. Follow along in our [#devnet-release](https://discord.com/channels/945856774056083548/956692649430093904) channel on [Discord](https://discord.gg/aptosnetwork).
 
 ### aptos-release-v*X.Y* release branches
-These are release branches based on Aptos release planning timeline. They are created off
+These are release branches based on Supra release planning timeline. They are created off
 the `main` branch every 1-2 months.
 
 ### aptos-node-v*X.Y.Z* release tag
-The aptos node release tags are created for validator/fullnode deployment of the given release branch. The minor number *Z* will increment when a new hot-fix release is required on the release branch. Aptos team will publish the matching tag docker images on [Aptos Docker Hub](https://hub.docker.com/r/aptoslabs/validator/tags) when it's available.
+The aptos node release tags are created for validator/fullnode deployment of the given release branch. The minor number *Z* will increment when a new hot-fix release is required on the release branch. Supra team will publish the matching tag docker images on [Supra Docker Hub](https://hub.docker.com/r/aptoslabs/validator/tags) when it's available.
 
 ### aptos-framework-v*X.Y.Z* release tag
 The aptos framework release tags are created to facilitate the on-chain framework upgrade of the given release branch. The minor number *Z* will increment when a new hot-fix release or a new  framework update is required on this release branch.
 
 ### aptos-cli-v*X.Y.Z* release tag
-The aptos cli release tags are created to track the CLI versions for community to use when developing on the Aptos network. It's always recommended to upgrade your CLI when a new version is released, for the best user experience. Learn how to update to the [latest CLI version](https://aptos.dev/tools/aptos-cli/install-cli/install-from-brew/#upgrading-the-cli).
+The aptos cli release tags are created to track the CLI versions for community to use when developing on the Supra network. It's always recommended to upgrade your CLI when a new version is released, for the best user experience. Learn how to update to the [latest CLI version](https://aptos.dev/tools/aptos-cli/install-cli/install-from-brew/#upgrading-the-cli).
 
-## Aptos Release Lifecycle
+## Supra Release Lifecycle
 (The time length here is a rough estimate, it varies depends on each release.)
 * [day 0] A release branch `aptos-release-vx.y` will be created, with a commit hash `abcde`. The full test suite will be triggered for the commit hash for validation.
 * [day 1] The release will be deployed to **devnet**.
@@ -48,10 +48,10 @@ The aptos cli release tags are created to track the CLI versions for community t
 * [day 24] Proposals executed on-chain if passed voting.
 
 ## Release Announcement
-* Each of the network release will be announced on Aptos Network [Discord](https://discord.gg/aptosnetwork). Follow mainnet-release, testnet-release, devnet-release channel to get updates.
+* Each of the network release will be announced on Supra Network [Discord](https://discord.gg/aptosnetwork). Follow mainnet-release, testnet-release, devnet-release channel to get updates.
 * When a release is ready to deploy, a [Github release page](https://github.com/aptos-labs/aptos-core/releases) will be created in this repo as well. You can search for the most recent release version titled with "[Mainnet]" for production usage.
 
-## How we test each release at Aptos
+## How we test each release at Supra
 ### Blockchain
 * We write and maintain high quality unit tests to verify code behavior and according to the specifications. Check out our [Codecov](https://app.codecov.io/gh/aptos-labs/aptos-core)!
 * Integration tests run on each PR verifying each component’s correctness.

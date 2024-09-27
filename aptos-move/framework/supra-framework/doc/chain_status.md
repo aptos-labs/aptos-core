@@ -113,7 +113,7 @@ Marks that genesis has finished.
 
 ## Function `is_genesis`
 
-Helper function to determine if Aptos is in genesis state.
+Helper function to determine if Supra is in genesis state.
 
 
 <pre><code>#[view]
@@ -139,7 +139,7 @@ Helper function to determine if Aptos is in genesis state.
 
 ## Function `is_operating`
 
-Helper function to determine if Aptos is operating. This is
+Helper function to determine if Supra is operating. This is
 the same as <code>!<a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>()</code> and is provided for convenience.
 Testing <code><a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>()</code> is more frequent than <code><a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>()</code>.
 
@@ -233,7 +233,7 @@ Helper function to assert genesis state.
 <td>1</td>
 <td>The end of genesis mark should persist throughout the entire life of the chain.</td>
 <td>Medium</td>
-<td>The Aptos framework account should never drop the GenesisEndMarker resource.</td>
+<td>The Supra framework account should never drop the GenesisEndMarker resource.</td>
 <td>Audited that GenesisEndMarker is published at the end of genesis and never removed. Formally verified via <a href="#high-level-req-1">set_genesis_end</a> that GenesisEndMarker is published.</td>
 </tr>
 

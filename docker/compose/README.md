@@ -1,6 +1,6 @@
 ---
 id: docker_compose
-title: Aptos Docker-Compose Configuration
+title: Supra Docker-Compose Configuration
 custom_edit_url: https://github.com/aptos/aptos/edit/main/docker/compose/README.md
 ---
 

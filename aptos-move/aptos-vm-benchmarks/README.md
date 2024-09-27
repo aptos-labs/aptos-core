@@ -1,12 +1,12 @@
 ---
-id: Aptos-vm-benchmarks
-title: Aptos VM Benchmarks
+id: Supra-vm-benchmarks
+title: Supra VM Benchmarks
 ---
 
-## Aptos VM Benchmarks
+## Supra VM Benchmarks
 
-The Aptos VM Benchmark allows anyone to specify a set of Move modules and benchmark 
-the running time of transactions in the AptosVM measured in milliseconds. The Aptos
+The Supra VM Benchmark allows anyone to specify a set of Move modules and benchmark 
+the running time of transactions in the AptosVM measured in milliseconds. The Supra
 VM Benchmark allows an arbitrary amount of packages to be benchmarked.
 
 ## Usage

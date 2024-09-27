@@ -3,13 +3,13 @@
 
 # Module `0x1::create_signer`
 
-Provides a common place for exporting <code><a href="create_signer.md#0x1_create_signer">create_signer</a></code> across the Aptos Framework.
+Provides a common place for exporting <code><a href="create_signer.md#0x1_create_signer">create_signer</a></code> across the Supra Framework.
 
 To use create_signer, add the module below, such that:
 <code><b>friend</b> supra_framework::friend_wants_create_signer</code>
 where <code>friend_wants_create_signer</code> is the module that needs <code><a href="create_signer.md#0x1_create_signer">create_signer</a></code>.
 
-Note, that this is only available within the Aptos Framework.
+Note, that this is only available within the Supra Framework.
 
 This exists to make auditing straight forward and to limit the need to depend
 on account to have access to this.
@@ -66,7 +66,7 @@ on account to have access to this.
 
 <tr>
 <td>1</td>
-<td>Obtaining a signer for an arbitrary account should only be available within the Aptos Framework.</td>
+<td>Obtaining a signer for an arbitrary account should only be available within the Supra Framework.</td>
 <td>Critical</td>
 <td>The create_signer::create_signer function only allows friend modules to retrieve the signer for an arbitrarily address.</td>
 <td>Enforced through function visibility.</td>

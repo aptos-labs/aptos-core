@@ -1,12 +1,12 @@
 ---
 id: aptos-sdk-builder
-title: Aptos SDK Builder
+title: Supra SDK Builder
 custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/language/aptos-sdk-builder/README.md
 ---
 
-# Aptos SDK Builder
+# Supra SDK Builder
 
-A *transaction builder* is a helper function that converts its arguments into the payload of an Aptos transaction calling a particular Move script.
+A *transaction builder* is a helper function that converts its arguments into the payload of an Supra transaction calling a particular Move script.
 
 In Rust, the signature of such a function typically looks like this:
 ```rust
@@ -21,10 +21,10 @@ pub fn encode_peer_to_peer_with_metadata_script(
 
 This crate provide a library to generate transaction builders in one programming language.
 
-The tool will also generate and install type definitions for Aptos types such as `TypeTag`, `AccountAddress`, and `Script`.
+The tool will also generate and install type definitions for Supra types such as `TypeTag`, `AccountAddress`, and `Script`.
 
-In practice, hashing and signing Aptos transactions additionally requires a runtime library for Binary Canonical Serialization ("BCS").
-Such a library will be installed together with the Aptos types.
+In practice, hashing and signing Supra transactions additionally requires a runtime library for Binary Canonical Serialization ("BCS").
+Such a library will be installed together with the Supra types.
 
 
 ## Supported Languages

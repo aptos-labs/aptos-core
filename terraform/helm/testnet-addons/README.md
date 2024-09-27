@@ -15,7 +15,7 @@ Additional components for aptos-nodes testnet
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | cloud | string | `"EKS"` |  |
-| genesis.chain_id | string | `nil` | Aptos Chain ID |
+| genesis.chain_id | string | `nil` | Supra Chain ID |
 | genesis.numValidators | string | `nil` | Number of validators deployed in this testnet |
 | genesis.username_prefix | string | `"aptos-node"` | Validator username prefix, used to get genesis secrets. This should be the fullname for the aptos-node helm release |
 | imageTag | string | `"devnet"` | Default image tag to use for all aptos images |

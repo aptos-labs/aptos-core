@@ -1,4 +1,4 @@
-# SDK for Aptos Node API
+# SDK for Supra Node API
 
 > **_NOTE:_**
 > This is the `legacy TypeScript SDK`, aka the npm package `aptos`. For a more robust SDK and better support, we recommend upgrading to the `new TypeScript SDK` [@aptos-labs/ts-sdk](https://github.com/aptos-labs/aptos-ts-sdk). Take a look at the [documentation](https://aptos.dev/sdks/new-ts-sdk/) and the [migration guide](https://aptos.dev/sdks/new-ts-sdk/migration-guide).
@@ -7,7 +7,7 @@
 [![NPM Package Version][npm-image-version]][npm-url]
 [![NPM Package Downloads][npm-image-downloads]][npm-url]
 
-The Aptos TypeScript SDK provides a convenient way to interact with the Aptos blockchain using TypeScript. It offers a set of utility functions, classes, and types to simplify the integration process and enhance developer productivity.
+The Supra TypeScript SDK provides a convenient way to interact with the Supra blockchain using TypeScript. It offers a set of utility functions, classes, and types to simplify the integration process and enhance developer productivity.
 
 ## Installation
 
@@ -29,7 +29,7 @@ Then, the SDK can be accessed through `window.aptosSDK`.
 
 ## Documentation and examples
 
-- [The Aptos documentation site](https://aptos.dev/sdks/ts-sdk/index) provides step-by-step instructions, code snippets, and best practices to use this library.
+- [The Supra documentation site](https://aptos.dev/sdks/ts-sdk/index) provides step-by-step instructions, code snippets, and best practices to use this library.
 - You can view the generated [Type Doc](https://aptos-labs.github.io/ts-sdk-doc/) for the latest release of the SDK.
 - For in-depth examples, check out the [examples](./examples) folder with ready-made `package.json` files to get you going quickly!
 

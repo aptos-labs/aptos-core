@@ -1,4 +1,4 @@
-# Aptos SDK Specification Document
+# Supra SDK Specification Document
 
 [Table of Content](#table-of-content)
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-The goal of this document is to set a shared standard for implementation and development of all Aptos SDKs.
+The goal of this document is to set a shared standard for implementation and development of all Supra SDKs.
 
 This is a living document, and should be changed and updated as changes are made when developer needs are discovered.
 
@@ -66,16 +66,16 @@ We do not use the fourth **`won't`** level in this specification.
 
 ### 2. API servers
 
-- [ ] **2.1** The SDK **must** interact directly with the Aptos REST API.
+- [ ] **2.1** The SDK **must** interact directly with the Supra REST API.
   - [ ] **2.1.1** The SDK **must** support pagination with optional `start` and `limit` parameters to the REST API request.
   - [ ] **2.1.2** The SDK **should** implement a client that adheres to the OpenAPI spec https://fullnode.mainnet.aptoslabs.com/v1/spec#/.
-- [ ] **2.2** The SDK **should** interact directly with the Aptos Indexer API.
+- [ ] **2.2** The SDK **should** interact directly with the Supra Indexer API.
   - [ ] **2.2.1** The SDK **must** support pagination with optional `offset` and `limit` parameters to Indexer API request.
   - [ ] **2.2.2** The SDK **must** validate the account address when interacting with the Indexer API.
     - [ ] **2.2.2.1** The SDK **must** validate an account address is a 64 character hex string with a leading `0x`.
   - [ ] **2.2.3** The SDK **must** handle premade GraphQL queries https://cloud.hasura.io/public/graphiql?endpoint=https://api.mainnet.aptoslabs.com/v1/graphql.
   - [ ] **2.2.3** The SDK **should** allow the user to pass in a custom GraphQL query.
-- [ ] **2.3** The SDK **should** support interactions with Aptos devnet, testnet and mainnet networks.
+- [ ] **2.3** The SDK **should** support interactions with Supra devnet, testnet and mainnet networks.
 - [ ] **2.4** The SDK **should** support interactions with a custom URL.
 
 ### 3. Account Management
@@ -136,7 +136,7 @@ We do not use the fourth **`won't`** level in this specification.
 
 - [ ] **7.6** A release package **should** not include unnecessary source code files or intermediary files for the SDK.
 
-- [ ] **7.7** The name of the SDK **should** follow language best practices, and be one of `aptos` or `Aptos`.
+- [ ] **7.7** The name of the SDK **should** follow language best practices, and be one of `aptos` or `Supra`.
 - [ ] **7.8** If the preferred name of the SDK is not available, it **could** be one of `aptos-sdk`, `AptosSDK`, or `aptosdev`.
 - [ ] **7.9** As soon as the first public version of the library has been signed off, the version **should** be bumped to `1.0.0`.
 - [ ] **7.10** New releases **could** be deployed automatically to the package manager using the CI server.
@@ -170,7 +170,7 @@ We do not use the fourth **`won't`** level in this specification.
 - [ ] **9.5** The SDK **should** include a `ISSUE_TEMPLATE` file.
 - [ ] **9.6** The SDK **should** include a `PULL_REQUEST_TEMPLATE` file.
 - [ ] **9.7** The SDK **should** include a `SUPPORT` file.
-- [ ] **9.8** The GitHub repository **should** have a title in the format, e.g. "Typescript library for the Aptos network"
+- [ ] **9.8** The GitHub repository **should** have a title in the format, e.g. "Typescript library for the Supra network"
 - [ ] **9.9** The GitHub repository **should** have the following tags: `aptos`, `blockchain`, `web3`, `sdk`, `library`.
 
 ## Dependencies & Infrastructure Requirements
@@ -178,7 +178,7 @@ We do not use the fourth **`won't`** level in this specification.
 ### 10. Testing
 
 - [ ] **10.1** The SDK **must** be thoroughly tested.
-- [ ] **10.2** For any real API calls, the tests **must** use the Aptos testnet or devnet network.
+- [ ] **10.2** For any real API calls, the tests **must** use the Supra testnet or devnet network.
 - [ ] **10.3** The tests **should** have integration tests to make the network calls.
 - [ ] **10.4** The tests **should** test responses.
 

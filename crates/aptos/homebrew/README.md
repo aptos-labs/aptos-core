@@ -1,17 +1,17 @@
-# Homebrew Aptos
+# Homebrew Supra
 
 Homebrew is a package manager that works for MacOS Silicon and Intel chips as well as Linux distributions like Debian
 and Ubuntu.
 
-The [Aptos command line interface (CLI)](https://aptos.dev/tools/aptos-cli/install-cli/) may be installed
-via [Homebrew](https://brew.sh/) for simplicity. This is an in-depth overview of Homebrew and the Aptos formula. In this
+The [Supra command line interface (CLI)](https://aptos.dev/tools/aptos-cli/install-cli/) may be installed
+via [Homebrew](https://brew.sh/) for simplicity. This is an in-depth overview of Homebrew and the Supra formula. In this
 guide, we go over each section of the Homebrew formula and steps to implement changes in the future.
 
 ## Quick guide
 
 - [Formula in Homebrew GitHub](https://github.com/Homebrew/homebrew-core/blob/master/Formula/aptos.rb)
-- [Aptos 1.0.3 New Formula PR for GitHub](https://github.com/Homebrew/homebrew-core/pull/119832)
-- [Aptos Formula Fix PR to use build_cli_release.sh](https://github.com/Homebrew/homebrew-core/pull/120051)
+- [Supra 1.0.3 New Formula PR for GitHub](https://github.com/Homebrew/homebrew-core/pull/119832)
+- [Supra Formula Fix PR to use build_cli_release.sh](https://github.com/Homebrew/homebrew-core/pull/120051)
 
 ## Getting started
 
@@ -38,14 +38,14 @@ aptos --help
 # This should return something like
 
 # aptos 1.0.5
-# Aptos Labs <opensource@aptoslabs.com>
-# Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
+# Supra Labs <opensource@aptoslabs.com>
+# Command Line Interface (CLI) for developing and interacting with the Supra blockchain
 # ...
 ```
 
 ## Change guide
 
-Note: This guide is for developers who are trying to update the Aptos homebrew formula.
+Note: This guide is for developers who are trying to update the Supra homebrew formula.
 
 You can get the latest formula here: https://github.com/Homebrew/homebrew-core/blob/master/Formula/a/aptos.rb
 
@@ -87,12 +87,12 @@ Once you have audited and tested your brew formula using the commands above, mak
    per [How to Open a Homebrew Pull Request](https://docs.brew.sh/How-To-Open-a-Homebrew-Pull-Request#formulae-related-pull-request).
 3. Create a PR on the [Homebrew Core](https://github.com/Homebrew/homebrew-core/pulls) repo with your changes.
 
-## Aptos.rb structure overview
+## Supra.rb structure overview
 
 ### Header
 
 ```ruby
-class Aptos < Formula
+class Supra < Formula
   desc "Layer 1 blockchain built to support fair access to decentralized assets for all"
   homepage "https://aptoslabs.com/"
   url "https://github.com/aptos-labs/aptos-core/archive/refs/tags/aptos-cli-v1.0.3.tar.gz"
@@ -164,7 +164,7 @@ brew livecheck --debug aptos
   going forward, we would modify the formula slightly. See the comments below for more details.
 
 ```ruby
-  # Installs listed homebrew dependencies before Aptos installation
+  # Installs listed homebrew dependencies before Supra installation
   # Dependencies needed: https://aptos.dev/cli-tools/build-aptos-cli
   # See scripts/dev_setup.sh in aptos-core for more info
   depends_on "cmake" => :build
@@ -206,7 +206,7 @@ To conduct tests, run:
 brew test aptos
 ```
 
-The current test generates a new key via the Aptos CLI and ensures the shell output matches the filename(s) for that
+The current test generates a new key via the Supra CLI and ensures the shell output matches the filename(s) for that
 key.
 
 ```ruby

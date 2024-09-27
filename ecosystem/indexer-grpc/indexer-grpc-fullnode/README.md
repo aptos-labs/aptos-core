@@ -1,4 +1,4 @@
-# Aptos Indexer GRPC on Fullnode
+# Supra Indexer GRPC on Fullnode
 
 This opens a GRPC endpoint on the indexer. A client (e.g. worker) connects to the endpoint and makes a request. The GRPC endpoint would maintain a stream and sends transactions back to the client on a batch basis. Note that transactions within a batch may be out of order. 
 

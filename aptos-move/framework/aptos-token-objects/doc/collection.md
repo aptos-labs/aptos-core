@@ -793,7 +793,7 @@ The collection does not have a max supply
 Creates a fixed-sized collection, or a collection that supports a fixed amount of tokens.
 This is useful to create a guaranteed, limited supply on-chain digital asset. For example,
 a collection 1111 vicious vipers. Note, creating restrictions such as upward limits results
-in data structures that prevent Aptos from parallelizing mints of this collection type.
+in data structures that prevent Supra from parallelizing mints of this collection type.
 Beyond that, it adds supply tracking with events.
 
 
@@ -892,7 +892,7 @@ the supply of tokens.
 ## Function `create_untracked_collection`
 
 Creates an untracked collection, or a collection that supports an arbitrary amount of
-tokens. This is useful for mass airdrops that fully leverage Aptos parallelization.
+tokens. This is useful for mass airdrops that fully leverage Supra parallelization.
 TODO: Hide this until we bring back meaningful way to enforce burns
 
 

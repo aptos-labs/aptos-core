@@ -104,8 +104,8 @@
 Configuration
 -------------
 
-This Helm chart deploys a public fullnode for the Aptos blockchain network. The
-fullnode connects to Aptos validators and synchronises the blockchain state to
+This Helm chart deploys a public fullnode for the Supra blockchain network. The
+fullnode connects to Supra validators and synchronises the blockchain state to
 a persistent volume. It provides a [REST API][] for interacting with
 the blockchain.
 
@@ -114,7 +114,7 @@ See [values.yaml][] for the full list of options you can configure.
 Connecting to Testnet
 -------------
 
-To connect to the Aptos devnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here: https://github.com/aptos-labs/aptos-genesis-waypoint
+To connect to the Supra devnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here: https://github.com/aptos-labs/aptos-genesis-waypoint
 
 The waypoint and genesis blobs are download at runtime, and their URLs are specified in `.Values.aptos_chains`.
 
@@ -129,4 +129,4 @@ Deployment
 
 [REST API]: https://github.com/aptos-labs/aptos-core/blob/main/api/doc/v0/openapi.yaml
 [values.yaml]: values.yaml
-[Aptos dockerhub]: https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated
+[Supra dockerhub]: https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated

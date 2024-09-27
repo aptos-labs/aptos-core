@@ -1,6 +1,6 @@
-# Aptos Node API
+# Supra Node API
 
-This module provides a REST API for client applications to query the Aptos blockchain.
+This module provides a REST API for client applications to query the Supra blockchain.
 
 See spec source:
 - [YAML in doc/spec.yaml](doc/spec.yaml).

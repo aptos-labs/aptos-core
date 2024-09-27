@@ -1,6 +1,6 @@
-# Aptos CLI Changelog
+# Supra CLI Changelog
 
-All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+All notable changes to the Supra CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 - Add balance command to easily get account balances for APT currently
@@ -192,4 +192,4 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 * Move compiler will no longer use an environment variable to communicate between compiler and CLI for the bytecode version
 
 ## [1.0.7]
-* For logs earlier than 1.0.7, please check out the [releases on GitHub](https://github.com/aptos-labs/aptos-core/releases?q="Aptos+CLI+Release")
+* For logs earlier than 1.0.7, please check out the [releases on GitHub](https://github.com/aptos-labs/aptos-core/releases?q="Supra+CLI+Release")

@@ -1,11 +1,11 @@
 ---
 id: aptos-gas-calibration
-title: Aptos Automated Gas Calibration
+title: Supra Automated Gas Calibration
 ---
 
-## Aptos Automated Gas Calibration
+## Supra Automated Gas Calibration
 
-The Aptos Automated Gas Calibration is a tool that lets anyone write Move Samples (or also Move IR) to calibrate the gas parameters for Native Functions (and also Move bytecode instructions). 
+The Supra Automated Gas Calibration is a tool that lets anyone write Move Samples (or also Move IR) to calibrate the gas parameters for Native Functions (and also Move bytecode instructions). 
 
 ### Terminology:
 

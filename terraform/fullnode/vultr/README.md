@@ -1,4 +1,4 @@
-Aptos Fullnodes VULTR (https://www.vultr.com/) Deployment
+Supra Fullnodes VULTR (https://www.vultr.com/) Deployment
 ==============================
 
 This directory contains Terraform configs to deploy a public fullnode on VULTR.

@@ -1,4 +1,4 @@
-# Aptos Faucet
+# Supra Faucet
 
 This doc contains information relevant to the development of more obscure parts of the faucet.
 
