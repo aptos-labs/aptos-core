@@ -50,6 +50,12 @@ module aptos_framework::account {
         type_info: TypeInfo,
     }
 
+    #[event]
+    struct CoinRegister has drop, store {
+        account: address,
+        type_info: TypeInfo,
+    }
+
     struct CapabilityOffer<phantom T> has store { for: Option<address> }
 
     struct RotationCapability has drop, store { account: address }
@@ -798,12 +804,21 @@ module aptos_framework::account {
 
     public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
         let account = borrow_global_mut<Account>(account_addr);
-        event::emit_event<CoinRegisterEvent>(
-            &mut account.coin_register_events,
-            CoinRegisterEvent {
-                type_info: type_info::type_of<CoinType>(),
-            },
-        );
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                CoinRegister {
+                    account: account_addr,
+                    type_info: type_info::type_of<CoinType>(),
+                },
+            );
+        } else {
+            event::emit_event<CoinRegisterEvent>(
+                &mut account.coin_register_events,
+                CoinRegisterEvent {
+                    type_info: type_info::type_of<CoinType>(),
+                },
+            );
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////
