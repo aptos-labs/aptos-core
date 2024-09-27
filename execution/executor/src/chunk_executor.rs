@@ -12,9 +12,8 @@ use crate::{
     },
     logging::{LogEntry, LogSchema},
     metrics::{
-        APTOS_CHUNK_EXECUTOR_OTHER_SECONDS, APTOS_EXECUTOR_APPLY_CHUNK_SECONDS,
-        APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS, APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS,
-        APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS, CONCURRENCY_GAUGE,
+        APPLY_CHUNK, CHUNK_OTHER_TIMERS, COMMIT_CHUNK, CONCURRENCY_GAUGE, EXECUTE_CHUNK,
+        VM_EXECUTE_CHUNK,
     },
 };
 use anyhow::{anyhow, ensure, Result};
@@ -227,16 +226,15 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     }
 
     fn commit_chunk_impl(&self) -> Result<ExecutedChunk> {
-        let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS.timer_with(&["commit_chunk_impl__total"]);
+        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__total"]);
         let (persisted_state, chunk) = {
-            let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
-                .timer_with(&["commit_chunk_impl__next_chunk_to_commit"]);
+            let _timer =
+                CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__next_chunk_to_commit"]);
             self.commit_queue.lock().next_chunk_to_commit()?
         };
 
         if chunk.ledger_info.is_some() || !chunk.transactions_to_commit().is_empty() {
-            let _timer =
-                APTOS_CHUNK_EXECUTOR_OTHER_SECONDS.timer_with(&["commit_chunk_impl__save_txns"]);
+            let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__save_txns"]);
             fail_point!("executor::commit_chunk", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_chunk"))
             });
@@ -258,8 +256,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         DEFAULT_DROPPER.schedule_drop(persisted_state);
 
-        let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
-            .timer_with(&["commit_chunk_impl__dequeue_and_return"]);
+        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
         self.commit_queue
             .lock()
             .dequeue_committed(chunk.result_state.clone())?;
@@ -274,7 +271,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        let _timer = APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS.start_timer();
+        let _timer = EXECUTE_CHUNK.start_timer();
 
         let num_txns = txn_list_with_proof.transactions.len();
         ensure!(num_txns != 0, "Empty transaction list!");
@@ -290,17 +287,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         );
 
         {
-            let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
-                .timer_with(&["enqueue_chunk_by_execution__verify_chunk"]);
-            THREAD_MANAGER
-                .get_exe_cpu_pool()
-                .install(|| -> Result<()> {
-                    verify_chunk(
-                        &txn_list_with_proof,
-                        verified_target_li,
-                        Some(first_version_in_request),
-                    )
-                })?;
+            let _timer =
+                CHUNK_OTHER_TIMERS.timer_with(&["enqueue_chunk_by_execution__verify_chunk"]);
+            verify_chunk(
+                &txn_list_with_proof,
+                verified_target_li,
+                Some(first_version_in_request),
+            )?;
         }
 
         let TransactionListWithProof {
@@ -331,7 +324,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         // Execute transactions.
         let state_view = self.latest_state_view(&parent_state)?;
         let chunk_output = {
-            let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
+            let _timer = VM_EXECUTE_CHUNK.start_timer();
             // State sync executor shouldn't have block gas limit.
             ChunkOutput::by_transaction_execution::<V>(
                 sig_verified_txns.into(),
@@ -378,7 +371,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        let _timer = APTOS_EXECUTOR_APPLY_CHUNK_SECONDS.start_timer();
+        let _timer = APPLY_CHUNK.start_timer();
 
         let num_txns = txn_output_list_with_proof.transactions_and_outputs.len();
         ensure!(num_txns != 0, "Empty transaction list!");
@@ -394,7 +387,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         );
 
         {
-            let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS.timer_with(&["apply_chunk__verify"]);
+            let _timer = CHUNK_OTHER_TIMERS.timer_with(&["apply_chunk__verify"]);
             // Verify input transaction list.
             THREAD_MANAGER
                 .get_exe_cpu_pool()
@@ -425,8 +418,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         // Calculate state snapshot
         let (result_state, next_epoch_state, state_checkpoint_output) = {
-            let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
-                .timer_with(&["apply_chunk__calculate_state_checkpoint"]);
+            let _timer =
+                CHUNK_OTHER_TIMERS.timer_with(&["apply_chunk__calculate_state_checkpoint"]);
             ApplyChunkOutput::calculate_state_checkpoint(
                 chunk_output,
                 &self.commit_queue.lock().latest_state(),
@@ -436,8 +429,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             )?
         };
 
-        let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
-            .timer_with(&["apply_chunk__enqueue_for_ledger_update"]);
+        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["apply_chunk__enqueue_for_ledger_update"]);
         // Enqueue for next stage.
         self.commit_queue
             .lock()
@@ -461,11 +453,10 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     }
 
     pub fn update_ledger(&self) -> Result<()> {
-        let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS.timer_with(&["chunk_update_ledger_total"]);
+        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger_total"]);
 
         let (parent_accumulator, chunk) = {
-            let _timer =
-                APTOS_CHUNK_EXECUTOR_OTHER_SECONDS.timer_with(&["chunk_update_ledger__next_chunk"]);
+            let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__next_chunk"]);
             self.commit_queue.lock().next_chunk_to_update_ledger()?
         };
         let ChunkToUpdateLedger {
@@ -485,8 +476,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         )?;
 
         let (ledger_update_output, to_discard, to_retry) = {
-            let _timer =
-                APTOS_CHUNK_EXECUTOR_OTHER_SECONDS.timer_with(&["chunk_update_ledger__calculate"]);
+            let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__calculate"]);
             ApplyChunkOutput::calculate_ledger_update(state_checkpoint_output, parent_accumulator)?
         };
         ensure!(to_discard.is_empty(), "Unexpected discard.");
@@ -507,7 +497,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         };
         let num_txns = executed_chunk.transactions_to_commit().len();
 
-        let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS.timer_with(&["chunk_update_ledger__save"]);
+        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__save"]);
         self.commit_queue
             .lock()
             .save_ledger_update_output(executed_chunk)?;
@@ -521,13 +511,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     }
 
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
-        let _timer = APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS.start_timer();
+        let _timer = COMMIT_CHUNK.start_timer();
         let executed_chunk = self.commit_chunk_impl()?;
         self.has_pending_pre_commit.store(false, Ordering::Release);
 
         let commit_notification = {
-            let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
-                .timer_with(&["commit_chunk__into_chunk_commit_notification"]);
+            let _timer =
+                CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk__into_chunk_commit_notification"]);
             executed_chunk.into_chunk_commit_notification()
         };
 
