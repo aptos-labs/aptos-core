@@ -1,3 +1,24 @@
-# Empty configs to import.
-{
-}
+testnet:
+  # Transaction Stream endpoint addresss.
+  transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
+  # (Optional) The key to use with developers.aptoslabs.com
+  api_key: aptoslabs_L7pzPsqiShp_EwzUCbhb6ehTe8PSvFp6ZeUr3B3gBdGaX
+  # A map from versions to dump and their output names.
+  versions_to_import:
+    123: testnet_v1.json
+    278556781: testnet_v1_coin_register_fa_metadata_278556781.json
+    1255836496: testnet_v2_fa_metadata_1255836496.json
+    5979639459: testnet_v5979639459.json
+    5992795934: testnet_v5992795934.json
+    51268254: testnet_v51268254.json
+
+
+mainnet:
+  # Transaction Stream endpoint addresss.
+  transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
+  # (Optional) The key to use with developers.aptoslabs.com
+  api_key: aptoslabs_L7pzPsqiShp_EwzUCbhb6ehTe8PSvFp6ZeUr3B3gBdGaX
+  # A map from versions to dump and their output names.
+  versions_to_import:
+    308783012: mainnet_v308783012.json
+
