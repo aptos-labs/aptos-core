@@ -43,9 +43,9 @@ fn identify_function_types_with_functions_in_args(func_returns: Vec<Type>) -> Ve
 
 // Takes a list of function-typed parameters, along with argument and result type
 // Returns a list of any parameters whose result type has a function value, along with that result type.
-fn identify_function_typed_params_with_functions_in_rets<'a>(
-    func_params: Vec<&'a Parameter>,
-) -> Vec<(&'a Parameter, &'a Type)> {
+fn identify_function_typed_params_with_functions_in_rets(
+    func_params: Vec<&Parameter>,
+) -> Vec<(&Parameter, &Type)> {
     func_params
         .iter()
         .filter_map(|param| {

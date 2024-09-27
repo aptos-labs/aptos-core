@@ -366,8 +366,6 @@ impl ModuleGenerator {
                 }
             },
             Fun(_param_ty, _result_ty) => {
-                // let _param_ty = Box::new(self.signature_token(ctx, loc, param_ty));
-                // let _result_ty = Box::new(self.signature_token(ctx, loc, result_ty));
                 // TODO(LAMBDA)
                 ctx.error(
                     loc,

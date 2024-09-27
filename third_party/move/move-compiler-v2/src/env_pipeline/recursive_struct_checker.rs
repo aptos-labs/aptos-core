@@ -117,12 +117,11 @@ impl<'a> RecursiveStructChecker<'a> {
             struct_name,
             struct_name,
         );
-        self.mod_env
-            .env
-            .error_with_labels(&struct_env.get_loc(), "cyclic data", vec![(
-                field_env.get_loc().clone(),
-                note,
-            )]);
+        self.mod_env.env.error_with_labels(
+            &struct_env.get_loc(),
+            "cyclic data",
+            vec![(field_env.get_loc().clone(), note)],
+        );
     }
 
     /// Report cyclic dependency of structs
@@ -195,7 +194,7 @@ impl<'a> RecursiveStructChecker<'a> {
                     .iter()
                     .any(|ty| self.ty_contains_struct(path, ty, loc.clone(), struct_id, checked))
             },
-            Type::Primitive(_) | Type::TypeParameter(_) => false,
+            Type::Primitive(_) | Type::TypeParameter(_) | Type::Fun(..) => false,
             _ => panic!("ICE: {:?} used as a type parameter", ty),
         }
     }
