@@ -40,8 +40,8 @@ import {
 
 export { TypeTagParser } from "../aptos_types";
 
-const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
-const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
+const RAW_TRANSACTION_SALT = "SUPRA::RawTransaction";
+const RAW_TRANSACTION_WITH_DATA_SALT = "SUPRA::RawTransactionWithData";
 
 export type AnyRawTransaction = RawTransaction | MultiAgentRawTransaction | FeePayerRawTransaction;
 

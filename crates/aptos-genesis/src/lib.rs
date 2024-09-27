@@ -165,6 +165,7 @@ impl GenesisInfo {
             &self.consensus_config,
             &self.execution_config,
             &self.gas_schedule,
+            b"test".to_vec(),
         )
     }
 

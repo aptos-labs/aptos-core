@@ -20,6 +20,7 @@ module supra_framework::genesis {
     use supra_framework::coin;
     use supra_framework::consensus_config;
     use supra_framework::execution_config;
+    use supra_framework::supra_config;
     use supra_framework::create_signer::create_signer;
     use supra_framework::gas_schedule;
     use supra_framework::reconfiguration;
@@ -124,6 +125,7 @@ module supra_framework::genesis {
         initial_version: u64,
         consensus_config: vector<u8>,
         execution_config: vector<u8>,
+        supra_config: vector<u8>,
         epoch_interval_microsecs: u64,
         minimum_stake: u64,
         maximum_stake: u64,
@@ -162,6 +164,7 @@ module supra_framework::genesis {
 
         consensus_config::initialize(&supra_framework_account, consensus_config);
         execution_config::set(&supra_framework_account, execution_config);
+        supra_config::initialize(&supra_framework_account, supra_config);
         version::initialize(&supra_framework_account, initial_version);
         stake::initialize(&supra_framework_account);
         staking_config::initialize(
@@ -622,6 +625,7 @@ module supra_framework::genesis {
         initial_version: u64,
         consensus_config: vector<u8>,
         execution_config: vector<u8>,
+        supra_config: vector<u8>,
         epoch_interval_microsecs: u64,
         minimum_stake: u64,
         maximum_stake: u64,
@@ -648,6 +652,7 @@ module supra_framework::genesis {
             initial_version,
             consensus_config,
             execution_config,
+            supra_config,
             epoch_interval_microsecs,
             minimum_stake,
             maximum_stake,
@@ -684,6 +689,7 @@ module supra_framework::genesis {
             0,
             x"12",
             x"13",
+            x"14",
             1,
             0,
             1000 * ONE_SUPRA,

@@ -4,5 +4,5 @@ export default defineConfig({
   entry: ["src/index.ts"],
   splitting: false,
   sourcemap: true,
-  target: "es2018",
+  target: "es2020",
 });
