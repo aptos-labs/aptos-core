@@ -1,5 +1,5 @@
 /// Abstraction to having "addressable" storage slots (i.e. items) in global storage.
-/// Addresses are local u64 values (unique within a single SlotsStorage instance,
+/// Addresses are local u64 values (unique within a single StorageSlotsAllocator instance,
 /// but can and do overlap across instances).
 ///
 /// Allows optionally to initialize slots (and pay for them upfront), and then reuse them,
@@ -15,21 +15,24 @@
 /// for example:
 /// * having one slot embeded into the struct itself
 /// * having a fee-payer for any storage creation operations
-module aptos_std::slots_storage {
+module aptos_std::storage_slots_allocator {
+    friend aptos_std::big_ordered_map;
+
     use aptos_std::table::{Self, Table};
 
     const NULL_INDEX: u64 = 0;
+    const FIRST_INDEX: u64 = 3;
 
     enum Link<T: store> has store {
-        Some {
+        Occupied {
             value: T,
         },
-        Empty {
+        Vacant {
             next: u64,
         }
     }
 
-    enum SlotsStorage<T: store> has store {
+    enum StorageSlotsAllocator<T: store> has store {
         Simple {
             slots: Table<u64, Link<T>>,
             new_slot_index: u64,
@@ -41,21 +44,21 @@ module aptos_std::slots_storage {
         },
     }
 
-    struct TransientSlot {
+    struct ReservedSlot {
         slot_index: u64,
     }
 
-    public fun new_storage_slots<T: store>(): SlotsStorage<T> {
-        SlotsStorage::Simple {
+    public fun new_storage_slots<T: store>(): StorageSlotsAllocator<T> {
+        StorageSlotsAllocator::Simple {
             slots: table::new(),
-            new_slot_index: 1,
+            new_slot_index: FIRST_INDEX,
         }
     }
 
-    public fun new_reuse_storage_slots<T: store>(num_to_preallocate: u64): SlotsStorage<T> {
-        let self = SlotsStorage::Reuse {
+    public fun new_reuse_storage_slots<T: store>(num_to_preallocate: u64): StorageSlotsAllocator<T> {
+        let self = StorageSlotsAllocator::Reuse {
             slots: table::new(),
-            new_slot_index: 1,
+            new_slot_index: FIRST_INDEX,
             reuse_head_index: NULL_INDEX,
         };
 
@@ -67,105 +70,105 @@ module aptos_std::slots_storage {
         self
     }
 
-    public fun add<T: store>(self: &mut SlotsStorage<T>, val: T): u64 {
-        if (self is SlotsStorage::Reuse<T>) {
+    public fun add<T: store>(self: &mut StorageSlotsAllocator<T>, val: T): u64 {
+        if (self is StorageSlotsAllocator::Reuse<T>) {
             let slot_index = self.reuse_head_index;
             if (slot_index != NULL_INDEX) {
-                let Link::Empty { next } = self.slots.remove(slot_index);
+                let Link::Vacant { next } = self.slots.remove(slot_index);
                 self.reuse_head_index = next;
-                self.slots.add(slot_index, Link::Some { value: val });
+                self.slots.add(slot_index, Link::Occupied { value: val });
                 return slot_index
             };
         };
 
         let slot_index = self.next_slot_index();
-        self.slots.add(slot_index, Link::Some { value: val });
+        self.slots.add(slot_index, Link::Occupied { value: val });
         slot_index
     }
 
-    public fun remove<T: store>(self: &mut SlotsStorage<T>, slot_index: u64): T {
-        let Link::Some { value } = self.slots.remove(slot_index);
+    public fun remove<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): T {
+        let Link::Occupied { value } = self.slots.remove(slot_index);
 
         self.push_to_reuse_queue(slot_index);
 
         value
     }
 
-    public fun destroy_empty<T: store>(self: SlotsStorage<T>) {
+    public(friend) fun destroy<T: store>(self: StorageSlotsAllocator<T>) {
         match (self) {
             Simple {
                 slots,
                 new_slot_index: _,
-            } => slots.destroy_empty(),
+            } => slots.destroy(),
             Reuse {
                 slots,
                 new_slot_index: _,
                 reuse_head_index,
             } => {
                 while (reuse_head_index != NULL_INDEX) {
-                    let Link::Empty { next } = slots.remove(reuse_head_index);
+                    let Link::Vacant { next } = slots.remove(reuse_head_index);
                     reuse_head_index = next;
                 };
-                slots.destroy_empty();
-            }
+                slots.destroy();
+            },
         };
     }
 
-    public fun borrow<T: store>(self: &SlotsStorage<T>, slot_index: u64): &T {
+    public fun borrow<T: store>(self: &StorageSlotsAllocator<T>, slot_index: u64): &T {
         &self.slots.borrow(slot_index).value
     }
 
-    public fun borrow_mut<T: store>(self: &mut SlotsStorage<T>, slot_index: u64): &mut T {
+    public fun borrow_mut<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): &mut T {
         &mut self.slots.borrow_mut(slot_index).value
     }
 
-    public fun get_index(self: &TransientSlot): u64 {
+    public fun get_index(self: &ReservedSlot): u64 {
         self.slot_index
     }
 
-    // splitting add into getting TransientSlot, and then inserting it later
-    public fun create_transient_slot<T: store>(self: &mut SlotsStorage<T>): TransientSlot {
-        if (self is SlotsStorage::Reuse<T>) {
+    // splitting add into getting ReservedSlot, and then inserting it later
+    public fun reserve_slot<T: store>(self: &mut StorageSlotsAllocator<T>): ReservedSlot {
+        if (self is StorageSlotsAllocator::Reuse<T>) {
             let slot_index = self.reuse_head_index;
             if (slot_index != NULL_INDEX) {
-                let Link::Empty { next } = self.slots.remove(slot_index);
+                let Link::Vacant { next } = self.slots.remove(slot_index);
                 self.reuse_head_index = next;
-                return TransientSlot {
+                return ReservedSlot {
                     slot_index,
                 };
             };
         };
 
         let slot_index = self.next_slot_index();
-        TransientSlot {
+        ReservedSlot {
             slot_index,
         }
     }
 
-    public fun add_transient_slot<T: store>(self: &mut SlotsStorage<T>, slot: TransientSlot, val: T) {
-        let TransientSlot { slot_index } = slot;
-        self.slots.add(slot_index, Link::Some { value: val });
+    public fun fill_reserved_slot<T: store>(self: &mut StorageSlotsAllocator<T>, slot: ReservedSlot, val: T) {
+        let ReservedSlot { slot_index } = slot;
+        self.slots.add(slot_index, Link::Occupied { value: val });
     }
 
-    public fun transiently_remove<T: store>(self: &mut SlotsStorage<T>, slot_index: u64): (TransientSlot, T) {
-        let Link::Some { value } = self.slots.remove(slot_index);
-        (TransientSlot { slot_index }, value)
+    /// Remove storage slot, but reserve it for later.
+    public fun remove_and_reserve<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): (ReservedSlot, T) {
+        let Link::Occupied { value } = self.slots.remove(slot_index);
+        (ReservedSlot { slot_index }, value)
     }
 
-    public fun destroy_transient_slot<T: store>(self: &mut SlotsStorage<T>, slot: TransientSlot) {
-        let TransientSlot { slot_index } = slot;
-
+    public fun free_reserved_slot<T: store>(self: &mut StorageSlotsAllocator<T>, slot: ReservedSlot) {
+        let ReservedSlot { slot_index } = slot;
         self.push_to_reuse_queue(slot_index);
     }
 
-    fun push_to_reuse_queue<T: store>(self: &mut SlotsStorage<T>, slot_index: u64) {
-        if (self is SlotsStorage::Reuse<T>) {
-            self.slots.add(slot_index, Link::Empty { next: self.reuse_head_index });
+    fun push_to_reuse_queue<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64) {
+        if (self is StorageSlotsAllocator::Reuse<T>) {
+            self.slots.add(slot_index, Link::Vacant { next: self.reuse_head_index });
             self.reuse_head_index = slot_index;
-        }
+        };
     }
 
-    fun next_slot_index<T: store>(self: &mut SlotsStorage<T>): u64 {
+    fun next_slot_index<T: store>(self: &mut StorageSlotsAllocator<T>): u64 {
         let slot_index = self.new_slot_index;
         self.new_slot_index = self.new_slot_index + 1;
         slot_index
