@@ -450,9 +450,10 @@ async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
     let ephemeral_key_pair = EphemeralKeyPair::new(esk, exp_date, blinder).unwrap();
 
     let mut info = swarm.aptos_public_info();
-    let keyless_account = KeylessAccount::derive_account(
+    let keyless_account = KeylessAccount::new_from_jwt(
         &jwt,
         ephemeral_key_pair,
+        None,
         Some(get_sample_pepper()),
         Some(get_sample_zk_sig()),
     )

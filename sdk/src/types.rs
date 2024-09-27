@@ -14,7 +14,7 @@ use crate::{
         transaction::{authenticator::AuthenticationKey, RawTransaction, SignedTransaction},
     },
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use aptos_crypto::{ed25519::Ed25519Signature, PrivateKey, SigningKey};
 use aptos_ledger::AptosLedgerError;
 pub use aptos_types::*;
@@ -517,7 +517,6 @@ pub struct KeylessAccount {
     pepper: Pepper,
     zk_sig: ZeroKnowledgeSig,
     jwt_header_json: String,
-    #[allow(dead_code)]
     jwt: Option<String>,
 }
 
@@ -550,23 +549,27 @@ impl KeylessAccount {
         })
     }
 
-    pub fn derive_account(
+    pub fn new_from_jwt(
         jwt: &str,
         ephemeral_key_pair: EphemeralKeyPair,
+        uid_key: Option<&str>,
         pepper: Option<Pepper>,
         zk_sig: Option<ZeroKnowledgeSig>,
     ) -> Result<Self> {
         let parts: Vec<&str> = jwt.split('.').collect();
-        let header_bytes = base64::decode(parts[0]).unwrap();
-        let jwt_header_json = String::from_utf8(header_bytes).unwrap();
-        let jwt_payload_json = base64::decode_config(parts[1], base64::URL_SAFE).unwrap();
+        let header_bytes = base64::decode(parts[0])?;
+        let jwt_header_json = String::from_utf8(header_bytes)?;
+        let jwt_payload_json = base64::decode_config(
+            parts.get(1).context("missing jwt payload")?,
+            base64::URL_SAFE,
+        )?;
         let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
 
-        let uid_key = "sub".to_owned();
+        let uid_key = uid_key.unwrap_or("sub").to_string();
         let uid_val = claims.get_uid_val(&uid_key)?;
         let aud = claims.oidc_claims.aud;
 
-        Self::new(
+        let account = Self::new(
             &claims.oidc_claims.iss,
             &aud,
             &uid_key,
@@ -575,7 +578,8 @@ impl KeylessAccount {
             ephemeral_key_pair,
             pepper.expect("pepper fetch not implemented"),
             zk_sig.expect("proof fetch not implemented"),
-        )
+        )?;
+        Ok(account.set_jwt(jwt))
     }
 
     pub fn authentication_key(&self) -> AuthenticationKey {
@@ -584,6 +588,11 @@ impl KeylessAccount {
 
     pub fn public_key(&self) -> &KeylessPublicKey {
         &self.public_key
+    }
+
+    pub fn set_jwt(mut self, jwt: &str) -> Self {
+        self.jwt = Some(jwt.to_string());
+        self
     }
 }
 
