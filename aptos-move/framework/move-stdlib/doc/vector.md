@@ -351,9 +351,11 @@ Moves range of elements <code>[removal_position, removal_position + length)</cod
 to vector <code><b>to</b></code>, inserting them starting at the <code>insert_position</code>.
 In the <code>from</code> vector, elements after the selected range are moved left to fill the hole
 (i.e. range is removed, while the order of the rest of the elements is kept)
-In the <code><b>to</b></code> vector, elements after the <code>insert_position</code> are moved to the right to make space for new elements
-(i.e. range is inserted, while the order of the rest of the elements is kept).
-Move prevents from having two mutable references to the same value, so <code>from</code> and <code><b>to</b></code> vectors are always distinct.
+In the <code><b>to</b></code> vector, elements after the <code>insert_position</code> are moved to the right to make
+space for new elements (i.e. range is inserted, while the order of the rest of the
+elements is kept).
+Move prevents from having two mutable references to the same value, so <code>from</code> and <code><b>to</b></code>
+vectors are always distinct.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, removal_position: u64, length: u64, <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, insert_position: u64)
@@ -365,7 +367,13 @@ Move prevents from having two mutable references to the same value, so <code>fro
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b>(<b>friend</b>) <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, removal_position: u64, length: u64, <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, insert_position: u64);
+<pre><code><b>native</b> <b>public</b>(<b>friend</b>) <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(
+    from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;,
+    removal_position: u64,
+    length: u64,
+    <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;,
+    insert_position: u64
+);
 </code></pre>
 
 
