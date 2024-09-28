@@ -81,6 +81,7 @@ pub struct ExecutionProxy {
     write_mutex: AsyncMutex<LogicalTime>,
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
+    pre_execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
 }
 
@@ -110,6 +111,8 @@ impl ExecutionProxy {
         });
         let execution_pipeline =
             ExecutionPipeline::spawn(executor.clone(), handle, enable_pre_commit);
+        let pre_execution_pipeline =
+            ExecutionPipeline::spawn(executor.clone(), handle, enable_pre_commit);
         Self {
             executor,
             txn_notifier,
@@ -118,6 +121,7 @@ impl ExecutionProxy {
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
+            pre_execution_pipeline,
             state: RwLock::new(None),
         }
     }
@@ -202,8 +206,12 @@ impl StateComputer for ExecutionProxy {
         };
 
         let pipeline_entry_time = Instant::now();
-        let fut = self
-            .execution_pipeline
+
+        let pipeline = match execution_type {
+            ExecutionType::Execution => &self.execution_pipeline,
+            ExecutionType::PreExecution => &self.pre_execution_pipeline,
+        };
+        let fut = pipeline
             .queue(
                 block.clone(),
                 metadata,
