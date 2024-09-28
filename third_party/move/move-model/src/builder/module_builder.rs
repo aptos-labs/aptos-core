@@ -911,7 +911,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+    pub fn check_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> bool {
         if !self.parent.env.language_version().is_at_least(version_min) {
             self.parent.env.error(
                 loc,
@@ -919,7 +924,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     "not supported before language version `{}`: {}",
                     version_min, feature
                 ),
-            )
+            );
+            false
+        } else {
+            true
         }
     }
 
@@ -1005,11 +1013,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 if !self.parent.const_table.contains_key(&qsym) {
                     continue;
                 }
-                self.check_language_version(
+                if !self.check_language_version(
                     &loc,
                     "constant definitions referring to other constants",
                     LanguageVersion::V2_0,
-                );
+                ) {
+                    continue;
+                }
                 if visited.contains(&const_name) {
                     continue;
                 }
@@ -3719,6 +3729,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let spec = self.fun_specs.remove(&name.symbol).unwrap_or_default();
             let def = self.fun_defs.remove(&name.symbol);
             let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
+            let used_funs = Some(def.as_ref().map(|e| e.used_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
             let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
@@ -3744,6 +3755,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 called_funs,
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),
+                used_funs,
+                using_funs: RefCell::default(),
+                transitive_closure_of_used_funs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }

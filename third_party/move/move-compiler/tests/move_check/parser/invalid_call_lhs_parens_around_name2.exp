@@ -1,9 +1,6 @@
-error[E01002]: unexpected token
-  ┌─ tests/move_check/parser/invalid_call_lhs_parens_around_name2.move:3:14
+error[E03009]: unbound variable
+  ┌─ tests/move_check/parser/invalid_call_lhs_parens_around_name2.move:3:10
   │
 3 │         (foo)()
-  │              ^
-  │              │
-  │              Unexpected '('
-  │              Expected ';'
+  │          ^^^ Invalid function usage. Unbound variable 'foo'
 

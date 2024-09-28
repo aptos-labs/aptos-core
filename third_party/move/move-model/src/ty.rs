@@ -39,7 +39,11 @@ pub enum Type {
     Vector(Box<Type>),
     Struct(ModuleId, StructId, /*type-params*/ Vec<Type>),
     TypeParameter(u16),
-    Fun(/*args*/ Box<Type>, /*result*/ Box<Type>),
+    Fun(
+        /* known args */ Box<Type>,
+        /*result*/ Box<Type>,
+        AbilitySet,
+    ),
 
     // Types only appearing in programs.
     Reference(ReferenceKind, Box<Type>),
@@ -817,6 +821,20 @@ impl Type {
         matches!(self, Type::TypeParameter(..))
     }
 
+    /// Returns true if the type depends on type parameters.
+    pub fn depends_from_type_parameter(&self) -> bool {
+        use Type::*;
+        match self {
+            TypeParameter(_) => true,
+            Tuple(ts) | Struct(_, _, ts) | ResourceDomain(_, _, Some(ts)) => {
+                ts.iter().any(|t| t.depends_from_type_parameter())
+            },
+            Vector(t) | Reference(_, t) | TypeDomain(t) => t.depends_from_type_parameter(),
+            Fun(t, r, _) => t.depends_from_type_parameter() || r.depends_from_type_parameter(),
+            _ => false,
+        }
+    }
+
     /// Determines whether this is a primitive.
     pub fn is_primitive(&self) -> bool {
         matches!(self, Type::Primitive(_))
@@ -931,7 +949,7 @@ impl Type {
         use Type::*;
         match self {
             Primitive(p) => p.is_spec(),
-            Fun(args, result) => args.is_spec() || result.is_spec(),
+            Fun(args, result, _) => args.is_spec() || result.is_spec(),
             TypeDomain(..) | ResourceDomain(..) | Error => true,
             Var(..) | TypeParameter(..) => false,
             Tuple(ts) => ts.iter().any(|t| t.is_spec()),
@@ -1158,9 +1176,10 @@ impl Type {
                 Type::Reference(*kind, Box::new(bt.replace(params, subs, use_constr)))
             },
             Type::Struct(mid, sid, args) => Type::Struct(*mid, *sid, replace_vec(args)),
-            Type::Fun(arg, result) => Type::Fun(
+            Type::Fun(arg, result, abilities) => Type::Fun(
                 Box::new(arg.replace(params, subs, use_constr)),
                 Box::new(result.replace(params, subs, use_constr)),
+                *abilities,
             ),
             Type::Tuple(args) => Type::Tuple(replace_vec(args)),
             Type::Vector(et) => Type::Vector(Box::new(et.replace(params, subs, use_constr))),
@@ -1186,7 +1205,7 @@ impl Type {
             match self {
                 Type::Reference(_, bt) => bt.contains(p),
                 Type::Struct(_, _, args) => contains_vec(args),
-                Type::Fun(arg, result) => arg.contains(p) || result.contains(p),
+                Type::Fun(arg, result, _) => arg.contains(p) || result.contains(p),
                 Type::Tuple(args) => contains_vec(args),
                 Type::Vector(et) => et.contains(p),
                 _ => false,
@@ -1200,7 +1219,7 @@ impl Type {
         match self {
             Var(_) => true,
             Tuple(ts) => ts.iter().any(|t| t.is_incomplete()),
-            Fun(a, r) => a.is_incomplete() || r.is_incomplete(),
+            Fun(a, r, _) => a.is_incomplete() || r.is_incomplete(),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_incomplete()),
             Vector(et) => et.is_incomplete(),
             Reference(_, bt) => bt.is_incomplete(),
@@ -1221,7 +1240,7 @@ impl Type {
         use Type::*;
         match self {
             Tuple(ts) => ts.iter().for_each(|t| t.module_usage(usage)),
-            Fun(a, r) => {
+            Fun(a, r, _) => {
                 a.module_usage(usage);
                 r.module_usage(usage);
             },
@@ -1325,7 +1344,7 @@ impl Type {
                 vars.insert(*id);
             },
             Tuple(ts) => ts.iter().for_each(|t| t.internal_get_vars(vars)),
-            Fun(a, r) => {
+            Fun(a, r, _) => {
                 a.internal_get_vars(vars);
                 r.internal_get_vars(vars);
             },
@@ -1348,7 +1367,7 @@ impl Type {
             Type::Vector(bt) => bt.visit(visitor),
             Type::Struct(_, _, tys) => visit_slice(tys, visitor),
             Type::Reference(_, ty) => ty.visit(visitor),
-            Type::Fun(a, ty) => {
+            Type::Fun(a, ty, _) => {
                 a.visit(visitor);
                 ty.visit(visitor);
             },
@@ -1951,7 +1970,7 @@ impl Substitution {
                     Ok(())
                 }
             },
-            Fun(_, _) => check(AbilitySet::FUNCTIONS),
+            Fun(_, _, abilities) => check(AbilitySet::FUNCTIONS.union(*abilities)),
             Reference(_, _) => check(AbilitySet::REFERENCES),
             TypeDomain(_) | ResourceDomain(_, _, _) => check(AbilitySet::EMPTY),
             Error => Ok(()),
@@ -2213,7 +2232,7 @@ impl Substitution {
                     .map_err(TypeUnificationError::lift(order, t1, t2))?,
                 ));
             },
-            (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
+            (Type::Fun(a1, r1, abilities1), Type::Fun(a2, r2, abilities2)) => {
                 // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
                 // conversion for arguments. We also have contra-variance of arguments:
                 //   |T1|R1 <= |T2|R2  <==>  T1 >= T2 && R1 <= R2
@@ -2229,6 +2248,7 @@ impl Substitution {
                         self.unify(context, variance, order, r1, r2)
                             .map_err(TypeUnificationError::lift(order, t1, t2))?,
                     ),
+                    abilities1.intersect(*abilities2),
                 ));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
@@ -3464,12 +3484,21 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 }
                 f.write_str(">")
             },
-            Fun(a, t) => {
+            Fun(a, t, abilities) => {
                 f.write_str("|")?;
                 write!(f, "{}", a.display(self.context))?;
                 f.write_str("|")?;
                 if !t.is_unit() {
-                    write!(f, "{}", t.display(self.context))
+                    write!(f, "{}", t.display(self.context))?;
+                }
+                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                    // Default formatter for Abilities is not compact, manually convert here.
+                    let abilities_as_str = abilities
+                        .iter()
+                        .map(|a| a.to_string())
+                        .reduce(|l, r| format!("{}+{}", l, r))
+                        .unwrap_or_default();
+                    write!(f, ":{}", abilities_as_str)
                 } else {
                     Ok(())
                 }
@@ -3647,7 +3676,8 @@ pub trait AbilityInference: AbilityContext {
                     .reduce(|a, b| a.intersect(b))
                     .unwrap_or(AbilitySet::PRIMITIVES),
             ),
-            Type::Fun(_, _) | Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
+            Type::Fun(_, _, abilities) => (false, *abilities),
+            Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
                 (false, AbilitySet::EMPTY)
             },
         }
