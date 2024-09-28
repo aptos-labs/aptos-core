@@ -976,20 +976,18 @@ impl RoundManager {
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        self.broadcast_fast_shares(vote.ledger_info().commit_info())
-            .await;
-
-        if self.randomness_config.skip_non_rand_blocks() {
-            if !require_randomness {
-                self.block_store
-                    .execution_client()
-                    .pre_execute(&pipelined_block)
-                    .await;
-                if let Some(consensus_publisher) = &self.consensus_publisher {
-                    let message = ConsensusObserverMessage::new_block_proposal_message(proposal);
-                    consensus_publisher.publish_message(message);
-                }
+        if self.randomness_config.skip_non_rand_blocks() && !require_randomness {
+            self.block_store
+                .execution_client()
+                .pre_execute(&pipelined_block)
+                .await;
+            if let Some(consensus_publisher) = &self.consensus_publisher {
+                let message = ConsensusObserverMessage::new_block_proposal_message(proposal);
+                consensus_publisher.publish_message(message);
             }
+        } else {
+            self.broadcast_fast_shares(vote.ledger_info().commit_info())
+            .await;
         }
 
         if self.local_config.broadcast_vote {
@@ -1336,8 +1334,17 @@ impl RoundManager {
                             qc, e
                         );
                     } else {
-                        self.broadcast_fast_shares(qc.certified_block()).await;
-                        self.broadcast_precommit_vote(vote.vote_data().proposed().clone(), HashValue::zero()).await;
+                        if self.randomness_config.skip_non_rand_blocks() {
+                            if let Some(block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
+                                if !block.require_randomness() {
+                                    self.broadcast_precommit_vote(vote.vote_data().proposed().clone(), HashValue::zero()).await;
+                                } else {
+                                    self.broadcast_fast_shares(qc.certified_block()).await;
+                                }
+                            }
+                        } else {
+                            self.broadcast_fast_shares(qc.certified_block()).await;
+                        }
                     }
                 }
                 Ok(())
