@@ -13,6 +13,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
+use move_binary_format::file_format::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Rewriter for expressions, allowing to substitute locals by expressions as well as instantiate
@@ -194,7 +195,13 @@ pub trait ExpRewriterFunctions {
     fn rewrite_invoke(&mut self, id: NodeId, target: &Exp, args: &[Exp]) -> Option<Exp> {
         None
     }
-    fn rewrite_lambda(&mut self, id: NodeId, pat: &Pattern, body: &Exp) -> Option<Exp> {
+    fn rewrite_lambda(
+        &mut self,
+        id: NodeId,
+        pat: &Pattern,
+        body: &Exp,
+        abilities: AbilitySet,
+    ) -> Option<Exp> {
         None
     }
     // Optionally can rewrite pat and return new value, otherwise is unchanged.
@@ -351,16 +358,17 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            Lambda(id, pat, body) => {
+            Lambda(id, pat, body, abilities) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
                 self.rewrite_enter_scope(new_id, new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope(new_id);
-                if let Some(new_exp) = self.rewrite_lambda(new_id, &new_pat, &new_body) {
+                if let Some(new_exp) = self.rewrite_lambda(new_id, &new_pat, &new_body, *abilities)
+                {
                     new_exp
                 } else if id_changed || pat_changed || body_changed {
-                    Lambda(new_id, new_pat, new_body).into_exp()
+                    Lambda(new_id, new_pat, new_body, *abilities).into_exp()
                 } else {
                     exp
                 }
@@ -479,12 +487,15 @@ pub trait ExpRewriterFunctions {
                     {
                         (true, new_exp)
                     } else {
-                        (false, MatchArm {
-                            loc: arm.loc.clone(),
-                            pattern: newer_pat,
-                            condition: new_cond,
-                            body: new_body,
-                        })
+                        (
+                            false,
+                            MatchArm {
+                                loc: arm.loc.clone(),
+                                pattern: newer_pat,
+                                condition: new_cond,
+                                body: new_body,
+                            },
+                        )
                     };
                     new_arms.push(new_arm);
                     arms_changed =
@@ -623,18 +634,24 @@ pub trait ExpRewriterFunctions {
         let new_exp = self.rewrite_exp(condition.exp.clone());
         let maybe_new_additional_exps = self.internal_rewrite_vec(&condition.additional_exps);
         if let Some(new_additional_exps) = maybe_new_additional_exps {
-            (true, Condition {
-                exp: new_exp,
-                additional_exps: new_additional_exps,
-                ..condition
-            })
+            (
+                true,
+                Condition {
+                    exp: new_exp,
+                    additional_exps: new_additional_exps,
+                    ..condition
+                },
+            )
         } else {
             let changed = !ExpData::ptr_eq(&condition.exp, &new_exp);
             if changed {
-                (true, Condition {
-                    exp: new_exp,
-                    ..condition
-                })
+                (
+                    true,
+                    Condition {
+                        exp: new_exp,
+                        ..condition
+                    },
+                )
             } else {
                 (false, condition)
             }

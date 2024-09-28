@@ -20,7 +20,7 @@ fn identify_function_types_with_functions_in_args(func_types: Vec<Type>) -> Vec<
     func_types
         .into_iter()
         .filter_map(|ty| {
-            if let Type::Fun(argt, _) = &ty {
+            if let Type::Fun(argt, _, _) = &ty {
                 if argt.deref().has_function() {
                     Some(ty)
                 } else {
@@ -41,7 +41,7 @@ fn identify_function_typed_params_with_functions_in_rets(
     func_types
         .iter()
         .filter_map(|param| {
-            if let Type::Fun(_argt, rest) = &param.1 {
+            if let Type::Fun(_argt, rest, _) = &param.1 {
                 let rest_unboxed = rest.deref();
                 if rest_unboxed.has_function() {
                     Some((*param, rest_unboxed))
@@ -270,7 +270,7 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                 },
                 ExpData::Assign(_, pat, _)
                 | ExpData::Block(_, pat, _, _)
-                | ExpData::Lambda(_, pat, _) => {
+                | ExpData::Lambda(_, pat, _, _) => {
                     pat.visit_pre_post(&mut |_, pat| {
                         if let Pattern::Struct(id, str, _, _) = pat {
                             let module_id = str.module_id;

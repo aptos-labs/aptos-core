@@ -1551,10 +1551,10 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
 
     // To create the declaration "let flag = false", first create the variable flag, and then assign it to false
     let flag_symb = Symbol::from(FOR_LOOP_UPDATE_ITER_FLAG);
-    let flag = sp(for_loc, vec![sp(
+    let flag = sp(
         for_loc,
-        Bind_::Var(Var(sp(for_loc, flag_symb))),
-    )]);
+        vec![sp(for_loc, Bind_::Var(Var(sp(for_loc, flag_symb))))],
+    );
     let false_exp = sp(for_loc, Exp_::Value(sp(for_loc, Value_::Bool(false))));
     let decl_flag = sp(
         for_loc,
@@ -1564,10 +1564,10 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     // To create the declaration "let ub_value = upper_bound", first create the variable flag, and
     // then assign it to upper_bound
     let ub_value_symbol = Symbol::from(FOR_LOOP_UPPER_BOUND_VALUE);
-    let ub_value_bindlist = sp(for_loc, vec![sp(
+    let ub_value_bindlist = sp(
         for_loc,
-        Bind_::Var(Var(sp(for_loc, ub_value_symbol))),
-    )]);
+        vec![sp(for_loc, Bind_::Var(Var(sp(for_loc, ub_value_symbol))))],
+    );
     let ub_value_assignment = sp(
         for_loc,
         SequenceItem_::Bind(ub_value_bindlist, None, Box::new(ub)),
@@ -1922,7 +1922,8 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                 spanned(context.tokens.file_hash(), start_loc, start_loc + 1, vec![])
             };
             let body = Box::new(parse_exp(context)?);
-            Exp_::Lambda(bindings, body)
+            let abilities = parse_abilities(context)?;
+            Exp_::Lambda(bindings, body, abilities)
         },
         Tok::Identifier if is_quant(context) => parse_quant(context)?,
         _ => {
@@ -2169,6 +2170,7 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 //      DotOrIndexChain =
 //          <DotOrIndexChain> "." <Identifier> [ ["::" "<" Comma<Type> ">"]? <CallArgs> ]?
 //          | <DotOrIndexChain> "[" <Exp> "]"
+//          | <Term> "(" Comma<Exp> ")"         // --> ExpCall
 //          | <Term>
 fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -2208,6 +2210,10 @@ fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic
                 let exp = Exp_::Index(Box::new(lhs), Box::new(index));
                 consume_token(context.tokens, Tok::RBracket)?;
                 exp
+            },
+            Tok::LParen => {
+                let args = parse_call_args(context)?;
+                Exp_::ExpCall(Box::new(lhs), args)
             },
             _ => break,
         };
@@ -2443,11 +2449,12 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
                     Type_::Unit,
                 )
             };
+            let abilities = parse_type_constraints(context)?;
             return Ok(spanned(
                 context.tokens.file_hash(),
                 start_loc,
                 context.tokens.previous_end_loc(),
-                Type_::Fun(args, Box::new(result)),
+                Type_::Fun(args, Box::new(result), abilities),
             ));
         },
         _ => {
@@ -2522,6 +2529,27 @@ fn parse_ability(context: &mut Context) -> Result<Ability, Box<Diagnostic>> {
     }
 }
 
+// Parse an optional type constraint:
+//      Constraint =
+//          ( ":" <Ability> (+ <Ability>)* )?
+fn parse_type_constraints(context: &mut Context) -> Result<Vec<Ability>, Box<Diagnostic>> {
+    if match_token(context.tokens, Tok::Colon)? {
+        parse_list(
+            context,
+            |context| match context.tokens.peek() {
+                Tok::Plus => {
+                    context.tokens.advance()?;
+                    Ok(true)
+                },
+                _ => Ok(false),
+            },
+            parse_ability,
+        )
+    } else {
+        Ok(vec![])
+    }
+}
+
 // Parse a type parameter:
 //      TypeParameter =
 //          <Identifier> <Constraint>?
@@ -2530,30 +2558,7 @@ fn parse_ability(context: &mut Context) -> Result<Ability, Box<Diagnostic>> {
 fn parse_type_parameter(context: &mut Context) -> Result<(Name, Vec<Ability>), Box<Diagnostic>> {
     let n = parse_identifier(context)?;
 
-    let ability_constraints = if match_token(context.tokens, Tok::Colon)? {
-        parse_list(
-            context,
-            |context| match context.tokens.peek() {
-                Tok::Plus => {
-                    context.tokens.advance()?;
-                    Ok(true)
-                },
-                Tok::Greater | Tok::Comma => Ok(false),
-                _ => Err(unexpected_token_error(
-                    context.tokens,
-                    &format!(
-                        "one of: '{}', '{}', or '{}'",
-                        Tok::Plus,
-                        Tok::Greater,
-                        Tok::Comma
-                    ),
-                )),
-            },
-            parse_ability,
-        )?
-    } else {
-        vec![]
-    };
+    let ability_constraints = parse_type_constraints(context)?;
     Ok((n, ability_constraints))
 }
 

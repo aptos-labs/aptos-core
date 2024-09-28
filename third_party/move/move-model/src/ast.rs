@@ -18,7 +18,7 @@ use internment::LocalIntern;
 use itertools::{EitherOrBoth, Itertools};
 use move_binary_format::{
     file_format,
-    file_format::{CodeOffset, Visibility},
+    file_format::{AbilitySet, CodeOffset, Visibility},
 };
 use move_core_types::account_address::AccountAddress;
 use num::BigInt;
@@ -598,7 +598,7 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Pattern, Exp),
+    Lambda(NodeId, Pattern, Exp, AbilitySet),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -889,12 +889,12 @@ impl ExpData {
             use ExpData::*;
             use VisitorPosition::*;
             match (e, pos) {
-                (Lambda(_, pat, _), Pre) | (Block(_, pat, _, _), BeforeBody) => {
+                (Lambda(_, pat, ..), Pre) | (Block(_, pat, _, _), BeforeBody) => {
                     // Add declared variables to shadow; in the Block case,
                     // do it only after processing bindings.
                     for_syms_in_pat_shadow_or_unshadow(pat, true, &mut shadow_map);
                 },
-                (Lambda(_, pat, _), Post) | (Block(_, pat, _, _), Post) => {
+                (Lambda(_, pat, ..), Post) | (Block(_, pat, _, _), Post) => {
                     // Remove declared variables from shadow
                     for_syms_in_pat_shadow_or_unshadow(pat, false, &mut shadow_map);
                 },
@@ -1352,7 +1352,7 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body) => body.visit_positions_impl(visitor)?,
+            Lambda(_, _, body, _) => body.visit_positions_impl(visitor)?,
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -3098,7 +3098,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(id, pat, body) => {
+            Lambda(id, pat, body, abilities) => {
                 if self.verbose {
                     write!(
                         f,
@@ -3106,14 +3106,24 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         id.as_usize(),
                         pat.display_for_exp(self),
                         body.display_cont(self)
-                    )
+                    )?;
                 } else {
                     write!(
                         f,
                         "|{}| {}",
                         pat.display_for_exp(self),
                         body.display_cont(self)
-                    )
+                    )?;
+                }
+                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                    let abilities_as_str = abilities
+                        .iter()
+                        .map(|a| a.to_string())
+                        .reduce(|l, r| format!("{}, {}", l, r))
+                        .unwrap_or_default();
+                    write!(f, " has {}", abilities_as_str)
+                } else {
+                    Ok(())
                 }
             },
             Block(id, pat, binding, body) => {
