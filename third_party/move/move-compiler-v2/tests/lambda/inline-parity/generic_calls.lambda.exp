@@ -1,0 +1,610 @@
+// -- Model dump before env processor pipeline:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor inlining:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(|s: m::S<u64>| m::id<u64>(s), s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(closure m::test_receiver_inference$lambda$1(), s)
+    }
+    private fun test_receiver_inference$lambda$1(s: m::S<u64>): m::S<u64> {
+        m::id<u64>(s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor specification checker:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(closure m::test_receiver_inference$lambda$1(), s)
+    }
+    private fun test_receiver_inference$lambda$1(s: m::S<u64>): m::S<u64> {
+        m::id<u64>(s)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x42::m {
+    struct S {
+        x: T,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        m::inlined<u64>(closure m::test_receiver_inference$lambda$1(), s)
+    }
+    private fun test_receiver_inference$lambda$1(s: m::S<u64>): m::S<u64> {
+        m::id<u64>(s)
+    }
+} // end 0x42::m
+
+
+
+Diagnostics:
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/inline-parity/generic_calls.move:36:9
+   │
+36 │         f(s);
+   │         ^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/inline-parity/generic_calls.move:47:17
+   │
+47 │         inlined(|s| s.id(), s)
+   │                 ^^^^^^^^^^

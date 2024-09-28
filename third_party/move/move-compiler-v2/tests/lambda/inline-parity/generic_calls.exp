@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `m::inlined` has a function parameter:
+   ┌─ tests/lambda/inline-parity/generic_calls.move:35:9
+   │
+35 │     fun inlined<T>(f: |S<T>|S<T>, s: S<T>) {
+   │         ^^^^^^^    - Parameter `f` has function-valued type `|m::S<T>|m::S<T>`.

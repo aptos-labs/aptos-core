@@ -1,0 +1,441 @@
+// -- Model dump before env processor pipeline:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor unused checks:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor type parameter check:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor inlining:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor acquires check:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          M::vector_fold<u64, u8>(gas_schedule_blob, Cast<u64>(0), |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+        }
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+// -- Model dump after env processor simplifier:
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        M::vector_fold<u64, u8>([Number(115), Number(115), Number(95), Number(112), Number(97), Number(99), Number(107), Number(101), Number(100), Number(32), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0)], 0, |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+    }
+    private fun test_2(): u64 {
+        M::vector_fold<u64, u8>([Number(115), Number(115), Number(95), Number(112), Number(97), Number(99), Number(107), Number(101), Number(100), Number(32), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0)], 0, |(sum: u64, addend: u8): (u64, u8)| Add<u64>(sum, Cast<u64>(addend)))
+    }
+    private fun vector_fold<Accumulator,Element>(v: vector<#1>,init: #0,f: |(#0, #1)|#0): #0 {
+        {
+          let accu: Accumulator = init;
+          M::vector_for_each<Element>(v, |elem: Element| accu: Accumulator = (f)(accu, elem));
+          accu
+        }
+    }
+    private fun vector_for_each<Element>(v: vector<#0>,f: |#0|) {
+        vector::reverse<Element>(Borrow(Mutable)(v));
+        loop {
+          if Not(vector::is_empty<Element>(Borrow(Immutable)(v))) {
+            {
+              let e: Element = vector::pop_back<Element>(Borrow(Mutable)(v));
+              (f)(e);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Tuple()
+    }
+} // end 0x12391283::M
+
+
+
+Diagnostics:
+error: captured variable `accu` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/lambda_cast.move:18:35
+   │
+18 │         vector_for_each(v, |elem| accu = f(accu, elem));
+   │                                   ^^^^

@@ -1,0 +1,458 @@
+// -- Model dump before env processor pipeline:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor inlining:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::Test {
+    use 0x1::vector as V; // resolved as: 0x1::vector
+    struct Elem {
+        k: K,
+        v: V,
+    }
+    public fun elem_for_each_ref<K,V>(v: &mut vector<Test::Elem<#0, #1>>,f: |(&#0, &mut #1)|u64): u64 {
+        {
+          let result: u64 = 0;
+          Test::for_each_ref_mut<Test::Elem<K, V>>(v, |elem: &mut Test::Elem<K, V>| {
+            let elem: &mut Test::Elem<K, V> = elem;
+            result: u64 = Add<u64>(result, (f)(Borrow(Immutable)(select Test::Elem.k<&mut Test::Elem<K, V>>(elem)), Borrow(Mutable)(select Test::Elem.v<&mut Test::Elem<K, V>>(elem))));
+            Tuple()
+          });
+          result
+        }
+    }
+    public fun for_each_ref_mut<Element>(v: &mut vector<#0>,f: |&mut #0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<Element>(Freeze(false)(v))) {
+              (f)(vector::borrow_mut<Element>(v, i));
+              i: u64 = Add<u64>(i, 1)
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test() {
+        if Eq<u64>(Test::elem_for_each_ref<u64, u64>(Borrow(Mutable)(Vector<Test::Elem<u64, u64>>(pack Test::Elem<u64, u64>(1, 2))), |(x: &u64, y: &mut u64): (&u64, &mut u64)| Add<u64>(Deref(x), Deref(y))), 3) {
+          Tuple()
+        } else {
+          Abort(0)
+        }
+    }
+} // end 0x42::Test
+
+
+
+Diagnostics:
+error: captured variable `result` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/multi_param.move:21:13
+   │
+21 │             result = result + f(&elem.k, &mut elem.v);
+   │             ^^^^^^

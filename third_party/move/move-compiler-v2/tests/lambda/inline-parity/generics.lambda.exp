@@ -1,0 +1,334 @@
+// -- Model dump before env processor pipeline:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor inlining:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            Test::foreach<u64>(Borrow(Immutable)(v), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+            sum
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::Test {
+    use std::vector;
+    public fun foreach<X>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<X>(v)) {
+              (action)(vector::borrow<X>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public fun test(): u64 {
+        {
+          let sum: u64 = 0;
+          Test::foreach<u64>(Borrow(Immutable)([Number(1), Number(2), Number(3)]), |e: &u64| sum: u64 = Add<u64>(sum, Deref(e)));
+          sum
+        }
+    }
+} // end 0x42::Test
+
+
+
+Diagnostics:
+error: captured variable `sum` cannot be modified inside of a lambda
+   ┌─ tests/lambda/inline-parity/generics.move:16:30
+   │
+16 │         foreach<u64>(&v, |e| sum = sum + *e);
+   │                              ^^^

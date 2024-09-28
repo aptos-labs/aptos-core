@@ -1,0 +1,416 @@
+// -- Model dump before env processor pipeline:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor inlining:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor specification checker:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x42::sort {
+    use std::vector;
+    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
+        {
+          let n: u64 = vector::length<T>(Freeze(false)(arr));
+          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
+        }
+    }
+    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
+        if Lt<u64>(low, high) {
+          {
+            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
+            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
+            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
+            Tuple()
+          }
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::sort
+
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun sort::incorrect_sort<#0>($t0: &mut vector<#0>, $t1: |(#0, #0)|bool) {
+     var $t2: u64
+     var $t3: &vector<#0>
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t3 := freeze_ref(implicit)($t0)
+  1: $t2 := vector::length<#0>($t3)
+  2: $t4 := 0
+  3: $t6 := 1
+  4: $t5 := -($t2, $t6)
+  5: sort::incorrect_sort_recursive<#0>($t0, $t4, $t5, $t1)
+  6: return ()
+}
+
+
+[variant baseline]
+public fun sort::incorrect_sort_recursive<#0>($t0: &mut vector<#0>, $t1: u64, $t2: u64, $t3: |(#0, #0)|bool) {
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t4 := <($t1, $t2)
+  1: if ($t4) goto 2 else goto 13
+  2: label L0
+  3: $t7 := 2
+  4: $t6 := /($t2, $t7)
+  5: $t5 := +($t1, $t6)
+  6: $t9 := 1
+  7: $t8 := -($t5, $t9)
+  8: sort::incorrect_sort_recursive<#0>($t0, $t1, $t8, $t3)
+  9: $t11 := 1
+ 10: $t10 := +($t5, $t11)
+ 11: sort::incorrect_sort_recursive<#0>($t0, $t10, $t2, $t3)
+ 12: goto 14
+ 13: label L1
+ 14: label L2
+ 15: return ()
+}
+
+
+Diagnostics:
+error: local `a_less_b` of type `|(T, T)|bool` does not have the `copy` ability
+   ┌─ tests/lambda/non_lambda_arg.move:12:13
+   │
+12 │             incorrect_sort_recursive(arr, low, pi - 1, a_less_b);
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ copy needed here because value is still in use
+13 │             incorrect_sort_recursive(arr, pi + 1, high, a_less_b);
+   │             ----------------------------------------------------- used here
+
+error: local `a_less_b` of type `|(T, T)|bool` does not have the `drop` ability
+   ┌─ tests/lambda/non_lambda_arg.move:10:9
+   │
+10 │ ╭         if (low < high) {
+11 │ │             let pi = low + high / 2;
+12 │ │             incorrect_sort_recursive(arr, low, pi - 1, a_less_b);
+13 │ │             incorrect_sort_recursive(arr, pi + 1, high, a_less_b);
+14 │ │         };
+   │ ╰─────────^ implicitly dropped here since it is no longer used
