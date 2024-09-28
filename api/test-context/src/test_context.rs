@@ -479,6 +479,26 @@ impl TestContext {
         multisig_address
     }
 
+    pub async fn create_multisig_account_with_existing_account(
+        &mut self,
+        account: &mut LocalAccount,
+        owners: Vec<AccountAddress>,
+        signatures_required: u64,
+        initial_balance: u64,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = account.sign_with_transaction_builder(
+            factory
+                .create_multisig_account_with_existing_account(owners, signatures_required)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![
+            txn,
+            self.account_transfer_to(account, account.address(), initial_balance),
+        ])
+        .await;
+    }
+
     pub async fn create_multisig_transaction(
         &mut self,
         owner: &mut LocalAccount,
