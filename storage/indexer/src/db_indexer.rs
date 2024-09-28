@@ -363,6 +363,7 @@ impl DBIndexer {
     pub fn process_a_batch(&self, start_version: Version) -> Result<Version> {
         let mut version = start_version;
         let num_transactions = self.get_num_of_transactions(version)?;
+        // This promises num_transactions should be readable from main db
         let mut db_iter = self.get_main_db_iter(version, num_transactions)?;
         let batch = SchemaBatch::new();
         db_iter.try_for_each(|res| {
@@ -407,7 +408,9 @@ impl DBIndexer {
             version += 1;
             Ok::<(), AptosDbError>(())
         })?;
+        // Assert we have processes all the readable transaction.
         assert_eq!(num_transactions, version - start_version);
+
         if self.indexer_db.transaction_enabled() {
             batch.put::<InternalIndexerMetadataSchema>(
                 &MetadataKey::TransactionVersion,
