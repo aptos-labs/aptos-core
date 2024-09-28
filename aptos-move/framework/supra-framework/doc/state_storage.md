@@ -303,15 +303,15 @@ guarantees a fresh state view then.
 
 <tr>
 <td>1</td>
-<td>Given the blockchain is in an operating state, the resources for tracking state storage usage and gas parameters must exist for the Aptos framework address.</td>
+<td>Given the blockchain is in an operating state, the resources for tracking state storage usage and gas parameters must exist for the Supra framework address.</td>
 <td>Critical</td>
-<td>The initialize function ensures only the Aptos framework address can call it.</td>
+<td>The initialize function ensures only the Supra framework address can call it.</td>
 <td>Formally verified via <a href="#high-level-req-1">module</a>.</td>
 </tr>
 
 <tr>
 <td>2</td>
-<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.</td>
+<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Supra framework account with default initial values.</td>
 <td>Medium</td>
 <td>The resource for tracking state storage usage may only be initialized with specific values and published under the supra_framework account.</td>
 <td>Formally verified via <a href="#high-level-req-2">initialize</a>.</td>
@@ -327,7 +327,7 @@ guarantees a fresh state view then.
 
 <tr>
 <td>4</td>
-<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.</td>
+<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Supra framework account with default initial values.</td>
 <td>Medium</td>
 <td>The resource for tracking state storage usage may only be initialized with specific values and published under the supra_framework account.</td>
 <td>Formally verified via <a href="#high-level-req-4">initialize</a>.</td>

@@ -74,7 +74,7 @@ module supra_framework::supra_coin {
 
     /// Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
     /// accounts.
-    /// Expects account and APT store to be registered before calling.
+    /// Expects account and SUPRA store to be registered before calling.
     public(friend) fun configure_accounts_for_test(
         supra_framework: &signer,
         core_resources: &signer,

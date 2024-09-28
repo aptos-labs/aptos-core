@@ -161,8 +161,8 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         )));
     }
 
-    // Check that the user has a reasonable amount of APT, since below the minimum gas amount is
-    // not useful 1 APT minimally
+    // Check that the user has a reasonable amount of SUPRA, since below the minimum gas amount is
+    // not useful 1 SUPRA minimally
     const MIN_USEFUL_AMOUNT: u64 = 200000000;
     let ten_percent_of_total = total_supply / 10;
     for account in accounts.iter() {

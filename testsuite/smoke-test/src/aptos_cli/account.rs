@@ -23,7 +23,7 @@ async fn test_account_flow() {
         .transfer_coins(0, 1, transfer_amount, None)
         .await
         .unwrap();
-    let expected_sender_amount = DEFAULT_FUNDED_COINS - (response.octa_spent()) - transfer_amount;
+    let expected_sender_amount = DEFAULT_FUNDED_COINS - (response.quant_spent()) - transfer_amount;
     let expected_receiver_amount = DEFAULT_FUNDED_COINS + transfer_amount;
 
     // transfer_coins already waits for transaction to be committed
@@ -62,7 +62,7 @@ async fn test_account_flow() {
         .unwrap();
     assert_eq!(2, summary.gas_unit_price);
 
-    let new_expected_balance = DEFAULT_FUNDED_COINS - summary.octa_spent() - 5;
+    let new_expected_balance = DEFAULT_FUNDED_COINS - summary.quant_spent() - 5;
 
     cli.assert_account_balance_now(2, new_expected_balance)
         .await;

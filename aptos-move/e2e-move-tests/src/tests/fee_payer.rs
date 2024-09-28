@@ -385,17 +385,17 @@ fn test_normal_tx_with_fee_payer_insufficient_funds() {
 }
 
 struct FeePayerPricingInfo {
-    estimated_per_new_account_fee_octas: u64,
-    new_account_min_abort_octas: u64,
+    estimated_per_new_account_fee_quants: u64,
+    new_account_min_abort_quants: u64,
 }
 
 impl FeePayerPricingInfo {
     pub fn new_account_upfront(&self, gas_unit_price: u64) -> u64 {
-        self.estimated_per_new_account_fee_octas / gas_unit_price * 2 + gas_unit_price * 10
+        self.estimated_per_new_account_fee_quants / gas_unit_price * 2 + gas_unit_price * 10
     }
 
     pub fn new_account_min_abort(&self, gas_unit_price: u64) -> u64 {
-        self.new_account_min_abort_octas / gas_unit_price
+        self.new_account_min_abort_quants / gas_unit_price
     }
 }
 
@@ -407,10 +407,10 @@ static PRICING: Lazy<FeePayerPricingInfo> = Lazy::new(|| {
     let pricing = StorageGasParameters::latest().space_pricing;
 
     FeePayerPricingInfo {
-        estimated_per_new_account_fee_octas: u64::from(
+        estimated_per_new_account_fee_quants: u64::from(
             pricing.hack_estimated_fee_for_account_creation(&params),
         ),
-        new_account_min_abort_octas: u64::from(
+        new_account_min_abort_quants: u64::from(
             pricing.hack_account_creation_fee_lower_bound(&params),
         ),
     }

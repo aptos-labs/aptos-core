@@ -21,7 +21,7 @@ pub struct FundWithFaucet {
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: Option<AccountAddress>,
 
-    /// Number of Octas to fund the account from the faucet
+    /// Number of Quants to fund the account from the faucet
     ///
     /// The amount added to the account may be limited by the faucet, and may be less
     /// than the amount requested.
@@ -53,7 +53,7 @@ impl CliCommand<String> for FundWithFaucet {
             .fund_account(client, &self.profile_options, self.amount, address)
             .await?;
         return Ok(format!(
-            "Added {} Octas to account {}",
+            "Added {} Quants to account {}",
             self.amount, address
         ));
     }

@@ -1,4 +1,4 @@
-Aptos Fullnodes GCP Deployment
+Supra Fullnodes GCP Deployment
 ==============================
 
 This directory contains Terraform configs to deploy a public fullnode on Google Cloud.

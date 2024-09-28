@@ -1,6 +1,6 @@
 # Rosetta API Dockerfile
 
-This directory contains a Dockerfile meant to build a [Rosetta compliant Docker image](https://www.rosetta-api.org/docs/node_deployment.html) of Aptos.
+This directory contains a Dockerfile meant to build a [Rosetta compliant Docker image](https://www.rosetta-api.org/docs/node_deployment.html) of Supra.
 
 ## One-shot devnet deployment
 

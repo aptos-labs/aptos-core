@@ -193,7 +193,7 @@ Wrong number of bytes were given as input when deserializing an Ed25519 signatur
 
 <a id="0x1_multi_ed25519_SIGNATURE_SCHEME_ID"></a>
 
-The identifier of the MultiEd25519 signature scheme, which is used when deriving Aptos authentication keys by hashing
+The identifier of the MultiEd25519 signature scheme, which is used when deriving Supra authentication keys by hashing
 it together with an MultiEd25519 public key.
 
 
@@ -645,7 +645,7 @@ proof of private key ownership when rotating authentication keys.
 
 ## Function `unvalidated_public_key_to_authentication_key`
 
-Derives the Aptos-specific authentication key of the given Ed25519 public key.
+Derives the Supra-specific authentication key of the given Ed25519 public key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_to_authentication_key">unvalidated_public_key_to_authentication_key</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_UnvalidatedPublicKey">multi_ed25519::UnvalidatedPublicKey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -728,7 +728,7 @@ if <code>bytes</code> does not correctly encode such a PK.
 
 ## Function `validated_public_key_to_authentication_key`
 
-Derives the Aptos-specific authentication key of the given Ed25519 public key.
+Derives the Supra-specific authentication key of the given Ed25519 public key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_validated_public_key_to_authentication_key">validated_public_key_to_authentication_key</a>(pk: &<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">multi_ed25519::ValidatedPublicKey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -851,7 +851,7 @@ Returns the threshold t <= n of the PK.
 
 ## Function `public_key_bytes_to_authentication_key`
 
-Derives the Aptos-specific authentication key of the given Ed25519 public key.
+Derives the Supra-specific authentication key of the given Ed25519 public key.
 
 
 <pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_public_key_bytes_to_authentication_key">public_key_bytes_to_authentication_key</a>(pk_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;

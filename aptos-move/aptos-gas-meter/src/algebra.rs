@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::traits::GasAlgebra;
-use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, NumBytes, NumModules, Octa};
+use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, NumBytes, NumModules, Quant};
 use aptos_gas_schedule::{gas_feature_versions, VMGasParameters};
 use aptos_logger::error;
 use aptos_vm_types::storage::{
@@ -207,14 +207,14 @@ impl GasAlgebra for StandardGasAlgebra {
 
     fn charge_storage_fee(
         &mut self,
-        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = Quant>,
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()> {
         let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
 
         let txn_params = &self.vm_gas_params.txn;
 
-        // Because the storage fees are defined in terms of fixed APT costs, we need
+        // Because the storage fees are defined in terms of fixed SUPRA costs, we need
         // to convert them into gas units.
         //
         // u128 is used to protect against overflow and preserve as much precision as

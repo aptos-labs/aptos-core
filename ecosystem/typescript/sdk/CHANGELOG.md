@@ -1,6 +1,6 @@
-# Aptos TS SDK Changelog
+# Supra TS SDK Changelog
 
-All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+All notable changes to the Supra Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
@@ -125,13 +125,13 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## 1.8.2 (2023-04-06)
 
-- Introduce `AnsClient` class to support ANS (Aptos Names Service) data fetching queries
+- Introduce `AnsClient` class to support ANS (Supra Names Service) data fetching queries
 - Add `User-Agent` header to `AptosClient` and `IndexerClient` queries
 - Add Indexer queries to `IndexerClient` - `getAccountCoinsData`, `getAccountTokensCount`, `getAccountTransactionsCount`, `getAccountTransactionsData`, `getCurrentDelegatorBalancesCount`, `getDelegatedStakingActivities`, `getTokensActivitiesCount`, `getTokenData`, `getTokenOwnersData`, `getTopUserTransactions`, `getUserTransactions`
 - Add convertion layer to `IndexerClient` queries to handle missing `0x`
 - Add validation layer to `IndexerClient` to validate queried account address is in the long format, i.e 66 chars long (0x<64 chars>)
 - Change `queryIndexer` function in `IndexerClient` class visibility to public
-- Add mint Aptos Name function `mintAptosName()` to `AnsClient` class
+- Add mint Supra Name function `mintAptosName()` to `AnsClient` class
 
 ## 1.7.2 (2023-03-13)
 
@@ -259,10 +259,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 This special entry does not conform to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) as there are noteworthy breaking changes with necessary rationale. Future entries will follow this format.
 
-This release updates the SDK to work with V1 of the Aptos Node API. There are some key changes between V0 and V1 that you can read about in the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/v1/CHANGELOG.md), refer to the notes for version 1.0.0. Accordingly, this SDK version represents breaking changes compared to 1.2.1.
+This release updates the SDK to work with V1 of the Supra Node API. There are some key changes between V0 and V1 that you can read about in the [API changelog](https://github.com/aptos-labs/aptos-core/blob/main/api/doc/v1/CHANGELOG.md), refer to the notes for version 1.0.0. Accordingly, this SDK version represents breaking changes compared to 1.2.1.
 
 - The SDK now communicates by default with the `/v1` path of the API. It will not work correctly with the v0 API. If you provide a path yourself when instantiating a client, make sure you include `/v1`, e.g. http://fullnode.devnet.aptoslabs.com/v1.
-- As of this release, the API, API spec, client generated from that spec, SDK wrapper, and examples are all tested together in CI. Previously it was possible for these to be out of sync, or in some cases, they would test against a different deployment entirely, such as devnet. Now we make the guarantee that all these pieces from the same commit work together. Notably this means exactly that; there is no guarantee that the latest version of the SDK will work with a particular Aptos network, such as devnet, except for a network built from the same commit as the SDK.
+- As of this release, the API, API spec, client generated from that spec, SDK wrapper, and examples are all tested together in CI. Previously it was possible for these to be out of sync, or in some cases, they would test against a different deployment entirely, such as devnet. Now we make the guarantee that all these pieces from the same commit work together. Notably this means exactly that; there is no guarantee that the latest version of the SDK will work with a particular Supra network, such as devnet, except for a network built from the same commit as the SDK.
 - The generated client within the SDK is generated using a different tool, [openapi-typescript-codegen](https://www.npmjs.com/package/openapi-typescript-codegen). Most of these changes are transparent to the user, as we continue to wrap the generated client, but some of the generated types are different, which we mention here.
 - Token types are no longer exposed from the generated client (under `Types`) as they are no longer part of the API (indeed, they never truly were). Instead you can find these definitions exposed at `TokenTypes`.
 - Some functions, such as for getting account resources and events, no longer accept resource types as concatenated strings. For example:
@@ -283,7 +283,7 @@ const aptosCoin = const aptosCoin = {
 - To help work with these different formats, functions for converting between them have been added to `utils`.
 - A new function, `waitForTransactionWithResult`, has been added to help wait for a transaction and then get access to the response from the server once the function exits.
 
-For help with migration, we recommend you see the updated examples under `examples/`, they demonstrate how to deal with some of these changes, such as the more structured responses. We are also available to assist in the [Aptos Discord](https://discord.gg/aptosnetwork).
+For help with migration, we recommend you see the updated examples under `examples/`, they demonstrate how to deal with some of these changes, such as the more structured responses. We are also available to assist in the [Supra Discord](https://discord.gg/aptosnetwork).
 
 **Deprecation Notice**: On September 1st we will remove the v0 API from the running nodes. As a user of the TS SDK, the best way you can migrate prior to this is by upgrading to version 1.3.2 or higher of the SDK. We will repeatedly remind developers of this upcoming deprecation as we approach that date.
 

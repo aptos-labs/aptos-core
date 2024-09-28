@@ -1,4 +1,4 @@
-# Aptos Protos
+# Supra Protos
 
 ## Changelog
 To update the changelog do the following:

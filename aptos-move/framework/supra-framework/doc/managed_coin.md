@@ -129,7 +129,7 @@ Withdraw an <code>amount</code> of coin <code>CoinType</code> from <code><a href
 
 ## Function `initialize`
 
-Initialize new coin <code>CoinType</code> in Aptos Blockchain.
+Initialize new coin <code>CoinType</code> in Supra Blockchain.
 Mint and Burn Capabilities will be stored under <code><a href="account.md#0x1_account">account</a></code> in <code><a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a></code> resource.
 
 

@@ -207,7 +207,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
         let name = string::utf8(b"SheepyCoin");
         let symbol = string::utf8(b"SHEEP");
         let starting_apt_balance = coin::balance<AptosCoin>(user_address);
-        // APT -> FA
+        // SUPRA -> FA
         bonding_curve_launchpad::swap(bonding_curve_creator, name, symbol, false, 100_000_000);
         assert!(
             coin::balance<AptosCoin>(user_address) == starting_apt_balance - 100_000_000,
@@ -217,7 +217,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
             bonding_curve_launchpad::get_balance(name, symbol, user_address) == 1_602_794,
             ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INCORRECT
         );
-        // FA -> APT
+        // FA -> SUPRA
         bonding_curve_launchpad::swap(bonding_curve_creator, name, symbol, true, 1_602_794);
         assert!(
             coin::balance<AptosCoin>(user_address) == starting_apt_balance - 26,
@@ -252,7 +252,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
             symbol,
             false,
             grad_apt
-        ); // Over-threshold Swap. APT -> FA
+        ); // Over-threshold Swap. SUPRA -> FA
         assert!(bonding_curve_launchpad::get_is_frozen(name, symbol) == false, EINCORRECT_FROZEN_STATUS);
     }
 
@@ -329,7 +329,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
             string::utf8(b"SHEEP"),
             false,
             1_000_000
-        ); // APT -> FA
+        ); // SUPRA -> FA
     }
 
     #[test(
@@ -352,7 +352,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
             string::utf8(b"SHEEP"),
             false,
             10
-        ); // FA -> APT
+        ); // FA -> SUPRA
     }
 
     #[test(
@@ -425,7 +425,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
             string::utf8(b"SHEEP"),
             false,
             0
-        ); // APT -> FA
+        ); // SUPRA -> FA
     }
 
     #[test(
@@ -448,7 +448,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
             string::utf8(b"SHEEP"),
             false,
             0
-        ); // Swap afer graduation, guaranteed to fail. FA -> APT
+        ); // Swap afer graduation, guaranteed to fail. FA -> SUPRA
     }
 
     #[test(
@@ -471,6 +471,6 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
             string::utf8(b"SHEEP"),
             true,
             10000
-        ); // Swap afer graduation, guaranteed to fail. FA -> APT
+        ); // Swap afer graduation, guaranteed to fail. FA -> SUPRA
     }
 }

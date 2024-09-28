@@ -1,4 +1,4 @@
-# Aptos Rosetta Implementation
+# Supra Rosetta Implementation
 
 This implementation is built for running a local proxy against
 a local fullnode.  However, for testing purposes, this can be used
@@ -6,14 +6,14 @@ against an external REST endpoint.
 
 ## Architecture
 
-[Rosetta](https://en.wikipedia.org/wiki/Rosetta_(software)) works as a sidecar to an Aptos fullnode.  Rosetta then proxies the Rosetta standard
-API calls to underlying Aptos REST API calls and builds the appropriate data.  
+[Rosetta](https://en.wikipedia.org/wiki/Rosetta_(software)) works as a sidecar to an Supra fullnode.  Rosetta then proxies the Rosetta standard
+API calls to underlying Supra REST API calls and builds the appropriate data.  
 
 
 ## Running Rosetta
 
 The `aptos-rosetta` binary can run in three modes:
-1. `online` -> This runs a local fullnode and blocks the Aptos REST API from outside access, using it only as a local proxy for Rosetta APIs.
+1. `online` -> This runs a local fullnode and blocks the Supra REST API from outside access, using it only as a local proxy for Rosetta APIs.
 2. `offline` -> This runs a Rosetta server that is not connected to the blockchain.  Only commands listed as `offline` work with this mode.
 3. `online-remote` -> This runs a Rosetta instance that connects to a remote fullnode e.g. a public fullnode.  Please keep in mind that since this proxies APIs, it can fail due to throttling and network errors between the servers.
 

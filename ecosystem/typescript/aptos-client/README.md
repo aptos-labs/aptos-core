@@ -1,6 +1,6 @@
 # @aptos-labs/aptos-client
 
-This package implements a client with which you can interact with the Aptos network. It can be used standalone, and it is the client package used by the Aptos TypeScript SDK.
+This package implements a client with which you can interact with the Supra network. It can be used standalone, and it is the client package used by the Supra TypeScript SDK.
 
 #### Implementation
 

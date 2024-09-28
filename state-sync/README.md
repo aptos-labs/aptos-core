@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/state-sync/R
 
 # State Synchronization (State Sync)
 
-State sync is a component that runs within each Aptos node and is responsible
+State sync is a component that runs within each Supra node and is responsible
 for synchronizing the node to the latest blockchain state. It is required by
 both validators and fullnodes to ensure that they do not fall behind the rest
 of the network. To achieve this, state sync identifies and fetches new
@@ -29,7 +29,7 @@ new data chunks from peers, without having to worry about which peers have the
 data or how to manage data requests. For example, the client can request all
 transactions since version `5` and the data streaming service will provide
 this.
-3. **Aptos Data Client**: The data client is responsible for handling data
+3. **Supra Data Client**: The data client is responsible for handling data
 requests from the data streaming service. For the data streaming service to
 stream all transactions, it must make multiple requests (each request for a
 batch of transactions) and send those requests to peers (e.g., transactions
@@ -45,7 +45,7 @@ a batch of transactions.
 The state sync code structure matches the architecture outlined above:
 - **Driver:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/state-sync-driver](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/state-sync-driver)
 - **Data Streaming Service:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/data-streaming-service](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/state-sync-v2/data-streaming-service)
-- **Aptos Data Client**: [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/aptos-data-client](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/aptos-data-client)
+- **Supra Data Client**: [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/aptos-data-client](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/aptos-data-client)
 - **Storage Service:** [https://github.com/aptos-labs/aptos-core/tree/main/state-sync/storage-service](https://github.com/aptos-labs/aptos-core/tree/main/state-sync/storage-service)
 
 In addition, there is also a directory containing the code for

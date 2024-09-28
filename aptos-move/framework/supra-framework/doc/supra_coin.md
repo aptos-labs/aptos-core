@@ -200,7 +200,7 @@ Max supply of Supra Coin to be 100 billion with 8 decimal places fraction
 
 ## Function `initialize`
 
-Can only called during genesis to initialize the Aptos coin.
+Can only called during genesis to initialize the Supra coin.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_coin.md#0x1_supra_coin_initialize">initialize</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): (<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">supra_coin::SupraCoin</a>&gt;, <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">supra_coin::SupraCoin</a>&gt;)
@@ -224,7 +224,7 @@ Can only called during genesis to initialize the Aptos coin.
 			<a href="supra_coin.md#0x1_supra_coin_MAX_SUPRA_COIN_SUPPLY">MAX_SUPRA_COIN_SUPPLY</a>,
     );
 
-    // Aptos framework needs mint cap <b>to</b> mint coins <b>to</b> initial validators. This will be revoked once the validators
+    // Supra framework needs mint cap <b>to</b> mint coins <b>to</b> initial validators. This will be revoked once the validators
     // have been initialized.
     <b>move_to</b>(supra_framework, <a href="supra_coin.md#0x1_supra_coin_MintCapStore">MintCapStore</a> { mint_cap });
 
@@ -295,7 +295,7 @@ and accounts have been initialized during genesis.
 
 Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
 accounts.
-Expects account and APT store to be registered before calling.
+Expects account and SUPRA store to be registered before calling.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_coin.md#0x1_supra_coin_configure_accounts_for_test">configure_accounts_for_test</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, core_resources: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, mint_cap: <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">supra_coin::SupraCoin</a>&gt;)

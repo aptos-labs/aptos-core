@@ -1,6 +1,6 @@
 # Third Party Crates
 
-This directory contains synchronized copies of selected external repositories. Those repos are mirrored in the aptos-core repo because they are core to the security of Aptos -- and control over the source should therefore be isolated. They are also mirrored to allow atomic changes across system boundaries. For example, the [Move repository](https://github.com/move-language/move) has a copy in this tree, so we can apply changes simultaneously to Move and Aptos.
+This directory contains synchronized copies of selected external repositories. Those repos are mirrored in the aptos-core repo because they are core to the security of Supra -- and control over the source should therefore be isolated. They are also mirrored to allow atomic changes across system boundaries. For example, the [Move repository](https://github.com/move-language/move) has a copy in this tree, so we can apply changes simultaneously to Move and Supra.
 
 In general:
 

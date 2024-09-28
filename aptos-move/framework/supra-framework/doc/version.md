@@ -300,7 +300,7 @@ to update the version.
 
 <tr>
 <td>2</td>
-<td>The version should be updateable after initialization, but only by the Aptos framework account and with an increasing version number.</td>
+<td>The version should be updateable after initialization, but only by the Supra framework account and with an increasing version number.</td>
 <td>Medium</td>
 <td>The version number for the blockchain should be updatable whenever necessary. This functionality is provided by the set_version function which ensures that the new version is greater than the previous one.</td>
 <td>Formally verified via <a href="#high-level-req-2">set_version</a>.</td>

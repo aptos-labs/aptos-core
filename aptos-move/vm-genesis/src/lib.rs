@@ -1171,12 +1171,12 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         allow_new_validators: true,
         epoch_duration_secs: 2 * 3600, // 2 hours
         is_test: false,
-        min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
-        // 400M APT
+        min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M SUPRA
+        // 400M SUPRA
         min_voting_threshold: 2,
-        max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M APT.
+        max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M SUPRA.
         recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
-        required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+        required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M SUPRA
         rewards_apy_percentage: 10,
         voting_duration_secs: 7 * 24 * 3600, // 7 days
         voters: vec![

@@ -1,10 +1,10 @@
 
 <a id="@Aptos_Framework_0"></a>
 
-# Aptos Framework
+# Supra Framework
 
 
-This is the reference documentation of the Aptos framework.
+This is the reference documentation of the Supra framework.
 
 
 <a id="@Index_1"></a>

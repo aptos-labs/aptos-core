@@ -236,7 +236,7 @@ Gets the current time in seconds.
 
 <tr>
 <td>2</td>
-<td>The global wall clock resource should only be owned by the Aptos framework.</td>
+<td>The global wall clock resource should only be owned by the Supra framework.</td>
 <td>High</td>
 <td>The function set_time_has_started ensures that only the supra_framework account can possess the CurrentTimeMicroseconds resource using the assert_supra_framework function.</td>
 <td>Formally verified via <a href="#high-level-req-2">module</a>.</td>

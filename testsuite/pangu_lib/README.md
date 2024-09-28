@@ -8,9 +8,9 @@ Pangu is a testnet creation and management CLI, which deploys on top of existing
 
 ## What is Pangu CLI?
 
-Ever had to wait for the Aptos devnet/testnet releases to test a new feature? Or, create a PR to launch testnets through Forge? Well, these will be a thing of the past with Pangu.
+Ever had to wait for the Supra devnet/testnet releases to test a new feature? Or, create a PR to launch testnets through Forge? Well, these will be a thing of the past with Pangu.
 
-Pangu is a modular, customizable, and next-gen Aptos testnet creation-management CLI tool written in Python. Pangu allows you to create, and manage testnets on demand, and blazingly fast 🚀🚀🚀 
+Pangu is a modular, customizable, and next-gen Supra testnet creation-management CLI tool written in Python. Pangu allows you to create, and manage testnets on demand, and blazingly fast 🚀🚀🚀 
 
 Pangu is inherently faster than its predecessors (Forge testnet creation) because:
 
@@ -91,7 +91,7 @@ CREATE OPTIONS:
     - Default: **`False`**
     - Example: **`-dry-run true`**
 1. **`-aptos-cli-path`**:
-    - The path to the Aptos CLI if it is not in your $PATH variable.
+    - The path to the Supra CLI if it is not in your $PATH variable.
     - Default: **`aptos`**
     - Example: **`-aptos-cli-path /path/to/aptos`**
 2. **`-name`**:

@@ -108,7 +108,7 @@ module supra_framework::transaction_context {
     }
     native fun max_gas_amount_internal(): u64;
 
-    /// Returns the gas unit price in Octas which is specified for the current transaction.
+    /// Returns the gas unit price in Quants which is specified for the current transaction.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun gas_unit_price(): u64 {
         assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));

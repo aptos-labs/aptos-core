@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/testsuite/fo
 # Forge CLI
 
 This crate contains the Forge command line interface (CLI) tool. This enables users to
-run local and remote Aptos swarms (i.e., networks of validators and validator fullnodes). For
+run local and remote Supra swarms (i.e., networks of validators and validator fullnodes). For
 example, to deploy a local validator swarm, run:
 
 ```
@@ -64,10 +64,10 @@ As an alternative to using the faucet service, you may use the faucet CLI direct
 cargo run -p aptos-faucet-cli -- --amount 10 --accounts <account_address> --key <private_key>
 ```
 
-:::tip Faucet and Aptos CLI
+:::tip Faucet and Supra CLI
 See more on how the faucet works in the [README](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet).
 
-Also see how to use the [Aptos CLI](../cli-tools/aptos-cli/use-cli/use-aptos-cli.md#account-examples) with an existing faucet.
+Also see how to use the [Supra CLI](../cli-tools/aptos-cli/use-cli/use-aptos-cli.md#account-examples) with an existing faucet.
 :::
 
 ## Validator fullnodes

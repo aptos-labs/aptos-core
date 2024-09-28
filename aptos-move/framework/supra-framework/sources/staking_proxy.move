@@ -70,7 +70,7 @@ module supra_framework::staking_proxy {
     }
 
     #[test_only]
-    const INITIAL_BALANCE: u64 = 100000000000000; // 1M APT coins with 8 decimals.
+    const INITIAL_BALANCE: u64 = 100000000000000; // 1M SUPRA coins with 8 decimals.
 
     #[test(
         supra_framework = @0x1,

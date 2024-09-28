@@ -23,7 +23,7 @@ spec supra_framework::genesis {
     ///
     /// No.: 3
     /// Requirement: The Aptos coin should be initialized during genesis and only the Aptos framework account should own
-    /// the mint and burn capabilities for the APT token.
+    /// the mint and burn capabilities for the SUPRA token.
     /// Criticality: Critical
     /// Implementation: Both mint and burn capabilities are wrapped inside the stake::SupraCoinCapabilities and
     /// transaction_fee::SupraCoinCapabilities resources which are stored under the aptos framework account.
@@ -101,7 +101,7 @@ spec supra_framework::genesis {
 
     spec initialize_supra_coin {
         // property 3: The Aptos coin should be initialized during genesis and only the Aptos framework account should
-        // own the mint and burn capabilities for the APT token.
+        // own the mint and burn capabilities for the SUPRA token.
         /// [high-level-req-3]
         requires !exists<stake::SupraCoinCapabilities>(@supra_framework);
         ensures exists<stake::SupraCoinCapabilities>(@supra_framework);

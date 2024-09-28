@@ -65,7 +65,7 @@ impl CliCommand<Vec<AccountBalance>> for Balance {
                 CliError::CommandArgumentError(format!("Invalid coin type '{}': {:#?}", coin, err))
             })?
         } else {
-            // If nothing is given, use the default APT
+            // If nothing is given, use the default SUPRA
             SUPRA_COIN_TYPE.to_owned()
         };
 

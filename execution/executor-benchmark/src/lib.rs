@@ -704,7 +704,7 @@ impl OverallMeasuring {
 fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
     let total_supply =
         DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
-    info!("total supply is {:?} octas", total_supply)
+    info!("total supply is {:?} quants", total_supply)
 }
 
 #[cfg(test)]

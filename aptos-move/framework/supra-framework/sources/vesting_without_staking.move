@@ -542,8 +542,8 @@ module supra_framework::vesting_without_staking {
         shareholder: address,
         new_beneficiary: address,
     ) acquires VestingContract {
-        // Verify that the beneficiary account is set up to receive APT. This is a requirement so distribute() wouldn't
-        // fail and block all other accounts from receiving APT if one beneficiary is not registered.
+        // Verify that the beneficiary account is set up to receive SUPRA. This is a requirement so distribute() wouldn't
+        // fail and block all other accounts from receiving SUPRA if one beneficiary is not registered.
         assert_account_is_registered_for_apt(new_beneficiary);
 
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
@@ -641,7 +641,7 @@ module supra_framework::vesting_without_staking {
         vector::append(&mut seed, contract_creation_seed);
 
         let (account_signer, signer_cap) = account::create_resource_account(admin, seed);
-        // Register the vesting contract account to receive APT
+        // Register the vesting contract account to receive SUPRA
         coin::register<SupraCoin>(&account_signer);
 
         (account_signer, signer_cap)
@@ -695,7 +695,7 @@ module supra_framework::vesting_without_staking {
     use supra_framework::account::create_account_for_test;
 
     #[test_only]
-    const GRANT_AMOUNT: u64 = 1000; // 1000 APT coins with 8 decimals.
+    const GRANT_AMOUNT: u64 = 1000; // 1000 SUPRA coins with 8 decimals.
 
     #[test_only]
     const VESTING_SCHEDULE_CLIFF: u64 = 31536000; // 1 year

@@ -4,7 +4,7 @@
 # Module `0x1::supra_governance`
 
 
-AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
+AptosGovernance represents the on-chain governance of the Supra network. Voting power is calculated based on the
 current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
 the stake pool's lockup needs to be at least as long as the proposal's duration.
 
@@ -862,7 +862,7 @@ Stores the signer capability for a given address.
 
 ## Function `initialize`
 
-Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
+Initializes the state for Supra Governance. Can only be called during Genesis with a signer
 for the supra_framework (0x1) account.
 This function is private because it's called directly from the vm.
 
@@ -967,7 +967,7 @@ AptosGovernance.
 
 ## Function `initialize_partial_voting`
 
-Initializes the state for Aptos Governance partial voting. Can only be called through Aptos governance
+Initializes the state for Supra Governance partial voting. Can only be called through Supra governance
 proposals with a signer for the supra_framework (0x1) account.
 
 
@@ -1816,7 +1816,7 @@ TODO: migrate these tests to be aware of async reconfiguration.
 ## Function `force_end_epoch_test_only`
 
 <code><a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>()</code> equivalent but only called in testnet,
-where the core resources account exists and has been granted power to mint Aptos coins.
+where the core resources account exists and has been granted power to mint Supra coins.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch_test_only">force_end_epoch_test_only</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
@@ -1870,7 +1870,7 @@ Update feature flags and also trigger reconfiguration.
 
 ## Function `get_signer_testnet_only`
 
-Only called in testnet where the core resources account exists and has been granted power to mint Aptos coins.
+Only called in testnet where the core resources account exists and has been granted power to mint Supra coins.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_supra_governance_get_signer_testnet_only">get_signer_testnet_only</a>(core_resources: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, signer_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>

@@ -6,7 +6,7 @@ module upgrade_and_govern::transfer {
     use supra_framework::coin;
     use upgrade_and_govern::parameters;
 
-    public entry fun transfer_octas(
+    public entry fun transfer_quants(
         from: &signer,
         to_1: address,
         to_2: address

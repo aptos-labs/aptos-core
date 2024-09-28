@@ -100,7 +100,7 @@ impl CoinInfoResource {
         };
         Self {
             name: "AptosCoin".to_string().into_bytes(),
-            symbol: "APT".to_string().into_bytes(),
+            symbol: "SUPRA".to_string().into_bytes(),
             decimals: 8,
             supply: Some(aggregator),
         }

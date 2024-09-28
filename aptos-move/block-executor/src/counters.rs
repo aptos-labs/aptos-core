@@ -16,8 +16,8 @@ impl GasType {
     pub const EXECUTION_GAS: &'static str = "execution_gas";
     pub const IO_GAS: &'static str = "io_gas";
     pub const NON_STORAGE_GAS: &'static str = "non_storage_gas";
-    pub const STORAGE_FEE: &'static str = "storage_in_octas";
-    pub const STORAGE_FEE_REFUND: &'static str = "storage_refund_in_octas";
+    pub const STORAGE_FEE: &'static str = "storage_in_quants";
+    pub const STORAGE_FEE_REFUND: &'static str = "storage_refund_in_quants";
     pub const TOTAL_GAS: &'static str = "total_gas";
 }
 

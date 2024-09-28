@@ -156,7 +156,7 @@ pub enum EntryFunctionCall {
 
     CoinCreateCoinConversionMap {},
 
-    /// Create APT pairing by passing `AptosCoin`.
+    /// Create SUPRA pairing by passing `AptosCoin`.
     CoinCreatePairing {
         coin_type: TypeTag,
     },
@@ -820,7 +820,7 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    /// Batch version of APT transfer.
+    /// Batch version of SUPRA transfer.
     SupraAccountBatchTransfer {
         recipients: Vec<AccountAddress>,
         amounts: Vec<u64>,
@@ -843,8 +843,8 @@ pub enum EntryFunctionCall {
         allow: bool,
     },
 
-    /// Convenient function to transfer APT to a recipient account that might not exist.
-    /// This would create the recipient account first, which also registers it to receive APT, before transferring.
+    /// Convenient function to transfer SUPRA to a recipient account that might not exist.
+    /// This would create the recipient account first, which also registers it to receive SUPRA, before transferring.
     SupraAccountTransfer {
         to: AccountAddress,
         amount: u64,
@@ -2099,7 +2099,7 @@ pub fn coin_create_coin_conversion_map() -> TransactionPayload {
     ))
 }
 
-/// Create APT pairing by passing `AptosCoin`.
+/// Create SUPRA pairing by passing `AptosCoin`.
 pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4123,7 +4123,7 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
-/// Batch version of APT transfer.
+/// Batch version of SUPRA transfer.
 pub fn supra_account_batch_transfer(
     recipients: Vec<AccountAddress>,
     amounts: Vec<u64>,
@@ -4200,8 +4200,8 @@ pub fn supra_account_set_allow_direct_coin_transfers(allow: bool) -> Transaction
     ))
 }
 
-/// Convenient function to transfer APT to a recipient account that might not exist.
-/// This would create the recipient account first, which also registers it to receive APT, before transferring.
+/// Convenient function to transfer SUPRA to a recipient account that might not exist.
+/// This would create the recipient account first, which also registers it to receive SUPRA, before transferring.
 pub fn supra_account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(

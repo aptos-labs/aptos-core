@@ -36,9 +36,9 @@ pub struct RestOptions {
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
-    /// The amount of Octas (10^-8 APT) used for a transaction is equal
+    /// The amount of Quants (10^-8 SUPRA) used for a transaction is equal
     /// to (gas unit price * gas used).  The gas_unit_price can
-    /// be used as a multiplier for the amount of Octas willing
+    /// be used as a multiplier for the amount of Quants willing
     /// to be paid for a transaction.  This will prioritize the
     /// transaction with a higher gas unit price.
     ///
@@ -47,12 +47,12 @@ pub struct GasOptions {
     /// Maximum amount of gas units to be used to send this transaction
     ///
     /// The maximum amount of gas units willing to pay for the transaction.
-    /// This is the (max gas in Octas / gas unit price).
+    /// This is the (max gas in Quants / gas unit price).
     ///
-    /// For example if I wanted to pay a maximum of 100 Octas, I may have the
+    /// For example if I wanted to pay a maximum of 100 Quants, I may have the
     /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
     /// gas unit price of 2, the max gas would need to be 50 to still only have
-    /// a maximum price of 100 Octas.
+    /// a maximum price of 100 Quants.
     ///
     /// Without a value, it will determine the price based on simulating the current transaction
     pub max_gas: Option<u64>,

@@ -1,7 +1,7 @@
 # Gas Profiling
 
 ## Overview
-This crate implements a gas profiler that can be plugged into the Aptos VM to generate comprehensive traces of gas usage, referred to as the transaction gas log.
+This crate implements a gas profiler that can be plugged into the Supra VM to generate comprehensive traces of gas usage, referred to as the transaction gas log.
 It also contains a module for visualizing the transaction gas log, in the form of a flamegraph.
 
 ## Running the Gas Profiler

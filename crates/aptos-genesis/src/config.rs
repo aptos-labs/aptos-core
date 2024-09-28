@@ -596,7 +596,7 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
                 }
                 if pool.validator.stake_amount < 100000000000000 {
                     errors.push(anyhow::anyhow!(
-                        "Employee pool #{} is setup to join during genesis but has a low stake amount {} < 1000000 APT",
+                        "Employee pool #{} is setup to join during genesis but has a low stake amount {} < 1000000 SUPRA",
                         i,
                         pool.validator.stake_amount
                     ));

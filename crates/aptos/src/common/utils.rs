@@ -451,14 +451,14 @@ pub async fn fund_account(
     faucet_url: Url,
     faucet_auth_token: Option<&str>,
     address: AccountAddress,
-    num_octas: u64,
+    num_quants: u64,
 ) -> CliTypedResult<()> {
     let mut client = FaucetClient::new_from_rest_client(faucet_url, rest_client);
     if let Some(token) = faucet_auth_token {
         client = client.with_auth_token(token.to_string());
     }
     client
-        .fund(address, num_octas)
+        .fund(address, num_quants)
         .await
         .map_err(|err| CliError::ApiError(format!("Faucet issue: {:#}", err)))
 }

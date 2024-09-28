@@ -4,13 +4,13 @@ title: Crypto
 custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/crypto/crypto/README.md
 ---
 
-The crypto component hosts all the implementations of cryptographic primitives we use in Aptos: hashing, signatures, multisignatures, aggregate signatures, and key derivation/generation.
+The crypto component hosts all the implementations of cryptographic primitives we use in Supra: hashing, signatures, multisignatures, aggregate signatures, and key derivation/generation.
 
 To enforce type-safety for signature schemes, we rely on traits from  [`traits.rs`](src/traits.rs) and [`validatable.rs`](src/validatable.rs).
 
 ## Overview
 
-Aptos makes use of several cryptographic algorithms:
+Supra makes use of several cryptographic algorithms:
 
 - **SHA-3** as the main hash function
   + Standardized in [FIPS 202](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf)

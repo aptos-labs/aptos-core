@@ -30,7 +30,7 @@ use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
     RuntimeModuleMetadataV1,
 };
-use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
+use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Quant};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
@@ -882,7 +882,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
-    ) -> Result<GasQuantity<Octa>, VMStatus> {
+    ) -> Result<GasQuantity<Quant>, VMStatus> {
         gas_meter.charge_io_gas_for_transaction(txn_data.transaction_size())?;
         for (event, _layout) in change_set.events() {
             gas_meter.charge_io_gas_for_event(event)?;

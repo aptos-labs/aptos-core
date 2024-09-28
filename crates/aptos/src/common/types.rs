@@ -1441,7 +1441,7 @@ impl FaucetOptions {
         &self,
         rest_client: Client,
         profile: &ProfileOptions,
-        num_octas: u64,
+        num_quants: u64,
         address: AccountAddress,
     ) -> CliTypedResult<()> {
         fund_account(
@@ -1449,7 +1449,7 @@ impl FaucetOptions {
             self.faucet_url(profile)?,
             self.faucet_auth_token.as_deref(),
             address,
-            num_octas,
+            num_quants,
         )
         .await
     }
@@ -1460,9 +1460,9 @@ impl FaucetOptions {
 pub struct GasOptions {
     /// Gas multiplier per unit of gas
     ///
-    /// The amount of Octas (10^-8 APT) used for a transaction is equal
+    /// The amount of quants (10^-8 SUPRA) used for a transaction is equal
     /// to (gas unit price * gas used).  The gas_unit_price can
-    /// be used as a multiplier for the amount of Octas willing
+    /// be used as a multiplier for the amount of quants willing
     /// to be paid for a transaction.  This will prioritize the
     /// transaction with a higher gas unit price.
     ///
@@ -1472,12 +1472,12 @@ pub struct GasOptions {
     /// Maximum amount of gas units to be used to send this transaction
     ///
     /// The maximum amount of gas units willing to pay for the transaction.
-    /// This is the (max gas in Octas / gas unit price).
+    /// This is the (max gas in quants / gas unit price).
     ///
-    /// For example if I wanted to pay a maximum of 100 Octas, I may have the
+    /// For example if I wanted to pay a maximum of 100 quants, I may have the
     /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
     /// gas unit price of 2, the max gas would need to be 50 to still only have
-    /// a maximum price of 100 Octas.
+    /// a maximum price of 100 quants.
     ///
     /// Without a value, it will determine the price based on simulating the current transaction
     #[clap(long)]
@@ -1665,7 +1665,7 @@ impl TransactionOptions {
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
             if ask_to_confirm_price {
-                let message = format!("Do you want to submit transaction for a maximum of {} Octas at a gas unit price of {} Octas?",  max_gas * gas_unit_price, gas_unit_price);
+                let message = format!("Do you want to submit transaction for a maximum of {} quants at a gas unit price of {} quants?",  max_gas * gas_unit_price, gas_unit_price);
                 prompt_yes_with_override(&message, self.prompt_options)?;
             }
             max_gas
@@ -1708,7 +1708,7 @@ impl TransactionOptions {
             let upper_cost_bound = adjusted_max_gas * gas_unit_price;
             let lower_cost_bound = gas_used * gas_unit_price;
             let message = format!(
-                    "Do you want to submit a transaction for a range of [{} - {}] Octas at a gas unit price of {} Octas?",
+                    "Do you want to submit a transaction for a range of [{} - {}] quants at a gas unit price of {} quants?",
                     lower_cost_bound,
                     upper_cost_bound,
                     gas_unit_price);

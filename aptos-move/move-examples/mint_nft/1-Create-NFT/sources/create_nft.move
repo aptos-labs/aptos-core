@@ -35,7 +35,7 @@
     INCLUDING DEPENDENCY MoveStdlib
     BUILDING Examples
     package size 2770 bytes
-    Do you want to submit a transaction for a range of [1164400 - 1746600] Octas at a gas unit price of 100 Octas? [yes/no] >
+    Do you want to submit a transaction for a range of [1164400 - 1746600] Quants at a gas unit price of 100 Quants? [yes/no] >
     yes
     {
       "Result": {

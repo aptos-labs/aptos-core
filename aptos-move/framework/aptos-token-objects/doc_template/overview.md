@@ -1,6 +1,6 @@
-# Aptos Token Framework
+# Supra Token Framework
 
-This is the reference documentation of the Aptos Token Objects framework.
+This is the reference documentation of the Supra Token Objects framework.
 
 ## Index
 

@@ -1,4 +1,4 @@
-# Aptos Keyless circuit
+# Supra Keyless circuit
 
 ## Installing dependencies
 

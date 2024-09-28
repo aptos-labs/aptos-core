@@ -445,7 +445,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 <tr>
 <td>1</td>
-<td>During genesis, the Aptos framework account should be assigned the gas schedule resource.</td>
+<td>During genesis, the Supra framework account should be assigned the gas schedule resource.</td>
 <td>Medium</td>
 <td>The gas_schedule::initialize function calls the assert_supra_framework function to ensure that the signer is the supra_framework and then assigns the GasScheduleV2 resource to it.</td>
 <td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
@@ -453,7 +453,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 <tr>
 <td>2</td>
-<td>Only the Aptos framework account should be allowed to update the gas schedule resource.</td>
+<td>Only the Supra framework account should be allowed to update the gas schedule resource.</td>
 <td>Critical</td>
 <td>The gas_schedule::set_gas_schedule function calls the assert_supra_framework function to ensure that the signer is the aptos framework account.</td>
 <td>Formally verified via <a href="#high-level-req-2">set_gas_schedule</a>.</td>

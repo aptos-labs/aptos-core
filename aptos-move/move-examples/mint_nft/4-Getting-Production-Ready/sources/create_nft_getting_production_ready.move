@@ -45,7 +45,7 @@
 /// example output:
 /*
 4-Getting-Production-Ready % aptos move run --function-id f634035fea40e23c5ed8817f7e996d96372dd5dbd64e853fb3c108817d92dcb4::create_nft_getting_production_ready::set_public_key --args hex:5C0637A3865FCA80550502BC30C8E7B4CCA7C8AB3B4FFECEFC8C43F7D0D44DEE --profile admin
-Do you want to submit a transaction for a range of [35200 - 52800] Octas at a gas unit price of 100 Octas? [yes/no] >
+Do you want to submit a transaction for a range of [35200 - 52800] Quants at a gas unit price of 100 Quants? [yes/no] >
 yes
 {
   "Result": {
@@ -73,7 +73,7 @@ yes
 /// example output:
 /*
 4-Getting-Production-Ready % aptos move run --function-id f634035fea40e23c5ed8817f7e996d96372dd5dbd64e853fb3c108817d92dcb4::create_nft_getting_production_ready::mint_event_ticket --args hex:fc833512ad1c575850569d14f5e434b929a19eb491c08df9f6b91584a13551bdb95830081a429f148fddcb9ba201cf72a357957849046da0d60675ed034f580f --profile nft-receiver
-Do you want to submit a transaction for a range of [600800 - 901200] Octas at a gas unit price of 100 Octas? [yes/no] >
+Do you want to submit a transaction for a range of [600800 - 901200] Quants at a gas unit price of 100 Quants? [yes/no] >
 yes
 {
   "Result": {

@@ -1,10 +1,10 @@
 
 <a id="@Aptos_Token_Framework_0"></a>
 
-# Aptos Token Framework
+# Supra Token Framework
 
 
-This is the reference documentation of the Aptos Token framework.
+This is the reference documentation of the Supra Token framework.
 
 
 <a id="@Index_1"></a>

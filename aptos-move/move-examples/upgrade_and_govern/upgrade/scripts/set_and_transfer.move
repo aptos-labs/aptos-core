@@ -13,6 +13,6 @@ script {
     ) {
         parameters::set_parameters(
             upgrade_and_govern, PARAMETER_1, PARAMETER_2);
-        transfer::transfer_octas(upgrade_and_govern, to_1, to_2);
+        transfer::transfer_quants(upgrade_and_govern, to_1, to_2);
     }
 } // <:!:script

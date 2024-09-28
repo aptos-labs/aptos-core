@@ -1,6 +1,6 @@
-# Aptos VM Profiling Scripts
+# Supra VM Profiling Scripts
 
-This is a collection of scripts to profile the Move VM and the Aptos VM using Valgrind,
+This is a collection of scripts to profile the Move VM and the Supra VM using Valgrind,
 which allows us to tell how many machine instructions a Move instruction or a certain
 VM procedure costs.
 

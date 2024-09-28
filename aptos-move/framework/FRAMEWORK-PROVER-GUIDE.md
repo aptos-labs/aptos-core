@@ -1,4 +1,4 @@
-This guide gives some hints to troubleshoot issues when using the prover for specifying the Aptos frameworks.
+This guide gives some hints to troubleshoot issues when using the prover for specifying the Supra frameworks.
 
 ## Installation
 

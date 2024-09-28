@@ -1,4 +1,4 @@
-# Generated TS client for Aptos Node Health Checker
+# Generated TS client for Supra Node Health Checker
 
 [![Discord][discord-image]][discord-url]
 [![NPM Package Version][npm-image-version]][npm-url]

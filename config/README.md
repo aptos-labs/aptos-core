@@ -1,4 +1,4 @@
-# Aptos Configuration
+# Supra Configuration
 
 The configuration describes the operational details for a node
 (Validator or Full node) and provides the clients' information on how to
@@ -38,7 +38,7 @@ configuration from many of the services.
 
 `config-builder` builds an entire configuration for a Validator or FullNode,
 including the genesis blob. It takes as one of its input parameters an index that
-specifies the specific node config to return. This can be used to create an Aptos
+specifies the specific node config to return. This can be used to create an Supra
 TestNet by constructing compatible configurations for the full set of Validators.
 Similarly the tool can be used to add Fullnodes to an existing network.  Finally,
 it enables generation of a mint/faucet client capable of performing mint

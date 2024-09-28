@@ -34,7 +34,7 @@
     Do you want to publish this package under the resource account's address 34f5acaaef16988aa31bb56ad7b35e30d14ff9fc849d370be799617b61d3df04? [yes/no] >
     yes
     package size 5694 bytes
-    Do you want to submit a transaction for a range of [1567300 - 2350900] Octas at a gas unit price of 100 Octas? [yes/no] >
+    Do you want to submit a transaction for a range of [1567300 - 2350900] Quants at a gas unit price of 100 Quants? [yes/no] >
     yes
     {
       "Result": "Success"
@@ -65,7 +65,7 @@
 /// example output:
     /*
     3-Adding-Admin % aptos move run --function-id 34f5acaaef16988aa31bb56ad7b35e30d14ff9fc849d370be799617b61d3df04::create_nft_with_resource_and_admin_accounts::set_minting_enabled --args bool:true --profile admin
-    Do you want to submit a transaction for a range of [23100 - 34600] Octas at a gas unit price of 100 Octas? [yes/no] >
+    Do you want to submit a transaction for a range of [23100 - 34600] Quants at a gas unit price of 100 Quants? [yes/no] >
     yes
     {
       "Result": {
@@ -86,7 +86,7 @@
 /// example output:
     /*
     3-Adding-Admin % aptos move run --function-id 34f5acaaef16988aa31bb56ad7b35e30d14ff9fc849d370be799617b61d3df04::create_nft_with_resource_and_admin_accounts::mint_event_ticket --profile nft-receiver
-    Do you want to submit a transaction for a range of [504500 - 756700] Octas at a gas unit price of 100 Octas? [yes/no] >
+    Do you want to submit a transaction for a range of [504500 - 756700] Quants at a gas unit price of 100 Quants? [yes/no] >
     yes
     {
       "Result": {

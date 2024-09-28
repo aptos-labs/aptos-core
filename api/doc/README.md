@@ -1,3 +1,3 @@
-# Aptos Node API v1
+# Supra Node API v1
 
 todo

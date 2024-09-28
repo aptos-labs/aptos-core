@@ -1,4 +1,4 @@
-# Aptos Indexer
+# Supra Indexer
 
 > Tails the blockchain's transactions and pushes them into a postgres DB
 
@@ -78,7 +78,7 @@ Username: postgres
 > - Diesel uses the `DATABASE_URL` env var to connect to the database, or the `--database-url` argument.
 > - Diesel CLI can be installed via cargo, e.g., `cargo install diesel_cli --no-default-features --features postgres`.
 > - `diesel migration run` sets up the database and runs all available migrations.
-> - Aptos tests use the `INDEXER_DATABASE_URL` env var. It needs to be set for the relevant tests to run.
+> - Supra tests use the `INDEXER_DATABASE_URL` env var. It needs to be set for the relevant tests to run.
 > - Postgres can be [installed and run via brew](https://wiki.postgresql.org/wiki/Homebrew).
 
 ## Adding new tables / Updating tables with Diesel

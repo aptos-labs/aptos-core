@@ -86,7 +86,7 @@ impl StorageFees {
                 .parse()
                 .expect("should be able parse count as u64");
 
-            format!("{} Octa", count)
+            format!("{} Quant", count)
         });
 
         Ok(Some(graph_content.as_bytes().to_vec()))

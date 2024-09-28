@@ -104,7 +104,7 @@ module supra_framework::coin {
     /// The coin converison map is not created yet.
     const ECOIN_CONVERSION_MAP_NOT_FOUND: u64 = 27;
 
-    /// APT pairing is not eanbled yet.
+    /// SUPRA pairing is not eanbled yet.
     const EAPT_PAIRING_IS_NOT_ENABLED: u64 = 28;
 
     //
@@ -294,7 +294,7 @@ module supra_framework::coin {
         };
     }
 
-    /// Create APT pairing by passing `AptosCoin`.
+    /// Create SUPRA pairing by passing `AptosCoin`.
     public entry fun create_pairing<CoinType>(
         supra_framework: &signer
     ) acquires CoinConversionMap, CoinInfo {
@@ -923,7 +923,7 @@ module supra_framework::coin {
     ): bool {
         let primary_store_address = primary_fungible_store::primary_store_address<Metadata>(account_address, metadata);
         fungible_asset::store_exists(primary_store_address) && (
-            // migration flag is needed, until we start defaulting new accounts to APT PFS
+            // migration flag is needed, until we start defaulting new accounts to SUPRA PFS
             features::new_accounts_default_to_fa_supra_store_enabled() || exists<MigrationFlag>(primary_store_address)
         )
     }

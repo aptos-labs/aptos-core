@@ -780,7 +780,7 @@ The signer capability offer doesn't exist at the given address
 
 <a id="0x1_account_ENO_VALID_FRAMEWORK_RESERVED_ADDRESS"></a>
 
-Address to create is not a valid reserved address for Aptos framework
+Address to create is not a valid reserved address for Supra framework
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ENO_VALID_FRAMEWORK_RESERVED_ADDRESS">ENO_VALID_FRAMEWORK_RESERVED_ADDRESS</a>: u64 = 11;
@@ -1942,10 +1942,10 @@ involves the use of a cryptographic hash operation and should be use thoughtfull
 ## Function `create_resource_account`
 
 A resource account is used to manage resources independent of an account managed by a user.
-In Aptos a resource account is created based upon the sha3 256 of the source's address and additional seed data.
+In Supra a resource account is created based upon the sha3 256 of the source's address and additional seed data.
 A resource account can only be created once, this is designated by setting the
 <code>Account::signer_capability_offer::for</code> to the address of the resource account. While an entity may call
-<code>create_account</code> to attempt to claim an account ahead of the creation of a resource account, if found Aptos will
+<code>create_account</code> to attempt to claim an account ahead of the creation of a resource account, if found Supra will
 transition ownership of the account over to the resource account. This is done by validating that the account has
 yet to execute any transactions and that the <code>Account::signer_capability_offer::for</code> is none. The probability of a
 collision where someone has legitimately produced a private key that maps to a resource account address is less

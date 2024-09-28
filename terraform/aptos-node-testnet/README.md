@@ -1,1 +1,1 @@
-# Aptos Node Testnet
+# Supra Node Testnet

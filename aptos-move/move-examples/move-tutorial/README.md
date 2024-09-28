@@ -1,13 +1,13 @@
 ---
-title: "Aptos Move Tutorial"
+title: "Supra Move Tutorial"
 slug: "move-tutorial"
 ---
 
 # Move Tutorial
 
-Welcome to the Aptos Move Tutorial! This is the original Move language and tools tutorial, independent of a particular network, adapted to use Aptos tooling. Here you will learn basic usage of the Move language and tools for compiling, testing, and verifying Move.
+Welcome to the Supra Move Tutorial! This is the original Move language and tools tutorial, independent of a particular network, adapted to use Supra tooling. Here you will learn basic usage of the Move language and tools for compiling, testing, and verifying Move.
 
-This tutorial does not teach you how to use the existing [Aptos Move frameworks](https://aptos.dev/reference/move) or how to run code on the Aptos network. See the [Aptos developer documentation](https://aptos.dev/tutorials/) for those instructions.
+This tutorial does not teach you how to use the existing [Supra Move frameworks](https://aptos.dev/reference/move) or how to run code on the Supra network. See the [Supra developer documentation](https://aptos.dev/tutorials/) for those instructions.
 
 There are nine steps in total:
 
@@ -27,7 +27,7 @@ Now let's get started!
 
 ## Step 0: Preparation
 
-You should obtain a copy of the content of the directory in which this `README.md` resides. One way to achieve this is to clone [the Aptos core repository](https://github.com/aptos-labs/aptos-core) and navigate to the [`aptos-move/move-examples/move-tutorial`](..) directory. Subsequently, we assume you have a local copy of this directory and all paths are relative to this. To check that you have the right contents, run the `cd` and `ls` commands below to ensure the `move-tutorial` directory has the relevant subdirectories:
+You should obtain a copy of the content of the directory in which this `README.md` resides. One way to achieve this is to clone [the Supra core repository](https://github.com/aptos-labs/aptos-core) and navigate to the [`aptos-move/move-examples/move-tutorial`](..) directory. Subsequently, we assume you have a local copy of this directory and all paths are relative to this. To check that you have the right contents, run the `cd` and `ls` commands below to ensure the `move-tutorial` directory has the relevant subdirectories:
 
 ```shell
 > cd move-tutorial
@@ -35,14 +35,14 @@ You should obtain a copy of the content of the directory in which this `README.m
 step_1 step_2 step_2_sol step_3 ...
 ```
 
-You also need a recent version of the [Aptos CLI](https://aptos.dev/tools/aptos-cli/install-cli/). This tutorial is written using the following version:
+You also need a recent version of the [Supra CLI](https://aptos.dev/tools/aptos-cli/install-cli/). This tutorial is written using the following version:
 
 ```shell
 > aptos --version
 aptos 1.0.7
 ```
 
-If you want to use an IDE for working through the examples, we recommend CLion/IntelliJ, which has good support for Aptos Move.
+If you want to use an IDE for working through the examples, we recommend CLion/IntelliJ, which has good support for Supra Move.
 
 
 ## Step 1: Writing my first Move module
@@ -233,7 +233,7 @@ assertion fails the unit test will fail.
 In this section, we are going to design a module implementing a basic coin and balance interface, where coins can
 be minted and transferred between balances held under different addresses. 
 
-> NOTE: The coin and balance interfaces are for illustration of Move concepts only. Aptos uses a different, richer [coin type](https://aptos.dev/reference/move?branch=mainnet&page=aptos-framework/doc/coin.md) contained in the Aptos framework.
+> NOTE: The coin and balance interfaces are for illustration of Move concepts only. Supra uses a different, richer [coin type](https://aptos.dev/reference/move?branch=mainnet&page=aptos-framework/doc/coin.md) contained in the Supra framework.
 
 The signatures of the public Move function are the following:
 
@@ -487,7 +487,7 @@ In definitions of both `Coin` and `Balance`, we declare the type parameter `Coin
 to be phantom because `CoinType` is not used in the struct definition or is only used as a phantom type
 parameter.
 
-Read more about [phantom type](https://aptos.dev/move/book/generics#phantom-type-parameters) parameters in the Aptos Move Book.
+Read more about [phantom type](https://aptos.dev/move/book/generics#phantom-type-parameters) parameters in the Supra Move Book.
 </details>
 
 ## Step 7:  Use the Move Prover

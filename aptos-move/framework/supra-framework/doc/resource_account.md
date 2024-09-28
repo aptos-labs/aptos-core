@@ -411,7 +411,7 @@ the SignerCapability.
 
 <tr>
 <td>3</td>
-<td>The resource account is registered for the Aptos coin.</td>
+<td>The resource account is registered for the Supra coin.</td>
 <td>High</td>
 <td>The create_resource_account_and_fund ensures the newly created resource account is registered to receive the SupraCoin.</td>
 <td>Formally verified via <a href="#high-level-req-3">create_resource_account_and_fund</a>.</td>

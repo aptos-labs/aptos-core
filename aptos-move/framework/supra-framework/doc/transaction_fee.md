@@ -199,12 +199,12 @@ units, so it's possible that the numbers don't add up exactly. -- This number is
 charge, while the break down is merely informational.
 - gas charge for execution (CPU time): <code>execution_gas_units</code>
 - gas charge for IO (storage random access): <code>io_gas_units</code>
-- storage fee charge (storage space): <code>storage_fee_octas</code>, to be included in
+- storage fee charge (storage space): <code>storage_fee_quants</code>, to be included in
 <code>total_charge_gas_unit</code>, this number is converted to gas units according to the user
 specified <code>gas_unit_price</code> on the transaction.
-- storage deletion refund: <code>storage_fee_refund_octas</code>, this is not included in <code>gas_used</code> or
+- storage deletion refund: <code>storage_fee_refund_quants</code>, this is not included in <code>gas_used</code> or
 <code>total_charge_gas_units</code>, the net charge / refund is calculated by
-<code>total_charge_gas_units</code> * <code>gas_unit_price</code> - <code>storage_fee_refund_octas</code>.
+<code>total_charge_gas_units</code> * <code>gas_unit_price</code> - <code>storage_fee_refund_quants</code>.
 
 This is meant to emitted as a module event.
 
@@ -239,13 +239,13 @@ This is meant to emitted as a module event.
  IO gas charge.
 </dd>
 <dt>
-<code>storage_fee_octas: u64</code>
+<code>storage_fee_quants: u64</code>
 </dt>
 <dd>
  Storage fee charge.
 </dd>
 <dt>
-<code>storage_fee_refund_octas: u64</code>
+<code>storage_fee_refund_quants: u64</code>
 </dt>
 <dd>
  Storage fee refund.
@@ -796,7 +796,7 @@ Only called during genesis.
 
 <tr>
 <td>1</td>
-<td>Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.</td>
+<td>Given the blockchain is in an operating state, it guarantees that the Supra framework signer may burn Supra coins.</td>
 <td>Critical</td>
 <td>The SupraCoinCapabilities structure is defined in this module and it stores burn capability to burn the gas fees.</td>
 <td>Formally Verified via <a href="#high-level-req-1">module</a>.</td>
@@ -814,7 +814,7 @@ Only called during genesis.
 <td>3</td>
 <td>Only the admin address is authorized to call the initialization function.</td>
 <td>Critical</td>
-<td>The initialize_fee_collection_and_distribution function ensures only the Aptos framework address calls it.</td>
+<td>The initialize_fee_collection_and_distribution function ensures only the Supra framework address calls it.</td>
 <td>Formally verified via <a href="#high-level-req-3">initialize_fee_collection_and_distribution</a>.</td>
 </tr>
 
@@ -836,7 +836,7 @@ Only called during genesis.
 
 <tr>
 <td>6</td>
-<td>The presence of the resource, indicating collected fees per block under the Aptos framework account, is a prerequisite for the successful execution of the following functionalities: Upgrading burn percentage. Registering a block proposer. Processing collected fees.</td>
+<td>The presence of the resource, indicating collected fees per block under the Supra framework account, is a prerequisite for the successful execution of the following functionalities: Upgrading burn percentage. Registering a block proposer. Processing collected fees.</td>
 <td>Low</td>
 <td>The functions: upgrade_burn_percentage, register_proposer_for_fee_collection, and process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under supra_framework by calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists or not.</td>
 <td>Formally verified via <a href="#high-level-req-6.1">register_proposer_for_fee_collection</a>, <a href="#high-level-req-6.2">process_collected_fees</a>, and <a href="#high-level-req-6.3">upgrade_burn_percentage</a>.</td>

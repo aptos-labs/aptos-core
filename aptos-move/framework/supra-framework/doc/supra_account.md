@@ -194,7 +194,7 @@ Account does not exist.
 
 <a id="0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT"></a>
 
-Account is not registered to receive APT.
+Account is not registered to receive SUPRA.
 
 
 <pre><code><b>const</b> <a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT">EACCOUNT_NOT_REGISTERED_FOR_APT</a>: u64 = 2;
@@ -242,7 +242,7 @@ Basic account creation methods.
 
 ## Function `batch_transfer`
 
-Batch version of APT transfer.
+Batch version of SUPRA transfer.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_batch_transfer">batch_transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
@@ -276,8 +276,8 @@ Batch version of APT transfer.
 
 ## Function `transfer`
 
-Convenient function to transfer APT to a recipient account that might not exist.
-This would create the recipient account first, which also registers it to receive APT, before transferring.
+Convenient function to transfer SUPRA to a recipient account that might not exist.
+This would create the recipient account first, which also registers it to receive SUPRA, before transferring.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="supra_account.md#0x1_supra_account_transfer">transfer</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
@@ -297,7 +297,7 @@ This would create the recipient account first, which also registers it to receiv
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_supra_store_enabled">features::operations_default_to_fa_supra_store_enabled</a>()) {
         <a href="supra_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(source, <b>to</b>, amount)
     } <b>else</b> {
-        // Resource accounts can be created without registering them <b>to</b> receive APT.
+        // Resource accounts can be created without registering them <b>to</b> receive SUPRA.
         // This conveniently does the registration <b>if</b> necessary.
         <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;SupraCoin&gt;(<b>to</b>)) {
             <a href="coin.md#0x1_coin_register">coin::register</a>&lt;SupraCoin&gt;(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(<b>to</b>));
@@ -577,12 +577,12 @@ By default, this returns true if an account has not explicitly set whether the c
 
 ## Function `fungible_transfer_only`
 
-APT Primary Fungible Store specific specialized functions,
-Utilized internally once migration of APT to FungibleAsset is complete.
-Convenient function to transfer APT to a recipient account that might not exist.
-This would create the recipient APT PFS first, which also registers it to receive APT, before transferring.
+SUPRA Primary Fungible Store specific specialized functions,
+Utilized internally once migration of SUPRA to FungibleAsset is complete.
+Convenient function to transfer SUPRA to a recipient account that might not exist.
+This would create the recipient SUPRA PFS first, which also registers it to receive SUPRA, before transferring.
 TODO: once migration is complete, rename to just "transfer_only" and make it an entry function (for cheapest way
-to transfer APT) - if we want to allow APT PFS without account itself
+to transfer SUPRA) - if we want to allow SUPRA PFS without account itself
 
 
 <pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_fungible_transfer_only">fungible_transfer_only</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64)
@@ -602,7 +602,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
 
     // <b>use</b> <b>internal</b> APIs, <b>as</b> they skip:
     // - owner, frozen and dispatchable checks
-    // <b>as</b> APT cannot be frozen or have dispatch, and PFS cannot be transfered
+    // <b>as</b> SUPRA cannot be frozen or have dispatch, and PFS cannot be transfered
     // (PFS could potentially be burned. regular transfer would permanently unburn the store.
     // Ignoring the check here <b>has</b> the equivalent of unburning, transfers, and then burning again)
     <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(recipient_store, <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(sender_store, amount));
@@ -617,7 +617,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
 
 ## Function `is_fungible_balance_at_least`
 
-Is balance from APT Primary FungibleStore at least the given amount
+Is balance from SUPRA Primary FungibleStore at least the given amount
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool
@@ -643,7 +643,7 @@ Is balance from APT Primary FungibleStore at least the given amount
 
 ## Function `burn_from_fungible_store`
 
-Burn from APT Primary FungibleStore
+Burn from SUPRA Primary FungibleStore
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="supra_account.md#0x1_supra_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
@@ -676,7 +676,7 @@ Burn from APT Primary FungibleStore
 
 ## Function `ensure_primary_fungible_store_exists`
 
-Ensure that APT Primary FungibleStore exists (and create if it doesn't)
+Ensure that SUPRA Primary FungibleStore exists (and create if it doesn't)
 
 
 <pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(owner: <b>address</b>): <b>address</b>
@@ -706,7 +706,7 @@ Ensure that APT Primary FungibleStore exists (and create if it doesn't)
 
 ## Function `primary_fungible_store_address`
 
-Address of APT Primary Fungible Store
+Address of SUPRA Primary Fungible Store
 
 
 <pre><code><b>fun</b> <a href="supra_account.md#0x1_supra_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b>
@@ -745,7 +745,7 @@ Address of APT Primary Fungible Store
 
 <tr>
 <td>1</td>
-<td>During the creation of an Aptos account the following rules should hold: (1) the authentication key should be 32 bytes in length, (2) an Aptos account should not already exist for that authentication key, and (3) the address of the authentication key should not be equal to a reserved address (0x0, 0x1, or 0x3).</td>
+<td>During the creation of an Supra account the following rules should hold: (1) the authentication key should be 32 bytes in length, (2) an Supra account should not already exist for that authentication key, and (3) the address of the authentication key should not be equal to a reserved address (0x0, 0x1, or 0x3).</td>
 <td>Critical</td>
 <td>The authentication key which is passed in as an argument to create_account should satisfy all necessary conditions.</td>
 <td>Formally verified via <a href="#high-level-req-1">CreateAccountAbortsIf</a>.</td>
@@ -753,7 +753,7 @@ Address of APT Primary Fungible Store
 
 <tr>
 <td>2</td>
-<td>After creating an Aptos account, the account should become registered to receive SupraCoin.</td>
+<td>After creating an Supra account, the account should become registered to receive SupraCoin.</td>
 <td>Critical</td>
 <td>The create_account function creates a new account for the particular address and registers SupraCoin.</td>
 <td>Formally verified via <a href="#high-level-req-2">create_account</a>.</td>
@@ -793,7 +793,7 @@ Address of APT Primary Fungible Store
 
 <tr>
 <td>7</td>
-<td>When performing a batch transfer of Aptos Coin and/or a batch transfer of a custom coin type, it should ensure that the vector containing destination addresses and the vector containing the corresponding amounts are equal in length.</td>
+<td>When performing a batch transfer of Supra Coin and/or a batch transfer of a custom coin type, it should ensure that the vector containing destination addresses and the vector containing the corresponding amounts are equal in length.</td>
 <td>Low</td>
 <td>The batch_transfer and batch_transfer_coins functions verify that the length of the recipient addresses vector matches the length of the amount vector through an assertion.</td>
 <td>Formally verified via <a href="#high-level-req-7">batch_transfer_coins</a>.</td>

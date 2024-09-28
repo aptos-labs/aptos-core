@@ -1,4 +1,4 @@
-The Aptos Core project has adopted a Code of Conduct that we expect project participants to adhere to. Please read the following so that you can understand what actions will and will not be tolerated.
+The Supra Core project has adopted a Code of Conduct that we expect project participants to adhere to. Please read the following so that you can understand what actions will and will not be tolerated.
 
 ## Our Pledge
 

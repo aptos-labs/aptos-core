@@ -3,7 +3,7 @@ This guide assumes you already have AWS account setup.
 
 Install pre-requisites if needed:
 
-   * Aptos CLI: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v0.1.0-alpha
+   * Supra CLI: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v0.1.0-alpha
    * Terraform 1.1.7: https://www.terraform.io/downloads.html
    * Kubernetes CLI: https://kubernetes.io/docs/tasks/tools/
    * AWS CLI: https://aws.amazon.com/cli/
@@ -149,7 +149,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
 
 13. Download AptosFramework Move bytecodes into a folder named `framework`.
 
-    Download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0
+    Download the Supra Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0
 
     ```
     $ unzip framework.zip

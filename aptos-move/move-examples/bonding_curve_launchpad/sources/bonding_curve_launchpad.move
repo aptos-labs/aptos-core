@@ -112,7 +112,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
 
     //---------------------------Dispatchable Standard---------------------------
     /// Follows the Dispatchable FA standard for creating custom withdraw logic.
-    /// Each created FA has transfers disabled, until the APT reserves minimum threshold on
+    /// Each created FA has transfers disabled, until the SUPRA reserves minimum threshold on
     /// the associated liquidity pair are met. This is referred to as graduation.
     /// - `transfer_ref` will ignore this custom withdraw logic.
     /// - Since `transfer_ref` is only available to our permissioned/explicit actions, participants will initially only
@@ -130,7 +130,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
 
     //---------------------------Bonding Curve Launchpad (BCL)---------------------------
     /// Participants can launch new FA's and their associated liquidity pair.
-    /// Optionally, the participant can immediately perform an initial swap from APT to FA.
+    /// Optionally, the participant can immediately perform an initial swap from SUPRA to FA.
     public entry fun create_fa_pair(
         creator: &signer,
         apt_amount_in: u64,
@@ -145,9 +145,9 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         let (fa_address, fa_minted) = create_fa(name, symbol, max_supply, decimals, icon_uri, project_uri);
         let fa_metadata_obj = object::address_to_object(fa_address);
         // `transfer_ref` is required for swapping in `liquidity_pair`. Otherwise, the custom withdraw function would
-        // block the transfer of APT to the creator.
+        // block the transfer of SUPRA to the creator.
         let transfer_ref = &borrow_global<FAController>(fa_address).transfer_ref;
-        // Create the liquidity pair between APT and the new FA. Include the initial creator swap, if needed.
+        // Create the liquidity pair between SUPRA and the new FA. Include the initial creator swap, if needed.
         liquidity_pairs::register_liquidity_pair(
             name,
             symbol,
@@ -160,7 +160,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         );
     }
 
-    /// Swap from FA to APT, or vice versa, through `liquidity_pair`.
+    /// Swap from FA to SUPRA, or vice versa, through `liquidity_pair`.
     public entry fun swap(
         account: &signer,
         name: String,

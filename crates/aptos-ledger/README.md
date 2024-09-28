@@ -1,6 +1,6 @@
 # aptos-ledger
 
-Provides a set of commands and methods to communicate with Aptos app on Ledger
+Provides a set of commands and methods to communicate with Supra app on Ledger
 
 The methods supported by the aptos-ledger are:
 
@@ -11,11 +11,11 @@ The methods supported by the aptos-ledger are:
 - get_public_key()
 - sign_txn()
 
-NOTE: All methods and commands requires the user to have Aptos ledger app unlocked and open
+NOTE: All methods and commands requires the user to have Supra ledger app unlocked and open
 
 ## Examples
 
-### Get Public Key from your Aptos account on Ledger
+### Get Public Key from your Supra account on Ledger
 
 ```rust
 use aptos_ledger::get_public_key;

@@ -141,7 +141,7 @@ A list of OIDC providers whose JWKs should be watched by validators. Maintained 
 
 ## Struct `UnsupportedJWK`
 
-An JWK variant that represents the JWKs which were observed but not yet supported by Aptos.
+An JWK variant that represents the JWKs which were observed but not yet supported by Supra.
 Observing <code><a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a></code>s means the providers adopted a new key type/format, and the system should be updated.
 
 

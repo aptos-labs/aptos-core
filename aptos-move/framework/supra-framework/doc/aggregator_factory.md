@@ -4,7 +4,7 @@
 # Module `0x1::aggregator_factory`
 
 This module provides foundations to create aggregators. Currently only
-Aptos Framework (0x1) can create them, so this module helps to wrap
+Supra Framework (0x1) can create them, so this module helps to wrap
 the constructor of <code>Aggregator</code> struct so that only a system account
 can initialize one. In the future, this might change and aggregators
 can be enabled for the public.
@@ -38,7 +38,7 @@ can be enabled for the public.
 ## Resource `AggregatorFactory`
 
 Creates new aggregators. Used to control the numbers of aggregators in the
-system and who can create them. At the moment, only Aptos Framework (0x1)
+system and who can create them. At the moment, only Supra Framework (0x1)
 account can.
 
 
@@ -156,7 +156,7 @@ to allow any signer to call.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator">create_aggregator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, limit: u128): Aggregator <b>acquires</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a> {
-    // Only Aptos Framework (0x1) <a href="account.md#0x1_account">account</a> can call this for now.
+    // Only Supra Framework (0x1) <a href="account.md#0x1_account">account</a> can call this for now.
     <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(<a href="account.md#0x1_account">account</a>);
     <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">create_aggregator_internal</a>(limit)
 }
@@ -207,25 +207,25 @@ Returns a new aggregator.
 
 <tr>
 <td>1</td>
-<td>During the module's initialization, it guarantees that the Aptos framework is the caller and that the AggregatorFactory resource will move under the Aptos framework account.</td>
+<td>During the module's initialization, it guarantees that the Supra framework is the caller and that the AggregatorFactory resource will move under the Supra framework account.</td>
 <td>High</td>
-<td>The initialize function is responsible for establishing the initial state of the module by creating the AggregatorFactory resource, indicating its presence within the module's context. Subsequently, the resource transfers to the Aptos framework account.</td>
+<td>The initialize function is responsible for establishing the initial state of the module by creating the AggregatorFactory resource, indicating its presence within the module's context. Subsequently, the resource transfers to the Supra framework account.</td>
 <td>Formally verified via <a href="#high-level-req-1">initialize_aggregator_factory</a>.</td>
 </tr>
 
 <tr>
 <td>2</td>
-<td>To create a new aggregator instance, the aggregator factory must already be initialized and exist under the Aptos account.</td>
+<td>To create a new aggregator instance, the aggregator factory must already be initialized and exist under the Supra account.</td>
 <td>High</td>
-<td>The create_aggregator_internal function asserts that AggregatorFactory exists for the Aptos account.</td>
+<td>The create_aggregator_internal function asserts that AggregatorFactory exists for the Supra account.</td>
 <td>Formally verified via <a href="#high-level-req-2">CreateAggregatorInternalAbortsIf</a>.</td>
 </tr>
 
 <tr>
 <td>3</td>
-<td>Only the Aptos framework address may create an aggregator instance currently.</td>
+<td>Only the Supra framework address may create an aggregator instance currently.</td>
 <td>Low</td>
-<td>The create_aggregator function ensures that the address calling it is the Aptos framework address.</td>
+<td>The create_aggregator function ensures that the address calling it is the Supra framework address.</td>
 <td>Formally verified via <a href="#high-level-req-3">create_aggregator</a>.</td>
 </tr>
 

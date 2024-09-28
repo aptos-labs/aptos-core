@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
+use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Quant};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
@@ -64,7 +64,7 @@ pub trait GasAlgebra {
     /// gas parameters.
     fn charge_storage_fee(
         &mut self,
-        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = Quant>,
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()>;
 
@@ -99,7 +99,7 @@ pub trait AptosGasMeter: MoveGasMeter {
 
     /// Charges fee for utilizing short-term or long-term storage.
     ///
-    /// Since the fee is measured in APT/Octa, it needs to be converted into gas units
+    /// Since the fee is measured in SUPRA/Quant, it needs to be converted into gas units
     /// according to the given unit price.
     fn charge_storage_fee(
         &mut self,

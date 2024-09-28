@@ -1,6 +1,6 @@
 # Docker Images Builder
 
-This directory contains [Docker](https://www.docker.com/) configuration for building Aptos docker images. This builder requires the use of Buildkit which is available by default in most recent Docker installations.
+This directory contains [Docker](https://www.docker.com/) configuration for building Supra docker images. This builder requires the use of Buildkit which is available by default in most recent Docker installations.
 
 To build these images run this from the repository root:
 
@@ -19,7 +19,7 @@ The builder can produce the following Docker images. To build a particular image
 
 1. `validator-testing` : Image containing the `aptos-node`, `aptos-debugger` binaries and other linux tools useful for debugging and testing. This image is used in Forge tests.
 2. `validator` : Image containing the `aptos-node` and `aptos-debugger` binaries. This image is usually used for distribution.
-3. `tools`: Image containing all the aptos tools binaries including `aptos-debugger`, `aptos`, `aptos-transaction-emitter`, `aptos-openapi-spec-generator` and `aptos-fn-check-client`. Also, includes the Aptos Move framework for use with genesis generation.
+3. `tools`: Image containing all the aptos tools binaries including `aptos-debugger`, `aptos`, `aptos-transaction-emitter`, `aptos-openapi-spec-generator` and `aptos-fn-check-client`. Also, includes the Supra Move framework for use with genesis generation.
 4. `forge`: Image containing the `forge` binary that orchestrates and runs Forge tests.
 5. `node-checker`: Image containing the `node-checker` binary that checks the health of a node.
 6. `faucet`: Image containing the `faucet` binary that provides a faucet service for minting coins.

@@ -163,7 +163,7 @@ fn out_of_gas_while_charging_storage_fee() {
         gas_params.vm.txn.legacy_free_write_bytes_quota = state_key_size();
     });
     // Allow 10 value bytes charged at most. Notice this is in external units,
-    //   which is 1/100x octas or 1Mx internal units.
+    //   which is 1/100x quants or 1Mx internal units.
     h.set_max_gas_per_txn(110_000);
 
     test_create_multiple_items(&mut h, &acc, |status| assert_out_of_gas!(status));
