@@ -1,0 +1,98 @@
+// -- Model dump before bytecode pipeline
+module 0x42::LambdaTest1 {
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply1(f: |u64|u64,b: u64): u64 {
+        {
+          let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>((f)(b), 1), 12);
+          Mul<u64>(a, 12)
+        }
+    }
+    public inline fun inline_mul(a: u64,b: u64): u64 {
+        Mul<u64>(a, b)
+    }
+} // end 0x42::LambdaTest1
+module 0x42::LambdaTest2 {
+    use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
+    use std::vector;
+    public inline fun foreach<T>(v: &vector<#0>,action: |&#0|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<T>(v)) {
+              (action)(vector::borrow<T>(v, i));
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          }
+        }
+    }
+    public inline fun inline_apply2(g: |u64|u64,c: u64): u64 {
+        Add<u64>({
+          let (b: u64): (u64) = Tuple((g)({
+            let (a: u64, b: u64): (u64, u64) = Tuple(c, 3);
+            Mul<u64>(a, 3)
+          }));
+          {
+            let (a: u64, b: u64): (u64, u64) = Tuple(Add<u64>({
+              let (z: u64): (u64) = Tuple(b);
+              z
+            }, 1), 12);
+            Mul<u64>(a, 12)
+          }
+        }, 2)
+    }
+    public inline fun inline_apply3(g: |u64|u64,c: u64): u64 {
+        Add<u64>(LambdaTest1::inline_apply1(g, LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x: u64| LambdaTest1::inline_apply(|y: u64| y, x), 3))), 4)
+    }
+    public fun test_inline_lambda() {
+        {
+          let product: u64 = 1;
+          {
+            let (v: &vector<u64>): (&vector<u64>) = Tuple(Borrow(Immutable)([Number(1), Number(2), Number(3)]));
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<u64>(v)) {
+                  {
+                    let (e: &u64): (&u64) = Tuple(vector::borrow<u64>(v, i));
+                    product: u64 = {
+                      let (a: u64, b: u64): (u64, u64) = Tuple(product, Deref(e));
+                      Mul<u64>(a, b)
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1);
+                  Tuple()
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          Tuple()
+        }
+    }
+} // end 0x42::LambdaTest2
+module 0x42::LambdaTest {
+    use 0x42::LambdaTest2; // resolved as: 0x42::LambdaTest2
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply_test(): u64 {
+        1120
+    }
+    private fun test_lambda() {
+        if false {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::LambdaTest
+
+
+============ bytecode verification succeeded ========

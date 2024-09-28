@@ -1,0 +1,645 @@
+// -- Model dump before env processor pipeline:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>(m::get<m::S>(a)), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor inlining:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      let (a: address): (address) = Tuple(a);
+      BorrowGlobal(Immutable)<m::S>(a)
+    }), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      let (a: address): (address) = Tuple(a);
+      BorrowGlobal(Immutable)<m::S>(a)
+    }), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      let (a: address): (address) = Tuple(a);
+      BorrowGlobal(Immutable)<m::S>(a)
+    }), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      let (a: address): (address) = Tuple(a);
+      BorrowGlobal(Immutable)<m::S>(a)
+    }), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(|y: num| Gt(y, 0), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      let (a: address): (address) = Tuple(a);
+      BorrowGlobal(Immutable)<m::S>(a)
+    }), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(closure m::function_code_spec_block$lambda$1(), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+    private fun function_code_spec_block$lambda$1(y: num): bool {
+        Gt(y, 0)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor specification checker:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      let (a: address): (address) = Tuple(a);
+      BorrowGlobal(Immutable)<m::S>(a)
+    }), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::exec<num, bool>(closure m::function_code_spec_block$lambda$1(), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+    private fun function_code_spec_block$lambda$1(y: num): bool {
+        Gt(y, 0)
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x42::m {
+    spec {
+      invariant forall a: address: TypeDomain<address>(): Implies(exists<m::S>(a), m::$exec<address, bool>(|a: address| Lt(select m::S.f<m::S>({
+      let (a: address): (address) = Tuple(a);
+      global<m::S>(a)
+    }), 10), a));
+    }
+
+    struct S {
+        f: u64,
+    }
+    spec {
+      invariant m::$exec<num, bool>(|x: num| Gt(x, 0), select m::S.f());
+    }
+
+    private fun exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: R = (f)(x);
+          spec {
+            assert Eq<#1>(r, (f)($t1));
+          }
+          ;
+          r
+        }
+    }
+    private fun function_code_spec_block(x: u64): u64 {
+        spec {
+          assert m::$exec<num, bool>(closure m::function_code_spec_block$lambda$1(), $t0);
+        }
+        ;
+        Add<u64>(x, 1)
+    }
+    private fun function_spec_block(x: u64): u64 {
+        Add<u64>(x, 1)
+    }
+    spec {
+      ensures Eq<u64>(result0(), m::$exec<num, num>(|x: num| Add(x, 1), $t0));
+    }
+
+    private inline fun get<R>(a: address): &#0 {
+        BorrowGlobal(Immutable)<R>(a)
+    }
+    private fun function_code_spec_block$lambda$1(y: num): bool {
+        Gt(y, 0)
+    }
+    spec fun $exec<T,R>(f: |#0|#1,x: #0): #1 {
+        {
+          let r: #1 = (f)(x);
+          r
+        }
+    }
+} // end 0x42::m
+
+
+
+Diagnostics:
+error: Calls to function values other than inline function parameters not yet supported
+  ┌─ tests/lambda/inline-parity/inline_fun_in_spec.move:4:17
+  │
+4 │         let r = f(x);
+  │                 ^

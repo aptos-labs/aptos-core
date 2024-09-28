@@ -1,0 +1,16 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `M::vector_for_each` has a function parameter:
+  ┌─ tests/lambda/inline-parity/lambda_cast.move:4:9
+  │
+4 │     fun vector_for_each<Element>(v: vector<Element>, f: |Element|) {
+  │         ^^^^^^^^^^^^^^^                              - Parameter `f` has function-valued type `|Element|`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `M::vector_fold` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda_cast.move:12:9
+   │
+12 │     fun vector_fold<Accumulator, Element>(
+   │         ^^^^^^^^^^^
+   ·
+15 │         f: |Accumulator,Element|Accumulator
+   │         - Parameter `f` has function-valued type `|(Accumulator, Element)|Accumulator`.

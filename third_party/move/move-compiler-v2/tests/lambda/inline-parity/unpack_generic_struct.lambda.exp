@@ -1,0 +1,694 @@
+// -- Model dump before env processor pipeline:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor inlining:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, |e: Key| pack m::E<Key>(e));
+          m::g<Key>(f, |e: m::E<Key>| {
+            let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+            v = key;
+            Tuple()
+          });
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
+          m::g<Key>(f, closure m::foo$lambda$2(v));
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+    private fun foo$lambda$1<Key>(e: #0): m::E<#0> {
+        pack m::E<Key>(e)
+    }
+    private fun foo$lambda$2<Key>(v: &mut #0,e: m::E<#0>) {
+        {
+          let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          v = key;
+          Tuple()
+        }
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor specification checker:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
+          m::g<Key>(f, closure m::foo$lambda$2(v));
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+    private fun foo$lambda$1<Key>(e: #0): m::E<#0> {
+        pack m::E<Key>(e)
+    }
+    private fun foo$lambda$2<Key>(v: &mut #0,e: m::E<#0>) {
+        {
+          let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          v = key;
+          Tuple()
+        }
+    }
+} // end 0x42::m
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x42::m {
+    use std::vector;
+    struct E {
+        key: Key,
+    }
+    struct Option {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: m::Option<#0>) {
+        if m::is_none<Element>(Borrow(Immutable)(t)) {
+          Tuple()
+        } else {
+          Abort(262144)
+        };
+        {
+          let m::Option<Element>{ vec } = t;
+          vector::destroy_empty<Element>(vec)
+        }
+    }
+    public fun foo<Key>(data: m::E<#0>,v: &mut #0) {
+        {
+          let f: m::E<Key> = m::h<Key>(data, closure m::foo$lambda$1());
+          m::g<Key>(f, closure m::foo$lambda$2(v));
+          Tuple()
+        }
+    }
+    public fun g<Key>(x: m::E<#0>,v: |m::E<#0>|) {
+        (v)(x)
+    }
+    public fun h<Key>(x: m::E<#0>,v: |#0|m::E<#0>): m::E<#0> {
+        {
+          let m::E<Key>{ key } = x;
+          (v)(key)
+        }
+    }
+    public fun is_none<Element>(t: &m::Option<#0>): bool {
+        vector::is_empty<Element>(Borrow(Immutable)(select m::Option.vec<&m::Option<Element>>(t)))
+    }
+    private fun foo$lambda$1<Key>(e: #0): m::E<#0> {
+        pack m::E<Key>(e)
+    }
+    private fun foo$lambda$2<Key>(v: &mut #0,e: m::E<#0>) {
+        {
+          let (m::E<Key>{ key }, _x: u64): (m::E<Key>, u64) = Tuple(e, 3);
+          v = key;
+          Tuple()
+        }
+    }
+} // end 0x42::m
+
+
+
+Diagnostics:
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/inline-parity/unpack_generic_struct.move:24:9
+   │
+24 │         v(key)
+   │         ^
+
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/inline-parity/unpack_generic_struct.move:28:9
+   │
+28 │         v(x)
+   │         ^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/inline-parity/unpack_generic_struct.move:33:25
+   │
+33 │           let f = h(data, |e| {
+   │ ╭─────────────────────────^
+34 │ │             E {key: e}
+35 │ │         });
+   │ ╰─────────^
+
+error: Function-typed values not yet supported except as parameters to calls to inline functions
+   ┌─ tests/lambda/inline-parity/unpack_generic_struct.move:36:14
+   │
+36 │           g(f, |e| {
+   │ ╭──────────────^
+37 │ │             let (E { key }, _x) = (e, 3);
+38 │ │             *v = key;
+39 │ │         });
+   │ ╰─────────^
