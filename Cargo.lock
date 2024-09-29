@@ -1197,6 +1197,7 @@ dependencies = [
  "aptos-config",
  "aptos-db-indexer-schemas",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-resource-viewer",
  "aptos-rocksdb-options",
@@ -1207,6 +1208,7 @@ dependencies = [
  "bytes",
  "dashmap",
  "move-core-types",
+ "once_cell",
  "rand 0.7.3",
 ]
 
