@@ -94,7 +94,7 @@
                 let b = Self::generate_random_scalar(rng);
                 let c = Self::generate_random_scalar(rng);
                 let mut acc = beta * a + alpha * b + c;
-                acc = acc * gamma.inverse().unwrap();
+                acc *= gamma.inverse().unwrap();
                 let gamma_abc_g1_i = g1_generator * acc;
                 gamma_abc_g1.push(gamma_abc_g1_i.into_affine());
             };
@@ -163,7 +163,7 @@
             for (i, b) in public_inputs.iter().zip(pk.gamma_abc_g1.iter().skip(1)) {
                 g_ic.add_assign(&b.mul_bigint(i.into_bigint()));
             }
-            g_ic = g_ic * pk.gamma;
+            g_ic *=  pk.gamma;
 
             let delta_inverse = pk.delta.inverse().unwrap();
             let ab = a * b;
