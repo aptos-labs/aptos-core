@@ -158,7 +158,6 @@ pub struct EmitJobRequest {
     mode: EmitJobMode,
 
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
-    account_type: AccountType,
 
     max_gas_per_txn: u64,
     init_max_gas_per_txn: Option<u64>,
@@ -191,6 +190,8 @@ pub struct EmitJobRequest {
     tps_wait_after_expiration_secs: Option<u64>,
 
     account_minter_seed: Option<[u8; 32]>,
+
+    account_type: AccountType,
 
     // Arguments for Keyless Load Testing
     keyless_ephem_secret_key: Option<[u8; 32]>,

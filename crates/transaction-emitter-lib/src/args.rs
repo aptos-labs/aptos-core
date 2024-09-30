@@ -138,9 +138,6 @@ pub struct EmitArgs {
     )]
     pub transaction_type: Vec<TransactionTypeArg>,
 
-    #[clap(long, value_enum, default_value = "local", ignore_case = true)]
-    pub account_type: AccountType,
-
     /// Number of copies of the modules that will be published,
     /// under separate accounts, creating independent contracts,
     /// removing contention.
@@ -219,14 +216,23 @@ pub struct EmitArgs {
     #[clap(long)]
     pub coins_per_account_override: Option<u64>,
 
-    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, requires = "proof_file_path", requires = "keyless_jwt")]
+    #[clap(flatten)]
+    pub account_type_args: AccountTypeArgs,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
+pub struct AccountTypeArgs {
+    #[clap(long, value_enum, default_value = "local", ignore_case = true)]
+    pub account_type: AccountType,
+
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, requires = "proof_file_path", requires = "epk_expiry_date_secs", requires = "keyless_jwt")]
     pub keyless_ephem_secret_key: Option<ConfigKey<Ed25519PrivateKey>>,
 
     #[clap(long)]
     pub proof_file_path: Option<String>,
 
-    #[clap(long, default_value_t = 2700000000)]
-    pub epk_expiry_date_secs: u64,
+    #[clap(long)]
+    pub epk_expiry_date_secs: Option<u64>,
 
     #[clap(long)]
     pub keyless_jwt: Option<String>,

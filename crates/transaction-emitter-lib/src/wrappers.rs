@@ -106,18 +106,27 @@ pub async fn emit_transactions_with_cluster(
                 args.coordination_delay_between_instances.unwrap_or(0),
             ));
 
-    if let Some(keyless_ephem_secret_key) = &args.keyless_ephem_secret_key {
+    if let Some(keyless_ephem_secret_key) = &args.account_type_args.keyless_ephem_secret_key {
         emit_job_request = emit_job_request
             .account_type(AccountType::Keyless)
             .keyless_ephem_secret_key(keyless_ephem_secret_key.private_key());
-        emit_job_request = emit_job_request.epk_expiry_date_secs(args.epk_expiry_date_secs);
+        emit_job_request = emit_job_request.epk_expiry_date_secs(
+            args.account_type_args
+                .epk_expiry_date_secs
+                .expect("epk expiry should be set"),
+        );
         emit_job_request = emit_job_request.proof_file_path(
-            args.proof_file_path
+            args.account_type_args
+                .proof_file_path
                 .as_ref()
                 .expect("proof file path should be set"),
         );
-        emit_job_request =
-            emit_job_request.keyless_jwt(args.keyless_jwt.as_ref().expect("jwt should be set"))
+        emit_job_request = emit_job_request.keyless_jwt(
+            args.account_type_args
+                .keyless_jwt
+                .as_ref()
+                .expect("jwt should be set"),
+        )
     }
 
     let num_accounts =
