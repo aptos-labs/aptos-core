@@ -1,0 +1,26 @@
+name: Trigger Processor Tests on JSON Change
+
+on:
+  workflow_dispatch:
+#  push:
+#    paths:
+#      - 'jsons/**'
+#    branches:
+#      - main  # or your relevant branch
+  pull_request:
+
+jobs:
+  dispatch_event:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Dispatch Event to Processor Repo
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+#          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  
+          repository: 'aptos-labs/aptos-indexer-processors'
+          event-type: 'json-change-detected'
+          client-payload: '{"commit_hash": "${{ github.sha }}"}'
