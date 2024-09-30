@@ -94,16 +94,14 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
                     if !func_returns.is_empty() {
                         // (2) is there a function type result at the top level?  This is allowed
                         // only for LAMBDA_IN_RETURNS
-                        if !lambda_return_ok {
-                            if !func_returns.is_empty() {
-                                env.diag(
-                                    Severity::Error,
-                                    &caller_func.get_result_type_loc(),
-                                    &format!("Functions may not return function-typed values, but function `{}` return type is the function type `{}`:",
-                                             &caller_name,
-                                             return_type.display(&type_display_ctx)),
-                                )
-                            }
+                        if !lambda_return_ok && !func_returns.is_empty() {
+                            env.diag(
+                                Severity::Error,
+                                &caller_func.get_result_type_loc(),
+                                &format!("Functions may not return function-typed values, but function `{}` return type is the function type `{}`:",
+                                         &caller_name,
+                                         return_type.display(&type_display_ctx)),
+                            )
                         }
                         if !lambda_params_ok {
                             // (3) is there *any* function type with function type in an arg? This
