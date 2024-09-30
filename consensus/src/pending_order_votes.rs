@@ -7,7 +7,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
-    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithVerifiedSignatures},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::{collections::HashMap, sync::Arc};
@@ -33,7 +33,7 @@ pub enum OrderVoteReceptionResult {
 #[derive(Debug, PartialEq, Eq)]
 enum OrderVoteStatus {
     EnoughVotes(LedgerInfoWithSignatures),
-    NotEnoughVotes(LedgerInfoWithPartialSignatures),
+    NotEnoughVotes(LedgerInfoWithVerifiedSignatures),
 }
 
 /// A PendingVotes structure keep track of order votes for the last few rounds
@@ -75,7 +75,7 @@ impl PendingOrderVotes {
                 verified_quorum_cert.expect(
                     "Quorum Cert is expected when creating a new entry in pending order votes",
                 ),
-                OrderVoteStatus::NotEnoughVotes(LedgerInfoWithPartialSignatures::new(
+                OrderVoteStatus::NotEnoughVotes(LedgerInfoWithVerifiedSignatures::new(
                     order_vote.ledger_info().clone(),
                     PartialSignatures::empty(),
                 )),

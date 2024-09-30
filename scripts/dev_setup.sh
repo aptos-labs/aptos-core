@@ -500,7 +500,7 @@ function install_cargo_sort {
 
 function install_cargo_machete {
   if ! command -v cargo-machete &>/dev/null; then
-    cargo install cargo-machete --locked
+    cargo install cargo-machete --locked --version 0.7.0
   fi
 }
 

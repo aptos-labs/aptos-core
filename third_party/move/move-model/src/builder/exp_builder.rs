@@ -176,15 +176,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
-        if !self.env().language_version().is_at_least(version_min) {
-            self.env().error(
-                loc,
-                &format!(
-                    "not supported before language version `{}`: {}",
-                    version_min, feature
-                ),
-            )
-        }
+        self.parent
+            .check_language_version(loc, feature, version_min);
     }
 
     pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {
