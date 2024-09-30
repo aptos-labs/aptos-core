@@ -17,10 +17,23 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
+      - uses: dsherret/rust-toolchain-file@v1
+      - id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - id: 'secrets'
+        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        with:
+          secrets: |-
+            token:aptos-shared-secrets/github-actions-repository-dispatch
+
       - name: Dispatch Event to Processor Repo
         uses: peter-evans/repository-dispatch@v3.0.0
         with:
-          token: ${{ secrets.GITHUB-ACTIONS-REPOSITORY-DISPATCH }}
+          TOKEN: '${{ steps.secrets.outputs.token }}'
           repository: 'aptos-labs/aptos-indexer-processors'
           event-type: 'json-change-detected'
           client-payload: '{"commit_hash": "${{ github.sha }}"}'
