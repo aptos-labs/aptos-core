@@ -927,7 +927,7 @@ With an existing collection, directly mint a soul bound token into the recipient
     );
 
     <b>assert</b>!(
-        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_check_permission">permissioned_signer::check_permission</a>(creator, 0, <a href="aptos_token.md#0x4_aptos_token_TokenUpdatePermission">TokenUpdatePermission</a> { token_address }),
+        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_check_permission_capacity_above">permissioned_signer::check_permission_capacity_above</a>(creator, 0, <a href="aptos_token.md#0x4_aptos_token_TokenUpdatePermission">TokenUpdatePermission</a> { token_address }),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_ENOT_CREATOR">ENOT_CREATOR</a>),
     );
     <b>borrow_global</b>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a>&gt;(token_address)
@@ -1629,7 +1629,7 @@ With an existing collection, directly mint a soul bound token into the recipient
     );
 
     <b>assert</b>!(
-        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_check_permission">permissioned_signer::check_permission</a>(creator, 0, <a href="aptos_token.md#0x4_aptos_token_CollectionUpdatePermission">CollectionUpdatePermission</a> { collection_address }),
+        <a href="../../aptos-framework/doc/permissioned_signer.md#0x1_permissioned_signer_check_permission_capacity_above">permissioned_signer::check_permission_capacity_above</a>(creator, 0, <a href="aptos_token.md#0x4_aptos_token_CollectionUpdatePermission">CollectionUpdatePermission</a> { collection_address }),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_token.md#0x4_aptos_token_ENOT_CREATOR">ENOT_CREATOR</a>),
     );
     <b>borrow_global</b>&lt;<a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a>&gt;(collection_address)

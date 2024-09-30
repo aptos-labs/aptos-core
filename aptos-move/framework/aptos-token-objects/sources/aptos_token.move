@@ -384,7 +384,7 @@ module aptos_token_objects::aptos_token {
         );
 
         assert!(
-            permissioned_signer::check_permission(creator, 0, TokenUpdatePermission { token_address }),
+            permissioned_signer::check_permission_capacity_above(creator, 0, TokenUpdatePermission { token_address }),
             error::permission_denied(ENOT_CREATOR),
         );
         borrow_global<AptosToken>(token_address)
@@ -630,7 +630,7 @@ module aptos_token_objects::aptos_token {
         );
 
         assert!(
-            permissioned_signer::check_permission(creator, 0, CollectionUpdatePermission { collection_address }),
+            permissioned_signer::check_permission_capacity_above(creator, 0, CollectionUpdatePermission { collection_address }),
             error::permission_denied(ENOT_CREATOR),
         );
         borrow_global<AptosCollection>(collection_address)

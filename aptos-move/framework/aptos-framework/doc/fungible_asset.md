@@ -2785,7 +2785,7 @@ Check the permission for withdraw operation.
     store: Object&lt;T&gt;,
     amount: u64,
 ) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
-    <b>assert</b>!(<a href="permissioned_signer.md#0x1_permissioned_signer_check_permission">permissioned_signer::check_permission</a>(owner, amount <b>as</b> u256, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
+    <b>assert</b>!(<a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(owner, amount <b>as</b> u256, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
         metadata_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&<a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).metadata)
     }), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EWITHDRAW_PERMISSION_DENIED">EWITHDRAW_PERMISSION_DENIED</a>));
 }
@@ -2816,7 +2816,7 @@ Check the permission for withdraw operation.
     metadata_address: <b>address</b>,
     amount: u64,
 ) {
-    <b>assert</b>!(<a href="permissioned_signer.md#0x1_permissioned_signer_check_permission">permissioned_signer::check_permission</a>(owner, amount <b>as</b> u256, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
+    <b>assert</b>!(<a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(owner, amount <b>as</b> u256, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
         metadata_address,
     }), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EWITHDRAW_PERMISSION_DENIED">EWITHDRAW_PERMISSION_DENIED</a>));
 }

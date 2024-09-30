@@ -4,12 +4,12 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{SignerRef, Struct, Value},
 };
-use move_core_types::account_address::AccountAddress;
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
@@ -77,7 +77,10 @@ fn native_signer_from_permissioned(
     let master_addr = safely_pop_arg!(arguments, AccountAddress);
     // context.charge()?;
 
-    Ok(smallvec![Value::struct_(Struct::pack_variant(1, vec![Value::address(master_addr), Value::address(permission_addr)]))])
+    Ok(smallvec![Value::struct_(Struct::pack_variant(1, vec![
+        Value::address(master_addr),
+        Value::address(permission_addr)
+    ]))])
 }
 
 /***************************************************************************************************

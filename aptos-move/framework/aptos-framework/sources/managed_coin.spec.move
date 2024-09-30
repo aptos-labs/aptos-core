@@ -97,6 +97,8 @@ spec aptos_framework::managed_coin {
         decimals: u8,
         monitor_supply: bool,
     ) {
+        use aptos_framework::permissioned_signer;
+        aborts_if permissioned_signer::spec_is_permissioned_signer(account);
         include coin::InitializeInternalSchema<CoinType>;
         aborts_if !string::spec_internal_check_utf8(name);
         aborts_if !string::spec_internal_check_utf8(symbol);
