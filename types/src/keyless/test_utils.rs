@@ -14,8 +14,9 @@ use crate::{
             SAMPLE_UID_KEY, SAMPLE_UPGRADED_VK,
         },
         get_public_inputs_hash,
+        proof_simulation::Groth16SimulatorBn254,
         zkp_sig::ZKP,
-        proof_simulation::Groth16SimulatorBn254, Configuration, EphemeralCertificate, FederatedKeylessPublicKey, Groth16Proof,
+        Configuration, EphemeralCertificate, FederatedKeylessPublicKey, Groth16Proof,
         KeylessPublicKey, KeylessSignature, OpenIdSig, ZeroKnowledgeSig,
     },
     transaction::{authenticator::EphemeralSignature, RawTransaction, SignedTransaction},
@@ -97,7 +98,11 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
-pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey, PreparedVerifyingKey<Bn254>) {
+pub fn get_random_simulated_groth16_sig_and_pk() -> (
+    KeylessSignature,
+    KeylessPublicKey,
+    PreparedVerifyingKey<Bn254>,
+) {
     // We need a ZeroKnowledgeSig inside of a KeylessSignature to derive a public input hash. The Groth16 proof
     // is not used to actually derive the hash so we can temporarily give a dummy
     // proof before later replacing it with a simulated proof
@@ -122,8 +127,10 @@ pub fn get_random_simulated_groth16_sig_and_pk() -> (KeylessSignature, KeylessPu
     let pih = get_public_inputs_hash(&sig, &pk, &rsa_jwk, &config).unwrap();
 
     let mut rng = rand::thread_rng();
-    let (sim_pk, vk) = Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
-    let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[pih], &sim_pk, &mut rng).unwrap();
+    let (sim_pk, vk) =
+        Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+    let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[pih], &sim_pk, &mut rng)
+        .unwrap();
     let pvk = prepare_verifying_key(&vk);
 
     // Replace dummy proof with the simulated proof
