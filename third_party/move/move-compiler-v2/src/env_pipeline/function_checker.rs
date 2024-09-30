@@ -15,21 +15,13 @@ use std::{collections::BTreeSet, iter::Iterator, ops::Deref, vec::Vec};
 
 type QualifiedFunId = QualifiedId<FunId>;
 
-fn type_has_function(ty: &Type) -> bool {
-    match ty {
-        Type::Tuple(tys) => tys.iter().any(|ty| ty.is_function()),
-        Type::Fun(..) => true,
-        _ => false,
-    }
-}
-
 // Takes a list of function types, returns those which have a function type in their argument type
-fn identify_function_types_with_functions_in_args(func_returns: Vec<Type>) -> Vec<Type> {
-    func_returns
+fn identify_function_types_with_functions_in_args(func_types: Vec<Type>) -> Vec<Type> {
+    func_types
         .into_iter()
         .filter_map(|ty| {
             if let Type::Fun(argt, _) = &ty {
-                if type_has_function(argt.deref()) {
+                if argt.deref().has_function() {
                     Some(ty)
                 } else {
                     None
@@ -44,14 +36,14 @@ fn identify_function_types_with_functions_in_args(func_returns: Vec<Type>) -> Ve
 // Takes a list of function-typed parameters, along with argument and result type
 // Returns a list of any parameters whose result type has a function value, along with that result type.
 fn identify_function_typed_params_with_functions_in_rets(
-    func_params: Vec<&Parameter>,
+    func_types: Vec<&Parameter>,
 ) -> Vec<(&Parameter, &Type)> {
-    func_params
+    func_types
         .iter()
         .filter_map(|param| {
             if let Type::Fun(_argt, rest) = &param.1 {
                 let rest_unboxed = rest.deref();
-                if type_has_function(rest_unboxed) {
+                if rest_unboxed.has_function() {
                     Some((*param, rest_unboxed))
                 } else {
                     None

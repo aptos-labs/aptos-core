@@ -819,14 +819,24 @@ impl Type {
         matches!(self, Type::Primitive(_))
     }
 
-    /// Determines whether this is a reference.
-    pub fn is_reference(&self) -> bool {
-        matches!(self, Type::Reference(_, _))
-    }
-
     /// Determines whether this is a function.
     pub fn is_function(&self) -> bool {
         matches!(self, Type::Fun(..))
+    }
+
+    /// Determines whether this is a function or a tuple with a function;
+    /// this is useful to test a function parameter/return type for function values.
+    pub fn has_function(&self) -> bool {
+        match self {
+            Type::Tuple(tys) => tys.iter().any(|ty| ty.is_function()),
+            Type::Fun(..) => true,
+            _ => false,
+        }
+    }
+
+    /// Determines whether this is a reference.
+    pub fn is_reference(&self) -> bool {
+        matches!(self, Type::Reference(_, _))
     }
 
     /// If this is a reference, return the kind of the reference, otherwise None.
