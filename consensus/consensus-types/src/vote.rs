@@ -113,6 +113,10 @@ impl Vote {
         self.signature.signature()
     }
 
+    pub fn signature_with_status(&self) -> &SignatureWithStatus {
+        &self.signature
+    }
+
     /// Returns whether the signature is verified
     pub fn is_verified(&self) -> bool {
         self.signature.is_verified()

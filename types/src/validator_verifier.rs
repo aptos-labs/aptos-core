@@ -21,6 +21,7 @@ use derivative::Derivative;
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -270,11 +271,39 @@ impl ValidatorVerifier {
         message: &T,
         signature_with_status: &SignatureWithStatus,
     ) -> std::result::Result<(), VerifyError> {
-        if !self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author) {
+        if (!self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author))
+            && !signature_with_status.is_verified()
+        {
             self.verify(author, message, signature_with_status.signature())?;
             signature_with_status.set_verified();
         }
         Ok(())
+    }
+
+    pub fn filter_invalid_signatures<T: Send + Sync + Serialize + CryptoHash>(
+        &self,
+        message: &T,
+        signatures: Vec<(AccountAddress, SignatureWithStatus)>,
+        need_verify: bool,
+    ) -> Vec<(AccountAddress, SignatureWithStatus)> {
+        signatures
+            .into_par_iter()
+            .with_min_len(4) // At least 4 signatures are verified in each task
+            .flat_map(|(account_address, signature)| {
+                if !need_verify
+                    || signature.is_verified()
+                    || self
+                        .verify(account_address, message, signature.signature())
+                        .is_ok()
+                {
+                    signature.set_verified();
+                    Some((account_address, signature))
+                } else {
+                    self.add_pessimistic_verify_set(account_address);
+                    None
+                }
+            })
+            .collect()
     }
 
     // Generates a multi signature or aggregate signature

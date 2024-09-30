@@ -110,11 +110,7 @@ impl PendingOrderVotes {
                         order_vote.author()
                     );
                 }
-                li_with_sig.add_signature(
-                    order_vote.author(),
-                    order_vote.signature(),
-                    order_vote.is_verified(),
-                );
+                li_with_sig.add_signature(order_vote.author(), order_vote.signature_with_status());
                 match li_with_sig.check_voting_power(&epoch_state.verifier, true) {
                     Ok(aggregated_voting_power) => {
                         assert!(

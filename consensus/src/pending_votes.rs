@@ -181,7 +181,7 @@ impl PendingVotes {
             },
             VoteStatus::NotEnoughVotes(li_with_sig) => {
                 // add this vote to the ledger info with signatures
-                li_with_sig.add_signature(vote.author(), vote.signature(), vote.is_verified());
+                li_with_sig.add_signature(vote.author(), vote.signature_with_status());
 
                 // check if we have enough signatures to create a QC
                 match li_with_sig.check_voting_power(&epoch_state.verifier, true) {
@@ -343,12 +343,12 @@ impl fmt::Display for PendingVotes {
                 VoteStatus::NotEnoughVotes(li) => {
                     write!(
                         f,
-                        "LI {} has {} verified votes {:?}, {} unverified votes {:?}",
+                        "LI {} has {} votes {:?}",
                         li_digest,
-                        li.verified_voters().count(),
-                        li.verified_voters().collect::<Vec<_>>(),
-                        li.unverified_voters().count(),
-                        li.unverified_voters().collect::<Vec<_>>()
+                        li.all_voters().count(),
+                        li.all_voters().collect::<Vec<_>>(),
+                        // li.unverified_voters().count(),
+                        // li.unverified_voters().collect::<Vec<_>>()
                     )?;
                 },
             }
