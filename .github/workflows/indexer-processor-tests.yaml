@@ -22,9 +22,9 @@ jobs:
 
       - name: Run CLI to Generate JSON Files
         run: |
-          cd ecosystem/indexer-grpc/indexer-transaction-generator
-#          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/json_transactions
-          cargo run -- --config ./example.yaml --output-folder ../indexer-test-transactions/json_transactions
+               cd ecosystem/indexer-grpc/indexer-transaction-generator
+          #          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/json_transactions
+               cargo run -- --config ./example.yaml --output-folder ../indexer-test-transactions/json_transactions
 
         working-directory: rust
 
@@ -41,4 +41,3 @@ jobs:
           repository: 'aptos-labs/aptos-indexer-processors'
           event-type: 'json-change-detected'
           client-payload: '{"commit_hash": "${{ github.sha }}"}'
-
