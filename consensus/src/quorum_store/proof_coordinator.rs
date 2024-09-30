@@ -14,7 +14,7 @@ use aptos_consensus_types::proof_of_store::{
 };
 use aptos_crypto::bls12381;
 use aptos_logger::prelude::*;
-use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
+use aptos_types::{epoch_state::EpochState, PeerId};
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap},
     sync::Arc,
@@ -54,7 +54,7 @@ impl IncrementalProofState {
     fn add_signature(
         &mut self,
         signed_batch_info: &SignedBatchInfo,
-        validator_verifier: &ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
     ) -> Result<(), SignedBatchInfoError> {
         if signed_batch_info.batch_info() != &self.info {
             return Err(SignedBatchInfoError::WrongInfo((
@@ -70,7 +70,10 @@ impl IncrementalProofState {
             return Err(SignedBatchInfoError::DuplicatedSignature);
         }
 
-        match validator_verifier.get_voting_power(&signed_batch_info.signer()) {
+        match epoch_state
+            .verifier
+            .get_voting_power(&signed_batch_info.signer())
+        {
             Some(voting_power) => {
                 let signer = signed_batch_info.signer();
                 if self
@@ -101,10 +104,11 @@ impl IncrementalProofState {
         Ok(())
     }
 
-    fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
-        if self.aggregated_voting_power >= validator_verifier.quorum_voting_power() {
-            let recheck =
-                validator_verifier.check_voting_power(self.aggregated_signature.keys(), true);
+    fn ready(&self, epoch_state: Arc<EpochState>) -> bool {
+        if self.aggregated_voting_power >= epoch_state.verifier.quorum_voting_power() {
+            let recheck = epoch_state
+                .verifier
+                .check_voting_power(self.aggregated_signature.keys(), true);
             if recheck.is_err() {
                 error!("Unexpected discrepancy: aggregated_voting_power is {}, while rechecking we get {:?}", self.aggregated_voting_power, recheck);
             }
@@ -114,13 +118,16 @@ impl IncrementalProofState {
         }
     }
 
-    fn take(&mut self, validator_verifier: &ValidatorVerifier) -> ProofOfStore {
+    fn take(&mut self, epoch_state: Arc<EpochState>) -> ProofOfStore {
         if self.completed {
             panic!("Cannot call take twice, unexpected issue occurred");
         }
         self.completed = true;
 
-        match validator_verifier.aggregate_signatures(self.aggregated_signature.iter()) {
+        match epoch_state
+            .verifier
+            .aggregate_signatures(self.aggregated_signature.iter())
+        {
             Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         }
@@ -206,7 +213,7 @@ impl ProofCoordinator {
     fn add_signature(
         &mut self,
         signed_batch_info: SignedBatchInfo,
-        validator_verifier: &ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
     ) -> Result<Option<ProofOfStore>, SignedBatchInfoError> {
         if !self
             .batch_info_to_proof
@@ -218,9 +225,9 @@ impl ProofCoordinator {
             .batch_info_to_proof
             .get_mut(signed_batch_info.batch_info())
         {
-            value.add_signature(&signed_batch_info, validator_verifier)?;
-            if !value.completed && value.ready(validator_verifier) {
-                let proof = value.take(validator_verifier);
+            value.add_signature(&signed_batch_info, epoch_state.clone())?;
+            if !value.completed && value.ready(epoch_state.clone()) {
+                let proof = value.take(epoch_state);
                 // proof validated locally, so adding to cache
                 self.proof_cache
                     .insert(proof.info().clone(), proof.multi_signature().clone());
@@ -297,7 +304,7 @@ impl ProofCoordinator {
         mut self,
         mut rx: Receiver<ProofCoordinatorCommand>,
         mut network_sender: impl QuorumStoreSender,
-        validator_verifier: ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));
         loop {
@@ -339,7 +346,7 @@ impl ProofCoordinator {
                                 let peer_id = signed_batch_info.signer();
                                 let digest = *signed_batch_info.digest();
                                 let batch_id = signed_batch_info.batch_id();
-                                match self.add_signature(signed_batch_info, &validator_verifier) {
+                                match self.add_signature(signed_batch_info, epoch_state.clone()) {
                                     Ok(result) => {
                                         if let Some(proof) = result {
                                             debug!(

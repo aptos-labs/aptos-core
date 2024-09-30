@@ -13,7 +13,7 @@ use aptos_consensus_types::proof_of_store::BatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
 use aptos_logger::prelude::*;
-use aptos_types::{transaction::SignedTransaction, validator_verifier::ValidatorVerifier, PeerId};
+use aptos_types::{epoch_state::EpochState, transaction::SignedTransaction, PeerId};
 use futures::{stream::FuturesUnordered, StreamExt};
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
@@ -95,36 +95,33 @@ impl BatchRequesterState {
 }
 
 pub(crate) struct BatchRequester<T> {
-    epoch: u64,
     my_peer_id: PeerId,
     request_num_peers: usize,
     retry_limit: usize,
     retry_interval_ms: usize,
     rpc_timeout_ms: usize,
     network_sender: T,
-    validator_verifier: Arc<ValidatorVerifier>,
+    epoch_state: Arc<EpochState>,
 }
 
 impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
     pub(crate) fn new(
-        epoch: u64,
         my_peer_id: PeerId,
         request_num_peers: usize,
         retry_limit: usize,
         retry_interval_ms: usize,
         rpc_timeout_ms: usize,
         network_sender: T,
-        validator_verifier: ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
     ) -> Self {
         Self {
-            epoch,
             my_peer_id,
             request_num_peers,
             retry_limit,
             retry_interval_ms,
             rpc_timeout_ms,
             network_sender,
-            validator_verifier: Arc::new(validator_verifier),
+            epoch_state,
         }
     }
 
@@ -136,12 +133,12 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
         mut subscriber_rx: oneshot::Receiver<PersistedValue>,
     ) -> Option<(BatchInfo, Vec<SignedTransaction>)> {
-        let validator_verifier = self.validator_verifier.clone();
+        let epoch_state = self.epoch_state.clone();
         let mut request_state = BatchRequesterState::new(responders, ret_tx, self.retry_limit);
         let network_sender = self.network_sender.clone();
         let request_num_peers = self.request_num_peers;
         let my_peer_id = self.my_peer_id;
-        let epoch = self.epoch;
+        let epoch = self.epoch_state.epoch;
         let retry_interval = Duration::from_millis(self.retry_interval_ms as u64);
         let rpc_timeout = Duration::from_millis(self.rpc_timeout_ms as u64);
 
@@ -177,7 +174,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                 counters::RECEIVED_BATCH_NOT_FOUND_COUNT.inc();
                                 if ledger_info.commit_info().epoch() == epoch
                                     && ledger_info.commit_info().timestamp_usecs() > expiration
-                                    && ledger_info.verify_signatures(&validator_verifier).is_ok()
+                                    && ledger_info.verify_signatures(&epoch_state.verifier).is_ok()
                                 {
                                     counters::RECEIVED_BATCH_EXPIRED_COUNT.inc();
                                     debug!("QS: batch request expired, digest:{}", digest);

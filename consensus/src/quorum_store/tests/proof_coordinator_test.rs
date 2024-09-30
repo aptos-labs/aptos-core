@@ -14,7 +14,8 @@ use aptos_consensus_types::proof_of_store::{BatchId, SignedBatchInfo, SignedBatc
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
-    transaction::SignedTransaction, validator_verifier::random_validator_verifier, PeerId,
+    epoch_state::EpochState, transaction::SignedTransaction,
+    validator_verifier::random_validator_verifier, PeerId,
 };
 use mini_moka::sync::Cache;
 use std::sync::Arc;
@@ -47,6 +48,7 @@ impl BatchReader for MockBatchReader {
 async fn test_proof_coordinator_basic() {
     aptos_logger::Logger::init_for_testing();
     let (signers, verifier) = random_validator_verifier(4, None, true);
+    let epoch_state = Arc::new(EpochState::new(1, verifier));
     let (tx, _rx) = channel(100);
     let proof_cache = Cache::builder().build();
     let proof_coordinator = ProofCoordinator::new(
@@ -62,7 +64,11 @@ async fn test_proof_coordinator_basic() {
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);
     let network_sender = MockQuorumStoreSender::new(tx);
-    tokio::spawn(proof_coordinator.start(proof_coordinator_rx, network_sender, verifier.clone()));
+    tokio::spawn(proof_coordinator.start(
+        proof_coordinator_rx,
+        network_sender,
+        epoch_state.clone(),
+    ));
 
     let batch_author = signers[0].author();
     let batch_id = BatchId::new_for_test(1);
@@ -85,7 +91,9 @@ async fn test_proof_coordinator_basic() {
         msg => panic!("Expected LocalProof but received: {:?}", msg),
     };
     // check normal path
-    assert!(proof_msg.verify(100, &verifier, &proof_cache).is_ok());
+    assert!(proof_msg
+        .verify(100, &epoch_state.verifier, &proof_cache)
+        .is_ok());
     let proofs = proof_msg.take();
     assert_eq!(proofs[0].digest(), digest);
 }

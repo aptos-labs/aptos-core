@@ -1104,13 +1104,13 @@ impl RoundManager {
                         .observe(start.elapsed().as_secs_f64());
                     self.pending_order_votes.insert_order_vote(
                         order_vote_msg.order_vote(),
-                        &self.epoch_state.verifier,
+                        self.epoch_state.clone(),
                         Some(order_vote_msg.quorum_cert().clone()),
                     )
                 } else {
                     self.pending_order_votes.insert_order_vote(
                         order_vote_msg.order_vote(),
-                        &self.epoch_state.verifier,
+                        self.epoch_state.clone(),
                         None,
                     )
                 };
@@ -1248,9 +1248,7 @@ impl RoundManager {
         {
             return Ok(());
         }
-        let vote_reception_result = self
-            .round_state
-            .insert_vote(vote, &self.epoch_state.verifier);
+        let vote_reception_result = self.round_state.insert_vote(vote, self.epoch_state.clone());
         self.process_vote_reception_result(vote, vote_reception_result)
             .await
     }

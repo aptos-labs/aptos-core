@@ -16,12 +16,16 @@ use aptos_crypto::HashValue;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
+    epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use move_core_types::account_address::AccountAddress;
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::oneshot;
 
 #[derive(Clone)]
@@ -81,15 +85,18 @@ async fn test_batch_request_exists() {
 
     let validator_signer = ValidatorSigner::random(None);
     let (tx, mut rx) = tokio::sync::oneshot::channel();
-    let batch_requester = BatchRequester::new(
+    let epoch_state = Arc::new(EpochState::new(
         1,
+        ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key()),
+    ));
+    let batch_requester = BatchRequester::new(
         AccountAddress::random(),
         1,
         2,
         1_000,
         1_000,
         MockBatchRequester::new(batch_response),
-        ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key()),
+        epoch_state,
     );
 
     let (_, subscriber_rx) = oneshot::channel();
@@ -176,15 +183,15 @@ async fn test_batch_request_not_exists_not_expired() {
     );
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     let batch_response = BatchResponse::NotFound(ledger_info_with_signatures);
+    let epoch_state = Arc::new(EpochState::new(1, validator_verifier));
     let batch_requester = BatchRequester::new(
-        1,
         AccountAddress::random(),
         1,
         2,
         retry_interval_ms,
         1_000,
         MockBatchRequester::new(batch_response),
-        validator_verifier,
+        epoch_state,
     );
 
     let request_start = Instant::now();
@@ -224,15 +231,15 @@ async fn test_batch_request_not_exists_expired() {
     );
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     let batch_response = BatchResponse::NotFound(ledger_info_with_signatures);
+    let epoch_state = Arc::new(EpochState::new(1, validator_verifier));
     let batch_requester = BatchRequester::new(
-        1,
         AccountAddress::random(),
         1,
         2,
         retry_interval_ms,
         1_000,
         MockBatchRequester::new(batch_response),
-        validator_verifier,
+        epoch_state,
     );
 
     let request_start = Instant::now();
