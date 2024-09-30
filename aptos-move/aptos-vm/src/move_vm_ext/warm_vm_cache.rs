@@ -81,6 +81,7 @@ impl WarmVmCache {
 
     fn warm_vm_up(vm: &MoveVM, resolver: &impl AptosMoveResolver) {
         let _timer = TIMER.timer_with(&["vm_warm_up"]);
+        // println!("Loading 0x1::account for warm up");
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
         //

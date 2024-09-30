@@ -134,6 +134,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
         F: FnOnce() -> VMResult<Option<Arc<ModuleStorageEntry>>>,
     {
         if CrossBlockModuleCache::is_invalidated() {
+            // println!("read {:?} from MVHashMap", key);
             // Short-cut for reading.
             if let Some(v) = self.entries.get(key) {
                 if let Some(read) = v.get(txn_idx) {
@@ -161,6 +162,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
                 .insert(ShiftedTxnIndex::zero_idx(), CachePadded::new(maybe_entry));
             result
         } else {
+            // println!("read (get) for CrossBlockModuleCache");
             let key = key.as_state_key();
             Ok(
                 match CrossBlockModuleCache::get_from_cross_block_module_cache(key) {
@@ -169,10 +171,10 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
                         let maybe_entry = init_func()?;
                         match maybe_entry {
                             Some(entry) => {
-                                CrossBlockModuleCache::store_to_cross_block_module_cache(
-                                    key.clone(),
-                                    entry.clone(),
-                                );
+                                // CrossBlockModuleCache::store_to_cross_block_module_cache(
+                                //     key.clone(),
+                                //     entry.clone(),
+                                // );
                                 ModuleStorageRead::storage_version(entry)
                             },
                             None => ModuleStorageRead::DoesNotExist,

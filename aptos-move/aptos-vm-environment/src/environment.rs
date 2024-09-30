@@ -30,6 +30,7 @@ use std::sync::Arc;
 /// used by execution, gas parameters, VM configs and global caches. Note that it is the user's
 /// responsibility to make sure the environment is consistent, for now it should only be used per
 /// block of transactions because all features or configs are updated only on per-block basis.
+#[derive(Debug)]
 pub struct AptosEnvironment(Arc<Environment>);
 
 impl AptosEnvironment {
@@ -61,7 +62,7 @@ impl AptosEnvironment {
     /// block executor where this optimization is needed. Note: whether the optimization will be
     /// enabled or not depends on the feature flag.
     pub fn new_with_delayed_field_optimization_enabled(state_view: &impl StateView) -> Self {
-        let env = Environment::new(state_view, true, None).try_enable_delayed_field_optimization();
+        let env = Environment::new(state_view, false, None).try_enable_delayed_field_optimization();
         Self(Arc::new(env))
     }
 
@@ -131,6 +132,7 @@ impl WithRuntimeEnvironment for AptosEnvironment {
     }
 }
 
+#[derive(Debug)]
 struct Environment {
     /// Specifies the chain, i.e., testnet, mainnet, etc.
     chain_id: ChainId,

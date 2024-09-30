@@ -4,12 +4,14 @@
 use crate::environment::AptosEnvironment;
 use aptos_types::{
     executable::ModulePath,
-    state_store::{state_key::StateKey, StateView},
+    state_store::{state_key::StateKey, StateView, TStateView},
     vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
 };
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, vm_status::StatusCode,
+};
 use move_vm_runtime::{Module, RuntimeEnvironment};
 use move_vm_types::{module_cyclic_dependency_error, module_linker_error};
 use once_cell::sync::Lazy;
@@ -18,8 +20,6 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use aptos_types::state_store::TStateView;
-use move_core_types::vm_status::StatusCode;
 
 /// Represents a unique identifier for an [AptosEnvironment] instance based on the features, gas
 /// feature version, and other configs.
@@ -34,14 +34,14 @@ impl EnvironmentID {
         // These are sufficient to distinguish different environments.
         let chain_id = env.chain_id();
         let features = env.features();
-        let timed_features = env.timed_features();
+        // let timed_features = env.timed_features();
         let gas_feature_version = env.gas_feature_version();
         let vm_config = env.vm_config();
 
         let bytes = bcs::to_bytes(&(
             chain_id,
             features,
-            timed_features,
+            // timed_features,
             gas_feature_version,
             vm_config,
         ))
@@ -79,12 +79,18 @@ impl EnvironmentCache {
             if &id == cached_id {
                 return cached_env.clone();
             }
+            // } else {
+            //     println!("Change of env!!!");
+            //     println!("Before: {:?}", cached_env);
+            //     println!("After: {:?}", env);
+            // }
         }
 
         let flush_cross_block_module_cache = cache.is_some();
         *cache = Some((id, env.clone()));
         drop(cache);
         if flush_cross_block_module_cache {
+            // println!(" !!! FLUSH: flush_cross_block_module_cache in get_or_fetch");
             MODULE_CACHE.0.write().flush()
         }
         env
@@ -108,12 +114,14 @@ impl ModuleCache {
     }
 
     fn flush(&mut self) {
+        println!(" !!! FLUSH: flush");
         self.invalidated = false;
         self.modules.clear();
     }
 
     fn flush_if_invalidated_and_mark_valid(&mut self) {
         if self.invalidated {
+            println!(" !!! FLUSH: flush_if_invalidated_and_mark_valid");
             self.invalidated = false;
             self.modules.clear();
         }
@@ -147,9 +155,13 @@ impl ModuleCache {
                 Some(dep_entry) => dep_entry.clone(),
                 None => {
                     let k = K::from_address_and_module_name(addr, name);
-                    let sv = base_view.get_state_value(&k).map_err(|_| {
-                        PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
-                    })?.ok_or_else(|| module_linker_error!(addr, name))?;
+                    let sv = base_view
+                        .get_state_value(&k)
+                        .map_err(|_| {
+                            PartialVMError::new(StatusCode::STORAGE_ERROR)
+                                .finish(Location::Undefined)
+                        })?
+                        .ok_or_else(|| module_linker_error!(addr, name))?;
                     ModuleStorageEntry::from_state_value(runtime_environment, sv).map(Arc::new)?
                 },
             };
@@ -181,6 +193,11 @@ impl ModuleCache {
                 .build_verified_module(locally_verified_module, &verified_dependencies)?,
         );
         let verified_entry = Arc::new(entry.make_verified(module.clone()));
+
+        // println!(
+        //     "Cached {}::{} in CrossBlockModuleCache",
+        //     address, module_name
+        // );
         self.modules.insert(
             StateKey::from_address_and_module_name(address, module_name),
             verified_entry,
@@ -227,6 +244,7 @@ impl CrossBlockModuleCache {
     }
 
     pub fn mark_invalid() {
+        // println!(" !!! FLUSH: mark_invalid");
         let mut cache = MODULE_CACHE.0.write();
         cache.invalidated = true;
     }

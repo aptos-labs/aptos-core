@@ -214,14 +214,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
             .read_module_storage(address, module_name)?
             .into_versioned()
         {
-            Some((version, entry)) => (version, entry),
+            Some((version, entry)) => {
+                // println!("{}::{} is cached in module storage???", address, module_name);
+                (version, entry)
+            },
             None => return Ok(None),
         };
         if let Some(module) = entry.try_as_verified_module() {
+            // println!("{}::{} is verified", address, module_name);
             return Ok(Some(module));
         }
 
         let module = if CrossBlockModuleCache::is_invalidated() {
+            // println!("Traverse MVHashMap starting from from {}::{}", address, module_name);
             let mut visited = HashSet::new();
             self.traversed_published_dependencies(
                 version,
@@ -231,6 +236,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
                 &mut visited,
             )?
         } else {
+            // println!("Traverse in locked CrossBlockModuleCache starting from {}::{}", address, module_name);
             CrossBlockModuleCache::traverse(
                 entry,
                 address,
@@ -278,6 +284,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     .borrow()
                     .get_captured_module_storage_read(key)
                 {
+                    // println!("{:?} is take from captured reads", key);
                     return Ok(read.clone());
                 }
 
@@ -297,6 +304,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 Ok(read)
             },
             ViewState::Unsync(state) => {
+                // println!("         SHOULD NOT BE USING UNSYNC MAP!!!!");
                 state.read_set.borrow_mut().module_reads.insert(key.clone());
                 Ok(match state.unsync_map.fetch_module(key) {
                     // For sequential execution, indices do not matter, but we still return

@@ -10,7 +10,7 @@ use serde::Serialize;
 pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
 
 /// Dynamic config options for the Move VM.
-#[derive(Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct VMConfig {
     pub verifier_config: VerifierConfig,
     pub deserializer_config: DeserializerConfig,

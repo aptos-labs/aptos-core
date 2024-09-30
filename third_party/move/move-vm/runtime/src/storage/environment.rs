@@ -26,7 +26,13 @@ use move_core_types::{
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use sha3::{Digest, Sha3_256};
-use std::sync::Arc;
+use std::{fmt::Formatter, sync::Arc};
+
+impl std::fmt::Debug for RuntimeEnvironment {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", &self.vm_config)
+    }
+}
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
 /// the code cache, possibly across multiple threads.
