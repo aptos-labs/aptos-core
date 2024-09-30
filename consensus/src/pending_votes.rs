@@ -343,12 +343,12 @@ impl fmt::Display for PendingVotes {
                 VoteStatus::NotEnoughVotes(li) => {
                     write!(
                         f,
-                        "LI {} has {} votes {:?}",
+                        "LI {} has {} verified votes {:?}, {} unverified votes {:?}",
                         li_digest,
-                        li.all_voters().count(),
-                        li.all_voters().collect::<Vec<_>>(),
-                        // li.unverified_voters().count(),
-                        // li.unverified_voters().collect::<Vec<_>>()
+                        li.verified_voters().count(),
+                        li.verified_voters().collect::<Vec<_>>(),
+                        li.unverified_voters().count(),
+                        li.unverified_voters().collect::<Vec<_>>()
                     )?;
                 },
             }
