@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod docker;
-mod health_checker;
 mod indexer_api;
 mod logging;
 mod postgres;
@@ -12,6 +11,7 @@ mod utils;
 
 // This is to allow external crates to use the localnode.
 pub mod faucet;
+pub mod health_checker;
 pub mod node;
 pub mod traits;
 
