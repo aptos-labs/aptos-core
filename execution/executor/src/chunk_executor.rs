@@ -289,7 +289,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let num_txns = chunk.len();
 
         let state_view = self.latest_state_view(&parent_state)?;
-        let (chunk_output, txn_infos_with_proof) = chunk.into_chunk_output::<V>(state_view)?;
+        let (chunk_output, chunk_proof) = chunk.into_output_and_proof::<V>(
+            state_view,
+            verified_target_li.clone(),
+            epoch_change_li.cloned(),
+        )?;
 
         // Calculate state snapshot
         let (result_state, next_epoch_state, state_checkpoint_output) =
@@ -297,7 +301,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 chunk_output,
                 &self.commit_queue.lock().latest_state(),
                 None, // append_state_checkpoint_to_block
-                Some(txn_infos_with_proof.state_checkpoint_hashes()),
+                Some(chunk_proof.txn_infos_with_proof.state_checkpoint_hashes()),
                 false, // is_block
             )?;
 

@@ -19,6 +19,8 @@ use aptos_vm::VMExecutor;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use crate::components::chunk_proof::ChunkProof;
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -43,10 +45,12 @@ pub trait TransactionChunkWithProof {
         self.len() == 0
     }
 
-    fn into_chunk_output<V: VMExecutor>(
+    fn into_output_and_proof<V: VMExecutor>(
         self,
         state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)>;
+        verified_target_li: LedgerInfoWithSignatures,
+        epoch_change_li: Option<LedgerInfoWithSignatures>,
+    ) -> Result<(ChunkOutput, ChunkProof)>;
 }
 
 impl TransactionChunkWithProof for TransactionListWithProof {
@@ -65,10 +69,12 @@ impl TransactionChunkWithProof for TransactionListWithProof {
         self.transactions.len()
     }
 
-    fn into_chunk_output<V: VMExecutor>(
+    fn into_output_and_proof<V: VMExecutor>(
         self,
         state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)> {
+        verified_target_li: LedgerInfoWithSignatures,
+        epoch_change_li: Option<LedgerInfoWithSignatures>,
+    ) -> Result<(ChunkOutput, ChunkProof)> {
         let TransactionListWithProof {
             transactions,
             events: _,
@@ -100,8 +106,13 @@ impl TransactionChunkWithProof for TransactionListWithProof {
                 BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )?
         };
+        let chunk_proof = ChunkProof {
+            txn_infos_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        };
 
-        Ok((chunk_out, txn_infos_with_proof))
+        Ok((chunk_out, chunk_proof))
     }
 }
 
@@ -119,10 +130,12 @@ impl TransactionChunkWithProof for TransactionOutputListWithProof {
         self.transactions_and_outputs.len()
     }
 
-    fn into_chunk_output<V: VMExecutor>(
+    fn into_output_and_proof<V: VMExecutor>(
         self,
         state_view: CachedStateView,
-    ) -> Result<(ChunkOutput, TransactionInfoListWithProof)> {
+        verified_target_li: LedgerInfoWithSignatures,
+        epoch_change_li: Option<LedgerInfoWithSignatures>,
+    ) -> Result<(ChunkOutput, ChunkProof)> {
         let TransactionOutputListWithProof {
             transactions_and_outputs,
             first_transaction_output_version: _,
@@ -130,7 +143,12 @@ impl TransactionChunkWithProof for TransactionOutputListWithProof {
         } = self;
 
         let chunk_out = ChunkOutput::by_transaction_output(transactions_and_outputs, state_view)?;
+        let chunk_proof = ChunkProof {
+            txn_infos_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        };
 
-        Ok((chunk_out, txn_infos_with_proof))
+        Ok((chunk_out, chunk_proof))
     }
 }

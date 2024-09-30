@@ -5,17 +5,22 @@
 #![forbid(unsafe_code)]
 
 use anyhow::{anyhow, ensure, Result};
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
+use aptos_executor_types::{ExecutedChunk};
 use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
 use aptos_types::{
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
+    proof::{accumulator::InMemoryTransactionAccumulator},
     transaction::Version,
 };
 use std::{collections::VecDeque, sync::Arc};
+use crate::components::chunk_output::ChunkOutput;
+use crate::components::chunk_proof::ChunkProof;
+use crate::components::speculative_state::SpeculativeState;
 
 pub(crate) struct ChunkToUpdateLedger {
+    pub chunk_output: ChunkOutput,
+    pub chunk_proof: ChunkProof,
+    pub speculative_state: SpeculativeState,
+    /* FIXME(aldenhu): remove
     pub result_state: StateDelta,
     /// transactions sorted by status, state roots, state updates
     pub state_checkpoint_output: StateCheckpointOutput,
@@ -27,6 +32,7 @@ pub(crate) struct ChunkToUpdateLedger {
     pub verified_target_li: LedgerInfoWithSignatures,
     pub epoch_change_li: Option<LedgerInfoWithSignatures>,
     pub txn_infos_with_proof: TransactionInfoListWithProof,
+     */
 }
 
 /// It's a two stage pipeline:

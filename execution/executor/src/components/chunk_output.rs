@@ -11,8 +11,8 @@ use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
-use aptos_logger::{sample, sample::SampleRate, warn};
+use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk, ParsedTransactionOutput};
+use aptos_logger::{error, sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     state_delta::StateDelta,
@@ -38,8 +38,14 @@ use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use std::{ops::Deref, sync::Arc, time::Duration};
+use std::iter::repeat;
+use aptos_executor_types::parsed_transaction_output::TransactionsWithParsedOutput;
+use aptos_executor_types::state_checkpoint_output::TransactionsByStatus;
+use aptos_types::transaction::{BlockEpiloguePayload, TransactionAuxiliaryData};
+use aptos_types::write_set::WriteSet;
+use crate::metrics::EXECUTOR_ERRORS;
 
-pub struct ChunkOutput {
+pub struct RawChunkOutput {
     /// Input transactions.
     pub transactions: Vec<Transaction>,
     /// Raw VM output.
@@ -48,8 +54,148 @@ pub struct ChunkOutput {
     /// execution result is processed; as well as all the accounts touched during execution, together
     /// with their proofs.
     pub state_cache: StateCache,
+}
+
+impl RawChunkOutput {
+    fn parse_into(
+        self,
+        append_state_checkpoint_to_block: Option<HashValue>,
+        block_end_info: Option<BlockEndInfo>,
+    ) -> Result<ChunkOutput> {
+        let Self {
+            transactions,
+            transaction_outputs,
+            state_cache: _,
+        } = self;
+
+        let mut transaction_outputs: Vec<ParsedTransactionOutput> =
+            transaction_outputs.into_iter().map(Into::into).collect();
+        // N.B. off-by-1 intentionally, for exclusive index
+        let new_epoch_marker = transaction_outputs
+            .iter()
+            .position(|o| o.is_reconfig())
+            .map(|idx| idx + 1);
+
+        let block_gas_limit_marker = transaction_outputs
+            .iter()
+            .position(|o| matches!(o.status(), TransactionStatus::Retry));
+
+        // Transactions after the epoch ending txn are all to be retried.
+        // Transactions after the txn that exceeded per-block gas limit are also to be retried.
+        let to_retry = if let Some(pos) = new_epoch_marker {
+            TransactionsWithParsedOutput::new(
+                transactions.drain(pos..).collect(),
+                transaction_outputs.drain(pos..).collect(),
+            )
+        } else if let Some(pos) = block_gas_limit_marker {
+            TransactionsWithParsedOutput::new(
+                transactions.drain(pos..).collect(),
+                transaction_outputs.drain(pos..).collect(),
+            )
+        } else {
+            TransactionsWithParsedOutput::new_empty()
+        };
+
+        let state_checkpoint_to_add =
+            new_epoch_marker.map_or_else(|| append_state_checkpoint_to_block, |_| None);
+
+        let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
+        let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
+
+        let status = keeps_and_discards.chain(retries).collect();
+
+        let to_discard = {
+            let mut res = TransactionsWithParsedOutput::new_empty();
+            for idx in 0..transactions.len() {
+                if transaction_outputs[idx].status().is_discarded() {
+                    res.push(transactions[idx].clone(), transaction_outputs[idx].clone());
+                } else if !res.is_empty() {
+                    transactions[idx - res.len()] = transactions[idx].clone();
+                    transaction_outputs[idx - res.len()] = transaction_outputs[idx].clone();
+                }
+            }
+            if !res.is_empty() {
+                let remaining = transactions.len() - res.len();
+                transactions.truncate(remaining);
+                transaction_outputs.truncate(remaining);
+            }
+            res
+        };
+        let to_keep = {
+            let mut res = TransactionsWithParsedOutput::new(transactions, transaction_outputs);
+
+            // Append the StateCheckpoint transaction to the end of to_keep
+            if let Some(block_id) = state_checkpoint_to_add {
+                let state_checkpoint_txn = block_end_info.map_or(
+                    Transaction::StateCheckpoint(block_id),
+                    |block_end_info| {
+                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
+                            block_id,
+                            block_end_info,
+                        })
+                    },
+                );
+                let state_checkpoint_txn_output: ParsedTransactionOutput =
+                    Into::into(TransactionOutput::new(
+                        WriteSet::default(),
+                        Vec::new(),
+                        0,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                        TransactionAuxiliaryData::default(),
+                    ));
+                res.push(state_checkpoint_txn, state_checkpoint_txn_output);
+            }
+            res
+        };
+
+        // Sanity check transactions with the Discard status:
+        to_discard.iter().for_each(|(t, o)| {
+            // In case a new status other than Retry, Keep and Discard is added:
+            if !matches!(o.status(), TransactionStatus::Discard(_)) {
+                error!("Status other than Retry, Keep or Discard; Transaction discarded.");
+            }
+            // VM shouldn't have output anything for discarded transactions, log if it did.
+            if !o.write_set().is_empty() || !o.events().is_empty() {
+                error!(
+                    "Discarded transaction has non-empty write set or events. \
+                        Transaction: {:?}. Status: {:?}.",
+                    t,
+                    o.status(),
+                );
+                EXECUTOR_ERRORS.inc();
+            }
+        });
+
+        Ok((
+            new_epoch_marker.is_some(),
+            status,
+            to_keep,
+            to_discard,
+            to_retry,
+        ))
+    }
+}
+
+pub struct ChunkOutput {
+    // Statuses of the input transactions, in the same order as the input transactions.
+    // Contains BlockMetadata/Validator transactions,
+    // but doesn't contain StateCheckpoint/BlockEpilogue, as those get added during execution
+    statuses_for_input_txns: Vec<TransactionStatus>,
+    // List of all transactions to be committed, including StateCheckpoint/BlockEpilogue if needed.
+    to_commit: TransactionsWithParsedOutput,
+    to_discard: TransactionsWithParsedOutput,
+    to_retry: TransactionsWithParsedOutput,
+
+    /// Carries the frozen base state view, so all in-mem nodes involved won't drop before the
+    /// execution result is processed; as well as all the accounts touched during execution, together
+    /// with their proofs.
+    pub state_cache: StateCache,
     /// Optional StateCheckpoint payload
     pub block_end_info: Option<BlockEndInfo>,
+    /// Optional EpochState payload.
+    /// Only present if the block is the last block of an epoch, and is parsed output of the
+    /// state cache.
+    pub next_epoch_state: Option<EpochState>,
 }
 
 impl ChunkOutput {

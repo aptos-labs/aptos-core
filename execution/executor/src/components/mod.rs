@@ -11,3 +11,5 @@ pub mod chunk_output;
 pub mod in_memory_state_calculator_v2;
 
 pub mod transaction_chunk;
+mod chunk_proof;
+mod speculative_state;
