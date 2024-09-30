@@ -1,11 +1,4 @@
 import_config:
-  mainnet:
-    # Transaction Stream endpoint addresss.
-    transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
-    # (Optional) The key to use with developers.aptoslabs.com
-    api_key: YOUR_KEY_HERE
-    versions_to_import:
-      123: mainnet_v1.json
   testnet:
     # Transaction Stream endpoint addresss.
     transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
@@ -13,19 +6,14 @@ import_config:
     api_key: aptoslabs_L7pzPsqiShp_EwzUCbhb6ehTe8PSvFp6ZeUr3B3gBdGaX
     # A map from versions to dump and their output names.
     versions_to_import:
-      123: testnet_v1.json
+      123: testnet_v123.json
   devnet:
     # Transaction Stream endpoint addresss.
     transaction_stream_endpoint: https://grpc.devnet.aptoslabs.com:443
     # (Optional) The key to use with developers.aptoslabs.com
-    api_key: YOUR_KEY_HERE
+    api_key: AG-NMD54CFQFTRNDWEVGASUW3J7ZZSVBGEQ6
     versions_to_import:
-      123: devnet_v1.json
-  custom:
-    # Transaction Stream endpoint addresss.
-    transaction_stream_endpoint: YOUR_CUSTOM_ENDPOINT
-    versions_to_import:
-      123: custom_v1.json
+      1000: devnet_v1000.json
 
 script_transaction_generator_config:
   runs: [

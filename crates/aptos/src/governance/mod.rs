@@ -905,10 +905,10 @@ pub struct CompileScriptFunction {
     pub compiled_script_path: Option<PathBuf>,
 
     #[clap(flatten)]
-    pub(crate) framework_package_args: FrameworkPackageArgs,
+    pub framework_package_args: FrameworkPackageArgs,
 
     #[clap(long, default_value_if("move_2", "true", "7"))]
-    pub(crate) bytecode_version: Option<u32>,
+    pub bytecode_version: Option<u32>,
 
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            default_value_if("move_2", "true", "2.0"))]
