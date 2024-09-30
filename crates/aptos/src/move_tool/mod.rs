@@ -78,7 +78,7 @@ pub use stored_package::*;
 use tokio::task;
 use url::Url;
 
-mod aptos_debug_natives;
+pub mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
 mod fmt;
@@ -848,7 +848,7 @@ impl FromStr for IncludedArtifacts {
     }
 }
 
-pub(crate) fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
+pub fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
     match optlevel {
         None | Some(OptimizationLevel::Default) => {
             vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]

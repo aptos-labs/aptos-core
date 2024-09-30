@@ -1,5 +1,6 @@
 address 0x42 {
 module M {
+    const B: u8 = C1;
     const C1: u8 = 0;
     const C2: u64 = 0;
     const C3: u128 = 0;
@@ -17,6 +18,7 @@ module M {
     fun t6(): vector<u8> { C6 }
     fun t7(): vector<u8> { C7 }
     fun t8(): vector<address> { C8 }
+    fun t9(): u8 { B }
 }
 }
 

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/friend_decl_inside_function.move:6:9
+  │
+6 │         friend 0x42::A;
+  │         ^^^^^^
+  │         │
+  │         Unexpected 'friend'
+  │         Expected an expression term

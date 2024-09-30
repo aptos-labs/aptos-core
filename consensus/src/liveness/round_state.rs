@@ -14,7 +14,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
 use aptos_types::{
-    ledger_info::LedgerInfoWithPartialSignatures, validator_verifier::ValidatorVerifier,
+    ledger_info::LedgerInfoWithVerifiedSignatures, validator_verifier::ValidatorVerifier,
 };
 use futures::future::AbortHandle;
 use serde::Serialize;
@@ -45,7 +45,7 @@ pub struct NewRoundEvent {
     pub round: Round,
     pub reason: NewRoundReason,
     pub timeout: Duration,
-    pub prev_round_votes: Vec<(HashValue, LedgerInfoWithPartialSignatures)>,
+    pub prev_round_votes: Vec<(HashValue, LedgerInfoWithVerifiedSignatures)>,
     pub prev_round_timeout_votes: Option<TwoChainTimeoutWithPartialSignatures>,
 }
 

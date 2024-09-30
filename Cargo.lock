@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "4.2.0"
+version = "4.2.3"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1184,6 +1184,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "status-line",
+ "tokio",
 ]
 
 [[package]]
@@ -1245,6 +1246,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.4.14",
  "itertools 0.13.0",
+ "serde_json",
  "tokio",
 ]
 
@@ -1668,7 +1670,6 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -2868,7 +2869,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515#51a34901b40d7f75767ac907b4d2478104d6a515"
 dependencies = [
  "chrono",
 ]
@@ -2876,7 +2877,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=e294b558b33619bba92e205cb74c581488bcb2a3#e294b558b33619bba92e205cb74c581488bcb2a3"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 dependencies = [
  "chrono",
 ]
@@ -4286,6 +4287,7 @@ dependencies = [
  "claims",
  "coset",
  "criterion",
+ "dashmap",
  "derivative",
  "fixed",
  "fxhash",
@@ -11618,7 +11620,6 @@ dependencies = [
  "proptest",
  "serde",
  "sha3 0.9.1",
- "tracing",
  "triomphe",
  "typed-arena",
 ]
@@ -13352,14 +13353,14 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=e294b558b33619bba92e205cb74c581488bcb2a3#e294b558b33619bba92e205cb74c581488bcb2a3"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515#51a34901b40d7f75767ac907b4d2478104d6a515"
 dependencies = [
  "ahash 0.8.11",
  "allocative",
  "allocative_derive",
  "anyhow",
  "aptos-indexer-processor-sdk",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=e294b558b33619bba92e205cb74c581488bcb2a3)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "async-trait",
  "bcs 0.1.4",
@@ -15156,7 +15157,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=e294b558b33619bba92e205cb74c581488bcb2a3#e294b558b33619bba92e205cb74c581488bcb2a3"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515#51a34901b40d7f75767ac907b4d2478104d6a515"
 dependencies = [
  "anyhow",
  "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
@@ -15510,7 +15511,6 @@ dependencies = [
  "aptos-db",
  "aptos-db-indexer",
  "aptos-db-indexer-schemas",
- "aptos-debugger",
  "aptos-dkg",
  "aptos-faucet-core",
  "aptos-forge",

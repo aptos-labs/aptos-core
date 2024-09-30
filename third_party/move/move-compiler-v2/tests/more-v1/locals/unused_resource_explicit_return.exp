@@ -1,0 +1,83 @@
+
+Diagnostics:
+warning: Unused local variable `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:5:13
+  │
+5 │         let r = R{};
+  │             ^
+
+warning: Unused local variable `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:28:13
+   │
+28 │         let r = R{};
+   │             ^
+
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:33:13
+   │
+33 │         let x = &R{};
+   │             ^
+
+
+Diagnostics:
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:5:17
+  │
+5 │         let r = R{};
+  │                 ^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:28:17
+   │
+28 │         let r = R{};
+   │                 ^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:33:17
+   │
+33 │         let x = &R{};
+   │                 ^^^^
+
+
+Diagnostics:
+error: local `r` of type `M::R` does not have the `drop` ability
+  ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:5:17
+  │
+5 │         let r = R{};
+  │                 ^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:11:21
+   │
+11 │         if (cond) { return () };
+   │                     ^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:17:29
+   │
+17 │         if (cond) {} else { return () };
+   │                             ^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:23:24
+   │
+23 │         while (cond) { return () };
+   │                        ^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:28:17
+   │
+28 │         let r = R{};
+   │                 ^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:33:17
+   │
+33 │         let x = &R{};
+   │                 ^^^^ implicitly dropped here since it is no longer used
+
+error: local `_x` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource_explicit_return.move:38:9
+   │
+38 │         return ()
+   │         ^^^^^^^^^ implicitly dropped here since it is no longer used

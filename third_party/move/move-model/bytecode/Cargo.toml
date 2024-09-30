@@ -15,6 +15,7 @@ move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
 move-model = { path = ".." }
 
+anyhow = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 ethnum = { workspace = true }
 im = "15.0.0"

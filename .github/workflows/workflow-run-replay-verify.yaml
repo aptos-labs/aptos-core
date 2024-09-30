@@ -25,6 +25,10 @@ on:
         required: false
         type: string
         description: The list of transaction versions to skip. If not specified, it will use the default list.
+      RANGES_TO_SKIP:
+        required: false
+        type: string
+        description: The optional list of transaction ranges to skip..
       BACKUP_CONFIG_TEMPLATE_PATH:
         description: "The path to the backup config template to use."
         type: string
@@ -39,7 +43,11 @@ on:
         description: "Github job timeout in minutes"
         type: number
         required: true
-        default: 720
+        default: 180
+      MAX_VERSIONS_PER_RANGE:
+        description: "The maximum number of versions to process in a single job."
+        type: number
+        required: true
   # This allows the workflow to be triggered manually from the Github UI or CLI
   # NOTE: because the "number" type is not supported, we default to 720 minute timeout
   workflow_dispatch:
@@ -65,6 +73,10 @@ on:
         required: false
         type: string
         description: The list of transaction versions to skip. If not specified, it will use the default list.
+      RANGES_TO_SKIP:
+        required: false
+        type: string
+        description: The optional list of transaction ranges to skip..
       BACKUP_CONFIG_TEMPLATE_PATH:
         description: "The path to the backup config template to use."
         type: string
@@ -75,25 +87,45 @@ on:
         type: string
         required: true
         default: "high-perf-docker-with-local-ssd"
-
+      MAX_VERSIONS_PER_RANGE:
+        description: "The maximum number of versions to process in a single job."
+        type: number
+        required: true
 jobs:
-  replay-verify:
-    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 720 }}
+  prepare:
     runs-on: ${{ inputs.RUNS_ON }}
-    strategy:
-      fail-fast: false
-      matrix:
-        number: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] # runner number
+    outputs:
+      job_ids: ${{ steps.gen-jobs.outputs.job_ids }}
     steps:
-      - name: Echo Runner Number
-        run: echo "Runner is ${{ matrix.number }}"
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.GIT_SHA }}
 
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - name: Load cached aptos-debugger binary
+        id: cache-aptos-debugger-binary
+        uses: actions/cache@v4
         with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          # copy the binary to the root of the repo and cache it there, because rust-setup calls a cache-rust action
+          # which cleans up the target directory in its post action
+          path: |
+            aptos-debugger
+            testsuite/replay_verify.py
+          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+
+      - name: Prepare for build if not cached
+        if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
+        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+      - name: Build and strip aptos-debugger binary if not cached
+        if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          cargo build --release -p aptos-debugger
+          strip -s target/release/aptos-debugger
+          cp target/release/aptos-debugger .
 
       - name: Install GCloud SDK
         uses: "google-github-actions/setup-gcloud@v2"
@@ -101,16 +133,162 @@ jobs:
           version: ">= 418.0.0"
           install_components: "kubectl,gke-gcloud-auth-plugin"
 
-      - name: Build CLI binaries in release mode
-        shell: bash
-        run: cargo build --release -p aptos-debugger
+      - name: get timestamp to use in cache key
+        id: get-timestamp
+        run: echo "ts=$(date +%s)" >> $GITHUB_OUTPUT
 
-      - name: Run replay-verify in parallel
-        shell: bash
-        run: testsuite/replay_verify.py ${{ matrix.number }} 19 # first argument is the runner number, second argument is the total number of runners
+      - name: Load cached backup storage metadata cache dir (and save back afterwards)
+        uses: actions/cache@v4
+        with:
+          path: metadata_cache
+          key: metadata-cache-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-${{ steps.get-timestamp.outputs.ts }}
+          restore-keys: metadata-cache-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-
+
+      - name: Generate job ranges
+        id: gen-jobs
         env:
           BUCKET: ${{ inputs.BUCKET }}
           SUB_DIR: ${{ inputs.SUB_DIR }}
-          HISTORY_START: ${{ inputs.HISTORY_START }}
-          TXNS_TO_SKIP: ${{ inputs.TXNS_TO_SKIP }}
-          BACKUP_CONFIG_TEMPLATE_PATH: ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+        run: |
+          ./aptos-debugger aptos-db gen-replay-verify-jobs  \
+            --metadata-cache-dir ./metadata_cache \
+            --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
+            --start-version ${{ inputs.HISTORY_START }} \
+            --ranges-to-skip "${{ inputs.RANGES_TO_SKIP }}" \
+            --max-versions-per-range ${{ inputs.MAX_VERSIONS_PER_RANGE }} \
+            \
+            --max-ranges-per-job 16 \
+            --output-json-file jobs.json \
+
+
+          jq -c 'length as $N | [range(0; $N)]' jobs.json > job_ids.json
+
+          cat job_ids.json
+          jq . jobs.json
+
+          echo "job_ids=$(cat job_ids.json)" >> $GITHUB_OUTPUT
+
+      - name: Cache backup storage config and job definition
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+            jobs.json
+          key: backup-config-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-${{ github.run_id }}
+
+  replay-verify:
+    needs: prepare
+    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 180 }}
+    runs-on: ${{ inputs.RUNS_ON }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job_id: ${{ fromJson(needs.prepare.outputs.job_ids) }}
+    steps:
+      - name: Load cached aptos-debugger binary and replay_verify.py script
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            aptos-debugger
+            testsuite/replay_verify.py
+          key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Load cached backup storage metadata cache dir
+        uses: actions/cache/restore@v4
+        with:
+          path: metadata_cache
+          key: metadata-cache-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-
+          fail-on-cache-miss: true
+
+      - name: Load cached backup storage config and job definitions
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }}
+            jobs.json
+          key: backup-config-${{ inputs.BUCKET }}/${{ inputs.SUB_DIR }}-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      - name: Install GCloud SDK
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          version: ">= 418.0.0"
+          install_components: "kubectl,gke-gcloud-auth-plugin"
+
+      - name: Run replay-verify in parallel
+        env:
+          BUCKET: ${{ inputs.BUCKET }}
+          SUB_DIR: ${{ inputs.SUB_DIR }}
+        shell: bash
+        run: |
+          set -o nounset -o errexit -o pipefail
+          replay() {
+              idx=$1
+              id=$2
+              begin=$3
+              end=$4
+              desc=$5
+
+              echo ---------
+              echo Job start. $id: $desc
+              echo ---------
+
+              MC=metadata_cache_$idx
+              cp -r metadata_cache $MC
+              DB=db_$idx
+
+              for try in {0..6}
+              do
+                if [ $try -gt 0 ]; then
+                  SLEEP=$((10 * $try))
+                  echo "sleeping for $SLEEP seconds before retry #$try" >&2
+                  sleep $SLEEP
+                fi
+
+                res=0
+                ./aptos-debugger aptos-db replay-verify \
+                  --metadata-cache-dir $MC \
+                  --command-adapter-config ${{ inputs.BACKUP_CONFIG_TEMPLATE_PATH }} \
+                  --start-version $begin \
+                  --end-version $end \
+                  \
+                  --lazy-quit \
+                  --enable-storage-sharding \
+                  --target-db-dir $DB \
+                  --concurrent-downloads 8 \
+                  --replay-concurrency-level 4 \
+                  || res=$?
+
+                if [[ $res == 0 || $res == 2 ]]
+                then
+                  return $res
+                fi
+              done
+              return 1
+          }
+
+          pids=()
+          idx=0
+          while read id begin end desc; do
+
+              replay $idx $id $begin $end "$desc" 2>&1 | sed "s/^/[partition $idx]: /" &
+
+              pids[$idx]=$!
+              idx=$((idx+1))
+          done < <(jq '.[${{ matrix.job_id }}][]' jobs.json)
+
+          res=0
+          for idx in `seq 0 $((idx-1))`
+          do
+              range_res=0
+              wait ${pids[$idx]} || range_res=$?
+              echo partition $idx returned $range_res
+              if [[ $range_res != 0 ]]
+              then
+                  res=$range_res
+              fi
+          done
+
+          echo All partitions done, returning $res
+          exit $res
