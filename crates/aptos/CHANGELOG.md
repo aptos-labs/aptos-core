@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- `aptos move fmt` formats move files inside the `tests` and `examples` directory of a package.
 
 ## [4.2.3] - 2024/09/20
 - Fix the broken indexer in localnet in 4.2.2, which migrates table info from sycn to async ways.
