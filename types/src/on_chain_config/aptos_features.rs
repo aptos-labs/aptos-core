@@ -175,7 +175,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
-            FeatureFlag::ENABLE_LOADER_V2,
+            // FeatureFlag::ENABLE_LOADER_V2,
         ]
     }
 }
@@ -198,11 +198,11 @@ impl Default for Features {
         }
 
         // TODO(loader_v2): Remove before rolling out. This allows us to replay with V2.
-        if use_loader_v1_based_on_env() {
-            features.disable(FeatureFlag::ENABLE_LOADER_V2);
-        } else {
-            features.enable(FeatureFlag::ENABLE_LOADER_V2);
-        }
+        // if use_loader_v1_based_on_env() {
+        //     features.disable(FeatureFlag::ENABLE_LOADER_V2);
+        // } else {
+        //     features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        // }
 
         features
     }

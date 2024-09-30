@@ -32,7 +32,7 @@ pub struct VMConfig {
 
 impl Default for VMConfig {
     fn default() -> Self {
-        let use_loader_v2 = !use_loader_v1_based_on_env();
+        let use_loader_v2 = false;// !use_loader_v1_based_on_env();
         Self {
             verifier_config: VerifierConfig::default(),
             deserializer_config: DeserializerConfig::default(),
