@@ -329,7 +329,7 @@ impl StateComputer for ExecutionProxy {
     }
 
     /// Synchronize to a commit that not present locally.
-    async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_to_target(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         let mut latest_logical_time = self.write_mutex.lock().await;
         let logical_time =
             LogicalTime::new(target.ledger_info().epoch(), target.ledger_info().round());
@@ -357,8 +357,8 @@ impl StateComputer for ExecutionProxy {
                 .notify_commit(block_timestamp, Vec::new());
         }
 
-        fail_point!("consensus::sync_to", |_| {
-            Err(anyhow::anyhow!("Injected error in sync_to").into())
+        fail_point!("consensus::sync_to_target", |_| {
+            Err(anyhow::anyhow!("Injected error in sync_to_target").into())
         });
         // Here to start to do state synchronization where ChunkExecutor inside will
         // process chunks and commit to Storage. However, after block execution and
@@ -366,7 +366,7 @@ impl StateComputer for ExecutionProxy {
         // it is required to reset the cache of ChunkExecutor in State Sync
         // when requested to sync.
         let res = monitor!(
-            "sync_to",
+            "sync_to_target",
             self.state_sync_notifier.sync_to_target(target).await
         );
         *latest_logical_time = logical_time;
@@ -577,8 +577,8 @@ async fn test_commit_sync_race() {
         .commit(&[], generate_li(1, 10), callback)
         .await
         .unwrap();
-    assert!(executor.sync_to(generate_li(1, 8)).await.is_ok());
+    assert!(executor.sync_to_target(generate_li(1, 8)).await.is_ok());
     assert_eq!(*recorded_commit.time.lock(), LogicalTime::new(1, 10));
-    assert!(executor.sync_to(generate_li(2, 8)).await.is_ok());
+    assert!(executor.sync_to_target(generate_li(2, 8)).await.is_ok());
     assert_eq!(*recorded_commit.time.lock(), LogicalTime::new(2, 8));
 }

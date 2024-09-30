@@ -88,8 +88,8 @@ pub trait TExecutionClient: Send + Sync {
         commit_msg: IncomingCommitRequest,
     ) -> Result<()>;
 
-    /// Synchronize to a commit that not present locally.
-    async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
+    /// Synchronize to a commit that is not present locally.
+    async fn sync_to_target(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     /// Resets the internal state of the rand and buffer managers.
     async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()>;
@@ -400,9 +400,9 @@ impl TExecutionClient for ExecutionProxyClient {
         }
     }
 
-    async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
-        fail_point!("consensus::sync_to", |_| {
-            Err(anyhow::anyhow!("Injected error in sync_to").into())
+    async fn sync_to_target(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        fail_point!("consensus::sync_to_target", |_| {
+            Err(anyhow::anyhow!("Injected error in sync_to_target").into())
         });
 
         // Reset the rand and buffer managers to the target round
@@ -410,7 +410,7 @@ impl TExecutionClient for ExecutionProxyClient {
 
         // TODO: handle the sync error, should re-push the ordered blocks to buffer manager
         // when it's reset but sync fails.
-        self.execution_proxy.sync_to(target).await?;
+        self.execution_proxy.sync_to_target(target).await?;
         Ok(())
     }
 
@@ -523,7 +523,7 @@ impl TExecutionClient for DummyExecutionClient {
         Ok(())
     }
 
-    async fn sync_to(&self, _: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_to_target(&self, _: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         Ok(())
     }
 
