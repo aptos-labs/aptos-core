@@ -3,7 +3,7 @@
 
 # Module `0x1::secp256k1`
 
-This module implements ECDSA signatures based on the prime-order secp256k1 ellptic curve (i.e., cofactor is 1).
+This module implements ECDSA signatures based on the prime-order secp256k1 elliptic curve (i.e., cofactor is 1).
 
 
 -  [Struct `ECDSARawPublicKey`](#0x1_secp256k1_ECDSARawPublicKey)
