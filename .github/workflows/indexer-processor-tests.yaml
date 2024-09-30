@@ -9,6 +9,12 @@ on:
     branches:
       - main
 
+# Grant the required permissions to request the ID token
+permissions:
+  id-token: write  # This is required for GCP authentication
+  contents: read   # Ensure the workflow has access to repository contents
+
+
 jobs:
   dispatch_event:
     runs-on: ubuntu-latest
@@ -17,7 +23,6 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
-      - uses: dsherret/rust-toolchain-file@v1
       - id: auth
         uses: "google-github-actions/auth@v2"
         with:
