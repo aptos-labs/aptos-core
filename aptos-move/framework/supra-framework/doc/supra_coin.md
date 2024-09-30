@@ -218,7 +218,7 @@ Can only called during genesis to initialize the Supra coin.
     <b>let</b> (burn_cap, freeze_cap, mint_cap) =<a href="coin.md#0x1_coin_initialize_with_parallelizable_supply_with_limit">coin::initialize_with_parallelizable_supply_with_limit</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a>&gt;(
         supra_framework,
         <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"Supra Coin"),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"SUP"),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"SUPRA"),
         8, // decimals
         <b>true</b>, // monitor_supply
 			<a href="supra_coin.md#0x1_supra_coin_MAX_SUPRA_COIN_SUPPLY">MAX_SUPRA_COIN_SUPPLY</a>,
@@ -497,7 +497,7 @@ Claim the delegated mint capability and destroy the delegated token.
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
 <b>aborts_if</b> addr != @supra_framework;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(b"Supra Coin");
-<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(b"SUP");
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(b"SUPRA");
 <b>aborts_if</b> <b>exists</b>&lt;<a href="supra_coin.md#0x1_supra_coin_MintCapStore">MintCapStore</a>&gt;(addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a>&gt;&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(addr);
