@@ -119,24 +119,9 @@ spec aptos_framework::coin {
         ensures [abstract] result == type_info::type_of<CoinType>().account_address;
     }
 
-    /// Can only be initialized once.
-    /// Can only be published by reserved addresses.
-    spec initialize_supply_config(aptos_framework: &signer) {
-        let aptos_addr = signer::address_of(aptos_framework);
-        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
-        aborts_if exists<SupplyConfig>(aptos_addr);
-        ensures !global<SupplyConfig>(aptos_addr).allow_upgrades;
-        ensures exists<SupplyConfig>(aptos_addr);
-    }
-
     /// Can only be updated by `@aptos_framework`.
-    spec allow_supply_upgrades(aptos_framework: &signer, allowed: bool) {
-        modifies global<SupplyConfig>(@aptos_framework);
-        let aptos_addr = signer::address_of(aptos_framework);
-        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
-        aborts_if !exists<SupplyConfig>(aptos_addr);
-        let post allow_upgrades_post = global<SupplyConfig>(@aptos_framework);
-        ensures allow_upgrades_post.allow_upgrades == allowed;
+    spec allow_supply_upgrades(_aptos_framework: &signer, _allowed: bool) {
+        aborts_if true;
     }
 
     spec balance<CoinType>(owner: address): u64 {
@@ -394,32 +379,8 @@ spec aptos_framework::coin {
 
     /// The creator of `CoinType` must be `@aptos_framework`.
     /// `SupplyConfig` allow upgrade.
-    spec upgrade_supply<CoinType>(account: &signer) {
-        let account_addr = signer::address_of(account);
-        let coin_address = type_info::type_of<CoinType>().account_address;
-        aborts_if coin_address != account_addr;
-        aborts_if !exists<SupplyConfig>(@aptos_framework);
-        /// [high-level-req-1.1]
-        aborts_if !exists<CoinInfo<CoinType>>(account_addr);
-
-        let supply_config = global<SupplyConfig>(@aptos_framework);
-        aborts_if !supply_config.allow_upgrades;
-        modifies global<CoinInfo<CoinType>>(account_addr);
-
-        let maybe_supply = global<CoinInfo<CoinType>>(account_addr).supply;
-        let supply = option::spec_borrow(maybe_supply);
-        let value = optional_aggregator::optional_aggregator_value(supply);
-
-        let post post_maybe_supply = global<CoinInfo<CoinType>>(account_addr).supply;
-        let post post_supply = option::spec_borrow(post_maybe_supply);
-        let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
-
-        let supply_no_parallel = option::spec_is_some(maybe_supply) &&
-            !optional_aggregator::is_parallelizable(supply);
-
-        aborts_if supply_no_parallel && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
-        ensures supply_no_parallel ==>
-            optional_aggregator::is_parallelizable(post_supply) && post_value == value;
+    spec upgrade_supply<CoinType>(_account: &signer) {
+        aborts_if true;
     }
 
     spec initialize {

@@ -16,6 +16,9 @@ module aptos_framework::optional_aggregator {
     /// Aggregator feature is not supported. Raised by native code.
     const EAGGREGATOR_UNDERFLOW: u64 = 2;
 
+    /// OptionalAggregator (Agg V1) switch not supported any more
+    const ESWITCH_DEPRECATED: u64 = 3;
+
     /// Wrapper around integer with a custom overflow limit. Supports add, subtract and read just like `Aggregator`.
     struct Integer has store {
         value: u128,
@@ -84,46 +87,8 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Switches between parallelizable and non-parallelizable implementations.
-    public fun switch(optional_aggregator: &mut OptionalAggregator) {
-        let value = read(optional_aggregator);
-        switch_and_zero_out(optional_aggregator);
-        add(optional_aggregator, value);
-    }
-
-    /// Switches between parallelizable and non-parallelizable implementations, setting
-    /// the value of the new optional aggregator to zero.
-    fun switch_and_zero_out(optional_aggregator: &mut OptionalAggregator) {
-        if (is_parallelizable(optional_aggregator)) {
-            switch_to_integer_and_zero_out(optional_aggregator);
-        } else {
-            switch_to_aggregator_and_zero_out(optional_aggregator);
-        }
-    }
-
-    /// Switches from parallelizable to non-parallelizable implementation, zero-initializing
-    /// the value.
-    fun switch_to_integer_and_zero_out(
-        optional_aggregator: &mut OptionalAggregator
-    ): u128 {
-        let aggregator = option::extract(&mut optional_aggregator.aggregator);
-        let limit = aggregator::limit(&aggregator);
-        aggregator::destroy(aggregator);
-        let integer = new_integer(limit);
-        option::fill(&mut optional_aggregator.integer, integer);
-        limit
-    }
-
-    /// Switches from non-parallelizable to parallelizable implementation, zero-initializing
-    /// the value.
-    fun switch_to_aggregator_and_zero_out(
-        optional_aggregator: &mut OptionalAggregator
-    ): u128 {
-        let integer = option::extract(&mut optional_aggregator.integer);
-        let limit = limit(&integer);
-        destroy_integer(integer);
-        let aggregator = aggregator_factory::create_aggregator_internal(limit);
-        option::fill(&mut optional_aggregator.aggregator, aggregator);
-        limit
+    public fun switch(_optional_aggregator: &mut OptionalAggregator) {
+        abort error::invalid_state(ESWITCH_DEPRECATED)
     }
 
     /// Destroys optional aggregator.
@@ -192,7 +157,7 @@ module aptos_framework::optional_aggregator {
     }
 
     #[test(account = @aptos_framework)]
-    fun optional_aggregator_test(account: signer) {
+    fun optional_aggregator_test_integer(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
 
         let aggregator = new(30, false);
@@ -204,9 +169,13 @@ module aptos_framework::optional_aggregator {
 
         sub(&mut aggregator, 10);
         assert!(read(&aggregator) == 5, 0);
+    }
 
-        // Switch to parallelizable aggregator and check the value is preserved.
-        switch(&mut aggregator);
+    #[test(account = @aptos_framework)]
+    fun optional_aggregator_test_aggregator(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(5, true);
+
         assert!(is_parallelizable(&aggregator), 0);
         assert!(read(&aggregator) == 5, 0);
 
