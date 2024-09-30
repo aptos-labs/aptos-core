@@ -220,12 +220,12 @@ pub async fn create_accounts_command(
     }
 
     let account_generator = if let Some(jwt) = &create_accounts_args.keyless_jwt {
-        emit_job_request = emit_job_request.keyless_jwt(&jwt);
+        emit_job_request = emit_job_request.keyless_jwt(jwt);
 
         create_keyless_account_generator(
             get_sample_esk(),
             0,
-            &jwt,
+            jwt,
             create_accounts_args.proof_file_path.as_deref(),
         )?
     } else {

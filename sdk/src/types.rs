@@ -531,7 +531,7 @@ impl KeylessAccount {
         pepper: Pepper,
         zk_sig: ZeroKnowledgeSig,
     ) -> Result<Self> {
-        let idc = IdCommitment::new_from_preimage(&pepper, &aud, &uid_key, &uid_val)?;
+        let idc = IdCommitment::new_from_preimage(&pepper, aud, uid_key, uid_val)?;
         let public_key = KeylessPublicKey {
             iss_val: iss.to_owned(),
             idc,
@@ -557,12 +557,10 @@ impl KeylessAccount {
         zk_sig: Option<ZeroKnowledgeSig>,
     ) -> Result<Self> {
         let parts: Vec<&str> = jwt.split('.').collect();
-        let header_bytes = base64::decode(parts.get(0).context("jwt malformed")?)?;
+        let header_bytes = base64::decode(parts.first().context("jwt malformed")?)?;
         let jwt_header_json = String::from_utf8(header_bytes)?;
-        let jwt_payload_json = base64::decode_config(
-            parts.get(1).context("jwt malformed")?,
-            base64::URL_SAFE,
-        )?;
+        let jwt_payload_json =
+            base64::decode_config(parts.get(1).context("jwt malformed")?, base64::URL_SAFE)?;
         let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
 
         let uid_key = uid_key.unwrap_or("sub").to_string();
