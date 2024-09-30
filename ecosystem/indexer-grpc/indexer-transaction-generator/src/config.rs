@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{accont_manager::AccountManager, managed_node::ManagedNode};
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -11,12 +12,19 @@ use std::{
 use url::Url;
 
 const IMPORTED_TRANSACTIONS_FOLDER: &str = "imported_transactions";
+const SCRIPTED_TRANSACTIONS_FOLDER: &str = "scripted_transactions";
+const MOVE_SCRIPTS_FOLDER: &str = "move_fixtures";
+const IMPORTED_TRANSACTION_CONFIG_FILE: &str = "imported_transactions.yaml";
+const ACCOUNT_MANAGER_FILE_NAME: &str = "testing_accounts.yaml";
 
 #[derive(Parser)]
 pub struct IndexerCliArgs {
-    /// Path to the configuration file with `TransactionGeneratorConfig`.
+    /// Path to the testing folder, which includes:
+    /// - The configuration file for importing transactions: `imported_transactions.yaml`.
+    /// - The folder containing the Move scripts to generate transactions: `move_fixtures`.
+    /// - The file containing the accounts for testing: `testing_accounts.yaml`.
     #[clap(long)]
-    pub config: PathBuf,
+    pub testing_folder: PathBuf,
 
     /// Path to the output folder where the generated transactions will be saved.
     #[clap(long)]
@@ -25,34 +33,101 @@ pub struct IndexerCliArgs {
 
 impl IndexerCliArgs {
     pub async fn run(&self) -> anyhow::Result<()> {
-        // Read the configuration file.
-        let config_raw = tokio::fs::read_to_string(&self.config)
-            .await
-            .with_context(|| format!("Failed to read configuration file: {:?}", self.config))?;
+        let output_folder = convert_relative_path_to_absolute_path(&self.output_folder);
+        let testing_folder = convert_relative_path_to_absolute_path(&self.testing_folder);
 
-        // Parse the configuration.
-        let config: TransactionGeneratorConfig = serde_yaml::from_str(&config_raw)
-            .with_context(|| format!("Failed to parse configuration file: {:?}", self.config))?;
+        // Run the transaction importer.
+        let imported_transactions_output_folder = output_folder.join(IMPORTED_TRANSACTIONS_FOLDER);
+        let imported_transactions_config_path =
+            testing_folder.join(IMPORTED_TRANSACTION_CONFIG_FILE);
 
-        // Run the transaction generator.
-        config.run(&self.output_folder).await
-    }
-}
-
-/// Overall configuration for the transaction generator.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TransactionGeneratorConfig {
-    pub import_config: TransactionImporterConfig, // TODO: Add scripted transaction generation configuration.
-}
-
-impl TransactionGeneratorConfig {
-    pub async fn run(&self, output_path: &Path) -> anyhow::Result<()> {
-        let import_config_path = output_path.join(IMPORTED_TRANSACTIONS_FOLDER);
-        // Check if the output folder exists.
-        if !import_config_path.exists() {
-            tokio::fs::create_dir_all(&import_config_path).await?;
+        // TODO: refactor this further to reduce the nesting.
+        // if the imported transactions config file exists, run the transaction importer.
+        if imported_transactions_config_path.exists() {
+            let imported_transactions_config_raw: String =
+                tokio::fs::read_to_string(&imported_transactions_config_path).await?;
+            let imported_transactions_config: TransactionImporterConfig =
+                serde_yaml::from_str(&imported_transactions_config_raw)?;
+            // Check if the output folder exists.
+            if !imported_transactions_output_folder.exists() {
+                tokio::fs::create_dir_all(&imported_transactions_output_folder).await?;
+            }
+            imported_transactions_config
+                .validate_and_run(&imported_transactions_output_folder)
+                .await
+                .context("Importing transactions failed.")?;
         }
-        self.import_config.run(&import_config_path).await
+
+        // Run the script transaction generator.
+        let script_transactions_output_folder = output_folder.join(SCRIPTED_TRANSACTIONS_FOLDER);
+        let move_folder_path = testing_folder.join(MOVE_SCRIPTS_FOLDER);
+        // If the move fixtures folder does not exist, skip the script transaction generator.
+        if !move_folder_path.exists() {
+            return Ok(());
+        }
+        if !script_transactions_output_folder.exists() {
+            tokio::fs::create_dir_all(&script_transactions_output_folder).await?;
+        }
+        // 1. Validate.
+        // Scan all yaml files in the move folder path.
+        let mut script_transactions_vec: Vec<(String, ScriptTransactions)> = vec![];
+        let move_files = std::fs::read_dir(&move_folder_path)?;
+        for entry in move_files {
+            let entry = entry?;
+            // entry has to be a file.
+            if !entry.file_type()?.is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if path.extension().unwrap_or_default() == "yaml" {
+                let file_name = path.file_name().unwrap().to_str().unwrap();
+                let script_transactions_raw: String = tokio::fs::read_to_string(&path).await?;
+                let script_transactions: ScriptTransactions =
+                    serde_yaml::from_str(&script_transactions_raw)?;
+                script_transactions_vec.push((file_name.to_string(), script_transactions));
+            }
+        }
+        // Validate the configuration.
+        let mut output_script_transactions_set = HashSet::new();
+        for (file_name, script_transactions) in script_transactions_vec.iter() {
+            if script_transactions.transactions.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "[Script Transaction Generator] No transactions found in file `{}`",
+                    file_name
+                ));
+            }
+            for script_transaction in script_transactions.transactions.iter() {
+                if let Some(output_name) = &script_transaction.output_name {
+                    if !output_script_transactions_set.insert(output_name.clone()) {
+                        return Err(anyhow::anyhow!(
+                            "[Script Transaction Generator] Output file name `{}` is duplicated in file `{}`",
+                            output_name.clone(),
+                            file_name
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Run each config.
+        let account_manager_file_path = testing_folder.join(ACCOUNT_MANAGER_FILE_NAME);
+        let mut account_manager = AccountManager::load(&account_manager_file_path).await?;
+        let mut managed_node = ManagedNode::start(None, None).await?;
+        for (file_name, script_transactions) in script_transactions_vec {
+            script_transactions
+                .run(
+                    &move_folder_path,
+                    &script_transactions_output_folder,
+                    &mut account_manager,
+                )
+                .await
+                .context(format!(
+                    "Failed to generate script transaction for file `{}`",
+                    file_name
+                ))?;
+        }
+        // Stop the localnet.
+        managed_node.stop().await
     }
 }
 
@@ -65,7 +140,7 @@ pub struct TransactionImporterConfig {
 }
 
 impl TransactionImporterConfig {
-    pub async fn run(&self, output_path: &Path) -> anyhow::Result<()> {
+    fn validate(&self) -> anyhow::Result<()> {
         // Validate the configuration. This is to make sure that no output file shares the same name.
         let mut output_files = HashSet::new();
         for (_, network_config) in self.configs.iter() {
@@ -78,12 +153,41 @@ impl TransactionImporterConfig {
                 }
             }
         }
+        Ok(())
+    }
+
+    pub async fn validate_and_run(&self, output_path: &Path) -> anyhow::Result<()> {
+        // Validate the configuration.
+        self.validate()?;
+
         // Run the transaction importer for each network.
         for (network_name, network_config) in self.configs.iter() {
-            network_config.run(output_path).await.context(format!(
-                "[Transaction Importer] Failed for network: {}",
-                network_name
-            ))?;
+            // Modify the output path by appending the network name to the base path
+            let modified_output_path = match network_name.as_str() {
+                "mainnet" => output_path.join("imported_mainnet_txns"),
+                "testnet" => output_path.join("imported_testnet_txns"),
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "[Transaction Importer] Unknown network: {}",
+                        network_name
+                    ));
+                },
+            };
+
+            tokio::fs::create_dir_all(&modified_output_path)
+                .await
+                .context(format!(
+                    "[Transaction Importer] Failed to create output directory for network: {}",
+                    network_name
+                ))?;
+
+            network_config
+                .run(modified_output_path.as_path())
+                .await
+                .context(format!(
+                    "[Transaction Importer] Failed for network: {}",
+                    network_name
+                ))?;
         }
         Ok(())
     }
@@ -101,36 +205,101 @@ pub struct TransactionImporterPerNetworkConfig {
     pub versions_to_import: HashMap<u64, String>,
 }
 
+/// Configuration for generating transactions from a script.
+/// `ScriptTransactions` will generate a list of transactions and output if specified.
+/// A managed-node will be used to execute the scripts in sequence.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScriptTransactions {
+    pub transactions: Vec<ScriptTransaction>,
+}
+
+/// A step that can optionally output one transaction.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScriptTransaction {
+    pub script_path: PathBuf,
+    pub output_name: Option<String>,
+    // Fund the address and execute the script with the account.
+    pub sender_address: String,
+}
+
+/// Convert relative path to absolute path.
+fn convert_relative_path_to_absolute_path(path: &Path) -> PathBuf {
+    if path.is_relative() {
+        let current_dir = std::env::current_dir().unwrap();
+        current_dir.join(path)
+    } else {
+        path.to_path_buf()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_duplicate_output_name() {
-        let transaction_generator_config = r#"
+    async fn test_import_transactions_duplicate_output_name() {
+        let importing_transactions_config = r#"
             {
-                "import_config": {
-                    "mainnet": {
-                        "transaction_stream_endpoint": "http://mainnet.com",
-                        "api_key": "mainnet_api_key",
-                        "versions_to_import": {
-                            1: "mainnet_v1.json"
-                        }
-                    },
-                    "testnet": {
-                        "transaction_stream_endpoint": "http://testnet.com",
-                        "api_key": "testnet_api_key",
-                        "versions_to_import": {
-                            1: "mainnet_v1.json"
-                        }
+                "mainnet": {
+                    "transaction_stream_endpoint": "http://mainnet.com",
+                    "api_key": "mainnet_api_key",
+                    "versions_to_import": {
+                        1: "mainnet_v1.json"
+                    }
+                },
+                "testnet": {
+                    "transaction_stream_endpoint": "http://testnet.com",
+                    "api_key": "testnet_api_key",
+                    "versions_to_import": {
+                        1: "mainnet_v1.json"
                     }
                 }
             }
         "#;
-        let transaction_generator_config: TransactionGeneratorConfig =
-            serde_yaml::from_str(transaction_generator_config).unwrap();
-        let output_path = PathBuf::from("/tmp");
-        let result = transaction_generator_config.run(&output_path).await;
+        let transaction_generator_config: TransactionImporterConfig =
+            serde_yaml::from_str(importing_transactions_config).unwrap();
+        // create a temporary folder for the output.
+        let tempfile = tempfile::tempdir().unwrap();
+        let result = transaction_generator_config
+            .validate_and_run(tempfile.path())
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_script_transactions_duplicate_output_name() {
+        // Create a temporary folder for the move scripts.
+        let tempfile = tempfile::tempdir().unwrap();
+        let output_folder = tempfile.path().join("output");
+        tokio::fs::create_dir(&output_folder).await.unwrap();
+        let move_folder_path = tempfile.path().join("move_fixtures");
+        tokio::fs::create_dir(&move_folder_path).await.unwrap();
+
+        let first_script_transactions = r#"
+            transactions:
+              - script_path: "simple_script_1"
+                output_name: "output.json"
+        "#;
+        let second_script_transactions = r#"
+            transactions:
+              - script_path: "simple_script_2"
+                output_name: "output.json"
+        "#;
+        let first_script_transactions_path =
+            move_folder_path.join("first_script_transactions.yaml");
+        let second_script_transactions_path =
+            move_folder_path.join("second_script_transactions.yaml");
+        tokio::fs::write(&first_script_transactions_path, first_script_transactions)
+            .await
+            .unwrap();
+        tokio::fs::write(&second_script_transactions_path, second_script_transactions)
+            .await
+            .unwrap();
+        let indexer_cli_args = IndexerCliArgs {
+            testing_folder: tempfile.path().to_path_buf(),
+            output_folder,
+        };
+        let result = indexer_cli_args.run().await;
         assert!(result.is_err());
     }
 }
