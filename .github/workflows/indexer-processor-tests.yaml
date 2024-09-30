@@ -2,12 +2,12 @@ name: Trigger Processor Tests on JSON Change
 
 on:
   workflow_dispatch:
-#  push:
-#    paths:
-#      - 'jsons/**'
-#    branches:
-#      - main  # or your relevant branch
-  pull_request:
+  pull_request:  # Trigger on PR-level events
+    paths:
+      - 'indexer-test-transactions/json_transactions/imported_transactions/**'
+      - 'indexer-test-transactions/json_transactions/scripted_transactions/**'
+    branches:
+      - main
 
 jobs:
   dispatch_event:
@@ -20,7 +20,37 @@ jobs:
       - name: Dispatch Event to Processor Repo
         uses: peter-evans/repository-dispatch@v3.0.0
         with:
-#          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  
+#          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          repository: 'aptos-labs/aptos-indexer-processors'
+          event-type: 'json-change-detected'
+          client-payload: '{"commit_hash": "${{ github.sha }}"}'
+
+jobs:
+  diff_check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Run CLI to Generate JSON Files
+        run: |
+          # Navigate to the directory and run the CLI
+          cd ecosystem/indexer-grpc/indexer-transaction-generator
+          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/json_transactions
+        working-directory: rust
+
+      - name: Compare JSON Files
+        run: |
+          diff -qr generated_jsons/ indexer-test-transactions/json_transactions/
+        continue-on-error: true
+        id: diff_check
+
+      - name: Dispatch Event if Changes Found
+        if: steps.diff_check.outcome == 'failure'  # Only run if diff found changes
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           repository: 'aptos-labs/aptos-indexer-processors'
           event-type: 'json-change-detected'
           client-payload: '{"commit_hash": "${{ github.sha }}"}'
