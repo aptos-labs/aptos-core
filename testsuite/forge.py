@@ -1331,7 +1331,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
 @envoption("FORGE_TEST_SUITE")
-@envoption("FORGE_RUNNER_DURATION_SECS", "300")
+@envoption("FORGE_RUNNER_DURATION_SECS", "600")
 @envoption("FORGE_IMAGE_TAG")
 @envoption("FORGE_RETAIN_DEBUG_LOGS", "false")
 @envoption("IMAGE_TAG")

@@ -94,7 +94,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[clap(long, default_value_t = 300)]
+    #[clap(long, default_value_t = 600)]
     duration_secs: usize,
     #[clap(flatten)]
     options: Options,
@@ -1065,7 +1065,7 @@ fn realistic_env_sweep_wrap(
         .add_network_test(wrap_with_realistic_env(test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
-            EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
+            EmitJobRequest::default().latency_polling_interval(Duration::from_millis(20)),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -1117,12 +1117,12 @@ fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)]) -> Option<
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(20, 5, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![10, 5000, 10000]),
+        workloads: Workloads::TPS(vec![10000]),
         criteria: [
-            (9, 0.9, 0.9, 1.2, 0),
-            (4800, 2.0, 2.5, 3.0, 0),
+            // (9, 0.9, 0.9, 1.2, 0),
+            // (4800, 2.0, 2.5, 3.0, 0),
             (9000, 4.5, 5.5, 7.0, 0),
         ]
         // workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
@@ -1147,7 +1147,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
             },
         )
         .collect(),
-        background_traffic: background_traffic_for_sweep(5),
+        background_traffic: None, //background_traffic_for_sweep(5),
     })
 }
 

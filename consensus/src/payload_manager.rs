@@ -402,7 +402,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 )
                 .await?;
                 let inline_batch_txns = opt_qs_payload.inline_batches().transactions();
-                let all_txns = [opt_batch_txns, proof_batch_txns, inline_batch_txns].concat();
+                let all_txns = [proof_batch_txns, opt_batch_txns, inline_batch_txns].concat();
                 BlockTransactionPayload::new_opt_quorum_store(
                     all_txns,
                     opt_qs_payload.proof_with_data().deref().clone(),

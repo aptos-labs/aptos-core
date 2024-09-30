@@ -104,9 +104,9 @@ impl Default for QuorumStoreConfig {
         QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
-            batch_generation_poll_interval_ms: 25,
-            batch_generation_min_non_empty_interval_ms: 100,
-            batch_generation_max_interval_ms: 250,
+            batch_generation_poll_interval_ms: 10,
+            batch_generation_min_non_empty_interval_ms: 20,
+            batch_generation_max_interval_ms: 100,
             sender_max_batch_txns: DEFEAULT_MAX_BATCH_TXNS,
             // TODO: on next release, remove BATCH_PADDING_BYTES
             sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
