@@ -134,6 +134,3 @@ test_indexer_grpc/*
 *.dot
 *.bytecode
 !third_party/move/move-prover/tests/xsources/design/*.bytecode
-
-# Allow forge envs
-!forge.env
