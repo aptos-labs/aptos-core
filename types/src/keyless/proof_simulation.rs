@@ -10,7 +10,7 @@
     use ark_ec::pairing::Pairing;
     use ark_ff::Field;
     use ark_relations::r1cs::SynthesisError;
-    use rand::{RngCore, Rng};
+    use rand::{SeedableRng, RngCore, Rng};
     use ark_std::{marker::PhantomData, vec::Vec};
     use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP};
     use ark_groth16::data_structures::{VerifyingKey, Proof};
@@ -193,7 +193,7 @@
     /// Generates and verifies a simulated proof using a hardcoded simulation prover and verifier key
     /// pair and a hardcoded public input. These values were generated with the Keyless circuit at commit
     /// `b715e935effe282bb998bb06c826b33d290d94ed` of `aptos-core`
-    fn test_prove_and_verify(n_iters: usize)
+    fn test_prove_and_verify(n_iters: usize, seed: u64)
     {
         let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
         let public_input = ark_ff::BigInt::new(public_input_values);
@@ -229,8 +229,7 @@
         let vk = VerifyingKey { alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1 };
         let pvk = prepare_verifying_key::<Bn254>(&vk);
 
-        // TODO: Make this rng seedable
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         for _ in 0..n_iters {
             let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(
                 &[public_input],
@@ -253,14 +252,13 @@
         }
     }
 
-    fn test_prove_and_verify_circuit_agnostic(n_iters: usize)
+    fn test_prove_and_verify_circuit_agnostic(n_iters: usize, seed: u64)
     {
         let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
         let public_input = ark_ff::BigInt::new(public_input_values);
         let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
-        // TODO: Make this rng seedable
-        let mut rng = rand::thread_rng();
 
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         let (pk, vk) = Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
         let pvk = prepare_verifying_key(&vk);
         for _i in 0..n_iters {
@@ -288,10 +286,14 @@
 
     #[test]
     fn prove_and_verify() {
-        test_prove_and_verify(25);
+        let iterations = 25;
+        let seed = 42;
+        test_prove_and_verify(iterations, seed);
     }
 
     #[test]
     fn prove_and_verify_circuit_agnostic() {
-        test_prove_and_verify_circuit_agnostic(25);
+        let iterations = 25;
+        let seed = 42;
+        test_prove_and_verify_circuit_agnostic(iterations, seed);
     }
