@@ -763,7 +763,7 @@ async fn setup_local_net_inner(
     (tw_sk, config, jwk, swarm, cli, root_idx)
 }
 
-async fn remove_training_wheels<'a>(
+pub(crate) async fn remove_training_wheels<'a>(
     cli: &mut CliTestFramework,
     info: &mut AptosPublicInfo,
     root_idx: usize,

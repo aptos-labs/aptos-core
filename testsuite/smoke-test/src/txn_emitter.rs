@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    keyless::spawn_network_and_execute_gov_proposals,
+    keyless::{remove_training_wheels, spawn_network_and_execute_gov_proposals},
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
     utils::create_and_fund_account,
 };
@@ -189,7 +189,10 @@ async fn test_keyless_txn_emmitter() {
         .build_with_cli(0)
         .await;
 
-    spawn_network_and_execute_gov_proposals(&mut swarm, &mut cli).await;
+    let (_tw_sk, _config, _jwk, root_idx) =
+        spawn_network_and_execute_gov_proposals(&mut swarm, &mut cli).await;
+
+    remove_training_wheels(&mut cli, &mut swarm.aptos_public_info(), root_idx).await;
 
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
