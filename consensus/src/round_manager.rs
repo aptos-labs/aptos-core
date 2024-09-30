@@ -1383,9 +1383,7 @@ impl RoundManager {
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_timeout_sent() => {
                 self.process_local_timeout(round).await
             },
-            VoteReceptionResult::VoteAdded(_)
-            | VoteReceptionResult::VoteAddedQCDelayed(_)
-            | VoteReceptionResult::EchoTimeout(_) => Ok(()),
+            VoteReceptionResult::VoteAdded(_) | VoteReceptionResult::EchoTimeout(_) => Ok(()),
             result @ VoteReceptionResult::NewQuorumCertificate(_)
             | result @ VoteReceptionResult::DuplicateVote => {
                 bail!("Unexpected result from timeout processing: {:?}", result);

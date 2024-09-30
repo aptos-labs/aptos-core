@@ -15,7 +15,6 @@ use aptos_consensus_types::{
     round_timeout::RoundTimeout,
     timeout_2chain::{TwoChainTimeoutCertificate, TwoChainTimeoutWithPartialSignatures},
     vote::Vote,
-    vote_data::VoteData,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
@@ -338,58 +337,6 @@ impl PendingVotes {
         //
 
         VoteReceptionResult::VoteAdded(voting_power)
-    }
-
-    pub fn aggregate_qc_now(
-        validator_verifier: &ValidatorVerifier,
-        li_with_sig: &LedgerInfoWithVerifiedSignatures,
-        vote_data: &VoteData,
-    ) -> VoteReceptionResult {
-        match li_with_sig.aggregate_signatures(validator_verifier) {
-            Ok(ledger_info_with_sig) => VoteReceptionResult::NewQuorumCertificate(Arc::new(
-                QuorumCert::new(vote_data.clone(), ledger_info_with_sig),
-            )),
-            Err(e) => VoteReceptionResult::ErrorAggregatingSignature(e),
-        }
-    }
-
-    pub fn process_delayed_qc(
-        &mut self,
-        validator_verifier: &ValidatorVerifier,
-        vote: Vote,
-    ) -> VoteReceptionResult {
-        let li_digest = vote.ledger_info().hash();
-        match self.li_digest_to_votes.get_mut(&li_digest) {
-            Some((_, li_with_sig)) => {
-                match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
-                    // a quorum of signature was reached, a new QC is formed
-                    Ok(_) => {
-                        Self::aggregate_qc_now(validator_verifier, li_with_sig, vote.vote_data())
-                    },
-
-                    // not enough votes
-                    Err(VerifyError::TooLittleVotingPower { .. }) => {
-                        panic!("Delayed QC aggregation should not be triggered if we don't have enough votes to form a QC");
-                    },
-
-                    // error
-                    Err(error) => {
-                        error!(
-                            "MUST_FIX: vote received could not be added: {}, vote: {}",
-                            error, vote
-                        );
-                        VoteReceptionResult::ErrorAddingVote(error)
-                    },
-                }
-            },
-            None => {
-                error!(
-                    "No LedgerInfoWithSignatures found for the given digest: {}",
-                    li_digest
-                );
-                VoteReceptionResult::ErrorAddingVote(VerifyError::EmptySignature)
-            },
-        }
     }
 
     pub fn drain_votes(
