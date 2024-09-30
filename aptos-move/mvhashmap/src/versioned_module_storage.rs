@@ -100,16 +100,23 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
         }
     }
 
+    /// Returns the module entry if it exists in multi-version data structure. If not, [None] is
+    /// returned.
+    #[inline]
+    fn get_impl(&self, key: &K, txn_idx: TxnIndex) -> Option<ModuleStorageRead<M>> {
+        match self.entries.get(key) {
+            Some(v) => v.get(txn_idx),
+            None => None,
+        }
+    }
+
     /// Returns the module entry from the module storage. If the entry does not exist,
     /// [ModuleStorageRead::DoesNotExist] is returned. If there is a pending code publish below
     /// the queried index, again the same [ModuleStorageRead::DoesNotExist] is returned as all
     /// pending publishes are treated as non-existent modules.
     pub fn get(&self, key: &K, txn_idx: TxnIndex) -> ModuleStorageRead<M> {
-        let v = self
-            .entries
-            .entry(key.clone())
-            .or_insert_with(VersionedEntry::empty);
-        v.get(txn_idx).unwrap_or(ModuleStorageRead::DoesNotExist)
+        self.get_impl(key, txn_idx)
+            .unwrap_or(ModuleStorageRead::DoesNotExist)
     }
 
     /// Similar to [VersionedModuleStorage::get]. The difference is that if the module does not
@@ -122,27 +129,30 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
         init_func: F,
     ) -> VMResult<ModuleStorageRead<M>>
     where
-        F: FnOnce() -> VMResult<Option<Arc<M>>>,
+        F: Fn() -> VMResult<Option<Arc<M>>>,
     {
+        if let Some(read) = self.get_impl(key, txn_idx) {
+            return Ok(read);
+        }
+
+        // Here the versioned map is locked, to ensure a single thread is used to initialize the
+        // storage version.
         let mut v = self
             .entries
             .entry(key.clone())
             .or_insert_with(VersionedEntry::empty);
 
-        // Module entry exists in versioned entry, return it.
-        if let Some(result) = v.get(txn_idx) {
-            return Ok(result);
-        }
-
-        // Otherwise, use the passed closure to compute the base storage value.
         let maybe_entry = init_func()?;
-        let result = Ok(match &maybe_entry {
-            Some(entry) => ModuleStorageRead::storage_version(entry.clone()),
+        v.versions.insert(
+            ShiftedTxnIndex::zero_idx(),
+            CachePadded::new(maybe_entry.clone()),
+        );
+        drop(v);
+
+        Ok(match maybe_entry {
+            Some(e) => ModuleStorageRead::storage_version(e),
             None => ModuleStorageRead::DoesNotExist,
-        });
-        v.versions
-            .insert(ShiftedTxnIndex::zero_idx(), CachePadded::new(maybe_entry));
-        result
+        })
     }
 
     /// Removes an existing entry at a given index.
