@@ -28,20 +28,29 @@ pub enum ObjectStatus {
 
 pub struct ObjectData {
     status: ObjectStatus,
-    failed_txns: Vec<TxnIndex>,
+    reader_txns: Vec<TxnIndex>,
     waiting_txns: Vec<TxnIndex>,
+}
+
+#[derive(Clone)]
+pub enum TxnStatus {
+    Fresh,
+    Failed,
+    Finished,
+    Waiting,
 }
 
 impl ObjectData {
     pub fn new() -> Self {
         Self {
             status: ObjectStatus::Empty,
-            failed_txns: Vec::new(),
+            reader_txns: Vec::new(),
             waiting_txns: Vec::new(),
         }
     }
 }
 
+#[derive(Copy)]
 pub enum Event {
     END,
     READ(u32),
@@ -73,6 +82,8 @@ pub struct Simulation<T: Transaction> {
     // whenever removed, use offset_gas and cur_event to insert next event from the same transaction
     event_pq: BinaryHeap<Reverse<(u64, TxnIndex)>>,
 
+    txn_status: Vec<TxnStatus>,
+    first_write: Vec<usize>,
     total_num_workers: usize,
     total_num_txns: u32,
     cur_num_txns: u32,
@@ -86,12 +97,14 @@ impl<T: Transaction> Simulation<T> {
             num_objects: 0,
             objects: Vec::new(),
             object_indexes: HashMap::new(),
-            events: Vec::with_capacity(init_size),
+            events: Vec::new(),
             transaction_pq: BinaryHeap::new(),
             offset_gas: vec![0u64; init_size],
             cur_event: vec![0; init_size],
             txn_pq: BinaryHeap::new(),
             event_pq: BinaryHeap::new(),
+            txn_status: vec![TxnStatus::Fresh; init_size],
+            first_write: Vec::with_capacity(init_size),
             total_num_workers: num_workers,
             total_num_txns: init_size as u32,
             cur_num_txns: 0,
@@ -106,12 +119,14 @@ impl<T: Transaction> Simulation<T> {
     ) {
         let (reads, writes) = txn_read_write_summary.get_summary();
 
+        self.events.push(Vec::new());
         for key in reads {
             if let Some(object_index) = self.object_indexes.get(&key) {
                 self.events[txn_idx as usize].push((0, Event::READ(*object_index)));
             }
         }
 
+        self.first_write[txn_idx as usize] = self.events.len();
         let exec_gas = fee_statement.execution_gas_used();
         for key in writes {
             self.object_indexes.insert(key, self.num_objects);
@@ -124,8 +139,18 @@ impl<T: Transaction> Simulation<T> {
     }
 
     fn run_simulation(&mut self) {
-        while true {
-            if let Some(top_event) = self.event_pq.pop() {}
+        loop {
+            if let Some(Reverse((gas_value, txn_idx))) = self.event_pq.pop() {
+                let (cur_gas, cur_event) =
+                    self.events[txn_idx as usize][self.cur_event[txn_idx as usize]];
+                match cur_event {
+                    Event::END => match self.txn_status[txn_idx as usize] {
+                        TxnStatus::Fresh => {
+                            self.txn_status[txn_idx as usize] = TxnStatus::Finished;
+                        },
+                    },
+                }
+            }
         }
     }
 
