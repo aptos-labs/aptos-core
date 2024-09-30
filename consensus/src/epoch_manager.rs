@@ -1064,11 +1064,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
+        let mut verifier: ValidatorVerifier = (&validator_set).into();
+        verifier.set_optimistic_sig_verification_flag(self.config.optimistic_sig_verification);
+
         let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
-            verifier: (&validator_set).into(),
+            verifier,
         });
-
         self.epoch_state = Some(epoch_state.clone());
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
@@ -1434,13 +1436,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
-            let perform_pessimistic_verification = self
-                .epoch_state()
-                .verifier
-                .pessimistic_verify_set()
-                .contains(&peer_id);
-            let optimistic_sig_verification =
-                self.config.optimistic_sig_verification && !perform_pessimistic_verification;
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -1453,7 +1448,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             peer_id == my_peer_id,
                             max_num_batches,
                             max_batch_expiry_gap_usecs,
-                            optimistic_sig_verification,
                         )
                     ) {
                         Ok(verified_event) => {

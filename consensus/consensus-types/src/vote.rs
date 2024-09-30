@@ -118,7 +118,7 @@ impl Vote {
         self.signature.is_verified()
     }
 
-    /// Only the verify method in this file can set the signature status verified.
+    /// Only the verify method in validator verifier can set the signature status verified.
     /// This method additionally lets the tests to set the status to verified.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn set_verified(&self) {
@@ -150,13 +150,16 @@ impl Vote {
         self.two_chain_timeout.is_some()
     }
 
-    /// Peforms basic verification such as verifying that the consensus data hash of LedgerInfo
-    /// corresponds to the vote info. Does not verify signature on the LedgerInfo.
-    pub fn verify_metadata(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,
+    /// and then verifies the signature.
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.ledger_info.consensus_data_hash() == self.vote_data.hash(),
             "Vote's hash mismatch with LedgerInfo"
         );
+        validator
+            .optimistic_verify(self.author(), &self.ledger_info, &self.signature)
+            .context("Failed to verify Vote")?;
         if let Some((timeout, signature)) = &self.two_chain_timeout {
             ensure!(
                 (timeout.epoch(), timeout.round())
@@ -171,20 +174,5 @@ impl Vote {
         // Let us verify the vote data as well
         self.vote_data().verify()?;
         Ok(())
-    }
-
-    /// Verifies the signature on the LedgerInfo.
-    pub fn verify_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        validator
-            .verify(self.author(), &self.ledger_info, self.signature.signature())
-            .context("Failed to verify Vote signature")?;
-        self.signature.set_verified();
-        Ok(())
-    }
-
-    /// Performs full verification including the signature verification.
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        self.verify_metadata(validator)?;
-        self.verify_signature(validator)
     }
 }

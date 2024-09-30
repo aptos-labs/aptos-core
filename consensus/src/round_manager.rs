@@ -102,7 +102,6 @@ impl UnverifiedEvent {
         self_message: bool,
         max_num_batches: usize,
         max_batch_expiry_gap_usecs: u64,
-        optimistic_signature_verification: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
         let start_time = Instant::now();
         Ok(match self {
@@ -118,7 +117,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::VoteMsg(v) => {
                 if !self_message {
-                    v.verify(validator, optimistic_signature_verification)?;
+                    v.verify(validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["vote"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -127,7 +126,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
-                    v.verify_order_vote(validator, optimistic_signature_verification)?;
+                    v.verify_order_vote(validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote"])
                         .observe(start_time.elapsed().as_secs_f64());

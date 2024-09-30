@@ -6,7 +6,7 @@
 use crate::validator_signer::ValidatorSigner;
 use crate::{
     account_address::AccountAddress, aggregate_signature::AggregateSignature,
-    on_chain_config::ValidatorSet,
+    ledger_info::SignatureWithStatus, on_chain_config::ValidatorSet,
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
@@ -152,6 +152,10 @@ pub struct ValidatorVerifier {
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     pessimistic_verify_set: Arc<DashSet<AccountAddress>>,
+    /// This is the feature flag indicating whether the optimistic signature verification feature is enabled.
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    optimistic_sig_verification: bool,
 }
 
 /// Reconstruct fields from the raw data upon deserialization.
@@ -191,6 +195,7 @@ impl ValidatorVerifier {
             total_voting_power,
             address_to_validator_index,
             pessimistic_verify_set: Arc::new(DashSet::new()),
+            optimistic_sig_verification: false,
         }
     }
 
@@ -226,6 +231,10 @@ impl ValidatorVerifier {
         ))
     }
 
+    pub fn set_optimistic_sig_verification_flag(&mut self, flag: bool) {
+        self.optimistic_sig_verification = flag;
+    }
+
     pub fn add_pessimistic_verify_set(&self, author: AccountAddress) {
         self.pessimistic_verify_set.insert(author);
     }
@@ -253,6 +262,19 @@ impl ValidatorVerifier {
                 .map_err(|_| VerifyError::InvalidMultiSignature),
             None => Err(VerifyError::UnknownAuthor),
         }
+    }
+
+    pub fn optimistic_verify<T: Serialize + CryptoHash>(
+        &self,
+        author: AccountAddress,
+        message: &T,
+        signature_with_status: &SignatureWithStatus,
+    ) -> std::result::Result<(), VerifyError> {
+        if !self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author) {
+            self.verify(author, message, signature_with_status.signature())?;
+            signature_with_status.set_verified();
+        }
+        Ok(())
     }
 
     // Generates a multi signature or aggregate signature

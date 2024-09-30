@@ -44,28 +44,16 @@ impl OrderVoteMsg {
         self.order_vote.epoch()
     }
 
-    /// Performs basic checks, excluding the signature verification.
-    pub fn verify_metadata(&self) -> anyhow::Result<()> {
+    /// This function verifies the order_vote component in the order_vote_msg.
+    /// The quorum cert is verified in the round manager when the quorum certificate is used.
+    pub fn verify_order_vote(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.quorum_cert().certified_block() == self.order_vote().ledger_info().commit_info(),
             "QuorumCert and OrderVote do not match"
         );
-        self.order_vote.verify_metadata()
-    }
-
-    /// This function verifies the order_vote component in the order_vote_msg.
-    /// The quorum cert is verified in the round manager when the quorum certificate is used.
-    pub fn verify_order_vote(
-        &self,
-        validator: &ValidatorVerifier,
-        optimistic_signature_verification: bool,
-    ) -> anyhow::Result<()> {
-        self.verify_metadata()?;
-        if !optimistic_signature_verification {
-            self.order_vote
-                .verify_signature(validator)
-                .context("[OrderVoteMsg] OrderVote verification failed")?;
-        }
+        self.order_vote
+            .verify(validator)
+            .context("[OrderVoteMsg] OrderVote verification failed")?;
         Ok(())
     }
 }

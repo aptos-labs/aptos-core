@@ -71,7 +71,7 @@ impl OrderVote {
         self.signature.is_verified()
     }
 
-    /// Only the verify method in this file can set the signature status verified.
+    /// Only the verify method in validator verifier can set the signature status verified.
     /// This method additionally lets the tests to set the status to verified.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn set_verified(&self) {
@@ -82,28 +82,16 @@ impl OrderVote {
         self.ledger_info.epoch()
     }
 
-    /// Performs basic checks, excluding the signature verification.
-    pub fn verify_metadata(&self) -> anyhow::Result<()> {
+    /// Verifies the signature on LedgerInfo.
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.ledger_info.consensus_data_hash() == HashValue::zero(),
             "Failed to verify OrderVote. Consensus data hash is not Zero"
         );
-        Ok(())
-    }
-
-    /// Verifies the signature on the LedgerInfo.
-    pub fn verify_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
-            .verify(self.author(), &self.ledger_info, self.signature.signature())
+            .optimistic_verify(self.author(), &self.ledger_info, &self.signature)
             .context("Failed to verify OrderVote")?;
-        self.signature.set_verified();
-        Ok(())
-    }
 
-    /// Performs full verification including the signature verification.
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        self.verify_metadata()?;
-        self.verify_signature(validator)?;
         Ok(())
     }
 }
