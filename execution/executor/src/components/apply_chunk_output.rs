@@ -36,6 +36,7 @@ use aptos_types::{
 };
 use rayon::prelude::*;
 use std::{iter::repeat, sync::Arc};
+use crate::metrics::APTOS_CHUNK_EXECUTOR_OTHER_SECONDS;
 
 pub struct ApplyChunkOutput;
 
@@ -207,8 +208,12 @@ impl ApplyChunkOutput {
         TransactionsWithParsedOutput,
         TransactionsWithParsedOutput,
     )> {
-        let mut transaction_outputs: Vec<ParsedTransactionOutput> =
-            transaction_outputs.into_iter().map(Into::into).collect();
+        let mut transaction_outputs: Vec<ParsedTransactionOutput> = {
+            let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
+                .with_label_values(&["parse_transaction_outputs"])
+                .start_timer();
+            transaction_outputs.into_iter().map(Into::into).collect()
+        };
         // N.B. off-by-1 intentionally, for exclusive index
         let new_epoch_marker = transaction_outputs
             .iter()
