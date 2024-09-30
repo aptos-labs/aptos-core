@@ -280,6 +280,53 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
+    /// Aborts a bridge transfer if the time lock has expired.
+    ///
+    /// @param caller The signer representing the bridge operator.
+    /// @param bridge_transfer_id The unique identifier for the bridge transfer.
+    /// @abort If the caller is not the bridge operator or if the time lock has not expired.
+    AtomicBridgeCounterpartyAbortBridgeTransfer {
+        bridge_transfer_id: Vec<u8>,
+    },
+
+    /// Bridge operator can complete the transfer
+    AtomicBridgeInitiatorCompleteBridgeTransfer {
+        bridge_transfer_id: Vec<u8>,
+        pre_image: Vec<u8>,
+    },
+
+    /// Initiate a bridge transfer of ETH from Movement to the base layer
+    /// Anyone can initiate a bridge transfer from the source chain
+    /// The amount is burnt from the initiator
+    AtomicBridgeInitiatorInitiateBridgeTransfer {
+        recipient: Vec<u8>,
+        hash_lock: Vec<u8>,
+        amount: u64,
+    },
+
+    /// Locks assets for a bridge transfer by the initiator.
+    ///
+    /// @param caller The signer representing the bridge operator.
+    /// @param initiator The initiator's Ethereum address as a vector of bytes.
+    /// @param bridge_transfer_id The unique identifier for the bridge transfer.
+    /// @param hash_lock The hash lock for securing the transfer.
+    /// @param time_lock The time lock duration for the transfer.
+    /// @param recipient The address of the recipient on the Aptos blockchain.
+    /// @param amount The amount of assets to be locked.
+    /// @abort If the caller is not the bridge operator.
+    AtomicBridgeCounterpartyLockBridgeTransferAssets {
+        initiator: Vec<u8>,
+        bridge_transfer_id: Vec<u8>,
+        hash_lock: Vec<u8>,
+        recipient: AccountAddress,
+        amount: u64,
+    },
+
+    /// Anyone can refund the transfer on the source chain once time lock has passed
+    AtomicBridgeInitiatorRefundBridgeTransfer {
+        bridge_transfer_id: Vec<u8>,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
@@ -1166,6 +1213,34 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
+            AtomicBridgeCounterpartyAbortBridgeTransfer { bridge_transfer_id } => {
+                atomic_bridge_counterparty_abort_bridge_transfer(bridge_transfer_id)
+            },
+            AtomicBridgeInitiatorCompleteBridgeTransfer {
+                bridge_transfer_id,
+                pre_image,
+            } => atomic_bridge_initiator_complete_bridge_transfer(bridge_transfer_id, pre_image),
+            AtomicBridgeInitiatorInitiateBridgeTransfer {
+                recipient,
+                hash_lock,
+                amount,
+            } => atomic_bridge_initiator_initiate_bridge_transfer(recipient, hash_lock, amount),
+            AtomicBridgeCounterpartyLockBridgeTransferAssets {
+                initiator,
+                bridge_transfer_id,
+                hash_lock,
+                recipient,
+                amount,
+            } => atomic_bridge_counterparty_lock_bridge_transfer_assets(
+                initiator,
+                bridge_transfer_id,
+                hash_lock,
+                recipient,
+                amount,
+            ),
+            AtomicBridgeInitiatorRefundBridgeTransfer { bridge_transfer_id } => {
+                atomic_bridge_initiator_refund_bridge_transfer(bridge_transfer_id)
+            },
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -2297,6 +2372,131 @@ pub fn aptos_governance_vote(
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
         ],
+    ))
+}
+
+/// Aborts a bridge transfer if the time lock has expired.
+///
+/// @param caller The signer representing the bridge operator.
+/// @param bridge_transfer_id The unique identifier for the bridge transfer.
+/// @abort If the caller is not the bridge operator or if the time lock has not expired.
+pub fn atomic_bridge_counterparty_abort_bridge_transfer(
+    bridge_transfer_id: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("atomic_bridge_counterparty").to_owned(),
+        ),
+        ident_str!("abort_bridge_transfer").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&bridge_transfer_id).unwrap()],
+    ))
+}
+
+/// Bridge operator can complete the transfer
+pub fn atomic_bridge_initiator_complete_bridge_transfer(
+    bridge_transfer_id: Vec<u8>,
+    pre_image: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("atomic_bridge_initiator").to_owned(),
+        ),
+        ident_str!("complete_bridge_transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&bridge_transfer_id).unwrap(),
+            bcs::to_bytes(&pre_image).unwrap(),
+        ],
+    ))
+}
+
+/// Initiate a bridge transfer of ETH from Movement to the base layer
+/// Anyone can initiate a bridge transfer from the source chain
+/// The amount is burnt from the initiator
+pub fn atomic_bridge_initiator_initiate_bridge_transfer(
+    recipient: Vec<u8>,
+    hash_lock: Vec<u8>,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("atomic_bridge_initiator").to_owned(),
+        ),
+        ident_str!("initiate_bridge_transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&hash_lock).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Locks assets for a bridge transfer by the initiator.
+///
+/// @param caller The signer representing the bridge operator.
+/// @param initiator The initiator's Ethereum address as a vector of bytes.
+/// @param bridge_transfer_id The unique identifier for the bridge transfer.
+/// @param hash_lock The hash lock for securing the transfer.
+/// @param time_lock The time lock duration for the transfer.
+/// @param recipient The address of the recipient on the Aptos blockchain.
+/// @param amount The amount of assets to be locked.
+/// @abort If the caller is not the bridge operator.
+pub fn atomic_bridge_counterparty_lock_bridge_transfer_assets(
+    initiator: Vec<u8>,
+    bridge_transfer_id: Vec<u8>,
+    hash_lock: Vec<u8>,
+    recipient: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("atomic_bridge_counterparty").to_owned(),
+        ),
+        ident_str!("lock_bridge_transfer_assets").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&initiator).unwrap(),
+            bcs::to_bytes(&bridge_transfer_id).unwrap(),
+            bcs::to_bytes(&hash_lock).unwrap(),
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Anyone can refund the transfer on the source chain once time lock has passed
+pub fn atomic_bridge_initiator_refund_bridge_transfer(
+    bridge_transfer_id: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("atomic_bridge_initiator").to_owned(),
+        ),
+        ident_str!("refund_bridge_transfer").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&bridge_transfer_id).unwrap()],
     ))
 }
 
@@ -4977,6 +5177,83 @@ mod decoder {
         }
     }
 
+    pub fn atomic_bridge_counterparty_abort_bridge_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AtomicBridgeCounterpartyAbortBridgeTransfer {
+                    bridge_transfer_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn atomic_bridge_initiator_complete_bridge_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AtomicBridgeInitiatorCompleteBridgeTransfer {
+                    bridge_transfer_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    pre_image: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn atomic_bridge_initiator_initiate_bridge_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AtomicBridgeInitiatorInitiateBridgeTransfer {
+                    recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    hash_lock: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    amount: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn atomic_bridge_counterparty_lock_bridge_transfer_assets(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AtomicBridgeCounterpartyLockBridgeTransferAssets {
+                    initiator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    bridge_transfer_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    hash_lock: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    recipient: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    amount: bcs::from_bytes(script.args().get(4)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn atomic_bridge_initiator_refund_bridge_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AtomicBridgeInitiatorRefundBridgeTransfer {
+                    bridge_transfer_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
@@ -6476,6 +6753,26 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
+        );
+        map.insert(
+            "atomic_bridge_counterparty_abort_bridge_transfer".to_string(),
+            Box::new(decoder::atomic_bridge_counterparty_abort_bridge_transfer),
+        );
+        map.insert(
+            "atomic_bridge_initiator_complete_bridge_transfer".to_string(),
+            Box::new(decoder::atomic_bridge_initiator_complete_bridge_transfer),
+        );
+        map.insert(
+            "atomic_bridge_initiator_initiate_bridge_transfer".to_string(),
+            Box::new(decoder::atomic_bridge_initiator_initiate_bridge_transfer),
+        );
+        map.insert(
+            "atomic_bridge_counterparty_lock_bridge_transfer_assets".to_string(),
+            Box::new(decoder::atomic_bridge_counterparty_lock_bridge_transfer_assets),
+        );
+        map.insert(
+            "atomic_bridge_initiator_refund_bridge_transfer".to_string(),
+            Box::new(decoder::atomic_bridge_initiator_refund_bridge_transfer),
         );
         map.insert(
             "code_publish_package_txn".to_string(),

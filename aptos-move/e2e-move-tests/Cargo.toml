@@ -46,6 +46,7 @@ test-case = { workspace = true }
 aptos-vm-types = { workspace = true }
 claims = { workspace = true }
 test-case = { workspace = true }
+tiny-keccak = { workspace = true }
 
 [lib]
 doctest = false

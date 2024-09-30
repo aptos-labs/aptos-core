@@ -582,6 +582,16 @@ module std::features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    /// Whether the Atomic bridge is available
+    /// Lifetime: transient
+    const ATOMIC_BRIDGE: u64 = 71;
+
+    public fun get_atomic_bridge_feature(): u64 { ATOMIC_BRIDGE }
+
+    public fun abort_atomic_bridge_enabled(): bool acquires Features {
+        is_enabled(ATOMIC_BRIDGE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
