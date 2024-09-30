@@ -3,9 +3,9 @@ name: Trigger Processor Tests on JSON Change
 on:
   workflow_dispatch:
   pull_request:  # Trigger on PR-level events
-    paths:
-      - 'indexer-test-transactions/json_transactions/imported_transactions/**'
-      - 'indexer-test-transactions/json_transactions/scripted_transactions/**'
+#    paths:
+#      - 'indexer-test-transactions/json_transactions/imported_transactions/**'
+#      - 'indexer-test-transactions/json_transactions/scripted_transactions/**'
     branches:
       - main
 
