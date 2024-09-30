@@ -1,6 +1,6 @@
 [package]
-name = "aptos-nft-metadata-crawler-parser"
-description = "NFT Metadata Crawler Parser service."
+name = "aptos-nft-metadata-crawler"
+description = "NFT Metadata Crawler related services."
 version = "0.1.0"
 
 # Workspace inherited keys

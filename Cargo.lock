@@ -3077,7 +3077,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-nft-metadata-crawler-parser"
+name = "aptos-nft-metadata-crawler"
 version = "0.1.0"
 dependencies = [
  "anyhow",

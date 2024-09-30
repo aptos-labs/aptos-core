@@ -30,7 +30,7 @@
 !api/doc/
 !crates/indexer/migrations/**/*.sql
 !ecosystem/indexer-grpc/indexer-grpc-parser/migrations/**/*.sql
-!ecosystem/nft-metadata-crawler-parser/migrations/**/*.sql
+!ecosystem/nft-metadata-crawler/migrations/**/*.sql
 !rust-toolchain.toml
 !scripts/
 !terraform/helm/aptos-node/
