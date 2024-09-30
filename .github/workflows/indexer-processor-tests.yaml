@@ -23,21 +23,35 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
-      - id: auth
-        uses: "google-github-actions/auth@v2"
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+#      - id: auth
+#        uses: "google-github-actions/auth@v2"
+#        with:
+#          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+#          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+#
+#      - name: Log active service account email
+#        run: |
+#          gcloud auth list --filter=status:ACTIVE --format="value(account)"
+#
+#      - id: 'secrets'
+#        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+#        with:
+#          secrets: |-
+#            token:1062980880927/github-actions-repository-dispatch
 
-      - name: Log active service account email
+      - name: Run CLI to Generate JSON Files
         run: |
-          gcloud auth list --filter=status:ACTIVE --format="value(account)"
+          cd ecosystem/indexer-grpc/indexer-transaction-generator
+#          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/json_transactions
+          cargo run -- --config ./example.yaml --output-folder ../indexer-test-transactions/json_transactions
 
-      - id: 'secrets'
-        uses: 'google-github-actions/get-secretmanager-secrets@v2'
-        with:
-          secrets: |-
-            token:1062980880927/github-actions-repository-dispatch
+        working-directory: rust
+
+      - name: Compare JSON Files
+        run: |
+          diff -qr generated_jsons/ indexer-test-transactions/json_transactions/
+        continue-on-error: true
+        id: diff_check
 
       - name: Dispatch Event to Processor Repo
         uses: peter-evans/repository-dispatch@v3.0.0
