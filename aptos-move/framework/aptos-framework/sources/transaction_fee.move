@@ -29,6 +29,13 @@ module aptos_framework::transaction_fee {
 
     const EFA_GAS_CHARGING_NOT_ENABLED: u64 = 5;
 
+    const EATOMIC_BRIDGE_NOT_ENABLED: u64 = 6;
+
+    const ECOPY_CAPS_SHOT: u64 = 7;
+
+    /// The one shot copy capabilities call
+    struct CopyCapabilitiesOneShot has key {}
+
     /// Stores burn capability to burn the gas fees.
     struct AptosCoinCapabilities has key {
         burn_cap: BurnCapability<AptosCoin>,
@@ -274,6 +281,20 @@ module aptos_framework::transaction_fee {
         move_to(aptos_framework, AptosCoinMintCapability { mint_cap })
     }
 
+    /// Copy Mint and Burn capabilities over to bridge
+    /// Can only be called once after which it will assert
+    public fun copy_capabilities_for_bridge(aptos_framework: &signer) : (MintCapability<AptosCoin>, BurnCapability<AptosCoin>)
+    acquires AptosCoinCapabilities, AptosCoinMintCapability {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(features::abort_atomic_bridge_enabled(), EATOMIC_BRIDGE_NOT_ENABLED);
+        assert!(!exists<CopyCapabilitiesOneShot>(@aptos_framework), ECOPY_CAPS_SHOT);
+        move_to(aptos_framework, CopyCapabilitiesOneShot{});
+        (
+            borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap,
+            borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap
+        )
+    }
+
     #[deprecated]
     public fun initialize_storage_refund(_: &signer) {
         abort error::not_implemented(ENO_LONGER_SUPPORTED)
@@ -451,6 +472,55 @@ module aptos_framework::transaction_fee {
         assert!(*option::borrow(&collected_fees.proposer) == alice_addr, 0);
         assert!(*option::borrow(&coin::supply<AptosCoin>()) == 28800, 0);
 
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+    }
+
+    #[test_only]
+    fun setup_coin_caps(aptos_framework: &signer) {
+        use aptos_framework::aptos_coin;
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
+        store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+        store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+    }
+
+    #[test_only]
+    fun setup_atomic_bridge(aptos_framework: &signer) {
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[features::get_atomic_bridge_feature()],
+            vector[]
+        );
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    fun test_copy_capabilities(aptos_framework: &signer) acquires AptosCoinCapabilities, AptosCoinMintCapability {
+        setup_coin_caps(aptos_framework);
+        setup_atomic_bridge(aptos_framework);
+
+        let (mint_cap, burn_cap) = copy_capabilities_for_bridge(aptos_framework);
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = EATOMIC_BRIDGE_NOT_ENABLED, location = Self)]
+    fun test_copy_capabilities_no_bridge(aptos_framework: &signer) acquires AptosCoinCapabilities, AptosCoinMintCapability {
+        setup_coin_caps(aptos_framework);
+        let (mint_cap, burn_cap) = copy_capabilities_for_bridge(aptos_framework);
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = ECOPY_CAPS_SHOT, location = Self)]
+    fun test_copy_capabilities_one_too_many_shots(aptos_framework: &signer) acquires AptosCoinCapabilities, AptosCoinMintCapability {
+        setup_coin_caps(aptos_framework);
+        setup_atomic_bridge(aptos_framework);
+        let (mint_cap, burn_cap) = copy_capabilities_for_bridge(aptos_framework);
+        coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
+        let (mint_cap, burn_cap) = copy_capabilities_for_bridge(aptos_framework);
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
     }

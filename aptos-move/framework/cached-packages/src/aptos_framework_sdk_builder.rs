@@ -322,6 +322,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Anyone can refund the transfer on the source chain once time lock has passed
+    AtomicBridgeInitiatorRefundBridgeTransfer {
+        bridge_transfer_id: Vec<u8>,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
@@ -1233,6 +1238,9 @@ impl EntryFunctionCall {
                 recipient,
                 amount,
             ),
+            AtomicBridgeInitiatorRefundBridgeTransfer { bridge_transfer_id } => {
+                atomic_bridge_initiator_refund_bridge_transfer(bridge_transfer_id)
+            },
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -2471,6 +2479,24 @@ pub fn atomic_bridge_counterparty_lock_bridge_transfer_assets(
             bcs::to_bytes(&recipient).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// Anyone can refund the transfer on the source chain once time lock has passed
+pub fn atomic_bridge_initiator_refund_bridge_transfer(
+    bridge_transfer_id: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("atomic_bridge_initiator").to_owned(),
+        ),
+        ident_str!("refund_bridge_transfer").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&bridge_transfer_id).unwrap()],
     ))
 }
 
@@ -5214,6 +5240,20 @@ mod decoder {
         }
     }
 
+    pub fn atomic_bridge_initiator_refund_bridge_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AtomicBridgeInitiatorRefundBridgeTransfer {
+                    bridge_transfer_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
@@ -6729,6 +6769,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "atomic_bridge_counterparty_lock_bridge_transfer_assets".to_string(),
             Box::new(decoder::atomic_bridge_counterparty_lock_bridge_transfer_assets),
+        );
+        map.insert(
+            "atomic_bridge_initiator_refund_bridge_transfer".to_string(),
+            Box::new(decoder::atomic_bridge_initiator_refund_bridge_transfer),
         );
         map.insert(
             "code_publish_package_txn".to_string(),

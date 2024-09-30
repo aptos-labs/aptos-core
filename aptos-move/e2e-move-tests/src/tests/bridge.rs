@@ -17,6 +17,8 @@ fn build_scripts() -> BTreeMap<String, Vec<u8>> {
         "update_operator",
         "update_initiator_time_lock",
         "update_counterparty_time_lock",
+        "mint_burn_caps",
+        "atomic_bridge_feature",
     ];
     common::build_scripts(package_folder, package_names)
 }
@@ -80,6 +82,40 @@ fn test_bridge_operator() {
     assert_eq!(*new_operator.address(), bridge_operator);
 }
 
+#[cfg(test)]
+fn run_mint_burn_caps(harness: &mut MoveHarness) {
+    let core_resources = harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let mint_burn_caps_code = BRIDGE_SCRIPTS
+        .get("mint_burn_caps")
+        .expect("mint_burn_caps script should be built");
+
+    let txn = harness.create_script(
+        &core_resources,
+        mint_burn_caps_code.clone(),
+        vec![],
+        vec![]
+    );
+
+    assert_success!(harness.run(txn));
+}
+
+#[cfg(test)]
+fn atomic_bridge_feature(harness: &mut MoveHarness) {
+    let core_resources = harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let mint_burn_caps_code = BRIDGE_SCRIPTS
+        .get("atomic_bridge_feature")
+        .expect("atomic_bridge_feature script should be built");
+
+    let txn = harness.create_script(
+        &core_resources,
+        mint_burn_caps_code.clone(),
+        vec![],
+        vec![]
+    );
+
+    assert_success!(harness.run(txn));
+}
+
 #[test]
 // The relayer has received a message from the source chain of a successful lock
 // `lock_bridge_transfer_assets` is called with a timelock
@@ -87,6 +123,9 @@ fn test_bridge_operator() {
 // `complete_bridge_transfer` to mint the tokens on the destination chain
 fn test_counterparty() {
     let mut harness = MoveHarness::new();
+
+    atomic_bridge_feature(&mut harness);
+    run_mint_burn_caps(&mut harness);
 
     let bridge_operator = harness.aptos_framework_account();
     let initiator = b"32Be343B94f860124dC4fEe278FDCBD38C102D88".to_vec();
@@ -138,6 +177,9 @@ struct BridgeTransferInitiatedEvent {
 // A relayer confirms that the amount was minted on the destination chain
 fn test_initiator() {
     let mut harness = MoveHarness::new();
+
+    atomic_bridge_feature(&mut harness);
+    run_mint_burn_caps(&mut harness);
 
     let bridge_operator = harness.aptos_framework_account();
 

@@ -1111,7 +1111,7 @@ module aptos_framework::atomic_bridge {
     ///
     /// @param aptos_framework The signer representing the Aptos framework.
     /// @param burn_cap The burn capability for AptosCoin.
-    public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
+    public fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (features::operations_default_to_fa_apt_store_enabled()) {
             let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
@@ -1125,7 +1125,7 @@ module aptos_framework::atomic_bridge {
     ///
     /// @param aptos_framework The signer representing the Aptos framework.
     /// @param mint_cap The mint capability for AptosCoin.
-    public(friend) fun store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
+    public fun store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to(aptos_framework, AptosCoinMintCapability { mint_cap })
     }

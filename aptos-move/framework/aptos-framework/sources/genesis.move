@@ -148,10 +148,6 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-        // Give atomic_bridge module MintCapability<AptosCoin> so it can mint on bridging.
-        atomic_bridge::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-        // Give atomic_bridge module BurnCapability<AptosCoin> so it can burn when bridging back.
-        atomic_bridge::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
     }
 
     /// Only called for testnets and e2e tests.
@@ -170,11 +166,6 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-        // Give atomic_bridge module MintCapability<AptosCoin> so it can mint on bridging.
-        atomic_bridge::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-        // Give atomic_bridge module BurnCapability<AptosCoin> so it can burn when bridging back.
-        atomic_bridge::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
-
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
         aptos_account::register_apt(&core_resources); // registers APT store
