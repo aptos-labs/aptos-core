@@ -256,7 +256,7 @@ mod tests {
 
             assert!(zks.verify_groth16_proof(public_input, &pvk).is_ok());
             let a = Groth16SimulatorBn254::generate_random_scalar(&mut rng);
-            assert!(!zks.verify_groth16_proof(a, &pvk).is_ok());
+            assert!(zks.verify_groth16_proof(a, &pvk).is_err());
         }
     }
 
@@ -288,16 +288,18 @@ mod tests {
 
             assert!(zks.verify_groth16_proof(public_input, &pvk).is_ok());
             let a = Groth16SimulatorBn254::generate_random_scalar(&mut rng);
-            assert!(!zks.verify_groth16_proof(a, &pvk).is_ok());
+            assert!(zks.verify_groth16_proof(a, &pvk).is_err());
         }
     }
 
+    #[test]
     fn prove_and_verify() {
         let iterations = 25;
         let seed = 42;
         test_prove_and_verify(iterations, seed);
     }
 
+    #[test]
     fn prove_and_verify_circuit_agnostic() {
         let iterations = 25;
         let seed = 42;
