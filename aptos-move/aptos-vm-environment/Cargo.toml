@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-metrics-core = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-table-natives = { workspace = true }

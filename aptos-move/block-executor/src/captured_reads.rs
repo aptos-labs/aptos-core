@@ -38,6 +38,8 @@ use std::{
     },
     sync::Arc,
 };
+use aptos_metrics_core::TimerHelper;
+use aptos_mvhashmap::versioned_module_storage::TIMER;
 
 /// The enum variants should not be re-ordered, as it defines a relation
 /// Existence < Metadata < Value.
@@ -612,6 +614,7 @@ impl<T: Transaction> CapturedReads<T> {
         module_storage: &VersionedModuleStorage<T::Key, ModuleStorageEntry>,
         idx_to_validate: TxnIndex,
     ) -> bool {
+        let _timer = TIMER.timer_with(&["CapturedReads::validate_module_reads"]);
         if self.speculative_failure {
             return false;
         }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::view::{LatestView, ViewState};
-use aptos_mvhashmap::versioned_module_storage::{ModuleStorageRead, ModuleVersion};
+use aptos_mvhashmap::versioned_module_storage::{ModuleStorageRead, ModuleVersion, TIMER};
 use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_value::StateValueMetadata, TStateView},
@@ -25,6 +25,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::{module_cyclic_dependency_error, module_linker_error};
 use std::{collections::HashSet, sync::Arc};
+use aptos_metrics_core::TimerHelper;
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosCodeStorage<T::Key>
     for LatestView<'a, T, S, X>
@@ -41,6 +42,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosModul
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
+        let _timer = TIMER.timer_with(&["LatestView::fetch_state_value_metadata"]);
         Ok(self
             .read_module_storage(address, module_name)
             .map_err(|e| e.to_partial())?
@@ -49,6 +51,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosModul
     }
 
     fn fetch_module_size_by_state_key(&self, key: &Self::Key) -> PartialVMResult<Option<usize>> {
+        let _timer = TIMER.timer_with(&["LatestView::fetch_module_size_by_state_key"]);
         Ok(self
             .read_module_storage_by_key(key)
             .map_err(|e| e.to_partial())?
@@ -153,6 +156,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<bool> {
+        let _timer = TIMER.timer_with(&["LatestView::check_module_exists"]);
         let exists = self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -165,6 +169,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
+        let _timer = TIMER.timer_with(&["LatestView::fetch_module_bytes"]);
         Ok(self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -176,6 +181,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
+        let _timer = TIMER.timer_with(&["LatestView::fetch_module_size_in_bytes"]);
         Ok(self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -187,6 +193,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Vec<Metadata>>> {
+        let _timer = TIMER.timer_with(&["LatestView::fetch_deserialized_module"]);
         Ok(self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -198,6 +205,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
+        let _timer = TIMER.timer_with(&["LatestView::fetch_deserialized_module"]);
         Ok(self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -222,6 +230,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
             return Ok(Some(module));
         }
 
+        let timer = TIMER.timer_with(&["LatestView::traversed_published_dependencies"]);
         let module = self.traversed_published_dependencies(
             version,
             entry,
@@ -229,6 +238,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
             module_name,
             &mut visited,
         )?;
+        drop(timer);
+
         Ok(Some(module))
     }
 }
@@ -310,6 +321,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
+        let _timer = TIMER.timer_with(&["LatestView::read_module_storage"]);
         let key = T::Key::from_address_and_module_name(address, module_name);
         self.read_module_storage_by_key(&key)
     }

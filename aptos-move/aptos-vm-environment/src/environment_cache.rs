@@ -8,8 +8,20 @@ use aptos_types::state_store::StateView;
 use bytes::Bytes;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use aptos_metrics_core::{HistogramVec, register_histogram_vec, TimerHelper};
+use aptos_metrics_core::exponential_buckets;
 // use aptos_types::state_store::state_key::StateKey;
 // use aptos_types::vm::modules::ModuleStorageEntry;
+
+pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "env_and_module_storage_timer_seconds",
+        "Various timers for performance analysis.",
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+    )
+        .unwrap()
+});
 
 /// Represents a unique identifier for an [AptosEnvironment] instance based on the features, gas
 /// feature version, and other configs.
@@ -52,8 +64,14 @@ impl EnvironmentCache {
     pub fn fetch_with_delayed_field_optimization_enabled(
         state_view: &impl StateView,
     ) -> AptosEnvironment {
+        let timer = TIMER.timer_with(&["AptosEnvironment::new"]);
         let env = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
+        drop(timer);
+
+        let timer = TIMER.timer_with(&["EnvironmentID::new"]);
         let id = EnvironmentID::new(&env);
+        drop(timer);
+
         ENVIRONMENT_CACHE.get_or_fetch(id, env)
     }
 

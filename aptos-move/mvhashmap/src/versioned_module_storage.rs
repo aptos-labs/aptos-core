@@ -9,6 +9,19 @@ use dashmap::DashMap;
 use derivative::Derivative;
 use move_binary_format::errors::VMResult;
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
+use aptos_crypto::_once_cell::sync::Lazy;
+use aptos_metrics_core::{HistogramVec, register_histogram_vec, TimerHelper};
+use aptos_metrics_core::exponential_buckets;
+
+pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "versioned_module_storage_timer_seconds",
+        "Various timers for performance analysis.",
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+    )
+        .unwrap()
+});
 
 /// Represents a version of a module - either written by some transaction, or fetched from storage.
 pub type ModuleVersion = Result<TxnIndex, StorageVersion>;
@@ -142,7 +155,10 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
             .entry(key.clone())
             .or_insert_with(VersionedEntry::empty);
 
+        let timer = TIMER.timer_with(&["VersionedModuleStorage::init_func"]);
         let maybe_entry = init_func()?;
+        drop(timer);
+
         v.versions.insert(
             ShiftedTxnIndex::zero_idx(),
             CachePadded::new(maybe_entry.clone()),
