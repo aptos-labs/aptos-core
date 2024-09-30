@@ -148,6 +148,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        None, /* append_state_checkpoint_to_block */
     )?
     .apply_to_ledger(&executed_trees, None)?;
     ensure!(

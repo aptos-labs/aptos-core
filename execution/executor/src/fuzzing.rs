@@ -73,8 +73,9 @@ impl TransactionBlockExecutor for FakeVM {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view, onchain_config)
+        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view, onchain_config, append_state_checkpoint_to_block)
     }
 }
 

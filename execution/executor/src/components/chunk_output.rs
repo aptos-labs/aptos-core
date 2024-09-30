@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
@@ -41,11 +41,15 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 use std::iter::repeat;
 use aptos_executor_types::parsed_transaction_output::TransactionsWithParsedOutput;
 use aptos_executor_types::state_checkpoint_output::TransactionsByStatus;
+use aptos_metrics_core::TimerHelper;
+use aptos_storage_interface::cached_state_view::ShardedStateCache;
+use aptos_types::on_chain_config::{ConfigurationResource, ValidatorSet};
+use aptos_types::state_store::ShardedStateUpdates;
 use aptos_types::transaction::{BlockEpiloguePayload, TransactionAuxiliaryData};
 use aptos_types::write_set::WriteSet;
-use crate::metrics::EXECUTOR_ERRORS;
+use crate::metrics::{EXECUTOR_ERRORS, OTHER_TIMERS};
 
-pub struct RawChunkOutput {
+pub struct RawChunkOutputParser {
     /// Input transactions.
     pub transactions: Vec<Transaction>,
     /// Raw VM output.
@@ -54,56 +58,65 @@ pub struct RawChunkOutput {
     /// execution result is processed; as well as all the accounts touched during execution, together
     /// with their proofs.
     pub state_cache: StateCache,
+    /// BlockEndInfo outputed by the VM
+    pub block_end_info: Option<BlockEndInfo>,
 }
 
-impl RawChunkOutput {
-    fn parse_into(
+impl RawChunkOutputParser {
+    fn parse(
         self,
         append_state_checkpoint_to_block: Option<HashValue>,
-        block_end_info: Option<BlockEndInfo>,
     ) -> Result<ChunkOutput> {
         let Self {
-            transactions,
+            mut transactions,
             transaction_outputs,
-            state_cache: _,
+            state_cache,
+            block_end_info,
         } = self;
 
-        let mut transaction_outputs: Vec<ParsedTransactionOutput> =
-            transaction_outputs.into_iter().map(Into::into).collect();
-        // N.B. off-by-1 intentionally, for exclusive index
-        let new_epoch_marker = transaction_outputs
-            .iter()
-            .position(|o| o.is_reconfig())
-            .map(|idx| idx + 1);
-
-        let block_gas_limit_marker = transaction_outputs
-            .iter()
-            .position(|o| matches!(o.status(), TransactionStatus::Retry));
-
-        // Transactions after the epoch ending txn are all to be retried.
-        // Transactions after the txn that exceeded per-block gas limit are also to be retried.
-        let to_retry = if let Some(pos) = new_epoch_marker {
-            TransactionsWithParsedOutput::new(
-                transactions.drain(pos..).collect(),
-                transaction_outputs.drain(pos..).collect(),
-            )
-        } else if let Some(pos) = block_gas_limit_marker {
-            TransactionsWithParsedOutput::new(
-                transactions.drain(pos..).collect(),
-                transaction_outputs.drain(pos..).collect(),
-            )
-        } else {
-            TransactionsWithParsedOutput::new_empty()
+        // Parse all outputs.
+        let mut transaction_outputs: Vec<ParsedTransactionOutput> = {
+            let _timer = OTHER_TIMERS.timer_with(&["parse_output"]);
+            transaction_outputs.into_iter().map(Into::into).collect()
         };
 
-        let state_checkpoint_to_add =
-            new_epoch_marker.map_or_else(|| append_state_checkpoint_to_block, |_| None);
+        // Isolate retries.
+        let to_retry = Self::extract_retries(&mut transactions, &mut transaction_outputs);
 
-        let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
-        let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
+        // Collect all statuses.
+        let statuses_for_input_txns = {
+            let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
+            // Forcibly overwriting statuses for retries, since VM can output otherwise.
+            let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
+            keeps_and_discards.chain(retries).collect()
+        };
 
-        let status = keeps_and_discards.chain(retries).collect();
+        // Isolate discards.
+        let to_discard = Self::extract_discards(&mut transactions, &mut transaction_outputs);
 
+        // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
+        let to_commit = TransactionsWithParsedOutput::new(transactions, transaction_outputs);
+        let to_commit = Self::maybe_add_block_epilogue(
+            to_commit,
+            block_end_info.as_ref(),
+            append_state_checkpoint_to_block,
+        );
+        let next_epoch_state = if to_commit.ends_epoch() {
+            Self::get_epoch_state(&state_cache.base, &state_cache.updates).ok()
+        };
+
+        Ok(ChunkOutput {
+            statuses_for_input_txns,
+            to_commit,
+            to_discard,
+            to_retry,
+            state_cache,
+            block_end_info,
+            next_epoch_state,
+        })
+    }
+
+    fn extract_discards(mut transactions: &mut Vec<Transaction>, mut transaction_outputs: &mut Vec<ParsedTransactionOutput>) -> TransactionsWithParsedOutput {
         let to_discard = {
             let mut res = TransactionsWithParsedOutput::new_empty();
             for idx in 0..transactions.len() {
@@ -118,32 +131,6 @@ impl RawChunkOutput {
                 let remaining = transactions.len() - res.len();
                 transactions.truncate(remaining);
                 transaction_outputs.truncate(remaining);
-            }
-            res
-        };
-        let to_keep = {
-            let mut res = TransactionsWithParsedOutput::new(transactions, transaction_outputs);
-
-            // Append the StateCheckpoint transaction to the end of to_keep
-            if let Some(block_id) = state_checkpoint_to_add {
-                let state_checkpoint_txn = block_end_info.map_or(
-                    Transaction::StateCheckpoint(block_id),
-                    |block_end_info| {
-                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
-                            block_id,
-                            block_end_info,
-                        })
-                    },
-                );
-                let state_checkpoint_txn_output: ParsedTransactionOutput =
-                    Into::into(TransactionOutput::new(
-                        WriteSet::default(),
-                        Vec::new(),
-                        0,
-                        TransactionStatus::Keep(ExecutionStatus::Success),
-                        TransactionAuxiliaryData::default(),
-                    ));
-                res.push(state_checkpoint_txn, state_checkpoint_txn_output);
             }
             res
         };
@@ -166,13 +153,88 @@ impl RawChunkOutput {
             }
         });
 
-        Ok((
-            new_epoch_marker.is_some(),
-            status,
-            to_keep,
-            to_discard,
-            to_retry,
-        ))
+        to_discard
+    }
+
+    fn extract_retries(
+        mut transactions: &mut Vec<Transaction>,
+        mut transaction_outputs: &mut Vec<ParsedTransactionOutput>
+    ) -> TransactionsWithParsedOutput {
+        // N.B. off-by-1 intentionally, for exclusive index
+        let new_epoch_marker = transaction_outputs
+            .iter()
+            .position(|o| o.is_reconfig())
+            .map(|idx| idx + 1);
+
+        let block_gas_limit_marker = transaction_outputs
+            .iter()
+            .position(|o| matches!(o.status(), TransactionStatus::Retry));
+
+        // Transactions after the epoch ending txn are all to be retried.
+        // Transactions after the txn that exceeded per-block gas limit are also to be retried.
+        if let Some(pos) = new_epoch_marker {
+            TransactionsWithParsedOutput::new(
+                transactions.drain(pos..).collect(),
+                transaction_outputs.drain(pos..).collect(),
+            )
+        } else if let Some(pos) = block_gas_limit_marker {
+            TransactionsWithParsedOutput::new(
+                transactions.drain(pos..).collect(),
+                transaction_outputs.drain(pos..).collect(),
+            )
+        } else {
+            TransactionsWithParsedOutput::new_empty()
+        }
+    }
+
+    fn maybe_add_block_epilogue(
+        mut to_commit: TransactionsWithParsedOutput,
+        block_end_info: Option<&BlockEndInfo>,
+        append_state_checkpoint_to_block: Option<HashValue>,
+    ) -> TransactionsWithParsedOutput {
+        if !to_commit.ends_epoch() {
+            // Append the StateCheckpoint transaction to the end
+            if let Some(block_id) = append_state_checkpoint_to_block {
+                let state_checkpoint_txn = block_end_info.cloned().map_or(
+                    Transaction::StateCheckpoint(block_id),
+                    |block_end_info| {
+                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
+                            block_id,
+                            block_end_info,
+                        })
+                    },
+                );
+                let state_checkpoint_txn_output: ParsedTransactionOutput =
+                    Into::into(TransactionOutput::new(
+                        WriteSet::default(),
+                        Vec::new(),
+                        0,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                        TransactionAuxiliaryData::default(),
+                    ));
+                to_commit.push(state_checkpoint_txn, state_checkpoint_txn_output);
+            }
+        }; // else: not adding block epilogue at epoch ending.
+
+
+        to_commit
+    }
+
+    fn get_epoch_state(
+        base: &ShardedStateCache,
+        updates: &ShardedStateUpdates,
+    ) -> Result<EpochState> {
+
+        let state_cache_view = StateCacheView::new(base, updates);
+        let validator_set = ValidatorSet::fetch_config(&state_cache_view)
+            .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
+        let configuration = ConfigurationResource::fetch_config(&state_cache_view)
+            .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
+
+        Ok(EpochState {
+            epoch: configuration.epoch(),
+            verifier: (&validator_set).into(),
+        })
     }
 }
 
@@ -203,13 +265,14 @@ impl ChunkOutput {
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<Self> {
         match transactions {
             ExecutableTransactions::Unsharded(txns) => {
-                Self::by_transaction_execution_unsharded::<V>(txns, state_view, onchain_config)
+                Self::by_transaction_execution_unsharded::<V>(txns, state_view, onchain_config, append_state_checkpoint_to_block)
             },
             ExecutableTransactions::Sharded(txns) => {
-                Self::by_transaction_execution_sharded::<V>(txns, state_view, onchain_config)
+                Self::by_transaction_execution_sharded::<V>(txns, state_view, onchain_config, append_state_checkpoint_to_block)
             },
         }
     }
@@ -218,22 +281,26 @@ impl ChunkOutput {
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<Self> {
         let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
-
         let (transaction_outputs, block_end_info) = block_output.into_inner();
-        Ok(Self {
+
+        RawChunkOutputParser {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
-            state_cache: state_view.into_state_cache(),
+            state_cache,
             block_end_info,
-        })
+        }.parse(
+            append_state_checkpoint_to_block,
+        )
     }
 
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
         transactions: PartitionedTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = Self::execute_block_sharded::<V>(
@@ -247,7 +314,7 @@ impl ChunkOutput {
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
-        Ok(Self {
+        RawChunkOutputParser {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
                 .map(|t| t.into_txn().into_inner())
@@ -255,7 +322,9 @@ impl ChunkOutput {
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
             block_end_info: None,
-        })
+        }.parse(
+            append_state_checkpoint_to_block
+        )
     }
 
     pub fn by_transaction_output(
@@ -276,12 +345,12 @@ impl ChunkOutput {
         // prime the state cache by fetching all touched accounts
         state_view.prime_cache_by_write_set(write_set)?;
 
-        Ok(Self {
+        RawChunkOutputParser {
             transactions,
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
             block_end_info: None,
-        })
+        }.parse(None)
     }
 
     pub fn apply_to_ledger(

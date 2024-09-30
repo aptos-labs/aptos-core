@@ -141,6 +141,10 @@ impl TransactionsWithParsedOutput {
             .find(|&i| Self::need_checkpoint(&self.transactions[i], &self.parsed_output[i]))
     }
 
+    pub fn ends_epoch(&self) -> bool {
+        self.parsed_output.last().map_or(false, |output| output.is_reconfig())
+    }
+
     pub fn need_checkpoint(txn: &Transaction, txn_output: &ParsedTransactionOutput) -> bool {
         if txn_output.is_reconfig() {
             return true;

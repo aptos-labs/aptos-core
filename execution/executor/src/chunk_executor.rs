@@ -296,9 +296,9 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         )?;
 
         // Calculate state snapshot
-        let (result_state, next_epoch_state, state_checkpoint_output) =
+        let speculative_state =
             ApplyChunkOutput::calculate_state_checkpoint(
-                chunk_output,
+                &chunk_output,
                 &self.commit_queue.lock().latest_state(),
                 None, // append_state_checkpoint_to_block
                 Some(chunk_proof.txn_infos_with_proof.state_checkpoint_hashes()),
@@ -309,12 +309,9 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         self.commit_queue
             .lock()
             .enqueue_for_ledger_update(ChunkToUpdateLedger {
-                result_state,
-                state_checkpoint_output,
-                next_epoch_state,
-                verified_target_li: verified_target_li.clone(),
-                epoch_change_li: epoch_change_li.cloned(),
-                txn_infos_with_proof,
+                chunk_output,
+                chunk_proof,
+                speculative_state,
             })?;
 
         info!(
@@ -605,6 +602,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            None, /* append_state_checkpoint_to_block */
         )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((

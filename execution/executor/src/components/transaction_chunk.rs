@@ -104,6 +104,7 @@ impl TransactionChunkWithProof for TransactionListWithProof {
                 sig_verified_txns.into(),
                 state_view,
                 BlockExecutorConfigFromOnchain::new_no_block_limit(),
+                None, /* append_state_checkpoint_to_block */
             )?
         };
         let chunk_proof = ChunkProof {
