@@ -87,9 +87,12 @@ module std::features {
 
     #[deprecated]
     /// Deprecated feature
-    public fun get_collect_and_distribute_gas_fees_feature(): u64 {
-        abort error::invalid_argument(EINVALID_FEATURE)
-    }
+    /// Lifetime: transient
+    const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 = 6;
+
+    #[deprecated]
+    /// Deprecated feature
+    public fun get_collect_and_distribute_gas_fees_feature(): u64 { COLLECT_AND_DISTRIBUTE_GAS_FEES }
 
     #[deprecated]
     public fun collect_and_distribute_gas_fees(): bool {

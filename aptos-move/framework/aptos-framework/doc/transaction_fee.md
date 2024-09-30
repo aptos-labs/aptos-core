@@ -9,29 +9,29 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Resource `AptosCoinCapabilities`](#0x1_transaction_fee_AptosCoinCapabilities)
 -  [Resource `AptosFABurnCapabilities`](#0x1_transaction_fee_AptosFABurnCapabilities)
 -  [Resource `AptosCoinMintCapability`](#0x1_transaction_fee_AptosCoinMintCapability)
--  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
 -  [Struct `FeeStatement`](#0x1_transaction_fee_FeeStatement)
+-  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
 -  [Constants](#@Constants_0)
--  [Function `initialize_fee_collection_and_distribution`](#0x1_transaction_fee_initialize_fee_collection_and_distribution)
--  [Function `upgrade_burn_percentage`](#0x1_transaction_fee_upgrade_burn_percentage)
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
 -  [Function `mint_and_refund`](#0x1_transaction_fee_mint_and_refund)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_transaction_fee_store_aptos_coin_burn_cap)
 -  [Function `convert_to_aptos_fa_burn_ref`](#0x1_transaction_fee_convert_to_aptos_fa_burn_ref)
 -  [Function `store_aptos_coin_mint_cap`](#0x1_transaction_fee_store_aptos_coin_mint_cap)
--  [Function `initialize_storage_refund`](#0x1_transaction_fee_initialize_storage_refund)
 -  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
+-  [Function `initialize_fee_collection_and_distribution`](#0x1_transaction_fee_initialize_fee_collection_and_distribution)
+-  [Function `upgrade_burn_percentage`](#0x1_transaction_fee_upgrade_burn_percentage)
+-  [Function `initialize_storage_refund`](#0x1_transaction_fee_initialize_storage_refund)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
     -  [Resource `CollectedFeesPerBlock`](#@Specification_1_CollectedFeesPerBlock)
-    -  [Function `initialize_fee_collection_and_distribution`](#@Specification_1_initialize_fee_collection_and_distribution)
     -  [Function `burn_fee`](#@Specification_1_burn_fee)
     -  [Function `mint_and_refund`](#@Specification_1_mint_and_refund)
     -  [Function `store_aptos_coin_burn_cap`](#@Specification_1_store_aptos_coin_burn_cap)
     -  [Function `store_aptos_coin_mint_cap`](#@Specification_1_store_aptos_coin_mint_cap)
-    -  [Function `initialize_storage_refund`](#@Specification_1_initialize_storage_refund)
     -  [Function `emit_fee_statement`](#@Specification_1_emit_fee_statement)
+    -  [Function `initialize_fee_collection_and_distribution`](#@Specification_1_initialize_fee_collection_and_distribution)
+    -  [Function `initialize_storage_refund`](#@Specification_1_initialize_storage_refund)
 
 
 <pre><code><b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
@@ -132,48 +132,6 @@ Stores mint capability to mint the refunds.
 
 </details>
 
-<a id="0x1_transaction_fee_CollectedFeesPerBlock"></a>
-
-## Resource `CollectedFeesPerBlock`
-
-Stores information about the block proposer and the amount of fees
-collected when executing the block.
-
-
-<pre><code>#[deprecated]
-<b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>amount: <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>proposer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>burn_percentage: u8</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a id="0x1_transaction_fee_FeeStatement"></a>
 
 ## Struct `FeeStatement`
@@ -245,6 +203,48 @@ This is meant to emitted as a module event.
 
 </details>
 
+<a id="0x1_transaction_fee_CollectedFeesPerBlock"></a>
+
+## Resource `CollectedFeesPerBlock`
+
+DEPRECATED: Stores information about the block proposer and the amount of fees
+collected when executing the block.
+
+
+<pre><code>#[deprecated]
+<b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>amount: <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>proposer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>burn_percentage: u8</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -289,61 +289,6 @@ No longer supported.
 </code></pre>
 
 
-
-<a id="0x1_transaction_fee_initialize_fee_collection_and_distribution"></a>
-
-## Function `initialize_fee_collection_and_distribution`
-
-DEPRECATED
-
-
-<pre><code>#[deprecated]
-<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _burn_percentage: u8)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _burn_percentage: u8) {
-    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_transaction_fee_upgrade_burn_percentage"></a>
-
-## Function `upgrade_burn_percentage`
-
-DEPRECATED
-
-
-<pre><code>#[deprecated]
-<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _new_burn_percentage: u8)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(
-    _aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    _new_burn_percentage: u8
-) {
-    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
-}
-</code></pre>
-
-
-
-</details>
 
 <a id="0x1_transaction_fee_burn_fee"></a>
 
@@ -501,6 +446,85 @@ Only called during genesis.
 
 </details>
 
+<a id="0x1_transaction_fee_emit_fee_statement"></a>
+
+## Function `emit_fee_statement`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">transaction_fee::FeeStatement</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a>) {
+    <a href="event.md#0x1_event_emit">event::emit</a>(fee_statement)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_initialize_fee_collection_and_distribution"></a>
+
+## Function `initialize_fee_collection_and_distribution`
+
+DEPRECATED
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _burn_percentage: u8)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _burn_percentage: u8) {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_upgrade_burn_percentage"></a>
+
+## Function `upgrade_burn_percentage`
+
+DEPRECATED
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _new_burn_percentage: u8)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(
+    _aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    _new_burn_percentage: u8
+) {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_transaction_fee_initialize_storage_refund"></a>
 
 ## Function `initialize_storage_refund`
@@ -519,30 +543,6 @@ Only called during genesis.
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_storage_refund">initialize_storage_refund</a>(_: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_transaction_fee_emit_fee_statement"></a>
-
-## Function `emit_fee_statement`
-
-
-
-<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">transaction_fee::FeeStatement</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a>) {
-    <a href="event.md#0x1_event_emit">event::emit</a>(fee_statement)
 }
 </code></pre>
 
@@ -672,18 +672,6 @@ Only called during genesis.
 
 
 
-<a id="@Specification_1_initialize_fee_collection_and_distribution"></a>
-
-### Function `initialize_fee_collection_and_distribution`
-
-
-<pre><code>#[deprecated]
-<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _burn_percentage: u8)
-</code></pre>
-
-
-
-
 <a id="@Specification_1_burn_fee"></a>
 
 ### Function `burn_fee`
@@ -793,6 +781,30 @@ Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCap
 
 
 
+<a id="@Specification_1_emit_fee_statement"></a>
+
+### Function `emit_fee_statement`
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">transaction_fee::FeeStatement</a>)
+</code></pre>
+
+
+Aborts if module event feature is not enabled.
+
+
+<a id="@Specification_1_initialize_fee_collection_and_distribution"></a>
+
+### Function `initialize_fee_collection_and_distribution`
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _burn_percentage: u8)
+</code></pre>
+
+
+
+
 <a id="@Specification_1_initialize_storage_refund"></a>
 
 ### Function `initialize_storage_refund`
@@ -808,19 +820,6 @@ Historical. Aborts.
 
 <pre><code><b>aborts_if</b> <b>true</b>;
 </code></pre>
-
-
-
-<a id="@Specification_1_emit_fee_statement"></a>
-
-### Function `emit_fee_statement`
-
-
-<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">transaction_fee::FeeStatement</a>)
-</code></pre>
-
-
-Aborts if module event feature is not enabled.
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

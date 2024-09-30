@@ -49,7 +49,6 @@ spec aptos_framework::gas_schedule {
     spec set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         use std::signer;
         use aptos_framework::util;
-        use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;
@@ -57,7 +56,6 @@ spec aptos_framework::gas_schedule {
 
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 600;
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         requires chain_status::is_genesis();
         include staking_config::StakingRewardsConfigRequirement;
@@ -75,14 +73,12 @@ spec aptos_framework::gas_schedule {
     }
 
     spec set_storage_gas_config(aptos_framework: &signer, config: StorageGasConfig) {
-        use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;
 
         // TODO: set because of timeout (property proved).
         pragma verify_duration_estimate = 600;
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         include staking_config::StakingRewardsConfigRequirement;

@@ -146,7 +146,6 @@ spec aptos_framework::aptos_governance {
         };
         include stake::GetReconfigStartTimeRequirement;
         requires chain_status::is_operating();
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;
@@ -584,7 +583,6 @@ spec aptos_framework::aptos_governance {
         include stake::GetReconfigStartTimeRequirement;
 
         requires chain_status::is_operating();
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;

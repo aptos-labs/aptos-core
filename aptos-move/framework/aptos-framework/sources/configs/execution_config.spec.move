@@ -11,7 +11,6 @@ spec aptos_framework::execution_config {
         use std::signer;
         use std::features;
         use aptos_framework::chain_status;
-        use aptos_framework::stake;
         use aptos_framework::staking_config;
         use aptos_framework::aptos_coin;
 
@@ -19,7 +18,6 @@ spec aptos_framework::execution_config {
         pragma verify_duration_estimate = 600;
         let addr = signer::address_of(account);
         requires chain_status::is_genesis();
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         requires len(config) > 0;
         include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;

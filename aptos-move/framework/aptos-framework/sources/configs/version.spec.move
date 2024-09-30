@@ -26,7 +26,6 @@ spec aptos_framework::version {
         use std::signer;
         use aptos_framework::chain_status;
         use aptos_framework::timestamp;
-        use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::staking_config;
@@ -37,7 +36,6 @@ spec aptos_framework::version {
         include staking_config::StakingRewardsConfigRequirement;
         requires chain_status::is_genesis();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
-        requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
 
         aborts_if !exists<SetVersionCapability>(signer::address_of(account));

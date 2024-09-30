@@ -43,15 +43,6 @@ module aptos_framework::transaction_fee {
         mint_cap: MintCapability<AptosCoin>,
     }
 
-    #[deprecated]
-    /// Stores information about the block proposer and the amount of fees
-    /// collected when executing the block.
-    struct CollectedFeesPerBlock has key {
-        amount: AggregatableCoin<AptosCoin>,
-        proposer: Option<address>,
-        burn_percentage: u8,
-    }
-
     #[event]
     /// Breakdown of fee charge and refund for a transaction.
     /// The structure is:
@@ -83,21 +74,6 @@ module aptos_framework::transaction_fee {
         storage_fee_octas: u64,
         /// Storage fee refund.
         storage_fee_refund_octas: u64,
-    }
-
-    #[deprecated]
-    /// DEPRECATED
-    public fun initialize_fee_collection_and_distribution(_aptos_framework: &signer, _burn_percentage: u8) {
-        abort error::not_implemented(ENO_LONGER_SUPPORTED)
-    }
-
-    #[deprecated]
-    /// DEPRECATED
-    public fun upgrade_burn_percentage(
-        _aptos_framework: &signer,
-        _new_burn_percentage: u8
-    ) {
-        abort error::not_implemented(ENO_LONGER_SUPPORTED)
     }
 
     /// Burn transaction fees in epilogue.
@@ -156,13 +132,39 @@ module aptos_framework::transaction_fee {
         move_to(aptos_framework, AptosCoinMintCapability { mint_cap })
     }
 
-    #[deprecated]
-    public fun initialize_storage_refund(_: &signer) {
-        abort error::not_implemented(ENO_LONGER_SUPPORTED)
-    }
-
     // Called by the VM after epilogue.
     fun emit_fee_statement(fee_statement: FeeStatement) {
         event::emit(fee_statement)
+    }
+
+    // DEPRECATED section:
+
+    #[deprecated]
+    /// DEPRECATED: Stores information about the block proposer and the amount of fees
+    /// collected when executing the block.
+    struct CollectedFeesPerBlock has key {
+        amount: AggregatableCoin<AptosCoin>,
+        proposer: Option<address>,
+        burn_percentage: u8,
+    }
+
+    #[deprecated]
+    /// DEPRECATED
+    public fun initialize_fee_collection_and_distribution(_aptos_framework: &signer, _burn_percentage: u8) {
+        abort error::not_implemented(ENO_LONGER_SUPPORTED)
+    }
+
+    #[deprecated]
+    /// DEPRECATED
+    public fun upgrade_burn_percentage(
+        _aptos_framework: &signer,
+        _new_burn_percentage: u8
+    ) {
+        abort error::not_implemented(ENO_LONGER_SUPPORTED)
+    }
+
+    #[deprecated]
+    public fun initialize_storage_refund(_: &signer) {
+        abort error::not_implemented(ENO_LONGER_SUPPORTED)
     }
 }
