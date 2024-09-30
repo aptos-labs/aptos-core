@@ -1184,6 +1184,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "status-line",
+ "tokio",
 ]
 
 [[package]]
@@ -1669,7 +1670,6 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -11623,7 +11623,6 @@ dependencies = [
  "proptest",
  "serde",
  "sha3 0.9.1",
- "tracing",
  "triomphe",
  "typed-arena",
 ]
@@ -15515,7 +15514,6 @@ dependencies = [
  "aptos-db",
  "aptos-db-indexer",
  "aptos-db-indexer-schemas",
- "aptos-debugger",
  "aptos-dkg",
  "aptos-faucet-core",
  "aptos-forge",
