@@ -162,9 +162,8 @@
             pk: &Trapdoor<E>,
             a: E::ScalarField,
             b: E::ScalarField,
-            input_assignment: &[E::ScalarField],
+            public_inputs: &[E::ScalarField],
         ) -> Result<Proof<E>, SynthesisError> {
-            let public_inputs = input_assignment;
             let mut g_ic = pk.gamma_abc_g1[0].into_group();
             for (i, b) in public_inputs.iter().zip(pk.gamma_abc_g1.iter().skip(1)) {
                 g_ic.add_assign(&b.mul_bigint(i.into_bigint()));
@@ -264,7 +263,7 @@
 
         let (pk, vk) = Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
         let pvk = prepare_verifying_key(&vk);
-        for i in 0..n_iters {
+        for _i in 0..n_iters {
 
             let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(
                 &[public_input],
