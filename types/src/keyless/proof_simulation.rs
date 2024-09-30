@@ -1,16 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-    use crate::keyless::ZeroKnowledgeSig;
     use crate::keyless::{Bn254, G1Bytes, G2Bytes};
-    use crate::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine};
-    use crate::keyless::{Groth16Proof, ZKP};
+    use crate::keyless::Groth16Proof;
     use ark_ec::Group;
-    use ark_groth16::prepare_verifying_key;
     use ark_ec::pairing::Pairing;
     use ark_ff::Field;
     use ark_relations::r1cs::SynthesisError;
-    use rand::{SeedableRng, RngCore, Rng};
+    use rand::{RngCore, Rng};
     use ark_std::{marker::PhantomData, vec::Vec};
     use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP};
     use ark_groth16::data_structures::{VerifyingKey, Proof};
@@ -18,8 +15,6 @@
     use ark_ec::{AffineRepr,CurveGroup};
     use ark_ff::PrimeField;
     use std::ops::AddAssign;
-    use ark_ff::MontBackend;
-    use ark_bn254::FrConfig;
 
     pub type Groth16SimulatorBn254 = Groth16Simulator<Bn254>;
 
@@ -190,10 +185,22 @@
         }
     }
 
+#[cfg(test)]
+mod tests {
+    use crate::keyless::proof_simulation::Trapdoor;
+    use crate::keyless::proof_simulation::VerifyingKey;
+    use rand::SeedableRng;
+    use crate::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine,ZKP};
+    use ark_bn254::FrConfig;
+    use ark_groth16::prepare_verifying_key;
+    use ark_ff::MontBackend;
+    use crate::keyless::Bn254;
+    use crate::keyless::proof_simulation::Groth16SimulatorBn254;
+    use crate::keyless::ZeroKnowledgeSig;
+    use ark_ff::PrimeField;
     /// Generates and verifies a simulated proof using a hardcoded simulation prover and verifier key
     /// pair and a hardcoded public input. These values were generated with the Keyless circuit at commit
     /// `b715e935effe282bb998bb06c826b33d290d94ed` of `aptos-core`
-    #[cfg(test)]
     fn test_prove_and_verify(n_iters: usize, seed: u64)
     {
         let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
@@ -253,7 +260,6 @@
         }
     }
 
-    #[cfg(test)]
     fn test_prove_and_verify_circuit_agnostic(n_iters: usize, seed: u64)
     {
         let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
@@ -286,16 +292,15 @@
         }
     }
 
-    #[test]
     fn prove_and_verify() {
         let iterations = 25;
         let seed = 42;
         test_prove_and_verify(iterations, seed);
     }
 
-    #[test]
     fn prove_and_verify_circuit_agnostic() {
         let iterations = 25;
         let seed = 42;
         test_prove_and_verify_circuit_agnostic(iterations, seed);
     }
+}
