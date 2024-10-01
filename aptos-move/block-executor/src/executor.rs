@@ -37,21 +37,23 @@ use aptos_types::{
     delayed_fields::PanicError,
     executable::Executable,
     on_chain_config::BlockGasLimitType,
-    state_store::{state_value::StateValue, TStateView},
+    state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
-    vm::modules::ModuleStorageEntry,
+    vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_environment::environment_cache::CrossBlockModuleCache;
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
 use aptos_vm_types::change_set::randomly_check_layout_matches;
 use bytes::Bytes;
-use claims::assert_none;
+use claims::{assert_none, assert_ok};
 use core::panic;
 use fail::fail_point;
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, value::MoveTypeLayout, vm_status::StatusCode,
+};
 use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use num_cpus;
 use rayon::ThreadPool;
@@ -64,6 +66,7 @@ use std::{
         Arc,
     },
 };
+use aptos_types::executable::ModulePath;
 
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -1009,6 +1012,38 @@ where
 
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
+
+        let state_key =
+            StateKey::module(&AccountAddress::ONE, ident_str!("transaction_validation"));
+        match CrossBlockModuleCache::get_from_cross_block_module_cache(&state_key) {
+            None => {
+                if let Some(state_value) = base_view.get_state_value(&T::Key::from_address_and_module_name(&AccountAddress::ONE, ident_str!("transaction_validation"))).unwrap() {
+                    let entry = assert_ok!(ModuleStorageEntry::from_state_value(
+                        env.runtime_environment(),
+                        state_value,
+                    ));
+                        assert_ok!(CrossBlockModuleCache::traverse(
+                        Arc::new(entry),
+                        &AccountAddress::ONE,
+                        ident_str!("transaction_validation"),
+                        base_view,
+                        env.runtime_environment()
+                    ));
+                }
+            },
+            Some(entry) if !entry.is_verified() => {
+                assert_ok!(CrossBlockModuleCache::traverse(
+                    entry,
+                    &AccountAddress::ONE,
+                    ident_str!("transaction_validation"),
+                    base_view,
+                    env.runtime_environment()
+                ));
+            },
+            _ => {
+                // do nothing
+            },
+        };
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
