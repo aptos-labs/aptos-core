@@ -2,7 +2,7 @@
 ///
 /// Has O(1) push/pop operations at both front and back, unlike a vector
 /// which has O(n) push/pop operations at the front.
-module aptos_std::ring_deque {
+module 0x1::ring_deque {
 
     use std::option::{Self, Option};
     use std::vector;
