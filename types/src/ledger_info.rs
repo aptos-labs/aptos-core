@@ -438,7 +438,7 @@ impl<'de> Deserialize<'de> for SignatureWithStatus {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LedgerInfoWithUnverifiedSignatures {
     ledger_info: LedgerInfo,
-    signatures: Vec<(AccountAddress, SignatureWithStatus)>,
+    signatures: BTreeMap<AccountAddress, SignatureWithStatus>,
 }
 
 impl Display for LedgerInfoWithUnverifiedSignatures {
@@ -451,7 +451,7 @@ impl LedgerInfoWithUnverifiedSignatures {
     pub fn new(ledger_info: LedgerInfo) -> Self {
         Self {
             ledger_info,
-            signatures: vec![],
+            signatures: BTreeMap::default(),
         }
     }
 
@@ -460,17 +460,7 @@ impl LedgerInfoWithUnverifiedSignatures {
     }
 
     pub fn add_signature(&mut self, validator: AccountAddress, signature: &SignatureWithStatus) {
-        let mut found = false;
-        for (v, s) in self.signatures.iter_mut() {
-            if v == &validator {
-                *s = signature.clone();
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            self.signatures.push((validator, signature.clone()));
-        }
+        self.signatures.insert(validator, signature.clone());
     }
 
     pub fn verified_voters(&self) -> impl Iterator<Item = &AccountAddress> {
@@ -494,7 +484,7 @@ impl LedgerInfoWithUnverifiedSignatures {
     }
 
     pub fn all_voters(&self) -> impl Iterator<Item = &AccountAddress> {
-        self.signatures.iter().map(|(author, _sig)| author)
+        self.signatures.keys()
     }
 
     pub fn check_voting_power(
@@ -882,9 +872,7 @@ mod tests {
             0
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures
-                .unverified_voters()
-                .count(),
+            ledger_info_with_mixed_signatures.verified_voters().count(),
             5
         );
         assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
