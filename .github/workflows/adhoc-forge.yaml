@@ -66,7 +66,6 @@ jobs:
           echo "FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}"
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
           echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
-          echo "FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}"
           echo "FORGE_ENABLE_INDEXER: ${{ inputs.FORGE_ENABLE_INDEXER }}"
           echo "FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}"
           echo "FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}"
@@ -78,11 +77,10 @@ jobs:
       forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS || 600 }}
       forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
       forgeClusterName: ${{ inputs.FORGE_CLUSTER_NAME }}
-      forgeEnableHaproxy: ${{ inputs.FORGE_ENABLE_HAPROXY }}
       forgeEnableIndexer: ${{ inputs.FORGE_ENABLE_INDEXER }}
       forgeNumValidators: ${{ inputs.FORGE_NUM_VALIDATORS }}
       forgeNumValidatorFullnodes: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
-
+      forgeRetainDebugLogs: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
   adhoc-forge-test:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     needs: [determine-forge-run-metadata]
@@ -94,8 +92,7 @@ jobs:
       FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }}
       FORGE_RUNNER_DURATION_SECS: ${{ fromJSON(needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs) }} # fromJSON converts to integer
       FORGE_CLUSTER_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeClusterName }}
-      FORGE_ENABLE_HAPROXY: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableHaproxy }}
-      FORGE_ENABLE_INDEXER: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableIndexer }}
+      FORGE_ENABLE_INDEXER: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableIndexer == 'true' }}
       FORGE_NUM_VALIDATORS: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidators }}
       FORGE_NUM_VALIDATOR_FULLNODES: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidatorFullnodes }}
-      FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
+      FORGE_RETAIN_DEBUG_LOGS: ${{ needs.determine-forge-run-metadata.outputs.forgeRetainDebugLogs == 'true' }}
