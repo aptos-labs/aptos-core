@@ -56,7 +56,12 @@ impl TransactionBlockExecutor for AptosVM {
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view, onchain_config, append_state_checkpoint_to_block)
+        ChunkOutput::by_transaction_execution::<AptosVM>(
+            transactions,
+            state_view,
+            onchain_config,
+            append_state_checkpoint_to_block,
+        )
     }
 }
 

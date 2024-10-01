@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    components::chunk_output::ChunkOutput,
+    components::{chunk_output::ChunkOutput, chunk_proof::ChunkProof},
     metrics::{CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
 };
 use anyhow::Result;
@@ -11,7 +11,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
-    ledger_info::LedgerInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::TransactionInfoListWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
@@ -19,8 +19,6 @@ use aptos_vm::VMExecutor;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use crate::components::chunk_proof::ChunkProof;
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(

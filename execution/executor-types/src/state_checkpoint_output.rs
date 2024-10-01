@@ -3,111 +3,39 @@
 
 #![forbid(unsafe_code)]
 
-use crate::parsed_transaction_output::TransactionsWithParsedOutput;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
-use aptos_storage_interface::cached_state_view::ShardedStateCache;
+use aptos_storage_interface::{
+    state_delta::StateDelta,
+};
 use aptos_types::{
     state_store::ShardedStateUpdates,
-    transaction::{block_epilogue::BlockEndInfo, TransactionStatus},
 };
 use itertools::zip_eq;
 
-#[derive(Default)]
-pub struct TransactionsByStatus {
-}
-
-impl TransactionsByStatus {
-    pub fn new(
-        statuses_for_input_txns: Vec<TransactionStatus>,
-        to_commit: TransactionsWithParsedOutput,
-        to_discard: TransactionsWithParsedOutput,
-        to_retry: TransactionsWithParsedOutput,
-    ) -> Self {
-        Self {
-            statuses_for_input_txns,
-            to_commit,
-            to_discard,
-            to_retry,
-        }
-    }
-
-    pub fn input_txns_len(&self) -> usize {
-        self.statuses_for_input_txns.len()
-    }
-
-    pub fn into_inner(
-        self,
-    ) -> (
-        Vec<TransactionStatus>,
-        TransactionsWithParsedOutput,
-        TransactionsWithParsedOutput,
-        TransactionsWithParsedOutput,
-    ) {
-        (
-            self.statuses_for_input_txns,
-            self.to_commit,
-            self.to_discard,
-            self.to_retry,
-        )
-    }
-}
-
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct StateCheckpointOutput {
-    txns: TransactionsByStatus,
-    per_version_state_updates: Vec<ShardedStateUpdates>,
-    state_checkpoint_hashes: Vec<Option<HashValue>>,
-    state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
-    sharded_state_cache: ShardedStateCache,
-    block_end_info: Option<BlockEndInfo>,
+    /// includes state updates between the last checkpoint version and the current version
+    pub result_state: StateDelta,
+    /// state updates between the base version and the last checkpoint version
+    pub state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
+    pub per_version_state_updates: Vec<ShardedStateUpdates>,
+    pub state_checkpoint_hashes: Vec<Option<HashValue>>,
 }
 
 impl StateCheckpointOutput {
     pub fn new(
-        txns: TransactionsByStatus,
-        per_version_state_updates: Vec<ShardedStateUpdates>,
-        state_checkpoint_hashes: Vec<Option<HashValue>>,
+        result_state: StateDelta,
         state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
-        sharded_state_cache: ShardedStateCache,
-        block_end_info: Option<BlockEndInfo>,
+        state_checkpoint_hashes: Vec<Option<HashValue>>,
+        per_version_state_updates: Vec<ShardedStateUpdates>,
     ) -> Self {
         Self {
-            txns,
+            result_state,
             per_version_state_updates,
             state_checkpoint_hashes,
             state_updates_before_last_checkpoint,
-            sharded_state_cache,
-            block_end_info,
         }
-    }
-
-    pub fn input_txns_len(&self) -> usize {
-        self.txns.input_txns_len()
-    }
-
-    pub fn txns_to_commit_len(&self) -> usize {
-        self.txns.to_commit.len()
-    }
-
-    pub fn into_inner(
-        self,
-    ) -> (
-        TransactionsByStatus,
-        Vec<ShardedStateUpdates>,
-        Vec<Option<HashValue>>,
-        Option<ShardedStateUpdates>,
-        ShardedStateCache,
-        Option<BlockEndInfo>,
-    ) {
-        (
-            self.txns,
-            self.per_version_state_updates,
-            self.state_checkpoint_hashes,
-            self.state_updates_before_last_checkpoint,
-            self.sharded_state_cache,
-            self.block_end_info,
-        )
     }
 
     pub fn check_and_update_state_checkpoint_hashes(
@@ -130,12 +58,14 @@ impl StateCheckpointOutput {
                 *self_hash = *trusted_hash;
             } else {
                 ensure!(self_hash == trusted_hash,
-                        "State checkpoint hash doesn't match, self: {self_hash:?}, trusted: {trusted_hash:?}");
+                    "State checkpoint hash doesn't match, self: {self_hash:?}, trusted: {trusted_hash:?}"
+                );
             }
             Ok(())
         })
     }
 
+    /// FIXME(aldenhu): move (for executor-benchmark)
     pub fn check_aborts_discards_retries(
         &self,
         allow_aborts: bool,

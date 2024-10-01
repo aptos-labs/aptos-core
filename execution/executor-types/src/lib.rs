@@ -42,7 +42,9 @@ use std::{
         Arc,
     },
 };
+use once_cell::sync::Lazy;
 
+pub mod chunk_output;
 mod error;
 mod executed_chunk;
 pub mod execution_output;
@@ -520,22 +522,24 @@ impl StateComputeResult {
     }
 }
 
-pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProofExt>,
+const EMPTY_PROOFS: Lazy<HashMap<HashValue, SparseMerkleProofExt>> = Lazy::new(|| HashMap::new());
+
+pub struct ProofReader<'a> {
+    proofs: &'a HashMap<HashValue, SparseMerkleProofExt>,
 }
 
-impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
+impl<'a> ProofReader<'a> {
+    pub fn new(proofs: &'a HashMap<HashValue, SparseMerkleProofExt>) -> Self {
         ProofReader { proofs }
     }
 
     pub fn new_empty() -> Self {
-        Self::new(HashMap::new())
+        Self::new(&*EMPTY_PROOFS)
     }
 }
 
-impl ProofRead for ProofReader {
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
+impl<'a> ProofRead for ProofReader<'a> {
+    fn get_proof(&self, key: HashValue) -> Option<&'a SparseMerkleProofExt> {
         self.proofs.get(&key)
     }
 }

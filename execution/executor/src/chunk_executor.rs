@@ -223,24 +223,31 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             self.commit_queue.lock().next_chunk_to_commit()?
         };
 
-        if chunk.ledger_info.is_some() || !chunk.transactions_to_commit().is_empty() {
+        if chunk.ledger_info.is_some() || !chunk.chunk_output.to_commit.is_empty() {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__save_txns"]);
             fail_point!("executor::commit_chunk", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_chunk"))
             });
+            let txns_to_commit = {
+                let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__make_txns_to_commit"]);
+                chunk.make_txns_to_commit()
+            };
+            let state_updates_before_last_checkpoint = {
+                let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__clone_state_updates"]);
+                chunk
+                    .state_checkpoint_output
+                    .state_updates_before_last_checkpoint
+                    .clone()
+            };
             self.db.writer.save_transactions(
-                chunk.transactions_to_commit(),
+                &txns_to_commit,
                 persisted_state.next_version(),
                 persisted_state.base_version,
                 chunk.ledger_info.as_ref(),
                 false, // sync_commit
-                chunk.result_state.clone(),
-                // TODO(aldenhu): avoid cloning
-                chunk
-                    .ledger_update_output
-                    .state_updates_until_last_checkpoint
-                    .clone(),
-                Some(&chunk.ledger_update_output.sharded_state_cache),
+                chunk.state_checkpoint_output.result_state.clone(),
+                state_updates_before_last_checkpoint,
+                Some(&chunk.chunk_output.state_cache.sharded_state_cache),
             )?;
         }
 
@@ -249,7 +256,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
         self.commit_queue
             .lock()
-            .dequeue_committed(chunk.result_state.clone())?;
+            .dequeue_committed(chunk.state_checkpoint_output.result_state.clone())?;
 
         Ok(chunk)
     }
@@ -294,16 +301,16 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             verified_target_li.clone(),
             epoch_change_li.cloned(),
         )?;
+        ensure!(chunk_output.to_discard.is_empty(), "Unexpected discard.");
+        ensure!(chunk_output.to_retry.is_empty(), "Unexpected retry.");
 
         // Calculate state snapshot
-        let speculative_state =
-            ApplyChunkOutput::calculate_state_checkpoint(
-                &chunk_output,
-                &self.commit_queue.lock().latest_state(),
-                None, // append_state_checkpoint_to_block
-                Some(chunk_proof.txn_infos_with_proof.state_checkpoint_hashes()),
-                false, // is_block
-            )?;
+        let state_checkpoint_output = ApplyChunkOutput::calculate_state_checkpoint(
+            &chunk_output,
+            &self.commit_queue.lock().latest_state(),
+            Some(chunk_proof.txn_infos_with_proof.state_checkpoint_hashes()),
+            false, // is_block
+        )?;
 
         // Enqueue for next stage.
         self.commit_queue
@@ -311,7 +318,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .enqueue_for_ledger_update(ChunkToUpdateLedger {
                 chunk_output,
                 chunk_proof,
-                speculative_state,
+                state_checkpoint_output,
             })?;
 
         info!(
@@ -333,42 +340,37 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             self.commit_queue.lock().next_chunk_to_update_ledger()?
         };
         let ChunkToUpdateLedger {
-            result_state,
+            chunk_output,
+            chunk_proof,
             state_checkpoint_output,
-            next_epoch_state,
-            verified_target_li,
-            epoch_change_li,
-            txn_infos_with_proof,
         } = chunk;
 
         let first_version = parent_accumulator.num_leaves();
-        self.verify_extends_ledger(
-            &txn_infos_with_proof,
-            first_version,
-            parent_accumulator.root_hash(),
-        )?;
+        let num_txns = chunk_output.to_commit.len();
 
-        let (ledger_update_output, to_discard, to_retry) = {
+        let ledger_update_output = {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__calculate"]);
-            ApplyChunkOutput::calculate_ledger_update(state_checkpoint_output, parent_accumulator)?
+            ApplyChunkOutput::calculate_ledger_update(
+                &chunk_output,
+                &state_checkpoint_output.state_checkpoint_hashes,
+                &parent_accumulator,
+            )?
         };
-        ensure!(to_discard.is_empty(), "Unexpected discard.");
-        ensure!(to_retry.is_empty(), "Unexpected retry.");
-        ledger_update_output
-            .ensure_transaction_infos_match(&txn_infos_with_proof.transaction_infos)?;
-        let ledger_info_opt = ledger_update_output.maybe_select_chunk_ending_ledger_info(
-            &verified_target_li,
-            epoch_change_li.as_ref(),
-            next_epoch_state.as_ref(),
-        )?;
+
+        chunk_proof.verify_chunk(&parent_accumulator, &ledger_update_output)?;
+
+        let ledger_info = chunk_proof
+            .maybe_select_chunk_ending_ledger_info(
+                &ledger_update_output,
+                chunk_output.next_epoch_state.as_ref()
+            )?;
 
         let executed_chunk = ExecutedChunk {
-            result_state,
-            ledger_info: ledger_info_opt,
-            next_epoch_state,
+            chunk_output,
+            state_checkpoint_output,
             ledger_update_output,
+            ledger_info,
         };
-        let num_txns = executed_chunk.transactions_to_commit().len();
 
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger__save"]);
         self.commit_queue
@@ -419,7 +421,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         )
     }
 
-    fn commit(&self) -> Result<ExecutedChunk> {
+    fn commit(&self) -> Result<Version> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "commit"]);
 
         self.inner.read().as_ref().expect("not reset").commit()
@@ -485,10 +487,10 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         Ok(())
     }
 
-    fn commit(&self) -> Result<ExecutedChunk> {
+    fn commit(&self) -> Result<Version> {
         let started = Instant::now();
 
-        let chunk = self.commit_chunk_impl()?;
+        let version = self.commit_chunk_impl()?;
 
         let num_committed = chunk.transactions_to_commit().len();
         info!(

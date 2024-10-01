@@ -977,6 +977,13 @@ impl TransactionStatus {
         }
     }
 
+    pub fn expect_keep_status(&self) -> &ExecutionStatus {
+        match self {
+            TransactionStatus::Keep(s) => s,
+            _ => panic!("Expected Keep."),
+        }
+    }
+
     pub fn from_vm_status(
         vm_status: VMStatus,
         charge_invariant_violation: bool,

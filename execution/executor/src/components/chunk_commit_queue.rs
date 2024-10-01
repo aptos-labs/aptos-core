@@ -4,35 +4,17 @@
 
 #![forbid(unsafe_code)]
 
+use crate::components::{chunk_output::ChunkOutput, chunk_proof::ChunkProof};
 use anyhow::{anyhow, ensure, Result};
-use aptos_executor_types::{ExecutedChunk};
+use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
 use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
-use aptos_types::{
-    proof::{accumulator::InMemoryTransactionAccumulator},
-    transaction::Version,
-};
+use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};
-use crate::components::chunk_output::ChunkOutput;
-use crate::components::chunk_proof::ChunkProof;
-use crate::components::speculative_state::SpeculativeState;
 
 pub(crate) struct ChunkToUpdateLedger {
     pub chunk_output: ChunkOutput,
     pub chunk_proof: ChunkProof,
-    pub speculative_state: SpeculativeState,
-    /* FIXME(aldenhu): remove
-    pub result_state: StateDelta,
-    /// transactions sorted by status, state roots, state updates
     pub state_checkpoint_output: StateCheckpointOutput,
-    /// If set, this is the new epoch info that should be changed to if this is committed.
-    pub next_epoch_state: Option<EpochState>,
-
-    /// the below are from the input -- can be checked / used only after the transaction accumulator
-    /// is updated.
-    pub verified_target_li: LedgerInfoWithSignatures,
-    pub epoch_change_li: Option<LedgerInfoWithSignatures>,
-    pub txn_infos_with_proof: TransactionInfoListWithProof,
-     */
 }
 
 /// It's a two stage pipeline:

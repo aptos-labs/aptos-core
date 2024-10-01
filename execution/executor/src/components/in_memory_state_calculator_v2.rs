@@ -1,11 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::OTHER_TIMERS;
+use crate::{components::chunk_output::ChunkOutput, metrics::OTHER_TIMERS};
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_executor_types::{parsed_transaction_output::TransactionsWithParsedOutput, ProofReader};
+use aptos_executor_types::{
+    parsed_transaction_output::TransactionsWithParsedOutput,
+    state_checkpoint_output::StateCheckpointOutput, ProofReader,
+};
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::FrozenSparseMerkleTree;
@@ -30,94 +33,47 @@ use itertools::zip_eq;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
-struct StateCacheView<'a> {
-    base: &'a ShardedStateCache,
-    updates: &'a ShardedStateUpdates,
-}
-
-impl<'a> StateCacheView<'a> {
-    pub fn new(base: &'a ShardedStateCache, updates: &'a ShardedStateUpdates) -> Self {
-        Self { base, updates }
-    }
-}
-
-impl<'a> TStateView for StateCacheView<'a> {
-    type Key = StateKey;
-
-    fn get_state_value(
-        &self,
-        state_key: &Self::Key,
-    ) -> aptos_types::state_store::Result<Option<StateValue>> {
-        if let Some(v_opt) = self.updates[state_key.get_shard_id() as usize].get(state_key) {
-            return Ok(v_opt.clone());
-        }
-        if let Some(entry) = self
-            .base
-            .shard(state_key.get_shard_id())
-            .get(state_key)
-            .as_ref()
-        {
-            let state_value = entry.value().1.as_ref();
-            return Ok(state_value.cloned());
-        }
-        Ok(None)
-    }
-
-    fn get_usage(&self) -> aptos_types::state_store::Result<StateStorageUsage> {
-        unreachable!("not supposed to be used.")
-    }
-}
-
 /// Helper class for calculating state changes after a block of transactions are executed.
 pub struct InMemoryStateCalculatorV2 {}
 
 impl InMemoryStateCalculatorV2 {
     pub fn calculate_for_transactions(
         base: &StateDelta,
-        state_cache: StateCache,
-        to_commit: &TransactionsWithParsedOutput,
-        new_epoch: bool,
+        chunk_output: &ChunkOutput,
         is_block: bool,
-    ) -> Result<(
-        Vec<ShardedStateUpdates>,
-        Vec<Option<HashValue>>,
-        StateDelta,
-        Option<EpochState>,
-        Option<ShardedStateUpdates>,
-        ShardedStateCache,
-    )> {
+    ) -> Result<StateCheckpointOutput> {
         if is_block {
-            Self::validate_input_for_block(base, to_commit)?;
+            Self::validate_input_for_block(base, &chunk_output.to_commit)?;
         }
 
-        let state_updates_vec =
-            Self::get_sharded_state_updates(to_commit.parsed_outputs(), |txn_output| {
-                txn_output.write_set()
-            });
+        let state_updates_vec = Self::get_sharded_state_updates(
+            chunk_output.to_commit.parsed_outputs(),
+            |txn_output| txn_output.write_set(),
+        );
 
         // If there are multiple checkpoints in the chunk, we only calculate the SMT (and its root
         // hash) for the last one.
-        let last_checkpoint_index = to_commit.get_last_checkpoint_index();
+        let last_checkpoint_index = chunk_output.to_commit.get_last_checkpoint_index();
 
         Self::calculate_impl(
             base,
-            state_cache,
+            &chunk_output.state_cache,
             state_updates_vec,
             last_checkpoint_index,
-            new_epoch,
+            chunk_output.to_commit.ends_epoch(),
             is_block,
         )
     }
 
     pub fn calculate_for_write_sets_after_snapshot(
         base: &StateDelta,
-        state_cache: StateCache,
+        state_cache: &StateCache,
         last_checkpoint_index: Option<usize>,
         write_sets: &[WriteSet],
     ) -> Result<(Option<ShardedStateUpdates>, StateDelta)> {
         let state_updates_vec = Self::get_sharded_state_updates(write_sets, |write_set| write_set);
 
-        let (_, _, result_state, _, updates_until_latest_checkpoint, _) = Self::calculate_impl(
+        let output = Self::calculate_impl(
             base,
             state_cache,
             state_updates_vec,
@@ -126,32 +82,23 @@ impl InMemoryStateCalculatorV2 {
             /*is_block=*/ false,
         )?;
 
-        Ok((updates_until_latest_checkpoint, result_state))
+        let StateCheckpointOutput {
+            state_updates_before_last_checkpoint,
+            result_state,
+            ..
+        } = output;
+
+        Ok((state_updates_before_last_checkpoint, result_state))
     }
 
     fn calculate_impl(
         base: &StateDelta,
-        state_cache: StateCache,
+        state_cache: &StateCache,
         state_updates_vec: Vec<ShardedStateUpdates>,
         last_checkpoint_index: Option<usize>,
-        new_epoch: bool,
         is_block: bool,
-    ) -> Result<(
-        Vec<ShardedStateUpdates>,
-        Vec<Option<HashValue>>,
-        StateDelta,
-        Option<EpochState>,
-        Option<ShardedStateUpdates>,
-        ShardedStateCache,
-    )> {
-        let StateCache {
-            // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
-            // calculation
-            frozen_base,
-            sharded_state_cache,
-            proofs,
-        } = state_cache;
-        assert!(frozen_base.smt.is_the_same(&base.current));
+    ) -> Result<StateCheckpointOutput> {
+        assert!(state_cache.frozen_base.smt.is_the_same(&base.current));
 
         let (updates_before_last_checkpoint, updates_after_last_checkpoint) =
             if let Some(index) = last_checkpoint_index {
@@ -168,30 +115,17 @@ impl InMemoryStateCalculatorV2 {
 
         let num_txns = state_updates_vec.len();
 
-        let next_epoch_state = if new_epoch {
-            // Assumes chunk doesn't cross epoch boundary here.
-            ensure!(
-                last_checkpoint_index == Some(num_txns - 1),
-                "The last txn must be a reconfig for epoch change."
-            );
-            Some(Self::get_epoch_state(
-                &sharded_state_cache,
+        let usage =
+            Self::calculate_usage(base.current.usage(), &state_cache.sharded_state_cache, &[
                 &updates_before_last_checkpoint,
-            )?)
-        } else {
-            None
-        };
-
-        let usage = Self::calculate_usage(base.current.usage(), &sharded_state_cache, &[
-            &updates_before_last_checkpoint,
-            &updates_after_last_checkpoint,
-        ]);
+                &updates_after_last_checkpoint,
+            ]);
 
         let first_version = base.current_version.map_or(0, |v| v + 1);
-        let proof_reader = ProofReader::new(proofs);
+        let proof_reader = ProofReader::new(&state_cache.proofs);
         let latest_checkpoint = if let Some(index) = last_checkpoint_index {
             Self::make_checkpoint(
-                base.current.freeze(&frozen_base.base_smt),
+                base.current.freeze(&state_cache.frozen_base.base_smt),
                 &updates_before_last_checkpoint,
                 if index == num_txns - 1 {
                     usage
@@ -203,7 +137,7 @@ impl InMemoryStateCalculatorV2 {
         } else {
             // If there is no checkpoint in this chunk, the latest checkpoint will be the existing
             // one.
-            base.base.freeze(&frozen_base.base_smt)
+            base.base.freeze(&state_cache.frozen_base.base_smt)
         };
 
         let mut latest_checkpoint_version = base.base_version;
@@ -224,7 +158,7 @@ impl InMemoryStateCalculatorV2 {
             let latest_tree = if last_checkpoint_index.is_some() {
                 latest_checkpoint.clone()
             } else {
-                base.current.freeze(&frozen_base.base_smt)
+                base.current.freeze(&state_cache.frozen_base.base_smt)
             };
             Self::make_checkpoint(
                 latest_tree,
@@ -234,8 +168,6 @@ impl InMemoryStateCalculatorV2 {
             )?
             .smt
         };
-
-        DEFAULT_DROPPER.schedule_drop(frozen_base);
 
         let updates_since_latest_checkpoint = if last_checkpoint_index.is_some() {
             updates_after_last_checkpoint
@@ -267,13 +199,12 @@ impl InMemoryStateCalculatorV2 {
 
         let updates_until_latest_checkpoint =
             last_checkpoint_index.map(|_| updates_before_last_checkpoint);
-        Ok((
-            state_updates_vec,
-            state_checkpoint_hashes,
+
+        Ok(StateCheckpointOutput::new(
             result_state,
-            next_epoch_state,
             updates_until_latest_checkpoint,
-            sharded_state_cache,
+            state_checkpoint_hashes,
+            state_updates_vec,
         ))
     }
 
@@ -413,22 +344,6 @@ impl InMemoryStateCalculatorV2 {
             .collect();
         let new_checkpoint = latest_checkpoint.batch_update(smt_updates, usage, proof_reader)?;
         Ok(new_checkpoint)
-    }
-
-    fn get_epoch_state(
-        base: &ShardedStateCache,
-        updates: &ShardedStateUpdates,
-    ) -> Result<EpochState> {
-        let state_cache_view = StateCacheView::new(base, updates);
-        let validator_set = ValidatorSet::fetch_config(&state_cache_view)
-            .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = ConfigurationResource::fetch_config(&state_cache_view)
-            .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
-
-        Ok(EpochState::new(
-            configuration.epoch(),
-            (&validator_set).into(),
-        ))
     }
 
     fn validate_input_for_block(

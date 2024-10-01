@@ -89,10 +89,10 @@ impl ParsedTransactionOutput {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TransactionsWithParsedOutput {
-    transactions: Vec<Transaction>,
-    parsed_output: Vec<ParsedTransactionOutput>,
+    pub transactions: Vec<Transaction>,
+    pub parsed_output: Vec<ParsedTransactionOutput>,
 }
 
 impl TransactionsWithParsedOutput {
@@ -131,7 +131,7 @@ impl TransactionsWithParsedOutput {
         &self.transactions
     }
 
-    pub fn parsed_outputs(&self) -> &Vec<ParsedTransactionOutput> {
+    pub fn parsed_outputs(&self) -> &[ParsedTransactionOutput] {
         &self.parsed_output
     }
 
@@ -142,7 +142,9 @@ impl TransactionsWithParsedOutput {
     }
 
     pub fn ends_epoch(&self) -> bool {
-        self.parsed_output.last().map_or(false, |output| output.is_reconfig())
+        self.parsed_output
+            .last()
+            .map_or(false, |output| output.is_reconfig())
     }
 
     pub fn need_checkpoint(txn: &Transaction, txn_output: &ParsedTransactionOutput) -> bool {
@@ -158,14 +160,6 @@ impl TransactionsWithParsedOutput {
             | Transaction::StateCheckpoint(_)
             | Transaction::BlockEpilogue(_) => true,
         }
-    }
-
-    pub fn into_txns(self) -> Vec<Transaction> {
-        self.transactions
-    }
-
-    pub fn into_inner(self) -> (Vec<Transaction>, Vec<ParsedTransactionOutput>) {
-        (self.transactions, self.parsed_output)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Transaction, &ParsedTransactionOutput)> {

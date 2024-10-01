@@ -265,6 +265,7 @@ impl CachedStateView {
     }
 }
 
+#[derive(Debug)]
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
     pub sharded_state_cache: ShardedStateCache,

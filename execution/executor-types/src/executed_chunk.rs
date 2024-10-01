@@ -4,29 +4,34 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{should_forward_to_subscription_service, ChunkCommitNotification, LedgerUpdateOutput};
-use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
+use crate::{
+    chunk_output::ChunkOutput,
+    state_checkpoint_output::StateCheckpointOutput, ChunkCommitNotification, LedgerUpdateOutput,
+};
+use aptos_storage_interface::{ExecutedTrees};
 #[cfg(test)]
 use aptos_types::account_config::NewEpochEvent;
 #[cfg(test)]
 use aptos_types::contract_event::ContractEvent;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    state_store::combine_or_add_sharded_state_updates, transaction::TransactionToCommit,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{TransactionOutputProvider, TransactionToCommit},
 };
+use itertools::izip;
+use crate::parsed_transaction_output::TransactionsWithParsedOutput;
 
 #[derive(Debug)]
 pub struct ExecutedChunk {
-    pub result_state: StateDelta,
-    pub ledger_info: Option<LedgerInfoWithSignatures>,
-    /// If set, this is the new epoch info that should be changed to if this is committed.
-    pub next_epoch_state: Option<EpochState>,
+    pub chunk_output: ChunkOutput,
+    pub state_checkpoint_output: StateCheckpointOutput,
     pub ledger_update_output: LedgerUpdateOutput,
+    pub ledger_info: Option<LedgerInfoWithSignatures>,
 }
 
 impl ExecutedChunk {
     pub fn reconfig_suffix(&self) -> Self {
+        todo!()
+        /*
         assert!(self.next_epoch_state.is_some());
         Self {
             result_state: self.result_state.clone(),
@@ -34,17 +39,16 @@ impl ExecutedChunk {
             next_epoch_state: self.next_epoch_state.clone(),
             ledger_update_output: self.ledger_update_output.reconfig_suffix(),
         }
-    }
-
-    pub fn transactions_to_commit(&self) -> &Vec<TransactionToCommit> {
-        &self.ledger_update_output.to_commit
+         */
     }
 
     pub fn has_reconfiguration(&self) -> bool {
-        self.next_epoch_state.is_some()
+        self.chunk_output.next_epoch_state.is_some()
     }
 
     pub fn combine(&mut self, rhs: Self) {
+        todo!()
+        /*
         assert_eq!(
             self.ledger_update_output.next_version(),
             rhs.ledger_update_output.first_version(),
@@ -73,40 +77,35 @@ impl ExecutedChunk {
         self.ledger_info = ledger_info;
         self.next_epoch_state = next_epoch_state;
         self.ledger_update_output.combine(ledger_update_output)
+         */
     }
 
     pub fn result_view(&self) -> ExecutedTrees {
+        todo!()
+        /*
         ExecutedTrees::new(
             self.result_state.clone(),
             self.ledger_update_output.transaction_accumulator.clone(),
         )
+         */
     }
 
     pub fn into_chunk_commit_notification(self) -> ChunkCommitNotification {
         let reconfiguration_occurred = self.has_reconfiguration();
-
-        let mut committed_transactions =
-            Vec::with_capacity(self.ledger_update_output.to_commit.len());
-        let mut subscribable_events =
-            Vec::with_capacity(self.ledger_update_output.to_commit.len() * 2);
-        let mut to_drop = Vec::with_capacity(self.ledger_update_output.to_commit.len());
-        for txn_to_commit in self.ledger_update_output.to_commit {
-            let TransactionToCommit {
-                transaction,
-                events,
-                state_updates,
-                write_set,
+        let Self {
+            chunk_output: ChunkOutput {
+                to_commit: TransactionsWithParsedOutput {
+                    transactions: committed_transactions,
+                    ..
+                },
                 ..
-            } = txn_to_commit;
-            committed_transactions.push(transaction);
-            subscribable_events.extend(
-                events
-                    .into_iter()
-                    .filter(should_forward_to_subscription_service),
-            );
-            to_drop.push((state_updates, write_set));
-        }
-        DEFAULT_DROPPER.schedule_drop(to_drop);
+            },
+            ledger_update_output: LedgerUpdateOutput {
+                subscribable_events,
+                ..
+            },
+            ..
+        } = self;
 
         ChunkCommitNotification {
             committed_transactions,
@@ -117,12 +116,36 @@ impl ExecutedChunk {
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
+        todo!()
+        /*
         Self {
             result_state: Default::default(),
             ledger_info: None,
             next_epoch_state: None,
             ledger_update_output: Default::default(),
         }
+         */
+    }
+
+    pub fn make_txns_to_commit(&self) -> Vec<TransactionToCommit> {
+        // TODO(aldenhu): see timer on the call site, consider avoiding cloning.
+        izip!(
+            self.chunk_output.to_commit.iter(),
+            &self.state_checkpoint_output.per_version_state_updates,
+            &self.ledger_update_output.transaction_infos,
+        )
+        .map(|((txn, txn_out), state_updates, txn_info)| {
+            TransactionToCommit::new(
+                txn.clone(),
+                txn_info.clone(),
+                state_updates.clone(),
+                txn_out.get_transaction_output().write_set().clone(),
+                txn_out.get_transaction_output().events().to_vec(),
+                txn_out.is_reconfig(),
+                txn_out.get_transaction_output().auxiliary_data().clone(),
+            )
+        })
+        .collect()
     }
 }
 
