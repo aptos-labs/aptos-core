@@ -11,7 +11,6 @@ use std::{
 };
 use url::Url;
 
-const IMPORTED_TRANSACTIONS_FOLDER: &str = "imported_transactions";
 const SCRIPTED_TRANSACTIONS_FOLDER: &str = "scripted_transactions";
 const MOVE_SCRIPTS_FOLDER: &str = "move_fixtures";
 const IMPORTED_TRANSACTION_CONFIG_FILE: &str = "imported_transactions.yaml";
