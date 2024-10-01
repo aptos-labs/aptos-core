@@ -297,13 +297,16 @@ fn publish_transaction_payload(
     metadata: &PackageMetadata,
 ) -> TransactionPayload {
     let metadata = bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
+    println!("metadata size: {:?}", metadata.len());
     let mut code: Vec<Vec<u8>> = vec![];
-    for (_, module) in modules {
+    for (name, module) in modules {
         let mut module_code: Vec<u8> = vec![];
         module
             .serialize(&mut module_code)
             .expect("Module must serialize");
+        println!("module code size name: {:?} {:?}", name, module_code.len());
         code.push(module_code);
     }
+    println!("publishing transaction");
     aptos_stdlib::code_publish_package_txn(metadata, code)
 }
