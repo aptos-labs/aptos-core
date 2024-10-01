@@ -44,7 +44,7 @@ pub fn create_transaction_shuffler(
             );
             Arc::new(SenderAwareShuffler::new(conflict_window_size as usize))
         },
-        DeprecatedFairness { .. } => {
+        DeprecatedFairness => {
             unreachable!("DeprecatedFairness shuffler is no longer supported.")
         },
         UseCaseAware {
