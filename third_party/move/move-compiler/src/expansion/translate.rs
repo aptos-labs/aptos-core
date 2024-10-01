@@ -2666,7 +2666,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                     Some(op) => {
                         if al.value.len() == 1 {
                             match &al.value[0] {
-                                // x += e
+                                // x += e (similarly for other binary operators)
                                 // =>
                                 // { let t = e; x = x + t; }
                                 sp!(var_loc, LValue_::Var(module_access, ty_opt)) => {
