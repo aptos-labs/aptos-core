@@ -1,13 +1,1 @@
-processed 5 tasks
-
-task 1 'run'. lines 37-37:
-return values: 12
-
-task 2 'run'. lines 39-39:
-return values: 6
-
-task 3 'run'. lines 41-41:
-return values: 6
-
-task 4 'run'. lines 43-43:
-return values: 6
+processed 6 tasks
