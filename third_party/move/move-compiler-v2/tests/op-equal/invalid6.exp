@@ -2,8 +2,8 @@
 module 0x42::test {
     private fun inc_new(x: &u256) {
         {
-          let $t: &u256 = x;
-          $t = Add<u256>(Deref($t), 1)
+          let $t1: &u256 = x;
+          $t1 = Add<u256>(Deref($t1), 1)
         };
         Tuple()
     }
