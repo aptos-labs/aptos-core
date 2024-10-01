@@ -82,7 +82,12 @@ fn add_type_args_ambiguity_label(loc: Loc, mut diag: Box<Diagnostic>) -> Box<Dia
 //**************************************************************************************************
 
 fn require_move_2(context: &mut Context, loc: Loc, description: &str) -> bool {
-    require_language_version(context, loc, LanguageVersion::V2, description)
+    require_language_version_msg(
+        context,
+        loc,
+        LanguageVersion::V2,
+        &format!("Move 2 language construct is not enabled: {}", description),
+    )
 }
 
 fn require_language_version(
@@ -91,17 +96,27 @@ fn require_language_version(
     min_language_version: LanguageVersion,
     description: &str,
 ) -> bool {
+    require_language_version_msg(
+        context,
+        loc,
+        min_language_version,
+        &format!(
+            "Move language construct `{}` is not enabled until version {}",
+            description, min_language_version
+        ),
+    )
+}
+
+fn require_language_version_msg(
+    context: &mut Context,
+    loc: Loc,
+    min_language_version: LanguageVersion,
+    msg: &str,
+) -> bool {
     if context.env.flags().language_version() < min_language_version {
-        context.env.add_diag(diag!(
-            Syntax::UnsupportedLanguageItem,
-            (
-                loc,
-                format!(
-                    "Move language construct `{}` is not enabled until version {}",
-                    description, min_language_version
-                )
-            )
-        ));
+        context
+            .env
+            .add_diag(diag!(Syntax::UnsupportedLanguageItem, (loc, msg)));
         false
     } else {
         true
