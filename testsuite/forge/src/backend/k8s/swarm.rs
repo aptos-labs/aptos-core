@@ -482,9 +482,20 @@ fn stateful_set_labels_matches(sts: &StatefulSet, labels: &BTreeMap<String, Stri
         .labels
         .as_ref()
         .expect("Failed to get StatefulSet labels");
-    labels
-        .iter()
-        .all(|(k, v)| sts_labels.get(k).map_or(false, |val| val == v))
+    labels.iter().all(|(k, v)| {
+        let truncated_k = k.chars().take(63).collect::<String>();
+        let truncated_v = v.chars().take(63).collect::<String>();
+        // warn if the label is truncated
+        if truncated_k != *k || truncated_v != *v {
+            warn!(
+                "Label truncated during search: {} -> {}, {} -> {}",
+                k, truncated_k, v, truncated_v
+            );
+        }
+        sts_labels
+            .get(&truncated_k)
+            .map_or(false, |val| val == &truncated_v)
+    })
 }
 
 fn parse_service_name_from_stateful_set_name(
@@ -958,5 +969,42 @@ mod tests {
         let mut match_labels = BTreeMap::new();
         match_labels.insert("app".to_string(), "validator".to_string());
         assert!(!stateful_set_labels_matches(&sts_no_labels, &match_labels));
+
+        // StatefulSet with truncated labels
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "validator".to_string());
+        // component label is truncated to 63 characters
+        labels.insert(
+            "component".to_string(),
+            "blockchain"
+                .to_string()
+                .repeat(10)
+                .chars()
+                .take(63)
+                .collect::<String>(),
+        );
+
+        let sts_truncated_labels = StatefulSet {
+            metadata: ObjectMeta {
+                labels: Some(labels),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut match_labels = BTreeMap::new();
+        // we try to match with the full label, which we dont know if it's truncated or not
+        match_labels.insert(
+            "component".to_string(),
+            "blockchain"
+                .to_string()
+                .repeat(10)
+                .chars()
+                .collect::<String>(),
+        );
+        // it should match because the labels are the same when truncated
+        assert!(stateful_set_labels_matches(
+            &sts_truncated_labels,
+            &match_labels
+        ));
     }
 }
