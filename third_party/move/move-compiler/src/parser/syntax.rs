@@ -1911,7 +1911,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                         LanguageVersion::V2_1,
                         &current_token.to_string(),
                     );
-                    let op_loc = context.tokens.advance_with_loc()?; // consume the "+="
+                    let op_loc = context.tokens.advance_with_loc()?; // consume the "op="
                     let rhs = Box::new(parse_exp(context)?);
                     Exp_::Assign(
                         Box::new(lhs),
