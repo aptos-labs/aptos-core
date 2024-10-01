@@ -70,10 +70,10 @@ strum_macros = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-ark-crypto-primitives = { workspace = true }
 ahash = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }
 aptos-proptest-helpers = { workspace = true }
+ark-crypto-primitives = { workspace = true }
 async-trait = { workspace = true }
 ciborium = { workspace = true }
 claims = { workspace = true }
