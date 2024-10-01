@@ -702,7 +702,7 @@ pub enum Exp_ {
     // ()
     Unit,
 
-    // a = e
+    // a [binop]= e
     Assign(Box<Exp>, Option<BinOp>, Box<Exp>),
 
     // return e
