@@ -621,7 +621,7 @@ impl Flags {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq,  Ord, ValueEnum)]
+#[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum LanguageVersion {
     #[value(name = "1")]
     V1,
@@ -631,6 +631,37 @@ pub enum LanguageVersion {
     V2_0,
     #[value(name = "2.1")]
     V2_1,
+}
+
+impl LanguageVersion {
+    fn to_ordinal(&self) -> usize {
+        match self {
+            LanguageVersion::V1 => 0,
+            LanguageVersion::V2 => 1,
+            LanguageVersion::V2_0 => 1,
+            LanguageVersion::V2_1 => 2,
+        }
+    }
+}
+
+impl PartialEq<LanguageVersion> for LanguageVersion {
+    fn eq(&self, other: &LanguageVersion) -> bool {
+        self.to_ordinal() == other.to_ordinal()
+    }
+}
+
+impl Eq for LanguageVersion {}
+
+impl PartialOrd<LanguageVersion> for LanguageVersion {
+    fn partial_cmp(&self, other: &LanguageVersion) -> Option<std::cmp::Ordering> {
+        Some(self.to_ordinal().cmp(&other.to_ordinal()))
+    }
+}
+
+impl Ord for LanguageVersion {
+    fn cmp(&self, other: &LanguageVersion) -> std::cmp::Ordering {
+        self.to_ordinal().cmp(&other.to_ordinal())
+    }
 }
 
 impl std::fmt::Display for LanguageVersion {
