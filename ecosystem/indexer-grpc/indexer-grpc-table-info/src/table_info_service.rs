@@ -66,6 +66,9 @@ impl TableInfoService {
                 let context = self.context.clone();
                 let _task = tokio::spawn(async move {
                     loop {
+                        aptos_logger::info!(
+                            "[Table Info] Checking for snapshots to backup."
+                        );
                         Self::backup_snapshot_if_present(
                             context.clone(),
                             backup_restore_operator.clone(),
