@@ -717,7 +717,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
         },
-        // Unreachable code remover
         TestConfig {
             name: "op-equal",
             runner: |p| run_test(p, get_config_by_name("op-equal")),
