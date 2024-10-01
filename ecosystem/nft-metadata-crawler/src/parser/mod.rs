@@ -10,7 +10,6 @@ use crate::{
         },
         database::check_or_update_chain_id,
     },
-    worker::Worker,
 };
 use axum::{http::StatusCode, response::Response, routing::post, Router};
 use bytes::Bytes;
@@ -21,6 +20,9 @@ use diesel::{
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use worker::Worker;
+
+mod worker;
 
 /// Struct to hold context required for parsing
 #[derive(Clone)]

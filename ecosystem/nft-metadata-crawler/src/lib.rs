@@ -12,7 +12,6 @@ pub mod models;
 pub mod parser;
 pub mod schema;
 pub mod utils;
-pub mod worker;
 
 /// HEAD request to get MIME type and size of content
 pub async fn get_uri_metadata(url: &str) -> anyhow::Result<(String, u32)> {
