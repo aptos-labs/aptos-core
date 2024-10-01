@@ -14,6 +14,7 @@ use crate::{
             SAMPLE_UID_KEY, SAMPLE_UID_VAL, SAMPLE_UPGRADED_VK,
         },
         get_public_inputs_hash,
+        proof_simulation::Groth16SimulatorBn254,
         zkp_sig::ZKP,
         Configuration, EphemeralCertificate, FederatedKeylessPublicKey, Groth16Proof,
         KeylessPublicKey, KeylessSignature, OpenIdSig, ZeroKnowledgeSig,
@@ -24,7 +25,7 @@ use aptos_crypto::{
     ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, SigningKey, Uniform,
 };
 use ark_bn254::Bn254;
-use ark_groth16::PreparedVerifyingKey;
+use ark_groth16::{prepare_verifying_key, PreparedVerifyingKey};
 use base64::{encode_config, URL_SAFE_NO_PAD};
 use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
@@ -119,6 +120,50 @@ pub fn get_sample_zk_sig() -> ZeroKnowledgeSig {
         override_aud_val: None,
         training_wheels_signature: None,
     }
+}
+
+/// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
+/// desired TXN.
+pub fn get_random_simulated_groth16_sig_and_pk() -> (
+    KeylessSignature,
+    KeylessPublicKey,
+    PreparedVerifyingKey<Bn254>,
+) {
+    // We need a ZeroKnowledgeSig inside of a KeylessSignature to derive a public input hash. The Groth16 proof
+    // is not used to actually derive the hash so we can temporarily give a dummy
+    // proof before later replacing it with a simulated proof
+    let dummy_proof = *SAMPLE_PROOF;
+    let mut zks = ZeroKnowledgeSig {
+        proof: ZKP::Groth16(dummy_proof),
+        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
+    };
+    let mut sig = KeylessSignature {
+        cert: EphemeralCertificate::ZeroKnowledgeSig(zks.clone()),
+        jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
+        exp_date_secs: SAMPLE_EXP_DATE,
+        ephemeral_pubkey: SAMPLE_EPK.clone(),
+        ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
+    };
+    let pk = SAMPLE_PK.clone();
+    let rsa_jwk = get_sample_jwk();
+    let config = Configuration::new_for_testing();
+    let pih = get_public_inputs_hash(&sig, &pk, &rsa_jwk, &config).unwrap();
+
+    let mut rng = rand::thread_rng();
+    let (sim_pk, vk) =
+        Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
+    let proof = Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[pih], &sim_pk, &mut rng)
+        .unwrap();
+    let pvk = prepare_verifying_key(&vk);
+
+    // Replace dummy proof with the simulated proof
+    zks.proof = ZKP::Groth16(proof);
+    sig.cert = EphemeralCertificate::ZeroKnowledgeSig(zks.clone());
+
+    (sig, pk, pvk)
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the

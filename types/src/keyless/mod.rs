@@ -28,6 +28,7 @@ mod configuration;
 mod groth16_sig;
 mod groth16_vk;
 mod openid_sig;
+pub mod proof_simulation;
 pub mod test_utils;
 mod zkp_sig;
 
