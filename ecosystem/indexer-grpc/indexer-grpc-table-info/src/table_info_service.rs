@@ -66,9 +66,7 @@ impl TableInfoService {
                 let context = self.context.clone();
                 let _task = tokio::spawn(async move {
                     loop {
-                        aptos_logger::info!(
-                            "[Table Info] Checking for snapshots to backup."
-                        );
+                        aptos_logger::info!("[Table Info] Checking for snapshots to backup.");
                         Self::backup_snapshot_if_present(
                             context.clone(),
                             backup_restore_operator.clone(),
@@ -420,9 +418,7 @@ impl TableInfoService {
         // If nothing to backup, return.
         if epochs_to_backup.is_empty() {
             // No snapshot to backup.
-            aptos_logger::info!(
-                "[Table Info] No snapshot to backup. Skipping the backup."
-            );
+            aptos_logger::info!("[Table Info] No snapshot to backup. Skipping the backup.");
             return;
         }
         aptos_logger::info!(
@@ -514,7 +510,7 @@ async fn backup_the_snapshot_and_cleanup(
     let snapshot_dir = context
         .node_config
         .get_data_dir()
-        .join(snapshot_folder_name);
+        .join(snapshot_folder_name.clone());
     aptos_logger::info!(
         epoch = epoch,
         snapshot_folder_name = snapshot_folder_name,
