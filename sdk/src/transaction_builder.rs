@@ -192,12 +192,14 @@ impl TransactionFactory {
         owners: Vec<AccountAddress>,
         signatures_required: u64,
     ) -> TransactionBuilder {
-        self.payload(aptos_stdlib::multisig_account_create_with_existing_account_call(
-            owners,
-            signatures_required,
-            vec![],
-            vec![],
-        ))
+        self.payload(
+            aptos_stdlib::multisig_account_create_with_existing_account_call(
+                owners,
+                signatures_required,
+                vec![],
+                vec![],
+            ),
+        )
     }
 
     pub fn create_multisig_account_with_existing_account_and_revoke_auth_key(
@@ -205,12 +207,14 @@ impl TransactionFactory {
         owners: Vec<AccountAddress>,
         signatures_required: u64,
     ) -> TransactionBuilder {
-        self.payload(aptos_stdlib::multisig_account_create_with_existing_account_and_revoke_auth_key_call(
-            owners,
-            signatures_required,
-            vec![],
-            vec![],
-        ))
+        self.payload(
+            aptos_stdlib::multisig_account_create_with_existing_account_and_revoke_auth_key_call(
+                owners,
+                signatures_required,
+                vec![],
+                vec![],
+            ),
+        )
     }
 
     pub fn create_multisig_transaction(
