@@ -82,18 +82,7 @@ fn add_type_args_ambiguity_label(loc: Loc, mut diag: Box<Diagnostic>) -> Box<Dia
 //**************************************************************************************************
 
 fn require_move_2(context: &mut Context, loc: Loc, description: &str) -> bool {
-    if !context.env.flags().lang_v2() {
-        context.env.add_diag(diag!(
-            Syntax::UnsupportedLanguageItem,
-            (
-                loc,
-                format!("Move 2 language construct is not enabled: {}", description)
-            )
-        ));
-        false
-    } else {
-        true
-    }
+    require_language_version(context, loc, LanguageVersion::V2, description)
 }
 
 fn require_language_version(
@@ -1867,6 +1856,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 //          | <Quantifier>                  spec only
 //          | <BinOpExp>
 //          | <UnaryExp> "=" <Exp>
+//          | <UnaryExp> ("+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=") <Exp>
 //          | <UnaryExp> ("as" | "is") Type
 fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -1885,7 +1875,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         },
         Tok::Identifier if is_quant(context) => parse_quant(context)?,
         _ => {
-            // This could be either an assignment or a binary operator
+            // This could be either an assignment, operator assignment (e.g., +=), or a binary operator
             // expression, or a cast or test
             let lhs = parse_unary_exp(context)?;
             let current_token = context.tokens.peek();

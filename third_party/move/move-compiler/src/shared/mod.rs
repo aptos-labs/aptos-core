@@ -597,13 +597,6 @@ impl Flags {
         self.lang_v2
     }
 
-    pub fn set_lang_v2(self, v2: bool) -> Self {
-        Self {
-            lang_v2: v2,
-            ..self
-        }
-    }
-
     pub fn language_version(&self) -> LanguageVersion {
         self.language_version
     }
