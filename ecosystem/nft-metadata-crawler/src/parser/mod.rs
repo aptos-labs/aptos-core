@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{ParserConfig, Server},
+    config::Server,
     utils::{
         counters::{
             GOT_CONNECTION_COUNT, PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT,
@@ -13,6 +13,7 @@ use crate::{
 };
 use axum::{http::StatusCode, response::Response, routing::post, Router};
 use bytes::Bytes;
+use config::ParserConfig;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
     PgConnection,
@@ -22,6 +23,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use worker::Worker;
 
+pub mod config;
 mod worker;
 
 /// Struct to hold context required for parsing
@@ -30,14 +32,12 @@ pub struct ParserContext {
     pub parser_config: Arc<ParserConfig>,
     pub pool: Pool<ConnectionManager<PgConnection>>,
     pub gcs_client: Arc<GCSClient>,
-    pub max_num_retries: i32,
 }
 
 impl ParserContext {
     pub async fn new(
         parser_config: ParserConfig,
         pool: Pool<ConnectionManager<PgConnection>>,
-        max_num_retries: i32,
     ) -> Self {
         if let Some(google_application_credentials) = &parser_config.google_application_credentials
         {
@@ -66,7 +66,6 @@ impl ParserContext {
             parser_config: Arc::new(parser_config),
             pool,
             gcs_client: Arc::new(GCSClient::new(gcs_config)),
-            max_num_retries,
         }
     }
 
@@ -153,7 +152,7 @@ impl ParserContext {
         let mut worker = Worker::new(
             self.parser_config.clone(),
             conn,
-            self.max_num_retries,
+            self.parser_config.max_num_parse_retries,
             self.gcs_client.clone(),
             &pubsub_message,
             parts[0],

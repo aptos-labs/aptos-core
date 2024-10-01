@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{AssetUploaderConfig, Server},
+    asset_uploader::config::AssetUploaderConfig,
+    config::Server,
     models::nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
     utils::{
         constants::{MAX_ASSET_UPLOAD_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
@@ -22,6 +23,8 @@ use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use tracing::{info, warn};
 use url::Url;
+
+pub mod config;
 
 #[derive(Clone)]
 pub struct AssetUploaderContext {
