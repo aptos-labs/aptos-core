@@ -135,28 +135,38 @@ pub fn new_test_context_inner(
             &tmp_dir,
             node_config.storage.rocksdb_configs.enable_storage_sharding,
         );
-        aptos_db.add_version_update_subscriber(sender).unwrap();
+        if node_config
+            .indexer_db_config
+            .is_internal_indexer_db_enabled()
+        {
+            aptos_db.add_version_update_subscriber(sender).unwrap();
+        }
         DbReaderWriter::wrap(aptos_db)
     } else {
-        DbReaderWriter::wrap(
-            AptosDB::open(
-                StorageDirPaths::from_path(&tmp_dir),
-                false,                       /* readonly */
-                NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-                RocksdbConfigs {
-                    enable_storage_sharding: node_config
-                        .storage
-                        .rocksdb_configs
-                        .enable_storage_sharding,
-                    ..Default::default()
-                },
-                false, /* indexer */
-                BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-                None,
-            )
-            .unwrap(),
+        let mut aptos_db = AptosDB::open(
+            StorageDirPaths::from_path(&tmp_dir),
+            false,                       /* readonly */
+            NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
+            RocksdbConfigs {
+                enable_storage_sharding: node_config
+                    .storage
+                    .rocksdb_configs
+                    .enable_storage_sharding,
+                ..Default::default()
+            },
+            false, /* indexer */
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
         )
+        .unwrap();
+        if node_config
+            .indexer_db_config
+            .is_internal_indexer_db_enabled()
+        {
+            aptos_db.add_version_update_subscriber(sender).unwrap();
+        }
+        DbReaderWriter::wrap(aptos_db)
     };
     let ret =
         db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();

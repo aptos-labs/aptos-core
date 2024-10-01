@@ -498,10 +498,18 @@ async fn test_get_transaction_by_hash_with_delayed_internal_indexer() {
         current_function_name!(),
         Some(1),
     );
-    let account = context.gen_account();
+
+    let mut account = context.gen_account();
     let txn = context.create_user_account(&account).await;
-    let committed_hash = txn.committed_hash().to_hex_literal();
     context.commit_block(&vec![txn.clone()]).await;
+    let txn1 = context.account_transfer_to(
+        &mut account,
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+        1,
+    );
+    context.commit_block(&vec![txn1.clone()]).await;
+    let committed_hash = txn1.committed_hash().to_hex_literal();
+
     let _ = context
         .get_indexer_reader()
         .unwrap()

@@ -190,6 +190,8 @@ impl InternalIndexerDBService {
             }
             start_version = next_version;
         }
+        // We should never stop the internal indexer
+        tokio::time::sleep(std::time::Duration::from_secs(100)).await;
 
         Ok(())
     }
