@@ -7,6 +7,7 @@ use move_command_line_common::{
     env,
     env::{get_move_compiler_v2_from_env, read_bool_env_var},
 };
+use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -210,6 +211,16 @@ impl FromStr for LanguageVersion {
                 "unrecognized language version `{}` (supported versions: `1`, `2`, `2.0`)",
                 s
             ),
+        }
+    }
+}
+
+impl Into<CompilerLanguageVersion> for LanguageVersion {
+    fn into(self) -> CompilerLanguageVersion {
+        match self {
+            LanguageVersion::V1 => CompilerLanguageVersion::V1,
+            LanguageVersion::V2_0 => CompilerLanguageVersion::V2_0,
+            LanguageVersion::V2_1 => CompilerLanguageVersion::V2_1,
         }
     }
 }
