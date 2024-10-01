@@ -35,7 +35,7 @@ use aptos_mvhashmap::{
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     delayed_fields::PanicError,
-    executable::Executable,
+    executable::{Executable, ModulePath},
     on_chain_config::BlockGasLimitType,
     state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
@@ -66,7 +66,6 @@ use std::{
         Arc,
     },
 };
-use aptos_types::executable::ModulePath;
 
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -1017,12 +1016,18 @@ where
             StateKey::module(&AccountAddress::ONE, ident_str!("transaction_validation"));
         match CrossBlockModuleCache::get_from_cross_block_module_cache(&state_key) {
             None => {
-                if let Some(state_value) = base_view.get_state_value(&T::Key::from_address_and_module_name(&AccountAddress::ONE, ident_str!("transaction_validation"))).unwrap() {
+                if let Some(state_value) = base_view
+                    .get_state_value(&T::Key::from_address_and_module_name(
+                        &AccountAddress::ONE,
+                        ident_str!("transaction_validation"),
+                    ))
+                    .unwrap()
+                {
                     let entry = assert_ok!(ModuleStorageEntry::from_state_value(
                         env.runtime_environment(),
                         state_value,
                     ));
-                        assert_ok!(CrossBlockModuleCache::traverse(
+                    assert_ok!(CrossBlockModuleCache::traverse(
                         Arc::new(entry),
                         &AccountAddress::ONE,
                         ident_str!("transaction_validation"),

@@ -104,8 +104,9 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
 
     /// Returns the module entry if it exists in multi-version data structure. If not, [None] is
     /// returned.
-    #[inline]
-    fn get_impl(&self, key: &K, txn_idx: TxnIndex) -> Option<ModuleStorageRead<M>> {
+    // #[inline]
+    #[allow(dead_code)]
+    fn get_impl(&self, key: &K, txn_idx: TxnIndex) -> Option<ModuleStorageRead> {
         match self.entries.get(key) {
             Some(v) => v.get(txn_idx),
             None => None,
