@@ -140,11 +140,11 @@ module 0x42::test {
 		res
 	}
 
-	fun test8(): vector<u256> {
+	fun test8() {
 		let x = 0;
 		let y = vector<u256>[0, 1];
 		y[x_plusplus(&mut x)] += 1;
-		y
+		assert!(y == vector<u256>[1, 1]);
 	}
 
 }
