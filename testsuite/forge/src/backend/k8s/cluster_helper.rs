@@ -2,13 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::GENESIS_HELM_RELEASE_NAME;
 use crate::{
-    get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
-    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
+    get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck,
+    wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
+    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_FORGE_DEPLOYER_PROFILE,
     DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
-    FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_CHART_PATH,
-    GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
+    FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX,
+    FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
     NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
     VALIDATOR_SERVICE_SUFFIX,
 };
@@ -29,17 +30,14 @@ use kube::{
 };
 use rand::Rng;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
     env,
     fmt::Debug,
-    fs,
-    fs::File,
+    fs::{self, File},
     io::Write,
     net::TcpListener,
-    path::Path,
     process::{Command, Stdio},
     str,
     sync::Arc,
@@ -47,7 +45,10 @@ use std::{
 };
 use tempfile::TempDir;
 use thiserror::Error;
-use tokio::time::Duration;
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    time::Duration,
+};
 
 /// Gets a free port
 pub fn get_free_port() -> u32 {
@@ -55,41 +56,82 @@ pub fn get_free_port() -> u32 {
     listener.local_addr().unwrap().port() as u32
 }
 
-/// Waits for the testnet's genesis job to complete, while tailing the job's logs
-async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &str) -> Result<()> {
-    aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
-        let jobs: Api<Job> = Api::namespaced(kube_client.clone(), kube_namespace);
-        Box::pin(async move {
-            let job_name = format!("{}-aptos-genesis-e{}", GENESIS_HELM_RELEASE_NAME, era);
+/// Dumps the given String contents into a file at the given temp directory
+pub fn dump_string_to_file(
+    file_name: String,
+    content: String,
+    tmp_dir: &TempDir,
+) -> Result<String> {
+    let file_path = tmp_dir.path().join(file_name.clone());
+    info!("Wrote content to: {:?}", &file_path);
+    let mut file = File::create(file_path).expect("Could not create file in temp dir");
+    file.write_all(&content.into_bytes())
+        .expect("Could not write to file");
+    let file_path_str = tmp_dir.path().join(file_name).display().to_string();
+    Ok(file_path_str)
+}
 
-            let genesis_job = jobs.get_status(&job_name).await.unwrap();
+/// Waits for a job to complete, while tailing the job's logs
+pub async fn wait_log_job(
+    jobs_api: Arc<dyn ReadWrite<Job>>,
+    job_namespace: &str,
+    job_name: String,
+    retry_strategy: impl Iterator<Item = Duration>,
+) -> Result<()> {
+    aptos_retrier::retry_async(retry_strategy, || {
+        let jobs_api = jobs_api.clone();
+        let job_name = job_name.clone();
+        Box::pin(async move {
+            let genesis_job = jobs_api.get_status(&job_name).await.unwrap();
 
             let status = genesis_job.status.unwrap();
-            info!("Genesis status: {:?}", status);
+            info!("Job {} status: {:?}", &job_name, status);
             match status.active {
                 Some(_) => {
                     // try tailing the logs of the genesis job
                     // by the time this is done, we can re-evalulate its status
-                    Command::new(KUBECTL_BIN)
+                    let mut command = tokio::process::Command::new(KUBECTL_BIN)
                         .args([
                             "-n",
-                            kube_namespace,
+                            job_namespace,
                             "logs",
+                            "--tail=10", // in case of connection reset we only want the last few lines to avoid spam
                             "-f",
                             format!("job/{}", &job_name).as_str(),
                         ])
-                        .status()
-                        .expect("Failed to tail genesis logs");
+                        .stdout(Stdio::piped())
+                        .spawn()?;
+                    // Ensure the command has stdout
+                    let stdout = command
+                        .stdout
+                        .take()
+                        .ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
+
+                    // Create a BufReader to read the output asynchronously, line by line
+                    let mut reader = BufReader::new(stdout).lines();
+
+                    // Iterate over the lines as they come
+                    while let Some(line) = reader.next_line().await.transpose() {
+                        match line {
+                            Ok(line) => {
+                                info!("[{}]: {}", &job_name, line); // Add a prefix to each line
+                            },
+                            Err(e) => {
+                                bail!("Error reading line: {}", e);
+                            },
+                        }
+                    }
+                    command.wait().await?;
                 },
-                None => info!("Genesis completed running"),
+                None => info!("Job {} completed running", &job_name),
             }
-            info!("Genesis status: {:?}", status);
+            info!("Job {} status: {:?}", &job_name, status);
             match status.succeeded {
                 Some(_) => {
-                    info!("Genesis done");
+                    info!("Job {} done", &job_name);
                     Ok(())
                 },
-                None => bail!("Genesis did not succeed"),
+                None => bail!("Job {} did not succeed", &job_name),
             }
         })
     })
@@ -303,97 +345,6 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
     Ok(())
 }
 
-fn upgrade_helm_release(
-    release_name: String,
-    helm_chart: String,
-    options: &[String],
-    kube_namespace: String,
-) -> Result<()> {
-    // Check to make sure helm_chart exists
-    let helm_chart_path = Path::new(&helm_chart);
-    if !helm_chart_path.exists() {
-        bail!(
-            "Helm chart {} does not exist, try running from the repo root",
-            helm_chart
-        );
-    }
-
-    // only create cluster-level resources once
-    let psp_values = match kube_namespace.as_str() {
-        "default" => "podSecurityPolicy=true",
-        _ => "podSecurityPolicy=false",
-    };
-    let upgrade_base_args = [
-        "upgrade".to_string(),
-        // "--debug".to_string(),
-        "--install".to_string(),
-        // // force replace if necessary
-        // "--force".to_string(),
-        // in a new namespace
-        "--create-namespace".to_string(),
-        "--namespace".to_string(),
-        kube_namespace,
-        // upgrade
-        release_name.clone(),
-        helm_chart.clone(),
-        // reuse old values
-        "--reuse-values".to_string(),
-        "--history-max".to_string(),
-        "2".to_string(),
-    ];
-    let upgrade_override_args = ["--set".to_string(), psp_values.to_string()];
-    let upgrade_args = [&upgrade_base_args, options, &upgrade_override_args].concat();
-    info!("{:?}", upgrade_args);
-    let upgrade_output = Command::new(HELM_BIN)
-        .stdout(Stdio::inherit())
-        .args(&upgrade_args)
-        .output()
-        .unwrap_or_else(|_| {
-            panic!(
-                "failed to helm upgrade release {} with chart {}",
-                release_name, helm_chart
-            )
-        });
-    if !upgrade_output.status.success() {
-        bail!(format!(
-            "Upgrade not completed: {}",
-            String::from_utf8(upgrade_output.stderr).unwrap()
-        ));
-    }
-
-    Ok(())
-}
-
-// TODO: upgrade via kube api
-#[allow(dead_code)]
-fn upgrade_validator(
-    _validator_name: String,
-    _options: &[String],
-    _kube_namespace: String,
-) -> Result<()> {
-    todo!()
-}
-
-fn upgrade_aptos_node_helm(options: &[String], kube_namespace: String) -> Result<()> {
-    upgrade_helm_release(
-        APTOS_NODE_HELM_RELEASE_NAME.to_string(),
-        APTOS_NODE_HELM_CHART_PATH.to_string(),
-        options,
-        kube_namespace,
-    )
-}
-
-// runs helm upgrade on the installed aptos-genesis release named "genesis"
-// if a new "era" is specified, a new genesis will be created, and old resources will be destroyed
-fn upgrade_genesis_helm(options: &[String], kube_namespace: String) -> Result<()> {
-    upgrade_helm_release(
-        GENESIS_HELM_RELEASE_NAME.to_string(),
-        GENESIS_HELM_CHART_PATH.to_string(),
-        options,
-        kube_namespace,
-    )
-}
-
 pub async fn uninstall_testnet_resources(kube_namespace: String) -> Result<()> {
     // delete kubernetes resources
     delete_k8s_cluster(kube_namespace.clone()).await?;
@@ -405,7 +356,7 @@ pub async fn uninstall_testnet_resources(kube_namespace: String) -> Result<()> {
     Ok(())
 }
 
-fn generate_new_era() -> String {
+pub fn generate_new_era() -> String {
     let mut rng = rand::thread_rng();
     let r: u8 = rng.gen();
     format!("forge{}", r)
@@ -500,9 +451,68 @@ pub async fn check_persistent_volumes(
     Ok(())
 }
 
+/// Get the existing helm values for a release
+fn get_default_helm_release_values_from_cluster(
+    helm_release_name: &str,
+) -> Result<serde_yaml::Value> {
+    let status_args = [
+        "status",
+        helm_release_name,
+        "--namespace",
+        "default",
+        "-o",
+        "yaml",
+    ];
+    info!("{:?}", status_args);
+    let raw_helm_values = Command::new(HELM_BIN)
+        .args(status_args)
+        .output()
+        .unwrap_or_else(|_| panic!("Failed to helm status {}", helm_release_name));
+
+    let helm_values = String::from_utf8(raw_helm_values.stdout).unwrap();
+    let j: serde_yaml::Value = serde_yaml::from_str(&helm_values).map_err(|e| {
+        format_err!(
+            "Failed to deserialize helm values. Check if release {} exists: {}",
+            helm_release_name,
+            e
+        )
+    })?;
+    // get .config or anyhow bail!
+    let config = j
+        .get("config")
+        .ok_or_else(|| anyhow!("Failed to get helm values"))?;
+    Ok(config.clone())
+}
+
+/// Merges two YAML values in place, with `b` taking precedence over `a`
+/// This simulates helm's behavior of merging default values (values.yaml) with overridden values specified (-f file or --set)
+/// Source: https://stackoverflow.com/questions/67727239/how-to-combine-including-nested-array-values-two-serde-yamlvalue-objects
+fn merge_yaml(a: &mut serde_yaml::Value, b: serde_yaml::Value) {
+    match (a, b) {
+        (a @ &mut serde_yaml::Value::Mapping(_), serde_yaml::Value::Mapping(b)) => {
+            let a = a.as_mapping_mut().unwrap();
+            for (k, v) in b {
+                if v.is_sequence() && a.contains_key(&k) && a[&k].is_sequence() {
+                    let mut _b = a.get(&k).unwrap().as_sequence().unwrap().to_owned();
+                    _b.append(&mut v.as_sequence().unwrap().to_owned());
+                    a[&k] = serde_yaml::Value::from(_b);
+                    continue;
+                }
+                if !a.contains_key(&k) {
+                    a.insert(k.to_owned(), v.to_owned());
+                } else {
+                    merge_yaml(&mut a[&k], v);
+                }
+            }
+        },
+        (a, b) => *a = b,
+    }
+}
+
 /// Installs a testnet in a k8s namespace by first running genesis, and the installing the aptos-nodes via helm
-/// Returns the current era, as well as a mapping of validators and fullnodes
+/// Returns all validators and fullnodes by collecting the running nodes
 pub async fn install_testnet_resources(
+    new_era: String,
     kube_namespace: String,
     num_validators: usize,
     num_fullnodes: usize,
@@ -511,21 +521,25 @@ pub async fn install_testnet_resources(
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
     enable_haproxy: bool,
+    enable_indexer: bool,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
-) -> Result<(String, HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
+    // If true, skip collecting running nodes after installing the testnet. This is useful when we only care about creating resources
+    // but not healthchecking or collecting the nodes for further operations. Setting this to "true" effectively makes the return type useless though.
+    skip_collecting_running_nodes: bool,
+) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await?;
 
-    // get deployment-specific helm values and cache it
-    let tmp_dir = TempDir::new().expect("Could not create temp dir");
-    let aptos_node_values_file = dump_helm_values_to_file(APTOS_NODE_HELM_RELEASE_NAME, &tmp_dir)?;
-    let genesis_values_file = dump_helm_values_to_file(GENESIS_HELM_RELEASE_NAME, &tmp_dir)?;
+    // get existing helm values from the cluster
+    // if the release doesn't exist, return an empty mapping, which may work, especially as we move away from this pattern and instead having default values baked into the deployer
+    let mut aptos_node_helm_values =
+        get_default_helm_release_values_from_cluster(APTOS_NODE_HELM_RELEASE_NAME)
+            .unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
+    let mut genesis_helm_values =
+        get_default_helm_release_values_from_cluster(GENESIS_HELM_RELEASE_NAME)
+            .unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
 
-    // generate a random era to wipe the network state
-    let new_era = generate_new_era();
-
-    // get forge override helm values and cache it
-    let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
+    let aptos_node_helm_values_override = construct_node_helm_values_from_input(
         node_helm_config_fn,
         fs::read_to_string(get_node_default_helm_path())
             .expect("Not able to read default value file"),
@@ -537,13 +551,7 @@ pub async fn install_testnet_resources(
         enable_haproxy,
     )?;
 
-    let aptos_node_forge_values_file = dump_string_to_file(
-        "aptos-node-values.yaml".to_string(),
-        aptos_node_forge_helm_values_yaml,
-        &tmp_dir,
-    )?;
-
-    let genesis_forge_helm_values_yaml = construct_genesis_helm_values(
+    let genesis_helm_values_override = construct_genesis_helm_values_from_input(
         genesis_helm_config_fn,
         kube_namespace.clone(),
         new_era.clone(),
@@ -551,61 +559,56 @@ pub async fn install_testnet_resources(
         genesis_image_tag,
         enable_haproxy,
     )?;
-    let genesis_forge_values_file = dump_string_to_file(
-        "genesis-values.yaml".to_string(),
-        genesis_forge_helm_values_yaml,
-        &tmp_dir,
-    )?;
 
-    // combine all helm values
-    let aptos_node_upgrade_options = vec![
-        // use the old values
-        "-f".to_string(),
-        aptos_node_values_file,
-        "-f".to_string(),
-        aptos_node_forge_values_file,
-    ];
+    merge_yaml(&mut aptos_node_helm_values, aptos_node_helm_values_override);
+    merge_yaml(&mut genesis_helm_values, genesis_helm_values_override);
 
-    let mut genesis_upgrade_options = vec![
-        // use the old values
-        "-f".to_string(),
-        genesis_values_file,
-        "-f".to_string(),
-        genesis_forge_values_file,
-    ];
-
-    // run genesis from the directory in aptos/init image
+    // disable uploading genesis to blob storage since indexer requires it in the cluster
+    if enable_indexer {
+        aptos_node_helm_values["genesis_blob_upload_url"] = "".into();
+    }
+    // run genesis from this directory in the image
     if let Some(genesis_modules_path) = genesis_modules_path {
-        genesis_upgrade_options.extend([
-            "--set".to_string(),
-            format!("genesis.moveModulesDir={}", genesis_modules_path),
-        ]);
+        genesis_helm_values["genesis"]["moveModulesDir"] = genesis_modules_path.into();
+    }
+    // disable uploading genesis to blob storage since indexer requires it in the cluster
+    if enable_indexer {
+        genesis_helm_values["genesis"]["genesis_blob_upload_url"] = "".into();
     }
 
-    // upgrade genesis
-    upgrade_genesis_helm(genesis_upgrade_options.as_slice(), kube_namespace.clone())?;
+    let config: serde_json::Value = serde_json::from_value(serde_json::json!({
+        "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+        "era": new_era,
+        "namespace": kube_namespace.clone(),
+        "testnet-values": aptos_node_helm_values,
+        "genesis-values": genesis_helm_values,
+    }))?;
 
-    // wait for genesis to run again, and get the updated validators
-    wait_genesis_job(&kube_client, &new_era, &kube_namespace).await?;
-
-    // TODO(rustielin): get the helm releases to be consistent
-    upgrade_aptos_node_helm(
-        aptos_node_upgrade_options.as_slice(),
+    let testnet_deployer = ForgeDeployerManager::new(
+        kube_client.clone(),
         kube_namespace.clone(),
-    )?;
+        FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+        None,
+    );
 
-    let (validators, fullnodes) = collect_running_nodes(
-        &kube_client,
-        kube_namespace,
-        use_port_forward,
-        enable_haproxy,
-    )
-    .await?;
+    testnet_deployer.start(config).await?;
+    testnet_deployer.wait_completed().await?;
 
-    Ok((new_era.clone(), validators, fullnodes))
+    if skip_collecting_running_nodes {
+        Ok((HashMap::new(), HashMap::new()))
+    } else {
+        let (validators, fullnodes) = collect_running_nodes(
+            &kube_client,
+            kube_namespace,
+            use_port_forward,
+            enable_haproxy,
+        )
+        .await?;
+        Ok((validators, fullnodes))
+    }
 }
 
-pub fn construct_node_helm_values(
+pub fn construct_node_helm_values_from_input(
     node_helm_config_fn: Option<NodeConfigFn>,
     base_helm_values: String,
     kube_namespace: String,
@@ -614,7 +617,7 @@ pub fn construct_node_helm_values(
     num_fullnodes: usize,
     image_tag: String,
     enable_haproxy: bool,
-) -> Result<String> {
+) -> Result<serde_yaml::Value> {
     let mut value: serde_yaml::Value = serde_yaml::from_str(&base_helm_values)?;
     value["numValidators"] = num_validators.into();
     value["numFullnodeGroups"] = num_fullnodes.into();
@@ -633,17 +636,17 @@ pub fn construct_node_helm_values(
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
-    serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
+    Ok(value)
 }
 
-pub fn construct_genesis_helm_values(
+pub fn construct_genesis_helm_values_from_input(
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     kube_namespace: String,
     era: String,
     num_validators: usize,
     genesis_image_tag: String,
     enable_haproxy: bool,
-) -> Result<String> {
+) -> Result<serde_yaml::Value> {
     let validator_internal_host_suffix = if enable_haproxy {
         VALIDATOR_HAPROXY_SERVICE_SUFFIX
     } else {
@@ -675,7 +678,7 @@ pub fn construct_genesis_helm_values(
         (config_fn)(&mut value);
     }
 
-    serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
+    Ok(value)
 }
 
 /// Collect the running nodes in the network into K8sNodes
@@ -703,7 +706,7 @@ pub async fn collect_running_nodes(
     }
 
     // get all fullnodes
-    let fullnodes = get_fullnodes(
+    let validator_fullnodes = get_validator_fullnodes(
         kube_client.clone(),
         &kube_namespace,
         use_port_forward,
@@ -712,11 +715,11 @@ pub async fn collect_running_nodes(
     .await
     .unwrap();
 
-    wait_nodes_stateful_set(kube_client, &kube_namespace, &fullnodes).await?;
+    wait_nodes_stateful_set(kube_client, &kube_namespace, &validator_fullnodes).await?;
 
     let nodes = validators
         .values()
-        .chain(fullnodes.values())
+        .chain(validator_fullnodes.values())
         .collect::<Vec<&K8sNode>>();
 
     // start port-forward for each of the nodes
@@ -728,7 +731,7 @@ pub async fn collect_running_nodes(
     }
 
     nodes_healthcheck(nodes).await?;
-    Ok((validators, fullnodes))
+    Ok((validators, validator_fullnodes))
 }
 
 /// Returns a [Config] object reading the KUBECONFIG environment variable or infering from the
@@ -773,68 +776,45 @@ pub async fn create_k8s_client() -> Result<K8sClient> {
     Ok(client)
 }
 
-/// Gets the result of helm status command as JSON
-fn get_helm_status(helm_release_name: &str) -> Result<Value> {
-    let status_args = [
-        "status",
-        helm_release_name,
-        "--namespace",
-        "default",
-        "-o",
-        "json",
-    ];
-    info!("{:?}", status_args);
-    let raw_helm_values = Command::new(HELM_BIN)
-        .args(status_args)
-        .output()
-        .unwrap_or_else(|_| panic!("Failed to helm status {}", helm_release_name));
-
-    let helm_values = String::from_utf8(raw_helm_values.stdout).unwrap();
-    serde_json::from_str(&helm_values).map_err(|e| {
-        format_err!(
-            "Failed to deserialize helm values. Check if release {} exists: {}",
-            helm_release_name,
-            e
-        )
-    })
-}
-
-/// Dumps the given String contents into a file at the given temp directory
-pub fn dump_string_to_file(
-    file_name: String,
-    content: String,
-    tmp_dir: &TempDir,
-) -> Result<String> {
-    let file_path = tmp_dir.path().join(file_name.clone());
-    info!("Wrote content to: {:?}", &file_path);
-    let mut file = File::create(file_path).expect("Could not create file in temp dir");
-    file.write_all(&content.into_bytes())
-        .expect("Could not write to file");
-    let file_path_str = tmp_dir.path().join(file_name).display().to_string();
-    Ok(file_path_str)
-}
-
-fn dump_helm_values_to_file(helm_release_name: &str, tmp_dir: &TempDir) -> Result<String> {
-    // get aptos-node values
-    let v: Value = get_helm_status(helm_release_name).unwrap();
-    let config = &v["config"];
-    let content = config.to_string();
-    let file_name = format!("{}_status.json", helm_release_name);
-
-    dump_string_to_file(file_name, content, tmp_dir)
-}
-
 #[derive(Error, Debug)]
 #[error("{0}")]
-enum ApiError {
+pub enum ApiError {
     RetryableError(String),
     FinalError(String),
 }
 
-async fn create_namespace(
+/// Does the same as create_namespace and handling the 409, but for any k8s resource T
+pub async fn maybe_create_k8s_resource<T>(
+    api: Arc<dyn ReadWrite<T>>,
+    resource: T,
+) -> Result<T, ApiError>
+where
+    T: kube::Resource + Clone + DeserializeOwned + Debug,
+    <T as kube::Resource>::DynamicType: Default,
+{
+    if let Err(KubeError::Api(api_err)) = api.create(&PostParams::default(), &resource).await {
+        if api_err.code == 409 {
+            info!(
+                "Resource {:?}, {} already exists, continuing with it",
+                std::any::type_name::<T>(),
+                resource.name()
+            );
+        } else {
+            return Err(ApiError::RetryableError(format!(
+                "Failed to use existing resource{:?} {}: {:?}",
+                std::any::type_name::<T>(),
+                resource.name(),
+                api_err
+            )));
+        }
+    }
+    Ok(resource)
+}
+
+pub async fn create_namespace(
     namespace_api: Arc<dyn ReadWrite<Namespace>>,
     kube_namespace: String,
-) -> Result<(), ApiError> {
+) -> Result<Namespace, ApiError> {
     let kube_namespace_name = kube_namespace.clone();
     let namespace = Namespace {
         metadata: ObjectMeta {
@@ -866,7 +846,7 @@ async fn create_namespace(
             )));
         }
     }
-    Ok(())
+    Ok(namespace)
 }
 
 pub async fn create_management_configmap(
@@ -1067,11 +1047,11 @@ pub fn make_k8s_label(value: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FailedNamespacesApi;
+    use crate::FailedK8sResourceApi;
 
     #[tokio::test]
     async fn test_create_namespace_final_error() {
-        let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(401));
+        let namespace_creator = Arc::new(FailedK8sResourceApi::from_status_code(401));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
             Err(ApiError::FinalError(_)) => {},
@@ -1081,7 +1061,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_construct_node_helm_values() {
-        let node_helm_values = construct_node_helm_values(
+        let node_helm_values = construct_node_helm_values_from_input(
             None,
             "{}".to_string(),
             "forge-123".to_string(),
@@ -1092,6 +1072,8 @@ mod tests {
             true,
         )
         .unwrap();
+
+        let node_helm_values_str = serde_yaml::to_string(&node_helm_values).unwrap();
 
         let expected_helm_values = "---
 numValidators: 5
@@ -1107,12 +1089,12 @@ labels:
   forge-test-suite: unknown-testsuite
   forge-username: unknown-username
 ";
-        assert_eq!(node_helm_values, expected_helm_values);
+        assert_eq!(node_helm_values_str, expected_helm_values);
     }
 
     #[tokio::test]
     async fn test_construct_genesis_helm_values() {
-        let genesis_helm_values = construct_genesis_helm_values(
+        let genesis_helm_values = construct_genesis_helm_values_from_input(
             Some(Arc::new(|helm_values| {
                 helm_values["chain"]["epoch_duration_secs"] = 60.into();
             })),
@@ -1123,6 +1105,7 @@ labels:
             true,
         )
         .unwrap();
+        let genesis_helm_values_str = serde_yaml::to_string(&genesis_helm_values).unwrap();
         let expected_helm_values = "---
 imageTag: genesis_image
 chain:
@@ -1142,13 +1125,13 @@ labels:
   forge-test-suite: unknown-testsuite
   forge-username: unknown-username
 ";
-        assert_eq!(genesis_helm_values, expected_helm_values);
-        println!("{}", genesis_helm_values);
+        assert_eq!(genesis_helm_values_str, expected_helm_values);
+        println!("{}", genesis_helm_values_str);
     }
 
     #[tokio::test]
     async fn test_create_namespace_retryable_error() {
-        let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(403));
+        let namespace_creator = Arc::new(FailedK8sResourceApi::from_status_code(403));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
         match result {
             Err(ApiError::RetryableError(_)) => {},
@@ -1220,5 +1203,46 @@ labels:
             "foo".to_string(),
             time_since_the_epoch
         ));
+    }
+
+    #[test]
+    fn test_merge_yaml_values() {
+        let yaml1 = r#"
+        foo:
+          bar: 1
+          baz:
+            qux: hello
+        "#;
+
+        let yaml2 = r#"
+        foo:
+          bar: 2
+          baz:
+            quux: world
+        extra: something
+        "#;
+
+        let mut value1: serde_yaml::Value = serde_yaml::from_str(yaml1).unwrap();
+        let value2: serde_yaml::Value = serde_yaml::from_str(yaml2).unwrap();
+
+        let merged_with_serde_merge_tmerge: serde_yaml::Value =
+            serde_merge::tmerge(&mut value1, &value2).unwrap();
+        merge_yaml(&mut value1, value2); // this is an in-place merge
+        let merged_with_crate = value1;
+
+        let expected: serde_yaml::Value = serde_yaml::from_str(
+            r#"
+        foo:
+          bar: 2
+          baz:
+            qux: hello
+            quux: world
+        extra: something
+        "#,
+        )
+        .unwrap();
+
+        assert_ne!(merged_with_serde_merge_tmerge, expected);
+        assert_eq!(merged_with_crate, expected);
     }
 }

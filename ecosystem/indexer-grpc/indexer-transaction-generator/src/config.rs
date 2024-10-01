@@ -11,7 +11,6 @@ use std::{
 };
 use url::Url;
 
-const IMPORTED_TRANSACTIONS_FOLDER: &str = "imported_transactions";
 const SCRIPTED_TRANSACTIONS_FOLDER: &str = "scripted_transactions";
 const MOVE_SCRIPTS_FOLDER: &str = "move_fixtures";
 const IMPORTED_TRANSACTION_CONFIG_FILE: &str = "imported_transactions.yaml";
@@ -37,7 +36,6 @@ impl IndexerCliArgs {
         let testing_folder = convert_relative_path_to_absolute_path(&self.testing_folder);
 
         // Run the transaction importer.
-        let imported_transactions_output_folder = output_folder.join(IMPORTED_TRANSACTIONS_FOLDER);
         let imported_transactions_config_path =
             testing_folder.join(IMPORTED_TRANSACTION_CONFIG_FILE);
 
@@ -48,12 +46,9 @@ impl IndexerCliArgs {
                 tokio::fs::read_to_string(&imported_transactions_config_path).await?;
             let imported_transactions_config: TransactionImporterConfig =
                 serde_yaml::from_str(&imported_transactions_config_raw)?;
-            // Check if the output folder exists.
-            if !imported_transactions_output_folder.exists() {
-                tokio::fs::create_dir_all(&imported_transactions_output_folder).await?;
-            }
+
             imported_transactions_config
-                .validate_and_run(&imported_transactions_output_folder)
+                .validate_and_run(&output_folder)
                 .await
                 .context("Importing transactions failed.")?;
         }

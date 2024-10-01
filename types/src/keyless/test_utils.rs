@@ -11,7 +11,7 @@ use crate::{
             SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
             SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_JWT_PAYLOAD_JSON, SAMPLE_PEPPER,
             SAMPLE_PK, SAMPLE_PROOF, SAMPLE_PROOF_FOR_UPGRADED_VK, SAMPLE_PROOF_NO_EXTRA_FIELD,
-            SAMPLE_UID_KEY, SAMPLE_UPGRADED_VK,
+            SAMPLE_UID_KEY, SAMPLE_UID_VAL, SAMPLE_UPGRADED_VK,
         },
         get_public_inputs_hash,
         proof_simulation::Groth16SimulatorBn254,
@@ -43,8 +43,18 @@ pub fn get_sample_esk() -> Ed25519PrivateKey {
     Ed25519PrivateKey::try_from(serialized).unwrap()
 }
 
+pub fn get_sample_tw_sk() -> Ed25519PrivateKey {
+    let sk_bytes =
+        hex::decode("1111111111111111111111111111111111111111111111111111111111111111").unwrap();
+    Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap()
+}
+
 pub fn get_sample_iss() -> String {
     SAMPLE_JWT_PARSED.oidc_claims.iss.clone()
+}
+
+pub fn get_sample_aud() -> String {
+    SAMPLE_JWT_PARSED.oidc_claims.aud.clone()
 }
 
 pub fn get_sample_jwk() -> RSA_JWK {
@@ -71,6 +81,10 @@ pub fn get_sample_uid_key() -> String {
     SAMPLE_UID_KEY.to_string()
 }
 
+pub fn get_sample_uid_val() -> String {
+    SAMPLE_UID_VAL.to_string()
+}
+
 pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
     let config = Configuration::new_for_testing();
     let (sig, pk) = get_sample_groth16_sig_and_pk();
@@ -93,6 +107,18 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
             ZKP::Groth16(proof) => proof,
         },
         public_inputs_hash,
+    }
+}
+
+pub fn get_sample_zk_sig() -> ZeroKnowledgeSig {
+    let proof = *SAMPLE_PROOF;
+
+    ZeroKnowledgeSig {
+        proof: proof.into(),
+        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
     }
 }
 
@@ -250,7 +276,7 @@ pub fn get_sample_jwt_token() -> String {
     let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
-    let sk = *SAMPLE_JWK_SK;
+    let sk = &*SAMPLE_JWK_SK;
     let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
 
     sk.sign(
@@ -404,7 +430,8 @@ mod test {
             "exp_horizon_secs": SAMPLE_EXP_HORIZON_SECS,
             "pepper": hex::encode(get_sample_pepper().to_bytes()),
             "uid_key": "sub",
-            "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY
+            "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY,
+            "use_insecure_test_jwk": true,
         });
         make_prover_request(&client, body, "SAMPLE_PROOF").await;
 
@@ -415,7 +442,8 @@ mod test {
             "exp_date_secs": get_sample_exp_date(),
             "exp_horizon_secs": SAMPLE_EXP_HORIZON_SECS,
             "pepper": hex::encode(get_sample_pepper().to_bytes()),
-            "uid_key": "sub"
+            "uid_key": "sub",
+            "use_insecure_test_jwk": true,
         });
         make_prover_request(&client, body, "SAMPLE_PROOF_NO_EXTRA_FIELD").await;
     }
@@ -425,7 +453,7 @@ mod test {
         body: Value,
         test_proof_name: &str,
     ) -> ProverResponse {
-        let url = "http://localhost:8080/v0/prove";
+        let url = "http://localhost:8083/v0/prove";
 
         // Send the POST request and await the response
         let response = client.post(url).json(&body).send().await.unwrap();

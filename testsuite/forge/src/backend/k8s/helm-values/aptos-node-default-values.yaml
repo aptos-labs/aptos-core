@@ -25,6 +25,12 @@ service:
       type: "ClusterIP"
     enableRestApi: true
     enableMetricsPort: true
+    config:
+      storage:
+        rocksdb_configs:
+          enable_storage_sharding: true
+      indexer_db_config:
+        enable_event: true
 
   fullnode:
     external:
@@ -33,6 +39,12 @@ service:
       type: "ClusterIP"
     enableRestApi: true
     enableMetricsPort: true
+    config:
+      storage:
+        rocksdb_configs:
+          enable_storage_sharding: true
+      indexer_db_config:
+        enable_event: true
 
 # always assume we're spinning up a testnet and doing genesis rather than using the single validator test mode
 loadTestGenesis: false
