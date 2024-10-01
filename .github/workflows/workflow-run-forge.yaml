@@ -39,11 +39,6 @@ on:
         type: boolean
         default: false
         description: Whether to post the test results comment to Slack
-      COMMENT_ON_PR:
-        required: false
-        type: boolean
-        default: true
-        description: Whether to post the test results comment to the PR
       TIMEOUT_MINUTES:
         required: false
         type: number
@@ -57,6 +52,10 @@ on:
         required: false
         type: string
         description: Whether to use HAPRoxy
+      FORGE_ENABLE_INDEXER:
+        required: false
+        type: boolean
+        description: Whether to use indexer
       FORGE_ENABLE_PERFORMANCE:
         required: false
         type: string
@@ -104,6 +103,7 @@ env:
   FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
   FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}
+  FORGE_ENABLE_INDEXER: ${{ inputs.FORGE_ENABLE_INDEXER }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
   FORGE_ENABLE_FAILPOINTS: ${{ inputs.FORGE_ENABLE_FAILPOINTS }}
@@ -111,7 +111,6 @@ env:
   FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
   COMMENT_HEADER: ${{ inputs.COMMENT_HEADER }}
   VERBOSE: true
-  COMMENT_ON_PR: ${{ inputs.COMMENT_ON_PR }}
   FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}
   FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
 
@@ -184,7 +183,7 @@ jobs:
         run: testsuite/run_forge.sh
 
       - name: Post pre-Forge comment
-        if: ${{ !inputs.SKIP_JOB && env.COMMENT_ON_PR == 'true' && github.event.number != null }}
+        if: ${{ !inputs.SKIP_JOB && github.event.number != null }}
         uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
         with:
           header: ${{ env.COMMENT_HEADER }}
@@ -199,7 +198,7 @@ jobs:
 
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR
-        if: ${{ !inputs.SKIP_JOB  && env.COMMENT_ON_PR == 'true' && github.event.number != null && !cancelled() }}
+        if: ${{ !inputs.SKIP_JOB  && github.event.number != null && !cancelled() }}
         uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
         with:
           header: ${{ env.COMMENT_HEADER }}

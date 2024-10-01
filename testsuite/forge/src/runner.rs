@@ -263,6 +263,9 @@ impl ForgeConfig {
         OverrideNodeConfig::new(override_config, base_config)
     }
 
+    /// Builds a function that can be used to override the default helm values for the validator and fullnode.
+    /// If a configuration is intended to be set for all nodes, set the value in the default helm values file:
+    /// testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml
     pub fn build_node_helm_config_fn(&self, retain_debug_logs: bool) -> Option<NodeConfigFn> {
         let validator_override_node_config = self
             .validator_override_node_config_fn
@@ -338,12 +341,6 @@ impl ForgeConfig {
                 helm_values["validator"]["rust_log"] = "debug,hyper=off".into();
                 helm_values["fullnode"]["rust_log"] = "debug,hyper=off".into();
             }
-            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
-                ["enable_storage_sharding"] = true.into();
-            helm_values["fullnode"]["config"]["storage"]["rocksdb_configs"]
-                ["enable_storage_sharding"] = true.into();
-            helm_values["validator"]["config"]["indexer_db_config"]["enable_event"] = true.into();
-            helm_values["fullnode"]["config"]["indexer_db_config"]["enable_event"] = true.into();
         }))
     }
 

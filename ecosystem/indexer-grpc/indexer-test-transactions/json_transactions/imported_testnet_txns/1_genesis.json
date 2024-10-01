@@ -1,0 +1,450 @@
+{
+  "timestamp": {
+    "seconds": "1662686657",
+    "nanos": 227425000
+  },
+  "version": "1",
+  "info": {
+    "hash": "vpNRbP9PKz15D8rWjh0w/8Li7QJXR3ADlRNqQb5uuNo=",
+    "stateChangeHash": "Oxu/8XwA83yMpltPI8OvY8GqmK4h3hGPcgg/8QKtbtU=",
+    "eventRootHash": "G0xb03ClIZcal2Kv3LG+aKSKh9f4z70gmDSDvZLSW54=",
+    "stateCheckpointHash": "z7haPTidZG8PFk9yG5h0liq7dkBaDCsv/XGh1gqZOnA=",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "nqkZmoQ8Amm54AP8v7Lab3A08VWAQ8VY4iHol7Jft04=",
+    "changes": [
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
+          "type": {
+            "address": "0x1",
+            "module": "block",
+            "name": "BlockResource"
+          },
+          "typeStr": "0x1::block::BlockResource",
+          "data": "{\"epoch_interval\":\"7200000000\",\"height\":\"1\",\"new_block_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"3\"}}},\"update_epoch_interval_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"4\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "/Oyrha7CwSRSnRt+eAL3NETP1PqiBLXYcvFVFj0aRbk=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "ValidatorSet"
+          },
+          "typeStr": "0x1::stake::ValidatorSet",
+          "data": "{\"active_validators\":[{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"config\":{\"consensus_pubkey\":\"0x85f65964ec20f65ea89637f12ffee6b50b6b7a7786345af0c161411abfb7391e1fe14557b7d3682c5767446dc6e7fbe5\",\"fullnode_addresses\":\"0x014904021f66756c6c6e6f6465332e746573746e65742e6170746f736c6162732e636f6d0526180720408614909b2446a3e10ee4a24d8efeaddb37812b9bb936f2f8df4f520041eb350800\",\"network_addresses\":\"0x014d040223726f63696e616e74652d6170746f732d6e6f64652d332d76616c696461746f722d6c6205241807206cc3991833803b2819db07ee909183875c4cf81161fb92b70ce80a24db4ffb780800\",\"validator_index\":\"0\"},\"voting_power\":\"400000000000000\"},{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"config\":{\"consensus_pubkey\":\"0x8079ffcb981301134410221a26ffe798661179ed62da61856954d090bb57884aa65f4989691c7e3882f9361305124642\",\"fullnode_addresses\":\"0x014904021f66756c6c6e6f6465322e746573746e65742e6170746f736c6162732e636f6d0526180720e03c58c945faa99971eee984594f2fab0b087206b3539af852bb1528731ad0040800\",\"network_addresses\":\"0x014d040223726f63696e616e74652d6170746f732d6e6f64652d322d76616c696461746f722d6c620524180720a46a7feb7296dfaf557a41e5515a25ff655a5f1133e081126213a1e90ba6652b0800\",\"validator_index\":\"1\"},\"voting_power\":\"400004566200000\"},{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"config\":{\"consensus_pubkey\":\"0xa8865d1badadd8d49abab0d602778bed7fbd073072bdd1e2b549e4c853c1485471271025b6e16418a1a13ad49d6ca4a6\",\"fullnode_addresses\":\"0x014904021f66756c6c6e6f6465312e746573746e65742e6170746f736c6162732e636f6d0526180720657c1ce875959e2ad84f25a28547021c5c905291a75c39d2b940b512e20ccf2b0800\",\"network_addresses\":\"0x014d040223726f63696e616e74652d6170746f732d6e6f64652d312d76616c696461746f722d6c620524180720f0abc63f97736382244d67b819493a320b353b575274839c1ed4082d8c756d330800\",\"validator_index\":\"2\"},\"voting_power\":\"400000000000000\"},{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"config\":{\"consensus_pubkey\":\"0xa208433bff5636ba2b73e1e54bed4cb9b76d02b9e2b02ee684f4cf484e2d0f36bcfd83620e0d864c42bcb5953dfd721d\",\"fullnode_addresses\":\"0x014904021f66756c6c6e6f6465302e746573746e65742e6170746f736c6162732e636f6d0526180720ea19ab47ed9191865f15d85d751ed0663205c0b2f0f465714b1947c0237159730800\",\"network_addresses\":\"0x014d040223726f63696e616e74652d6170746f732d6e6f64652d302d76616c696461746f722d6c620524180720c5edf62233096df793b554e1013b07c83d01b3cf50c14ac83a0a7e0cfe3404260800\",\"validator_index\":\"3\"},\"voting_power\":\"400000000000000\"}],\"consensus_scheme\":0,\"pending_active\":[],\"pending_inactive\":[],\"total_joining_power\":\"0\",\"total_voting_power\":\"1600004566200000\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "gEjJVCIYFLBFM6nwqZRsOo1HKsYt9azLn0fAl+JW6LY=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "ValidatorPerformance"
+          },
+          "typeStr": "0x1::stake::ValidatorPerformance",
+          "data": "{\"validators\":[{\"failed_proposals\":\"0\",\"successful_proposals\":\"0\"},{\"failed_proposals\":\"0\",\"successful_proposals\":\"0\"},{\"failed_proposals\":\"0\",\"successful_proposals\":\"0\"},{\"failed_proposals\":\"0\",\"successful_proposals\":\"0\"}]}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "exYVvwEtPJQiPz92KH7i973zHTZAcRKLJWrv8IQbYm0=",
+          "type": {
+            "address": "0x1",
+            "module": "timestamp",
+            "name": "CurrentTimeMicroseconds"
+          },
+          "typeStr": "0x1::timestamp::CurrentTimeMicroseconds",
+          "data": "{\"microseconds\":\"1662686657227425\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "t69mClGhLhRMIdEQ2JecSuEOSDT0kMzCVH6mq6w1YS8=",
+          "type": {
+            "address": "0x1",
+            "module": "state_storage",
+            "name": "GasParameter"
+          },
+          "typeStr": "0x1::state_storage::GasParameter",
+          "data": "{\"usage\":{\"bytes\":\"273204\",\"items\":\"128\"}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "rLamyj9FTcXOT+7oZEgHwwg1WcI7RCxO2qR8/D4viSk=",
+          "type": {
+            "address": "0x1",
+            "module": "state_storage",
+            "name": "StateStorageUsage"
+          },
+          "typeStr": "0x1::state_storage::StateStorageUsage",
+          "data": "{\"epoch\":\"1\",\"usage\":{\"bytes\":\"273204\",\"items\":\"128\"}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x1",
+          "stateKeyHash": "IodpLBeQApgaj+Gfbe8ZftX/RShIZZ4uCR6tMY1xkFA=",
+          "type": {
+            "address": "0x1",
+            "module": "reconfiguration",
+            "name": "Configuration"
+          },
+          "typeStr": "0x1::reconfiguration::Configuration",
+          "data": "{\"epoch\":\"2\",\"events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}},\"last_reconfiguration_time\":\"1662686657227425\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f",
+          "stateKeyHash": "GcxuXyqXF7TtycdR6+IpAVBM3Jv9TYq7utPYAJdqw7E=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"400000000000000\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"6\"}}},\"delegated_voter\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"distribute_rewards_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"12\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"10\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"4\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"11\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"15\"}}},\"locked_until_secs\":\"1662773057\",\"operator_address\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"0\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"7\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"8\"}}},\"set_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"5\"}}},\"unlock_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"13\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"9\"}}},\"withdraw_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"creation_num\":\"14\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f",
+          "stateKeyHash": "rm/9fo5DW6DHC4o5K9TmdRAiA8SDCR9oLjgu7BakqVI=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "ValidatorConfig"
+          },
+          "typeStr": "0x1::stake::ValidatorConfig",
+          "data": "{\"consensus_pubkey\":\"0xa8865d1badadd8d49abab0d602778bed7fbd073072bdd1e2b549e4c853c1485471271025b6e16418a1a13ad49d6ca4a6\",\"fullnode_addresses\":\"0x014904021f66756c6c6e6f6465312e746573746e65742e6170746f736c6162732e636f6d0526180720657c1ce875959e2ad84f25a28547021c5c905291a75c39d2b940b512e20ccf2b0800\",\"network_addresses\":\"0x014d040223726f63696e616e74652d6170746f732d6e6f64652d312d76616c696461746f722d6c620524180720f0abc63f97736382244d67b819493a320b353b575274839c1ed4082d8c756d330800\",\"validator_index\":\"2\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f",
+          "stateKeyHash": "oGyPwLTZfr5o9j5vvEEUHkHh1sP2g0YVBRpcoPpMelY=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"400000000000000\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"6\"}}},\"delegated_voter\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"distribute_rewards_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"12\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"10\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"4\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"11\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"15\"}}},\"locked_until_secs\":\"1662773057\",\"operator_address\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"0\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"7\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"8\"}}},\"set_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"5\"}}},\"unlock_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"13\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"9\"}}},\"withdraw_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"creation_num\":\"14\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f",
+          "stateKeyHash": "WT2I8uZTmUNOsv9t4s6p80dZhHC/4GkVhFDySuoBTAI=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "ValidatorConfig"
+          },
+          "typeStr": "0x1::stake::ValidatorConfig",
+          "data": "{\"consensus_pubkey\":\"0xa208433bff5636ba2b73e1e54bed4cb9b76d02b9e2b02ee684f4cf484e2d0f36bcfd83620e0d864c42bcb5953dfd721d\",\"fullnode_addresses\":\"0x014904021f66756c6c6e6f6465302e746573746e65742e6170746f736c6162732e636f6d0526180720ea19ab47ed9191865f15d85d751ed0663205c0b2f0f465714b1947c0237159730800\",\"network_addresses\":\"0x014d040223726f63696e616e74652d6170746f732d6e6f64652d302d76616c696461746f722d6c620524180720c5edf62233096df793b554e1013b07c83d01b3cf50c14ac83a0a7e0cfe3404260800\",\"validator_index\":\"3\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c",
+          "stateKeyHash": "lBpyw1HUmM0/w18XxsJgRh258TjkNJAR/LXnhv9KOio=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"400000000000000\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"6\"}}},\"delegated_voter\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"distribute_rewards_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"12\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"10\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"4\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"11\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"15\"}}},\"locked_until_secs\":\"1662773057\",\"operator_address\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"0\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"7\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"8\"}}},\"set_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"5\"}}},\"unlock_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"13\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"9\"}}},\"withdraw_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"creation_num\":\"14\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c",
+          "stateKeyHash": "X8f1gZW8rLjX30Wj3YR3eycYCfdnzbIv91/kutwlllg=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "ValidatorConfig"
+          },
+          "typeStr": "0x1::stake::ValidatorConfig",
+          "data": "{\"consensus_pubkey\":\"0x85f65964ec20f65ea89637f12ffee6b50b6b7a7786345af0c161411abfb7391e1fe14557b7d3682c5767446dc6e7fbe5\",\"fullnode_addresses\":\"0x014904021f66756c6c6e6f6465332e746573746e65742e6170746f736c6162732e636f6d0526180720408614909b2446a3e10ee4a24d8efeaddb37812b9bb936f2f8df4f520041eb350800\",\"network_addresses\":\"0x014d040223726f63696e616e74652d6170746f732d6e6f64652d332d76616c696461746f722d6c6205241807206cc3991833803b2819db07ee909183875c4cf81161fb92b70ce80a24db4ffb780800\",\"validator_index\":\"0\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16",
+          "stateKeyHash": "Cr8UNGcLO0rzUjpSVHrHFJmK/QH14QtHI4qTe3WUzAA=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"400004566200000\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"6\"}}},\"delegated_voter\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"distribute_rewards_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"12\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"10\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"4\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"11\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"15\"}}},\"locked_until_secs\":\"1662773057\",\"operator_address\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"0\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"7\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"8\"}}},\"set_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"5\"}}},\"unlock_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"13\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"9\"}}},\"withdraw_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"creation_num\":\"14\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16",
+          "stateKeyHash": "bnh+KpKQYw0X+GTvHW2PteTTbrctAtmD2U3zj26cx50=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "ValidatorConfig"
+          },
+          "typeStr": "0x1::stake::ValidatorConfig",
+          "data": "{\"consensus_pubkey\":\"0x8079ffcb981301134410221a26ffe798661179ed62da61856954d090bb57884aa65f4989691c7e3882f9361305124642\",\"fullnode_addresses\":\"0x014904021f66756c6c6e6f6465322e746573746e65742e6170746f736c6162732e636f6d0526180720e03c58c945faa99971eee984594f2fab0b087206b3539af852bb1528731ad0040800\",\"network_addresses\":\"0x014d040223726f63696e616e74652d6170746f732d6e6f64652d322d76616c696461746f722d6c620524180720a46a7feb7296dfaf557a41e5515a25ff655a5f1133e081126213a1e90ba6652b0800\",\"validator_index\":\"1\"}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_TABLE_ITEM",
+        "writeTableItem": {
+          "stateKeyHash": "bkso1A+YoQamUWNTCSTA3LQME0nTqpFdEItNbPwd2xk=",
+          "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+          "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+          "data": {
+            "key": "\"0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935\"",
+            "keyType": "address",
+            "value": "\"18448344078275751615\"",
+            "valueType": "u128"
+          }
+        }
+      }
+    ]
+  },
+  "epoch": "1",
+  "blockHeight": "1",
+  "type": "TRANSACTION_TYPE_BLOCK_METADATA",
+  "sizeInfo": {
+    "transactionBytes": 100,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 54,
+        "totalBytes": 217
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 151
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 151
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 151
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 151
+      },
+      {
+        "typeTagBytes": 64,
+        "totalBytes": 120
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 88,
+        "valueBytes": 112
+      },
+      {
+        "keyBytes": 87,
+        "valueBytes": 1048
+      },
+      {
+        "keyBytes": 95,
+        "valueBytes": 65
+      },
+      {
+        "keyBytes": 102,
+        "valueBytes": 8
+      },
+      {
+        "keyBytes": 95,
+        "valueBytes": 16
+      },
+      {
+        "keyBytes": 100,
+        "valueBytes": 24
+      },
+      {
+        "keyBytes": 98,
+        "valueBytes": 64
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 90,
+        "valueBytes": 213
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 90,
+        "valueBytes": 213
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 90,
+        "valueBytes": 213
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 90,
+        "valueBytes": 213
+      },
+      {
+        "keyBytes": 66,
+        "valueBytes": 16
+      }
+    ]
+  },
+  "blockMetadata": {
+    "id": "0x01f4392dc07a74b39eaea58b912855cbbd1ab67e5089ae6166329e883c2085f0",
+    "round": "3",
+    "events": [
+      {
+        "key": {
+          "creationNumber": "3",
+          "accountAddress": "0x1"
+        },
+        "sequenceNumber": "1",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "block",
+            "name": "NewBlockEvent"
+          }
+        },
+        "typeStr": "0x1::block::NewBlockEvent",
+        "data": "{\"epoch\":\"1\",\"failed_proposer_indices\":[\"2\",\"1\"],\"hash\":\"0x1f4392dc07a74b39eaea58b912855cbbd1ab67e5089ae6166329e883c2085f0\",\"height\":\"1\",\"previous_block_votes_bitvec\":\"0x00\",\"proposer\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"round\":\"3\",\"time_microseconds\":\"1662686657227425\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "12",
+          "accountAddress": "0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "DistributeRewardsEvent"
+          }
+        },
+        "typeStr": "0x1::stake::DistributeRewardsEvent",
+        "data": "{\"pool_address\":\"0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c\",\"rewards_amount\":\"0\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "12",
+          "accountAddress": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "DistributeRewardsEvent"
+          }
+        },
+        "typeStr": "0x1::stake::DistributeRewardsEvent",
+        "data": "{\"pool_address\":\"0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16\",\"rewards_amount\":\"4566200000\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "12",
+          "accountAddress": "0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "DistributeRewardsEvent"
+          }
+        },
+        "typeStr": "0x1::stake::DistributeRewardsEvent",
+        "data": "{\"pool_address\":\"0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f\",\"rewards_amount\":\"0\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "12",
+          "accountAddress": "0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "DistributeRewardsEvent"
+          }
+        },
+        "typeStr": "0x1::stake::DistributeRewardsEvent",
+        "data": "{\"pool_address\":\"0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f\",\"rewards_amount\":\"0\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x1"
+        },
+        "sequenceNumber": "1",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "reconfiguration",
+            "name": "NewEpochEvent"
+          }
+        },
+        "typeStr": "0x1::reconfiguration::NewEpochEvent",
+        "data": "{\"epoch\":\"2\"}"
+      }
+    ],
+    "previousBlockVotesBitvec": "AA==",
+    "proposer": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16",
+    "failedProposerIndices": [
+      2,
+      1
+    ]
+  }
+}
