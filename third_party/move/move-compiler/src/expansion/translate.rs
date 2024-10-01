@@ -2670,29 +2670,20 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                                 // =>
                                 // { let t = e; x = x + t; }
                                 sp!(var_loc, LValue_::Var(module_access, ty_opt)) => {
-                                    let er_loc = er.loc;
                                     let x = sp(
                                         *var_loc,
                                         EE::Name(module_access.clone(), ty_opt.clone()),
                                     );
-                                    // t
-                                    let t_symbol = Symbol::from("$t");
-                                    let t_name = sp(er_loc, t_symbol);
-                                    let mod_acc = ModuleAccess_::Name(t_name);
-                                    let t_ = EE::Name(sp(er_loc, mod_acc.clone()), None);
-                                    let t = sp(er_loc, t_);
-                                    // let t = e;
-                                    let lval_ = LValue_::Var(sp(er_loc, mod_acc), None);
-                                    let lval = sp(er_loc, lval_);
-                                    let lvals = sp(er_loc, vec![lval]);
-                                    let bind_ = SequenceItem_::Bind(lvals, *er);
-                                    let bind = sp(er_loc, bind_);
+                                    // t, let t = e;
+                                    let (t, bind) = let_symbol_eq_exp(er.loc, Symbol::from("$t"), *er);
                                     // x + t;
-                                    let rhs_expanded = sp(loc, EE::BinopExp(Box::new(x), op, Box::new(t)));
+                                    let rhs_expanded =
+                                        sp(loc, EE::BinopExp(Box::new(x), op, Box::new(t)));
                                     // x = x + t;
                                     let assign = sp(loc, EE::Assign(al, Box::new(rhs_expanded)));
                                     // { let t = e; x = x + t; }
-                                    let sequence = VecDeque::from([bind, sp(loc, SequenceItem_::Seq(assign))]);
+                                    let sequence =
+                                        VecDeque::from([bind, sp(loc, SequenceItem_::Seq(assign))]);
                                     EE::Block(sequence)
                                 },
                                 _ => {
@@ -2713,40 +2704,22 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                         // =>
                         // { let t2 = e2; let t1 = e1; *t1 = *t1 + t2 }
                         Some(op) => {
-                            let inner_loc = el.loc;
-                            // t1
-                            let tmp_symbol = Symbol::from("$t1");
-                            let tmp_name = sp(inner_loc, tmp_symbol);
-                            let mod_acc1 = ModuleAccess_::Name(tmp_name);
-                            let tmp_ = EE::Name(sp(inner_loc, mod_acc1.clone()), None);
-                            let tmp1 = sp(inner_loc, tmp_);
-                            // t2
-                            let tmp_symbol = Symbol::from("$t2");
-                            let tmp_name = sp(inner_loc, tmp_symbol);
-                            let mod_acc2 = ModuleAccess_::Name(tmp_name);
-                            let tmp_ = EE::Name(sp(inner_loc, mod_acc2.clone()), None);
-                            let tmp2 = sp(inner_loc, tmp_);
-                            // let t2 = e2;
-                            let lval_ = LValue_::Var(sp(inner_loc, mod_acc2), None);
-                            let lval = sp(inner_loc, lval_);
-                            let lvals = sp(inner_loc, vec![lval]);
-                            let bind_ = SequenceItem_::Bind(lvals, *er);
-                            let bind2 = sp(inner_loc, bind_);
-                            // let t1 = e1;
-                            let lval_ = LValue_::Var(sp(inner_loc, mod_acc1), None);
-                            let lval = sp(inner_loc, lval_);
-                            let lvals = sp(inner_loc, vec![lval]);
-                            let bind_ = SequenceItem_::Bind(lvals, match &el.value {
-                                EE::Index(..) => sp(inner_loc, EE::Borrow(true, el)),
-                                _ => *el,
-                            });
-                            let bind1 = sp(inner_loc, bind_);
+                            // t2, let t2 = e2;
+                            let (tmp2, bind2) = let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
+                            // t1, let t1 = e1;
+                            let (tmp1, bind1) =
+                                let_symbol_eq_exp(el.loc, Symbol::from("$t1"), match &el.value {
+                                    EE::Index(..) => sp(el.loc, EE::Borrow(true, el)),
+                                    _ => *el,
+                                });
                             // *t1
                             let deref_tmp1 = sp(loc, EE::Dereference(Box::new(tmp1.clone())));
                             // *t1 + t2
-                            let rhs_expanded = sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
+                            let rhs_expanded =
+                                sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
                             // *t1 = *t1 + t2
-                            let assign = sp(loc, EE::Mutate(Box::new(tmp1), Box::new(rhs_expanded)));
+                            let assign =
+                                sp(loc, EE::Mutate(Box::new(tmp1), Box::new(rhs_expanded)));
                             // { let t2 = e2; let t1 = e1; *t1 = *t1 + t2 }
                             let sequence =
                                 VecDeque::from([bind2, bind1, sp(loc, SequenceItem_::Seq(assign))]);
@@ -2761,42 +2734,25 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                     // { let t2 = e2; let t1 = &mut e1.f; *t1 = *t1 + t2 }
                     Some(op) => {
                         let lhs_loc = edotted.loc;
-                        // t2
-                        let tmp_symbol = Symbol::from("$t2");
-                        let tmp_name = sp(lhs_loc, tmp_symbol);
-                        let mod_acc2 = ModuleAccess_::Name(tmp_name);
-                        let tmp_ = EE::Name(sp(lhs_loc, mod_acc2.clone()), None);
-                        let tmp2 = sp(lhs_loc, tmp_);
-                        // let t2 = e2;
-                        let lval_ = LValue_::Var(sp(lhs_loc, mod_acc2), None);
-                        let lval = sp(lhs_loc, lval_);
-                        let lvals = sp(lhs_loc, vec![lval]);
-                        let bind_ = SequenceItem_::Bind(lvals, *er);
-                        let bind2 = sp(lhs_loc, bind_);
-                        // t1
-                        let tmp_symbol = Symbol::from("$t");
-                        let tmp_name = sp(lhs_loc, tmp_symbol);
-                        let mod_acc = ModuleAccess_::Name(tmp_name);
-                        let tmp_ = EE::Name(sp(lhs_loc, mod_acc.clone()), None);
-                        let tmp1 = sp(lhs_loc, tmp_);
+                        // t2, let t2 = e2;
+                        let (tmp2, bind2) =
+                            let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
                         // e1.f
-                        let e = sp(edotted.loc, EE::ExpDotted(edotted));
+                        let e = sp(lhs_loc, EE::ExpDotted(edotted));
                         // &mut e1.f
                         let e_mut = sp(lhs_loc, EE::Borrow(true, Box::new(e)));
-                        // let t = &mut e1.f;
-                        let lval_ = LValue_::Var(sp(lhs_loc, mod_acc), None);
-                        let lval = sp(lhs_loc, lval_);
-                        let lvals = sp(lhs_loc, vec![lval]);
-                        let bind_ = SequenceItem_::Bind(lvals, e_mut);
-                        let bind1 = sp(lhs_loc, bind_);
+                        // t1, let t1 = &mut e1.f;
+                        let (tmp1, bind1) = let_symbol_eq_exp(lhs_loc, Symbol::from("$t1"), e_mut);
                         // *t1
                         let deref_tmp1 = sp(loc, EE::Dereference(Box::new(tmp1.clone())));
                         // *t1 + t2
-                        let rhs_expanded = sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
+                        let rhs_expanded =
+                            sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
                         // *t1 = *t1 + t2
                         let assign = sp(loc, EE::Mutate(Box::new(tmp1), Box::new(rhs_expanded)));
                         // { let t2 = e2; let t1 = &mut e1.f; *t1 = *t1 + t2 }
-                        let sequence = VecDeque::from([bind2, bind1, sp(loc, SequenceItem_::Seq(assign))]);
+                        let sequence =
+                            VecDeque::from([bind2, bind1, sp(loc, SequenceItem_::Seq(assign))]);
                         EE::Block(sequence)
                     },
                     None => EE::FieldMutate(edotted, er),
@@ -3798,4 +3754,24 @@ fn restricted_name_error(case: NameCase, loc: Loc, restricted: &str) -> Diagnost
         restricted = restricted,
     );
     diag!(NameResolution::ReservedName, (loc, msg))
+}
+
+//**************************************************************************************************
+// Utility functions
+//**************************************************************************************************
+
+/// Returns expansion expressions `(t, let t = e)` where `t` is a variable named `symbol`
+fn let_symbol_eq_exp(loc: Loc, symbol: Symbol, e: E::Exp) -> (E::Exp, E::SequenceItem) {
+    // t
+    let tmp_name = sp(loc, symbol);
+    let mod_acc = ModuleAccess_::Name(tmp_name);
+    let tmp_ = E::Exp_::Name(sp(loc, mod_acc.clone()), None);
+    let tmp = sp(loc, tmp_);
+    // let t = e;
+    let lval_ = LValue_::Var(sp(loc, mod_acc), None);
+    let lval = sp(loc, lval_);
+    let lvals = sp(loc, vec![lval]);
+    let bind_ = SequenceItem_::Bind(lvals, e);
+    let bind = sp(loc, bind_);
+    (tmp, bind)
 }
