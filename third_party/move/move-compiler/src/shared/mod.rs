@@ -621,12 +621,12 @@ impl Flags {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
+#[derive(Clone, Copy, Debug, Eq,  Ord, ValueEnum)]
 pub enum LanguageVersion {
     #[value(name = "1")]
     V1,
     #[value(name = "2")]
-    V2,
+    V2, /* V2 is the same as V2_0, here for the parser */
     #[value(name = "2.0")]
     V2_0,
     #[value(name = "2.1")]
