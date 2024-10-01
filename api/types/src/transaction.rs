@@ -395,7 +395,7 @@ pub struct TransactionInfo {
     pub epoch: Option<U64>,
 }
 
-/// A transaction waiting in mempool or not committed to internal indexer yet
+/// A transaction waiting in mempool
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct PendingTransaction {
     pub hash: HashValue,
