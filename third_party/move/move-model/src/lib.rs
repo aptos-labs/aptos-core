@@ -34,7 +34,7 @@ use move_compiler::{
     parser::ast::{self as P, CallKind, ModuleName as ParserModuleName},
     shared::{
         parse_named_address, unique_map::UniqueMap, CompilationEnv, Identifier as IdentifierTrait,
-        LanguageVersion as CompilerLanguageVersion, NumericalAddress, PackagePaths,
+        NumericalAddress, PackagePaths,
     },
     typing::ast as T,
     Compiler, Flags, PASS_COMPILATION, PASS_EXPANSION, PASS_INLINING, PASS_PARSER,
