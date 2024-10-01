@@ -97,8 +97,6 @@ impl<'a> BoundsChecker<'a> {
         self.check_function_instantiations()?;
         self.check_field_instantiations()?;
         self.check_struct_defs()?;
-        self.check_function_defs()?;
-        // Since bytecode version 7
         self.check_table(
             self.view.variant_field_handles(),
             Self::check_variant_field_handle,
@@ -115,6 +113,7 @@ impl<'a> BoundsChecker<'a> {
             self.view.struct_variant_instantiations(),
             Self::check_struct_variant_instantiation,
         )?;
+        self.check_function_defs()?;
         Ok(())
     }
 
