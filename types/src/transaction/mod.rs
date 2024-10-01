@@ -962,6 +962,14 @@ impl TransactionStatus {
         }
     }
 
+    pub fn is_keep(&self) -> bool {
+        match self {
+            TransactionStatus::Discard(_) => false,
+            TransactionStatus::Keep(_) => true,
+            TransactionStatus::Retry => false,
+        }
+    }
+
     pub fn is_retry(&self) -> bool {
         match self {
             TransactionStatus::Discard(_) => false,
