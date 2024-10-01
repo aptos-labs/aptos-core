@@ -102,6 +102,16 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedModuleStorage<K> {
         }
     }
 
+    /// Returns the module entry if it exists in multi-version data structure. If not, [None] is
+    /// returned.
+    #[inline]
+    fn get_impl(&self, key: &K, txn_idx: TxnIndex) -> Option<ModuleStorageRead<M>> {
+        match self.entries.get(key) {
+            Some(v) => v.get(txn_idx),
+            None => None,
+        }
+    }
+
     /// Returns the module entry from the module storage. If the entry does not exist,
     /// [ModuleStorageRead::DoesNotExist] is returned. If there is a pending code publish below
     /// the queried index, again the same [ModuleStorageRead::DoesNotExist] is returned as all
