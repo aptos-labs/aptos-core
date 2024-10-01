@@ -12,7 +12,7 @@ fn main() {
 
     create_directory_if_missing("json_transactions/imported_mainnet_txns");
     create_directory_if_missing("json_transactions/imported_testnet_txns");
-    create_directory_if_missing("json_transactions/generated_txns");
+    create_directory_if_missing("json_transactions/scripted_txns");
 
     all_transactions_code.push_str(&process_directory(
         "imported_mainnet_txns",

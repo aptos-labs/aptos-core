@@ -14,6 +14,6 @@ mod tests {
         // Check that the transaction is valid JSON
         let transaction = serde_json::from_slice::<Transaction>(json_bytes).unwrap();
 
-        assert_eq!(transaction.version, 1);
+        assert_eq!(transaction.version, 65);
     }
 }
