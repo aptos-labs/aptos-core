@@ -2666,13 +2666,34 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                     Some(op) => {
                         if al.value.len() == 1 {
                             match &al.value[0] {
+                                // x += e
+                                // =>
+                                // { let t = e; x = x + t; }
                                 sp!(var_loc, LValue_::Var(module_access, ty_opt)) => {
+                                    let er_loc = er.loc;
                                     let x = sp(
                                         *var_loc,
                                         EE::Name(module_access.clone(), ty_opt.clone()),
                                     );
-                                    let rhs_expanded = sp(loc, EE::BinopExp(Box::new(x), op, er));
-                                    EE::Assign(al, Box::new(rhs_expanded))
+                                    // t
+                                    let t_symbol = Symbol::from("$t");
+                                    let t_name = sp(er_loc, t_symbol);
+                                    let mod_acc = ModuleAccess_::Name(t_name);
+                                    let t_ = EE::Name(sp(er_loc, mod_acc.clone()), None);
+                                    let t = sp(er_loc, t_);
+                                    // let t = e;
+                                    let lval_ = LValue_::Var(sp(er_loc, mod_acc), None);
+                                    let lval = sp(er_loc, lval_);
+                                    let lvals = sp(er_loc, vec![lval]);
+                                    let bind_ = SequenceItem_::Bind(lvals, *er);
+                                    let bind = sp(er_loc, bind_);
+                                    // x + t;
+                                    let rhs_expanded = sp(loc, EE::BinopExp(Box::new(x), op, Box::new(t)));
+                                    // x = x + t;
+                                    let assign = sp(loc, EE::Assign(al, Box::new(rhs_expanded)));
+                                    // { let t = e; x = x + t; }
+                                    let sequence = VecDeque::from([bind, sp(loc, SequenceItem_::Seq(assign))]);
+                                    EE::Block(sequence)
                                 },
                                 _ => {
                                     context.env.add_diag(diag!(Syntax::InvalidLValue, (loc, "Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment")));
