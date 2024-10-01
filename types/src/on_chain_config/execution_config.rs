@@ -149,9 +149,9 @@ pub enum TransactionShufflerType {
     DeprecatedSenderAwareV1(u32),
     SenderAwareV2(u32),
     DeprecatedFairness {
-        sender_conflict_window_size: u32,
-        module_conflict_window_size: u32,
-        entry_fun_conflict_window_size: u32,
+        _deprecated_sender_conflict_window_size: u32,
+        _deprecated_module_conflict_window_size: u32,
+        _deprecated_entry_fun_conflict_window_size: u32,
     },
     UseCaseAware {
         sender_spread_factor: usize,
