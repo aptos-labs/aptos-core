@@ -47,11 +47,13 @@ use aptos_types::{
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
 use aptos_vm_types::change_set::randomly_check_layout_matches;
 use bytes::Bytes;
-use claims::assert_none;
+use claims::{assert_none, assert_ok};
 use core::panic;
 use fail::fail_point;
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, value::MoveTypeLayout, vm_status::StatusCode,
+};
+use move_vm_runtime::{ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -1003,6 +1005,23 @@ where
 
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
+
+        {
+            let parallel_state = ParallelState::<T, X>::new(
+                &versioned_cache,
+                &scheduler,
+                start_shared_counter,
+                &shared_counter,
+            );
+            let latest_view = LatestView::new(
+                base_view,
+                env.runtime_environment(),
+                ViewState::Sync(parallel_state),
+                0,
+            );
+            assert_ok!(latest_view
+                .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation")));
+        }
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
