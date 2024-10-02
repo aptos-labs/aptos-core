@@ -87,13 +87,14 @@ fn test_resource_group_deletion() {
         None,
     );
 
+    let env = MockEnvironment::new();
     assert_ok!(block_executor.execute_transactions_sequential(
-        (),
+        &env,
         &transactions,
         &data_view,
         false
     ));
-    assert_ok!(block_executor.execute_transactions_parallel(&(), &transactions, &data_view));
+    assert_ok!(block_executor.execute_transactions_parallel(&env, &transactions, &data_view));
 }
 
 #[test]

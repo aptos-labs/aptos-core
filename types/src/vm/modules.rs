@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delayed_fields::PanicError,
+    error::PanicError,
     state_store::state_value::{StateValue, StateValueMetadata},
     write_set::TransactionWrite,
 };

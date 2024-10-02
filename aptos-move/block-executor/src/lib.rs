@@ -141,6 +141,7 @@ extern crate scopeguard;
 
 mod captured_reads;
 pub mod counters;
+pub mod cross_block_caches;
 pub mod errors;
 pub mod executor;
 mod executor_utilities;
