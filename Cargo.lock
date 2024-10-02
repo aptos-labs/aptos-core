@@ -11488,7 +11488,6 @@ dependencies = [
  "proptest",
  "serde",
  "sha3 0.9.1",
- "tracing",
  "triomphe",
  "typed-arena",
 ]
