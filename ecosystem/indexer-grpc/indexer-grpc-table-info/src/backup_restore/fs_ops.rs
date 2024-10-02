@@ -58,7 +58,7 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
     let temp_tar_file_path = dir_path.join(format!("{}.tmp", tar_file_name));
     aptos_logger::info!(
         dir_path = dir_path.to_str(),
-        backup_file_name,
+        backup_file_name = backup_file_name,
         tar_file_path = tar_file_path.to_str(),
         tar_file_name = tar_file_name,
         temp_tar_file_path = temp_tar_file_path.to_str(),
