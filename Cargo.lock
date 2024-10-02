@@ -1030,6 +1030,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "status-line",
+ "tracing",
 ]
 
 [[package]]

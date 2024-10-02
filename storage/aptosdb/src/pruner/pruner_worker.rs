@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pruner::db_pruner::DBPruner;
-use aptos_logger::{
-    error,
-    prelude::{sample, SampleRate},
-};
+use aptos_logger::prelude::{sample, SampleRate};
 use aptos_types::transaction::Version;
+
+use tracing::error;
+
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},

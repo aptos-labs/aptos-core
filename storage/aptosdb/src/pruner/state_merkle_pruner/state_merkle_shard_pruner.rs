@@ -13,7 +13,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_logger::info;
+use tracing::info;
 use aptos_schemadb::{schema::KeyCodec, SchemaBatch, DB};
 use aptos_types::transaction::Version;
 use std::{marker::PhantomData, sync::Arc};

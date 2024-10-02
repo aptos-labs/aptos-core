@@ -23,7 +23,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
-use aptos_logger::info;
+use tracing::info;
 use aptos_schemadb::{schema::KeyCodec, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
