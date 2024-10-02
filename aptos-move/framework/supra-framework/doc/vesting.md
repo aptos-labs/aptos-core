@@ -2166,7 +2166,7 @@ Create a vesting contract with a given configurations.
         !<a href="system_addresses.md#0x1_system_addresses_is_reserved_address">system_addresses::is_reserved_address</a>(withdrawal_address),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EINVALID_WITHDRAWAL_ADDRESS">EINVALID_WITHDRAWAL_ADDRESS</a>),
     );
-    assert_account_is_registered_for_apt(withdrawal_address);
+    assert_account_is_registered_for_supra(withdrawal_address);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_ENO_SHAREHOLDERS">ENO_SHAREHOLDERS</a>));
     <b>assert</b>!(
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_length">simple_map::length</a>(&buy_ins) == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders),
@@ -2907,7 +2907,7 @@ has already been terminated.
 ) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
     // Verify that the beneficiary <a href="account.md#0x1_account">account</a> is set up <b>to</b> receive SUPRA. This is a requirement so <a href="vesting.md#0x1_vesting_distribute">distribute</a>() wouldn't
     // fail and <a href="block.md#0x1_block">block</a> all other accounts from receiving SUPRA <b>if</b> one beneficiary is not registered.
-    assert_account_is_registered_for_apt(new_beneficiary);
+    assert_account_is_registered_for_supra(new_beneficiary);
 
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin, vesting_contract);
@@ -3928,6 +3928,19 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> len(contract_addresses) == 0;
 <b>include</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_vesting_PreconditionAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a> {
+    contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;
+    <b>requires</b> <b>forall</b> i in 0..len(contract_addresses): <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(<b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">staking_contract::Store</a>&gt;(contract_addresses[i]).staking_contracts, <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_addresses[i]).staking.operator).commission_percentage &gt;= 0
+        && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(<b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">staking_contract::Store</a>&gt;(contract_addresses[i]).staking_contracts, <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_addresses[i]).staking.operator).commission_percentage &lt;= 100;
+}
 </code></pre>
 
 
