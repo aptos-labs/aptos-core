@@ -12,8 +12,8 @@ use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_block_executor::{
-    errors::BlockExecutionError, executor::BlockExecutor,
-    task::TransactionOutput as BlockExecutorTransactionOutput,
+    cross_block_caches::CachedAptosEnvironment, errors::BlockExecutionError,
+    executor::BlockExecutor, task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
@@ -30,11 +30,9 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
-use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, output::VMOutput,
-    resolver::ResourceGroupSize,
+    abstract_write_op::AbstractResourceWriteOp, output::VMOutput, resolver::ResourceGroupSize,
 };
 use move_core_types::{
     language_storage::StructTag,
@@ -417,7 +415,8 @@ impl BlockAptosVM {
             ExecutableTestType,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
-        let environment = AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view);
+        let environment =
+            CachedAptosEnvironment::fetch_with_delayed_field_optimization_enabled(state_view);
         let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {

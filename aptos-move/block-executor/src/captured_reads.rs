@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
+use crate::{
+    counters::TASK_VALIDATE_MODULES_SECONDS, types::InputOutputKey,
+    value_exchange::filter_value_for_exchange,
+};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
@@ -612,6 +615,7 @@ impl<T: Transaction> CapturedReads<T> {
         module_storage: &VersionedModuleStorage<T::Key, ModuleStorageEntry>,
         idx_to_validate: TxnIndex,
     ) -> bool {
+        let _timer = TASK_VALIDATE_MODULES_SECONDS.start_timer();
         if self.non_delayed_field_speculative_failure {
             return false;
         }
