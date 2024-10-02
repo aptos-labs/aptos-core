@@ -2675,7 +2675,8 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                                         EE::Name(module_access.clone(), ty_opt.clone()),
                                     );
                                     // t, let t = e;
-                                    let (t, bind) = let_symbol_eq_exp(er.loc, Symbol::from("$t"), *er);
+                                    let (t, bind) =
+                                        let_symbol_eq_exp(er.loc, Symbol::from("$t"), *er);
                                     // x + t;
                                     let rhs_expanded =
                                         sp(loc, EE::BinopExp(Box::new(x), op, Box::new(t)));
@@ -2735,8 +2736,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                     Some(op) => {
                         let lhs_loc = edotted.loc;
                         // t2, let t2 = e2;
-                        let (tmp2, bind2) =
-                            let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
+                        let (tmp2, bind2) = let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
                         // e1.f
                         let e = sp(lhs_loc, EE::ExpDotted(edotted));
                         // &mut e1.f

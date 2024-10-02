@@ -215,9 +215,9 @@ impl FromStr for LanguageVersion {
     }
 }
 
-impl Into<CompilerLanguageVersion> for LanguageVersion {
-    fn into(self) -> CompilerLanguageVersion {
-        match self {
+impl From<LanguageVersion> for CompilerLanguageVersion {
+    fn from(val: LanguageVersion) -> Self {
+        match val {
             LanguageVersion::V1 => CompilerLanguageVersion::V1,
             LanguageVersion::V2_0 => CompilerLanguageVersion::V2_0,
             LanguageVersion::V2_1 => CompilerLanguageVersion::V2_1,
