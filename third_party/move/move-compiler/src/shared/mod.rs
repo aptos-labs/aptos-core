@@ -634,7 +634,7 @@ pub enum LanguageVersion {
 }
 
 impl LanguageVersion {
-    fn to_ordinal(&self) -> usize {
+    fn to_ordinal(self) -> usize {
         match self {
             LanguageVersion::V1 => 0,
             LanguageVersion::V2 => 1,
