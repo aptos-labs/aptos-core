@@ -9,26 +9,34 @@ use aptos_db_indexer::{
     indexer_reader::IndexerReaders,
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
+use aptos_logger::info;
 use aptos_storage_interface::DbReader;
 use aptos_types::{indexer::indexer_db_reader::IndexerReader, transaction::Version};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
-use tokio::runtime::Handle;
+use tokio::{runtime::Handle, sync::watch::Receiver as WatchReceiver};
 
 const SERVICE_TYPE: &str = "internal_indexer_db_service";
 const INTERNAL_INDEXER_DB: &str = "internal_indexer_db";
 
 pub struct InternalIndexerDBService {
     pub db_indexer: Arc<DBIndexer>,
+    pub update_receiver: WatchReceiver<Version>,
 }
 
 impl InternalIndexerDBService {
-    pub fn new(db_reader: Arc<dyn DbReader>, internal_indexer_db: InternalIndexerDB) -> Self {
+    pub fn new(
+        db_reader: Arc<dyn DbReader>,
+        internal_indexer_db: InternalIndexerDB,
+        update_receiver: WatchReceiver<Version>,
+    ) -> Self {
         let internal_db_indexer = Arc::new(DBIndexer::new(internal_indexer_db, db_reader));
         Self {
             db_indexer: internal_db_indexer,
+            update_receiver,
         }
     }
 
@@ -140,9 +148,17 @@ impl InternalIndexerDBService {
             let next_version = self.db_indexer.process_a_batch(start_version)?;
 
             if next_version == start_version {
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                if let Ok(recv_res) =
+                    tokio::time::timeout(Duration::from_millis(100), self.update_receiver.changed())
+                        .await
+                {
+                    if recv_res.is_err() {
+                        info!("update sender is dropped");
+                        return Ok(());
+                    }
+                }
                 continue;
-            }
+            };
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::InternalIndexerDBProcessed,
@@ -158,6 +174,27 @@ impl InternalIndexerDBService {
             start_version = next_version;
         }
     }
+
+    // For internal testing
+    pub async fn run_with_end_version(
+        &mut self,
+        node_config: &NodeConfig,
+        end_version: Option<Version>,
+    ) -> Result<()> {
+        let mut start_version = self.get_start_version(node_config).await?;
+        while start_version <= end_version.unwrap_or(std::u64::MAX) {
+            let next_version = self.db_indexer.process_a_batch(start_version)?;
+            if next_version == start_version {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                continue;
+            }
+            start_version = next_version;
+        }
+        // We should never stop the internal indexer
+        tokio::time::sleep(std::time::Duration::from_secs(100)).await;
+
+        Ok(())
+    }
 }
 
 pub struct MockInternalIndexerDBService {
@@ -166,7 +203,12 @@ pub struct MockInternalIndexerDBService {
 }
 
 impl MockInternalIndexerDBService {
-    pub fn new_for_test(db_reader: Arc<dyn DbReader>, node_config: &NodeConfig) -> Self {
+    pub fn new_for_test(
+        db_reader: Arc<dyn DbReader>,
+        node_config: &NodeConfig,
+        update_receiver: WatchReceiver<Version>,
+        end_version: Option<Version>,
+    ) -> Self {
         if !node_config
             .indexer_db_config
             .is_internal_indexer_db_enabled()
@@ -179,12 +221,13 @@ impl MockInternalIndexerDBService {
 
         let db = InternalIndexerDBService::get_indexer_db(node_config).unwrap();
         let handle = Handle::current();
-        let mut internal_indexer_db_service = InternalIndexerDBService::new(db_reader, db);
+        let mut internal_indexer_db_service =
+            InternalIndexerDBService::new(db_reader, db, update_receiver);
         let db_indexer = internal_indexer_db_service.get_db_indexer();
         let config_clone = node_config.to_owned();
         handle.spawn(async move {
             internal_indexer_db_service
-                .run(&config_clone)
+                .run_with_end_version(&config_clone, end_version)
                 .await
                 .unwrap();
         });

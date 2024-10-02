@@ -382,7 +382,7 @@ pub enum ModuleAccess_ {
 }
 
 impl ModuleAccess_ {
-    fn get_name(&self) -> &Name {
+    pub fn get_name(&self) -> &Name {
         match self {
             ModuleAccess_::Name(n) | ModuleAccess_::ModuleAccess(_, n, _) => n,
         }
