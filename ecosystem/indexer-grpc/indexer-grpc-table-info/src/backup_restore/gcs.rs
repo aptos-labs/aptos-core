@@ -172,8 +172,22 @@ impl GcsBackupRestoreOperator {
         // chain id + epoch is the unique identifier for the snapshot.
         let snapshot_tar_file_name = format!("chain_id_{}_epoch_{}", chain_id, epoch);
         let snapshot_path_closure = snapshot_path.clone();
+        aptos_logger::info!(
+            snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
+            "[Table Info] Starting to compress the folder.",
+        );
         let tar_file = task::spawn_blocking(move || {
-            create_tar_gz(snapshot_path_closure.clone(), &snapshot_tar_file_name)
+            aptos_logger::info!(
+                snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
+                "[Table Info] Compressing the folder."
+            );
+            let result = create_tar_gz(snapshot_path_closure.clone(), &snapshot_tar_file_name);
+            aptos_logger::info!(
+                snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
+                result = result.is_ok(),
+                "[Table Info] Compressed the folder."
+            );
+            result
         })
         .await
         .context("Failed to spawn task to create snapshot backup file.")?

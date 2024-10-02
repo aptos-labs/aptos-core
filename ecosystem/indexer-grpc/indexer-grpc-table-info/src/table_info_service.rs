@@ -515,12 +515,6 @@ async fn backup_the_snapshot_and_cleanup(
         .node_config
         .get_data_dir()
         .join(snapshot_folder_name.clone());
-    aptos_logger::info!(
-        epoch = epoch,
-        snapshot_folder_name = snapshot_folder_name,
-        snapshot_dir = snapshot_dir.to_str(),
-        "[Table Info] Backing up the snapshot."
-    );
     // If the backup is for old epoch, clean up and return.
     if let Some(metadata) = backup_metadata {
         if metadata.epoch >= epoch {
@@ -540,6 +534,12 @@ async fn backup_the_snapshot_and_cleanup(
             "[Table Info] No backup metadata found."
         );
     }
+    aptos_logger::info!(
+        epoch = epoch,
+        snapshot_folder_name = snapshot_folder_name,
+        snapshot_dir = snapshot_dir.to_str(),
+        "[Table Info] Backing up the snapshot."
+    );
     // TODO: add checks to handle concurrent backup jobs.
     backup_restore_operator
         .backup_db_snapshot_and_update_metadata(ledger_chain_id as u64, epoch, snapshot_dir.clone())
