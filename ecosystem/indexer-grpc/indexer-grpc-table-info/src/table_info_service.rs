@@ -427,6 +427,10 @@ impl TableInfoService {
         );
         // Sort the epochs to backup.
         epochs_to_backup.sort();
+        aptos_logger::info!(
+            epochs_to_backup = format!("{:?}", epochs_to_backup),
+            "[Table Info] Sorted snapshots to backup."
+        );
         // Backup the existing snapshots and cleanup.
         for epoch in epochs_to_backup {
             backup_the_snapshot_and_cleanup(
@@ -529,6 +533,12 @@ async fn backup_the_snapshot_and_cleanup(
             std::fs::remove_dir_all(snapshot_dir).unwrap();
             return;
         }
+    } else {
+        aptos_logger::warn!(
+            epoch = epoch,
+            snapshot_folder_name = snapshot_folder_name,
+            "[Table Info] No backup metadata found."
+        );
     }
     // TODO: add checks to handle concurrent backup jobs.
     backup_restore_operator

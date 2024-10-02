@@ -174,6 +174,10 @@ impl GcsBackupRestoreOperator {
         .await
         .context("Failed to spawn task to create snapshot backup file.")?
         .context("Failed to create tar.gz file in blocking task")?;
+        aptos_logger::info!(
+            "[Table Info] Created snapshot tar file: {:?}",
+            tar_file.file_name().unwrap()
+        );
 
         // Open the file in async mode to stream it
         let file = File::open(&tar_file)
@@ -183,6 +187,10 @@ impl GcsBackupRestoreOperator {
 
         let filename = generate_blob_name(chain_id, epoch);
 
+        aptos_logger::info!(
+            "[Table Info] Uploading snapshot to GCS bucket: {}",
+            filename
+        );
         match self
             .gcs_client
             .upload_streamed_object(
@@ -206,6 +214,10 @@ impl GcsBackupRestoreOperator {
                     .and_then(|_| fs::remove_dir_all(snapshot_path_clone))
                     .await
                     .expect("Failed to clean up after db snapshot upload");
+                aptos_logger::info!(
+                    "[Table Info] Successfully uploaded snapshot to GCS bucket: {}",
+                    filename
+                );
             },
             Err(err) => {
                 error!("Failed to upload snapshot: {}", err);
