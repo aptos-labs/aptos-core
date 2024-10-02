@@ -141,6 +141,10 @@ impl GcsBackupRestoreOperator {
                 .await
             {
                 Ok(_) => {
+                    aptos_logger::info!(
+                        "[Table Info] Successfully updated metadata to GCS bucket: {}",
+                        METADATA_FILE_NAME
+                    );
                     return Ok(());
                 },
                 // https://cloud.google.com/storage/quotas
