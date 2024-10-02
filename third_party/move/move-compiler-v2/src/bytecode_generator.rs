@@ -480,7 +480,7 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _, _) => self.error(
+            ExpData::Lambda(id, _, _, _, _) => self.error(
                 *id,
                 "Function-typed values not yet supported except as parameters to calls to inline functions",
             ),
@@ -814,7 +814,7 @@ impl<'env> Generator<'env> {
             Operation::NoOp => {}, // do nothing
 
             // TODO(LAMBDA)
-            Operation::Closure(..) => self.error(
+            Operation::Closure => self.error(
                 id,
                 "Function-typed values not yet supported except as parameters to calls to inline functions",
             ),
@@ -1331,12 +1331,9 @@ impl<'env> Generator<'env> {
         };
         self.gen_borrow_field_operation(id, borrow_dest, str, fields, oper_temp);
         if need_read_ref {
-            self.emit_call(
-                id,
-                vec![target],
-                BytecodeOperation::ReadRef,
-                vec![borrow_dest],
-            )
+            self.emit_call(id, vec![target], BytecodeOperation::ReadRef, vec![
+                borrow_dest,
+            ])
         }
     }
 
@@ -1524,13 +1521,10 @@ enum MatchMode {
 impl MatchMode {
     /// Whether this match is in probing mode.
     fn is_probing(&self) -> bool {
-        matches!(
-            self,
-            MatchMode::Refutable {
-                probing_vars: Some(_),
-                ..
-            }
-        )
+        matches!(self, MatchMode::Refutable {
+            probing_vars: Some(_),
+            ..
+        })
     }
 
     /// Whether a variable appearing in the pattern should be bound to a temporary.
@@ -1658,12 +1652,9 @@ impl<'env> Generator<'env> {
                         ReferenceKind::Immutable,
                         Box::new(value_ty.clone()),
                     ));
-                    self.emit_call(
-                        id,
-                        vec![value_ref],
-                        BytecodeOperation::BorrowLoc,
-                        vec![value],
-                    );
+                    self.emit_call(id, vec![value_ref], BytecodeOperation::BorrowLoc, vec![
+                        value,
+                    ]);
                     needs_probing = true;
                     value_ref
                 }
@@ -1785,11 +1776,10 @@ impl<'env> Generator<'env> {
                             ),
                         );
                         return Some(
-                            ExpData::Call(
-                                id,
-                                Operation::Deref,
-                                vec![ExpData::LocalVar(new_id, var).into_exp()],
+                            ExpData::Call(id, Operation::Deref, vec![ExpData::LocalVar(
+                                new_id, var,
                             )
+                            .into_exp()])
                             .into_exp(),
                         );
                     }

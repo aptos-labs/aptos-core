@@ -645,6 +645,34 @@ pub enum CallKind {
     Receiver,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Default)]
+pub enum LambdaCaptureKind {
+    /// Direct use (e.g., inlining)
+    #[default]
+    Default,
+    /// Copy
+    Copy,
+    /// Move
+    Move,
+    /// Borrow (`&`)
+    Borrow,
+}
+
+impl fmt::Display for LambdaCaptureKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &LambdaCaptureKind::Default => {
+                write!(f, "")
+            },
+            &LambdaCaptureKind::Copy => {
+                write!(f, "copy")
+            },
+            &LambdaCaptureKind::Move => write!(f, "move"),
+            &LambdaCaptureKind::Borrow => write!(f, "&"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum Exp_ {
@@ -664,10 +692,15 @@ pub enum Exp_ {
         CallKind,
         Option<Vec<Type>>,
         Spanned<Vec<Exp>>,
+        bool, // ends in ".."
     ),
 
-    // e(earg,*)
-    ExpCall(Box<Exp>, Spanned<Vec<Exp>>),
+    // e(earg,* [..]?)
+    ExpCall(
+        Box<Exp>,
+        Spanned<Vec<Exp>>,
+        bool, // ends in ".."
+    ),
 
     // tn {f1: e1, ... , f_n: e_n }
     Pack(NameAccessChain, Option<Vec<Type>>, Vec<(Field, Exp)>),
@@ -692,7 +725,7 @@ pub enum Exp_ {
     // { seq }
     Block(Sequence),
     // | x1 [: t1], ..., xn [: tn] | e
-    Lambda(TypedBindList, Box<Exp>, Vec<Ability>),
+    Lambda(TypedBindList, Box<Exp>, LambdaCaptureKind, Vec<Ability>),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -1057,32 +1090,24 @@ impl fmt::Display for BinOp_ {
 
 impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match &self {
-                Visibility::Public(_) => Visibility::PUBLIC,
-                Visibility::Script(_) => Visibility::SCRIPT,
-                Visibility::Friend(_) => Visibility::FRIEND,
-                Visibility::Package(_) => Visibility::PACKAGE,
-                Visibility::Internal => Visibility::INTERNAL,
-            }
-        )
+        write!(f, "{}", match &self {
+            Visibility::Public(_) => Visibility::PUBLIC,
+            Visibility::Script(_) => Visibility::SCRIPT,
+            Visibility::Friend(_) => Visibility::FRIEND,
+            Visibility::Package(_) => Visibility::PACKAGE,
+            Visibility::Internal => Visibility::INTERNAL,
+        })
     }
 }
 
 impl fmt::Display for Ability_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match &self {
-                Ability_::Copy => Ability_::COPY,
-                Ability_::Drop => Ability_::DROP,
-                Ability_::Store => Ability_::STORE,
-                Ability_::Key => Ability_::KEY,
-            }
-        )
+        write!(f, "{}", match &self {
+            Ability_::Copy => Ability_::COPY,
+            Ability_::Drop => Ability_::DROP,
+            Ability_::Store => Ability_::STORE,
+            Ability_::Key => Ability_::KEY,
+        })
     }
 }
 
@@ -1834,7 +1859,7 @@ impl AstDebug for Exp_ {
                     w.write(">");
                 }
             },
-            E::Call(ma, kind, tys_opt, sp!(_, rhs)) => {
+            E::Call(ma, kind, tys_opt, sp!(_, rhs), ends_in_dotdot) => {
                 ma.ast_debug(w);
                 w.write(kind.to_string());
                 if let Some(ss) = tys_opt {
@@ -1844,12 +1869,18 @@ impl AstDebug for Exp_ {
                 }
                 w.write("(");
                 w.comma(rhs, |w, e| e.ast_debug(w));
+                if ends_in_dotdot {
+                    w.write("..");
+                }
                 w.write(")");
             },
-            E::ExpCall(arg, sp!(_, rhs)) => {
+            E::ExpCall(arg, sp!(_, rhs), ends_in_dotdot) => {
                 arg.ast_debug(w);
                 w.write("(");
                 w.comma(rhs, |w, e| e.ast_debug(w));
+                if ends_in_dotdot {
+                    w.write("..")
+                }
                 w.write(")");
             },
             E::Pack(ma, tys_opt, fields) => {
@@ -1918,7 +1949,10 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, tbs), e, abilities) => {
+            E::Lambda(sp!(_, tbs), e, capture_kind, abilities) => {
+                if *capture_kind != LambdaCaptureKind::Default {
+                    w.write(format!("{} ", capture_kind));
+                }
                 w.write("|");
                 tbs.ast_debug(w);
                 w.write("|");

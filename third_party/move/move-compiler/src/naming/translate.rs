@@ -941,7 +941,7 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::While(_, eb, el) => NE::While(exp(context, *eb), exp(context, *el)),
         EE::Loop(_, el) => NE::Loop(exp(context, *el)),
         EE::Block(seq) => NE::Block(sequence(context, seq)),
-        EE::Lambda(args, body, _abilities) => {
+        EE::Lambda(args, body, _lambda_capture_kind, _abilities) => {
             let bind_opt = bind_typed_list(context, args);
             match bind_opt {
                 None => {
@@ -1032,9 +1032,13 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::Cast(e, t) => NE::Cast(exp(context, *e), type_(context, t)),
         EE::Annotate(e, t) => NE::Annotate(exp(context, *e), type_(context, t)),
 
-        EE::Call(sp!(mloc, E::ModuleAccess_::Name(n)), CallKind::Macro, tys_opt, rhs)
-            if n.value.as_str() == N::BuiltinFunction_::ASSERT_MACRO =>
-        {
+        EE::Call(
+            sp!(mloc, E::ModuleAccess_::Name(n)),
+            CallKind::Macro,
+            tys_opt,
+            rhs,
+            _ends_in_dotdot, // not relevant to Move V1
+        ) if n.value.as_str() == N::BuiltinFunction_::ASSERT_MACRO => {
             use N::BuiltinFunction_ as BF;
             if tys_opt.is_some() {
                 context.env.add_diag(diag!(
@@ -1061,7 +1065,7 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
             ));
             NE::UnresolvedError
         },
-        EE::Call(sp!(mloc, ma_), kind, tys_opt, rhs) => {
+        EE::Call(sp!(mloc, ma_), kind, tys_opt, rhs, _ends_in_dotdot) => {
             use E::ModuleAccess_ as EA;
             let ty_args = tys_opt.map(|tys| types(context, tys));
             let nes = call_args(context, rhs);

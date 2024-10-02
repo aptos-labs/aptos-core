@@ -218,7 +218,10 @@ pub(crate) fn new_full_name(
 
 /// Helper to create a call exp.
 pub(crate) fn new_call_exp(loc: Loc, fun: NameAccessChain, args: Vec<Exp>) -> Exp {
-    sp(loc, Exp_::Call(fun, CallKind::Regular, None, sp(loc, args)))
+    sp(
+        loc,
+        Exp_::Call(fun, CallKind::Regular, None, sp(loc, args), false),
+    )
 }
 
 pub(crate) fn new_borrow_exp(loc: Loc, arg: Exp) -> Exp {

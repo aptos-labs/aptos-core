@@ -512,6 +512,34 @@ pub enum AddressSpecifier {
     Call(QualifiedInstId<FunId>, Symbol),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Hash, Default)]
+pub enum LambdaCaptureKind {
+    /// No modifier (e.g., inlining)
+    #[default]
+    Default,
+    /// Copy
+    Copy,
+    /// Move
+    Move,
+    /// Borrow (`&`)
+    Borrow,
+}
+
+impl fmt::Display for LambdaCaptureKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &LambdaCaptureKind::Default => {
+                write!(f, "")
+            },
+            &LambdaCaptureKind::Copy => {
+                write!(f, "copy")
+            },
+            &LambdaCaptureKind::Move => write!(f, "move"),
+            &LambdaCaptureKind::Borrow => write!(f, "&"),
+        }
+    }
+}
+
 impl ResourceSpecifier {
     /// Checks whether this resource specifier matches the given struct. A function
     /// instantiation is passed to instantiate the specifier in the calling context
@@ -598,7 +626,7 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Pattern, Exp, AbilitySet),
+    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind, AbilitySet),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -1352,7 +1380,7 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body, _) => body.visit_positions_impl(visitor)?,
+            Lambda(_, _, body, _, _) => body.visit_positions_impl(visitor)?,
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -1709,7 +1737,7 @@ pub enum Operation {
 
     // Specification specific
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
-    Closure(ModuleId, FunId),
+    Closure,
     UpdateField(ModuleId, StructId, FieldId),
     Result(usize),
     Index,
@@ -3098,19 +3126,31 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(id, pat, body, abilities) => {
+            Lambda(id, pat, body, capture_kind, abilities) => {
                 if self.verbose {
                     write!(
                         f,
-                        "{}: |{}| {}",
+                        "{}: {}{}|{}| {}",
                         id.as_usize(),
+                        if *capture_kind != LambdaCaptureKind::Default {
+                            " "
+                        } else {
+                            ""
+                        },
+                        capture_kind,
                         pat.display_for_exp(self),
                         body.display_cont(self)
                     )?;
                 } else {
                     write!(
                         f,
-                        "|{}| {}",
+                        "{}{}|{}| {}",
+                        if *capture_kind != LambdaCaptureKind::Default {
+                            " "
+                        } else {
+                            ""
+                        },
+                        capture_kind,
                         pat.display_for_exp(self),
                         body.display_cont(self)
                     )?;

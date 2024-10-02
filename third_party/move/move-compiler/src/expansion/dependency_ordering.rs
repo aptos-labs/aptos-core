@@ -446,12 +446,12 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             module_access(context, ma);
             types_opt(context, tys_opt)
         },
-        E::Call(ma, _is_macro, tys_opt, sp!(_, args_)) => {
+        E::Call(ma, _is_macro, tys_opt, sp!(_, args_), _ends_in_dotdot) => {
             module_access(context, ma);
             types_opt(context, tys_opt);
             args_.iter().for_each(|e| exp(context, e))
         },
-        E::ExpCall(fexp, sp!(_, args_)) => {
+        E::ExpCall(fexp, sp!(_, args_), _ends_in_dotdot) => {
             exp(context, fexp);
             args_.iter().for_each(|e| exp(context, e))
         },
@@ -516,7 +516,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             tys.iter().for_each(|ty| type_(context, ty))
         },
 
-        E::Lambda(ll, e, _abilities) => {
+        E::Lambda(ll, e, _capture_kind, _abilities) => {
             use crate::expansion::ast::TypedLValue_;
             let mapped = ll.value.iter().map(|sp!(_, TypedLValue_(lv, _opt_ty))| lv);
             lvalues(context, mapped);

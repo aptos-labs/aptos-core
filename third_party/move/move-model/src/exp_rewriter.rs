@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        Condition, Exp, ExpData, MatchArm, MemoryLabel, Operation, Pattern, Spec, SpecBlockTarget,
-        TempIndex, Value,
+        Condition, Exp, ExpData, LambdaCaptureKind, MatchArm, MemoryLabel, Operation, Pattern,
+        Spec, SpecBlockTarget, TempIndex, Value,
     },
     model::{GlobalEnv, Loc, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -200,6 +200,7 @@ pub trait ExpRewriterFunctions {
         id: NodeId,
         pat: &Pattern,
         body: &Exp,
+        capture_kind: LambdaCaptureKind,
         abilities: AbilitySet,
     ) -> Option<Exp> {
         None
@@ -358,17 +359,18 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            Lambda(id, pat, body, abilities) => {
+            Lambda(id, pat, body, capture_kind, abilities) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
                 self.rewrite_enter_scope(new_id, new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope(new_id);
-                if let Some(new_exp) = self.rewrite_lambda(new_id, &new_pat, &new_body, *abilities)
+                if let Some(new_exp) =
+                    self.rewrite_lambda(new_id, &new_pat, &new_body, *capture_kind, *abilities)
                 {
                     new_exp
                 } else if id_changed || pat_changed || body_changed {
-                    Lambda(new_id, new_pat, new_body, *abilities).into_exp()
+                    Lambda(new_id, new_pat, new_body, *capture_kind, *abilities).into_exp()
                 } else {
                     exp
                 }
@@ -487,15 +489,12 @@ pub trait ExpRewriterFunctions {
                     {
                         (true, new_exp)
                     } else {
-                        (
-                            false,
-                            MatchArm {
-                                loc: arm.loc.clone(),
-                                pattern: newer_pat,
-                                condition: new_cond,
-                                body: new_body,
-                            },
-                        )
+                        (false, MatchArm {
+                            loc: arm.loc.clone(),
+                            pattern: newer_pat,
+                            condition: new_cond,
+                            body: new_body,
+                        })
                     };
                     new_arms.push(new_arm);
                     arms_changed =
@@ -634,24 +633,18 @@ pub trait ExpRewriterFunctions {
         let new_exp = self.rewrite_exp(condition.exp.clone());
         let maybe_new_additional_exps = self.internal_rewrite_vec(&condition.additional_exps);
         if let Some(new_additional_exps) = maybe_new_additional_exps {
-            (
-                true,
-                Condition {
-                    exp: new_exp,
-                    additional_exps: new_additional_exps,
-                    ..condition
-                },
-            )
+            (true, Condition {
+                exp: new_exp,
+                additional_exps: new_additional_exps,
+                ..condition
+            })
         } else {
             let changed = !ExpData::ptr_eq(&condition.exp, &new_exp);
             if changed {
-                (
-                    true,
-                    Condition {
-                        exp: new_exp,
-                        ..condition
-                    },
-                )
+                (true, Condition {
+                    exp: new_exp,
+                    ..condition
+                })
             } else {
                 (false, condition)
             }

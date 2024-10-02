@@ -40,10 +40,9 @@
 //! ```
 
 use itertools::Itertools;
-use move_binary_format::file_format::AbilitySet;
-use move_binary_format::file_format::Visibility;
+use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, TempIndex},
+    ast::{Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
@@ -260,13 +259,10 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
 
     fn rewrite_assign(&mut self, _node_id: NodeId, lhs: &Pattern, _rhs: &Exp) -> Option<Exp> {
         for (node_id, name) in lhs.vars() {
-            self.free_locals.insert(
-                name,
-                VarInfo {
-                    node_id,
-                    modified: true,
-                },
-            );
+            self.free_locals.insert(name, VarInfo {
+                node_id,
+                modified: true,
+            });
         }
         None
     }
@@ -275,22 +271,16 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         if matches!(oper, Operation::Borrow(ReferenceKind::Mutable)) {
             match args[0].as_ref() {
                 ExpData::LocalVar(node_id, name) => {
-                    self.free_locals.insert(
-                        *name,
-                        VarInfo {
-                            node_id: *node_id,
-                            modified: true,
-                        },
-                    );
+                    self.free_locals.insert(*name, VarInfo {
+                        node_id: *node_id,
+                        modified: true,
+                    });
                 },
                 ExpData::Temporary(node_id, param) => {
-                    self.free_params.insert(
-                        *param,
-                        VarInfo {
-                            node_id: *node_id,
-                            modified: true,
-                        },
-                    );
+                    self.free_params.insert(*param, VarInfo {
+                        node_id: *node_id,
+                        modified: true,
+                    });
                 },
                 _ => {},
             }
@@ -303,6 +293,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         id: NodeId,
         pat: &Pattern,
         body: &Exp,
+        capture_kind: LambdaCaptureKind,
         _abilities: AbilitySet, // TODO(LAMBDA): do something with this
     ) -> Option<Exp> {
         if self.exempted_lambdas.contains(&id) {
@@ -315,6 +306,21 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         // parameter indices in the lambda context to indices in the lifted
         // functions (courtesy of #12317)
         let mut param_index_mapping = BTreeMap::new();
+        match capture_kind {
+            LambdaCaptureKind::Default => {
+                // OK.
+            },
+            LambdaCaptureKind::Move | LambdaCaptureKind::Copy | LambdaCaptureKind::Borrow => {
+                let loc = env.get_node_loc(id);
+                env.error(
+                    &loc,
+                    &format!(
+                        "Lambda function `{}` of free variables not yet supported.", // TODO(LAMBDA)
+                        capture_kind
+                    ),
+                );
+            },
+        };
         for (used_param_count, (param, var_info)) in
             mem::take(&mut self.free_params).into_iter().enumerate()
         {
