@@ -1668,7 +1668,6 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -15338,7 +15337,6 @@ dependencies = [
  "aptos-db",
  "aptos-db-indexer",
  "aptos-db-indexer-schemas",
- "aptos-debugger",
  "aptos-dkg",
  "aptos-faucet-core",
  "aptos-forge",
