@@ -277,6 +277,12 @@ module aptos_framework::object {
         create_object_internal(owner_address, unique_address, false)
     }
 
+    /// Create an object whose owner is self.
+    public fun create_self_owned_object(): ConstructorRef {
+        let unique_address = transaction_context::generate_auid_address();
+        create_object_internal(unique_address, unique_address, true)
+    }
+
     /// Create a sticky object at a specific address. Only used by aptos_framework::coin.
     public(friend) fun create_sticky_object_at_address(
         owner_address: address,

@@ -51,6 +51,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_user_derived_object`](#0x1_object_create_user_derived_object)
 -  [Function `create_object`](#0x1_object_create_object)
 -  [Function `create_sticky_object`](#0x1_object_create_sticky_object)
+-  [Function `create_self_owned_object`](#0x1_object_create_self_owned_object)
 -  [Function `create_sticky_object_at_address`](#0x1_object_create_sticky_object_at_address)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
 -  [Function `create_object_from_object`](#0x1_object_create_object_from_object)
@@ -1176,6 +1177,32 @@ Same as <code>create_object</code> except the object to be created will be undel
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_sticky_object">create_sticky_object</a>(owner_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">transaction_context::generate_auid_address</a>();
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, unique_address, <b>false</b>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_create_self_owned_object"></a>
+
+## Function `create_self_owned_object`
+
+Create an object whose owner is self.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_self_owned_object">create_self_owned_object</a>(): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_self_owned_object">create_self_owned_object</a>(): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
+    <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">transaction_context::generate_auid_address</a>();
+    <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(unique_address, unique_address, <b>true</b>)
 }
 </code></pre>
 
