@@ -139,6 +139,7 @@ subsequent incarnation to finish.
 #[macro_use(defer)]
 extern crate scopeguard;
 
+mod barriers;
 mod captured_reads;
 pub mod counters;
 pub mod errors;

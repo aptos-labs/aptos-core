@@ -19,6 +19,26 @@ use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_sta
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 
+/// Kind of events that are important for parallel block executor to efficiently
+/// schedule the transactions.
+pub enum BlockSynchronizationEvent {
+    /// A transaction started executing. If write_barrier is true, then the transaction
+    /// will have writes that subsequent transactions likely depend on (e.g. block
+    /// metadata transaction). Block executor may decide to delay starting subsequent
+    /// transactions until the execution finishes (and writes become visible).
+    TransactionStart {
+        write_barrier: bool,
+    },
+    UserPrologueFinish,
+}
+
+/// Allows the adapter to inform & query block executor regarding required synchronization,
+/// this involves signaling on pre-defined events, waiting for barriers, and write hints.
+/// TODO: support all of the above functionality (currently just signal).
+pub trait BlockSynchronizationView {
+    fn signal_sync_event(&self, event: BlockSynchronizationEvent);
+}
+
 /// Allows to query resources from the state.
 pub trait TResourceView {
     type Key;
@@ -204,6 +224,7 @@ pub trait TExecutorView<K, T, L, I, V>:
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView
+    + BlockSynchronizationView
 {
 }
 
@@ -213,6 +234,7 @@ impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView
+        + BlockSynchronizationView
 {
 }
 
@@ -284,6 +306,15 @@ where
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         self.get_usage().map_err(Into::into)
+    }
+}
+
+impl<S> BlockSynchronizationView for S
+where
+    S: StateView,
+{
+    fn signal_sync_event(&self, _event: BlockSynchronizationEvent) {
+        // No need to do anything when executing based on a StateView.
     }
 }
 

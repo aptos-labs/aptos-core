@@ -4,6 +4,7 @@
 #[cfg(test)]
 use crate::types::InputOutputKey;
 use crate::{
+    barriers::BlockBarriers,
     captured_reads::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
         UnsyncReadSet,
@@ -49,7 +50,8 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{
-    ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
+    BlockSynchronizationEvent, BlockSynchronizationView, ResourceGroupSize, StateStorageView,
+    TModuleView, TResourceGroupView, TResourceView,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -160,6 +162,8 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
+    barriers: &'a BlockBarriers,
+    write_barrier: RefCell<bool>,
     captured_reads: RefCell<CapturedReads<T>>,
 }
 
@@ -443,12 +447,15 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         shared_scheduler: &'a Scheduler,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
+        shared_barriers: &'a BlockBarriers,
     ) -> Self {
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             start_counter: start_shared_counter,
             counter: shared_counter,
+            barriers: shared_barriers,
+            write_barrier: RefCell::new(false),
             captured_reads: RefCell::new(CapturedReads::new()),
         }
     }
@@ -979,6 +986,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
+    pub(crate) fn has_write_barrier(&self) -> bool {
+        match &self.latest_view {
+            ViewState::Sync(state) => *state.write_barrier.borrow(),
+            ViewState::Unsync(_) => false,
+        }
+    }
+
     #[cfg(test)]
     fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
         match &self.latest_view {
@@ -1381,6 +1395,38 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             ValueWithLayout::RawFromStorage(Arc::new(metadata_op)),
         );
         Ok(())
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> BlockSynchronizationView
+    for LatestView<'a, T, S, X>
+{
+    fn signal_sync_event(&self, event: BlockSynchronizationEvent) {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                use BlockSynchronizationEvent::*;
+                match event {
+                    TransactionStart {
+                        write_barrier: true,
+                    } => {
+                        *state.write_barrier.borrow_mut() = true;
+                    },
+                    TransactionStart {
+                        write_barrier: false,
+                    } => {
+                        if state.barriers.signal_can_start(self.txn_idx + 1).is_err() {
+                            state.captured_reads.borrow_mut().mark_incorrect_use();
+                        }
+                    },
+                    UserPrologueFinish => {
+                        // TODO(barriers): implement prologue finish handling.
+                    },
+                }
+            },
+            ViewState::Unsync(_) => {
+                // Nothing to do during Unsync (sequential block execution) context.
+            },
+        }
     }
 }
 
@@ -2740,6 +2786,7 @@ mod test {
         base_view: MockStateView,
         versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
         scheduler: Scheduler,
+        barriers: BlockBarriers,
     }
 
     impl ComparisonHolder {
@@ -2749,6 +2796,7 @@ mod test {
             let base_view = MockStateView::new(data);
             let versioned_map = MVHashMap::new();
             let scheduler = Scheduler::new(30);
+            let barriers = BlockBarriers::new();
 
             Self {
                 start_counter,
@@ -2757,6 +2805,7 @@ mod test {
                 base_view,
                 versioned_map,
                 scheduler,
+                barriers,
             }
         }
 
@@ -2770,6 +2819,7 @@ mod test {
                         &self.scheduler,
                         self.start_counter,
                         &self.counter,
+                        &self.barriers,
                     )),
                     1,
                 );
