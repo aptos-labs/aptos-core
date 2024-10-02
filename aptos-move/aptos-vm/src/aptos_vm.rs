@@ -279,7 +279,7 @@ impl AptosVM {
     }
 
     #[inline(always)]
-    fn features(&self) -> &Features {
+    pub(crate) fn features(&self) -> &Features {
         self.move_vm.env.features()
     }
 
@@ -2189,7 +2189,7 @@ impl AptosVM {
             randomness,
         } = block_metadata_with_randomness;
 
-        let args = vec![
+        let mut args = vec![
             MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
             MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
             MoveValue::U64(epoch),
@@ -2208,12 +2208,22 @@ impl AptosVM {
                 .as_move_value(),
         ];
 
+        let mut function_name = BLOCK_PROLOGUE_EXT;
+
+        if self
+            .features()
+            .is_enabled(FeatureFlag::ASYNC_RECONFIG_FRAMEWORK)
+        {
+            args.push(MoveValue::Signer(AccountAddress::ONE));
+            function_name = BLOCK_PROLOGUE_EXT_V2;
+        }
+
         let storage = TraversalStorage::new();
 
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
-                BLOCK_PROLOGUE_EXT,
+                function_name,
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
@@ -2221,7 +2231,7 @@ impl AptosVM {
             )
             .map(|_return_vals| ())
             .or_else(|e| {
-                expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
+                expect_only_successful_execution(e, function_name.as_str(), log_context)
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 

@@ -11,6 +11,7 @@ module aptos_framework::consensus_config {
 
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     struct ConsensusConfig has drop, key, store {
         config: vector<u8>,

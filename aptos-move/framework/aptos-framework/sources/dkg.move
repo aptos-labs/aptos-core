@@ -1,15 +1,19 @@
-/// DKG on-chain states and helper functions.
+/// Some states and helper functions of the group-element DKG that supports on-chain randomness.
 module aptos_framework::dkg {
     use std::error;
     use std::option;
     use std::option::Option;
     use aptos_framework::event::emit;
+    use aptos_framework::randomness_config;
     use aptos_framework::randomness_config::RandomnessConfig;
+    use aptos_framework::reconfiguration;
+    use aptos_framework::stake;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::validator_consensus_info::ValidatorConsensusInfo;
     friend aptos_framework::block;
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     const EDKG_IN_PROGRESS: u64 = 1;
     const EDKG_NOT_IN_PROGRESS: u64 = 2;
@@ -82,6 +86,72 @@ module aptos_framework::dkg {
             start_time_us,
             session_metadata: new_session_metadata,
         });
+    }
+
+    /// Mark on-chain DKG state as in-progress. Notify validators to start DKG.
+    ///
+    /// Called by async reconfig framework at the beginning of a reconfig.
+    public(friend) fun on_async_reconfig_start() acquires DKGState {
+        if (randomness_config::enabled()) {
+            let dealer_epoch = reconfiguration::current_epoch();
+            let randomness_config = randomness_config::current();
+            let dealer_validator_set = stake::cur_validator_consensus_infos();
+            let target_validator_set = stake::next_validator_consensus_infos();
+            let new_session_metadata = DKGSessionMetadata {
+                dealer_epoch,
+                randomness_config,
+                dealer_validator_set,
+                target_validator_set,
+            };
+            let start_time_us = timestamp::now_microseconds();
+            let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
+            dkg_state.in_progress = std::option::some(DKGSessionState {
+                metadata: new_session_metadata,
+                start_time_us,
+                transcript: vector[],
+            });
+
+            emit(DKGStartEvent {
+                start_time_us,
+                session_metadata: new_session_metadata,
+            });
+        };
+    }
+
+    /// Return whether there's still ongoing DKG work and the reconfig should wait for it.
+    ///
+    /// Used by async reconfig framework.
+    public(friend) fun ready_for_next_epoch(): bool acquires DKGState {
+        // If randomness is not enabled, no processing is required.
+        if (!randomness_config::enabled()) {
+            return true
+        };
+
+        // We say DKG is ready only when we see a transcript for the next epoch.
+        {
+            if (!exists<DKGState>(@aptos_framework)) {
+                return false
+            };
+
+            let maybe_session = &borrow_global<DKGState>(@aptos_framework).last_completed;
+            if (option::is_none(maybe_session)) {
+                return false
+            };
+
+            let session = option::borrow(maybe_session);
+            if (session.metadata.dealer_epoch != reconfiguration::current_epoch()) {
+                return false
+            };
+        };
+
+        true
+    }
+
+    /// DKG on-chain state clean-up.
+    ///
+    /// Called by Async reconfig framework right before epoch change.
+    public(friend) fun on_new_epoch(framework: &signer) acquires DKGState {
+        try_clear_incomplete_session(framework);
     }
 
     /// Put a transcript into the currently incomplete DKG session, then mark it completed.

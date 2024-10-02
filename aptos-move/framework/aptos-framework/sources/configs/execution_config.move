@@ -10,6 +10,7 @@ module aptos_framework::execution_config {
     use aptos_framework::system_addresses;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     struct ExecutionConfig has drop, key, store {
         config: vector<u8>,

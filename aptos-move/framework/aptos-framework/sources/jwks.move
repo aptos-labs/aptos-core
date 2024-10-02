@@ -26,6 +26,7 @@ module aptos_framework::jwks {
 
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
+    friend aptos_framework::async_reconfig;
 
     /// We limit the size of a `PatchedJWKs` resource installed by a dapp owner for federated keyless accounts.
     /// Note: If too large, validators waste work reading it for invalid TXN signatures.
