@@ -10,10 +10,7 @@ use crate::{
     schema::block_metadata_transactions,
     util::{parse_timestamp, standardize_address},
 };
-use aptos_api_types::{
-    BlockMetadataExtTransaction as APIBlockMetadataExtTransaction,
-    BlockMetadataTransaction as APIBlockMetadataTransaction,
-};
+use aptos_api_types::BlockMetadataTransaction as APIBlockMetadataTransaction;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -70,23 +67,6 @@ impl BlockMetadataTransaction {
                 .unwrap(),
             // time is in microseconds
             timestamp: parse_timestamp(txn.timestamp.0, txn_version),
-        }
-    }
-
-    pub fn from_ext_transaction(txn: &APIBlockMetadataExtTransaction, block_height: i64) -> Self {
-        let txn_version = txn.transaction_info().version.0 as i64;
-        Self {
-            version: txn_version,
-            block_height,
-            id: txn.id().to_string(),
-            epoch: txn.epoch() as i64,
-            round: txn.round() as i64,
-            proposer: standardize_address(&txn.proposer().inner().to_hex_literal()),
-            failed_proposer_indices: serde_json::to_value(txn.failed_proposer_indices()).unwrap(),
-            previous_block_votes_bitvec: serde_json::to_value(txn.previous_block_votes_bitvec())
-                .unwrap(),
-            // time is in microseconds
-            timestamp: parse_timestamp(txn.timestamp(), txn_version),
         }
     }
 }

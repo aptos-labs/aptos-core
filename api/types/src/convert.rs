@@ -4,10 +4,10 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, BlockMetadataTransaction,
-        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
-        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
+        BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData, DeleteModule,
+        DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
+        MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
+        WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,

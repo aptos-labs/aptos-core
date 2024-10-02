@@ -19,7 +19,7 @@ use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt},
+    block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{DKGTranscript, DKGTranscriptMetadata},
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
@@ -557,14 +557,16 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
-    pub extra: Option<BlockMetadataExtra>,
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub extension: BlockMetadataExtension,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct BlockMetadataExtraV0 {}
+pub struct BlockMetadataExtensionEmpty {}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct BlockMetadataExtraV1 {
+pub struct BlockMetadataExtensionRandomness {
     randomness: Option<HexEncodedBytes>,
 }
 
@@ -572,20 +574,28 @@ pub struct BlockMetadataExtraV1 {
 #[serde(tag = "extension_type", rename_all = "snake_case")]
 #[oai(
     one_of,
-    discriminator_name = "extension_type",
+    discriminator_name = "block_metadata_extension_type",
     rename_all = "snake_case"
 )]
-pub enum BlockMetadataExtra {
-    V0(BlockMetadataExtraV0),
-    V1(BlockMetadataExtraV1),
+pub enum BlockMetadataExtension {
+    Nil(BlockMetadataExtensionEmpty),
+    V0(BlockMetadataExtensionEmpty),
+    V1(BlockMetadataExtensionRandomness),
 }
 
-impl BlockMetadataExtra {
+impl BlockMetadataExtension {
+    pub fn nil() -> Self {
+        Self::Nil(BlockMetadataExtensionEmpty {})
+    }
+
     pub fn from_internal_txn(txn: &BlockMetadataExt) -> Self {
         match txn {
-            BlockMetadataExt::V0(_) => Self::V0(BlockMetadataExtraV0 {}),
-            BlockMetadataExt::V1(payload) => Self::V1(BlockMetadataExtraV1 {
-                randomness: payload.randomness.clone().map(|pr|HexEncodedBytes::from(pr.randomness_cloned()))
+            BlockMetadataExt::V0(_) => Self::V0(BlockMetadataExtensionEmpty {}),
+            BlockMetadataExt::V1(payload) => Self::V1(BlockMetadataExtensionRandomness {
+                randomness: payload
+                    .randomness
+                    .clone()
+                    .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
             }),
         }
     }
@@ -607,7 +617,7 @@ impl BlockMetadataTransaction {
             proposer: internal.proposer().into(),
             failed_proposer_indices: internal.failed_proposer_indices().clone(),
             timestamp: internal.timestamp_usecs().into(),
-            extra: None,
+            extension: BlockMetadataExtension::nil(),
         }
     }
 
@@ -626,15 +636,15 @@ impl BlockMetadataTransaction {
             proposer: internal.proposer().into(),
             failed_proposer_indices: internal.failed_proposer_indices().clone(),
             timestamp: internal.timestamp_usecs().into(),
-            extra: Some(BlockMetadataExtra::from_internal_txn(&internal)),
+            extension: BlockMetadataExtension::from_internal_txn(&internal),
         }
     }
 
     pub fn type_str(&self) -> &'static str {
-        match self.extra {
-            None => "block_metadata_transaction",
-            Some(BlockMetadataExtra::V0(_)) => "block_metadata_ext_transaction__v0",
-            Some(BlockMetadataExtra::V1(_)) => "block_metadata_ext_transaction__v1",
+        match self.extension {
+            BlockMetadataExtension::Nil(_) => "block_metadata_transaction",
+            BlockMetadataExtension::V0(_) => "block_metadata_ext_transaction__v0",
+            BlockMetadataExtension::V1(_) => "block_metadata_ext_transaction__v1",
         }
     }
 }
