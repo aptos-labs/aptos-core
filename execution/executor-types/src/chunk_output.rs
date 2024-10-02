@@ -34,11 +34,92 @@ pub struct ChunkOutput {
 }
 
 impl ChunkOutput {
-    pub fn ensure_is_block(&self) -> Result<()> {
-        self.to_commit.ends_epoch()
+    pub fn ends_epoch(&self) -> bool {
+        self.next_epoch_state.is_some()
     }
 
-    pub fn ensure_is_replay(&self) -> Result<()> {
+    pub fn ensure_is_block(&self) -> Result<()> {
+        if self.ends_epoch() {
+            ensure!(self.to_commit.is_empty() || self.to_commit.ends_with_reconfig());
+        } else {
+            ensure!(!self.to_commit.is_empty());
+            ensure!(self.to_commit.ends_with_state_checkpoint());
+        }
 
+        Ok(())
+    }
+
+    pub fn ensure_is_replayed(&self) -> Result<()> {
+        ensure!(self.to_discard.is_empty());
+        ensure!(self.to_retry.is_empty());
+
+        Ok(())
+    }
+
+    pub fn check_aborts_discards_retries(
+        &self,
+        allow_aborts: bool,
+        allow_discards: bool,
+        allow_retries: bool,
+    ) {
+        let aborts = self
+            .to_commit
+            .iter()
+            .flat_map(|(txn, output)| match output.status().status() {
+                Ok(execution_status) => {
+                    if execution_status.is_success() {
+                        None
+                    } else {
+                        Some(format!("{:?}: {:?}", txn, output.status()))
+                    }
+                },
+                Err(_) => None,
+            })
+            .collect::<Vec<_>>();
+
+        let discards_3 = self
+            .to_discard
+            .iter()
+            .take(3)
+            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
+            .collect::<Vec<_>>();
+        let retries_3 = self
+            .to_retry
+            .iter()
+            .take(3)
+            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
+            .collect::<Vec<_>>();
+
+        if !aborts.is_empty() || !discards_3.is_empty() || !retries_3.is_empty() {
+            println!(
+                "Some transactions were not successful: {} aborts, {} discards and {} retries out of {}, examples: aborts: {:?}, discards: {:?}, retries: {:?}",
+                aborts.len(),
+                self.to_discard.len(),
+                self.to_retry.len(),
+                self.statuses_for_input_txns.len(),
+                &aborts[..aborts.len().min(3)],
+                discards_3,
+                retries_3,
+            )
+        }
+
+        assert!(
+            allow_aborts || aborts.is_empty(),
+            "No aborts allowed, {}, examples: {:?}",
+            aborts.len(),
+            &aborts[..aborts.len().min(3)]
+        );
+        assert!(
+            allow_discards || discards_3.is_empty(),
+            "No discards allowed, {}, examples: {:?}",
+            self.to_discard.len(),
+            discards_3,
+        );
+        assert!(
+            allow_retries || retries_3.is_empty(),
+            "No retries allowed, {}, examples: {:?}",
+            self.to_retry.len(),
+            retries_3,
+        );
     }
 }

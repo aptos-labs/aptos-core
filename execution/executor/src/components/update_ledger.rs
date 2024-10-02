@@ -1,5 +1,4 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -33,33 +32,9 @@ use rayon::prelude::*;
 use std::{sync::Arc};
 use aptos_executor_types::chunk_output::ChunkOutput;
 
-pub struct ApplyChunkOutput;
+pub struct UpdateLedger;
 
-impl ApplyChunkOutput {
-    pub fn calculate_state_checkpoint(
-        chunk_output: &ChunkOutput,
-        parent_state: &StateDelta,
-        known_state_checkpoints: Option<Vec<Option<HashValue>>>,
-        is_block: bool,
-    ) -> Result<StateCheckpointOutput> {
-        // Apply the write set, get the latest state.
-        let mut res = InMemoryStateCalculatorV2::calculate_for_transactions(
-            parent_state,
-            chunk_output,
-            is_block,
-        )?;
-
-        // On state sync/replay, we generate state checkpoints only periodically, for the
-        // last state checkpoint of each chunk.
-        // A mismatch in the SMT will be detected at that occasion too. Here we just copy
-        // in the state root from the TxnInfo in the proof.
-        if let Some(state_checkpoint_hashes) = known_state_checkpoints {
-            res.check_and_update_state_checkpoint_hashes(state_checkpoint_hashes)?;
-        }
-
-        Ok(res)
-    }
-
+impl UpdateLedger {
     pub fn calculate_ledger_update(
         chunk_output: &ChunkOutput,
         state_checkpoint_hashes: &[Option<HashValue>],
@@ -97,37 +72,29 @@ impl ApplyChunkOutput {
         })
     }
 
-    /* FIXME(aldenhu): remove
-    pub fn apply_chunk(
-        chunk_output: ChunkOutput,
-        base_view: &ExecutedTrees,
-        known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-    ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
-        let (result_state, next_epoch_state, state_checkpoint_output) =
-            Self::calculate_state_checkpoint(
-                chunk_output,
-                base_view.state(),
-                None, // append_state_checkpoint_to_block
-                known_state_checkpoint_hashes,
-                /*is_block=*/ false,
-            )?;
-        let (ledger_update_output, to_discard, to_retry) = Self::calculate_ledger_update(
-            state_checkpoint_output,
-            base_view.txn_accumulator().clone(),
-        )?;
+    fn calculate_events_and_writeset_hashes(
+        to_commit: &[ParsedTransactionOutput],
+    ) -> (Vec<HashValue>, Vec<HashValue>) {
+        let _timer = OTHER_TIMERS.timer_with(&["calculate_events_and_writeset_hashes"]);
 
-        Ok((
-            ExecutedChunk {
-                result_state,
-                ledger_info: None,
-                next_epoch_state,
-                ledger_update_output,
-            },
-            to_discard,
-            to_retry,
-        ))
+        let num_txns = to_commit.len();
+        to_commit
+            .par_iter()
+            .with_min_len(optimal_min_len(num_txns, 64))
+            .map(|txn_output| {
+                let event_hashes = txn_output
+                    .events()
+                    .iter()
+                    .map(CryptoHash::hash)
+                    .collect::<Vec<_>>();
+
+                (
+                    InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash(),
+                    CryptoHash::hash(txn_output.write_set()),
+                )
+            })
+            .unzip()
     }
-     */
 
     fn assemble_transaction_infos(
         to_commit: &TransactionsWithParsedOutput,
@@ -163,30 +130,6 @@ impl ApplyChunkOutput {
             },
         )
         .unzip()
-    }
-
-    fn calculate_events_and_writeset_hashes(
-        to_commit: &[ParsedTransactionOutput],
-    ) -> (Vec<HashValue>, Vec<HashValue>) {
-        let _timer = OTHER_TIMERS.timer_with(&["calculate_events_and_writeset_hashes"]);
-
-        let num_txns = to_commit.len();
-        to_commit
-            .par_iter()
-            .with_min_len(optimal_min_len(num_txns, 64))
-            .map(|txn_output| {
-                let event_hashes = txn_output
-                    .events()
-                    .iter()
-                    .map(CryptoHash::hash)
-                    .collect::<Vec<_>>();
-
-                (
-                    InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash(),
-                    CryptoHash::hash(txn_output.write_set()),
-                )
-            })
-            .unzip()
     }
 }
 

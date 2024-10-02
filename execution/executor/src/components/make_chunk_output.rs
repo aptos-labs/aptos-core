@@ -2,20 +2,31 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::iter;
+use std::sync::Arc;
 use aptos_crypto::HashValue;
 use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
 use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
-use aptos_types::block_executor::partitioner::ExecutableTransactions;
+use aptos_types::block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions};
 use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 use aptos_vm::VMExecutor;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use aptos_executor_service::local_executor_helper::SHARDED_BLOCK_EXECUTOR;
+use aptos_executor_service::remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR};
 use aptos_executor_types::chunk_output::ChunkOutput;
 use aptos_executor_types::parsed_transaction_output::TransactionsWithParsedOutput;
-use aptos_executor_types::ParsedTransactionOutput;
-use aptos_types::transaction::{BlockEndInfo, Transaction, TransactionOutput, TransactionStatus};
-use crate::metrics::{update_counters_for_processed_chunk, OTHER_TIMERS};
+use aptos_executor_types::{ParsedTransactionOutput};
+use aptos_logger::error;
+use aptos_types::epoch_state::EpochState;
+use aptos_types::on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet};
+use aptos_types::state_store::state_key::StateKey;
+use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_types::state_store::state_value::StateValue;
+use aptos_types::state_store::TStateView;
+use aptos_types::transaction::{BlockEndInfo, BlockOutput, Transaction, TransactionOutput, TransactionStatus};
+use aptos_types::write_set::WriteSet;
+use crate::metrics::{update_counters_for_processed_chunk, EXECUTOR_ERRORS, OTHER_TIMERS};
 
-struct MakeChunkOutput;
+pub(crate) struct MakeChunkOutput;
 
 impl MakeChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
@@ -51,13 +62,14 @@ impl MakeChunkOutput {
         let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
         let (transaction_outputs, block_end_info) = block_output.into_inner();
 
+        let state_cache = state_view.into_state_cache();
         RawChunkOutputParser {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache,
             block_end_info,
         }
-            .parse(append_state_checkpoint_to_block)
+        .parse(append_state_checkpoint_to_block)
     }
 
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
@@ -93,11 +105,11 @@ impl MakeChunkOutput {
     pub fn by_transaction_output(
         transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
         state_view: CachedStateView,
-    ) -> Result<Self> {
+    ) -> Result<ChunkOutput> {
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();
 
-        metrics::update_counters_for_processed_chunk(&transactions, &transaction_outputs, "output");
+        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "output");
 
         // collect all accounts touched and dedup
         let write_set = transaction_outputs
@@ -114,18 +126,7 @@ impl MakeChunkOutput {
             state_cache: state_view.into_state_cache(),
             block_end_info: None,
         }
-            .parse(None)
-    }
-
-    pub fn apply_to_ledger(
-        self,
-        base_view: &ExecutedTrees,
-        known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-    ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
-        fail_point!("executor::apply_to_ledger", |_| {
-            Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
-        });
-        ApplyChunkOutput::apply_chunk(self, base_view, known_state_checkpoint_hashes)
+        .parse(None)
     }
 
     fn execute_block_sharded<V: VMExecutor>(
@@ -257,7 +258,7 @@ impl RawChunkOutputParser {
             append_state_checkpoint_to_block,
         );
         let next_epoch_state = to_commit
-            .ends_epoch()
+            .ends_with_reconfig()
             .then(|| Self::expect_next_epoch_state(&to_commit)?);
 
         Ok(ChunkOutput {
@@ -272,8 +273,8 @@ impl RawChunkOutputParser {
     }
 
     fn extract_retries(
-        mut transactions: &mut Vec<Transaction>,
-        mut transaction_outputs: &mut Vec<ParsedTransactionOutput>,
+        transactions: &mut Vec<Transaction>,
+        transaction_outputs: &mut Vec<ParsedTransactionOutput>,
     ) -> TransactionsWithParsedOutput {
         // N.B. off-by-1 intentionally, for exclusive index
         let new_epoch_marker = transaction_outputs
@@ -303,8 +304,8 @@ impl RawChunkOutputParser {
     }
 
     fn extract_discards(
-        mut transactions: &mut Vec<Transaction>,
-        mut transaction_outputs: &mut Vec<ParsedTransactionOutput>,
+        transactions: &mut Vec<Transaction>,
+        transaction_outputs: &mut Vec<ParsedTransactionOutput>,
     ) -> TransactionsWithParsedOutput {
         let to_discard = {
             let mut res = TransactionsWithParsedOutput::new_empty();
@@ -350,27 +351,15 @@ impl RawChunkOutputParser {
         block_end_info: Option<&BlockEndInfo>,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> TransactionsWithParsedOutput {
-        if !to_commit.ends_epoch() {
+        if !to_commit.ends_with_reconfig() {
             // Append the StateCheckpoint transaction to the end
             if let Some(block_id) = append_state_checkpoint_to_block {
-                let state_checkpoint_txn = block_end_info.cloned().map_or(
-                    Transaction::StateCheckpoint(block_id),
-                    |block_end_info| {
-                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
-                            block_id,
-                            block_end_info,
-                        })
-                    },
-                );
-                let state_checkpoint_txn_output: ParsedTransactionOutput =
-                    Into::into(TransactionOutput::new(
-                        WriteSet::default(),
-                        Vec::new(),
-                        0,
-                        TransactionStatus::Keep(ExecutionStatus::Success),
-                        TransactionAuxiliaryData::default(),
-                    ));
-                to_commit.push(state_checkpoint_txn, state_checkpoint_txn_output);
+                let state_checkpoint_txn = match block_end_info {
+                    None => Transaction::StateCheckpoint(block_id),
+                    Some(block_end_info) => Transaction::block_epilogue(block_id, block_end_info.clone())
+                };
+
+                to_commit.push(state_checkpoint_txn, TransactionOutput::empty_success().into());
             }
         }; // else: not adding block epilogue at epoch ending.
 
@@ -383,6 +372,7 @@ impl RawChunkOutputParser {
             .last()
             .ok_or_else(|| Err(anyhow!("to_commit is empty.")))?
             .write_set();
+
         let write_set_view = WriteSetStateView {
             write_set: last_write_set,
         };

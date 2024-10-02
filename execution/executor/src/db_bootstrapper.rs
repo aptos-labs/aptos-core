@@ -4,7 +4,6 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::chunk_output::ChunkOutput;
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutedChunk;
@@ -27,6 +26,7 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use std::sync::Arc;
+use crate::components::make_chunk_output::MakeChunkOutput;
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,
@@ -144,7 +144,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         get_state_epoch(&base_state_view)?
     };
 
-    let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
+    let (mut output, _, _) = MakeChunkOutput::by_transaction_execution::<V>(
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),

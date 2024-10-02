@@ -6,21 +6,17 @@
 
 use crate::{
     components::{
-        apply_chunk_output::{ensure_no_discard, ensure_no_retry, ApplyChunkOutput},
+        apply_chunk_output::{ApplyChunkOutput},
         chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger},
-        chunk_output::ChunkOutput,
         transaction_chunk::TransactionChunkWithProof,
     },
     logging::{LogEntry, LogSchema},
     metrics::{APPLY_CHUNK, CHUNK_OTHER_TIMERS, COMMIT_CHUNK, CONCURRENCY_GAUGE, EXECUTE_CHUNK},
 };
-use anyhow::{ensure, Result};
+use anyhow::{Result};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_executor_types::{
-    ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
-    TransactionReplayer, VerifyExecutionMode,
-};
+use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput, TransactionReplayer, VerifyExecutionMode};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -54,6 +50,7 @@ use std::{
     },
     time::Instant,
 };
+use crate::components::make_chunk_output::MakeChunkOutput;
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -301,8 +298,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             verified_target_li.clone(),
             epoch_change_li.cloned(),
         )?;
-        ensure!(chunk_output.to_discard.is_empty(), "Unexpected discard.");
-        ensure!(chunk_output.to_retry.is_empty(), "Unexpected retry.");
+        chunk_output.ensure_is_replayed()?;
 
         // Calculate state snapshot
         let state_checkpoint_output = ApplyChunkOutput::calculate_state_checkpoint(
@@ -421,7 +417,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         )
     }
 
-    fn commit(&self) -> Result<Version> {
+    fn commit(&self) -> Result<ExecutedChunk> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "commit"]);
 
         self.inner.read().as_ref().expect("not reset").commit()
@@ -487,12 +483,12 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
         Ok(())
     }
 
-    fn commit(&self) -> Result<Version> {
+    fn commit(&self) -> Result<ExecutedChunk> {
         let started = Instant::now();
 
-        let version = self.commit_chunk_impl()?;
+        let chunk = self.commit_chunk_impl()?;
 
-        let num_committed = chunk.transactions_to_commit().len();
+        let num_committed = chunk.chunk_output.to_commit.len();
         info!(
             num_committed = num_committed,
             tps = num_committed as f64 / started.elapsed().as_secs_f64(),
@@ -600,7 +596,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
-        let chunk_output = ChunkOutput::by_transaction_execution::<V>(
+        let chunk_output = MakeChunkOutput::by_transaction_execution::<V>(
             txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
@@ -668,21 +664,28 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         .collect();
 
         let state_view = self.latest_state_view(latest_view.state())?;
-        let chunk_output = ChunkOutput::by_transaction_output(txns_and_outputs, state_view)?;
-        let (executed_batch, to_discard, to_retry) = chunk_output.apply_to_ledger(
-            latest_view,
-            Some(
-                txn_infos
-                    .iter()
-                    .map(|txn_info| txn_info.state_checkpoint_hash())
-                    .collect(),
-            ),
+        let chunk_output = MakeChunkOutput::by_transaction_output(txns_and_outputs, state_view)?;
+        chunk_output.ensure_is_replayed()?;
+
+        let state_checkpoint_hashes = txn_infos.iter().map(|t| t.state_checkpoint_hash()).collect();
+        let state_checkpoint_output = ApplyChunkOutput::calculate_state_checkpoint(
+            &chunk_output,
+            &executed_chunk.as_ref().unwrap().state_checkpoint_output.result_state,
+            Some(state_checkpoint_hashes),
+            false, // is_block
         )?;
-        ensure_no_discard(to_discard)?;
-        ensure_no_retry(to_retry)?;
-        executed_batch
-            .ledger_update_output
-            .ensure_transaction_infos_match(&txn_infos)?;
+        let ledger_update_output = ApplyChunkOutput::calculate_ledger_update(
+            &chunk_output,
+            &state_checkpoint_output.state_checkpoint_hashes,
+            &executed_chunk.as_ref().unwrap().ledger_update_output.transaction_accumulator,
+        )?;
+
+        let executed_batch = ExecutedChunk {
+            chunk_output,
+            state_checkpoint_output,
+            ledger_update_output,
+            ledger_info: None,
+        };
 
         match executed_chunk {
             Some(chunk) => chunk.combine(executed_batch),

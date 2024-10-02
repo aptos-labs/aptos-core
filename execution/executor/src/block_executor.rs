@@ -6,7 +6,7 @@
 
 use crate::{
     components::{
-        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree, chunk_output::ChunkOutput,
+        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree,
     },
     logging::{LogEntry, LogSchema},
     metrics::{
@@ -39,6 +39,8 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
+use aptos_executor_types::chunk_output::ChunkOutput;
+use crate::components::make_chunk_output::MakeChunkOutput;
 
 pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
@@ -56,7 +58,7 @@ impl TransactionBlockExecutor for AptosVM {
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(
+        MakeChunkOutput::by_transaction_execution::<AptosVM>(
             transactions,
             state_view,
             onchain_config,
@@ -271,8 +273,9 @@ where
                             "Injected error in vm_execute_block"
                         )))
                     });
-                    V::execute_transaction_block(transactions, state_view, onchain_config.clone())?
+                    V::execute_transaction_block(transactions, state_view, onchain_config.clone(), Some(block_id))?
                 };
+                chunk_output.ensure_is_block()?;
 
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
@@ -341,10 +344,6 @@ where
                 })?;
                 output
             };
-
-        if !current_output.output.has_reconfiguration() {
-            output.ensure_ends_with_state_checkpoint()?;
-        }
 
         let state_compute_result = output.as_state_compute_result(
             parent_accumulator,

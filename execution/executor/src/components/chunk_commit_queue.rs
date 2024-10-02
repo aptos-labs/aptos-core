@@ -4,12 +4,13 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::{chunk_output::ChunkOutput, chunk_proof::ChunkProof};
+use crate::components::{chunk_proof::ChunkProof};
 use anyhow::{anyhow, ensure, Result};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
 use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};
+use aptos_executor_types::chunk_output::ChunkOutput;
 
 pub(crate) struct ChunkToUpdateLedger {
     pub chunk_output: ChunkOutput,

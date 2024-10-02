@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{components::chunk_output::ChunkOutput, metrics::OTHER_TIMERS};
-use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_drop_helper::DEFAULT_DROPPER;
+use crate::{metrics::OTHER_TIMERS};
+use anyhow::{ensure, Result};
+use aptos_crypto::{hash::CryptoHash, };
 use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput,
     state_checkpoint_output::StateCheckpointOutput, ProofReader,
@@ -17,12 +16,9 @@ use aptos_storage_interface::{
     state_delta::StateDelta,
 };
 use aptos_types::{
-    epoch_state::EpochState,
-    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::{
         create_empty_sharded_state_updates, state_key::StateKey,
         state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
-        TStateView,
     },
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},
@@ -32,6 +28,7 @@ use dashmap::DashMap;
 use itertools::zip_eq;
 use rayon::prelude::*;
 use std::collections::HashMap;
+use aptos_executor_types::chunk_output::ChunkOutput;
 
 /// Helper class for calculating state changes after a block of transactions are executed.
 pub struct InMemoryStateCalculatorV2 {}

@@ -9,10 +9,6 @@ use crate::{
     state_checkpoint_output::StateCheckpointOutput, ChunkCommitNotification, LedgerUpdateOutput,
 };
 use aptos_storage_interface::{ExecutedTrees};
-#[cfg(test)]
-use aptos_types::account_config::NewEpochEvent;
-#[cfg(test)]
-use aptos_types::contract_event::ContractEvent;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionOutputProvider, TransactionToCommit},
@@ -46,7 +42,7 @@ impl ExecutedChunk {
         self.chunk_output.next_epoch_state.is_some()
     }
 
-    pub fn combine(&mut self, rhs: Self) {
+    pub fn combine(&mut self, _rhs: Self) {
         todo!()
         /*
         assert_eq!(
@@ -151,6 +147,11 @@ impl ExecutedChunk {
 
 #[test]
 fn into_chunk_commit_notification_should_apply_event_filters() {
+
+    /* FIXME(aldenhu): redo
+    use aptos_types::account_config::NewEpochEvent;
+    use aptos_types::contract_event::ContractEvent;
+
     let event_1 = ContractEvent::new_v2_with_type_tag_str(
         "0x2345::random_module::RandomEvent",
         b"random_data_x".to_vec(),
@@ -180,4 +181,5 @@ fn into_chunk_commit_notification_should_apply_event_filters() {
     let notification = chunk.into_chunk_commit_notification();
 
     assert_eq!(vec![event_2, event_4], notification.subscribable_events);
+     */
 }

@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, Result};
-use aptos_crypto::HashValue;
-use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, LedgerUpdateOutput};
+use aptos_executor_types::{LedgerUpdateOutput};
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
-    transaction::Version,
 };
 use itertools::zip_eq;
 

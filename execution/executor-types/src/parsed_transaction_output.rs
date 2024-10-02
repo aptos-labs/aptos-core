@@ -17,7 +17,7 @@ use std::ops::Deref;
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ParsedTransactionOutput {
     output: TransactionOutput,
     reconfig_events: Vec<ContractEvent>,
@@ -141,7 +141,7 @@ impl TransactionsWithParsedOutput {
             .find(|&i| Self::need_checkpoint(&self.transactions[i], &self.parsed_output[i]))
     }
 
-    pub fn ends_epoch(&self) -> bool {
+    pub fn ends_with_reconfig(&self) -> bool {
         self.parsed_output
             .last()
             .map_or(false, |output| output.is_reconfig())
@@ -160,6 +160,10 @@ impl TransactionsWithParsedOutput {
             | Transaction::StateCheckpoint(_)
             | Transaction::BlockEpilogue(_) => true,
         }
+    }
+
+    pub fn ends_with_state_checkpoint(&self) -> bool {
+        self.get_last_checkpoint_index().map_or(false, |idx| idx + 1 == self.len())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Transaction, &ParsedTransactionOutput)> {
