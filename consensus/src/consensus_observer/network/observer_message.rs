@@ -987,7 +987,7 @@ mod test {
             100,
         );
         let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(current_epoch, validator_verifier.clone());
+        let epoch_state = EpochState::new(current_epoch, validator_verifier);
 
         // Verify the commit proof and ensure it fails (the signature set is insufficient)
         let error = commit_decision
@@ -1119,7 +1119,7 @@ mod test {
             100,
         );
         let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(current_epoch, validator_verifier.clone());
+        let epoch_state = EpochState::new(current_epoch, validator_verifier);
 
         // Verify the ordered proof and ensure it fails (the signature set is insufficient)
         let error = ordered_block
@@ -1242,7 +1242,7 @@ mod test {
             100,
         );
         let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(current_epoch, validator_verifier.clone());
+        let epoch_state = EpochState::new(current_epoch, validator_verifier);
 
         // Verify the block payload signatures and ensure it fails (the signature set is insufficient)
         let error = block_payload

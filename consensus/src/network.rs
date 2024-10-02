@@ -198,7 +198,7 @@ pub struct NetworkSender {
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
-    validators: ValidatorVerifier,
+    validators: Arc<ValidatorVerifier>,
     time_service: aptos_time_service::TimeService,
 }
 
@@ -207,7 +207,7 @@ impl NetworkSender {
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
-        validators: ValidatorVerifier,
+        validators: Arc<ValidatorVerifier>,
     ) -> Self {
         NetworkSender {
             author,

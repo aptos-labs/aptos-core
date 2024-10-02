@@ -981,8 +981,11 @@ mod test {
             validator_signer.public_key(),
             100,
         );
-        let validator_verifier = ValidatorVerifier::new(vec![validator_consensus_info]);
-        let epoch_state = EpochState::new(next_epoch, validator_verifier.clone());
+        let validator_verifier = Arc::new(ValidatorVerifier::new(vec![validator_consensus_info]));
+        let epoch_state = EpochState {
+            epoch: next_epoch,
+            verifier: validator_verifier.clone(),
+        };
 
         // Verify the block payload signatures (for this epoch)
         block_payload_store.verify_payload_signatures(&epoch_state);
@@ -997,7 +1000,10 @@ mod test {
         );
 
         // Create an epoch state for the future epoch (with a non-empty verifier)
-        let epoch_state = EpochState::new(future_epoch, validator_verifier);
+        let epoch_state = EpochState {
+            epoch: future_epoch,
+            verifier: validator_verifier.clone(),
+        };
 
         // Verify the block payload signatures (for the future epoch)
         block_payload_store.verify_payload_signatures(&epoch_state);

@@ -429,10 +429,10 @@ impl InMemoryStateCalculatorV2 {
         let configuration = ConfigurationResource::fetch_config(&state_cache_view)
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
-        Ok(EpochState {
-            epoch: configuration.epoch(),
-            verifier: (&validator_set).into(),
-        })
+        Ok(EpochState::new(
+            configuration.epoch(),
+            (&validator_set).into(),
+        ))
     }
 
     fn validate_input_for_block(

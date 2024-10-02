@@ -130,7 +130,10 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
 /// Supports validation of signatures for known authors with individual voting powers. This struct
 /// can be used for all signature verification operations including block and network signature
 /// verification, respectively.
-#[derive(Clone, Debug, Derivative, Serialize)]
+// Note: The "Clone" trait has been removed intentionally for ValidatorVerifier to ensure that the same
+// view of ValidatorVerifier is used across the system. In can case a ValidatorVerifier needs to be cloned,
+// please use Arc<ValidatorVerifier> instead.
+#[derive(Debug, Derivative, Serialize)]
 #[derivative(PartialEq, Eq)]
 pub struct ValidatorVerifier {
     /// A vector of each validator's on-chain account address to its pubkeys and voting power.
