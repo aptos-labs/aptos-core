@@ -35,6 +35,9 @@ on:
   schedule:
     - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
 
+permissions:
+  id-token: write
+
 # cancel redundant builds
 concurrency:
   # cancel redundant builds on PRs (only on PR, not on branches)
@@ -70,8 +73,7 @@ jobs:
       # 1195000000-122000000: https://github.com/aptos-labs/aptos-core/pull/13832
       RANGES_TO_SKIP: "1195000000-1220000000"
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
-      # workflow config
-      RUNS_ON: "high-perf-docker-with-local-ssd"
+      RUNS_ON: "runs-on,cpu=96,family=c5d+c5ad,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false"
       TIMEOUT_MINUTES: 180
       MAX_VERSIONS_PER_RANGE: 2000000
 
@@ -94,8 +96,7 @@ jobs:
       # 1197378568-1198492648: https://github.com/aptos-labs/aptos-core/pull/13832
       RANGES_TO_SKIP: "1197378568-1198492648"
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
-      # workflow config
-      RUNS_ON: "high-perf-docker-with-local-ssd"
+      RUNS_ON: "runs-on,cpu=96,family=c5d+c5ad,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false"
       TIMEOUT_MINUTES: 180
       MAX_VERSIONS_PER_RANGE: 800000
 
@@ -115,7 +116,6 @@ jobs:
       # 1195000000-1220000000: https://github.com/aptos-labs/aptos-core/pull/13832
       RANGES_TO_SKIP: "1195000000-1220000000"
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
-      # workflow config
-      RUNS_ON: "high-perf-docker-with-local-ssd"
+      RUNS_ON: "runs-on,cpu=96,family=c5d+c5ad,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false"
       TIMEOUT_MINUTES: 120 # increase test replay timeout to capture more flaky errors
       MAX_VERSIONS_PER_RANGE: 2000000

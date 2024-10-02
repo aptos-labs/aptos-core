@@ -38,8 +38,7 @@ jobs:
       BUCKET: aptos-testnet-backup-2223d95b
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
-      # workflow config
-      RUNS_ON: high-perf-docker-with-local-ssd
+      RUNS_ON: runs-on,cpu=96,family=c5d+c5ad,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false
       TIMEOUT_MINUTES: 20
 
   verify-modules-mainnet:
@@ -51,8 +50,7 @@ jobs:
       BUCKET: aptos-mainnet-backup-backup-831a69a8
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
-      # workflow config
-      RUNS_ON: high-perf-docker-with-local-ssd
+      RUNS_ON: runs-on,cpu=96,family=c5d+c5ad,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false
       TIMEOUT_MINUTES: 20
 
   test-verify-modules:
@@ -64,6 +62,5 @@ jobs:
       BUCKET: aptos-testnet-backup-2223d95b
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
-      # workflow config
-      RUNS_ON: "high-perf-docker-with-local-ssd"
+      RUNS_ON: "runs-on,cpu=96,family=c5d+c5ad,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false"
       TIMEOUT_MINUTES: 20
