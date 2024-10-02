@@ -1437,6 +1437,18 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sequence_number: None,
             },
+            Transaction::BlockMetadataExtTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.transaction_info().hash,
+                success: Some(txn.transaction_info().success),
+                version: Some(txn.transaction_info().version.0),
+                vm_status: Some(txn.transaction_info().vm_status.clone()),
+                timestamp_us: Some(txn.timestamp()),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
             Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
                 success: Some(txn.info.success),

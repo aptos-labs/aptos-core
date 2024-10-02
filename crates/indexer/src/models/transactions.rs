@@ -205,6 +205,34 @@ impl Transaction {
                     wsc_detail,
                 )
             },
+            APITransaction::BlockMetadataExtTransaction(block_metadata_txn) => {
+                let txn_info = block_metadata_txn.transaction_info();
+                let txn_version = txn_info.version.0 as i64;
+                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
+                    &txn_info.changes,
+                    txn_version,
+                    block_height,
+                );
+                (
+                    Self::from_transaction_info(
+                        txn_info,
+                        None,
+                        transaction.type_str().to_string(),
+                        0,
+                        block_height,
+                        epoch,
+                    ),
+                    Some(TransactionDetail::BlockMetadata(
+                        BlockMetadataTransaction::from_ext_transaction(
+                            block_metadata_txn,
+                            block_height,
+                        ),
+                    )),
+                    EventModel::from_events(block_metadata_txn.events(), txn_version, block_height),
+                    wsc,
+                    wsc_detail,
+                )
+            },
             APITransaction::StateCheckpointTransaction(state_checkpoint_txn) => (
                 Self::from_transaction_info(
                     &state_checkpoint_txn.info,
