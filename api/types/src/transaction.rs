@@ -323,38 +323,6 @@ impl From<(TransactionInfo, WriteSetPayload, Vec<Event>)> for Transaction {
     }
 }
 
-impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
-    fn from((txn, info, events): (&BlockMetadata, TransactionInfo, Vec<Event>)) -> Self {
-        Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
-            info,
-            id: txn.id().into(),
-            epoch: txn.epoch().into(),
-            round: txn.round().into(),
-            events,
-            previous_block_votes_bitvec: txn.previous_block_votes_bitvec().clone(),
-            proposer: txn.proposer().into(),
-            failed_proposer_indices: txn.failed_proposer_indices().clone(),
-            timestamp: txn.timestamp_usecs().into(),
-        })
-    }
-}
-
-impl From<(&BlockMetadataExt, TransactionInfo, Vec<Event>)> for Transaction {
-    fn from((txn, info, events): (&BlockMetadataExt, TransactionInfo, Vec<Event>)) -> Self {
-        Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
-            info,
-            id: txn.id().into(),
-            epoch: txn.epoch().into(),
-            round: txn.round().into(),
-            events,
-            previous_block_votes_bitvec: txn.previous_block_votes_bitvec().clone(),
-            proposer: txn.proposer().into(),
-            failed_proposer_indices: txn.failed_proposer_indices().clone(),
-            timestamp: txn.timestamp_usecs().into(),
-        })
-    }
-}
-
 impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     fn from((txn, payload): (&SignedTransaction, TransactionPayload)) -> Self {
         Self {
@@ -589,6 +557,91 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[oai(default, skip_serializing_if = "Option::is_none")]
+    pub block_metadata_extension: Option<BlockMetadataExtension>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtensionEmpty {}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtensionRandomness {
+    randomness: Option<HexEncodedBytes>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "extension_type", rename_all = "snake_case")]
+#[oai(
+    one_of,
+    discriminator_name = "type",
+    rename_all = "snake_case"
+)]
+pub enum BlockMetadataExtension {
+    V0(BlockMetadataExtensionEmpty),
+    V1(BlockMetadataExtensionRandomness),
+}
+
+impl BlockMetadataExtension {
+    pub fn from_internal_txn(txn: &BlockMetadataExt) -> Self {
+        match txn {
+            BlockMetadataExt::V0(_) => Self::V0(BlockMetadataExtensionEmpty {}),
+            BlockMetadataExt::V1(payload) => Self::V1(BlockMetadataExtensionRandomness {
+                randomness: payload
+                    .randomness
+                    .clone()
+                    .map(|pr| HexEncodedBytes::from(pr.randomness_cloned())),
+            }),
+        }
+    }
+}
+
+impl BlockMetadataTransaction {
+    pub fn from_internal(
+        internal: BlockMetadata,
+        info: TransactionInfo,
+        events: Vec<Event>,
+    ) -> Self {
+        Self {
+            info,
+            id: internal.id().into(),
+            epoch: internal.epoch().into(),
+            round: internal.round().into(),
+            events,
+            previous_block_votes_bitvec: internal.previous_block_votes_bitvec().clone(),
+            proposer: internal.proposer().into(),
+            failed_proposer_indices: internal.failed_proposer_indices().clone(),
+            timestamp: internal.timestamp_usecs().into(),
+            block_metadata_extension: None,
+        }
+    }
+
+    pub fn from_internal_ext(
+        internal: BlockMetadataExt,
+        info: TransactionInfo,
+        events: Vec<Event>,
+    ) -> Self {
+        Self {
+            info,
+            id: internal.id().into(),
+            epoch: internal.epoch().into(),
+            round: internal.round().into(),
+            events,
+            previous_block_votes_bitvec: internal.previous_block_votes_bitvec().clone(),
+            proposer: internal.proposer().into(),
+            failed_proposer_indices: internal.failed_proposer_indices().clone(),
+            timestamp: internal.timestamp_usecs().into(),
+            block_metadata_extension: Some(BlockMetadataExtension::from_internal_txn(&internal)),
+        }
+    }
+
+    pub fn type_str(&self) -> &'static str {
+        match self.block_metadata_extension {
+            None => "block_metadata_transaction",
+            Some(BlockMetadataExtension::V0(_)) => "block_metadata_ext_transaction__v0",
+            Some(BlockMetadataExtension::V1(_)) => "block_metadata_ext_transaction__v1",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
