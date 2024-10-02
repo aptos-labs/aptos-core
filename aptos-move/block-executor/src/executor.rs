@@ -410,7 +410,10 @@ where
 
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
-            && read_set.validate_module_reads(versioned_cache.code_storage().module_storage(), idx_to_validate)
+            && read_set.validate_module_reads(
+                versioned_cache.code_storage().module_storage(),
+                idx_to_validate,
+            )
     }
 
     fn update_transaction_on_abort(

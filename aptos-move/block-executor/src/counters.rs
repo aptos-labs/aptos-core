@@ -321,3 +321,49 @@ pub(crate) fn update_state_counters(block_state_stats: BlockStateStats, is_paral
         .with_label_values(&[mode_str, "delayed_field"])
         .observe(block_state_stats.base_delayed_fields_size as f64);
 }
+
+// Loader V1 and V2 counters.
+
+pub static TASK_VALIDATE_MODULES_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_task_validate_modules_seconds",
+        // metric description
+        "The time spent in module validation in Block STM",
+        time_buckets(),
+    )
+    .unwrap()
+});
+
+pub static GET_MODULE_STATE_VALUE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_get_module_state_value",
+        // metric description
+        "The time spent in seconds when getting raw state value from the base view in Block-STM",
+        time_buckets(),
+    )
+    .unwrap()
+});
+
+pub static READ_MODULE_ENTRY_FROM_MODULE_STORAGE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_read_module_entry",
+        // metric description
+        "The time spent in seconds when reading a module entry from VersionedModuleStorage",
+        time_buckets(),
+    )
+    .unwrap()
+});
+
+pub static FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_fetch_verified_module",
+        // metric description
+        "The time spent in seconds when fetching a module from VersionedModuleStorage",
+        time_buckets(),
+    )
+    .unwrap()
+});

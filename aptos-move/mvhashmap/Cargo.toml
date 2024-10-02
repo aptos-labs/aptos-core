@@ -19,9 +19,11 @@ aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
 bytes = { workspace = true }
+derivative = { workspace = true }
 claims = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
