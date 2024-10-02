@@ -6,9 +6,8 @@ use aptos_aggregator::types::code_invariant_error;
 use aptos_logger::error;
 use aptos_mvhashmap::types::ValueWithLayout;
 use aptos_types::{
-    contract_event::TransactionEvent, delayed_fields::PanicError, executable::Executable,
-    state_store::TStateView, transaction::BlockExecutableTransaction as Transaction,
-    write_set::TransactionWrite,
+    contract_event::TransactionEvent, delayed_fields::PanicError, state_store::TStateView,
+    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use aptos_vm_logging::{alert, prelude::*};
 use bytes::Bytes;
@@ -165,10 +164,9 @@ pub(crate) fn gen_id_start_value(sequential: bool) -> u32 {
 pub(crate) fn map_id_to_values_in_group_writes<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
-    X: Executable + 'static,
 >(
     finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
-    latest_view: &LatestView<T, S, X>,
+    latest_view: &LatestView<T, S>,
 ) -> Result<Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>, PanicError> {
     let mut patched_finalized_groups = Vec::with_capacity(finalized_groups.len());
     for (group_key, group_metadata_op, resource_vec) in finalized_groups.into_iter() {
@@ -190,13 +188,9 @@ pub(crate) fn map_id_to_values_in_group_writes<
 
 // For each delayed field in resource write set, replace the identifiers with values
 // (ignoring other writes). Currently also checks the keys are unique.
-pub(crate) fn map_id_to_values_in_write_set<
-    T: Transaction,
-    S: TStateView<Key = T::Key> + Sync,
-    X: Executable + 'static,
->(
+pub(crate) fn map_id_to_values_in_write_set<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
     resource_write_set: Vec<(T::Key, Arc<T::Value>, Arc<MoveTypeLayout>)>,
-    latest_view: &LatestView<T, S, X>,
+    latest_view: &LatestView<T, S>,
 ) -> Result<Vec<(T::Key, T::Value)>, PanicError> {
     resource_write_set
         .into_iter()
@@ -210,13 +204,9 @@ pub(crate) fn map_id_to_values_in_write_set<
 }
 
 // For each delayed field in the event, replace delayed field identifier with value.
-pub(crate) fn map_id_to_values_events<
-    T: Transaction,
-    S: TStateView<Key = T::Key> + Sync,
-    X: Executable + 'static,
->(
+pub(crate) fn map_id_to_values_events<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
     events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
-    latest_view: &LatestView<T, S, X>,
+    latest_view: &LatestView<T, S>,
 ) -> Result<Vec<T::Event>, PanicError> {
     events
         .map(|(event, layout)| {
@@ -243,14 +233,10 @@ pub(crate) fn map_id_to_values_events<
 }
 
 // Parse the input `value` and replace delayed field identifiers with corresponding values
-fn replace_ids_with_values<
-    T: Transaction,
-    S: TStateView<Key = T::Key> + Sync,
-    X: Executable + 'static,
->(
+fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
     value: &Arc<T::Value>,
     layout: &MoveTypeLayout,
-    latest_view: &LatestView<T, S, X>,
+    latest_view: &LatestView<T, S>,
 ) -> Result<T::Value, PanicError> {
     let mut value = (**value).clone();
 

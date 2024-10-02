@@ -117,6 +117,7 @@ pub mod keyless_validation;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
+pub mod static_config;
 pub mod system_module_names;
 pub mod testing;
 pub mod transaction_metadata;

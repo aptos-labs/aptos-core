@@ -8,12 +8,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug)]
 pub struct BlockExecutorLocalConfig {
     pub concurrency_level: usize,
-    // If specified, parallel execution fallbacks to sequential, if issue occurs.
-    // Otherwise, if there is an error in either of the execution, we will panic.
-    pub allow_fallback: bool,
-    // If true, we will discard the failed blocks and continue with the next block.
-    // (allow_fallback needs to be set)
+    /// If specified, parallel block execution fallbacks to sequential, if issue occurs.
+    /// If there is still an error in sequential block fallback as well, we will panic.
+    pub allow_sequential_block_fallback: bool,
+    /// If true, we will discard the failed blocks and continue with the next block.
+    /// (allow_sequential_block_fallback needs to be set)
     pub discard_failed_blocks: bool,
+    /// When true, block-stm will record and log certain profiling outputs.
+    pub enable_block_stm_profiling: bool,
+    /// Determines behavior of the workers that rolling commit transactions and may
+    /// perform a 'backup' execution of the immediately following transaction tx in
+    /// order to make sure the critical path of the block execution does not contain
+    /// validation failure and re-execution of tx.
+    pub enable_committer_backup: bool,
 }
 
 /// Configuration from on-chain configuration, that is
@@ -71,8 +78,10 @@ impl BlockExecutorConfig {
         Self {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
-                allow_fallback: true,
+                allow_sequential_block_fallback: true,
                 discard_failed_blocks: false,
+                enable_block_stm_profiling: false,
+                enable_committer_backup: true,
             },
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         }
@@ -85,8 +94,10 @@ impl BlockExecutorConfig {
         Self {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
-                allow_fallback: true,
+                allow_sequential_block_fallback: true,
                 discard_failed_blocks: false,
+                enable_block_stm_profiling: false,
+                enable_committer_backup: true,
             },
             onchain: BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
         }

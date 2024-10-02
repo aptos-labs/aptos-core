@@ -29,6 +29,12 @@ pub struct Opts {
 
     #[clap(long, num_args = 0..)]
     pub(crate) concurrency_level: Vec<usize>,
+
+    #[clap(long, default_value_t = false)]
+    pub(crate) enable_block_stm_profiling: bool,
+
+    #[clap(long, default_value_t = true)]
+    pub(crate) enable_committer_backup: bool,
 }
 
 #[derive(Parser)]

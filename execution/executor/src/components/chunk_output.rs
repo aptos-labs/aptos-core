@@ -34,7 +34,7 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{static_config::AptosVMStaticConfig, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use std::{ops::Deref, sync::Arc, time::Duration};
@@ -252,7 +252,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
     T: TransactionProvider,
     O: TransactionOutputProvider,
 {
-    let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
+    let detailed_counters = AptosVMStaticConfig::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
     if transactions.len() != transaction_outputs.len() {
         warn!(

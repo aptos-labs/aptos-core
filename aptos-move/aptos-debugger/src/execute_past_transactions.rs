@@ -45,6 +45,8 @@ impl Command {
                 self.use_same_block_boundaries,
                 self.repeat_execution_times.unwrap_or(1),
                 &self.opts.concurrency_level,
+                self.opts.enable_block_stm_profiling,
+                self.opts.enable_committer_backup,
             )
             .await?;
 

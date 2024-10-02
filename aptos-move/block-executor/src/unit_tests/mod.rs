@@ -24,10 +24,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
-    contract_event::TransactionEvent,
-    executable::{ExecutableTestType, ModulePath},
-    state_store::state_value::StateValueMetadata,
+    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
+    executable::ModulePath, state_store::state_value::StateValueMetadata,
 };
 use claims::assert_matches;
 use fail::FailScenario;
@@ -90,7 +88,6 @@ fn resource_group_bcs_fallback() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -183,7 +180,6 @@ fn block_output_err_precedence() {
         MockTask<KeyType<u32>, MockEvent>,
         DeltaDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -221,7 +217,6 @@ fn skip_rest_gas_limit() {
         MockTask<KeyType<u32>, MockEvent>,
         DeltaDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
         executor_thread_pool,
@@ -254,7 +249,6 @@ where
         MockTask<K, E>,
         DeltaDataView<K>,
         NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
-        ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,

@@ -37,7 +37,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
     write_set::WriteSet,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{static_config::AptosVMStaticConfig, AptosVM};
 use clap::Parser;
 use futures::{
     future,
@@ -288,7 +288,9 @@ impl TransactionRestoreBatchController {
                 self.output_transaction_analysis.is_none(),
                 "Bug: requested to output transaction output sizing info in restore mode.",
             );
-            AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
+            AptosVMStaticConfig::set_concurrency_level_once(
+                self.global_opt.replay_concurrency_level,
+            );
 
             let kv_only = self.replay_from_version.map_or(false, |(_, k)| k);
             let txns_to_execute_stream = self

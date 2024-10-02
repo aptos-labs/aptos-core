@@ -624,8 +624,10 @@ impl FakeExecutor {
                 } else {
                     usize::min(4, num_cpus::get())
                 },
-                allow_fallback: self.allow_block_executor_fallback,
+                allow_sequential_block_fallback: self.allow_block_executor_fallback,
                 discard_failed_blocks: false,
+                enable_block_stm_profiling: false,
+                enable_committer_backup: true,
             },
             onchain: onchain_config,
         };

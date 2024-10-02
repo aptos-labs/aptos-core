@@ -27,7 +27,7 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, Features},
     vm::configs::set_paranoid_type_checks,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{static_config::AptosVMStaticConfig, AptosVM};
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
 use std::{
@@ -241,6 +241,12 @@ struct Opt {
         help = "Number of threads to use for execution. Generally replaces --concurrency-level flag (directly for default case, and as a total across all shards for sharded case)"
     )]
     execution_threads: Option<usize>,
+
+    #[clap(long, default_value_t = false)]
+    enable_block_stm_profiling: bool,
+
+    #[clap(long, default_value_t = true)]
+    enable_committer_backup: bool,
 
     #[clap(flatten)]
     pruner_opt: PrunerOpt,
@@ -563,10 +569,12 @@ fn main() {
     if opt.skip_paranoid_checks {
         set_paranoid_type_checks(false);
     }
-    AptosVM::set_num_shards_once(execution_shards);
-    AptosVM::set_concurrency_level_once(execution_threads_per_shard);
+    AptosVMStaticConfig::set_num_shards_once(execution_shards);
+    AptosVMStaticConfig::set_concurrency_level_once(execution_threads_per_shard);
+    AptosVMStaticConfig::set_committer_backup_enabled_once(opt.enable_committer_backup);
+    AptosVMStaticConfig::set_block_stm_profiling_enabled_once(opt.enable_block_stm_profiling);
     NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);
-    AptosVM::set_processed_transactions_detailed_counters();
+    AptosVMStaticConfig::set_processed_transactions_detailed_counters();
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);

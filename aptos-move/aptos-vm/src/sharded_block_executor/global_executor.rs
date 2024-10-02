@@ -62,8 +62,10 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: self.concurrency_level,
-                    allow_fallback: true,
+                    allow_sequential_block_fallback: true,
                     discard_failed_blocks: false,
+                    enable_block_stm_profiling: false,
+                    enable_committer_backup: true,
                 },
                 onchain: onchain_config,
             },

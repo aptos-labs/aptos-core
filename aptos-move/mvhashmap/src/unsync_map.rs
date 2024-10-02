@@ -2,16 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    types::{GroupReadResult, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
-    utils::module_hash,
+    types::{GroupReadResult, UnsyncGroupError, ValueWithLayout},
     BlockStateStats,
 };
 use aptos_aggregator::types::{code_invariant_error, DelayedFieldValue};
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
-    delayed_fields::PanicError,
-    executable::{Executable, ExecutableDescriptor, ModulePath},
-    write_set::TransactionWrite,
+    delayed_fields::PanicError, executable::ModulePath, write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_binary_format::errors::PartialVMResult;
@@ -30,13 +27,10 @@ use std::{
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
-/// The functionality also includes Executable caching based on the hash of ExecutableDescriptor
-/// (i.e. module hash for modules published during the latest block - not at storage version).
 pub struct UnsyncMap<
     K: ModulePath,
     T: Hash + Clone + Debug + Eq + Serialize,
     V: TransactionWrite,
-    X: Executable,
     I: Copy,
 > {
     // Only use Arc to provide unified interfaces with the MVHashMap / concurrent setting. This
@@ -45,8 +39,6 @@ pub struct UnsyncMap<
     // Optional hash can store the hash of the module to avoid re-computations.
     module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
     group_cache: RefCell<HashMap<K, RefCell<HashMap<T, ValueWithLayout<V>>>>>,
-    executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
-    executable_bytes: RefCell<usize>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 
     total_base_resource_size: AtomicU64,
@@ -57,17 +49,14 @@ impl<
         K: ModulePath + Hash + Clone + Eq,
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
-        X: Executable,
         I: Hash + Clone + Copy + Eq,
-    > Default for UnsyncMap<K, T, V, X, I>
+    > Default for UnsyncMap<K, T, V, I>
 {
     fn default() -> Self {
         Self {
             resource_map: RefCell::new(HashMap::new()),
             module_map: RefCell::new(HashMap::new()),
             group_cache: RefCell::new(HashMap::new()),
-            executable_cache: RefCell::new(HashMap::new()),
-            executable_bytes: RefCell::new(0),
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
             total_base_delayed_field_size: AtomicU64::new(0),
@@ -79,9 +68,8 @@ impl<
         K: ModulePath + Hash + Clone + Eq + Debug,
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
-        X: Executable,
         I: Hash + Clone + Copy + Eq,
-    > UnsyncMap<K, T, V, X, I>
+    > UnsyncMap<K, T, V, I>
 {
     pub fn new() -> Self {
         Self::default()
@@ -240,18 +228,13 @@ impl<
             .map(|entry| entry.0.clone())
     }
 
-    pub fn fetch_module(&self, key: &K) -> Option<MVModulesOutput<V, X>> {
-        use MVModulesOutput::*;
+    pub fn fetch_module(&self, key: &K) -> Option<Arc<V>> {
         debug_assert!(key.is_module_path());
 
-        self.module_map.borrow_mut().get_mut(key).map(|entry| {
-            let hash = entry.1.get_or_insert(module_hash(entry.0.as_ref()));
-
-            self.executable_cache.borrow().get(hash).map_or_else(
-                || Module((entry.0.clone(), *hash)),
-                |x| Executable((x.clone(), ExecutableDescriptor::Published(*hash))),
-            )
-        })
+        self.module_map
+            .borrow_mut()
+            .get(key)
+            .map(|entry| entry.0.clone())
     }
 
     pub fn fetch_delayed_field(&self, id: &I) -> Option<DelayedFieldValue> {
@@ -280,29 +263,6 @@ impl<
         }
     }
 
-    /// We return false if the executable was already stored, as this isn't supposed to happen
-    /// during sequential execution (and the caller may choose to e.g. log a message).
-    /// Versioned modules storage does not cache executables at storage version, hence directly
-    /// the descriptor hash in ExecutableDescriptor::Published is provided.
-    pub fn store_executable(&self, descriptor_hash: HashValue, executable: X) -> bool {
-        let size = executable.size_bytes();
-        if self
-            .executable_cache
-            .borrow_mut()
-            .insert(descriptor_hash, Arc::new(executable))
-            .is_some()
-        {
-            *self.executable_bytes.borrow_mut() += size;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn executable_size(&self) -> usize {
-        *self.executable_bytes.borrow()
-    }
-
     pub fn write_delayed_field(&self, id: I, value: DelayedFieldValue) {
         self.delayed_field_map.borrow_mut().insert(id, value);
     }
@@ -320,11 +280,10 @@ impl<
 mod test {
     use super::*;
     use crate::types::test::{KeyType, TestValue};
-    use aptos_types::executable::ExecutableTestType;
     use claims::{assert_err, assert_err_eq, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
 
     fn finalize_group_as_hashmap(
-        map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>,
+        map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ()>,
         key: &KeyType<Vec<u8>>,
     ) -> HashMap<usize, ValueWithLayout<TestValue>> {
         map.finalize_group(key).collect()
@@ -334,7 +293,7 @@ mod test {
     #[test]
     fn group_commit_idx() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         map.set_group_base_values(
             ap.clone(),
@@ -422,7 +381,7 @@ mod test {
     #[test]
     fn set_base_twice() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         map.set_group_base_values(
             ap.clone(),
@@ -438,7 +397,7 @@ mod test {
     #[test]
     fn group_op_without_base() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(10, true), None));
     }
@@ -447,7 +406,7 @@ mod test {
     #[test]
     fn group_no_path_exists() {
         let ap = KeyType(b"/foo/b".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         let _ = map.finalize_group(&ap).collect::<Vec<_>>();
     }
@@ -455,7 +414,7 @@ mod test {
     #[test]
     fn group_size() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Uninitialized);
 
@@ -514,7 +473,7 @@ mod test {
     #[test]
     fn group_value() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         // Uninitialized before group is set, TagNotFound afterwards
         assert_err_eq!(

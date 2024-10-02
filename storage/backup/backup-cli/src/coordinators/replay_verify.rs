@@ -21,7 +21,7 @@ use aptos_types::{
     on_chain_config::TimedFeatureOverride, transaction::Version,
     vm::configs::set_timed_feature_override,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::static_config::AptosVMStaticConfig;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -101,7 +101,7 @@ impl ReplayVerifyCoordinator {
     }
 
     async fn run_impl(self) -> Result<(), ReplayError> {
-        AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+        AptosVMStaticConfig::set_concurrency_level_once(self.replay_concurrency_level);
         set_timed_feature_override(TimedFeatureOverride::Replay);
 
         let metadata_view = metadata::cache::sync_and_load(

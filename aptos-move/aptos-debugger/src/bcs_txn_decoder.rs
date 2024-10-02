@@ -17,6 +17,12 @@ pub struct Command {
 
     #[clap(long, default_value_t = 1)]
     concurrency_level: usize,
+
+    #[clap(long, default_value_t = false)]
+    enable_block_stm_profiling: bool,
+
+    #[clap(long, default_value_t = true)]
+    enable_committer_backup: bool,
 }
 
 impl Command {
@@ -71,7 +77,15 @@ impl Command {
             println!(
                 "{:#?}",
                 debugger
-                    .execute_past_transactions(version, 1, false, 1, &[self.concurrency_level])
+                    .execute_past_transactions(
+                        version,
+                        1,
+                        false,
+                        1,
+                        &[self.concurrency_level],
+                        self.enable_block_stm_profiling,
+                        self.enable_committer_backup
+                    )
                     .await?
             );
         }
