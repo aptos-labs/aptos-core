@@ -54,11 +54,15 @@ impl QuorumStoreSender for MockBatchRequester {
         unimplemented!()
     }
 
-    async fn broadcast_batch_msg(&mut self, _batches: Vec<Batch>) {
+    async fn broadcast_batch_msg(&mut self, _batches: Vec<Batch>, _priority_peers: Vec<Author>) {
         unimplemented!()
     }
 
-    async fn broadcast_proof_of_store_msg(&mut self, _proof_of_stores: Vec<ProofOfStore>) {
+    async fn broadcast_proof_of_store_msg(
+        &mut self,
+        _proof_of_stores: Vec<ProofOfStore>,
+        _priority_peers: Vec<Author>,
+    ) {
         unimplemented!()
     }
 

@@ -183,11 +183,20 @@ pub trait QuorumStoreSender: Send + Clone {
         recipients: Vec<Author>,
     );
 
-    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>, priority_authors: Vec<Author>);
 
-    async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore>);
+    async fn broadcast_proof_of_store_msg(
+        &mut self,
+        proof_of_stores: Vec<ProofOfStore>,
+        priority_authors: Vec<Author>,
+    );
 
     async fn send_proof_of_store_msg_to_self(&mut self, proof_of_stores: Vec<ProofOfStore>);
+}
+
+pub enum BroadcastOrder {
+    ByDecreasingLatency,
+    ByDecreasingLatencyWithPriorityPeers(Vec<Author>),
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -304,7 +313,7 @@ impl NetworkSender {
     /// The future is fulfilled as soon as the message is put into the mpsc channel to network
     /// internal (to provide back pressure), it does not indicate the message is delivered or sent
     /// out.
-    async fn broadcast(&self, msg: ConsensusMsg) {
+    async fn broadcast_with_order(&self, msg: ConsensusMsg, order: BroadcastOrder) {
         fail_point!("consensus::send::any", |_| ());
         // Directly send the message to ourself without going through network.
         let self_msg = Event::Message(self.author, msg.clone());
@@ -313,17 +322,38 @@ impl NetworkSender {
             error!("Error broadcasting to self: {:?}", err);
         }
 
-        self.broadcast_without_self(msg);
+        self.broadcast_without_self(msg, order);
     }
 
-    pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
+    async fn broadcast(&self, msg: ConsensusMsg) {
+        self.broadcast_with_order(msg, BroadcastOrder::ByDecreasingLatency)
+            .await
+    }
+
+    pub fn broadcast_without_self(&self, msg: ConsensusMsg, order: BroadcastOrder) {
         let self_author = self.author;
-        let mut other_validators: Vec<_> = self
-            .validators
-            .get_ordered_account_addresses_iter()
-            .filter(|author| author != &self_author)
-            .collect();
-        self.sort_peers_by_latency(&mut other_validators);
+
+        let other_validators = match order {
+            BroadcastOrder::ByDecreasingLatency => {
+                let mut other_validators: Vec<_> = self
+                    .validators
+                    .get_ordered_account_addresses_iter()
+                    .filter(|author| author != &self_author)
+                    .collect();
+                self.sort_peers_by_latency(&mut other_validators);
+                other_validators
+            },
+            BroadcastOrder::ByDecreasingLatencyWithPriorityPeers(mut peers) => {
+                let mut other_validators: Vec<_> = self
+                    .validators
+                    .get_ordered_account_addresses_iter()
+                    .filter(|author| author != &self_author && !peers.contains(author))
+                    .collect();
+                self.sort_peers_by_latency(&mut other_validators);
+                peers.extend(other_validators);
+                peers
+            },
+        };
 
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
@@ -507,16 +537,28 @@ impl QuorumStoreSender for NetworkSender {
         self.send(msg, recipients).await
     }
 
-    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>, priority_authors: Vec<Author>) {
         fail_point!("consensus::send::broadcast_batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
-        self.broadcast(msg).await
+        self.broadcast_with_order(
+            msg,
+            BroadcastOrder::ByDecreasingLatencyWithPriorityPeers(priority_authors),
+        )
+        .await
     }
 
-    async fn broadcast_proof_of_store_msg(&mut self, proofs: Vec<ProofOfStore>) {
+    async fn broadcast_proof_of_store_msg(
+        &mut self,
+        proofs: Vec<ProofOfStore>,
+        priority_authors: Vec<Author>,
+    ) {
         fail_point!("consensus::send::proof_of_store", |_| ());
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
-        self.broadcast(msg).await
+        self.broadcast_with_order(
+            msg,
+            BroadcastOrder::ByDecreasingLatencyWithPriorityPeers(priority_authors),
+        )
+        .await
     }
 
     async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore>) {
