@@ -92,6 +92,7 @@ pub struct ConsensusConfig {
     pub enable_pre_commit: bool,
     pub max_pending_rounds_in_commit_vote_cache: u64,
     pub optimistic_sig_verification: bool,
+    pub enable_round_timeout_msg: bool,
 }
 
 /// Deprecated
@@ -321,6 +322,7 @@ impl Default for ConsensusConfig {
             enable_pre_commit: true,
             max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification: true,
+            enable_round_timeout_msg: false,
         }
     }
 }

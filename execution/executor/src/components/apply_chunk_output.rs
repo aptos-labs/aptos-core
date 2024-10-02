@@ -9,7 +9,7 @@ use crate::{
         chunk_output::{update_counters_for_processed_chunk, ChunkOutput},
         in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
     },
-    metrics::{APTOS_EXECUTOR_ERRORS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS},
+    metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -21,6 +21,7 @@ use aptos_executor_types::{
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::error;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
     contract_event::ContractEvent,
@@ -54,9 +55,8 @@ impl ApplyChunkOutput {
             block_end_info,
         } = chunk_output;
         let (new_epoch, statuses_for_input_txns, to_commit, to_discard, to_retry) = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["sort_transactions"])
-                .start_timer();
+            let _timer = OTHER_TIMERS.timer_with(&["sort_transactions"]);
+
             // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
             // Will return transactions with Retry txns sorted after Keep/Discard txns.
             Self::sort_transactions_with_state_checkpoint(
@@ -76,7 +76,7 @@ impl ApplyChunkOutput {
             state_updates_before_last_checkpoint,
             sharded_state_cache,
         ) = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            let _timer = OTHER_TIMERS
                 .with_label_values(&["calculate_for_transactions"])
                 .start_timer();
             InMemoryStateCalculatorV2::calculate_for_transactions(
@@ -141,9 +141,7 @@ impl ApplyChunkOutput {
         );
 
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["assemble_ledger_diff_for_block"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["assemble_ledger_diff_for_block"]);
 
         let (txns_to_commit, transaction_info_hashes, subscribable_events) =
             Self::assemble_ledger_diff(to_commit, state_updates_vec, state_checkpoint_hashes);
@@ -301,7 +299,7 @@ impl ApplyChunkOutput {
                     t,
                     o.status(),
                 );
-                APTOS_EXECUTOR_ERRORS.inc();
+                EXECUTOR_ERRORS.inc();
             }
         });
 
@@ -331,9 +329,8 @@ impl ApplyChunkOutput {
         let mut txn_info_hashes = Vec::with_capacity(num_txns);
         let hashes_vec =
             Self::calculate_events_and_writeset_hashes(to_commit_from_execution.parsed_outputs());
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["process_events_and_writeset_hashes"])
-            .start_timer();
+
+        let _timer = OTHER_TIMERS.timer_with(&["process_events_and_writeset_hashes"]);
         let hashes_vec: Vec<(HashValue, HashValue)> = hashes_vec
             .into_par_iter()
             .map(|(event_hashes, write_set_hash)| {
@@ -398,9 +395,8 @@ impl ApplyChunkOutput {
     fn calculate_events_and_writeset_hashes(
         to_commit_from_execution: &[ParsedTransactionOutput],
     ) -> Vec<(Vec<HashValue>, HashValue)> {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["calculate_events_and_writeset_hashes"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["calculate_events_and_writeset_hashes"]);
+
         let num_txns = to_commit_from_execution.len();
         to_commit_from_execution
             .par_iter()

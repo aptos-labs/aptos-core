@@ -45,8 +45,9 @@ use aptos_consensus_types::{
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
+    round_timeout::{RoundTimeout, RoundTimeoutMsg, RoundTimeoutReason},
     sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutCertificate,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_data::VoteData,
     vote_msg::VoteMsg,
@@ -83,6 +84,7 @@ use tokio::{
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
+    RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
     SyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
@@ -123,6 +125,15 @@ impl UnverifiedEvent {
                         .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::VoteMsg(v)
+            },
+            UnverifiedEvent::RoundTimeoutMsg(v) => {
+                if !self_message {
+                    v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["timeout"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::RoundTimeoutMsg(v)
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
@@ -179,6 +190,7 @@ impl UnverifiedEvent {
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
+            UnverifiedEvent::RoundTimeoutMsg(t) => Ok(t.epoch()),
         }
     }
 }
@@ -193,6 +205,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
+            ConsensusMsg::RoundTimeoutMsg(m) => UnverifiedEvent::RoundTimeoutMsg(m),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -204,6 +217,7 @@ pub enum VerifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
+    RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
@@ -710,49 +724,91 @@ impl RoundManager {
             bail!("[RoundManager] sync_only flag is set, broadcasting SyncInfo");
         }
 
-        let (is_nil_vote, mut timeout_vote) = match self.round_state.vote_sent() {
-            Some(vote) if vote.vote_data().proposed().round() == round => {
-                (vote.vote_data().is_for_nil(), vote)
-            },
-            _ => {
-                // Didn't vote in this round yet, generate a backup vote
-                let nil_block = self
-                    .proposal_generator
-                    .generate_nil_block(round, self.proposer_election.clone())?;
-                info!(
-                    self.new_log(LogEvent::VoteNIL),
-                    "Planning to vote for a NIL block {}", nil_block
+        if self.local_config.enable_round_timeout_msg {
+            let timeout = if let Some(timeout) = self.round_state.timeout_sent() {
+                timeout
+            } else {
+                let timeout = TwoChainTimeout::new(
+                    self.epoch_state().epoch,
+                    round,
+                    self.block_store.highest_quorum_cert().as_ref().clone(),
                 );
-                counters::VOTE_NIL_COUNT.inc();
-                let nil_vote = self.vote_block(nil_block).await?;
-                (true, nil_vote)
-            },
-        };
+                let signature = self
+                    .safety_rules
+                    .lock()
+                    .sign_timeout_with_qc(
+                        &timeout,
+                        self.block_store.highest_2chain_timeout_cert().as_deref(),
+                    )
+                    .context("[RoundManager] SafetyRules signs 2-chain timeout")?;
 
-        if !timeout_vote.is_timeout() {
-            let timeout = timeout_vote
-                .generate_2chain_timeout(self.block_store.highest_quorum_cert().as_ref().clone());
-            let signature = self
-                .safety_rules
-                .lock()
-                .sign_timeout_with_qc(
-                    &timeout,
-                    self.block_store.highest_2chain_timeout_cert().as_deref(),
+                // TODO(ibalajiarun): placeholder, update with proper reason.
+                let timeout_reason = RoundTimeoutReason::Unknown;
+                RoundTimeout::new(
+                    timeout,
+                    self.proposal_generator.author(),
+                    timeout_reason,
+                    signature,
                 )
-                .context("[RoundManager] SafetyRules signs 2-chain timeout")?;
-            timeout_vote.add_2chain_timeout(timeout, signature);
-        }
+            };
 
-        self.round_state.record_vote(timeout_vote.clone());
-        let timeout_vote_msg = VoteMsg::new(timeout_vote, self.block_store.sync_info());
-        self.network.broadcast_timeout_vote(timeout_vote_msg).await;
-        warn!(
-            round = round,
-            remote_peer = self.proposer_election.get_valid_proposer(round),
-            voted_nil = is_nil_vote,
-            event = LogEvent::Timeout,
-        );
-        bail!("Round {} timeout, broadcast to all peers", round);
+            self.round_state.record_round_timeout(timeout.clone());
+            let round_timeout_msg = RoundTimeoutMsg::new(timeout, self.block_store.sync_info());
+            self.network
+                .broadcast_round_timeout(round_timeout_msg)
+                .await;
+            warn!(
+                round = round,
+                remote_peer = self.proposer_election.get_valid_proposer(round),
+                event = LogEvent::Timeout,
+            );
+            bail!("Round {} timeout, broadcast to all peers", round);
+        } else {
+            let (is_nil_vote, mut timeout_vote) = match self.round_state.vote_sent() {
+                Some(vote) if vote.vote_data().proposed().round() == round => {
+                    (vote.vote_data().is_for_nil(), vote)
+                },
+                _ => {
+                    // Didn't vote in this round yet, generate a backup vote
+                    let nil_block = self
+                        .proposal_generator
+                        .generate_nil_block(round, self.proposer_election.clone())?;
+                    info!(
+                        self.new_log(LogEvent::VoteNIL),
+                        "Planning to vote for a NIL block {}", nil_block
+                    );
+                    counters::VOTE_NIL_COUNT.inc();
+                    let nil_vote = self.vote_block(nil_block).await?;
+                    (true, nil_vote)
+                },
+            };
+
+            if !timeout_vote.is_timeout() {
+                let timeout = timeout_vote.generate_2chain_timeout(
+                    self.block_store.highest_quorum_cert().as_ref().clone(),
+                );
+                let signature = self
+                    .safety_rules
+                    .lock()
+                    .sign_timeout_with_qc(
+                        &timeout,
+                        self.block_store.highest_2chain_timeout_cert().as_deref(),
+                    )
+                    .context("[RoundManager] SafetyRules signs 2-chain timeout")?;
+                timeout_vote.add_2chain_timeout(timeout, signature);
+            }
+
+            self.round_state.record_vote(timeout_vote.clone());
+            let timeout_vote_msg = VoteMsg::new(timeout_vote, self.block_store.sync_info());
+            self.network.broadcast_timeout_vote(timeout_vote_msg).await;
+            warn!(
+                round = round,
+                remote_peer = self.proposer_election.get_valid_proposer(round),
+                voted_nil = is_nil_vote,
+                event = LogEvent::Timeout,
+            );
+            bail!("Round {} timeout, broadcast to all peers", round);
+        }
     }
 
     /// This function is called only after all the dependencies of the given QC have been retrieved.
@@ -1345,7 +1401,7 @@ impl RoundManager {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
             },
-            VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
+            VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_timeout_sent() => {
                 self.process_local_timeout(round).await
             },
             VoteReceptionResult::VoteAdded(_) => {
@@ -1355,6 +1411,70 @@ impl RoundManager {
             VoteReceptionResult::EchoTimeout(_) | VoteReceptionResult::DuplicateVote => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),
         }
+    }
+
+    async fn process_timeout_reception_result(
+        &mut self,
+        timeout: &RoundTimeout,
+        result: VoteReceptionResult,
+    ) -> anyhow::Result<()> {
+        let round = timeout.round();
+        match result {
+            VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
+                self.new_2chain_tc_aggregated(tc).await
+            },
+            VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_timeout_sent() => {
+                self.process_local_timeout(round).await
+            },
+            VoteReceptionResult::VoteAdded(_) | VoteReceptionResult::EchoTimeout(_) => Ok(()),
+            result @ VoteReceptionResult::NewQuorumCertificate(_)
+            | result @ VoteReceptionResult::DuplicateVote => {
+                bail!("Unexpected result from timeout processing: {:?}", result);
+            },
+            e => Err(anyhow::anyhow!("{:?}", e)),
+        }
+    }
+
+    pub async fn process_round_timeout_msg(
+        &mut self,
+        round_timeout_msg: RoundTimeoutMsg,
+    ) -> anyhow::Result<()> {
+        fail_point!("consensus::process_round_timeout_msg", |_| {
+            Err(anyhow::anyhow!(
+                "Injected error in process_round_timeout_msg"
+            ))
+        });
+        // Check whether this validator is a valid recipient of the vote.
+        if self
+            .ensure_round_and_sync_up(
+                round_timeout_msg.round(),
+                round_timeout_msg.sync_info(),
+                round_timeout_msg.author(),
+            )
+            .await
+            .context("[RoundManager] Stop processing vote")?
+        {
+            self.process_round_timeout(round_timeout_msg.timeout())
+                .await
+                .context("[RoundManager] Add a new timeout")?;
+        }
+        Ok(())
+    }
+
+    async fn process_round_timeout(&mut self, timeout: RoundTimeout) -> anyhow::Result<()> {
+        info!(
+            self.new_log(LogEvent::ReceiveRoundTimeout)
+                .remote_peer(timeout.author()),
+            vote = %timeout,
+            epoch = timeout.epoch(),
+            round = timeout.round(),
+        );
+
+        let vote_reception_result = self
+            .round_state
+            .insert_round_timeout(&timeout, &self.epoch_state.verifier);
+        self.process_timeout_reception_result(&timeout, vote_reception_result)
+            .await
     }
 
     async fn process_order_vote_reception_result(
@@ -1604,6 +1724,9 @@ impl RoundManager {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
+                        }
+                        VerifiedEvent::RoundTimeoutMsg(timeout_msg) => {
+                            monitor!("process_round_timeout", self.process_round_timeout_msg(*timeout_msg).await)
                         }
                         VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
                             monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg).await)

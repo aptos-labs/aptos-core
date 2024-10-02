@@ -157,6 +157,8 @@ impl Vote {
     /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,
     /// and then verifies the signature.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        // TODO(ibalajiarun): Ensure timeout is None if RoundTimeoutMsg is enabled.
+
         ensure!(
             self.ledger_info.consensus_data_hash() == self.vote_data.hash(),
             "Vote's hash mismatch with LedgerInfo"

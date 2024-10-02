@@ -21,6 +21,7 @@ pub(crate) struct ChunkToUpdateLedger {
     pub state_checkpoint_output: StateCheckpointOutput,
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
+
     /// the below are from the input -- can be checked / used only after the transaction accumulator
     /// is updated.
     pub verified_target_li: LedgerInfoWithSignatures,

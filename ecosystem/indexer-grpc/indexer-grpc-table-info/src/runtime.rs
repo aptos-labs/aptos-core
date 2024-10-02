@@ -14,9 +14,9 @@ use aptos_db_indexer::{
 };
 use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReaderWriter;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, transaction::Version};
 use std::sync::Arc;
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, sync::watch::Receiver as WatchReceiver};
 
 const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
 
@@ -24,14 +24,18 @@ pub fn bootstrap_internal_indexer_db(
     config: &NodeConfig,
     db_rw: DbReaderWriter,
     internal_indexer_db: Option<InternalIndexerDB>,
+    update_receiver: Option<WatchReceiver<Version>>,
 ) -> Option<(Runtime, Arc<DBIndexer>)> {
     if !config.indexer_db_config.is_internal_indexer_db_enabled() || internal_indexer_db.is_none() {
         return None;
     }
     let runtime = aptos_runtimes::spawn_named_runtime("index-db".to_string(), None);
     // Set up db config and open up the db initially to read metadata
-    let mut indexer_service =
-        InternalIndexerDBService::new(db_rw.reader, internal_indexer_db.unwrap());
+    let mut indexer_service = InternalIndexerDBService::new(
+        db_rw.reader,
+        internal_indexer_db.unwrap(),
+        update_receiver.expect("Internal indexer db update receiver is missing"),
+    );
     let db_indexer = indexer_service.get_db_indexer();
     // Spawn task for db indexer
     let config_clone = config.to_owned();

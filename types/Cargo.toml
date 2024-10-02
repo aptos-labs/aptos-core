@@ -21,9 +21,12 @@ aptos-dkg = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
+ark-relations = { workspace = true }
 ark-serialize = { workspace = true }
+ark-std = { workspace = true }
 arr_macro = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
@@ -70,6 +73,7 @@ thiserror = { workspace = true }
 ahash = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }
 aptos-proptest-helpers = { workspace = true }
+ark-crypto-primitives = { workspace = true }
 async-trait = { workspace = true }
 ciborium = { workspace = true }
 claims = { workspace = true }
