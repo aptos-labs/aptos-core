@@ -16,7 +16,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use move_binary_format::{errors::PartialVMResult, file_format::CompiledScript};
+use move_binary_format::file_format::CompiledScript;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::Script;
 use serde::Serialize;

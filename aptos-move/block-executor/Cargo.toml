@@ -21,6 +21,7 @@ aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 arc-swap = { workspace = true }

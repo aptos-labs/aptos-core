@@ -9,7 +9,8 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::{
-    abstract_write_op::GroupWrite, module_and_script_storage::module_storage::AptosModuleStorage,
+    abstract_write_op::GroupWrite,
+    module_and_script_storage::module_storage::AptosModuleStorage,
     resource_group_adapter::{
         check_size_and_existence_match, decrement_size_for_remove_tag, group_tagged_resource_size,
         increment_size_for_add_tag,

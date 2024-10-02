@@ -5,7 +5,7 @@ use crate::{
     scripts::ScriptCacheEntry, types::TxnIndex, versioned_module_storage::VersionedModuleStorage,
 };
 use aptos_types::{
-    delayed_fields::PanicError, executable::ModulePath, vm::modules::ModuleStorageEntry,
+    error::PanicError, executable::ModulePath, vm::modules::ModuleStorageEntry,
     write_set::TransactionWrite,
 };
 use crossbeam::utils::CachePadded;

@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::view::{LatestView, ViewState};
+use crate::{
+    counters::{
+        FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS, GET_MODULE_STATE_VALUE_SECONDS,
+        READ_MODULE_ENTRY_FROM_MODULE_STORAGE_SECONDS,
+    },
+    view::{LatestView, ViewState},
+};
 use aptos_mvhashmap::versioned_module_storage::{ModuleStorageRead, ModuleVersion};
 use aptos_types::{
     executable::{Executable, ModulePath},
@@ -209,7 +215,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
-        let mut visited = HashSet::new();
+        let _timer = FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS.start_timer();
 
         let (version, entry) = match self
             .read_module_storage(address, module_name)?
@@ -222,6 +228,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
             return Ok(Some(module));
         }
 
+        let mut visited = HashSet::new();
         let module = self.traversed_published_dependencies(
             version,
             entry,
@@ -248,6 +255,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         key: &T::Key,
     ) -> VMResult<Option<Arc<ModuleStorageEntry>>> {
+        let _timer = GET_MODULE_STATE_VALUE_SECONDS.start_timer();
         self.get_raw_base_value(key)
             .map_err(|e| e.finish(Location::Undefined))?
             .map(|s| {
@@ -262,6 +270,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         key: &T::Key,
     ) -> VMResult<ModuleStorageRead<ModuleStorageEntry>> {
+        let _timer = READ_MODULE_ENTRY_FROM_MODULE_STORAGE_SECONDS.start_timer();
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // If the module read has been previously cached, return early.
