@@ -271,6 +271,13 @@ impl<'a> BoundsChecker<'a> {
 
     fn check_variant_field_handle(&self, field_handle: &VariantFieldHandle) -> PartialVMResult<()> {
         check_bounds_impl_opt(&self.view.struct_defs(), field_handle.struct_index)?;
+        if field_handle.variants.is_empty() {
+            return Err(verification_error(
+                StatusCode::ZERO_VARIANTS_ERROR,
+                IndexKind::MemberCount,
+                field_handle.field,
+            ));
+        }
         let struct_def = self.view.struct_def_at(field_handle.struct_index)?;
         for variant in &field_handle.variants {
             Self::check_variant_index(struct_def, *variant)?;
