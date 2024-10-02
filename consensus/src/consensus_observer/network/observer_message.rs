@@ -3,9 +3,7 @@
 
 use crate::consensus_observer::common::error::Error;
 use aptos_consensus_types::{
-    common::{BatchPayload, Payload},
-    pipelined_block::PipelinedBlock,
-    proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
+    block::Block, common::{BatchPayload, Payload}, pipelined_block::PipelinedBlock, proof_of_store::{BatchInfo, ProofCache, ProofOfStore}
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::{
@@ -58,6 +56,10 @@ impl ConsensusObserverMessage {
             block,
             transaction_payload,
         })
+    }
+
+    pub fn new_block_proposal_message(block: Block) -> ConsensusObserverDirectSend {
+        ConsensusObserverDirectSend::BlockProposal(block)
     }
 }
 
@@ -129,6 +131,7 @@ pub enum ConsensusObserverDirectSend {
     OrderedBlock(OrderedBlock),
     CommitDecision(CommitDecision),
     BlockPayload(BlockPayload),
+    BlockProposal(Block),
 }
 
 impl ConsensusObserverDirectSend {
@@ -138,6 +141,7 @@ impl ConsensusObserverDirectSend {
             ConsensusObserverDirectSend::OrderedBlock(_) => "ordered_block",
             ConsensusObserverDirectSend::CommitDecision(_) => "commit_decision",
             ConsensusObserverDirectSend::BlockPayload(_) => "block_payload",
+            ConsensusObserverDirectSend::BlockProposal(_) => "block_proposal",
         }
     }
 }
@@ -160,6 +164,9 @@ impl Display for ConsensusObserverDirectSend {
                     block_payload.transaction_payload.limit(),
                     block_payload.transaction_payload.payload_proofs(),
                 )
+            },
+            ConsensusObserverDirectSend::BlockProposal(block) => {
+                write!(f, "BlockProposal: {}", block.id())
             },
         }
     }

@@ -266,6 +266,7 @@ where
                     });
                     V::execute_transaction_block(transactions, state_view, onchain_config.clone())?
                 };
+                debug!("chunk_output: block_id {:?}", block_id);
 
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 

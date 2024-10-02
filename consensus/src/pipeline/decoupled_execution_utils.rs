@@ -12,19 +12,22 @@ use crate::{
         persisting_phase::{PersistingPhase, PersistingRequest},
         pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
-    },
-    state_replication::StateComputer,
+    }, state_computer::SyncStateComputeResultFut, state_replication::StateComputer
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel::Receiver;
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
+use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, epoch_state::EpochState};
+use dashmap::DashMap;
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64},
     Arc,
 };
+
+use super::pre_execution_phase::{PreExecutionPhase, PreExecutionRequest};
 
 /// build channels and return phases and buffer manager
 #[allow(clippy::too_many_arguments)]
@@ -35,6 +38,7 @@ pub fn prepare_phases_and_buffer_manager(
     commit_msg_tx: NetworkSender,
     commit_msg_rx: Receiver<AccountAddress, IncomingCommitRequest>,
     persisting_proxy: Arc<dyn StateComputer>,
+    pre_execute_block_rx: UnboundedReceiver<PipelinedBlock>,
     block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
     epoch_state: Arc<EpochState>,
@@ -45,7 +49,9 @@ pub fn prepare_phases_and_buffer_manager(
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     max_pending_rounds_in_commit_vote_cache: u64,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 ) -> (
+    PipelinePhase<PreExecutionPhase>,
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
@@ -55,12 +61,23 @@ pub fn prepare_phases_and_buffer_manager(
     let reset_flag = Arc::new(AtomicBool::new(false));
     let ongoing_tasks = Arc::new(AtomicU64::new(0));
 
+    // PreExecution Phase
+    let (pre_execution_phase_request_tx, pre_execution_phase_request_rx) =
+        create_channel::<CountedRequest<PreExecutionRequest>>();
+    let pre_execution_phase_processor = PreExecutionPhase::new(execution_proxy.clone(), execution_futures.clone());
+    let pre_execution_phase = PipelinePhase::new(
+        pre_execution_phase_request_rx,
+        None,
+        Box::new(pre_execution_phase_processor),
+        reset_flag.clone(),
+    );
+
     // Execution Phase
     let (execution_schedule_phase_request_tx, execution_schedule_phase_request_rx) =
         create_channel::<CountedRequest<ExecutionRequest>>();
     let (execution_schedule_phase_response_tx, execution_schedule_phase_response_rx) =
         create_channel::<ExecutionWaitRequest>();
-    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy);
+    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy, execution_futures.clone());
     let execution_schedule_phase = PipelinePhase::new(
         execution_schedule_phase_request_rx,
         Some(execution_schedule_phase_response_tx),
@@ -108,6 +125,7 @@ pub fn prepare_phases_and_buffer_manager(
     );
 
     (
+        pre_execution_phase,
         execution_schedule_phase,
         execution_wait_phase,
         signing_phase,
@@ -124,6 +142,8 @@ pub fn prepare_phases_and_buffer_manager(
             commit_msg_rx,
             persisting_phase_request_tx,
             persisting_phase_response_rx,
+            pre_execute_block_rx,
+            Some(pre_execution_phase_request_tx),
             block_rx,
             sync_rx,
             epoch_state,
@@ -136,6 +156,7 @@ pub fn prepare_phases_and_buffer_manager(
             consensus_observer_config,
             consensus_publisher,
             max_pending_rounds_in_commit_vote_cache,
+            execution_futures,
         ),
     )
 }

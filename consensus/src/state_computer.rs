@@ -20,24 +20,28 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    block::Block, common::Round, pipeline_execution_result::PipelineExecutionResult,
+    block::Block, block_data::BlockData, common::Round, pipeline_execution_result::PipelineExecutionResult,
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness, transaction::Transaction,
 };
 use fail::fail_point;
-use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc, time::Instant};
+use futures::{future::{BoxFuture, Shared}, Future, FutureExt, SinkExt, StreamExt};
+use std::{boxed::Box, pin::Pin, sync::Arc, time::Instant};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
+
+pub type SyncBoxFuture<'a, T> = Shared<Pin<Box<dyn Future<Output = T> + Send + 'a>>>;
+pub type SyncStateComputeResultFut = SyncBoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -158,7 +162,7 @@ impl StateComputer for ExecutionProxy {
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
         lifetime_guard: CountedRequest<()>,
-    ) -> StateComputeResultFut {
+    ) -> SyncStateComputeResultFut {
         let block_id = block.id();
         debug!(
             block = %block,
@@ -212,7 +216,7 @@ impl StateComputer for ExecutionProxy {
         counters::PIPELINE_ENTRY_TO_INSERTED_TIME.observe_duration(pipeline_entry_time.elapsed());
         let pipeline_inserted_timestamp = Instant::now();
 
-        Box::pin(async move {
+        async move {
             let pipeline_execution_result = fut.await?;
             debug!(
                 block_id = block_id,
@@ -253,7 +257,7 @@ impl StateComputer for ExecutionProxy {
             }
 
             Ok(pipeline_execution_result)
-        })
+        }.boxed().shared()
     }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.

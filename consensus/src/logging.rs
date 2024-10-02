@@ -47,6 +47,7 @@ pub enum LogEvent {
     Vote,
     VoteNIL,
     // log events related to randomness generation
+    SkipRandomnessGeneration,
     BroadcastRandShare,
     ReceiveProactiveRandShare,
     ReceiveReactiveRandShare,

@@ -6,7 +6,7 @@ use crate::{
     common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeout, vote_data::VoteData,
 };
 use anyhow::{ensure, Context};
-use aptos_crypto::{bls12381, hash::CryptoHash, CryptoMaterialError};
+use aptos_crypto::{bls12381, hash::CryptoHash, CryptoMaterialError, HashValue};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
@@ -95,6 +95,10 @@ impl Vote {
 
     pub fn vote_data(&self) -> &VoteData {
         &self.vote_data
+    }
+
+    pub fn vote_data_hash(&self) -> HashValue {
+        self.vote_data.hash()
     }
 
     /// Return the author of the vote

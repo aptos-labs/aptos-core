@@ -6,7 +6,7 @@ use crate::{
     block::Block,
     common::{Payload, Round},
     order_vote_proposal::OrderVoteProposal,
-    pipeline_execution_result::PipelineExecutionResult,
+    pipeline_execution_result::{PipelineExecutionResult, SyncBoxFuture},
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
@@ -49,7 +49,7 @@ pub struct PipelinedBlock {
     pipeline_insertion_time: OnceCell<Instant>,
     execution_summary: Arc<OnceCell<ExecutionSummary>>,
     #[derivative(PartialEq = "ignore")]
-    pre_commit_fut: Arc<Mutex<Option<BoxFuture<'static, ExecutorResult<()>>>>>,
+    pre_commit_fut: Arc<Mutex<Option<SyncBoxFuture<'static, ExecutorResult<()>>>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -187,7 +187,7 @@ impl PipelinedBlock {
         assert!(self.pipeline_insertion_time.set(Instant::now()).is_ok());
     }
 
-    pub fn take_pre_commit_fut(&self) -> BoxFuture<'static, ExecutorResult<()>> {
+    pub fn take_pre_commit_fut(&self) -> SyncBoxFuture<'static, ExecutorResult<()>> {
         self.pre_commit_fut
             .lock()
             .take()
@@ -333,6 +333,10 @@ impl PipelinedBlock {
 
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
+    }
+
+    pub fn require_randomness(&self) -> bool {
+        self.block().require_randomness()
     }
 }
 

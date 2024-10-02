@@ -71,6 +71,11 @@ impl VMValidator {
             vm,
         }
     }
+
+    pub fn check_randomness(&self, txn: &SignedTransaction) -> bool {
+        let resolver = self.vm.as_move_resolver(&self.state_view);
+        self.vm.check_randomness(txn, &resolver)
+    }
 }
 
 impl TransactionValidation for VMValidator {
@@ -141,6 +146,16 @@ impl PooledVMValidator {
         let random_index = rng.gen_range(0, self.vm_validators.len()); // Generate random index
         self.vm_validators[random_index].clone() // Return the VM at the random index
     }
+
+    pub fn check_randomness(&self, txn: &SignedTransaction) -> bool {
+        self.get_next_vm().lock().unwrap().check_randomness(txn)
+    }
+
+    pub fn check_randomness_in_batch(&self, txns: &Option<Vec<SignedTransaction>>) -> bool {
+        txns.as_ref()
+            .map_or(false, |txns| txns.iter().any(|txn| self.check_randomness(txn)))
+    }
+
 }
 
 impl TransactionValidation for PooledVMValidator {

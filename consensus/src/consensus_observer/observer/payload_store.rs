@@ -10,7 +10,7 @@ use crate::consensus_observer::{
     network::observer_message::{BlockPayload, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{block::Block, common::Round, pipelined_block::PipelinedBlock};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_types::epoch_state::EpochState;
@@ -54,6 +54,15 @@ impl BlockPayloadStore {
                 Some(BlockPayloadStatus::AvailableAndVerified(_))
             )
         })
+    }
+
+    pub fn all_payloads_exist_for_proposal(&self, block: &Block) -> bool {
+        let block_payloads = self.block_payloads.lock();
+        let epoch_and_round = (block.epoch(), block.round());
+        matches!(
+            block_payloads.get(&epoch_and_round),
+            Some(BlockPayloadStatus::AvailableAndVerified(_))
+        )
     }
 
     /// Clears all the payloads from the block payload store
@@ -161,54 +170,61 @@ impl BlockPayloadStore {
     ) -> Result<(), Error> {
         // Verify each of the blocks in the ordered block
         for ordered_block in ordered_block.blocks() {
-            // Get the block epoch and round
-            let block_epoch = ordered_block.epoch();
-            let block_round = ordered_block.round();
-
-            // Fetch the block payload
-            match self.block_payloads.lock().entry((block_epoch, block_round)) {
-                Entry::Occupied(entry) => {
-                    // Get the block transaction payload
-                    let transaction_payload = match entry.get() {
-                        BlockPayloadStatus::AvailableAndVerified(block_payload) => {
-                            block_payload.transaction_payload()
-                        },
-                        BlockPayloadStatus::AvailableAndUnverified(_) => {
-                            // The payload should have already been verified
-                            return Err(Error::InvalidMessageError(format!(
-                                "Payload verification failed! Block payload for epoch: {:?} and round: {:?} is unverified.",
-                                ordered_block.epoch(),
-                                ordered_block.round()
-                            )));
-                        },
-                    };
-
-                    // Get the ordered block payload
-                    let ordered_block_payload = match ordered_block.block().payload() {
-                        Some(payload) => payload,
-                        None => {
-                            return Err(Error::InvalidMessageError(format!(
-                                "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
-                                ordered_block.epoch(),
-                                ordered_block.round()
-                            )));
-                        },
-                    };
-
-                    // Verify the transaction payload against the ordered block payload
-                    transaction_payload.verify_against_ordered_payload(ordered_block_payload)?;
-                },
-                Entry::Vacant(_) => {
-                    // The payload is missing (this should never happen)
-                    return Err(Error::InvalidMessageError(format!(
-                        "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
-                        ordered_block.epoch(),
-                        ordered_block.round()
-                    )));
-                },
-            }
+            self.verify_payloads_against_block(ordered_block.block())?;
         }
+        Ok(())
+    }
 
+    pub fn verify_payloads_against_block(
+        &mut self,
+        block: &Block,
+    ) -> Result<(), Error> {
+        // Get the block epoch and round
+        let block_epoch = block.epoch();
+        let block_round = block.round();
+
+        // Fetch the block payload
+        match self.block_payloads.lock().entry((block_epoch, block_round)) {
+            Entry::Occupied(entry) => {
+                // Get the block transaction payload
+                let transaction_payload = match entry.get() {
+                    BlockPayloadStatus::AvailableAndVerified(block_payload) => {
+                        block_payload.transaction_payload()
+                    },
+                    BlockPayloadStatus::AvailableAndUnverified(_) => {
+                        // The payload should have already been verified
+                        return Err(Error::InvalidMessageError(format!(
+                            "Payload verification failed! Block payload for epoch: {:?} and round: {:?} is unverified.",
+                            block.epoch(),
+                            block.round()
+                        )));
+                    },
+                };
+
+                // Get the block payload
+                let block_payload = match block.payload() {
+                    Some(payload) => payload,
+                    None => {
+                        return Err(Error::InvalidMessageError(format!(
+                            "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
+                            block.epoch(),
+                            block.round()
+                        )));
+                    },
+                };
+
+                // Verify the transaction payload against the ordered block payload
+                transaction_payload.verify_against_ordered_payload(block_payload)?;
+            },
+            Entry::Vacant(_) => {
+                // The payload is missing (this should never happen)
+                return Err(Error::InvalidMessageError(format!(
+                    "Payload verification failed! Missing block payload for epoch: {:?} and round: {:?}",
+                    block.epoch(),
+                    block.round()
+                )));
+            },
+        }
         Ok(())
     }
 

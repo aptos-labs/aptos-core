@@ -385,8 +385,9 @@ impl BatchProofQueue {
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
-    ) -> (Vec<ProofOfStore>, PayloadTxnsSize, u64, bool) {
-        let (result, all_txns, unique_txns, is_full) = self.pull_internal(
+        proofs_with_data: bool,
+    ) -> (Vec<ProofOfStore>, PayloadTxnsSize, u64, bool, Vec<Arc<Option<Vec<SignedTransaction>>>>) {
+        let (result, all_txns, unique_txns, is_full, ret_txns) = self.pull_internal(
             false,
             excluded_batches,
             max_txns,
@@ -394,6 +395,7 @@ impl BatchProofQueue {
             soft_max_txns_after_filtering,
             return_non_full,
             block_timestamp,
+            proofs_with_data,
         );
         let proof_of_stores: Vec<_> = result
             .into_iter()
@@ -411,6 +413,7 @@ impl BatchProofQueue {
             })
             .collect();
 
+
         if is_full || return_non_full {
             counters::BLOCK_SIZE_WHEN_PULL.observe(unique_txns as f64);
             counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(all_txns.count() as f64);
@@ -423,7 +426,7 @@ impl BatchProofQueue {
             self.log_remaining_data_after_pull(excluded_batches, &proof_of_stores);
         }
 
-        (proof_of_stores, all_txns, unique_txns, !is_full)
+        (proof_of_stores, all_txns, unique_txns, !is_full, ret_txns)
     }
 
     pub fn pull_batches(
@@ -434,8 +437,9 @@ impl BatchProofQueue {
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
-    ) -> (Vec<BatchInfo>, PayloadTxnsSize, u64) {
-        let (result, all_txns, unique_txns, _) = self.pull_internal(
+        batches_with_data: bool,
+    ) -> (Vec<BatchInfo>, PayloadTxnsSize, u64, Vec<Arc<Option<Vec<SignedTransaction>>>>) {
+        let (result, all_txns, unique_txns, _, ret_txns) = self.pull_internal(
             true,
             excluded_batches,
             max_txns,
@@ -443,9 +447,10 @@ impl BatchProofQueue {
             soft_max_txns_after_filtering,
             return_non_full,
             block_timestamp,
+            batches_with_data,
         );
         let batches = result.into_iter().map(|item| item.info.clone()).collect();
-        (batches, all_txns, unique_txns)
+        (batches, all_txns, unique_txns, ret_txns)
     }
 
     pub fn pull_batches_with_transactions(
@@ -461,17 +466,18 @@ impl BatchProofQueue {
         PayloadTxnsSize,
         u64,
     ) {
-        let (batches, all_txns, unique_txns) = self.pull_batches(
+        let (batches, all_txns, unique_txns, _) = self.pull_batches(
             excluded_batches,
             max_txns,
             max_txns_after_filtering,
             soft_max_txns_after_filtering,
             return_non_full,
             block_timestamp,
+            false,
         );
         let mut result = Vec::new();
         for batch in batches.into_iter() {
-            if let Ok(mut persisted_value) = self.batch_store.get_batch_from_local(batch.digest()) {
+            if let Ok(persisted_value) = self.batch_store.get_batch_from_local(batch.digest()) {
                 if let Some(txns) = persisted_value.take_payload() {
                     result.push((batch, txns));
                 }
@@ -494,12 +500,14 @@ impl BatchProofQueue {
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
-    ) -> (Vec<&QueueItem>, PayloadTxnsSize, u64, bool) {
+        batches_with_data: bool,
+    ) -> (Vec<&QueueItem>, PayloadTxnsSize, u64, bool, Vec<Arc<Option<Vec<SignedTransaction>>>>) {
         let mut result = Vec::new();
         let mut cur_unique_txns = 0;
         let mut cur_all_txns = PayloadTxnsSize::zero();
         let mut excluded_txns = 0;
         let mut full = false;
+        let mut ret_txns = Vec::new();
         // Set of all the excluded transactions and all the transactions included in the result
         let mut filtered_txns = HashSet::new();
         for batch_info in excluded_batches {
@@ -563,6 +571,19 @@ impl BatchProofQueue {
                             full = true;
                             return false;
                         }
+                        if batches_with_data {
+                            match self.batch_store.get_batch_from_local(batch.digest()) {
+                                Ok(persisted_value) => {
+                                    ret_txns.push(persisted_value.payload_arc());
+                                    counters::BATCH_WITH_DATA.inc();
+                                }
+                                Err(_) => {
+                                    // If the batch is not found in local storage, skip it.
+                                    counters::BATCH_WITHOUT_DATA.inc();
+                                    return false;
+                                }
+                            }
+                        }
                         cur_all_txns += batch.size();
                         // Add this batch to filtered_txns and calculate the number of
                         // unique transactions added in the result so far.
@@ -615,9 +636,9 @@ impl BatchProofQueue {
         if full || return_non_full {
             // Stable sort, so the order of proofs within an author will not change.
             result.sort_by_key(|item| Reverse(item.info.gas_bucket_start()));
-            (result, cur_all_txns, cur_unique_txns, full)
+            (result, cur_all_txns, cur_unique_txns, full, ret_txns)
         } else {
-            (Vec::new(), PayloadTxnsSize::zero(), 0, full)
+            (Vec::new(), PayloadTxnsSize::zero(), 0, full, Vec::new())
         }
     }
 
@@ -812,5 +833,9 @@ impl BatchProofQueue {
             }
         }
         counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
+    }
+
+    pub fn batch_store(&self) -> &Arc<BatchStore> {
+        &self.batch_store
     }
 }

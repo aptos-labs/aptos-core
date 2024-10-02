@@ -22,9 +22,11 @@ use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
+use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
+use aptos_vm_validator::vm_validator::PooledVMValidator;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
@@ -695,6 +697,10 @@ pub fn setup_environment_and_start_node(
         update_receiver,
     )?;
 
+    let pooled_validator = Arc::new(RwLock::new(PooledVMValidator::new(
+        Arc::clone(&db_rw.reader),
+        num_cpus::get(),
+    )));
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
         services::start_mempool_runtime_and_get_consensus_sender(
@@ -705,6 +711,7 @@ pub fn setup_environment_and_start_node(
             mempool_listener,
             mempool_client_receiver,
             peers_and_metadata,
+            pooled_validator.clone(),
         );
 
     // Create the DKG runtime and get the VTxn pool
@@ -746,6 +753,7 @@ pub fn setup_environment_and_start_node(
         vtxn_pool,
         consensus_publisher.clone(),
         &mut admin_service,
+        pooled_validator,
     );
 
     Ok(AptosHandle {

@@ -21,6 +21,7 @@ use aptos_types::{
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
@@ -52,7 +53,7 @@ fn verify_signatures(
     PartialSignatures::new(
         unverified_signatures
             .signatures()
-            .iter()
+            .par_iter()
             .filter(|(author, sig)| validator.verify(**author, commit_ledger_info, sig).is_ok())
             .map(|(author, sig)| (*author, sig.clone()))
             .collect(),
@@ -433,6 +434,8 @@ impl BufferItem {
                         .unverified_signatures
                         .add_signature(author, signature);
                     return Ok(());
+                } else {
+                    return Err(anyhow!("Inconsistent commit info ordered {} vs {}", ordered.ordered_proof.commit_info(), target_commit_info));
                 }
             },
             Self::Executed(executed) => {
@@ -441,12 +444,16 @@ impl BufferItem {
                         .partial_commit_proof
                         .add_signature(author, signature);
                     return Ok(());
+                } else {
+                    return Err(anyhow!("Inconsistent commit info executed {} vs {}", executed.commit_info, target_commit_info));
                 }
             },
             Self::Signed(signed) => {
                 if signed.partial_commit_proof.commit_info() == target_commit_info {
                     signed.partial_commit_proof.add_signature(author, signature);
                     return Ok(());
+                } else {
+                    return Err(anyhow!("Inconsistent commit info signed {} vs {}", signed.partial_commit_proof.commit_info(), target_commit_info));
                 }
             },
             Self::Aggregated(aggregated) => {
@@ -454,10 +461,12 @@ impl BufferItem {
                 // but return true is helpful to stop the outer loop early
                 if aggregated.commit_proof.commit_info() == target_commit_info {
                     return Ok(());
+                } else {
+                    return Err(anyhow!("Inconsistent commit info aggregated {} vs {}", aggregated.commit_proof.commit_info(), target_commit_info));
                 }
             },
         }
-        Err(anyhow!("Inconsistent commit info."))
+        // Err(anyhow!("Inconsistent commit info."))
     }
 
     pub fn is_ordered(&self) -> bool {

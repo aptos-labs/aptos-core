@@ -26,11 +26,13 @@ use aptos_dkg_runtime::{start_dkg_runtime, DKGMessage};
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
+use aptos_infallible::RwLock;
 use aptos_jwk_consensus::{start_jwk_consensus_runtime, types::JWKConsensusMsg};
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_validator_transaction_pool::VTxnPoolState;
+use aptos_vm_validator::vm_validator::PooledVMValidator;
 use futures::channel::mpsc::Sender;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -46,6 +48,7 @@ pub fn create_consensus_runtime(
     vtxn_pool: VTxnPoolState,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     admin_service: &mut AdminService,
+    validator: Arc<RwLock<PooledVMValidator>>,
 ) -> Option<Runtime> {
     consensus_network_interfaces.map(|consensus_network_interfaces| {
         let (consensus_runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
@@ -57,6 +60,7 @@ pub fn create_consensus_runtime(
             consensus_to_mempool_sender.clone(),
             vtxn_pool,
             consensus_publisher.clone(),
+            validator,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
 

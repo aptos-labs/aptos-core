@@ -2202,6 +2202,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
+        None,
     )
     .unwrap();
 
@@ -2286,6 +2287,7 @@ fn assert_process_proposal_result(
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
+        None,
     )
     .unwrap();
 
@@ -2350,6 +2352,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
+        None,
     )
     .unwrap();
 
@@ -2361,6 +2364,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
+        None,
     )
     .unwrap();
 
@@ -2372,6 +2376,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
+        None,
     )
     .unwrap();
 
@@ -2383,6 +2388,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
+        None,
     )
     .unwrap();
 
@@ -2394,6 +2400,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         genesis_qc.clone(),
         &node.signer,
         Vec::new(),
+        None,
     )
     .unwrap();
 
