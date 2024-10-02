@@ -26,6 +26,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use async_trait::async_trait;
 use futures::{channel::mpsc::Sender, FutureExt};
+use itertools::Itertools;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     ops::Deref,
@@ -305,7 +306,52 @@ impl TPayloadManager for QuorumStorePayloadManager {
             },
             Payload::InQuorumStore(_) => true,
             Payload::InQuorumStoreWithLimit(_) => true,
-            Payload::QuorumStoreInlineHybrid(_, _, _) => true,
+            Payload::QuorumStoreInlineHybrid(inline_batches, proofs, _) => {
+                fn update_availability_metrics<'a>(
+                    batch_reader: &Arc<dyn BatchReader>,
+                    is_proof_label: &str,
+                    total_count: usize,
+                    batch_infos: impl Iterator<Item = &'a BatchInfo>,
+                ) {
+                    for (author, chunk) in &batch_infos.chunk_by(|info| info.author()) {
+                        let available_count = chunk
+                            .filter_map(|info| batch_reader.exists(info.digest()))
+                            .count();
+                        let missing_count = total_count - available_count;
+                        counters::CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS
+                            .with_label_values(&[
+                                &author.to_hex_literal(),
+                                is_proof_label,
+                                "available",
+                            ])
+                            .inc_by(available_count as u64);
+                        counters::CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS
+                            .with_label_values(&[
+                                &author.to_hex_literal(),
+                                is_proof_label,
+                                "missing",
+                            ])
+                            .inc_by(missing_count as u64);
+                    }
+                }
+
+                update_availability_metrics(
+                    &self.batch_reader,
+                    "false",
+                    inline_batches.len(),
+                    inline_batches.iter().map(|(batch_info, _)| batch_info),
+                );
+                update_availability_metrics(
+                    &self.batch_reader,
+                    "true",
+                    proofs.proofs.len(),
+                    proofs.proofs.iter().map(|proof| proof.info()),
+                );
+
+                // The payload is considered available because it contains only proofs that guarantee network availabiliy
+                // or inlined transactions.
+                true
+            },
             Payload::OptQuorumStore(opt_qs_payload) => {
                 for batch in opt_qs_payload.opt_batches().deref() {
                     if self.batch_reader.exists(batch.digest()).is_none() {
