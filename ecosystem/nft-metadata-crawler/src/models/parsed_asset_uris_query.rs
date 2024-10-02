@@ -16,7 +16,7 @@ use tracing::error;
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(asset_uri))]
 #[diesel(table_name = parsed_asset_uris)]
-pub struct NFTMetadataCrawlerURIsQuery {
+pub struct ParsedAssetUrisQuery {
     pub asset_uri: String,
     pub raw_image_uri: Option<String>,
     pub raw_animation_uri: Option<String>,
@@ -31,7 +31,7 @@ pub struct NFTMetadataCrawlerURIsQuery {
     pub last_transaction_version: i64,
 }
 
-impl NFTMetadataCrawlerURIsQuery {
+impl ParsedAssetUrisQuery {
     pub fn get_by_asset_uri(
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
         asset_uri: &str,
@@ -39,7 +39,7 @@ impl NFTMetadataCrawlerURIsQuery {
         let mut op = || {
             parsed_asset_uris::table
                 .find(asset_uri)
-                .first::<NFTMetadataCrawlerURIsQuery>(conn)
+                .first::<ParsedAssetUrisQuery>(conn)
                 .optional()
                 .map_err(Into::into)
         };
@@ -65,7 +65,7 @@ impl NFTMetadataCrawlerURIsQuery {
                 .filter(parsed_asset_uris::raw_image_uri.eq(raw_image_uri))
                 .filter(parsed_asset_uris::asset_uri.ne(asset_uri))
                 .filter(parsed_asset_uris::cdn_image_uri.is_not_null())
-                .first::<NFTMetadataCrawlerURIsQuery>(conn)
+                .first::<ParsedAssetUrisQuery>(conn)
                 .optional()
                 .map_err(Into::into)
         };
@@ -91,7 +91,7 @@ impl NFTMetadataCrawlerURIsQuery {
                 .filter(parsed_asset_uris::raw_animation_uri.eq(raw_animation_uri))
                 .filter(parsed_asset_uris::asset_uri.ne(asset_uri))
                 .filter(parsed_asset_uris::cdn_animation_uri.is_not_null())
-                .first::<NFTMetadataCrawlerURIsQuery>(conn)
+                .first::<ParsedAssetUrisQuery>(conn)
                 .optional()
                 .map_err(Into::into)
         };
@@ -108,7 +108,7 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 }
 
-impl Default for NFTMetadataCrawlerURIsQuery {
+impl Default for ParsedAssetUrisQuery {
     fn default() -> Self {
         Self {
             asset_uri: "".to_string(),

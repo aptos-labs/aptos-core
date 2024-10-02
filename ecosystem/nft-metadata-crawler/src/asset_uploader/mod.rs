@@ -4,7 +4,7 @@
 use crate::{
     asset_uploader::config::AssetUploaderConfig,
     config::Server,
-    models::nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
+    models::parsed_asset_uris::ParsedAssetUris,
     utils::{
         constants::{MAX_ASSET_UPLOAD_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
         database::upsert_uris,
@@ -144,7 +144,7 @@ impl AssetUploaderContext {
                             cdn_uri = cdn_url,
                             "[Asset Uploader] Writing to Postgres"
                         );
-                        let mut model = NFTMetadataCrawlerURIs::new(url.as_ref());
+                        let mut model = ParsedAssetUris::new(url.as_ref());
                         model.set_cdn_image_uri(Some(cdn_url.clone()));
 
                         let mut conn = self_clone.pool.get().context("Failed to get connection")?;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    models::nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
+    models::parsed_asset_uris_query::ParsedAssetUrisQuery,
     schema::nft_metadata_crawler::parsed_asset_uris,
 };
 use diesel::prelude::*;
@@ -13,7 +13,7 @@ use tracing::warn;
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(asset_uri))]
 #[diesel(table_name = parsed_asset_uris)]
-pub struct NFTMetadataCrawlerURIs {
+pub struct ParsedAssetUris {
     asset_uri: String,
     raw_image_uri: Option<String>,
     raw_animation_uri: Option<String>,
@@ -27,7 +27,7 @@ pub struct NFTMetadataCrawlerURIs {
     last_transaction_version: i64,
 }
 
-impl NFTMetadataCrawlerURIs {
+impl ParsedAssetUris {
     pub fn new(asset_uri: &str) -> Self {
         Self {
             asset_uri: asset_uri.to_string(),
@@ -172,8 +172,8 @@ impl NFTMetadataCrawlerURIs {
     }
 }
 
-impl From<NFTMetadataCrawlerURIsQuery> for NFTMetadataCrawlerURIs {
-    fn from(query: NFTMetadataCrawlerURIsQuery) -> Self {
+impl From<ParsedAssetUrisQuery> for ParsedAssetUris {
+    fn from(query: ParsedAssetUrisQuery) -> Self {
         Self {
             asset_uri: query.asset_uri,
             raw_image_uri: query.raw_image_uri,

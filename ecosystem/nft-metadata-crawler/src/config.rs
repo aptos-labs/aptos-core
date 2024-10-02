@@ -85,6 +85,9 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
     }
 
     fn get_server_name(&self) -> String {
-        "parser".to_string()
+        match &self.server_config {
+            ServerConfig::Parser(_) => "parser".to_string(),
+            ServerConfig::AssetUploader(_) => "asset_uploader".to_string(),
+        }
     }
 }

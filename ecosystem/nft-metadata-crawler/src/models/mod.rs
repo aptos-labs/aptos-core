@@ -2,5 +2,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod ledger_info;
-pub mod nft_metadata_crawler_uris;
-pub mod nft_metadata_crawler_uris_query;
+pub mod parsed_asset_uris;
+pub mod parsed_asset_uris_query;
