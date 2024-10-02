@@ -376,8 +376,8 @@ pub fn update_new_epoch_metrics() {
 
 /// Executes the given list of transactions and
 /// returns the number of transactions in the list.
-pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + Clone>(
-    mut storage_synchronizer: StorageSyncer,
+pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface>(
+    storage_synchronizer: &mut StorageSyncer,
     notification_metadata: NotificationMetadata,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -397,8 +397,8 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + 
 
 /// Applies the given list of transaction outputs and
 /// returns the number of outputs in the list.
-pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterface + Clone>(
-    mut storage_synchronizer: StorageSyncer,
+pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterface>(
+    storage_synchronizer: &mut StorageSyncer,
     notification_metadata: NotificationMetadata,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
