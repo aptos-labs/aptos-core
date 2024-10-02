@@ -4,7 +4,7 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, BlockMetadataExtTransaction, BlockMetadataTransaction,
+        BlockEpilogueTransaction, BlockMetadataTransaction,
         DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
         MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
         UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
@@ -206,10 +206,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 (info, payload, events).into()
             },
             BlockMetadata(txn) => Transaction::BlockMetadataTransaction(
-                BlockMetadataTransaction::from_internal_repr(txn, info, events),
+                BlockMetadataTransaction::from_internal(txn, info, events),
             ),
-            BlockMetadataExt(txn) => Transaction::BlockMetadataExtTransaction(
-                BlockMetadataExtTransaction::from_internal_repr(txn, info, events),
+            BlockMetadataExt(txn) => Transaction::BlockMetadataTransaction(
+                BlockMetadataTransaction::from_internal_ext(txn, info, events),
             ),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {

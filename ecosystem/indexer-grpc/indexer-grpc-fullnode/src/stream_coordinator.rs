@@ -399,10 +399,6 @@ impl IndexerStreamCoordinator {
                             bmt.info.block_height = Some(block_height_bcs);
                             bmt.info.epoch = Some(epoch_bcs);
                         },
-                        APITransaction::BlockMetadataExtTransaction(ref mut bmet) => {
-                            bmet.transaction_info_mut().block_height = Some(block_height_bcs);
-                            bmet.transaction_info_mut().epoch = Some(epoch_bcs);
-                        },
                         APITransaction::StateCheckpointTransaction(ref mut sct) => {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);

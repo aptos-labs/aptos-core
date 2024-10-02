@@ -776,9 +776,6 @@ pub fn convert_transaction(
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TransactionType::Validator
         },
-        Transaction::BlockMetadataExtTransaction(_) => {
-            transaction::transaction::TransactionType::BlockMetadata
-        },
     };
 
     let txn_data = match &transaction {
@@ -821,19 +818,6 @@ pub fn convert_transaction(
                     proposer: bm.proposer.to_string(),
                     failed_proposer_indices: bm.failed_proposer_indices.clone(),
                     round: bm.round.0,
-                },
-            )
-        },
-        Transaction::BlockMetadataExtTransaction(bme) => {
-            timestamp = Some(convert_timestamp_usecs(bme.timestamp()));
-            transaction::transaction::TxnData::BlockMetadata(
-                transaction::BlockMetadataTransaction {
-                    id: bme.id().to_string(),
-                    events: convert_events(bme.events()),
-                    previous_block_votes_bitvec: bme.previous_block_votes_bitvec().to_vec(),
-                    proposer: bme.proposer().to_string(),
-                    failed_proposer_indices: bme.failed_proposer_indices().to_vec(),
-                    round: bme.round(),
                 },
             )
         },

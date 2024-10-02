@@ -19,7 +19,7 @@ use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
+    block_metadata_ext::{BlockMetadataExt},
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{DKGTranscript, DKGTranscriptMetadata},
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
@@ -191,7 +191,6 @@ pub enum Transaction {
     UserTransaction(UserTransaction),
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
-    BlockMetadataExtTransaction(BlockMetadataExtTransaction),
     StateCheckpointTransaction(StateCheckpointTransaction),
     BlockEpilogueTransaction(BlockEpilogueTransaction),
     ValidatorTransaction(ValidatorTransaction),
@@ -207,7 +206,6 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.timestamp.0,
             Transaction::BlockEpilogueTransaction(txn) => txn.timestamp.0,
             Transaction::ValidatorTransaction(txn) => txn.timestamp().0,
-            Transaction::BlockMetadataExtTransaction(txn) => txn.timestamp(),
         }
     }
 
@@ -220,9 +218,6 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => Some(txn.info.version.into()),
             Transaction::BlockEpilogueTransaction(txn) => Some(txn.info.version.into()),
             Transaction::ValidatorTransaction(txn) => Some(txn.transaction_info().version.into()),
-            Transaction::BlockMetadataExtTransaction(txn) => {
-                Some(txn.transaction_info().version.into())
-            },
         }
     }
 
@@ -235,7 +230,6 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.info.success,
             Transaction::BlockEpilogueTransaction(txn) => txn.info.success,
             Transaction::ValidatorTransaction(txn) => txn.transaction_info().success,
-            Transaction::BlockMetadataExtTransaction(txn) => txn.transaction_info().success,
         }
     }
 
@@ -252,9 +246,6 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::BlockEpilogueTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::ValidatorTransaction(txn) => txn.transaction_info().vm_status.clone(),
-            Transaction::BlockMetadataExtTransaction(txn) => {
-                txn.transaction_info().vm_status.clone()
-            },
         }
     }
 
@@ -267,7 +258,6 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
             Transaction::BlockEpilogueTransaction(_) => "block_epilogue_transaction",
             Transaction::ValidatorTransaction(vt) => vt.type_str(),
-            Transaction::BlockMetadataExtTransaction(bmet) => bmet.type_str(),
         }
     }
 
@@ -282,7 +272,6 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => &txn.info,
             Transaction::BlockEpilogueTransaction(txn) => &txn.info,
             Transaction::ValidatorTransaction(txn) => txn.transaction_info(),
-            Transaction::BlockMetadataExtTransaction(txn) => txn.transaction_info(),
         })
     }
 }
@@ -568,10 +557,42 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
+    pub extra: Option<BlockMetadataExtra>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtraV0 {}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtraV1 {
+    randomness: Option<HexEncodedBytes>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "extension_type", rename_all = "snake_case")]
+#[oai(
+    one_of,
+    discriminator_name = "extension_type",
+    rename_all = "snake_case"
+)]
+pub enum BlockMetadataExtra {
+    V0(BlockMetadataExtraV0),
+    V1(BlockMetadataExtraV1),
+}
+
+impl BlockMetadataExtra {
+    pub fn from_internal_txn(txn: &BlockMetadataExt) -> Self {
+        match txn {
+            BlockMetadataExt::V0(_) => Self::V0(BlockMetadataExtraV0 {}),
+            BlockMetadataExt::V1(payload) => Self::V1(BlockMetadataExtraV1 {
+                randomness: payload.randomness.clone().map(|pr|HexEncodedBytes::from(pr.randomness_cloned()))
+            }),
+        }
+    }
 }
 
 impl BlockMetadataTransaction {
-    pub fn from_internal_repr(
+    pub fn from_internal(
         internal: BlockMetadata,
         info: TransactionInfo,
         events: Vec<Event>,
@@ -586,155 +607,34 @@ impl BlockMetadataTransaction {
             proposer: internal.proposer().into(),
             failed_proposer_indices: internal.failed_proposer_indices().clone(),
             timestamp: internal.timestamp_usecs().into(),
+            extra: None,
         }
     }
-}
 
-/// A block metadata transaction
-///
-/// This signifies the beginning of a block, and contains information
-/// about the specific block
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct BlockMetadataWithRandomnessTransaction {
-    #[serde(flatten)]
-    #[oai(flatten)]
-    pub info: TransactionInfo,
-    pub id: HashValue,
-    pub epoch: U64,
-    pub round: U64,
-    /// The events emitted at the block creation
-    pub events: Vec<Event>,
-    /// Previous block votes
-    pub previous_block_votes_bitvec: Vec<u8>,
-    pub proposer: Address,
-    /// The indices of the proposers who failed to propose
-    pub failed_proposer_indices: Vec<u32>,
-    pub timestamp: U64,
-    pub randomness: Option<Vec<u8>>,
-}
-
-impl BlockMetadataWithRandomnessTransaction {
-    pub fn from_internal_repr(
-        internal: BlockMetadataWithRandomness,
+    pub fn from_internal_ext(
+        internal: BlockMetadataExt,
         info: TransactionInfo,
         events: Vec<Event>,
     ) -> Self {
         Self {
             info,
-            id: internal.id.into(),
-            epoch: internal.epoch.into(),
-            round: internal.round.into(),
+            id: internal.id().into(),
+            epoch: internal.epoch().into(),
+            round: internal.round().into(),
             events,
-            previous_block_votes_bitvec: internal.previous_block_votes_bitvec.clone(),
-            proposer: internal.proposer.into(),
-            failed_proposer_indices: internal.failed_proposer_indices.clone(),
-            timestamp: internal.timestamp_usecs.into(),
-            randomness: internal.randomness.map(|r| r.randomness().to_vec()),
-        }
-    }
-}
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
-#[serde(tag = "block_metadata_ext_transaction_type", rename_all = "snake_case")]
-#[oai(
-    one_of,
-    discriminator_name = "block_metadata_ext_transaction_type",
-    rename_all = "snake_case"
-)]
-pub enum BlockMetadataExtTransaction {
-    V0(BlockMetadataTransaction),
-    V1(BlockMetadataWithRandomnessTransaction),
-}
-
-impl BlockMetadataExtTransaction {
-    pub fn from_internal_repr(
-        internal: BlockMetadataExt,
-        info: TransactionInfo,
-        events: Vec<Event>,
-    ) -> Self {
-        match internal {
-            BlockMetadataExt::V0(v0) => Self::V0(BlockMetadataTransaction::from_internal_repr(
-                v0, info, events,
-            )),
-            BlockMetadataExt::V1(v1) => Self::V1(
-                BlockMetadataWithRandomnessTransaction::from_internal_repr(v1, info, events),
-            ),
-        }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        match self {
-            BlockMetadataExtTransaction::V0(txn) => txn.epoch.0,
-            BlockMetadataExtTransaction::V1(txn) => txn.epoch.0,
-        }
-    }
-
-    pub fn events(&self) -> &[Event] {
-        match self {
-            BlockMetadataExtTransaction::V0(txn) => &txn.events,
-            BlockMetadataExtTransaction::V1(txn) => &txn.events,
-        }
-    }
-
-    pub fn failed_proposer_indices(&self) -> &[u32] {
-        match self {
-            BlockMetadataExtTransaction::V0(txn) => &txn.failed_proposer_indices,
-            BlockMetadataExtTransaction::V1(txn) => &txn.failed_proposer_indices,
-        }
-    }
-
-    pub fn id(&self) -> HashValue {
-        match self {
-            BlockMetadataExtTransaction::V0(txn) => txn.id,
-            BlockMetadataExtTransaction::V1(txn) => txn.id,
-        }
-    }
-
-    pub fn previous_block_votes_bitvec(&self) -> &[u8] {
-        match self {
-            BlockMetadataExtTransaction::V0(txn) => &txn.previous_block_votes_bitvec,
-            BlockMetadataExtTransaction::V1(txn) => &txn.previous_block_votes_bitvec,
-        }
-    }
-
-    pub fn proposer(&self) -> Address {
-        match self {
-            BlockMetadataExtTransaction::V0(txn) => txn.proposer,
-            BlockMetadataExtTransaction::V1(txn) => txn.proposer,
-        }
-    }
-
-    pub fn round(&self) -> u64 {
-        match self {
-            BlockMetadataExtTransaction::V0(txn) => txn.round.0,
-            BlockMetadataExtTransaction::V1(txn) => txn.round.0,
+            previous_block_votes_bitvec: internal.previous_block_votes_bitvec().clone(),
+            proposer: internal.proposer().into(),
+            failed_proposer_indices: internal.failed_proposer_indices().clone(),
+            timestamp: internal.timestamp_usecs().into(),
+            extra: Some(BlockMetadataExtra::from_internal_txn(&internal)),
         }
     }
 
     pub fn type_str(&self) -> &'static str {
-        match self {
-            BlockMetadataExtTransaction::V0(_) => "block_metadata_ext_transaction__v0",
-            BlockMetadataExtTransaction::V1(_) => "block_metadata_ext_transaction__v1",
-        }
-    }
-
-    pub fn transaction_info(&self) -> &TransactionInfo {
-        match self {
-            BlockMetadataExtTransaction::V0(t) => &t.info,
-            BlockMetadataExtTransaction::V1(t) => &t.info,
-        }
-    }
-
-    pub fn transaction_info_mut(&mut self) -> &mut TransactionInfo {
-        match self {
-            BlockMetadataExtTransaction::V0(t) => &mut t.info,
-            BlockMetadataExtTransaction::V1(t) => &mut t.info,
-        }
-    }
-
-    pub fn timestamp(&self) -> u64 {
-        match self {
-            BlockMetadataExtTransaction::V0(t) => t.timestamp.0,
-            BlockMetadataExtTransaction::V1(t) => t.timestamp.0,
+        match self.extra {
+            None => "block_metadata_transaction",
+            Some(BlockMetadataExtra::V0(_)) => "block_metadata_ext_transaction__v0",
+            Some(BlockMetadataExtra::V1(_)) => "block_metadata_ext_transaction__v1",
         }
     }
 }
