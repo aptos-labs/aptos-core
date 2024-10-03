@@ -27,15 +27,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -324,15 +324,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -621,15 +621,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -918,15 +918,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -1215,15 +1215,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -1512,15 +1512,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -1809,15 +1809,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -2106,15 +2106,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -2403,15 +2403,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -2700,15 +2700,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -2997,15 +2997,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -3294,15 +3294,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -3597,15 +3597,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }
@@ -3900,15 +3900,15 @@ module 0x42::test {
         x: bool,
         y: u8,
     }
-    struct S4 {
+    struct S4<T> {
         x: T,
         y: test::S3,
     }
-    struct S5 {
+    struct S5<T,U> {
         0: T,
         1: U,
     }
-    struct S6 {
+    struct S6<T,U> {
         x: T,
         y: U,
     }

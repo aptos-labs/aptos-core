@@ -1,7 +1,7 @@
 // -- Model dump before env processor pipeline:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -42,7 +42,7 @@ module 0x42::Test {
 // -- Model dump after env processor unused checks:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -83,7 +83,7 @@ module 0x42::Test {
 // -- Model dump after env processor type parameter check:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -124,7 +124,7 @@ module 0x42::Test {
 // -- Model dump after env processor check recursive struct definition:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -165,7 +165,7 @@ module 0x42::Test {
 // -- Model dump after env processor check cyclic type instantiation:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -206,7 +206,7 @@ module 0x42::Test {
 // -- Model dump after env processor unused struct params check:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -247,7 +247,7 @@ module 0x42::Test {
 // -- Model dump after env processor access and use check before inlining:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -288,7 +288,7 @@ module 0x42::Test {
 // -- Model dump after env processor inlining:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -329,7 +329,7 @@ module 0x42::Test {
 // -- Model dump after env processor access and use check after inlining:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -370,7 +370,7 @@ module 0x42::Test {
 // -- Model dump after env processor acquires check:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
@@ -411,7 +411,7 @@ module 0x42::Test {
 // -- Model dump after env processor simplifier:
 module 0x42::Test {
     use 0x1::vector as V; // resolved as: 0x1::vector
-    struct Elem {
+    struct Elem<K,V> {
         k: K,
         v: V,
     }
