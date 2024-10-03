@@ -94,15 +94,17 @@ pub fn execute_user_txn(
     iterations: u64,
     args: Vec<Vec<u8>>,
 ) -> u128 {
-    let elapsed = executor.exec_func_record_running_time(
-        module_name,
-        function_name,
-        vec![],
-        args,
-        iterations,
-        ExecFuncTimerDynamicArgs::NoArgs,
-        GasMeterType::UnmeteredGasMeter,
-    );
+    let elapsed = executor
+        .exec_func_record_running_time(
+            module_name,
+            function_name,
+            vec![],
+            args,
+            iterations,
+            ExecFuncTimerDynamicArgs::NoArgs,
+            GasMeterType::UnmeteredGasMeter,
+        )
+        .elapsed_micros;
     println!("running time (microseconds): {}", elapsed);
     elapsed
 }

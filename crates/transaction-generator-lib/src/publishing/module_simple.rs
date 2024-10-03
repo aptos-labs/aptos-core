@@ -226,6 +226,25 @@ pub enum EntryPoints {
         num_objects: u64,
         object_payload_size: u64,
     },
+    VectorSplitOffAppend {
+        vec_len: u64,
+        element_len: u64,
+        index: u64,
+        repeats: u64,
+    },
+    VectorRemoveInsert {
+        vec_len: u64,
+        element_len: u64,
+        index: u64,
+        repeats: u64,
+    },
+    VectorRangeMove {
+        vec_len: u64,
+        element_len: u64,
+        index: u64,
+        move_len: u64,
+        repeats: u64,
+    },
     /// Initialize Token V1 NFT collection
     TokenV1InitializeCollection,
     /// Mint an NFT token. Should be called only after InitializeCollection is called
@@ -297,6 +316,9 @@ impl EntryPoints {
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
             | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
+            | EntryPoints::VectorSplitOffAppend { .. }
+            | EntryPoints::VectorRemoveInsert { .. }
+            | EntryPoints::VectorRangeMove { .. }
             | EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -354,6 +376,9 @@ impl EntryPoints {
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
             },
+            EntryPoints::VectorSplitOffAppend { .. }
+            | EntryPoints::VectorRemoveInsert { .. }
+            | EntryPoints::VectorRangeMove { .. } => "vector_example",
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -531,6 +556,51 @@ impl EntryPoints {
                     bcs::to_bytes(num_objects).unwrap(),
                     bcs::to_bytes(object_payload_size).unwrap(),
                     bcs::to_bytes(other.expect("Must provide other")).unwrap(),
+                ],
+            ),
+            EntryPoints::VectorSplitOffAppend {
+                vec_len,
+                element_len,
+                index,
+                repeats,
+            }
+            | EntryPoints::VectorRemoveInsert {
+                vec_len,
+                element_len,
+                index,
+                repeats,
+            } => get_payload(
+                module_id,
+                ident_str!(
+                    if let EntryPoints::VectorSplitOffAppend { .. } = self {
+                        "test_split_off_append"
+                    } else {
+                        "test_remove_insert"
+                    }
+                )
+                .to_owned(),
+                vec![
+                    bcs::to_bytes(vec_len).unwrap(),
+                    bcs::to_bytes(element_len).unwrap(),
+                    bcs::to_bytes(index).unwrap(),
+                    bcs::to_bytes(repeats).unwrap(),
+                ],
+            ),
+            EntryPoints::VectorRangeMove {
+                vec_len,
+                element_len,
+                index,
+                move_len,
+                repeats,
+            } => get_payload(
+                module_id,
+                ident_str!("test_middle_range_move").to_owned(),
+                vec![
+                    bcs::to_bytes(vec_len).unwrap(),
+                    bcs::to_bytes(element_len).unwrap(),
+                    bcs::to_bytes(index).unwrap(),
+                    bcs::to_bytes(move_len).unwrap(),
+                    bcs::to_bytes(repeats).unwrap(),
                 ],
             ),
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
@@ -799,6 +869,9 @@ impl EntryPoints {
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 AutomaticArgs::Signer
             },
+            EntryPoints::VectorSplitOffAppend { .. }
+            | EntryPoints::VectorRemoveInsert { .. }
+            | EntryPoints::VectorRangeMove { .. } => AutomaticArgs::None,
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
