@@ -169,7 +169,6 @@ pub fn aptos_natives_with_builder(
     #[allow(unreachable_code)]
     aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
         .into_iter()
-        .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
             builder,
