@@ -108,7 +108,9 @@ module aptos_framework::transaction_validation {
                     );
                 } else {
                     assert!(
-                        lite_account::using_dispatchable_authenticator(transaction_sender),
+                        features::is_account_abstraction_enabled() && lite_account::using_dispatchable_authenticator(
+                            transaction_sender
+                        ),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     )
                 };
@@ -324,7 +326,9 @@ module aptos_framework::transaction_validation {
                     );
                 } else {
                     assert!(
-                        lite_account::using_dispatchable_authenticator(secondary_address),
+                        features::is_account_abstraction_enabled() && lite_account::using_dispatchable_authenticator(
+                            secondary_address
+                        ),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                     )
                 };
@@ -369,7 +373,9 @@ module aptos_framework::transaction_validation {
             );
         } else {
             assert!(
-                lite_account::using_dispatchable_authenticator(fee_payer_address),
+                features::is_account_abstraction_enabled() && lite_account::using_dispatchable_authenticator(
+                    fee_payer_address
+                ),
                 error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
             )
         };
@@ -414,7 +420,9 @@ module aptos_framework::transaction_validation {
                 );
             } else {
                 assert!(
-                    lite_account::using_dispatchable_authenticator(fee_payer_address),
+                    features::is_account_abstraction_enabled() && lite_account::using_dispatchable_authenticator(
+                        fee_payer_address
+                    ),
                     error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
                 )
             };
