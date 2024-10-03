@@ -130,7 +130,7 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
 /// can be used for all signature verification operations including block and network signature
 /// verification, respectively.
 // Note: The "Clone" trait has been removed intentionally for ValidatorVerifier to ensure that the same
-// view of ValidatorVerifier is used across the system. In can case a ValidatorVerifier needs to be cloned,
+// view of ValidatorVerifier is used across the system. In case a ValidatorVerifier needs to be cloned,
 // please use Arc<ValidatorVerifier> instead.
 #[derive(Debug, Derivative, Serialize)]
 #[derivative(PartialEq, Eq)]
