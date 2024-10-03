@@ -310,14 +310,18 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 fn update_availability_metrics<'a>(
                     batch_reader: &Arc<dyn BatchReader>,
                     is_proof_label: &str,
-                    total_count: usize,
                     batch_infos: impl Iterator<Item = &'a BatchInfo>,
                 ) {
                     for (author, chunk) in &batch_infos.chunk_by(|info| info.author()) {
-                        let available_count = chunk
-                            .filter_map(|info| batch_reader.exists(info.digest()))
-                            .count();
-                        let missing_count = total_count - available_count;
+                        let (available_count, missing_count) = chunk
+                            .map(|info| batch_reader.exists(info.digest()))
+                            .fold((0, 0), |(available_count, missing_count), item| {
+                                if item.is_some() {
+                                    (available_count + 1, missing_count)
+                                } else {
+                                    (available_count, missing_count + 1)
+                                }
+                            });
                         counters::CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS
                             .with_label_values(&[
                                 &author.to_hex_literal(),
@@ -338,13 +342,11 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 update_availability_metrics(
                     &self.batch_reader,
                     "false",
-                    inline_batches.len(),
                     inline_batches.iter().map(|(batch_info, _)| batch_info),
                 );
                 update_availability_metrics(
                     &self.batch_reader,
                     "true",
-                    proofs.proofs.len(),
                     proofs.proofs.iter().map(|proof| proof.info()),
                 );
 
