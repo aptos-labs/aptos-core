@@ -1,6 +1,6 @@
 // -- Model dump before bytecode pipeline
 module 0x2::Container {
-    struct T {
+    struct T<V> {
         f: V,
     }
     public fun get<V>(_self: &T<V>): V {
@@ -15,7 +15,7 @@ module 0x2::Container {
 } // end 0x2::Container
 module 0x2::M {
     use 0x2::Container; // resolved as: 0x2::Container
-    struct Box {
+    struct Box<T> {
         f1: T,
         f2: T,
     }

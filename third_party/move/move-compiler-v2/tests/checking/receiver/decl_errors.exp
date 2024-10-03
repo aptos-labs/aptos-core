@@ -38,7 +38,7 @@ module 0x42::n {
 } // end 0x42::n
 module 0x42::m {
     use 0x42::n::{T}; // resolved as: 0x42::n
-    struct G {
+    struct G<T,R> {
         x: T,
         y: R,
     }

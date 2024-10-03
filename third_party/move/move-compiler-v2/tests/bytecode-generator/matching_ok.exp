@@ -39,7 +39,7 @@ module 0xc0ffee::m {
             y: u64,
         }
     }
-    enum Option {
+    enum Option<A> {
         None,
         Some {
             value: A,

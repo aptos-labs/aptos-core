@@ -18,14 +18,14 @@ module 0x42::test {
         0: u8,
         1: bool,
     }
-    struct S3 {
+    struct S3<T> {
         0: T,
         1: u8,
     }
     struct S4 {
         dummy_field: bool,
     }
-    struct S5 {
+    struct S5<T> {
         x: T,
         y: u8,
     }

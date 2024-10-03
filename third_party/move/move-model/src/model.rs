@@ -2431,8 +2431,25 @@ impl GlobalEnv {
             }
             for str in module.get_structs() {
                 let tctx = str.get_type_display_ctx();
+                let type_params = str.get_type_parameters();
+                let type_params_str = if !type_params.is_empty() {
+                    format!(
+                        "<{}>",
+                        type_params
+                            .iter()
+                            .map(|p| p.0.display(spool).to_string())
+                            .join(",")
+                    )
+                } else {
+                    "".to_owned()
+                };
                 if str.has_variants() {
-                    emitln!(writer, "enum {} {{", str.get_name().display(spool));
+                    emitln!(
+                        writer,
+                        "enum {}{} {{",
+                        str.get_name().display(spool),
+                        type_params_str
+                    );
                     writer.indent();
                     for variant in str.get_variants() {
                         emit!(writer, "{}", variant.display(spool));
@@ -2450,7 +2467,12 @@ impl GlobalEnv {
                         }
                     }
                 } else {
-                    emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                    emitln!(
+                        writer,
+                        "struct {}{} {{",
+                        str.get_name().display(spool),
+                        type_params_str
+                    );
                     writer.indent();
                     for fld in str.get_fields() {
                         emitln!(writer, "{},", self.dump_field(&tctx, &fld))

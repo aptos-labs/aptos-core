@@ -1,20 +1,20 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M1 {
-    struct S1 {
+    struct S1<T> {
         a: u64,
     }
-    struct S2 {
+    struct S2<T> {
         a: S1<T>,
         b: vector<S1<T>>,
     }
-    struct S3 {
+    struct S3<T1,T2,T3,T4> {
         a: T2,
         b: T4,
     }
-    struct S4 {
+    struct S4<T> {
         a: u64,
     }
-    struct S5 {
+    struct S5<T> {
         a: S4<T>,
     }
 } // end 0x42::M1

@@ -1,6 +1,6 @@
 // -- Model dump before bytecode pipeline
 module 0x42::objects {
-    struct ReaderRef {
+    struct ReaderRef<T> {
         addr: address,
     }
     public fun get_addr<T>(ref: &ReaderRef<T>): address {

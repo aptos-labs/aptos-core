@@ -1,6 +1,6 @@
 // -- Model dump before bytecode pipeline
 module 0x2::Token {
-    struct Coin {
+    struct Coin<AssetType> {
         type: AssetType,
         value: u64,
     }
@@ -86,16 +86,16 @@ module 0x70dd::ToddNickels {
 module 0xb055::OneToOneMarket {
     use std::signer;
     use 0x2::Token; // resolved as: 0x2::Token
-    struct BorrowRecord {
+    struct BorrowRecord<InputAsset,OutputAsset> {
         record: u64,
     }
-    struct DepositRecord {
+    struct DepositRecord<InputAsset,OutputAsset> {
         record: u64,
     }
-    struct Pool {
+    struct Pool<AssetType> {
         coin: Token::Coin<AssetType>,
     }
-    struct Price {
+    struct Price<InputAsset,OutputAsset> {
         price: u64,
     }
     public fun borrow<In,Out>(account: &signer,amount: u64): Token::Coin<Out>

@@ -23,7 +23,7 @@ module 0x42::m {
     struct T {
         dummy_field: bool,
     }
-    struct G {
+    struct G<T> {
         dummy_field: bool,
     }
     struct R {

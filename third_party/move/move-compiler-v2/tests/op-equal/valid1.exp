@@ -3,7 +3,7 @@ module 0x42::test {
     struct Coin {
         0: u256,
     }
-    struct Wrapper {
+    struct Wrapper<T> {
         0: T,
     }
     private fun bitand_vec_coin_new(x: vector<Coin>,index: u64) {

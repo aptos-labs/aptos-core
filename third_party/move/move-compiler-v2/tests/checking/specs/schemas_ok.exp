@@ -52,7 +52,7 @@ note: unused schema M::SchemaExp
 
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct S {
+    struct S<X> {
         x: X,
     }
     private fun add(x: u64): u64 {

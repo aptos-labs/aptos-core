@@ -3,7 +3,7 @@ module 0x815::m {
     struct MyMap {
         table: Table<address, ValueWrap>,
     }
-    struct Table {
+    struct Table<T1,T2> {
         x: T1,
         y: T2,
     }

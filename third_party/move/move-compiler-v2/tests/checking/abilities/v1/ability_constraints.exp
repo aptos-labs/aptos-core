@@ -1,9 +1,9 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct Box {
+    struct Box<T> {
         f: T,
     }
-    struct Pair {
+    struct Pair<T1,T2> {
         f1: T1,
         f2: T2,
     }
@@ -13,22 +13,22 @@ module 0x42::M {
     struct S {
         dummy_field: bool,
     }
-    struct Sc {
+    struct Sc<T> {
         dummy_field: bool,
     }
-    struct Scds {
+    struct Scds<T> {
         dummy_field: bool,
     }
-    struct Sd {
+    struct Sd<T> {
         dummy_field: bool,
     }
-    struct Sk {
+    struct Sk<T> {
         dummy_field: bool,
     }
-    struct Ss {
+    struct Ss<T> {
         dummy_field: bool,
     }
-    struct Ssk {
+    struct Ssk<T> {
         dummy_field: bool,
     }
     private fun c<T>() {

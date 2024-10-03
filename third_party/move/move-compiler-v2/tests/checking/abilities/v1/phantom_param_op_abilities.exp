@@ -1,21 +1,21 @@
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct HasCopy {
+    struct HasCopy<T1,T2> {
         a: T2,
     }
-    struct HasDrop {
+    struct HasDrop<T1,T2> {
         a: T2,
     }
-    struct HasKey {
+    struct HasKey<T1,T2> {
         a: T2,
     }
-    struct HasStore {
+    struct HasStore<T1,T2> {
         a: T2,
     }
     struct NoAbilities {
         dummy_field: bool,
     }
-    struct RequireStore {
+    struct RequireStore<T> {
         a: T,
     }
     private fun f1(ref: &mut HasDrop<NoAbilities, u64>) {

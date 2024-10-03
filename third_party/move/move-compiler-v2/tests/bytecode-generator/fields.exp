@@ -3,7 +3,7 @@ module 0x42::fields {
     struct T {
         h: u64,
     }
-    struct G {
+    struct G<X> {
         f: X,
     }
     struct S {

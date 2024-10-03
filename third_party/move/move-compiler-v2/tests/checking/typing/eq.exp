@@ -1,6 +1,6 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
-    struct G {
+    struct G<T> {
         f: T,
     }
     struct R {

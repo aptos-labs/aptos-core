@@ -18,7 +18,7 @@ warning: unused type parameter
 
 // -- Model dump before bytecode pipeline
 module 0x2::Token {
-    struct Coin {
+    struct Coin<AssetType> {
         type: AssetType,
         value: u64,
     }
@@ -71,7 +71,7 @@ module 0x2::Token {
     }
 } // end 0x2::Token
 module 0x2::Map {
-    struct T {
+    struct T<K,V> {
     }
     public native fun empty<K,V>(): T<K, V>;
     public native fun remove<K,V>(m: &T<K, V>,k: &K): V;
@@ -84,16 +84,16 @@ module 0x3::OneToOneMarket {
     use std::signer;
     use 0x2::Map; // resolved as: 0x2::Map
     use 0x2::Token; // resolved as: 0x2::Token
-    struct BorrowRecord {
+    struct BorrowRecord<InputAsset,OutputAsset> {
         record: Map::T<address, u64>,
     }
-    struct DepositRecord {
+    struct DepositRecord<InputAsset,OutputAsset> {
         record: Map::T<address, u64>,
     }
-    struct Pool {
+    struct Pool<AssetType> {
         coin: Token::Coin<AssetType>,
     }
-    struct Price {
+    struct Price<InputAsset,OutputAsset> {
         price: u64,
     }
     public fun borrow<In,Out>(account: &signer,pool_owner: address,amount: u64): Token::Coin<Out>
