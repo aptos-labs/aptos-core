@@ -27,13 +27,7 @@ use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
 use claims::{assert_matches, assert_none, assert_some, assert_some_eq};
 use itertools::izip;
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    hash::Hash,
-    result::Result,
-    sync::{atomic::Ordering, Arc},
-};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
 
 // TODO: extend to derived values, and code.
 #[derive(Clone)]
@@ -103,7 +97,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
     pub(crate) fn generate<E: Debug + Clone + TransactionEvent>(
-        txns: &[Arc<MockTransaction<K, E>>],
+        txns: &[MockTransaction<K, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         let mut current_world = HashMap::<K, BaselineValue>::new();
@@ -115,7 +109,6 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         let mut group_reads = vec![];
 
         for txn in txns.iter() {
-            let txn = txn.as_ref();
             match txn {
                 MockTransaction::Abort => {
                     status = BaselineStatus::Aborted;

@@ -114,7 +114,7 @@ impl DoGetExecutionOutput {
             txn_provider
                 .txns
                 .into_iter()
-                .map(|t| Arc::into_inner(t).unwrap().into_inner())
+                .map(|t| t.into_inner())
                 .collect(),
             transaction_outputs,
             state_view.into_state_cache(),

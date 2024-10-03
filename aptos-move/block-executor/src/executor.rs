@@ -128,7 +128,7 @@ where
         parallel_state: ParallelState<T, X>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
-        let txn = &signature_verified_block.get_txn(idx_to_execute);
+        let txn = signature_verified_block.get_txn(idx_to_execute);
 
         // VM execution.
         let sync_view = LatestView::new(
@@ -1393,7 +1393,7 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn.as_ref(), idx as TxnIndex);
+            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {

@@ -361,7 +361,7 @@ impl AptosDebugger {
     }
 }
 
-fn print_transaction_stats(sig_verified_txns: &[Arc<SignatureVerifiedTransaction>], version: u64) {
+fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], version: u64) {
     let transaction_types = sig_verified_txns
         .iter()
         .map(|txn| txn.expect_valid().type_name().to_string())
