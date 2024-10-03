@@ -557,8 +557,8 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
-    #[serde(flatten, default="BlockMetadataExtension::nil", skip_serializing_if="BlockMetadataExtension::is_nil")]
-    #[oai(flatten, default="BlockMetadataExtension::nil", skip_serializing_if="BlockMetadataExtension::is_nil")]
+    #[serde(skip_serializing_if="BlockMetadataExtension::is_nil")]
+    #[oai(skip_serializing_if="BlockMetadataExtension::is_nil")]
     pub extension: BlockMetadataExtension,
 }
 
