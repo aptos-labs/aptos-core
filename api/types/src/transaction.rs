@@ -557,6 +557,14 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
+
+    /// If some, it means the internal txn type is `aptos_types::transaction::Transaction::BlockMetadataExt`.
+    /// Otherwise, it is `aptos_types::transaction::Transaction::BlockMetadata`.
+    ///
+    /// NOTE: we could have introduced a new APT txn type to represent the corresponding internal type,
+    /// but that is a breaking change to the ecosystem.
+    ///
+    /// NOTE: `oai` does not support `flatten` together with `skip_serializing_if`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[oai(default, skip_serializing_if = "Option::is_none")]
     pub block_metadata_extension: Option<BlockMetadataExtension>,
