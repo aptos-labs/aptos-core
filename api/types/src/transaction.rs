@@ -557,9 +557,8 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
-    #[serde(flatten)]
-    #[oai(flatten)]
-    pub extension: BlockMetadataExtension,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extension: Option<BlockMetadataExtension>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -578,16 +577,11 @@ pub struct BlockMetadataExtensionRandomness {
     rename_all = "snake_case"
 )]
 pub enum BlockMetadataExtension {
-    Nil(BlockMetadataExtensionEmpty),
     V0(BlockMetadataExtensionEmpty),
     V1(BlockMetadataExtensionRandomness),
 }
 
 impl BlockMetadataExtension {
-    pub fn nil() -> Self {
-        Self::Nil(BlockMetadataExtensionEmpty {})
-    }
-
     pub fn from_internal_txn(txn: &BlockMetadataExt) -> Self {
         match txn {
             BlockMetadataExt::V0(_) => Self::V0(BlockMetadataExtensionEmpty {}),
@@ -617,7 +611,7 @@ impl BlockMetadataTransaction {
             proposer: internal.proposer().into(),
             failed_proposer_indices: internal.failed_proposer_indices().clone(),
             timestamp: internal.timestamp_usecs().into(),
-            extension: BlockMetadataExtension::nil(),
+            extension: None,
         }
     }
 
@@ -636,15 +630,15 @@ impl BlockMetadataTransaction {
             proposer: internal.proposer().into(),
             failed_proposer_indices: internal.failed_proposer_indices().clone(),
             timestamp: internal.timestamp_usecs().into(),
-            extension: BlockMetadataExtension::from_internal_txn(&internal),
+            extension: Some(BlockMetadataExtension::from_internal_txn(&internal)),
         }
     }
 
     pub fn type_str(&self) -> &'static str {
         match self.extension {
-            BlockMetadataExtension::Nil(_) => "block_metadata_transaction",
-            BlockMetadataExtension::V0(_) => "block_metadata_ext_transaction__v0",
-            BlockMetadataExtension::V1(_) => "block_metadata_ext_transaction__v1",
+            None => "block_metadata_transaction",
+            Some(BlockMetadataExtension::V0(_)) => "block_metadata_ext_transaction__v0",
+            Some(BlockMetadataExtension::V1(_)) => "block_metadata_ext_transaction__v1",
         }
     }
 }
