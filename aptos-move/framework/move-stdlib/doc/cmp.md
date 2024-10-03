@@ -96,7 +96,7 @@ and if equal we proceed to the next.
 - enum's are compared first by their variant, and if equal - they are compared as structs are.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="cmp.md#0x1_cmp_compare">compare</a>&lt;T&gt;(first: &T, second: &T): <a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>
+<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_compare">compare</a>&lt;T&gt;(first: &T, second: &T): <a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>
 </code></pre>
 
 
@@ -105,7 +105,7 @@ and if equal we proceed to the next.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b>(<b>friend</b>) <b>fun</b> <a href="cmp.md#0x1_cmp_compare">compare</a>&lt;T&gt;(first: &T, second: &T): <a href="cmp.md#0x1_cmp_Ordering">Ordering</a>;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_compare">compare</a>&lt;T&gt;(first: &T, second: &T): <a href="cmp.md#0x1_cmp_Ordering">Ordering</a>;
 </code></pre>
 
 

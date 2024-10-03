@@ -101,7 +101,7 @@ fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
             let parts = line.split('\t').collect::<Vec<_>>();
             (parts[0].to_string(), CalibrationInfo {
                 // count: parts[1].parse().unwrap(),
-                expected_time_micros: parts[parts.len() - 1].parse().unwrap(),
+                expected_time_micros: parts[parts.len() - 1].parse().expect(line),
             })
         })
         .collect()
@@ -236,6 +236,46 @@ fn main() {
         //     move_len: 10,
         //     repeats: 1000,
         // },
+        EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 0,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 100,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 100,
+            use_simple_map: true,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 0,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            use_simple_map: true,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 1000,
+            repeats: 0,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 1000,
+            repeats: 100,
+            use_simple_map: false,
+        },
     ];
 
     let mut failures = Vec::new();
