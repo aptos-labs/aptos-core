@@ -557,8 +557,8 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
-    #[serde(flatten)]
-    #[oai(flatten)]
+    #[serde(flatten, default="BlockMetadataExtension::nil", skip_serializing_if="BlockMetadataExtension::is_nil")]
+    #[oai(flatten, default="BlockMetadataExtension::nil", skip_serializing_if="BlockMetadataExtension::is_nil")]
     pub extension: BlockMetadataExtension,
 }
 
@@ -586,6 +586,10 @@ pub enum BlockMetadataExtension {
 impl BlockMetadataExtension {
     pub fn nil() -> Self {
         Self::Nil(BlockMetadataExtensionEmpty {})
+    }
+
+    pub fn is_nil(&self) -> bool {
+        matches!(self, BlockMetadataExtension::Nil(_))
     }
 
     pub fn from_internal_txn(txn: &BlockMetadataExt) -> Self {
