@@ -58,7 +58,16 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
     let gz_encoder = GzEncoder::new(buf, Compression::fast());
     let tar_data = BufWriter::new(gz_encoder);
     let mut tar_builder = Builder::new(tar_data);
+    aptos_logger::info!(
+        dir_path = dir_path.to_str(),
+        backup_file_name = backup_file_name,
+        "[Table Info] Creating a tar.gz archive from the db snapshot directory"
+    );
     tar_builder.append_dir_all(".", &dir_path)?;
+    aptos_logger::info!("[Table Info] Directory contents appended to the tar.gz archive");
+    // Finish the tar.gz archive.
+    tar_builder.finish()?;
+
     let raw_file_bytes = tar_builder.into_inner()?;
 
     let tar_file_name = format!("{}.tar.gz", backup_file_name);
