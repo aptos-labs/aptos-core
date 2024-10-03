@@ -2307,6 +2307,25 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 }
 
 impl VectorRef {
+    pub fn len_usize_raw(&self, type_param: &Type) -> PartialVMResult<usize> {
+        let c: &Container = self.0.container();
+        check_elem_layout(type_param, c)?;
+
+        let len = match c {
+            Container::VecU8(r) => r.borrow().len(),
+            Container::VecU16(r) => r.borrow().len(),
+            Container::VecU32(r) => r.borrow().len(),
+            Container::VecU64(r) => r.borrow().len(),
+            Container::VecU128(r) => r.borrow().len(),
+            Container::VecU256(r) => r.borrow().len(),
+            Container::VecBool(r) => r.borrow().len(),
+            Container::VecAddress(r) => r.borrow().len(),
+            Container::Vec(r) => r.borrow().len(),
+            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+        };
+        Ok(len)
+    }
+
     pub fn len(&self, type_param: &Type) -> PartialVMResult<Value> {
         let c: &Container = self.0.container();
         check_elem_layout(type_param, c)?;
@@ -2450,6 +2469,64 @@ impl VectorRef {
         }
 
         self.0.mark_dirty();
+        Ok(())
+    }
+
+    pub fn move_range(
+        &self,
+        removal_position: usize,
+        length: usize,
+        to_self: &Self,
+        insert_position: usize,
+        type_param: &Type,
+    ) -> PartialVMResult<()> {
+        let from_c = self.0.container();
+        let to_c = to_self.0.container();
+        check_elem_layout(type_param, from_c)?;
+        check_elem_layout(type_param, to_c)?;
+
+        macro_rules! move_range {
+            ($from:expr, $to:expr) => {{
+                let mut from_v = $from.borrow_mut();
+                let mut to_v = $to.borrow_mut();
+
+                if removal_position.checked_add(length).map_or(true, |end| end > from_v.len())
+                        || insert_position > to_v.len() {
+                    return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
+                        .with_sub_status(INDEX_OUT_OF_BOUNDS));
+                }
+
+                // Short-circuit with faster implementation some of the common cases.
+                // This includes all non-direct calls to move-range (i.e. insert/remove/append/split_off inside vector).
+                if length == 1 {
+                    to_v.insert(insert_position, from_v.remove(removal_position));
+                } else if removal_position == 0 && length == from_v.len() && insert_position == to_v.len() {
+                    to_v.append(&mut from_v);
+                } else if (removal_position + length == from_v.len() && insert_position == to_v.len()) {
+                    to_v.append(&mut from_v.split_off(removal_position));
+                } else {
+                    to_v.splice(insert_position..insert_position, from_v.splice(removal_position..(removal_position + length), []));
+                }
+            }};
+        }
+
+        match (from_c, to_c) {
+            (Container::VecU8(from_r), Container::VecU8(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU16(from_r), Container::VecU16(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU32(from_r), Container::VecU32(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU64(from_r), Container::VecU64(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU128(from_r), Container::VecU128(to_r)) => move_range!(from_r, to_r),
+            (Container::VecU256(from_r), Container::VecU256(to_r)) => move_range!(from_r, to_r),
+            (Container::VecBool(from_r), Container::VecBool(to_r)) => move_range!(from_r, to_r),
+            (Container::VecAddress(from_r), Container::VecAddress(to_r)) => {
+                move_range!(from_r, to_r)
+            },
+            (Container::Vec(from_r), Container::Vec(to_r)) => move_range!(from_r, to_r),
+            (_, _) => unreachable!(),
+        }
+
+        self.0.mark_dirty();
+        to_self.0.mark_dirty();
         Ok(())
     }
 }
