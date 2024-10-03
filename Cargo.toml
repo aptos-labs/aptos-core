@@ -29,6 +29,7 @@ members = [
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
+    "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
