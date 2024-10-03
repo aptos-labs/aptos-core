@@ -12,9 +12,9 @@ use crate::counters;
 use aptos_consensus_types::{
     common::Author,
     quorum_cert::QuorumCert,
+    round_timeout::RoundTimeout,
     timeout_2chain::{TwoChainTimeoutCertificate, TwoChainTimeoutWithPartialSignatures},
     vote::Vote,
-    vote_data::VoteData,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
@@ -80,6 +80,83 @@ impl PendingVotes {
             author_to_vote: HashMap::new(),
             echo_timeout: false,
         }
+    }
+
+    /// Insert a RoundTimeout and return a TimeoutCertificate if it can be formed
+    pub fn insert_round_timeout(
+        &mut self,
+        round_timeout: &RoundTimeout,
+        validator_verifier: &ValidatorVerifier,
+    ) -> VoteReceptionResult {
+        //
+        // Let's check if we can create a TC
+        //
+
+        let timeout = round_timeout.two_chain_timeout();
+        let signature = round_timeout.signature();
+
+        let validator_voting_power = validator_verifier
+            .get_voting_power(&round_timeout.author())
+            .unwrap_or(0);
+        if validator_voting_power == 0 {
+            warn!(
+                "Received vote with no voting power, from {}",
+                round_timeout.author()
+            );
+        }
+        let cur_epoch = round_timeout.epoch();
+        let cur_round = round_timeout.round();
+
+        counters::CONSENSUS_CURRENT_ROUND_TIMEOUT_VOTED_POWER
+            .with_label_values(&[&round_timeout.author().to_string()])
+            .set(validator_voting_power as f64);
+        counters::CONSENSUS_LAST_TIMEOUT_VOTE_EPOCH
+            .with_label_values(&[&round_timeout.author().to_string()])
+            .set(cur_epoch as i64);
+        counters::CONSENSUS_LAST_TIMEOUT_VOTE_ROUND
+            .with_label_values(&[&round_timeout.author().to_string()])
+            .set(cur_round as i64);
+
+        let partial_tc = self
+            .maybe_partial_2chain_tc
+            .get_or_insert_with(|| TwoChainTimeoutWithPartialSignatures::new(timeout.clone()));
+        partial_tc.add(round_timeout.author(), timeout.clone(), signature.clone());
+        let tc_voting_power =
+            match validator_verifier.check_voting_power(partial_tc.signers(), true) {
+                Ok(_) => {
+                    return match partial_tc.aggregate_signatures(validator_verifier) {
+                        Ok(tc_with_sig) => {
+                            VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
+                        },
+                        Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
+                    };
+                },
+                Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
+                Err(error) => {
+                    error!(
+                        "MUST_FIX: 2-chain timeout vote received could not be added: {}, vote: {}",
+                        error, timeout
+                    );
+                    return VoteReceptionResult::ErrorAddingVote(error);
+                },
+            };
+
+        // Echo timeout if receive f+1 timeout message.
+        if !self.echo_timeout {
+            let f_plus_one = validator_verifier.total_voting_power()
+                - validator_verifier.quorum_voting_power()
+                + 1;
+            if tc_voting_power >= f_plus_one {
+                self.echo_timeout = true;
+                return VoteReceptionResult::EchoTimeout(tc_voting_power);
+            }
+        }
+
+        //
+        // No TC could be formed, return the TC's voting power
+        //
+
+        VoteReceptionResult::VoteAdded(tc_voting_power)
     }
 
     /// Insert a vote and if the vote is valid, return a QuorumCertificate preferentially over a
@@ -260,58 +337,6 @@ impl PendingVotes {
         //
 
         VoteReceptionResult::VoteAdded(voting_power)
-    }
-
-    pub fn aggregate_qc_now(
-        validator_verifier: &ValidatorVerifier,
-        li_with_sig: &LedgerInfoWithVerifiedSignatures,
-        vote_data: &VoteData,
-    ) -> VoteReceptionResult {
-        match li_with_sig.aggregate_signatures(validator_verifier) {
-            Ok(ledger_info_with_sig) => VoteReceptionResult::NewQuorumCertificate(Arc::new(
-                QuorumCert::new(vote_data.clone(), ledger_info_with_sig),
-            )),
-            Err(e) => VoteReceptionResult::ErrorAggregatingSignature(e),
-        }
-    }
-
-    pub fn process_delayed_qc(
-        &mut self,
-        validator_verifier: &ValidatorVerifier,
-        vote: Vote,
-    ) -> VoteReceptionResult {
-        let li_digest = vote.ledger_info().hash();
-        match self.li_digest_to_votes.get_mut(&li_digest) {
-            Some((_, li_with_sig)) => {
-                match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
-                    // a quorum of signature was reached, a new QC is formed
-                    Ok(_) => {
-                        Self::aggregate_qc_now(validator_verifier, li_with_sig, vote.vote_data())
-                    },
-
-                    // not enough votes
-                    Err(VerifyError::TooLittleVotingPower { .. }) => {
-                        panic!("Delayed QC aggregation should not be triggered if we don't have enough votes to form a QC");
-                    },
-
-                    // error
-                    Err(error) => {
-                        error!(
-                            "MUST_FIX: vote received could not be added: {}, vote: {}",
-                            error, vote
-                        );
-                        VoteReceptionResult::ErrorAddingVote(error)
-                    },
-                }
-            },
-            None => {
-                error!(
-                    "No LedgerInfoWithSignatures found for the given digest: {}",
-                    li_digest
-                );
-                VoteReceptionResult::ErrorAddingVote(VerifyError::EmptySignature)
-            },
-        }
     }
 
     pub fn drain_votes(

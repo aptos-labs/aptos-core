@@ -75,7 +75,13 @@ pub fn build_updater(
         .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
 }
 
-pub fn get_path(name: &str, exe_env: &str, binary_name: &str, exe: &str) -> Result<PathBuf> {
+pub fn get_path(
+    name: &str,
+    exe_env: &str,
+    binary_name: &str,
+    exe: &str,
+    find_in_path: bool,
+) -> Result<PathBuf> {
     // Look at the environment variable first.
     if let Ok(path) = std::env::var(exe_env) {
         return Ok(PathBuf::from(path));
@@ -87,9 +93,11 @@ pub fn get_path(name: &str, exe_env: &str, binary_name: &str, exe: &str) -> Resu
         return Ok(path);
     }
 
-    // See if we can find the binary in the PATH.
-    if let Some(path) = pathsearch::find_executable_in_path(exe) {
-        return Ok(path);
+    if find_in_path {
+        // See if we can find the binary in the PATH.
+        if let Some(path) = pathsearch::find_executable_in_path(exe) {
+            return Ok(path);
+        }
     }
 
     Err(anyhow!(

@@ -81,7 +81,7 @@ use std::{
     sync::Arc,
     time::Instant,
 };
-
+use tokio::sync::watch::Sender;
 #[cfg(test)]
 mod aptosdb_test;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -101,6 +101,7 @@ pub struct AptosDB {
     commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,
+    update_subscriber: Option<Sender<Version>>,
 }
 
 // DbReader implementations and private functions used by them.
@@ -184,6 +185,11 @@ impl AptosDB {
         )?;
 
         Ok((ledger_db, state_merkle_db, state_kv_db))
+    }
+
+    pub fn add_version_update_subscriber(&mut self, sender: Sender<Version>) -> Result<()> {
+        self.update_subscriber = Some(sender);
+        Ok(())
     }
 
     /// Gets an instance of `BackupHandler` for data backup purpose.

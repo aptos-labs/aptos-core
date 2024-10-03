@@ -8,13 +8,14 @@ use crate::{
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
-use aptos_aggregator::types::code_invariant_error;
 use aptos_logger::error;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
-    delayed_fields::PanicError, fee_statement::FeeStatement,
+    error::{code_invariant_error, PanicError},
+    fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
-    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
@@ -250,18 +251,21 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
-    pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
+    pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
         if self.block_skips_rest_at_idx(txn_idx) {
             // Already skipping.
-            return;
+            return Ok(());
         }
 
         // check_execution_status_during_commit must be used for checks re:status.
         // Hence, since the status is not SkipRest, it must be Success.
-        if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
+        if let ExecutionStatus::Success(output) = self.take_output(txn_idx)? {
             self.outputs[txn_idx as usize].store(Some(Arc::new(ExecutionStatus::SkipRest(output))));
+            Ok(())
         } else {
-            unreachable!("Unexpected status, must be Success");
+            Err(code_invariant_error(
+                "Unexpected status to change to SkipRest, must be Success",
+            ))
         }
     }
 
@@ -446,12 +450,16 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
-    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<O, E> {
-        let owning_ptr = self.outputs[txn_idx as usize]
-            .swap(None)
-            .expect("[BlockSTM]: Output must be recorded after execution");
+    pub(crate) fn take_output(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Result<ExecutionStatus<O, E>, PanicError> {
+        let owning_ptr = self.outputs[txn_idx as usize].swap(None).ok_or_else(|| {
+            code_invariant_error("[BlockSTM]: Output must be recorded after execution")
+        })?;
 
-        Arc::try_unwrap(owning_ptr)
-            .expect("[BlockSTM]: Output should be uniquely owned after execution")
+        Arc::try_unwrap(owning_ptr).map_err(|_| {
+            code_invariant_error("[BlockSTM]: Output must be uniquely owned after execution")
+        })
     }
 }
