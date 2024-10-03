@@ -89,7 +89,7 @@ module aptos_std::table {
     }
 
     /// Table cannot know if it is empty or not, so this method is not public,
-    /// and can be used only in modules that know by themselves that table is empty. 
+    /// and can be used only in modules that know by themselves that table is empty.
     public(friend) fun destroy<K: copy + drop, V>(self: Table<K, V>) {
         destroy_empty_box<K, V, Box<V>>(&self);
         drop_unchecked_box<K, V, Box<V>>(self)
