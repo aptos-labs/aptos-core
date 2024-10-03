@@ -356,6 +356,8 @@ Returns true iff <code>self</code> contains an entry for <code>key</code>.
 
 ## Function `destroy`
 
+Table cannot know if it is empty or not, so this method is not public,
+and can be used only in modules that know by themselves that table is empty.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="table.md#0x1_table_destroy">destroy</a>&lt;K: <b>copy</b>, drop, V&gt;(self: <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;)
