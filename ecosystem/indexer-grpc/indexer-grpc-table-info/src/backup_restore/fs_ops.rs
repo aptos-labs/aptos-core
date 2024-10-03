@@ -54,8 +54,7 @@ pub fn rename_db_folders_and_cleanup(
 /// Creates a tar.gz archive from the db snapshot directory
 pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBuf, anyhow::Error> {
     // Create a buffer to write the tar.gz archive.
-    let buf: Vec<_> = Vec::new();
-    let gz_encoder = GzEncoder::new(buf, Compression::fast());
+    let gz_encoder = GzEncoder::new(Vec::new(), Compression::fast());
     let tar_data = BufWriter::new(gz_encoder);
     let mut tar_builder = Builder::new(tar_data);
     aptos_logger::info!(
@@ -65,10 +64,12 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
     );
     tar_builder.append_dir_all(".", &dir_path)?;
     aptos_logger::info!("[Table Info] Directory contents appended to the tar.gz archive");
-    // Finish the tar.gz archive.
-    tar_builder.finish()?;
+    // Finish writing the tar archive and get the compressed GzEncoder back
+    let tar_data = tar_builder.into_inner()?;
+    let mut gz_encoder = tar_data.into_inner()?;
 
-    let raw_file_bytes = tar_builder.into_inner()?;
+    // Finish the compression process
+    let compressed_data = gz_encoder.finish()?;
 
     let tar_file_name = format!("{}.tar.gz", backup_file_name);
     let tar_file_path = dir_path.join(&tar_file_name);
@@ -80,7 +81,7 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
         "[Table Info] Prepare to compress the db snapshot directory"
     );
     // Write the tar.gz archive to a file
-    std::fs::write(&tar_file_path, raw_file_bytes.buffer())?;
+    std::fs::write(&tar_file_path, &compressed_data)?;
     aptos_logger::info!("[Table Info] Tar.gz archive created successfully");
 
     Ok(tar_file_path)
