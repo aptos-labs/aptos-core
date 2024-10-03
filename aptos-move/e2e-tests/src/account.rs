@@ -10,16 +10,21 @@ use aptos_keygen::KeyGen;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{self, AccountResource, CoinStoreResource},
+    account_config::{
+        self, primary_apt_store, AccountResource, CoinStoreResource,
+        ConcurrentFungibleBalanceResource, FungibleStoreResource, MigrationFlag,
+        ObjectCoreResource, ObjectGroupResource,
+    },
     chain_id::ChainId,
     event::{EventHandle, EventKey},
-    keyless::KeylessPublicKey,
+    keyless::AnyKeylessPublicKey,
     state_store::state_key::StateKey,
     transaction::{
         authenticator::{AnyPublicKey, AuthenticationKey},
         EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
+    AptosCoinType,
 };
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use move_core_types::move_resource::MoveStructType;
@@ -30,27 +35,38 @@ pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum AccountPublicKey {
     Ed25519(Ed25519PublicKey),
-    Keyless(KeylessPublicKey),
+    AnyPublicKey(AnyPublicKey),
 }
 
 impl AccountPublicKey {
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
             AccountPublicKey::Ed25519(pk) => pk.to_bytes().to_vec(),
-            AccountPublicKey::Keyless(pk) => pk.to_bytes(),
+            AccountPublicKey::AnyPublicKey(pk) => pk.to_bytes().to_vec(),
         }
     }
 
     pub fn as_ed25519(&self) -> Option<Ed25519PublicKey> {
         match self {
             AccountPublicKey::Ed25519(pk) => Some(pk.clone()),
-            AccountPublicKey::Keyless(_) => None,
+            AccountPublicKey::AnyPublicKey(pk) => match pk {
+                AnyPublicKey::Ed25519 { public_key } => Some(public_key.clone()),
+                _ => None,
+            },
         }
     }
 
-    pub fn as_keyless(&self) -> Option<KeylessPublicKey> {
+    pub fn as_keyless(&self) -> Option<AnyKeylessPublicKey> {
         match self {
-            AccountPublicKey::Keyless(pk) => Some(pk.clone()),
+            AccountPublicKey::AnyPublicKey(pk) => match pk {
+                AnyPublicKey::Keyless { public_key } => {
+                    Some(AnyKeylessPublicKey::Normal(public_key.clone()))
+                },
+                AnyPublicKey::FederatedKeyless { public_key } => {
+                    Some(AnyKeylessPublicKey::Federated(public_key.clone()))
+                },
+                _ => None,
+            },
             AccountPublicKey::Ed25519(_) => None,
         }
     }
@@ -66,7 +82,8 @@ impl AccountPublicKey {
 pub struct Account {
     addr: AccountAddress,
     /// The current private key for this account.
-    /// TODO: When `pubkey` is of type `AccountPublicKey::Keyless`, this will be undefined.
+    /// TODO: Refactor appropriately since, for example, when `pubkey` is of type
+    /// `AccountPublicKey::AnyPublicKey::Keyless`, this `privkey` field will be undefined.
     pub privkey: Ed25519PrivateKey,
     /// The current public key for this account.
     pub pubkey: AccountPublicKey,
@@ -171,8 +188,11 @@ impl Account {
     ///
     /// Use this to retrieve or publish the Account CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
-        AccessPath::resource_access_path(self.addr, CoinStoreResource::struct_tag())
-            .expect("access path in  test")
+        AccessPath::resource_access_path(
+            self.addr,
+            CoinStoreResource::<AptosCoinType>::struct_tag(),
+        )
+        .expect("access path in  test")
     }
 
     /// Changes the keys for this account to the provided ones.
@@ -187,9 +207,7 @@ impl Account {
     pub fn auth_key(&self) -> Vec<u8> {
         match &self.pubkey {
             AccountPublicKey::Ed25519(pk) => AuthenticationKey::ed25519(pk),
-            AccountPublicKey::Keyless(pk) => {
-                AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone()))
-            },
+            AccountPublicKey::AnyPublicKey(pk) => AuthenticationKey::any_key(pk.clone()),
         }
         .to_vec()
     }
@@ -381,13 +399,84 @@ impl CoinStore {
 
     /// Returns the Move Value for the account's CoinStore
     pub fn to_bytes(&self) -> Vec<u8> {
-        let coin_store = CoinStoreResource::new(
+        let coin_store = CoinStoreResource::<AptosCoinType>::new(
             self.coin,
             self.frozen,
             self.deposit_events.clone(),
             self.withdraw_events.clone(),
         );
         bcs::to_bytes(&coin_store).unwrap()
+    }
+}
+
+/// Struct that represents an account FungibleStore resource for tests.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FungibleStore {
+    pub owner: AccountAddress,
+    pub metadata: AccountAddress,
+    pub balance: u64,
+    pub frozen: bool,
+    pub concurrent_balance: bool,
+}
+
+impl FungibleStore {
+    pub fn new(
+        owner: AccountAddress,
+        metadata: AccountAddress,
+        balance: u64,
+        frozen: bool,
+        concurrent_balance: bool,
+    ) -> Self {
+        Self {
+            owner,
+            metadata,
+            balance,
+            frozen,
+            concurrent_balance,
+        }
+    }
+
+    /// Retrieve the balance inside of this
+    pub fn balance(&self) -> u64 {
+        self.balance
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let primary_store_object_address = primary_apt_store(self.owner);
+        let mut object_group = ObjectGroupResource::default();
+        object_group.insert(
+            ObjectCoreResource::struct_tag(),
+            bcs::to_bytes(&ObjectCoreResource::new(
+                self.owner,
+                false,
+                new_event_handle(0, primary_store_object_address),
+            ))
+            .unwrap(),
+        );
+        object_group.insert(
+            FungibleStoreResource::struct_tag(),
+            bcs::to_bytes(&FungibleStoreResource::new(
+                self.metadata,
+                if self.concurrent_balance {
+                    0
+                } else {
+                    self.balance
+                },
+                self.frozen,
+            ))
+            .unwrap(),
+        );
+        if self.concurrent_balance {
+            object_group.insert(
+                ConcurrentFungibleBalanceResource::struct_tag(),
+                bcs::to_bytes(&ConcurrentFungibleBalanceResource::new(self.balance)).unwrap(),
+            );
+        }
+        object_group.insert(
+            MigrationFlag::struct_tag(),
+            bcs::to_bytes(&MigrationFlag::default()).unwrap(),
+        );
+        bcs::to_bytes(&object_group).unwrap()
     }
 }
 
@@ -404,7 +493,8 @@ pub struct AccountData {
     sequence_number: u64,
     coin_register_events: EventHandle,
     key_rotation_events: EventHandle,
-    coin_store: CoinStore,
+    coin_store: Option<CoinStore>,
+    fungible_store: Option<FungibleStore>,
 }
 
 fn new_event_handle(count: u64, address: AccountAddress) -> EventHandle {
@@ -416,7 +506,7 @@ impl AccountData {
     ///
     /// This constructor is non-deterministic and should not be used against golden file.
     pub fn new(balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(Account::new(), balance, sequence_number)
+        Self::with_account(Account::new(), balance, sequence_number, false, false)
     }
 
     pub fn increment_sequence_number(&mut self) {
@@ -427,12 +517,33 @@ impl AccountData {
     ///
     /// Most tests will want to use this constructor.
     pub fn new_from_seed(seed: &mut KeyGen, balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(Account::new_from_seed(seed), balance, sequence_number)
+        Self::with_account(
+            Account::new_from_seed(seed),
+            balance,
+            sequence_number,
+            false,
+            false,
+        )
     }
 
     /// Creates a new `AccountData` with the provided account.
-    pub fn with_account(account: Account, balance: u64, sequence_number: u64) -> Self {
-        Self::with_account_and_event_counts(account, balance, sequence_number, 0, 0)
+    pub fn with_account(
+        account: Account,
+        balance: u64,
+        sequence_number: u64,
+        use_fa_apt: bool,
+        use_concurrent_balance: bool,
+    ) -> Self {
+        if use_fa_apt {
+            Self::with_account_and_fungible_store(
+                account,
+                balance,
+                sequence_number,
+                use_concurrent_balance,
+            )
+        } else {
+            Self::with_account_and_event_counts(account, balance, sequence_number, 0, 0)
+        }
     }
 
     /// Creates a new `AccountData` with the provided account.
@@ -443,7 +554,7 @@ impl AccountData {
         sequence_number: u64,
     ) -> Self {
         let account = Account::with_keypair(privkey, pubkey);
-        Self::with_account(account, balance, sequence_number)
+        Self::with_account(account, balance, sequence_number, false, false)
     }
 
     /// Creates a new `AccountData` with custom parameters.
@@ -457,11 +568,36 @@ impl AccountData {
         let addr = *account.address();
         Self {
             account,
-            coin_store: CoinStore::new(
+            coin_store: Some(CoinStore::new(
                 balance,
                 new_event_handle(received_events_count, addr),
                 new_event_handle(sent_events_count, addr),
-            ),
+            )),
+            fungible_store: None,
+            sequence_number,
+            coin_register_events: new_event_handle(0, addr),
+            key_rotation_events: new_event_handle(1, addr),
+        }
+    }
+
+    /// Creates a new `AccountData` with custom parameters.
+    pub fn with_account_and_fungible_store(
+        account: Account,
+        fungible_balance: u64,
+        sequence_number: u64,
+        use_concurrent_balance: bool,
+    ) -> Self {
+        let addr = *account.address();
+        Self {
+            account,
+            coin_store: None,
+            fungible_store: Some(FungibleStore::new(
+                addr,
+                AccountAddress::TEN,
+                fungible_balance,
+                false,
+                use_concurrent_balance,
+            )),
             sequence_number,
             coin_register_events: new_event_handle(0, addr),
             key_rotation_events: new_event_handle(1, addr),
@@ -501,16 +637,30 @@ impl AccountData {
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let write_set = vec![
-            (
-                StateKey::resource_typed::<AccountResource>(self.address()).unwrap(),
-                WriteOp::legacy_modification(self.to_bytes().into()),
-            ),
-            (
-                StateKey::resource_typed::<CoinStoreResource>(self.address()).unwrap(),
-                WriteOp::legacy_modification(self.coin_store.to_bytes().into()),
-            ),
-        ];
+        let mut write_set = vec![(
+            StateKey::resource_typed::<AccountResource>(self.address()).unwrap(),
+            WriteOp::legacy_modification(self.to_bytes().into()),
+        )];
+
+        if let Some(coin_store) = &self.coin_store {
+            write_set.push((
+                StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(self.address())
+                    .unwrap(),
+                WriteOp::legacy_modification(coin_store.to_bytes().into()),
+            ));
+        }
+
+        if let Some(fungible_store) = &self.fungible_store {
+            let primary_store_object_address = primary_apt_store(*self.address());
+
+            write_set.push((
+                StateKey::resource_group(
+                    &primary_store_object_address,
+                    &ObjectGroupResource::struct_tag(),
+                ),
+                WriteOp::legacy_modification(fungible_store.to_bytes().into()),
+            ));
+        }
 
         WriteSetMut::new(write_set).freeze().unwrap()
     }
@@ -534,8 +684,12 @@ impl AccountData {
     }
 
     /// Returns the initial balance.
-    pub fn balance(&self) -> u64 {
-        self.coin_store.coin()
+    pub fn coin_balance(&self) -> Option<u64> {
+        self.coin_store.as_ref().map(CoinStore::coin)
+    }
+
+    pub fn fungible_balance(&self) -> Option<u64> {
+        self.fungible_store.as_ref().map(FungibleStore::balance)
     }
 
     /// Returns the initial sequence number.
@@ -545,21 +699,21 @@ impl AccountData {
 
     /// Returns the unique key for this sent events stream.
     pub fn sent_events_key(&self) -> &EventKey {
-        self.coin_store.withdraw_events.key()
+        self.coin_store.as_ref().unwrap().withdraw_events.key()
     }
 
     /// Returns the initial sent events count.
     pub fn sent_events_count(&self) -> u64 {
-        self.coin_store.withdraw_events.count()
+        self.coin_store.as_ref().unwrap().withdraw_events.count()
     }
 
     /// Returns the unique key for this received events stream.
     pub fn received_events_key(&self) -> &EventKey {
-        self.coin_store.deposit_events.key()
+        self.coin_store.as_ref().unwrap().deposit_events.key()
     }
 
     /// Returns the initial received events count.
     pub fn received_events_count(&self) -> u64 {
-        self.coin_store.deposit_events.count()
+        self.coin_store.as_ref().unwrap().deposit_events.count()
     }
 }

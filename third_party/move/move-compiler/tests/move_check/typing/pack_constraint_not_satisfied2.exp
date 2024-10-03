@@ -1,0 +1,23 @@
+error[E05001]: ability constraint not satisfied
+  ┌─ tests/move_check/typing/pack_constraint_not_satisfied2.move:7:9
+  │
+3 │     struct R<T: key>  { r: T }
+  │                 --- 'key' constraint declared here
+  ·
+7 │         R {r:_ } = R { r: 0 };
+  │         ^^^^^^^^          - The type 'u64' does not have the ability 'key'
+  │         │                  
+  │         'key' constraint not satisifed
+
+error[E05001]: ability constraint not satisfied
+  ┌─ tests/move_check/typing/pack_constraint_not_satisfied2.move:7:20
+  │
+3 │     struct R<T: key>  { r: T }
+  │                 --- 'key' constraint declared here
+  ·
+7 │         R {r:_ } = R { r: 0 };
+  │                    ^^^^^^^^^^
+  │                    │      │
+  │                    │      The type 'u64' does not have the ability 'key'
+  │                    'key' constraint not satisifed
+

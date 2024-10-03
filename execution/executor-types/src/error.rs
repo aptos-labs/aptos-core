@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use thiserror::Error;
 
-#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
+#[derive(Debug, Deserialize, Error, PartialEq, Eq, Serialize, Clone)]
 /// Different reasons for proposal rejection
 pub enum ExecutorError {
     #[error("Cannot find speculation result for block id {0}")]

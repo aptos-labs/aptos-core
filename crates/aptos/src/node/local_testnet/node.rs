@@ -90,6 +90,29 @@ pub struct NodeManager {
     no_node: bool,
 }
 
+pub fn build_node_config(
+    rng: StdRng,
+    config_path: &Option<PathBuf>,
+    test_config_override: &Option<PathBuf>,
+    performance: bool,
+    test_dir: PathBuf,
+) -> Result<NodeConfig> {
+    // If there is a config on disk, this function will use that. If not, it will
+    // create a new one, taking the config_path and test_config_override arguments
+    // into account.
+    load_node_config(
+        config_path,
+        test_config_override,
+        &test_dir,
+        false,
+        false,
+        performance,
+        aptos_cached_packages::head_release_bundle(),
+        rng,
+    )
+    .context("Failed to load / create config for node")
+}
+
 impl NodeManager {
     pub fn new(args: &RunLocalnet, bind_to: Ipv4Addr, test_dir: PathBuf) -> Result<Self> {
         let rng = args
@@ -98,35 +121,43 @@ impl NodeManager {
             .map(StdRng::from_seed)
             .unwrap_or_else(StdRng::from_entropy);
 
-        // If there is a config on disk, this function will use that. If not, it will
-        // create a new one, taking the config_path and test_config_override arguments
-        // into account.
-        let mut node_config = load_node_config(
+        let node_config = build_node_config(
+            rng,
             &args.node_args.config_path,
             &args.node_args.test_config_override,
-            &test_dir,
-            false,
-            false,
             args.node_args.performance,
-            aptos_cached_packages::head_release_bundle(),
-            rng,
+            test_dir.clone(),
+        )?;
+        Self::new_with_config(
+            node_config,
+            bind_to,
+            test_dir,
+            !args.node_args.no_txn_stream,
+            args.node_args.txn_stream_port,
+            args.node_args.no_node,
         )
-        .context("Failed to load / create config for node")?;
+    }
 
+    pub fn new_with_config(
+        mut node_config: NodeConfig,
+        bind_to: Ipv4Addr,
+        test_dir: PathBuf,
+        run_txn_stream: bool,
+        txn_stream_port: u16,
+        no_node: bool,
+    ) -> Result<Self> {
         eprintln!();
 
         // Enable the grpc stream on the node if we will run a txn stream service.
-        let run_txn_stream = !args.node_args.no_txn_stream;
         node_config.indexer_grpc.enabled = run_txn_stream;
         node_config.indexer_grpc.use_data_service_interface = run_txn_stream;
-        node_config
-            .indexer_grpc
-            .address
-            .set_port(args.node_args.txn_stream_port);
+        node_config.indexer_grpc.address.set_port(txn_stream_port);
 
-        // So long as the indexer relies on storage indexing tables, this must be set
-        // for the indexer GRPC stream on the node to work.
-        node_config.storage.enable_indexer = run_txn_stream;
+        node_config.indexer_table_info.table_info_service_mode = match run_txn_stream {
+            // Localnet should be responsible for backup or restore of table info tables.
+            true => aptos_config::config::TableInfoServiceMode::IndexingOnly,
+            false => aptos_config::config::TableInfoServiceMode::Disabled,
+        };
 
         // Bind to the requested address.
         node_config.api.address.set_ip(IpAddr::V4(bind_to));
@@ -137,7 +168,7 @@ impl NodeManager {
         Ok(NodeManager {
             config: node_config,
             test_dir,
-            no_node: args.node_args.no_node,
+            no_node,
         })
     }
 

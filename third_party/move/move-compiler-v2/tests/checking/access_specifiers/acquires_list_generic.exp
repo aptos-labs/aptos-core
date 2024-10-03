@@ -1,0 +1,17 @@
+// -- Model dump before bytecode pipeline
+module 0x42::M {
+    struct B {
+        dummy_field: bool,
+    }
+    struct CupC {
+        dummy_field: bool,
+    }
+    struct R {
+        dummy_field: bool,
+    }
+    private fun foo()
+        acquires M::B<M::CupC<M::R>>(*)
+     {
+        Abort(0)
+    }
+} // end 0x42::M

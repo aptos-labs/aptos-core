@@ -1234,11 +1234,13 @@ class AnyPublicKey(_message.Message):
         TYPE_SECP256K1_ECDSA: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256R1_ECDSA: _ClassVar[AnyPublicKey.Type]
         TYPE_KEYLESS: _ClassVar[AnyPublicKey.Type]
+        TYPE_FEDERATED_KEYLESS: _ClassVar[AnyPublicKey.Type]
     TYPE_UNSPECIFIED: AnyPublicKey.Type
     TYPE_ED25519: AnyPublicKey.Type
     TYPE_SECP256K1_ECDSA: AnyPublicKey.Type
     TYPE_SECP256R1_ECDSA: AnyPublicKey.Type
     TYPE_KEYLESS: AnyPublicKey.Type
+    TYPE_FEDERATED_KEYLESS: AnyPublicKey.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     type: AnyPublicKey.Type

@@ -31,3 +31,7 @@ rand = { workspace = true }
 [[bench]]
 name = "sort_dedup"
 harness = false
+
+[[bench]]
+name = "update"
+harness = false

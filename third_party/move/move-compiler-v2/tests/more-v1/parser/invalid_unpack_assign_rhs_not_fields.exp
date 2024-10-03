@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/more-v1/parser/invalid_unpack_assign_rhs_not_fields.move:11:14
+   │
+11 │         X::S 0 = 0;
+   │              ^
+   │              │
+   │              Unexpected '0'
+   │              Expected ';'

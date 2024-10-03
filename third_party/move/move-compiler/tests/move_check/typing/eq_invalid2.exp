@@ -1,0 +1,55 @@
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/eq_invalid2.move:11:9
+   │
+ 3 │     struct R has key {
+   │            - To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+10 │     fun t1(r: R) {
+   │               - The type '0x8675309::M::R' does not have the ability 'drop'
+11 │         r == r;
+   │         ^ '==' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/eq_invalid2.move:11:14
+   │
+ 3 │     struct R has key {
+   │            - To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+10 │     fun t1(r: R) {
+   │               - The type '0x8675309::M::R' does not have the ability 'drop'
+11 │         r == r;
+   │              ^ '==' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+
+error[E06002]: use of unassigned variable
+   ┌─ tests/move_check/typing/eq_invalid2.move:11:14
+   │
+11 │         r == r;
+   │         -    ^ Invalid usage of previously moved variable 'r'.
+   │         │     
+   │         The value of 'r' was previously moved here.
+   │         Suggestion: use 'copy r' to avoid the move.
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/eq_invalid2.move:15:9
+   │
+ 7 │     struct G1<T: key> { f: T }
+   │            -- To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+15 │         G1{ f: t } == G1{ f: t };
+   │         ^^^^^^^^^^
+   │         │
+   │         '==' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+   │         The type '0x8675309::M::G1<T>' does not have the ability 'drop'
+
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/eq_invalid2.move:15:23
+   │
+ 7 │     struct G1<T: key> { f: T }
+   │            -- To satisfy the constraint, the 'drop' ability would need to be added here
+   ·
+15 │         G1{ f: t } == G1{ f: t };
+   │                       ^^^^^^^^^^
+   │                       │
+   │                       '==' requires the 'drop' ability as the value is consumed. Try borrowing the values with '&' first.'
+   │                       The type '0x8675309::M::G1<T>' does not have the ability 'drop'
+

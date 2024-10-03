@@ -151,7 +151,7 @@ fn test_duplicate_compilation_metadata_entries() {
     };
     let result = test_compilation_metadata_with_changes(
         duplicate_compilation_metatdata,
-        CompilerVersion::V2_0,
+        CompilerVersion::V2_1,
     );
     assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
     let result = test_compilation_metadata_with_changes(
@@ -230,7 +230,7 @@ fn test_compilation_metadata_internal(
     let path = builder.write_to_temp().unwrap();
 
     let compiler_version = if v2_flag {
-        CompilerVersion::V2_0
+        CompilerVersion::V2_1
     } else {
         CompilerVersion::V1
     };
@@ -298,7 +298,7 @@ fn test_compilation_metadata_script_internal(
     let path = builder.write_to_temp().unwrap();
 
     let compiler_version = if v2_flag {
-        CompilerVersion::V2_0
+        CompilerVersion::V2_1
     } else {
         CompilerVersion::V1
     };

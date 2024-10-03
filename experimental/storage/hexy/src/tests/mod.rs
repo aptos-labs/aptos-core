@@ -82,13 +82,13 @@ fn sleep_random() {
 
 fn update_fn(
     base: Arc<HexyBase>,
-    first_pending: Arc<Mutex<HexyOverlay>>,
+    base_overlay: Arc<Mutex<HexyOverlay>>,
     latest: Arc<Mutex<HexyOverlay>>,
     updates: Vec<Vec<(LeafIdx, HashValue)>>,
 ) -> impl FnOnce() {
     move || {
         for batch in updates.into_iter() {
-            let view = latest.lock().view(&base, &first_pending.lock());
+            let view = latest.lock().view(&base, &base_overlay.lock());
             sleep_random();
             *latest.lock() = view.new_overlay(batch.clone()).unwrap();
         }
@@ -97,7 +97,7 @@ fn update_fn(
 
 fn merge_fn(
     base: Arc<HexyBase>,
-    first_pending: Arc<Mutex<HexyOverlay>>,
+    base_overlay: Arc<Mutex<HexyOverlay>>,
     latest: Arc<Mutex<HexyOverlay>>,
     quit_signal: Arc<AtomicBool>,
 ) -> impl FnOnce() {
@@ -107,14 +107,18 @@ fn merge_fn(
             quit = quit_signal.load(Ordering::Acquire);
             sleep_random();
 
-            let bottom = first_pending.lock().clone();
-            let top = latest.lock().clone();
-            if top.is_the_same(&bottom) {
+            let base_overlay_ = base_overlay.lock().clone();
+            let latest_ = latest.lock().clone();
+            if latest_.is_the_same(&base_overlay_) {
                 continue;
             }
-            base.merge(top.overlay.into_layers_view_since(bottom.overlay.clone()))
-                .unwrap();
-            *first_pending.lock() = bottom;
+            base.merge(
+                latest_
+                    .overlay
+                    .into_layers_view_after(base_overlay_.overlay.clone()),
+            )
+            .unwrap();
+            *base_overlay.lock() = base_overlay_;
         }
     }
 }
@@ -132,17 +136,17 @@ proptest! {
     fn test_update((num_leaves, updates) in arb_test_case()) {
         let base = Arc::new(HexyBase::allocate(num_leaves));
         let root_overlay = HexyOverlay::new_empty(&base);
-        let first_pending = Arc::new(Mutex::new(root_overlay.clone()));
+        let base_overlay = Arc::new(Mutex::new(root_overlay.clone()));
         let latest = Arc::new(Mutex::new(root_overlay));
         let quit_signal = Arc::new(AtomicBool::new(false));
 
         let root_hash = naive_root_hash(num_leaves, &updates);
 
         let update_thread = std::thread::spawn(
-            update_fn(base.clone(), first_pending.clone(), latest.clone(), updates)
+            update_fn(base.clone(), base_overlay.clone(), latest.clone(), updates)
         );
         let merge_thread = std::thread::spawn(
-            merge_fn(base.clone(), first_pending.clone(), latest.clone(), quit_signal.clone())
+            merge_fn(base.clone(), base_overlay.clone(), latest.clone(), quit_signal.clone())
         );
 
         update_thread.join().unwrap();

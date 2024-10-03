@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/visibility-checker/direct_visibility_err3.move:2:13
+  │
+2 │     package 0x815::a;
+  │             ^^^^^
+  │             │
+  │             Unexpected '0x815'
+  │             Expected a module member: 'spec', 'use', 'friend', 'const', 'fun', 'inline', or 'struct'

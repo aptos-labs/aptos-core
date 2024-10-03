@@ -1,0 +1,6 @@
+warning[W09002]: unused variable
+  ┌─ tests/move_check/locals/dont_warn_unused_self.move:5:27
+  │
+5 │     fun receiver(self: S, y: u64) {
+  │                           ^ Unused parameter 'y'. Consider removing or prefixing with an underscore: '_y'
+

@@ -79,7 +79,7 @@ The overall structure of the Aptos Framework is as follows:
 ├── aptos-token                                 # Sources, testing and generated documentation for Aptos token component
 ├── aptos-stdlib                                 # Sources, testing and generated documentation for Aptos stdlib component
 ├── move-stdlib                                 # Sources, testing and generated documentation for Move stdlib component
-├── cached-packages                                 # Tooling to generate SDK from mvoe sources.
+├── cached-packages                                 # Tooling to generate SDK from move sources.
 ├── src                                     # Compilation and generation of information from Move source files in the Aptos Framework. Not designed to be used as a Rust library
 ├── releases                                    # Move release bundles
 └── tests

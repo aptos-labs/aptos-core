@@ -1064,7 +1064,7 @@ module aptos_framework::vesting {
         role: String,
         role_holder: address,
     ) acquires VestingAccountManagement, VestingContract {
-        let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
+        let vesting_contract = borrow_global<VestingContract>(contract_address);
         verify_admin(admin, vesting_contract);
 
         if (!exists<VestingAccountManagement>(contract_address)) {
@@ -1108,7 +1108,7 @@ module aptos_framework::vesting {
     /// This doesn't give the admin total power as the admin would still need to follow the rules set by
     /// staking_contract and stake modules.
     public fun get_vesting_account_signer(admin: &signer, contract_address: address): signer acquires VestingContract {
-        let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
+        let vesting_contract = borrow_global<VestingContract>(contract_address);
         verify_admin(admin, vesting_contract);
         get_vesting_account_signer_internal(vesting_contract)
     }

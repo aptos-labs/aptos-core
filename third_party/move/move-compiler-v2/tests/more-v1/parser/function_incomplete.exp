@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/function_incomplete.move:5:1
+  │
+5 │
+  │ ^
+  │
+  │ Unexpected end-of-file
+  │ Expected an expression term

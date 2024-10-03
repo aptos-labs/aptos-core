@@ -50,6 +50,8 @@ module aptos_framework::object {
     const EOBJECT_NOT_BURNT: u64 = 8;
     /// Object is untransferable any operations that might result in a transfer are disallowed.
     const EOBJECT_NOT_TRANSFERRABLE: u64 = 9;
+    /// Objects cannot be burnt
+    const EBURN_NOT_ALLOWED: u64 = 10;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -610,15 +612,12 @@ module aptos_framework::object {
         };
     }
 
-    /// Forcefully transfer an unwanted object to BURN_ADDRESS, ignoring whether ungated_transfer is allowed.
-    /// This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
-    /// Original owners can reclaim burnt objects any time in the future by calling unburn.
-    public entry fun burn<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
-        let original_owner = signer::address_of(owner);
-        assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
-        let object_addr = object.inner;
-        move_to(&create_signer(object_addr), TombStone { original_owner });
-        transfer_raw_inner(object_addr, BURN_ADDRESS);
+    #[deprecated]
+    /// Previously allowed to burn objects, has now been disabled.  Objects can still be unburnt.
+    ///
+    /// Please use the test only [`object::burn_object`] for testing with previously burned objects.
+    public entry fun burn<T: key>(_owner: &signer, _object: Object<T>) {
+        abort error::permission_denied(EBURN_NOT_ALLOWED)
     }
 
     /// Allow origin owners to reclaim any objects they previous burnt.
@@ -704,6 +703,20 @@ module aptos_framework::object {
     const EHERO_DOES_NOT_EXIST: u64 = 0x100;
     #[test_only]
     const EWEAPON_DOES_NOT_EXIST: u64 = 0x101;
+
+    #[test_only]
+    /// For testing the previous behavior of `object::burn()`
+    ///
+    /// Forcefully transfer an unwanted object to BURN_ADDRESS, ignoring whether ungated_transfer is allowed.
+    /// This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
+    /// Original owners can reclaim burnt objects any time in the future by calling unburn.
+    public fun burn_object<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
+        let original_owner = signer::address_of(owner);
+        assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        let object_addr = object.inner;
+        move_to(&create_signer(object_addr), TombStone { original_owner });
+        transfer_raw_inner(object_addr, BURN_ADDRESS);
+    }
 
     #[test_only]
     struct HeroEquipEvent has drop, store {
@@ -820,7 +833,7 @@ module aptos_framework::object {
     #[expected_failure(abort_code = 0x10008, location = Self)]
     fun test_cannot_unburn_after_transfer_with_ref(creator: &signer) acquires ObjectCore, TombStone {
         let (hero_constructor, hero) = create_hero(creator);
-        burn(creator, hero);
+        burn_object(creator, hero);
         let transfer_ref = generate_transfer_ref(&hero_constructor);
         transfer_with_ref(generate_linear_transfer_ref(&transfer_ref), @0x456);
         unburn(creator, hero);
@@ -876,7 +889,7 @@ module aptos_framework::object {
         disable_ungated_transfer(&transfer_ref);
 
         // Owner should be able to burn, despite ungated transfer disallowed.
-        burn(creator, hero);
+        burn_object(creator, hero);
         assert!(owner(hero) == BURN_ADDRESS, 0);
         assert!(!ungated_transfer_allowed(hero), 0);
 
@@ -897,7 +910,7 @@ module aptos_framework::object {
         // Owner should be not be able to burn weapon directly.
         assert!(owner(weapon) == object_address(&hero), 0);
         assert!(owns(weapon, signer::address_of(creator)), 0);
-        burn(creator, weapon);
+        burn_object(creator, weapon);
     }
 
     #[test(creator = @0x123)]
@@ -905,6 +918,13 @@ module aptos_framework::object {
     fun test_unburn_object_not_burnt_should_fail(creator: &signer) acquires ObjectCore, TombStone {
         let (_, hero) = create_hero(creator);
         unburn(creator, hero);
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 0x5000A, location = Self)]
+    fun test_burn_should_fail(creator: &signer) acquires ObjectCore {
+        let (_, hero) = create_hero(creator);
+        burn(creator, hero);
     }
 
     #[test_only]

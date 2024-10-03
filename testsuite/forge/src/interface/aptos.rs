@@ -113,6 +113,7 @@ impl<'t> AptosContext<'t> {
     }
 }
 
+#[derive(Clone)]
 pub struct AptosPublicInfo {
     chain_id: ChainId,
     inspection_service_url: Url,

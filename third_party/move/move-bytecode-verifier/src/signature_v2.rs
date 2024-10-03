@@ -1151,14 +1151,28 @@ fn max_num_of_ty_params_or_args(resolver: BinaryIndexedView) -> usize {
 
     if let Some(struct_defs) = resolver.struct_defs() {
         for struct_def in struct_defs {
-            if let StructFieldInformation::Declared(fields) = &struct_def.field_information {
-                for field in fields {
-                    for ty in field.signature.0.preorder_traversal() {
-                        if let SignatureToken::TypeParameter(ty_param_idx) = ty {
-                            n = n.max(*ty_param_idx as usize + 1)
+            match &struct_def.field_information {
+                StructFieldInformation::Native => {},
+                StructFieldInformation::Declared(fields) => {
+                    for field in fields {
+                        for ty in field.signature.0.preorder_traversal() {
+                            if let SignatureToken::TypeParameter(ty_param_idx) = ty {
+                                n = n.max(*ty_param_idx as usize + 1)
+                            }
                         }
                     }
-                }
+                },
+                StructFieldInformation::DeclaredVariants(variants) => {
+                    for variant in variants {
+                        for field in &variant.fields {
+                            for ty in field.signature.0.preorder_traversal() {
+                                if let SignatureToken::TypeParameter(ty_param_idx) = ty {
+                                    n = n.max(*ty_param_idx as usize + 1)
+                                }
+                            }
+                        }
+                    }
+                },
             }
         }
     }

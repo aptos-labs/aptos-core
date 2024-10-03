@@ -1,0 +1,319 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    enum E1 {
+        A {
+            0: u8,
+            1: bool,
+        }
+        B {
+            0: u8,
+        }
+        C {
+            x: u8,
+            y: test::S1,
+        }
+    }
+    struct S0 {
+        dummy_field: bool,
+    }
+    struct S1 {
+        0: u8,
+    }
+    struct S2 {
+        0: bool,
+        1: test::S0,
+    }
+    struct S3 {
+        x: bool,
+        y: u8,
+    }
+    struct S4 {
+        x: #0,
+        y: test::S3,
+    }
+    struct S5 {
+        0: #0,
+        1: #1,
+    }
+    struct S6 {
+        x: #0,
+        y: #1,
+    }
+    struct S7 {
+        0: u8,
+        1: u16,
+        2: u32,
+        3: u64,
+    }
+    private inline fun lambda_param(f: |test::S2|bool): bool {
+        {
+          let x: test::S2 = pack test::S2(true, pack test::S0(false));
+          (f)(x)
+        }
+    }
+    private fun nested1(x: test::S4<bool>) {
+        {
+          let test::S4<bool>{ x: _x, y: _ } = x;
+          {
+            let test::S4<bool>{ x: _, y: _y } = x;
+            {
+              let test::S4<bool>{ x: _, y: test::S3{ x: _, y: _ } } = x;
+              {
+                let test::S4<bool>{ x: _, y: test::S3{ x: _x, y: _ } } = x;
+                {
+                  let test::S4<bool>{ x: _x2, y: test::S3{ x: _x1, y: _ } } = x;
+                  {
+                    let test::S4<bool>{ x: _, y: test::S3{ x: _, y: _y } } = x;
+                    {
+                      let test::S4<bool>{ x: _x2, y: test::S3{ x: _x1, y: _ } } = x;
+                      Tuple()
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun nested1_ref(x: &test::S4<bool>) {
+        {
+          let test::S4<bool>{ x: _x, y: _ } = x;
+          {
+            let test::S4<bool>{ x: _, y: _y } = x;
+            {
+              let test::S4<bool>{ x: _, y: test::S3{ x: _, y: _ } } = x;
+              {
+                let test::S4<bool>{ x: _, y: test::S3{ x: _x, y: _ } } = x;
+                {
+                  let test::S4<bool>{ x: _x2, y: test::S3{ x: _x1, y: _ } } = x;
+                  {
+                    let test::S4<bool>{ x: _, y: test::S3{ x: _, y: _y } } = x;
+                    {
+                      let test::S4<bool>{ x: _x2, y: test::S3{ x: _x1, y: _ } } = x;
+                      Tuple()
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun nested2(x: test::S5<bool, test::S1>) {
+        {
+          let test::S5<bool, test::S1>{ 0: _, 1: test::S1{ 0: _ } } = x;
+          Tuple()
+        }
+    }
+    private fun nested2_ref(x: &test::S5<bool, test::S1>) {
+        {
+          let test::S5<bool, test::S1>{ 0: _, 1: test::S1{ 0: _ } } = x;
+          Tuple()
+        }
+    }
+    private fun nested3(x: test::S5<bool, test::S4<bool>>) {
+        {
+          let test::S5<bool, test::S4<bool>>{ 0: _, 1: test::S4<bool>{ x: _, y: _ } } = x;
+          Tuple()
+        }
+    }
+    private fun nested3_ref(x: &test::S5<bool, test::S4<bool>>) {
+        {
+          let test::S5<bool, test::S4<bool>>{ 0: _, 1: test::S4<bool>{ x: _, y: _ } } = x;
+          Tuple()
+        }
+    }
+    private fun nested4(x: test::S4<test::S1>) {
+        {
+          let test::S4<test::S1>{ x: test::S1{ 0: _ }, y: _ } = x;
+          Tuple()
+        }
+    }
+    private fun nested4_ref(x: &test::S4<test::S1>) {
+        {
+          let test::S4<test::S1>{ x: test::S1{ 0: _ }, y: _ } = x;
+          Tuple()
+        }
+    }
+    private fun simple_0(x: test::S0) {
+        {
+          let test::S0{ dummy_field: _ } = x;
+          Tuple()
+        }
+    }
+    private fun simple_0_ref(x: &test::S0) {
+        {
+          let test::S0{ dummy_field: _ } = x;
+          Tuple()
+        }
+    }
+    private fun simple_1(x: test::S1) {
+        {
+          let test::S1{ 0: _ } = x;
+          Tuple()
+        }
+    }
+    private fun simple_1_ref(x: &mut test::S1) {
+        {
+          let test::S1{ 0: _ } = x;
+          Tuple()
+        }
+    }
+    private fun simple_2(x: test::S2) {
+        {
+          let test::S2{ 0: _, 1: _ } = x;
+          {
+            let test::S2{ 0: _x, 1: _ } = x;
+            {
+              let test::S2{ 0: _, 1: _x } = x;
+              {
+                let test::S2{ 0: _, 1: _ } = x;
+                {
+                  let test::S2{ 0: _, 1: _ } = x;
+                  {
+                    let test::S2{ 0: _x, 1: _y } = x;
+                    {
+                      let test::S2{ 0: _x, 1: _y } = x;
+                      {
+                        let test::S2{ 0: _x, 1: _y } = x;
+                        Tuple()
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun simple_2_ref(x: &test::S2) {
+        {
+          let test::S2{ 0: _, 1: _ } = x;
+          {
+            let test::S2{ 0: _x, 1: _ } = x;
+            {
+              let test::S2{ 0: _, 1: _x } = x;
+              {
+                let test::S2{ 0: _, 1: _ } = x;
+                {
+                  let test::S2{ 0: _, 1: _ } = x;
+                  {
+                    let test::S2{ 0: _x, 1: _y } = x;
+                    {
+                      let test::S2{ 0: _x, 1: _y } = x;
+                      {
+                        let test::S2{ 0: _x, 1: _y } = x;
+                        Tuple()
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun simple_3(x: test::S3) {
+        {
+          let test::S3{ x: _, y: _ } = x;
+          {
+            let test::S3{ x: _x, y: _ } = x;
+            {
+              let test::S3{ x: _, y: _y } = x;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun simple_3_ref(x: test::S3) {
+        {
+          let test::S3{ x: _, y: _ } = x;
+          {
+            let test::S3{ x: _x, y: _ } = x;
+            {
+              let test::S3{ x: _, y: _y } = x;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun simple_4(x: test::E1): u8 {
+        match (x) {
+          test::E1::A{ 0: x, 1: _ } => {
+            x
+          }
+          test::E1::B{ 0: x } => {
+            x
+          }
+          test::E1::C{ x, y: _ } => {
+            x
+          }
+        }
+
+    }
+    private fun simple_4_ref(x: &test::E1): &u8 {
+        match (x) {
+          test::E1::A{ 0: x, 1: _ } => {
+            x
+          }
+          test::E1::B{ 0: x } => {
+            x
+          }
+        }
+
+    }
+    private fun simple_5(x: test::E1): u8 {
+        match (x) {
+          test::E1::A{ 0: _, 1: y } => {
+            if y {
+              1
+            } else {
+              0
+            }
+          }
+          test::E1::B{ 0: x } => {
+            x
+          }
+          test::E1::C{ x: _, y: test::S1{ 0: x } } => {
+            x
+          }
+        }
+
+    }
+    private fun simple_6(x: &test::S7) {
+        {
+          let test::S7{ 0: _w, 1: _, 2: _, 3: _z } = x;
+          {
+            let test::S7{ 0: _w, 1: _x, 2: _y, 3: _z } = x;
+            Tuple()
+          }
+        }
+    }
+    private fun test_lambda_param(): bool {
+        {
+          let x: test::S2 = pack test::S2(true, pack test::S0(false));
+          {
+            let (test::S2{ 0: x, 1: _ }): (test::S2) = Tuple(x);
+            x
+          }
+        }
+    }
+} // end 0x42::test
+
+
+Diagnostics:
+error: match not exhaustive
+    ┌─ tests/checking/dotdot/dotdot_valid.move:142:16
+    │
+142 │         match (x) {
+    │                ^
+    │
+    = missing `E1::C{..}`
+
+error: match not exhaustive
+    ┌─ tests/checking/dotdot/dotdot_valid.move:153:16
+    │
+153 │         match (x) {
+    │                ^
+    │
+    = missing `E1::C{..}`

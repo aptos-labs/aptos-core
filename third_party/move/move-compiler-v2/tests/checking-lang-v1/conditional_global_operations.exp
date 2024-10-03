@@ -1,18 +1,18 @@
 
 Diagnostics:
-error: not supported before language version `2.0-unstable`: access specifier type instantiation. Try removing the type instantiation.
+error: not supported before language version `2.0`: access specifier type instantiation. Try removing the type instantiation.
    ┌─ tests/checking-lang-v1/conditional_global_operations.move:14:49
    │
 14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
    │                                                 ^^^^^^
 
-error: not supported before language version `2.0-unstable`: access specifier type instantiation. Try removing the type instantiation.
+error: not supported before language version `2.0`: access specifier type instantiation. Try removing the type instantiation.
    ┌─ tests/checking-lang-v1/conditional_global_operations.move:14:57
    │
 14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
    │                                                         ^^^^^^
 
-error: not supported before language version `2.0-unstable`: access specifier type instantiation. Try removing the type instantiation.
+error: not supported before language version `2.0`: access specifier type instantiation. Try removing the type instantiation.
    ┌─ tests/checking-lang-v1/conditional_global_operations.move:14:65
    │
 14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {

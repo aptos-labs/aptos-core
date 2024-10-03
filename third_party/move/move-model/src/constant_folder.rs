@@ -328,9 +328,17 @@ impl<'env> ConstantFolder<'env> {
                     O::Neq => val0
                         .equivalent(val1)
                         .map(|equivalence| V(id, Bool(!equivalence)).into_exp()),
-                    _ => self.constant_folding_error(id, |_| {
-                        "Unknown binary expression in `const`".to_owned()
-                    }),
+                    _ => {
+                        if oper.is_binop() {
+                            self.constant_folding_error(id, |_| {
+                                "Constant folding failed due to incomplete evaluation".to_owned()
+                            })
+                        } else {
+                            self.constant_folding_error(id, |_| {
+                                "Unknown binary expression in `const`".to_owned()
+                            })
+                        }
+                    },
                 }
             }
         } else {

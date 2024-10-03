@@ -1,0 +1,41 @@
+comparison between v1 and v2 failed:
+- processed 3 tasks
++ processed 3 tasks
+= 
+- task 1 'publish'. lines 8-15:
+- Error: error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE1:12:23
+-    │
+- 12 │         Test1::apply(|x: u64, y: u64| x + y, 1, Test1::apply(|x: u64, y: u64| x * y, 2, 1))
+-    │                       ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE1:12:31
+-    │
+- 12 │         Test1::apply(|x: u64, y: u64| x + y, 1, Test1::apply(|x: u64, y: u64| x * y, 2, 1))
+-    │                               ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE1:12:63
+-    │
+- 12 │         Test1::apply(|x: u64, y: u64| x + y, 1, Test1::apply(|x: u64, y: u64| x * y, 2, 1))
+-    │                                                               ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE1:12:71
+-    │
+- 12 │         Test1::apply(|x: u64, y: u64| x + y, 1, Test1::apply(|x: u64, y: u64| x * y, 2, 1))
+-    │                                                                       ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- 
+- 
+= task 2 'run'. lines 17-17:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ return values: 3
+= 

@@ -194,11 +194,15 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
         // Get the upstream peers to add or disable, using a read lock
         let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
-        info!(
-            "Mempool peers added: {:?}, Mempool peers disabled: {:?}",
-            to_add.iter().map(|(peer, _)| peer).collect::<Vec<_>>(),
-            to_disable
-        );
+
+        if !to_add.is_empty() || !to_disable.is_empty() {
+            info!(
+                "Mempool peers added: {:?}, Mempool peers disabled: {:?}",
+                to_add.iter().map(|(peer, _)| peer).collect::<Vec<_>>(),
+                to_disable
+            );
+        }
+
         // If there are updates, apply using a write lock
         self.add_and_disable_upstream_peers(&to_add, &to_disable);
 

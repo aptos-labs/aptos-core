@@ -518,6 +518,7 @@ message AnyPublicKey {
     TYPE_SECP256K1_ECDSA = 2;
     TYPE_SECP256R1_ECDSA = 3;
     TYPE_KEYLESS = 4;
+    TYPE_FEDERATED_KEYLESS = 5;
   }
 
   Type type = 1;

@@ -582,6 +582,27 @@ module std::features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    /// Whether the simulation enhancement is enabled. This enables the simulation without an authentication check,
+    /// the sponsored transaction simulation when the fee payer is set to 0x0, and the multisig transaction
+    /// simulation consistnet with the execution.
+    ///
+    /// Lifetime: transient
+    const TRANSACTION_SIMULATION_ENHANCEMENT: u64 = 78;
+
+    public fun get_transaction_simulation_enhancement_feature(): u64 { TRANSACTION_SIMULATION_ENHANCEMENT }
+
+    public fun transaction_simulation_enhancement_enabled(): bool acquires Features {
+        is_enabled(TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    const COLLECTION_OWNER: u64 = 79;
+
+    public fun get_collection_owner_feature(): u64 { COLLECTION_OWNER }
+
+    public fun is_collection_owner_enabled(): bool acquires Features {
+        is_enabled(COLLECTION_OWNER)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

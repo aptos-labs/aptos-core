@@ -89,7 +89,8 @@ async fn test_batch_request_exists() {
         1_000,
         1_000,
         MockBatchRequester::new(batch_response),
-        ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key()),
+        ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key())
+            .into(),
     );
 
     let (_, subscriber_rx) = oneshot::channel();
@@ -149,7 +150,7 @@ fn create_ledger_info_with_timestamp(
         ValidatorVerifier::new_with_quorum_voting_power(validator_infos, NUM_SIGNERS as u128)
             .expect("Incorrect quorum size.");
     let aggregated_signature = validator_verifier
-        .aggregate_signatures(&partial_signature)
+        .aggregate_signatures(partial_signature.signatures_iter())
         .unwrap();
     let ledger_info_with_signatures =
         LedgerInfoWithSignatures::new(ledger_info, aggregated_signature);
@@ -184,7 +185,7 @@ async fn test_batch_request_not_exists_not_expired() {
         retry_interval_ms,
         1_000,
         MockBatchRequester::new(batch_response),
-        validator_verifier,
+        validator_verifier.into(),
     );
 
     let request_start = Instant::now();
@@ -232,7 +233,7 @@ async fn test_batch_request_not_exists_expired() {
         retry_interval_ms,
         1_000,
         MockBatchRequester::new(batch_response),
-        validator_verifier,
+        validator_verifier.into(),
     );
 
     let request_start = Instant::now();

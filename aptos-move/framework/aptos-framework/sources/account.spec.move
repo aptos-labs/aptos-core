@@ -575,6 +575,7 @@ spec aptos_framework::account {
         // This function should not abort assuming the result of `sha3_256` is deserializable into an address.
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_resource_address(source, seed);
+        ensures [abstract] source != result; // We can assume that the derived resource account does not equal to `source`
     }
 
     spec fun spec_create_resource_address(source: address, seed: vector<u8>): address;
@@ -617,7 +618,7 @@ spec aptos_framework::account {
     }
 
     /// The Account existed under the signer.
-    /// The guid_creation_num of the ccount resource is up to MAX_U64.
+    /// The guid_creation_num of the account resource is up to MAX_U64.
     spec create_guid(account_signer: &signer): guid::GUID {
         let addr = signer::address_of(account_signer);
         include NewEventHandleAbortsIf {

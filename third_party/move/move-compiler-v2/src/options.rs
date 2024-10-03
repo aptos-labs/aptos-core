@@ -14,7 +14,7 @@ use move_compiler::{
         warn_of_deprecation_use_in_aptos_libs_env_var,
     },
 };
-use move_model::metadata::LanguageVersion;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
@@ -47,6 +47,10 @@ pub struct Options {
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
 
+    /// The compiler version to use.
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
+    pub compiler_version: Option<CompilerVersion>,
+
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
     pub skip_attribute_checks: bool,
@@ -62,8 +66,9 @@ pub struct Options {
     pub testing: bool,
 
     /// Active experiments. Experiments alter default behavior of the compiler.
+    /// Each element is `name[=on/off]` to enable/disable experiment `name`.
     /// See `Experiment` struct.
-    #[clap(short)]
+    #[clap(short, hide(true))]
     #[clap(
         long = "experiment",
         num_args = 0..
@@ -88,6 +93,7 @@ pub struct Options {
     #[clap(skip)]
     pub sources_deps: Vec<String>,
 
+    /// Warn about use of deprecated functions, modules, etc.
     #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
            default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
     pub warn_deprecated: bool,
@@ -95,7 +101,7 @@ pub struct Options {
     /// Show warnings about use of deprecated usage in the Aptos libraries,
     /// which we should generally not bother users with.
     /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
+    #[clap(hide(true), long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
            default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 

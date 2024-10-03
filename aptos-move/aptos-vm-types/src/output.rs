@@ -8,11 +8,10 @@ use crate::{
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::AggregatorV1Resolver,
-    types::code_invariant_error,
 };
 use aptos_types::{
     contract_event::ContractEvent,
-    delayed_fields::PanicError,
+    error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
@@ -167,7 +166,7 @@ impl VMOutput {
         self.try_materialize(resolver)?;
         self.into_transaction_output().map_err(|e| {
             VMStatus::error(
-                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
                 Some(e.to_string()),
             )
         })

@@ -1,0 +1,7 @@
+warning: pragma bv is currently not support in enum types and will be ignored
+   ┌─ tests/sources/functional/bitwise_operators_enum.move:43:5
+   │
+43 │ ╭     spec A {
+44 │ │       pragma bv=b"1"; // this leads to a warning
+45 │ │     }
+   │ ╰─────^

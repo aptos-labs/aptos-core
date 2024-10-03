@@ -125,7 +125,6 @@ test(Arg0: u64): bool /* def_idx: 0 */ {
 L1:	loc0: u64
 L2:	loc1: u64
 L3:	loc2: u64
-L4:	loc3: bool
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: StLoc[1](loc0: u64)
@@ -134,13 +133,11 @@ B0:
 	4: MoveLoc[0](Arg0: u64)
 	5: LdU64(1)
 	6: Add
-	7: MoveLoc[1](loc0: u64)
-	8: MoveLoc[2](loc1: u64)
-	9: Eq
-	10: StLoc[4](loc3: bool)
-	11: Pop
-	12: MoveLoc[4](loc3: bool)
-	13: Ret
+	7: Pop
+	8: MoveLoc[1](loc0: u64)
+	9: MoveLoc[2](loc1: u64)
+	10: Eq
+	11: Ret
 }
 }
 ============ bytecode verification succeeded ========

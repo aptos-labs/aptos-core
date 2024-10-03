@@ -1,0 +1,21 @@
+
+Diagnostics:
+note: unused schema X::Foo
+  ┌─ tests/more-v1/expansion/use_spec_schema_as_struct.move:3:5
+  │
+3 │ ╭     spec schema Foo<T> {
+4 │ │         ensures true;
+5 │ │     }
+  │ ╰─────^
+
+error: type cannot have type arguments
+   ┌─ tests/more-v1/expansion/use_spec_schema_as_struct.move:10:14
+   │
+10 │     fun t(): Foo<u64> {
+   │              ^^^
+
+error: undeclared `0x2::X::Foo`
+   ┌─ tests/more-v1/expansion/use_spec_schema_as_struct.move:10:14
+   │
+10 │     fun t(): Foo<u64> {
+   │              ^^^

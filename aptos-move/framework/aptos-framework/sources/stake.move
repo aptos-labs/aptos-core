@@ -588,7 +588,7 @@ module aptos_framework::stake {
         fullnode_addresses: vector<u8>,
     ) acquires AllowedValidators {
         // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
-        let pubkey_from_pop = &mut bls12381::public_key_from_bytes_with_pop(
+        let pubkey_from_pop = &bls12381::public_key_from_bytes_with_pop(
             consensus_pubkey,
             &proof_of_possession_from_bytes(proof_of_possession)
         );
@@ -730,7 +730,7 @@ module aptos_framework::stake {
         // Only track and validate voting power increase for active and pending_active validator.
         // Pending_inactive validator will be removed from the validator set in the next epoch.
         // Inactive validator's total stake will be tracked when they join the validator set.
-        let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
+        let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
         // Search directly rather using get_validator_state to save on unnecessary loops.
         if (option::is_some(&find_validator(&validator_set.active_validators, pool_address)) ||
             option::is_some(&find_validator(&validator_set.pending_active, pool_address))) {
@@ -826,7 +826,7 @@ module aptos_framework::stake {
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
         // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
-        let pubkey_from_pop = &mut bls12381::public_key_from_bytes_with_pop(
+        let pubkey_from_pop = &bls12381::public_key_from_bytes_with_pop(
             new_consensus_pubkey,
             &proof_of_possession_from_bytes(proof_of_possession)
         );
@@ -976,7 +976,7 @@ module aptos_framework::stake {
         update_voting_power_increase(voting_power);
 
         // Add validator to pending_active, to be activated in the next epoch.
-        let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
+        let validator_config = borrow_global<ValidatorConfig>(pool_address);
         assert!(!vector::is_empty(&validator_config.consensus_pubkey), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
         // Validate the current validator set size has not exceeded the limit.
@@ -1273,8 +1273,8 @@ module aptos_framework::stake {
         }) {
             let old_validator_info = vector::borrow_mut(&mut validator_set.active_validators, i);
             let pool_address = old_validator_info.addr;
-            let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
-            let stake_pool = borrow_global_mut<StakePool>(pool_address);
+            let validator_config = borrow_global<ValidatorConfig>(pool_address);
+            let stake_pool = borrow_global<StakePool>(pool_address);
             let new_validator_info = generate_validator_info(pool_address, stake_pool, *validator_config);
 
             // A validator needs at least the min stake required to join the validator set.

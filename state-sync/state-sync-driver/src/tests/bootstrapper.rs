@@ -1401,7 +1401,9 @@ async fn test_snapshot_sync_lag() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "Fast syncing is currently unsupported for nodes with existing state!")]
+#[should_panic(
+    expected = "You are currently 10000 versions behind the latest snapshot version (1000000)"
+)]
 async fn test_snapshot_sync_lag_panic() {
     // Create test data
     let num_versions_behind = 10000;
@@ -1613,7 +1615,10 @@ fn create_bootstrapper(
         .returning(|| Ok(create_epoch_ending_ledger_info()));
     mock_database_reader
         .expect_get_synced_version()
-        .returning(|| Ok(0));
+        .returning(|| Ok(Some(0)));
+    mock_database_reader
+        .expect_get_pre_committed_version()
+        .returning(|| Ok(Some(0)));
 
     // Create the output fallback handler
     let time_service = time_service.unwrap_or_else(TimeService::mock);
@@ -1670,7 +1675,10 @@ fn create_bootstrapper_with_storage(
         .returning(move || Ok(epoch_ending_ledger_info.clone()));
     mock_database_reader
         .expect_get_synced_version()
-        .returning(move || Ok(latest_synced_version));
+        .returning(move || Ok(Some(latest_synced_version)));
+    mock_database_reader
+        .expect_get_pre_committed_version()
+        .returning(move || Ok(Some(latest_synced_version)));
 
     // Create the output fallback handler
     let output_fallback_handler =

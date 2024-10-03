@@ -1,0 +1,51 @@
+error[E07001]: referential transparency violated
+  ┌─ tests/move_check/typing/mutable_borrow_from_immutable2.move:6:9
+  │
+6 │         &mut (&s).v;
+  │         ^^^^^^^^^^^
+  │         │    │
+  │         │    Immutable because of this position
+  │         Invalid mutable borrow from an immutable reference
+
+error[E07001]: referential transparency violated
+   ┌─ tests/move_check/typing/mutable_borrow_from_immutable2.move:10:9
+   │
+10 │         &mut (&s.x).f;
+   │         ^^^^^^^^^^^^^
+   │         │    │
+   │         │    Immutable because of this position
+   │         Invalid mutable borrow from an immutable reference
+
+error[E07001]: referential transparency violated
+   ┌─ tests/move_check/typing/mutable_borrow_from_immutable2.move:15:9
+   │
+14 │         let sref = &s;
+   │                    -- Immutable because of this position
+15 │         &mut sref.v;
+   │         ^^^^^^^^^^^ Invalid mutable borrow from an immutable reference
+
+error[E07001]: referential transparency violated
+   ┌─ tests/move_check/typing/mutable_borrow_from_immutable2.move:20:9
+   │
+19 │         let xref = &s.x;
+   │                    ---- Immutable because of this position
+20 │         &mut xref.f;
+   │         ^^^^^^^^^^^ Invalid mutable borrow from an immutable reference
+
+error[E07001]: referential transparency violated
+   ┌─ tests/move_check/typing/mutable_borrow_from_immutable2.move:24:9
+   │
+23 │     fun t2(s: &S, x: &X) {
+   │                      -- Immutable because of this position
+24 │         x.f = x.f + 1;
+   │         ^^^ Invalid mutable borrow from an immutable reference
+
+error[E07001]: referential transparency violated
+   ┌─ tests/move_check/typing/mutable_borrow_from_immutable2.move:25:9
+   │
+23 │     fun t2(s: &S, x: &X) {
+   │               -- Immutable because of this position
+24 │         x.f = x.f + 1;
+25 │         s.x.f = s.x.f + 1
+   │         ^^^^^ Invalid mutable borrow from an immutable reference
+

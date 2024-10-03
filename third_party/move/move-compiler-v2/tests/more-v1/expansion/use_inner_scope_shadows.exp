@@ -1,0 +1,12 @@
+
+Diagnostics:
+note: unused schema M::Foo
+   ┌─ tests/more-v1/expansion/use_inner_scope_shadows.move:12:5
+   │
+12 │ ╭     spec schema Foo<T> {
+13 │ │         ensures true;
+14 │ │     }
+   │ ╰─────^
+
+
+============ bytecode verification succeeded ========

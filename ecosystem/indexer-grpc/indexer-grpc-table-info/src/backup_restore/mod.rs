@@ -12,8 +12,11 @@ pub const JSON_FILE_TYPE: &str = "application/json";
 pub const TAR_FILE_TYPE: &str = "application/gzip";
 
 #[inline]
-pub fn generate_blob_name(epoch: u64) -> String {
-    format!("{}/{}.tar.gz", FILE_FOLDER_NAME, epoch)
+pub fn generate_blob_name(chain_id: u64, epoch: u64) -> String {
+    format!(
+        "{}/chain_id_{}_epoch_{}.tar.gz",
+        FILE_FOLDER_NAME, chain_id, epoch
+    )
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]

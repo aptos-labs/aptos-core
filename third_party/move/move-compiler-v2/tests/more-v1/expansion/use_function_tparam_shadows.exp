@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/more-v1/expansion/use_function_tparam_shadows.move:7:17
+  │
+7 │     use 0x2::X::foo;
+  │                 ^^^ Unused 'use' of alias 'foo'. Consider removing it
+
+error: no function named `foo` found
+   ┌─ tests/more-v1/expansion/use_function_tparam_shadows.move:10:9
+   │
+10 │         foo()
+   │         ^^^^^

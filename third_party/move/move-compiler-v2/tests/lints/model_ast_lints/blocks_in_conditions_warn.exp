@@ -1,0 +1,76 @@
+
+Diagnostics:
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:20:13
+   │
+20 │         if ({let x = foo(); !x}) {
+   │             ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:26:13
+   │
+26 │         if ({x = x && foo(); x}) {
+   │             ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:32:16
+   │
+32 │         match ({let x = blah(); x}) {
+   │                ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:39:13
+   │
+39 │         if ({let x = foo(); x}) {
+   │             ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:40:17
+   │
+40 │             if ({let x = foo(); x}) {
+   │                 ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:44:17
+   │
+44 │             if ({let x = foo(); x}) {
+   │                 ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:52:13
+   │
+52 │         if ({if ({let x = foo(); x}) {bar();}; let x = foo(); x}) {
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:58:16
+   │
+58 │         while ({x = x + 1; x < 10}) {
+   │                ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/blocks_in_conditions_warn.move:64:13
+   │
+64 │         if ({x = x + 1; x < 10} && {x = x + 1; x < 11}) {
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+
+============ bytecode verification succeeded ========

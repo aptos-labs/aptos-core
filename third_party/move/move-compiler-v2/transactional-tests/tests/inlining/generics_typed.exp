@@ -1,0 +1,23 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
++ processed 2 tasks
+= 
+- task 0 'publish'. lines 1-20:
+- Error: error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:14:27
+-    │
+- 14 │         foreach<u64>(&v, |e: &u64| sum = sum + *e);
+-    │                           ^^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- 
+- 
+= task 1 'run'. lines 22-22:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ return values: 6
+= 

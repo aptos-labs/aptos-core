@@ -2,10 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
+use crate::{
+    Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version,
+    INDEXER_GRPC_DOCKER_IMAGE_REPO, VALIDATOR_DOCKER_IMAGE_REPO,
+};
 use anyhow::bail;
 use aptos_logger::info;
+use futures::{future, FutureExt};
 use rand::rngs::StdRng;
+use serde_json::json;
 use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
 
 pub mod chaos;
@@ -19,6 +24,9 @@ pub mod prometheus;
 mod stateful_set;
 mod swarm;
 
+use super::{
+    ForgeDeployerManager, DEFAULT_FORGE_DEPLOYER_PROFILE, FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO,
+};
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
@@ -39,6 +47,7 @@ pub struct K8sFactory {
     reuse: bool,
     keep: bool,
     enable_haproxy: bool,
+    enable_indexer: bool,
 }
 
 impl K8sFactory {
@@ -50,6 +59,7 @@ impl K8sFactory {
         reuse: bool,
         keep: bool,
         enable_haproxy: bool,
+        enable_indexer: bool,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
             hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
@@ -78,6 +88,7 @@ impl K8sFactory {
             reuse,
             keep,
             enable_haproxy,
+            enable_indexer,
         })
     }
 }
@@ -148,33 +159,80 @@ impl Factory for K8sFactory {
 
                 // We return early here if there are not enough PVs to claim.
                 check_persistent_volumes(
-                    kube_client,
+                    kube_client.clone(),
                     num_validators.get() + num_fullnodes,
                     existing_db_tag,
                 )
                 .await?;
             }
             // try installing testnet resources, but clean up if it fails
-            match install_testnet_resources(
-                self.kube_namespace.clone(),
-                num_validators.get(),
-                num_fullnodes,
-                format!("{}", init_version),
-                format!("{}", genesis_version),
-                genesis_modules_path,
-                self.use_port_forward,
-                self.enable_haproxy,
-                genesis_config_fn,
-                node_config_fn,
-            )
-            .await
-            {
-                Ok(res) => (Some(res.0), res.1, res.2),
-                Err(e) => {
-                    uninstall_testnet_resources(self.kube_namespace.clone()).await?;
-                    bail!(e);
-                },
+            let new_era = generate_new_era();
+            info!(
+                "Creating new era {} in namespace {}",
+                &new_era, &self.kube_namespace
+            );
+
+            // try installing testnet resources, but clean up if it fails
+            let deploy_testnet_fut = async {
+                install_testnet_resources(
+                    new_era.clone(),
+                    self.kube_namespace.clone(),
+                    num_validators.get(),
+                    num_fullnodes,
+                    format!("{}", init_version),
+                    format!("{}", genesis_version),
+                    genesis_modules_path,
+                    self.use_port_forward,
+                    self.enable_haproxy,
+                    self.enable_indexer,
+                    genesis_config_fn,
+                    node_config_fn,
+                    false,
+                )
+                .await
             }
+            .boxed();
+
+            let deploy_indexer_fut = async {
+            if self.enable_indexer {
+                // NOTE: by default, use a deploy profile and no additional configuration values
+                let config = serde_json::from_value(json!({
+                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    "era": new_era.clone(),
+                    "namespace": self.kube_namespace.clone(),
+                    "indexer-grpc-values": {
+                        "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, init_version),
+                        "fullnodeConfig": {
+                            "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, init_version),
+                        }
+                    },
+                }))?;
+
+                let indexer_deployer = ForgeDeployerManager::new(
+                    kube_client.clone(),
+                    self.kube_namespace.clone(),
+                    FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                    None,
+                );
+                indexer_deployer.start(config).await?;
+                indexer_deployer.wait_completed().await
+                } else {
+                    Ok(())
+                }
+            }.boxed();
+
+            // join on testnet and indexer deployment futures, handling the output from the testnet
+            // deployment
+            let (validators, fullnodes) =
+                match future::try_join(deploy_testnet_fut, deploy_indexer_fut).await {
+                    Ok((deploy_testnet_ret, _)) => deploy_testnet_ret,
+                    Err(e) => {
+                        uninstall_testnet_resources(self.kube_namespace.clone()).await?;
+                        bail!(e);
+                    },
+                };
+
+            (Some(new_era), validators, fullnodes)
         };
 
         let swarm = K8sSwarm::new(

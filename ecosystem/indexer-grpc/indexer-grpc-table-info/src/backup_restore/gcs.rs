@@ -6,7 +6,6 @@ use super::{
     generate_blob_name, BackupRestoreMetadata, JSON_FILE_TYPE, METADATA_FILE_NAME, TAR_FILE_TYPE,
 };
 use anyhow::Context;
-use aptos_db_indexer::db_v2::IndexerAsyncV2;
 use aptos_logger::{error, info};
 use futures::TryFutureExt;
 use google_cloud_storage::{
@@ -22,16 +21,7 @@ use google_cloud_storage::{
     },
 };
 use hyper::StatusCode;
-use std::{
-    borrow::Cow::Borrowed,
-    env,
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{borrow::Cow::Borrowed, env, path::PathBuf, time::Duration};
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
@@ -41,7 +31,6 @@ use tokio_stream::StreamExt;
 
 pub struct GcsBackupRestoreOperator {
     bucket_name: String,
-    metadata_epoch: AtomicU64,
     gcs_client: Client,
 }
 
@@ -54,7 +43,6 @@ impl GcsBackupRestoreOperator {
         let gcs_client = Client::new(gcs_config);
         Self {
             bucket_name,
-            metadata_epoch: AtomicU64::new(0),
             gcs_client,
         }
     }
@@ -99,7 +87,6 @@ impl GcsBackupRestoreOperator {
         match self.download_metadata_object().await {
             Ok(metadata) => {
                 assert!(metadata.chain_id == expected_chain_id, "Chain ID mismatch.");
-                self.set_metadata_epoch(metadata.epoch);
                 Ok(metadata)
             },
             Err(Error::HttpClient(err)) => {
@@ -108,7 +95,6 @@ impl GcsBackupRestoreOperator {
                     self.update_metadata(expected_chain_id, 0)
                         .await
                         .expect("Update metadata failed.");
-                    self.set_metadata_epoch(0);
                     Ok(BackupRestoreMetadata::new(expected_chain_id, 0))
                 } else {
                     Err(anyhow::Error::msg(format!(
@@ -171,30 +157,23 @@ impl GcsBackupRestoreOperator {
         }
     }
 
-    pub async fn backup_db_snapshot(
+    /// Backup the db snapshot to GCS bucket; this is a stateless operation, and
+    /// all validation should be done before calling this function.
+    pub async fn backup_db_snapshot_and_update_metadata(
         &self,
         chain_id: u64,
         epoch: u64,
-        indexer_async_v2: Arc<IndexerAsyncV2>,
         snapshot_path: PathBuf,
     ) -> anyhow::Result<()> {
-        // reading epoch from gcs metadata is too slow, so updating the local var first so that every previous
-        // new epoch based backup will be observed correctly by the next backup
-        self.set_metadata_epoch(epoch);
-
-        // rocksdb will create a checkpoint to take a snapshot of full db and then save it to snapshot_path
-        indexer_async_v2
-            .create_checkpoint(&snapshot_path)
-            .context(format!("DB checkpoint failed at epoch {}", epoch))?;
-
-        // Spawn blocking a thread to create a gzipped tar file by compressing a folder into a single file
-        // synchronously without blocking the async thread
+        // chain id + epoch is the unique identifier for the snapshot.
+        let snapshot_tar_file_name = format!("chain_id_{}_epoch_{}", chain_id, epoch);
         let snapshot_path_closure = snapshot_path.clone();
         let tar_file = task::spawn_blocking(move || {
-            create_tar_gz(snapshot_path_closure.clone(), &epoch.to_string())
+            create_tar_gz(snapshot_path_closure.clone(), &snapshot_tar_file_name)
         })
-        .await?
-        .expect("Failed to create tar.gz file in blocking task");
+        .await
+        .context("Failed to spawn task to create snapshot backup file.")?
+        .context("Failed to create tar.gz file in blocking task")?;
 
         // Open the file in async mode to stream it
         let file = File::open(&tar_file)
@@ -202,7 +181,7 @@ impl GcsBackupRestoreOperator {
             .context("Failed to open gzipped tar file for reading")?;
         let file_stream = tokio_util::io::ReaderStream::new(file);
 
-        let filename = generate_blob_name(epoch);
+        let filename = generate_blob_name(chain_id, epoch);
 
         match self
             .gcs_client
@@ -230,6 +209,9 @@ impl GcsBackupRestoreOperator {
             },
             Err(err) => {
                 error!("Failed to upload snapshot: {}", err);
+                // TODO: better error handling, i.e., permanent failure vs transient failure.
+                // For example, permission issue vs rate limit issue.
+                anyhow::bail!("Failed to upload snapshot: {}", err);
             },
         };
 
@@ -248,7 +230,7 @@ impl GcsBackupRestoreOperator {
         assert!(metadata.chain_id == chain_id, "Chain ID mismatch.");
 
         let epoch = metadata.epoch;
-        let epoch_based_filename = generate_blob_name(epoch);
+        let epoch_based_filename = generate_blob_name(chain_id, epoch);
 
         match self
             .gcs_client
@@ -284,20 +266,9 @@ impl GcsBackupRestoreOperator {
                 fs::remove_file(&temp_file_path)
                     .await
                     .context("Failed to remove temporary file after unpacking")?;
-
-                self.set_metadata_epoch(epoch);
-
                 Ok(())
             },
             Err(e) => Err(anyhow::Error::new(e)),
         }
-    }
-
-    pub fn set_metadata_epoch(&self, epoch: u64) {
-        self.metadata_epoch.store(epoch, Ordering::Relaxed)
-    }
-
-    pub fn get_metadata_epoch(&self) -> u64 {
-        self.metadata_epoch.load(Ordering::Relaxed)
     }
 }

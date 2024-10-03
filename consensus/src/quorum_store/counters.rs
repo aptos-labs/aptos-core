@@ -809,6 +809,15 @@ pub static EMPTY_BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     )
 });
 
+pub static GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_garbage_collected_batch_count",
+        "Count of the number of garbage collected batches.",
+        &["reason"]
+    )
+    .unwrap()
+});
+
 /// Histogram of the time it takes to compute bucketed batches after txns are pulled from mempool.
 pub static BATCH_CREATION_COMPUTE_LATENCY: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
@@ -847,6 +856,25 @@ pub static BATCH_SUCCESSFUL_CREATION: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_batch_successful_creation",
         "Counter for whether we are successfully creating batches",
+    )
+});
+
+pub static QUORUM_STORE_MSG_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_msg_count",
+        "Count of messages received by various quoroum store components",
+        &["type"]
+    )
+    .unwrap()
+});
+
+pub static TIME_LAG_IN_BATCH_PROOF_QUEUE: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_time_lag_in_proof_queue",
+            "Time lag between txn timestamp and current time when txn is added to proof queue",
+        )
+        .unwrap(),
     )
 });
 

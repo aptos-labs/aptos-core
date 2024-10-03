@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/extra_text_after_main.move:6:1
+  │
+6 │ fun foo() {
+  │ ^^^ Unexpected characters after end of 'script' function

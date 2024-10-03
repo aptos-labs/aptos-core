@@ -1,0 +1,43 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
+= task 0 'publish'. lines 1-46:
+- Error: error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:11:14
++ warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
++    ┌─ TEMPFILE:23:17
+=    │
+- 11 │         foo(|y: u64| {
+-    │              ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
++ 23 │         let x = q;
++    │                 ^
+= 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:16:15
+-    │
+- 16 │         foo2(|y: u64| {
+-    │               ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+= 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:24:14
+-    │
+- 24 │         foo(|y: u64| {
+-    │              ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+= 
+- error[E01013]: unsupported language construct
+-    ┌─ TEMPFILE:29:15
+-    │
+- 29 │         foo2(|y: u64| {
+-    │               ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- 
+- 
+- task 1 'run'. lines 48-48:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
+- 

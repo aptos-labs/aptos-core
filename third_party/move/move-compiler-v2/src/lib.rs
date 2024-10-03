@@ -2,34 +2,33 @@
 // Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod acquires_checker;
-pub mod ast_simplifier;
 mod bytecode_generator;
-pub mod cyclic_instantiation_checker;
 pub mod env_pipeline;
 mod experiments;
 mod file_format_generator;
-pub mod flow_insensitive_checkers;
-pub mod function_checker;
-pub mod inliner;
+pub mod lint_common;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
-pub mod recursive_struct_checker;
-pub mod unused_params_checker;
 
 use crate::{
     env_pipeline::{
-        lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
-        seqs_in_binop_checker, spec_checker, spec_rewriter, EnvProcessorPipeline,
+        acquires_checker, ast_simplifier, cyclic_instantiation_checker, flow_insensitive_checkers,
+        function_checker, inliner, lambda_lifter, lambda_lifter::LambdaLiftingOptions,
+        model_ast_lints, recursive_struct_checker, rewrite_target::RewritingScope,
+        seqs_in_binop_checker, spec_checker, spec_rewriter, unused_params_checker,
+        EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
         avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        control_flow_graph_simplifier::ControlFlowGraphSimplifier,
         copy_propagation::CopyPropagation,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
+        flush_writes_processor::FlushWritesProcessor,
+        lint_processor::LintProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety::{reference_safety_processor_v2, reference_safety_processor_v3},
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
@@ -45,7 +44,7 @@ use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream, WriteColor},
 };
-pub use experiments::Experiment;
+pub use experiments::{Experiment, EXPERIMENTS};
 use log::{debug, info, log_enabled, Level};
 use move_binary_format::{binary_views::BinaryIndexedView, errors::VMError};
 use move_bytecode_source_map::source_map::SourceMap;
@@ -97,6 +96,10 @@ where
     let mut env = run_checker_and_rewriters(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
 
+    if options.experiment_on(Experiment::STOP_BEFORE_STACKLESS_BYTECODE) {
+        std::process::exit(0)
+    }
+
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;
@@ -121,11 +124,16 @@ where
             &dump_base_name,
             false,
             &pipeline::register_formatters,
+            || !env.has_errors(),
         )
     } else {
-        pipeline.run(&env, &mut targets)
+        pipeline.run_with_hook(&env, &mut targets, |_| {}, |_, _, _| !env.has_errors())
     }
     check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
+
+    if options.experiment_on(Experiment::STOP_BEFORE_FILE_FORMAT) {
+        std::process::exit(0)
+    }
 
     let modules_and_scripts = run_file_format_gen(&mut env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;
@@ -325,6 +333,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
+    if !for_v1_model && options.experiment_on(Experiment::LINT_CHECKS) {
+        // Perform all the model AST lint checks before AST transformations, to be closer
+        // in form to the user code.
+        env_pipeline.add("model AST lints", model_ast_lints::checker);
+    }
+
     if options.experiment_on(Experiment::INLINING) {
         let keep_inline_funs = options.experiment_on(Experiment::KEEP_INLINE_FUNS);
         env_pipeline.add("inlining", {
@@ -347,11 +361,11 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
 
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
         env_pipeline.add("simplifier with code elimination", {
-            move |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, true)
+            |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, true)
         });
     } else if options.experiment_on(Experiment::AST_SIMPLIFY) {
         env_pipeline.add("simplifier", {
-            move |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, false)
+            |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, false)
         });
     }
 
@@ -383,7 +397,7 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
     env_pipeline
 }
 
-/// Returns the bytecode processing pipeline.
+/// Returns the stackless bytecode processing pipeline.
 pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
     let mut pipeline = FunctionTargetPipeline::default();
@@ -424,11 +438,22 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         pipeline.add_processor(Box::new(AbilityProcessor {}));
     }
 
+    // --- Lint checks: run before optimizations and after correctness checks
+    if options.experiment_on(Experiment::LINT_CHECKS) {
+        // Some lint checks need live variable analysis.
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+        pipeline.add_processor(Box::new(LintProcessor {}));
+    }
+
     // --- Optimizations
     // Any compiler errors or warnings should be reported before running this section, as we can
     // potentially delete or change code through these optimizations.
     // While this section of the pipeline is optional, some code that used to previously compile
     // may no longer compile without this section because of using too many local (temp) variables.
+
+    if options.experiment_on(Experiment::CFG_SIMPLIFICATION) {
+        pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
+    }
 
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
         pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
@@ -458,7 +483,14 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+    // There should be no "transforming" processors run after this point.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
+
+    if options.experiment_on(Experiment::FLUSH_WRITES_OPTIMIZATION) {
+        // This processor only adds annotations, does not transform the bytecode.
+        pipeline.add_processor(Box::new(FlushWritesProcessor {}));
+    }
+
     pipeline
 }
 

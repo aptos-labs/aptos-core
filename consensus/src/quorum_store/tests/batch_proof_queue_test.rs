@@ -651,6 +651,9 @@ fn test_proof_pull_proofs_with_duplicates() {
     // txn_0, txn_1, txn_2 are expired.
     assert_eq!(result.0.len(), 2);
     assert_eq!(result.2, 0);
+
+    proof_queue.handle_updated_block_timestamp(now_in_usecs + 5_000_000);
+    assert!(proof_queue.is_empty());
 }
 
 #[test]
@@ -693,4 +696,93 @@ fn test_proof_queue_soft_limit() {
 
     assert_eq!(pulled.len(), 2);
     assert_eq!(num_unique_txns, 20);
+}
+
+#[test]
+fn test_proof_queue_insert_after_commit() {
+    let my_peer_id = PeerId::random();
+    let batch_store = batch_store_for_test(5 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+
+    let author = PeerId::random();
+    let author_batches = vec![
+        proof_of_store_with_size(author, BatchId::new_for_test(0), 100, 1, 10),
+        proof_of_store_with_size(author, BatchId::new_for_test(1), 200, 1, 10),
+        proof_of_store_with_size(author, BatchId::new_for_test(2), 200, 1, 10),
+    ];
+    let batch_infos = author_batches
+        .iter()
+        .map(|proof| proof.info().clone())
+        .collect();
+
+    proof_queue.mark_committed(batch_infos);
+
+    for proof in author_batches {
+        proof_queue.insert_proof(proof);
+    }
+
+    let (remaining_txns, remaining_proofs) = proof_queue.remaining_txns_and_proofs();
+    assert_eq!(remaining_txns, 0);
+    assert_eq!(remaining_proofs, 0);
+
+    proof_queue.handle_updated_block_timestamp(10);
+
+    assert!(proof_queue.is_empty());
+}
+
+#[test]
+fn test_proof_queue_pull_full_utilization() {
+    let my_peer_id = PeerId::random();
+    let batch_store = batch_store_for_test(5 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+
+    let author = PeerId::random();
+    let author_batches = vec![
+        proof_of_store_with_size(author, BatchId::new_for_test(0), 100, 1, 10),
+        proof_of_store_with_size(author, BatchId::new_for_test(1), 200, 1, 10),
+        proof_of_store_with_size(author, BatchId::new_for_test(2), 200, 1, 10),
+    ];
+
+    for proof in author_batches {
+        proof_queue.insert_proof(proof);
+    }
+
+    let (remaining_txns, remaining_proofs) = proof_queue.remaining_txns_and_proofs();
+    assert_eq!(remaining_txns, 30);
+    assert_eq!(remaining_proofs, 3);
+
+    let now_in_secs = aptos_infallible::duration_since_epoch();
+    let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
+        proof_queue.pull_proofs(
+            &HashSet::new(),
+            PayloadTxnsSize::new(10, 10),
+            10,
+            10,
+            true,
+            now_in_secs,
+        );
+
+    assert_eq!(proof_block.len(), 1);
+    assert_eq!(txns_with_proof_size.count(), 10);
+    assert_eq!(cur_unique_txns, 10);
+    assert!(!proof_queue_fully_utilized);
+
+    let now_in_secs = aptos_infallible::duration_since_epoch();
+    let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =
+        proof_queue.pull_proofs(
+            &HashSet::new(),
+            PayloadTxnsSize::new(50, 50),
+            50,
+            50,
+            true,
+            now_in_secs,
+        );
+
+    assert_eq!(proof_block.len(), 3);
+    assert_eq!(txns_with_proof_size.count(), 30);
+    assert_eq!(cur_unique_txns, 30);
+    assert!(proof_queue_fully_utilized);
+
+    proof_queue.handle_updated_block_timestamp(10);
+    assert!(proof_queue.is_empty());
 }

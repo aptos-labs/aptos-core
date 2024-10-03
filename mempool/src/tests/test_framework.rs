@@ -235,12 +235,7 @@ impl MempoolNode {
                 .collect();
             let expected: Vec<_> = txns
                 .iter()
-                .map(|txn| {
-                    (
-                        TestTransaction::get_address(txn.address),
-                        txn.sequence_number,
-                    )
-                })
+                .map(|txn| (txn.address, txn.sequence_number))
                 .collect();
             Err((actual, expected))
         } else {
@@ -392,12 +387,7 @@ impl MempoolNode {
                         .collect();
                     let expected_txns: Vec<_> = expected_txns
                         .iter()
-                        .map(|txn| {
-                            (
-                                TestTransaction::get_address(txn.address),
-                                txn.sequence_number,
-                            )
-                        })
+                        .map(|txn| (txn.address, txn.sequence_number))
                         .collect();
 
                     panic!(
@@ -420,12 +410,7 @@ impl MempoolNode {
                         .collect();
                     let expected_txns: Vec<_> = expected_txns
                         .iter()
-                        .map(|txn| {
-                            (
-                                TestTransaction::get_address(txn.address),
-                                txn.sequence_number,
-                            )
-                        })
+                        .map(|txn| (txn.address, txn.sequence_number))
                         .collect();
 
                     panic!(
@@ -686,8 +671,14 @@ fn mpsc_channel<T>() -> (
 }
 
 /// Creates a single [`TestTransaction`] with the given `seq_num`.
-pub const fn test_transaction(seq_num: u64) -> TestTransaction {
-    TestTransaction::new(1, seq_num, 1)
+pub fn test_transaction(seq_num: u64) -> TestTransaction {
+    TestTransaction {
+        address: TestTransaction::get_address(1),
+        sequence_number: seq_num,
+        gas_price: 1,
+        account_seqno: 0,
+        script: None,
+    }
 }
 
 /// Tells us if a [`SignedTransaction`] block contains only the [`TestTransaction`]s
@@ -723,7 +714,7 @@ pub fn block_contains_any_transaction(
 fn block_contains_transaction(block: &[SignedTransaction], txn: &TestTransaction) -> bool {
     block.iter().any(|signed_txn| {
         signed_txn.sequence_number() == txn.sequence_number
-            && signed_txn.sender() == TestTransaction::get_address(txn.address)
+            && signed_txn.sender() == txn.address
             && signed_txn.gas_unit_price() == txn.gas_price
     })
 }

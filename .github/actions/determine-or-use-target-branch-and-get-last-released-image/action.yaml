@@ -1,0 +1,88 @@
+name: "Determine or Use Target Branch and Get Latest Docker Image"
+description: |
+  Determine the branch to fetch the latest docker image tag from, or use a target branch directly.
+  - If base-branch is set, determine the target branch to fetch the latest docker image tag from
+    - Determine the IMAGE_TAG based on the latest release R and check for images built on branch R - 1:
+      - For commits on the aptos-release-v1.19 branch, the IMAGE_TAG should be the latest commit built on aptos-release-v1.18
+      - For commits on the main branch, the IMAGE_TAG should be the latest commit on the max release aptos-release-v<X.X> branch
+      - For commits on other branches, the IMAGE_TAG should be the latest commit on the branch's last release aptos-release-v<X.X> branch
+  - If branch is set, use it directly
+
+inputs:
+  base-branch:
+    description: "The base branch to determine the target from, or use a target branch directly"
+    required: false
+  branch:
+    description: "Use this branch directly if set"
+    required: false
+  variants:
+    description: "The variants to check, as a space-separated string, e.g. 'performance failpoints'"
+    required: false
+
+outputs:
+  TARGET_BRANCH:
+    description: "The determined or target target branch"
+    value: ${{ steps.set-target-branch.outputs.TARGET_BRANCH }}
+  IMAGE_TAG:
+    description: "The latest docker image tag for the given branch and variants"
+    value: ${{ steps.determine-test-image-tag.outputs.IMAGE_TAG }}
+
+runs:
+  using: composite
+  steps:
+    # Checkout repository based on base branch or target branch
+    - name: Checkout branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.base-branch || inputs.branch }}
+        path: checkout_branch
+        fetch-depth: 0
+
+    - name: Setup Python environment
+      uses: ./checkout_branch/.github/actions/python-setup
+      with:
+        pyproject_directory: checkout_branch/testsuite
+
+    # Determine the target branch if base-branch is used
+    - name: Set target branch
+      id: set-target-branch
+      run: |
+        if [[ -n "${{ inputs.base-branch }}" ]]; then
+          base_branch="${{ inputs.base-branch }}"
+          echo "Determining target branch from base branch: $base_branch"
+          ./testrun determine_target_branch_to_fetch_last_released_image.py "$base_branch"
+        else
+          echo "Using target branch: ${{ inputs.branch }}"
+          echo "TARGET_BRANCH=${{ inputs.branch }}" >> $GITHUB_OUTPUT
+        fi
+      shell: bash
+      working-directory: checkout_branch/testsuite
+
+    # Checkout the determined or target branch
+    - name: Checkout target branch
+      if: ${{ steps.set-target-branch.outputs.TARGET_BRANCH != inputs.branch }}
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.set-target-branch.outputs.TARGET_BRANCH }}
+        path: checkout_branch
+        fetch-depth: 0
+
+    # Setup Python environment again after second checkout, as branches are different
+    - name: Setup Python environment again
+      if: ${{ steps.set-target-branch.outputs.TARGET_BRANCH != inputs.branch }}
+      uses: ./checkout_branch/.github/actions/python-setup
+      with:
+        pyproject_directory: checkout_branch/testsuite
+
+    # Determine image tag using the target branch
+    - name: Determine image tag
+      id: determine-test-image-tag
+      run: |
+        variants=(${{ inputs.variants }}) # split the variants string into an array
+        variants_args=()
+        for variant in "${variants[@]}"; do
+          variants_args+=("--variant" "$variant")
+        done
+        ./testrun find_latest_image.py "${variants_args[@]}"
+      shell: bash
+      working-directory: checkout_branch/testsuite

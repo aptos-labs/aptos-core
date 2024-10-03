@@ -17,6 +17,3 @@ error: unable to generate test
   │
 5 │     #[test_only, test]
   │                  ^^^^ Testing attributes are not allowed in scripts.
-
-
-============ bytecode verification succeeded ========

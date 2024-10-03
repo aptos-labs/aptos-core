@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/function_params_missing.move:3:12
+  │
+3 │     fun fn { }
+  │            ^
+  │            │
+  │            Unexpected '{'
+  │            Expected '('

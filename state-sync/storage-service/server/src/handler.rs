@@ -247,7 +247,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         {
             sample!(
                 SampleRate::Duration(Duration::from_secs(ERROR_LOG_FREQUENCY_SECS)),
-                warn!(LogSchema::new(LogEntry::OptimisticFetchRequest)
+                trace!(LogSchema::new(LogEntry::OptimisticFetchRequest)
                     .error(&Error::InvalidRequest(
                         "An active optimistic fetch was already found for the peer!".into()
                     ))

@@ -1,0 +1,24 @@
+
+Diagnostics:
+warning: [lint] Use the more explicit `loop` instead.
+  ┌─ tests/lints/model_ast_lints/while_true_warn.move:3:9
+  │
+3 │ ╭         while (true) {
+4 │ │             if (x > 10) { break; } else { test_warn_1(x + 1); }
+5 │ │         }
+  │ ╰─────────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(while_true)]`.
+
+warning: [lint] Use the more explicit `loop` instead.
+   ┌─ tests/lints/model_ast_lints/while_true_warn.move:11:9
+   │
+11 │ ╭         while (true) {
+12 │ │             if (__update_iter_flag) { i = i + 1; } else { __update_iter_flag = true; }
+13 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(while_true)]`.
+
+
+============ bytecode verification succeeded ========

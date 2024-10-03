@@ -418,22 +418,16 @@ impl Payload {
                 Payload::QuorumStoreInlineHybrid(b2, p3, m3)
             },
             (
-                Payload::QuorumStoreInlineHybrid(inline_batches, proofs, limit),
-                Payload::OptQuorumStore(opt_qs),
+                Payload::QuorumStoreInlineHybrid(_inline_batches, _proofs, _limit),
+                Payload::OptQuorumStore(_opt_qs),
             )
             | (
-                Payload::OptQuorumStore(opt_qs),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proofs, limit),
+                Payload::OptQuorumStore(_opt_qs),
+                Payload::QuorumStoreInlineHybrid(_inline_batches, _proofs, _limit),
             ) => {
-                let execution_limits = PayloadExecutionLimit::max_txns_to_execute(limit);
-                let converted_payload = OptQuorumStorePayload::new(
-                    inline_batches.into(),
-                    Vec::new().into(),
-                    proofs.into(),
-                    execution_limits,
-                );
-                let opt_qs3 = opt_qs.extend(converted_payload);
-                Payload::OptQuorumStore(opt_qs3)
+                unimplemented!(
+                    "Cannot extend OptQuorumStore with QuorumStoreInlineHybrid or viceversa"
+                )
             },
             (Payload::OptQuorumStore(opt_qs1), Payload::OptQuorumStore(opt_qs2)) => {
                 let opt_qs3 = opt_qs1.extend(opt_qs2);

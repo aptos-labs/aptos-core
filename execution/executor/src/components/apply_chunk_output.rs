@@ -9,7 +9,7 @@ use crate::{
         chunk_output::{update_counters_for_processed_chunk, ChunkOutput},
         in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
     },
-    metrics::{APTOS_EXECUTOR_ERRORS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS},
+    metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -21,6 +21,7 @@ use aptos_executor_types::{
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::error;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
     contract_event::ContractEvent,
@@ -54,9 +55,8 @@ impl ApplyChunkOutput {
             block_end_info,
         } = chunk_output;
         let (new_epoch, statuses_for_input_txns, to_commit, to_discard, to_retry) = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["sort_transactions"])
-                .start_timer();
+            let _timer = OTHER_TIMERS.timer_with(&["sort_transactions"]);
+
             // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
             // Will return transactions with Retry txns sorted after Keep/Discard txns.
             Self::sort_transactions_with_state_checkpoint(
@@ -76,7 +76,7 @@ impl ApplyChunkOutput {
             state_updates_before_last_checkpoint,
             sharded_state_cache,
         ) = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            let _timer = OTHER_TIMERS
                 .with_label_values(&["calculate_for_transactions"])
                 .start_timer();
             InMemoryStateCalculatorV2::calculate_for_transactions(
@@ -141,9 +141,7 @@ impl ApplyChunkOutput {
         );
 
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["assemble_ledger_diff_for_block"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["assemble_ledger_diff_for_block"]);
 
         let (txns_to_commit, transaction_info_hashes, subscribable_events) =
             Self::assemble_ledger_diff(to_commit, state_updates_vec, state_checkpoint_hashes);
@@ -232,7 +230,7 @@ impl ApplyChunkOutput {
                 transaction_outputs.drain(pos..).collect(),
             )
         } else {
-            TransactionsWithParsedOutput::new(vec![], vec![])
+            TransactionsWithParsedOutput::new_empty()
         };
 
         let state_checkpoint_to_add =
@@ -243,59 +241,73 @@ impl ApplyChunkOutput {
 
         let status = keeps_and_discards.chain(retries).collect();
 
-        // Separate transactions with the Keep status out.
-        let (mut to_keep, to_discard) = itertools::zip_eq(transactions, transaction_outputs)
-            .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
-                matches!(o.status(), TransactionStatus::Keep(_))
-            });
+        let to_discard = {
+            let mut res = TransactionsWithParsedOutput::new_empty();
+            for idx in 0..transactions.len() {
+                if transaction_outputs[idx].status().is_discarded() {
+                    res.push(transactions[idx].clone(), transaction_outputs[idx].clone());
+                } else if !res.is_empty() {
+                    transactions[idx - res.len()] = transactions[idx].clone();
+                    transaction_outputs[idx - res.len()] = transaction_outputs[idx].clone();
+                }
+            }
+            if !res.is_empty() {
+                let remaining = transactions.len() - res.len();
+                transactions.truncate(remaining);
+                transaction_outputs.truncate(remaining);
+            }
+            res
+        };
+        let to_keep = {
+            let mut res = TransactionsWithParsedOutput::new(transactions, transaction_outputs);
 
-        // Append the StateCheckpoint transaction to the end of to_keep
-        if let Some(block_id) = state_checkpoint_to_add {
-            let state_checkpoint_txn =
-                block_end_info.map_or(Transaction::StateCheckpoint(block_id), |block_end_info| {
-                    Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
-                        block_id,
-                        block_end_info,
-                    })
-                });
-            let state_checkpoint_txn_output: ParsedTransactionOutput =
-                Into::into(TransactionOutput::new(
-                    WriteSet::default(),
-                    Vec::new(),
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::Success),
-                    TransactionAuxiliaryData::default(),
-                ));
-            to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
-        }
+            // Append the StateCheckpoint transaction to the end of to_keep
+            if let Some(block_id) = state_checkpoint_to_add {
+                let state_checkpoint_txn = block_end_info.map_or(
+                    Transaction::StateCheckpoint(block_id),
+                    |block_end_info| {
+                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
+                            block_id,
+                            block_end_info,
+                        })
+                    },
+                );
+                let state_checkpoint_txn_output: ParsedTransactionOutput =
+                    Into::into(TransactionOutput::new(
+                        WriteSet::default(),
+                        Vec::new(),
+                        0,
+                        TransactionStatus::Keep(ExecutionStatus::Success),
+                        TransactionAuxiliaryData::default(),
+                    ));
+                res.push(state_checkpoint_txn, state_checkpoint_txn_output);
+            }
+            res
+        };
 
         // Sanity check transactions with the Discard status:
-        let to_discard = to_discard
-            .into_iter()
-            .map(|(t, o)| {
-                // In case a new status other than Retry, Keep and Discard is added:
-                if !matches!(o.status(), TransactionStatus::Discard(_)) {
-                    error!("Status other than Retry, Keep or Discard; Transaction discarded.");
-                }
-                // VM shouldn't have output anything for discarded transactions, log if it did.
-                if !o.write_set().is_empty() || !o.events().is_empty() {
-                    error!(
-                        "Discarded transaction has non-empty write set or events. \
-                     Transaction: {:?}. Status: {:?}.",
-                        t,
-                        o.status(),
-                    );
-                    APTOS_EXECUTOR_ERRORS.inc();
-                }
-                Ok((t, o))
-            })
-            .collect::<Result<Vec<_>>>()?;
+        to_discard.iter().for_each(|(t, o)| {
+            // In case a new status other than Retry, Keep and Discard is added:
+            if !matches!(o.status(), TransactionStatus::Discard(_)) {
+                error!("Status other than Retry, Keep or Discard; Transaction discarded.");
+            }
+            // VM shouldn't have output anything for discarded transactions, log if it did.
+            if !o.write_set().is_empty() || !o.events().is_empty() {
+                error!(
+                    "Discarded transaction has non-empty write set or events. \
+                        Transaction: {:?}. Status: {:?}.",
+                    t,
+                    o.status(),
+                );
+                EXECUTOR_ERRORS.inc();
+            }
+        });
 
         Ok((
             new_epoch_marker.is_some(),
             status,
-            to_keep.into(),
-            to_discard.into(),
+            to_keep,
+            to_discard,
             to_retry,
         ))
     }
@@ -317,6 +329,8 @@ impl ApplyChunkOutput {
         let mut txn_info_hashes = Vec::with_capacity(num_txns);
         let hashes_vec =
             Self::calculate_events_and_writeset_hashes(to_commit_from_execution.parsed_outputs());
+
+        let _timer = OTHER_TIMERS.timer_with(&["process_events_and_writeset_hashes"]);
         let hashes_vec: Vec<(HashValue, HashValue)> = hashes_vec
             .into_par_iter()
             .map(|(event_hashes, write_set_hash)| {
@@ -381,9 +395,8 @@ impl ApplyChunkOutput {
     fn calculate_events_and_writeset_hashes(
         to_commit_from_execution: &[ParsedTransactionOutput],
     ) -> Vec<(Vec<HashValue>, HashValue)> {
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-            .with_label_values(&["calculate_events_and_writeset_hashes"])
-            .start_timer();
+        let _timer = OTHER_TIMERS.timer_with(&["calculate_events_and_writeset_hashes"]);
+
         let num_txns = to_commit_from_execution.len();
         to_commit_from_execution
             .par_iter()

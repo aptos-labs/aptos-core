@@ -8,7 +8,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus::{
-    consensus_observer, consensus_observer::network_message::ConsensusObserverMessage,
+    consensus_observer, consensus_observer::network::observer_message::ConsensusObserverMessage,
     network_interface::ConsensusMsg,
 };
 use aptos_dkg_runtime::DKGMessage;
@@ -181,7 +181,9 @@ pub fn consensus_observer_network_configuration(
         rpc_protocols,
         aptos_channel::Config::new(max_network_channel_size)
             .queue_style(QueueStyle::FIFO)
-            .counters(&consensus_observer::metrics::PENDING_CONSENSUS_OBSERVER_NETWORK_EVENTS),
+            .counters(
+                &consensus_observer::common::metrics::PENDING_CONSENSUS_OBSERVER_NETWORK_EVENTS,
+            ),
     );
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }

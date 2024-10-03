@@ -1,0 +1,43 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-43:
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ TEMPFILE:20:17
+   │
+20 │             let x = 4;
+   │                 ^
+
+warning: Unused local variable `i`. Consider removing or prefixing with an underscore: `_i`
+   ┌─ TEMPFILE:35:17
+   │
+35 │             Two{i, b} => 3,
+   │                 ^
+
+warning: Unused local variable `b`. Consider removing or prefixing with an underscore: `_b`
+   ┌─ TEMPFILE:35:20
+   │
+35 │             Two{i, b} => 3,
+   │                    ^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ TEMPFILE:20:21
+   │
+20 │             let x = 4;
+   │                     ^
+
+warning: Unused assignment to `b`. Consider removing or prefixing with an underscore: `_b`
+   ┌─ TEMPFILE:35:13
+   │
+35 │             Two{i, b} => 3,
+   │             ^^^^^^^^^
+
+warning: Unused assignment to `i`. Consider removing or prefixing with an underscore: `_i`
+   ┌─ TEMPFILE:35:13
+   │
+35 │             Two{i, b} => 3,
+   │             ^^^^^^^^^
+
+
+
+task 1 'run'. lines 45-45:
+return values: 3

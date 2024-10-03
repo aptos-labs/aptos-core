@@ -23,12 +23,9 @@ comparison between v1 and v2 failed:
 = 	4: CopyLoc[1](loc1: &mut u64)
 = 	5: Call id_mut<u64>(&mut u64): &mut u64
 = 	6: ReadRef
-- 	7: Pop
-- 	8: MoveLoc[1](loc1: &mut u64)
-- 	9: ReadRef
-+ 	7: MoveLoc[1](loc1: &mut u64)
-+ 	8: ReadRef
-+ 	9: Pop
+= 	7: Pop
+= 	8: MoveLoc[1](loc1: &mut u64)
+= 	9: ReadRef
 = 	10: Pop
 = 	11: Ret
 = }

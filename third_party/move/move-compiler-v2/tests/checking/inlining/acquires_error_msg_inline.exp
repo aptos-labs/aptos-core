@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: missing acquires annotation for `Test`
+   ┌─ tests/checking/inlining/acquires_error_msg_inline.move:6:16
+   │
+ 6 │     public fun call_modify_without_acquire() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 7 │         modify(); // expect error message here
+   │         -------- from a call inlined at this callsite
+   ·
+11 │         borrow_global_mut<Test>(@0xcafe).value = 2;
+   │         -------------------------------- acquired here

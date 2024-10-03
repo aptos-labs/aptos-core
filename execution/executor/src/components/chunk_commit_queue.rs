@@ -11,6 +11,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
+    transaction::Version,
 };
 use std::{collections::VecDeque, sync::Arc};
 
@@ -20,6 +21,7 @@ pub(crate) struct ChunkToUpdateLedger {
     pub state_checkpoint_output: StateCheckpointOutput,
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
+
     /// the below are from the input -- can be checked / used only after the transaction accumulator
     /// is updated.
     pub verified_target_li: LedgerInfoWithSignatures,
@@ -62,6 +64,10 @@ impl ChunkCommitQueue {
 
     pub(crate) fn latest_state(&self) -> StateDelta {
         self.latest_state.clone()
+    }
+
+    pub(crate) fn expecting_version(&self) -> Version {
+        self.latest_txn_accumulator.num_leaves()
     }
 
     pub(crate) fn expect_latest_view(&self) -> Result<ExecutedTrees> {

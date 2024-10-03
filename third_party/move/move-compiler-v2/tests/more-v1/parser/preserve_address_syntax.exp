@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: no function named `M::foo` found
+  ┌─ tests/more-v1/parser/preserve_address_syntax.move:5:9
+  │
+5 │         0x00042::M::foo();
+  │         ^^^^^^^^^^^^^^^^^
+
+error: no function named `N::bar` found
+  ┌─ tests/more-v1/parser/preserve_address_syntax.move:6:9
+  │
+6 │         000112::N::bar();
+  │         ^^^^^^^^^^^^^^^^

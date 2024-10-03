@@ -22,15 +22,15 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
-    spec destroy<K: drop, V: drop>(table: SmartTable<K, V>) {
+    spec destroy<K: drop, V: drop>(self: SmartTable<K, V>) {
         pragma verify = false;
     }
 
-    spec clear<K: drop, V: drop>(table: &mut SmartTable<K, V>) {
+    spec clear<K: drop, V: drop>(self: &mut SmartTable<K, V>) {
         pragma verify = false;
     }
 
-    spec split_one_bucket<K, V>(table: &mut SmartTable<K, V>) {
+    spec split_one_bucket<K, V>(self: &mut SmartTable<K, V>) {
         pragma verify = false;
     }
 
@@ -38,26 +38,26 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
-    spec borrow_with_default<K: copy + drop, V>(table: &SmartTable<K, V>, key: K, default: &V): &V {
+    spec borrow_with_default<K: copy + drop, V>(self: &SmartTable<K, V>, key: K, default: &V): &V {
         pragma verify = false;
     }
 
-    spec load_factor<K, V>(table: &SmartTable<K, V>): u64 {
+    spec load_factor<K, V>(self: &SmartTable<K, V>): u64 {
         pragma verify = false;
     }
 
     spec to_simple_map<K: store + copy + drop, V: store + copy>(
-    table: &SmartTable<K, V>,
+    self: &SmartTable<K, V>,
     ): SimpleMap<K, V> {
         pragma verify = false;
     }
 
-    spec keys<K: store + copy + drop, V: store + copy>(table_ref: &SmartTable<K, V>): vector<K> {
+    spec keys<K: store + copy + drop, V: store + copy>(self: &SmartTable<K, V>): vector<K> {
         pragma verify = false;
     }
 
     spec keys_paginated<K: store + copy + drop, V: store + copy>(
-        table_ref: &SmartTable<K, V>,
+        self: &SmartTable<K, V>,
         starting_bucket_index: u64,
         starting_vector_index: u64,
         num_keys_to_get: u64,
@@ -69,35 +69,35 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
-    spec add_all<K, V>(table: &mut SmartTable<K, V>, keys: vector<K>, values: vector<V>) {
+    spec add_all<K, V>(self: &mut SmartTable<K, V>, keys: vector<K>, values: vector<V>) {
         pragma verify = false;
     }
 
-    spec update_split_load_threshold<K, V>(table: &mut SmartTable<K, V>, split_load_threshold: u8) {
+    spec update_split_load_threshold<K, V>(self: &mut SmartTable<K, V>, split_load_threshold: u8) {
         pragma verify = false;
     }
 
-    spec update_target_bucket_size<K, V>(table: &mut SmartTable<K, V>, target_bucket_size: u64) {
+    spec update_target_bucket_size<K, V>(self: &mut SmartTable<K, V>, target_bucket_size: u64) {
         pragma verify = false;
     }
 
-    spec borrow_kv<K, V>(e: &Entry<K, V>): (&K, &V) {
+    spec borrow_kv<K, V>(self: &Entry<K, V>): (&K, &V) {
         pragma verify = false;
     }
 
-    spec borrow_kv_mut<K, V>(e: &mut Entry<K, V>): (&mut K, &mut V) {
+    spec borrow_kv_mut<K, V>(self: &mut Entry<K, V>): (&mut K, &mut V) {
         pragma verify = false;
     }
 
-    spec num_buckets<K, V>(table: &SmartTable<K, V>): u64 {
+    spec num_buckets<K, V>(self: &SmartTable<K, V>): u64 {
         pragma verify = false;
     }
 
-    spec borrow_buckets<K, V>(table: &SmartTable<K, V>): &TableWithLength<u64, vector<Entry<K, V>>> {
+    spec borrow_buckets<K, V>(self: &SmartTable<K, V>): &TableWithLength<u64, vector<Entry<K, V>>> {
         pragma verify = false;
     }
 
-    spec borrow_buckets_mut<K, V>(table: &mut SmartTable<K, V>): &mut TableWithLength<u64, vector<Entry<K, V>>> {
+    spec borrow_buckets_mut<K, V>(self: &mut SmartTable<K, V>): &mut TableWithLength<u64, vector<Entry<K, V>>> {
         pragma verify = false;
     }
 

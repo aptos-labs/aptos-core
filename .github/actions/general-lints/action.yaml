@@ -16,27 +16,3 @@ runs:
         sudo apt-get install shellcheck --assume-yes --no-install-recommends
         shellcheck scripts/dev_setup.sh
       shell: bash
-
-    # Run the python lints and tests
-    - name: Run python lints and tests
-      uses: ./.github/actions/python-lint-tests
-
-    # Setup node
-    - name: Setup node
-      uses: actions/setup-node@v3
-      with:
-        node-version-file: .node-version
-
-    # Setup pnpm
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-
-    # Install packages for examples and run package build, lint and tests
-    - name: Run ecosystem lint
-      run: |
-        cd ./ecosystem/typescript/sdk/examples/typescript && pnpm install && cd -
-        cd ./ecosystem/typescript/sdk/examples/javascript && pnpm install && cd -
-        cd ./ecosystem/typescript/sdk && pnpm install && cd -
-        cd ./ecosystem/typescript/sdk && pnpm lint && cd -
-        cd ./ecosystem/typescript/sdk && pnpm fmt:check && cd -
-      shell: bash

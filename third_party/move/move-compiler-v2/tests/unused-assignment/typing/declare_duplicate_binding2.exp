@@ -1,0 +1,19 @@
+
+Diagnostics:
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/typing/declare_duplicate_binding2.move:7:9
+  │
+7 │         x = 0;
+  │         ^^^^^
+
+warning: Unused assignment to `f`. Consider removing or prefixing with an underscore: `_f`
+  ┌─ tests/unused-assignment/typing/declare_duplicate_binding2.move:8:9
+  │
+8 │         f = 0;
+  │         ^^^^^
+
+warning: Unused assignment to `g`. Consider removing or prefixing with an underscore: `_g`
+  ┌─ tests/unused-assignment/typing/declare_duplicate_binding2.move:9:9
+  │
+9 │         g = 0;
+  │         ^^^^^

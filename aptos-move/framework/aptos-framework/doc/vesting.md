@@ -3011,7 +3011,7 @@ account.
     role: String,
     role_holder: <b>address</b>,
 ) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>, <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
-    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin, vesting_contract);
 
     <b>if</b> (!<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>&gt;(contract_address)) {
@@ -3135,7 +3135,7 @@ staking_contract and stake modules.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_get_vesting_account_signer">get_vesting_account_signer</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
-    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin, vesting_contract);
     <a href="vesting.md#0x1_vesting_get_vesting_account_signer_internal">get_vesting_account_signer_internal</a>(vesting_contract)
 }
@@ -3686,7 +3686,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_TotalAccumulatedRewardsAbortsIf">TotalAccumulatedRewardsAbortsIf</a> {
     vesting_contract_address: <b>address</b>;
-    <b>requires</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &lt;= 100;
     <b>include</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;{contract_address: vesting_contract_address};
     <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
     <b>let</b> staker = vesting_contract_address;
@@ -3892,7 +3891,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> len(contract_addresses) == 0;
-<b>include</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a>;
 </code></pre>
 
 
@@ -3927,7 +3925,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> len(contract_addresses) == 0;
-<b>include</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a>;
 </code></pre>
 
 

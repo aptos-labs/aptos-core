@@ -60,7 +60,7 @@ module aptos_framework::staking_contract {
     const EINSUFFICIENT_ACTIVE_STAKE_TO_WITHDRAW: u64 = 7;
     /// Caller must be either the staker, operator, or beneficiary.
     const ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY: u64 = 8;
-    /// Chaning beneficiaries for operators is not supported.
+    /// Changing beneficiaries for operators is not supported.
     const EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED: u64 = 9;
 
     /// Maximum number of distributions a stake pool can support.
@@ -785,7 +785,7 @@ module aptos_framework::staking_contract {
         // Buy all recipients out of the distribution pool.
         while (pool_u64::shareholders_count(distribution_pool) > 0) {
             let recipients = pool_u64::shareholders(distribution_pool);
-            let recipient = *vector::borrow(&mut recipients, 0);
+            let recipient = *vector::borrow(&recipients, 0);
             let current_shares = pool_u64::shares(distribution_pool, recipient);
             let amount_to_distribute = pool_u64::redeem_shares(distribution_pool, recipient, current_shares);
             // If the recipient is the operator, send the commission to the beneficiary instead.
@@ -815,7 +815,7 @@ module aptos_framework::staking_contract {
     /// Assert that a staking_contract exists for the staker/operator pair.
     fun assert_staking_contract_exists(staker: address, operator: address) acquires Store {
         assert!(exists<Store>(staker), error::not_found(ENO_STAKING_CONTRACT_FOUND_FOR_STAKER));
-        let staking_contracts = &mut borrow_global_mut<Store>(staker).staking_contracts;
+        let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
         assert!(
             simple_map::contains_key(staking_contracts, &operator),
             error::not_found(ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR),

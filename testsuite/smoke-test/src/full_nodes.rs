@@ -5,21 +5,16 @@
 use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{
-        assert_balance, create_and_fund_account, transfer_coins, MAX_CATCH_UP_WAIT_SECS,
-        MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+        add_node_to_seeds, assert_balance, create_and_fund_account, transfer_coins,
+        MAX_CATCH_UP_WAIT_SECS, MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
 };
 use aptos_config::{
-    config::{DiscoveryMethod, NodeConfig, OverrideNodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
+    config::{DiscoveryMethod, NodeConfig, OverrideNodeConfig, PeerRole},
     network_id::NetworkId,
 };
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
-use aptos_types::network_address::{NetworkAddress, Protocol};
-use std::{
-    collections::HashSet,
-    net::Ipv4Addr,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 #[tokio::test]
 async fn test_full_node_basic_flow() {
@@ -284,54 +279,6 @@ async fn test_private_full_node() {
     assert_balance(&user_client, &account_1, 20).await;
     assert_balance(&validator_client, &account_0, 90).await;
     assert_balance(&validator_client, &account_1, 20).await;
-}
-
-fn add_node_to_seeds(
-    dest_config: &mut NodeConfig,
-    seed_config: &NodeConfig,
-    network_id: NetworkId,
-    peer_role: PeerRole,
-) {
-    let dest_network_config = dest_config
-        .full_node_networks
-        .iter_mut()
-        .find(|network| network.network_id == network_id)
-        .unwrap();
-    let seed_network_config = seed_config
-        .full_node_networks
-        .iter()
-        .find(|network| network.network_id == network_id)
-        .unwrap();
-
-    let seed_peer_id = seed_network_config.peer_id();
-    let seed_key = seed_network_config.identity_key().public_key();
-
-    let seed_peer = if peer_role != PeerRole::Downstream {
-        // For upstreams, we know the address, but so don't duplicate the keys in the config (lazy way)
-        // TODO: This is ridiculous, we need a better way to manipulate these `NetworkAddress`s
-        let address = seed_network_config.listen_address.clone();
-        let port_protocol = address
-            .as_slice()
-            .iter()
-            .find(|protocol| matches!(protocol, Protocol::Tcp(_)))
-            .unwrap();
-        let address = NetworkAddress::from_protocols(vec![
-            Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)),
-            port_protocol.clone(),
-            Protocol::NoiseIK(seed_key),
-            Protocol::Handshake(HANDSHAKE_VERSION),
-        ])
-        .unwrap();
-
-        Peer::new(vec![address], HashSet::new(), peer_role)
-    } else {
-        // For downstreams, we don't know the address, but we know the keys
-        let mut seed_keys = HashSet::new();
-        seed_keys.insert(seed_key);
-        Peer::new(vec![], seed_keys, peer_role)
-    };
-
-    dest_network_config.seeds.insert(seed_peer_id, seed_peer);
 }
 
 async fn local_swarm_with_fullnodes(num_validators: usize, num_fullnodes: usize) -> LocalSwarm {

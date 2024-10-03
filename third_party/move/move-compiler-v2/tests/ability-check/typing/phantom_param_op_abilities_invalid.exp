@@ -1,0 +1,52 @@
+
+Diagnostics:
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid.move:30:17
+   │
+30 │         move_to<HasKey<NoAbilities, NoAbilities>>(s, x);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasKey`
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid.move:35:19
+   │
+35 │         move_from<HasKey<NoAbilities, NoAbilities>>(@0x0)
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasKey`
+   = required by instantiating type parameter `T:key` of function `move_from`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid.move:40:16
+   │
+40 │         exists<HasKey<NoAbilities, NoAbilities>>(@0x0)
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasKey`
+   = required by instantiating type parameter `T:key` of function `exists`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid.move:44:28
+   │
+ 7 │     struct RequireStore<T: store> { a: T }
+   │                         - declaration of type parameter `T`
+   ·
+44 │     fun f8(): RequireStore<HasStore<NoAbilities, NoAbilities>> {
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasStore`
+   = required by instantiating type parameter `T:store` of struct `RequireStore`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/ability-check/typing/phantom_param_op_abilities_invalid.move:45:22
+   │
+ 7 │     struct RequireStore<T: store> { a: T }
+   │                         - declaration of type parameter `T`
+   ·
+45 │         RequireStore<HasStore<NoAbilities, NoAbilities>> { a: HasStore { a: NoAbilities {} } }
+   │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasStore`
+   = required by instantiating type parameter `T:store` of struct `RequireStore`

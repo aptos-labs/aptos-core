@@ -1,0 +1,28 @@
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    private fun inc_new(x: &u256) {
+        {
+          let $t1: &u256 = x;
+          $t1 = Add<u256>(Deref($t1), 1)
+        };
+        Tuple()
+    }
+    private fun inc_old(x: &u256) {
+        x = Add<u256>(Deref(x), 1);
+        Tuple()
+    }
+} // end 0x42::test
+
+
+Diagnostics:
+error: expected `&mut` but found `&u256`
+  ┌─ tests/op-equal/invalid6.move:3:10
+  │
+3 │         *x = *x + 1;
+  │          ^
+
+error: expected `&mut` but found `&u256`
+  ┌─ tests/op-equal/invalid6.move:7:11
+  │
+7 │          *x += 1;
+  │           ^

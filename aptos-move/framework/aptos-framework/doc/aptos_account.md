@@ -879,10 +879,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
 <b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(account_addr_source);
 <b>let</b> balance_source = coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
-<b>requires</b> <b>forall</b> i in 0..len(recipients):
-    recipients[i] != account_addr_source;
-<b>requires</b> <b>exists</b> i in 0..len(recipients):
-    amounts[i] &gt; 0;
 <b>aborts_if</b> len(recipients) != len(amounts);
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
         !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[i]) && <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(recipients[i]);
@@ -920,7 +916,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
-<b>requires</b> account_addr_source != <b>to</b>;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_GuidAbortsIf">GuidAbortsIf</a>&lt;AptosCoin&gt;;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;AptosCoin&gt;{from: source};
@@ -948,10 +943,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
 <b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
 <b>let</b> balance_source = coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
-<b>requires</b> <b>forall</b> i in 0..len(recipients):
-    recipients[i] != account_addr_source;
-<b>requires</b> <b>exists</b> i in 0..len(recipients):
-    amounts[i] &gt; 0;
 // This enforces <a id="high-level-req-7" href="#high-level-req">high-level requirement 7</a>:
 <b>aborts_if</b> len(recipients) != len(amounts);
 <b>aborts_if</b> <b>exists</b> i in 0..len(recipients):
@@ -992,7 +983,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
-<b>requires</b> account_addr_source != <b>to</b>;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt;;
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt;;

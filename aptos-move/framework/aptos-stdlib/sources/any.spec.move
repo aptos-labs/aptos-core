@@ -15,28 +15,28 @@ spec aptos_std::any {
         ensures [abstract] from_bcs::deserializable<T>(result.data);
     }
 
-    spec unpack<T>(x: Any): T {
+    spec unpack<T>(self: Any): T {
         use aptos_std::from_bcs;
         include UnpackAbortsIf<T>;
-        ensures result == from_bcs::deserialize<T>(x.data);
+        ensures result == from_bcs::deserialize<T>(self.data);
     }
 
     spec schema UnpackAbortsIf<T> {
         use aptos_std::from_bcs;
-        x: Any;
-        aborts_if type_info::type_name<T>() != x.type_name;
-        aborts_if !from_bcs::deserializable<T>(x.data);
+        self: Any;
+        aborts_if type_info::type_name<T>() != self.type_name;
+        aborts_if !from_bcs::deserializable<T>(self.data);
     }
 
     spec schema UnpackRequirement<T> {
         use aptos_std::from_bcs;
-        x: Any;
-        requires type_info::type_name<T>() == x.type_name;
-        requires from_bcs::deserializable<T>(x.data);
+        self: Any;
+        requires type_info::type_name<T>() == self.type_name;
+        requires from_bcs::deserializable<T>(self.data);
     }
 
-    spec type_name(x: &Any): &String {
+    spec type_name(self: &Any): &String {
         aborts_if false;
-        ensures result == x.type_name;
+        ensures result == self.type_name;
     }
 }

@@ -122,13 +122,11 @@ B0:
 	4: MoveLoc[0](Arg0: u64)
 	5: LdU64(1)
 	6: Add
-	7: MoveLoc[2](loc1: u64)
-	8: MoveLoc[1](loc0: u64)
-	9: Add
-	10: StLoc[1](loc0: u64)
-	11: Pop
-	12: MoveLoc[1](loc0: u64)
-	13: Ret
+	7: Pop
+	8: MoveLoc[2](loc1: u64)
+	9: MoveLoc[1](loc0: u64)
+	10: Add
+	11: Ret
 }
 }
 ============ bytecode verification succeeded ========

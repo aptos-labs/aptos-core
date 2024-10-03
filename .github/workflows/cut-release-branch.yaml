@@ -31,7 +31,7 @@ jobs:
   cut-release-branch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.CUT_RELEASE_BRANCH_CREDENTIALS }}
           fetch-depth: 0

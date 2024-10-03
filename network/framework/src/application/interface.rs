@@ -177,7 +177,7 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
             sample!(
                 SampleRate::Duration(Duration::from_secs(10)),
                 warn!(
-                    "Unavailable peers (without a common network protocol): {:?}",
+                    "[sampled] Unavailable peers (without a common network protocol): {:?}",
                     peers_without_a_protocol
                 )
             );

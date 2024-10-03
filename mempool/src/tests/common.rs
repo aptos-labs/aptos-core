@@ -15,7 +15,7 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     mempool_status::MempoolStatusCode,
-    transaction::{RawTransaction, Script, SignedTransaction},
+    transaction::{RawTransaction, Script, SignedTransaction, TransactionArgument},
 };
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
@@ -45,21 +45,83 @@ static ACCOUNTS: Lazy<Vec<AccountAddress>> = Lazy::new(|| {
     ]
 });
 
+static SMALL_SCRIPT: Lazy<Script> = Lazy::new(|| Script::new(vec![], vec![], vec![]));
+
+static LARGE_SCRIPT: Lazy<Script> = Lazy::new(|| {
+    let mut args = vec![];
+    for _ in 0..200 {
+        args.push(TransactionArgument::Address(AccountAddress::random()));
+    }
+    Script::new(vec![], vec![], args)
+});
+
+static HUGE_SCRIPT: Lazy<Script> = Lazy::new(|| {
+    let mut args = vec![];
+    for _ in 0..200_000 {
+        args.push(TransactionArgument::Address(AccountAddress::random()));
+    }
+    Script::new(vec![], vec![], args)
+});
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TestTransaction {
-    pub(crate) address: usize,
+    pub(crate) address: AccountAddress,
     pub(crate) sequence_number: u64,
     pub(crate) gas_price: u64,
     pub(crate) account_seqno: u64,
+    pub(crate) script: Option<Script>,
 }
 
 impl TestTransaction {
-    pub(crate) const fn new(address: usize, sequence_number: u64, gas_price: u64) -> Self {
+    pub(crate) fn new(address: usize, sequence_number: u64, gas_price: u64) -> Self {
+        Self {
+            address: TestTransaction::get_address(address),
+            sequence_number,
+            gas_price,
+            account_seqno: 0,
+            script: None,
+        }
+    }
+
+    pub(crate) fn new_with_large_script(
+        address: usize,
+        sequence_number: u64,
+        gas_price: u64,
+    ) -> Self {
+        Self {
+            address: TestTransaction::get_address(address),
+            sequence_number,
+            gas_price,
+            account_seqno: 0,
+            script: Some(LARGE_SCRIPT.clone()),
+        }
+    }
+
+    pub(crate) fn new_with_huge_script(
+        address: usize,
+        sequence_number: u64,
+        gas_price: u64,
+    ) -> Self {
+        Self {
+            address: TestTransaction::get_address(address),
+            sequence_number,
+            gas_price,
+            account_seqno: 0,
+            script: Some(HUGE_SCRIPT.clone()),
+        }
+    }
+
+    pub(crate) fn new_with_address(
+        address: AccountAddress,
+        sequence_number: u64,
+        gas_price: u64,
+    ) -> Self {
         Self {
             address,
             sequence_number,
             gas_price,
             account_seqno: 0,
+            script: None,
         }
     }
 
@@ -87,9 +149,9 @@ impl TestTransaction {
         exp_timestamp_secs: u64,
     ) -> SignedTransaction {
         let raw_txn = RawTransaction::new_script(
-            TestTransaction::get_address(self.address),
+            self.address,
             self.sequence_number,
-            Script::new(vec![], vec![], vec![]),
+            self.script.clone().unwrap_or(SMALL_SCRIPT.clone()),
             max_gas_amount,
             self.gas_price,
             exp_timestamp_secs,

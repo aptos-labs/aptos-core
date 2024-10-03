@@ -77,7 +77,7 @@ impl EventsApi {
         // Ensure that account exists
         let api = self.clone();
         api_spawn_blocking(move || {
-            let account = Account::new(api.context.clone(), address.0, None, None, None, true)?;
+            let account = Account::new(api.context.clone(), address.0, None, None, None)?;
             account.verify_account_or_object_resource()?;
             api.list(
                 account.latest_ledger_info,
@@ -144,7 +144,7 @@ impl EventsApi {
 
         let api = self.clone();
         api_spawn_blocking(move || {
-            let account = Account::new(api.context.clone(), address.0, None, None, None, true)?;
+            let account = Account::new(api.context.clone(), address.0, None, None, None)?;
             let key = account.find_event_key(event_handle.0, field_name.0.into())?;
             api.list(account.latest_ledger_info, accept_type, page, key)
         })

@@ -265,7 +265,7 @@ impl<
 
     /// Returns the highest synced version and epoch in storage
     fn get_highest_synced_version_and_epoch(&self) -> Result<(Version, Epoch), Error> {
-        let highest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
+        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
         let highest_synced_epoch = utils::fetch_latest_epoch_state(self.storage.clone())?.epoch;
 
         Ok((highest_synced_version, highest_synced_epoch))
@@ -302,7 +302,7 @@ impl<
             ContinuousSyncingMode::ApplyTransactionOutputs => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     utils::apply_transaction_outputs(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         ledger_info_with_signatures.clone(),
                         None,
@@ -323,7 +323,7 @@ impl<
             ContinuousSyncingMode::ExecuteTransactions => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         ledger_info_with_signatures.clone(),
                         None,
@@ -344,7 +344,7 @@ impl<
             ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         ledger_info_with_signatures.clone(),
                         None,
@@ -354,7 +354,7 @@ impl<
                 } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
                 {
                     utils::apply_transaction_outputs(
-                        self.storage_synchronizer.clone(),
+                        &mut self.storage_synchronizer,
                         notification_metadata,
                         ledger_info_with_signatures.clone(),
                         None,

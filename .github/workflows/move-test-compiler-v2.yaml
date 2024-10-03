@@ -28,7 +28,7 @@ jobs:
   rust-move-tests:
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run Aptos Move tests with compiler V2
         uses: ./.github/actions/move-tests-compiler-v2
         with:

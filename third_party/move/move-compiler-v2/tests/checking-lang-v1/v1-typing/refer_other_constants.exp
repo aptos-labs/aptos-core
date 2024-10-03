@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: not supported before language version `2.0`: constant definitions referring to other constants
+  ┌─ tests/checking-lang-v1/v1-typing/refer_other_constants.move:3:5
+  │
+3 │     const X: u64 = Y;
+  │     ^^^^^^^^^^^^^^^^^

@@ -58,8 +58,9 @@ pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
     block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
-    fee_statement::FeeStatement, proof::accumulator::InMemoryEventAccumulator,
-    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
+    fee_statement::FeeStatement, keyless::FederatedKeylessPublicKey,
+    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
+    write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -625,6 +626,18 @@ impl SignedTransaction {
         Self::new_single_sender(raw_txn, authenticator)
     }
 
+    pub fn new_federated_keyless(
+        raw_txn: RawTransaction,
+        public_key: FederatedKeylessPublicKey,
+        signature: KeylessSignature,
+    ) -> SignedTransaction {
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::federated_keyless(public_key),
+            AnySignature::keyless(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
+    }
+
     pub fn new_single_sender(
         raw_txn: RawTransaction,
         authenticator: AccountAuthenticator,
@@ -877,25 +890,24 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 
+    pub fn aug_with_aux_data(self, aux_data: &TransactionAuxiliaryData) -> Self {
+        if let Some(aux_error) = aux_data.get_detail_error_message() {
+            if let ExecutionStatus::MiscellaneousError(status_code) = self {
+                if status_code.is_none() {
+                    return ExecutionStatus::MiscellaneousError(Some(aux_error.status_code()));
+                }
+            }
+        }
+        self
+    }
+
     // Used by simulation API for showing detail error message. Should not be used by production code.
     pub fn conmbine_vm_status_for_simulation(
         aux_data: &TransactionAuxiliaryData,
         partial_status: TransactionStatus,
     ) -> Self {
         match partial_status {
-            TransactionStatus::Keep(exec_status) => {
-                if let Some(aux_error) = aux_data.get_detail_error_message() {
-                    let status_code = aux_error.status_code;
-                    match exec_status {
-                        ExecutionStatus::MiscellaneousError(_) => {
-                            ExecutionStatus::MiscellaneousError(Some(status_code))
-                        },
-                        _ => exec_status,
-                    }
-                } else {
-                    exec_status
-                }
-            },
+            TransactionStatus::Keep(exec_status) => exec_status.aug_with_aux_data(aux_data),
             TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
         }

@@ -20,7 +20,7 @@ use aptos_consensus_types::{
     common::{Payload, Round},
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{bls12381::PrivateKey, HashValue};
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -94,6 +94,7 @@ impl MockExecutionClient {
 impl TExecutionClient for MockExecutionClient {
     async fn start_epoch(
         &self,
+        _maybe_consensus_key: Option<Arc<PrivateKey>>,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,

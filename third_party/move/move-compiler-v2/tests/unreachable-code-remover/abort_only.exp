@@ -17,8 +17,6 @@ fun m::test() {
   0: $t0 := 0
      # maybe
   1: abort($t0)
-     # no
-  2: return ()
 }
 
 ============ after UnreachableCodeRemover: ================

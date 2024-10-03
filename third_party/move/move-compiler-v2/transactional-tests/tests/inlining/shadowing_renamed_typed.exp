@@ -1,0 +1,25 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
+= task 0 'publish'. lines 1-19:
+- Error: error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:9:14
++ warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
++   ┌─ TEMPFILE:8:17
+=   │
+- 9 │         foo(|y: u64| {
+-   │              ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
++ 8 │         let x = 1;
++   │                 ^
+= 
+= 
+= 
+- task 1 'run'. lines 21-21:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
+- 

@@ -411,6 +411,7 @@ impl FunctionTargetPipeline {
     /// preceding it in the pipeline have been executed for all functions before it is called.
     /// `hook_before_pipeline` is called before the pipeline is run, and `hook_after_each_processor`
     /// is called after each processor in the pipeline has been run on all functions.
+    /// If `hook_after_each_processor` returns false, the pipeline is stopped.
     /// Note that `hook_after_each_processor` is called with index starting at 1.
     pub fn run_with_hook<Before, AfterEach>(
         &self,
@@ -420,7 +421,7 @@ impl FunctionTargetPipeline {
         hook_after_each_processor: AfterEach,
     ) where
         Before: Fn(&FunctionTargetsHolder),
-        AfterEach: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder),
+        AfterEach: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder) -> bool,
     {
         let rev_topo_order = Self::sort_in_reverse_topological_order(env, targets);
         info!("transforming bytecode");
@@ -463,18 +464,21 @@ impl FunctionTargetPipeline {
                 }
                 processor.finalize(env, targets);
             }
-            hook_after_each_processor(step_count + 1, processor.as_ref(), targets);
+            if !hook_after_each_processor(step_count + 1, processor.as_ref(), targets) {
+                break;
+            }
         }
     }
 
     /// Run the pipeline on all functions in the targets holder, with no hooks in effect
     pub fn run(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
-        self.run_with_hook(env, targets, |_| {}, |_, _, _| {})
+        self.run_with_hook(env, targets, |_| {}, |_, _, _| true)
     }
 
     /// Runs the pipeline on all functions in the targets holder, and dump the bytecode via `log` before the
     /// pipeline as well as after each processor pass, identifying it by `dump_base_name`. If `dump_cfg` is set,
     /// dump the per-function control-flow graph (in dot format) to a file, using the given base name.
+    /// `continue_to_next_processor` determines whether the pipeline should continue to the next processor.
     pub fn run_with_dump(
         &self,
         env: &GlobalEnv,
@@ -482,6 +486,7 @@ impl FunctionTargetPipeline {
         dump_base_name: &str,
         dump_cfg: bool,
         register_annotations: &impl Fn(&FunctionTarget),
+        continue_to_next_processor: impl Fn() -> bool,
     ) {
         self.run_with_hook(
             env,
@@ -511,6 +516,7 @@ impl FunctionTargetPipeline {
                 if dump_cfg {
                     Self::dump_cfg(env, holders, dump_base_name, step_count, &suffix);
                 }
+                continue_to_next_processor()
             },
         );
     }

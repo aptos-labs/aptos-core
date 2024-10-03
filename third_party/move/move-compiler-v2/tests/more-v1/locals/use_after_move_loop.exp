@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/locals/use_after_move_loop.move:4:20
+  │
+4 │         loop { _ = move x }
+  │                    ^^^^^^
+  │                    │
+  │                    attempted to move here
+  │                    used here
+
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/locals/use_after_move_loop.move:9:37
+  │
+9 │         loop { if (cond) break; _ = move x }
+  │                                     ^^^^^^
+  │                                     │
+  │                                     attempted to move here
+  │                                     used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_loop.move:14:31
+   │
+14 │         loop { let y = x; _ = move x; y; }
+   │                        -      ^^^^^^ attempted to move here
+   │                        │
+   │                        used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_loop.move:19:51
+   │
+19 │         loop { let y = x; if (cond) continue; _ = move x; y; }
+   │                        -                          ^^^^^^ attempted to move here
+   │                        │
+   │                        used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_loop.move:24:44
+   │
+24 │         loop { let y = &x; _ = move y; _ = move x }
+   │                        --                  ^^^^^^ attempted to move here
+   │                        │
+   │                        used here

@@ -146,47 +146,50 @@ CALIBRATED_TPS_INDEX = -1
 CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	min_ratio	max_ratio	median
+# (or if from log:
+#    transaction_type module_working_set_size executor_type  block_size expected_tps tps
+# )
 CALIBRATION = """
-no-op	1	VM	0.900	1.031	33440.0
-no-op	1000	VM	0.926	1.020	20420.9
-apt-fa-transfer	1	VM	0.860	1.030	25331.5
-account-generation	1	VM	0.892	1.036	20798.2
-account-resource32-b	1	VM	0.896	1.046	29796.4
-modify-global-resource	1	VM	0.932	1.009	2870.9
-modify-global-resource	10	VM	0.931	1.016	16886.3
-publish-package	1	VM	0.932	1.031	149.5
-mix_publish_transfer	1	VM	0.956	1.099	2259.6
-batch100-transfer	1	VM	0.859	1.023	784.5
-vector-picture30k	1	VM	0.954	1.021	112.2
-vector-picture30k	20	VM	0.879	1.036	1119.0
-smart-table-picture30-k-with200-change	1	VM	0.950	1.044	21.8
-smart-table-picture30-k-with200-change	20	VM	0.946	1.056	185.9
-modify-global-resource-agg-v2	1	VM	0.877	1.050	29796.4
-modify-global-flag-agg-v2	1	VM	0.964	1.022	5294.9
-modify-global-bounded-agg-v2	1	VM	0.938	1.076	8866.4
-modify-global-milestone-agg-v2	1	VM	0.907	1.026	24885.0
-resource-groups-global-write-tag1-kb	1	VM	0.941	1.043	9039.0
-resource-groups-global-write-and-read-tag1-kb	1	VM	0.936	1.020	6221.0
-resource-groups-sender-write-tag1-kb	1	VM	0.893	1.047	20798.2
-resource-groups-sender-multi-change1-kb	1	VM	0.906	1.054	16553.6
-token-v1ft-mint-and-transfer	1	VM	0.899	1.041	1276.2
-token-v1ft-mint-and-transfer	20	VM	0.879	1.011	11483.9
-token-v1nft-mint-and-transfer-sequential	1	VM	0.899	1.024	812.9
-token-v1nft-mint-and-transfer-sequential	20	VM	0.883	1.012	7732.8
-coin-init-and-mint	1	VM	0.845	1.026	27205.9
-coin-init-and-mint	20	VM	0.815	1.033	23591.6
-fungible-asset-mint	1	VM	0.848	1.018	21180.4
-fungible-asset-mint	20	VM	0.874	1.043	19680.6
-no-op5-signers	1	VM	0.884	1.041	33440.0
-token-v2-ambassador-mint	1	VM	0.840	1.028	15320.8
-token-v2-ambassador-mint	20	VM	0.866	1.016	15320.8
-liquidity-pool-swap	1	VM	0.909	1.028	975.7
-liquidity-pool-swap	20	VM	0.895	1.010	8194.6
-liquidity-pool-swap-stable	1	VM	0.899	1.016	957.5
-liquidity-pool-swap-stable	20	VM	0.917	1.022	7881.5
-deserialize-u256	1	VM	0.850	1.039	33440.0
-no-op-fee-payer	1	VM	0.907	1.018	2216.5
-no-op-fee-payer	50	VM	0.837	1.011	25786.3
+no-op	1	VM	0.822	1.047	38275.3
+no-op	1000	VM	0.775	1.033	22763.8
+apt-fa-transfer	1	VM	0.770	1.059	27699.5
+account-generation	1	VM	0.735	1.026	22763.8
+account-resource32-b	1	VM	0.718	1.049	33440.0
+modify-global-resource	1	VM	0.868	1.019	2819.9
+modify-global-resource	10	VM	0.877	1.018	17562.1
+publish-package	1	VM	0.944	1.037	143.9
+mix_publish_transfer	1	VM	0.953	1.124	2131.6
+batch100-transfer	1	VM	0.768	1.027	770.7
+vector-picture30k	1	VM	0.944	1.036	112.2
+vector-picture30k	20	VM	0.835	1.020	1140.7
+smart-table-picture30-k-with200-change	1	VM	0.955	1.051	21.8
+smart-table-picture30-k-with200-change	20	VM	0.926	1.065	185.9
+modify-global-resource-agg-v2	1	VM	0.792	1.060	33440.0
+modify-global-flag-agg-v2	1	VM	0.921	1.014	5199.3
+modify-global-bounded-agg-v2	1	VM	0.906	1.103	8866.4
+modify-global-milestone-agg-v2	1	VM	0.804	1.033	27699.5
+resource-groups-global-write-tag1-kb	1	VM	0.915	1.074	9039.0
+resource-groups-global-write-and-read-tag1-kb	1	VM	0.938	1.016	6221.0
+resource-groups-sender-write-tag1-kb	1	VM	0.835	1.134	19680.6
+resource-groups-sender-multi-change1-kb	1	VM	0.896	1.071	16553.6
+token-v1ft-mint-and-transfer	1	VM	0.894	1.029	1276.2
+token-v1ft-mint-and-transfer	20	VM	0.897	1.024	11901.1
+token-v1nft-mint-and-transfer-sequential	1	VM	0.923	1.025	798.6
+token-v1nft-mint-and-transfer-sequential	20	VM	0.873	1.024	7732.8
+coin-init-and-mint	1	VM	0.779	1.055	29251.9
+coin-init-and-mint	20	VM	0.827	1.077	24885.0
+fungible-asset-mint	1	VM	0.773	1.023	23174.5
+fungible-asset-mint	20	VM	0.803	1.047	21567.9
+no-op5-signers	1	VM	0.854	1.078	37561.3
+token-v2-ambassador-mint	1	VM	0.848	1.022	16553.6
+token-v2-ambassador-mint	20	VM	0.811	1.044	16228.8
+liquidity-pool-swap	1	VM	0.922	1.027	975.7
+liquidity-pool-swap	20	VM	0.881	1.014	8359.6
+liquidity-pool-swap-stable	1	VM	0.890	1.013	957.5
+liquidity-pool-swap-stable	20	VM	0.916	1.019	8035.3
+deserialize-u256	1	VM	0.842	1.060	37561.3
+no-op-fee-payer	1	VM	0.908	1.029	2131.6
+no-op-fee-payer	50	VM	0.890	1.038	27205.9
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.

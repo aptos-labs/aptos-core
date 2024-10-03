@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::format_module_id;
+use crate::{format_module_id, DEFAULT_EXECUTION_BOUND};
 use codespan_reporting::files::{Files, SimpleFiles};
 use colored::{control, Colorize};
 use move_binary_format::{
@@ -18,6 +18,9 @@ use move_compiler::{
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status::StatusType};
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
+use move_vm_runtime::native_extensions::NativeContextExtensions;
+use move_vm_test_utils::gas_schedule::{zero_cost_schedule, CostTable, GasCost, GasStatus};
+use move_vm_types::gas::GasMeter;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -25,6 +28,63 @@ use std::{
     sync::Mutex,
     time::Duration,
 };
+
+/// A gas schedule where every instruction has a cost of "1". This is used to bound execution of a
+/// test to a certain number of ticks.
+fn unit_cost_table() -> CostTable {
+    let mut cost_schedule = zero_cost_schedule();
+    cost_schedule.instruction_table.iter_mut().for_each(|cost| {
+        *cost = GasCost::new(1, 1);
+    });
+    cost_schedule
+}
+
+pub trait UnitTestFactory {
+    type GasMeter: GasMeter;
+    fn new_gas_meter(&self) -> Self::GasMeter;
+    fn finalize_test_run_info(
+        &self,
+        change_set: &ChangeSet,
+        extensions: &mut NativeContextExtensions,
+        gas_meter: Self::GasMeter,
+        test_run_info: TestRunInfo,
+    ) -> TestRunInfo;
+}
+
+pub struct UnitTestFactoryWithCostTable {
+    cost_table: CostTable,
+    gas_limit: u64,
+}
+
+impl UnitTestFactoryWithCostTable {
+    pub fn new(cost_table: Option<CostTable>, gas_limit: Option<u64>) -> Self {
+        Self {
+            cost_table: cost_table.unwrap_or_else(unit_cost_table),
+            gas_limit: gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
+        }
+    }
+}
+
+impl UnitTestFactory for UnitTestFactoryWithCostTable {
+    type GasMeter = GasStatus;
+
+    fn new_gas_meter(&self) -> Self::GasMeter {
+        GasStatus::new(self.cost_table.clone(), self.gas_limit.into())
+    }
+
+    // @dev: the caller must fill the test_run_info.gas_used field in the returned TestRunInfo
+    fn finalize_test_run_info(
+        &self,
+        _: &ChangeSet,
+        _: &mut NativeContextExtensions,
+        gas_status: Self::GasMeter,
+        mut test_run_info: TestRunInfo,
+    ) -> TestRunInfo {
+        let remaining_gas: u64 = gas_status.remaining_gas().into();
+        test_run_info.gas_used = self.gas_limit - remaining_gas;
+        test_run_info
+    }
+}
 
 #[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq)]
 pub enum FailureReason {
@@ -65,7 +125,7 @@ pub struct TestFailure {
 pub struct TestRunInfo {
     pub function_ident: String,
     pub elapsed_time: Duration,
-    pub instructions_executed: u64,
+    pub gas_used: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -82,11 +142,11 @@ pub struct TestResults {
 }
 
 impl TestRunInfo {
-    pub fn new(function_ident: String, elapsed_time: Duration, instructions_executed: u64) -> Self {
+    pub fn new(function_ident: String, elapsed_time: Duration) -> Self {
         Self {
             function_ident,
             elapsed_time,
-            instructions_executed,
+            gas_used: 0,
         }
     }
 }
@@ -485,7 +545,7 @@ impl TestResults {
                 stats.push((
                     qualified_function_name,
                     test_result.elapsed_time.as_secs_f32(),
-                    test_result.instructions_executed,
+                    test_result.gas_used,
                 ))
             }
         }
@@ -502,7 +562,7 @@ impl TestResults {
                 stats.push((
                     qualified_function_name,
                     test_failure.test_run_info.elapsed_time.as_secs_f32(),
-                    test_failure.test_run_info.instructions_executed,
+                    test_failure.test_run_info.gas_used,
                 ));
             }
         }
@@ -518,14 +578,14 @@ impl TestResults {
             )?;
             writeln!(
                 writer.lock().unwrap(),
-                "│ {name:^width$} │ {time:^10} │ {instructions:^25} │",
+                "│ {name:^width$} │ {time:^10} │ {gas_used:^25} │",
                 width = max_function_name_size,
                 name = "Test Name",
                 time = "Time",
-                instructions = "Gas Used"
+                gas_used = "Gas Used"
             )?;
 
-            for (qualified_function_name, time, instructions) in stats {
+            for (qualified_function_name, time, gas_used) in stats {
                 writeln!(
                     writer.lock().unwrap(),
                     "├─{:─^width$}─┼─{:─^10}─┼─{:─^25}─┤",
@@ -536,11 +596,11 @@ impl TestResults {
                 )?;
                 writeln!(
                     writer.lock().unwrap(),
-                    "│ {name:<width$} │ {time:^10.3} │ {instructions:^25} │",
+                    "│ {name:<width$} │ {time:^10.3} │ {gas_used:^25} │",
                     name = qualified_function_name,
                     width = max_function_name_size,
                     time = time,
-                    instructions = instructions,
+                    gas_used = gas_used,
                 )?;
             }
 

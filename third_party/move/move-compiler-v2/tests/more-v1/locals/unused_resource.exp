@@ -1,0 +1,91 @@
+
+Diagnostics:
+warning: Unused local variable `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/more-v1/locals/unused_resource.move:5:13
+  │
+5 │         let r = R{};
+  │             ^
+
+warning: Unused local variable `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/unused_resource.move:29:20
+   │
+29 │         loop { let r = R{}; }
+   │                    ^
+
+
+Diagnostics:
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/more-v1/locals/unused_resource.move:5:17
+  │
+5 │         let r = R{};
+  │                 ^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/unused_resource.move:15:21
+   │
+15 │         if (cond) { r = R{}; };
+   │                     ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/unused_resource.move:20:29
+   │
+20 │         if (cond) {} else { r = R{}; };
+   │                             ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/unused_resource.move:25:24
+   │
+25 │         while (cond) { r = R{} };
+   │                        ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/unused_resource.move:29:24
+   │
+29 │         loop { let r = R{}; }
+   │                        ^^^
+
+
+Diagnostics:
+error: local `r` of type `M::R` does not have the `drop` ability
+  ┌─ tests/more-v1/locals/unused_resource.move:5:17
+  │
+5 │         let r = R{};
+  │                 ^^^ implicitly dropped here since it is no longer used
+
+error: local `_r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource.move:10:18
+   │
+10 │         let _r = R{};
+   │                  ^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource.move:15:21
+   │
+15 │         if (cond) { r = R{}; };
+   │                     ^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource.move:20:29
+   │
+20 │         if (cond) {} else { r = R{}; };
+   │                             ^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource.move:25:24
+   │
+25 │         while (cond) { r = R{} };
+   │                        ^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource.move:33:17
+   │
+33 │         let _ = &R{};
+   │                 ^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `_x` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/unused_resource.move:36:22
+   │
+36 │       fun t7<T>(_x: R) {
+   │ ╭──────────────────────^
+37 │ │     }
+   │ ╰─────^ implicitly dropped here since it is no longer used

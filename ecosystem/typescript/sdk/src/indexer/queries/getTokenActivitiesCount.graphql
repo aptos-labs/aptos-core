@@ -1,7 +1,0 @@
-query getTokenActivitiesCount($token_id: String) {
-  token_activities_v2_aggregate(where: { token_data_id: { _eq: $token_id } }) {
-    aggregate {
-      count
-    }
-  }
-}

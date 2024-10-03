@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/struct_type_misspelled_key_constraint.move:3:17
+  │
+3 │     struct S<T: ky> { }
+  │                 ^^ Unexpected 'ky'. Expected a type ability, one of: 'copy', 'drop', 'store', or 'key'

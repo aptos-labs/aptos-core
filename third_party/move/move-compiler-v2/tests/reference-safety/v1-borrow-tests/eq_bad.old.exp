@@ -1,0 +1,41 @@
+
+Diagnostics:
+error: mutable reference in local `r` requires exclusive access but is borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/eq_bad.move:8:23
+  │
+8 │         _ = copy r == copy r;
+  │             ----------^^^^^^
+  │             │         │
+  │             │         requirement enforced here
+  │             conflicting reference used here
+  │             previous freeze
+
+error: mutable reference in local `r` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/eq_bad.move:17:23
+   │
+17 │         _ = copy r == move r;
+   │             ----------^^^^^^
+   │             │         │
+   │             │         requirement enforced here
+   │             conflicting reference used here
+   │             previous freeze
+
+error: mutable reference in local `r` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/eq_bad.move:26:23
+   │
+26 │         _ = copy r != copy r;
+   │             ----------^^^^^^
+   │             │         │
+   │             │         requirement enforced here
+   │             conflicting reference used here
+   │             previous freeze
+
+error: mutable reference in local `r` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/eq_bad.move:35:23
+   │
+35 │         _ = copy r != move r;
+   │             ----------^^^^^^
+   │             │         │
+   │             │         requirement enforced here
+   │             conflicting reference used here
+   │             previous freeze

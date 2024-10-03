@@ -28,13 +28,13 @@ flate2 = { workspace = true }
 futures = { workspace = true }
 google-cloud-storage = { workspace = true }
 hyper = { workspace = true }
+itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tar = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
-tonic = { workspace = true }
 
 [dev-dependencies]
 rocksdb = { workspace = true }

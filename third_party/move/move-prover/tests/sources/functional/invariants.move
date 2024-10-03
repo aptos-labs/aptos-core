@@ -12,7 +12,7 @@ module 0x42::TestInvariants {
 
     spec R {
         // We must always have a value greater one.
-        invariant greater_one(x);
+        invariant greater_one(self.x);
 
         // When we update via a reference, the new value must be smaller or equal the old one.
         // invariant update x <= old(x) && tautology();
@@ -165,4 +165,29 @@ module 0x42::TestInvariants {
 
         (a, b)
     }
+
+    struct StructSelf has key, copy, drop {
+        self: u64
+    }
+
+    spec StructSelf {
+        invariant self.self > 10;
+    }
+
+    fun pack_struct_self(): StructSelf  {
+        StructSelf { self: 2 }
+    }
+
+    struct RR has key, copy, drop {
+        x: u64
+    }
+
+    spec RR {
+        invariant self.x > 10;
+    }
+
+    fun pack_struct_RR(): RR  {
+        RR { x: 2 }
+    }
+
 }

@@ -55,7 +55,7 @@ async fn test_dkg_state_transition() {
         .collect::<Vec<_>>();
     let epoch_state = EpochState {
         epoch: 999,
-        verifier: ValidatorVerifier::new(validator_consensus_infos.clone()),
+        verifier: Arc::new(ValidatorVerifier::new(validator_consensus_infos.clone())),
     };
     let agg_node_producer = DummyAggTranscriptProducer {};
     let mut dkg_manager: DKGManager<DummyDKG> = DKGManager::new(

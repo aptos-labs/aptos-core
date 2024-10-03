@@ -36,7 +36,7 @@ impl Display for SyncInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "SyncInfo[certified_round: {}, ordered_round: {}, timeout round: {}, committed_round: {},\n hqc: {:?},\n hoc: {:?},\n hcc: {:?}]",
+            "SyncInfo[certified_round: {}, ordered_round: {}, timeout round: {}, committed_round: {},\n hqc: {},\n hoc: {},\n hcc: {}]",
             self.highest_certified_round(),
             self.highest_ordered_round(),
             self.highest_timeout_round(),

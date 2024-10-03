@@ -13,12 +13,11 @@ pub mod types;
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask, network_interface::DKGNetworkClient,
 };
-use aptos_config::config::ReliableBroadcastConfig;
+use aptos_config::config::{ReliableBroadcastConfig, SafetyRulesConfig};
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
-use aptos_types::dkg::{DKGTrait, DefaultDKG};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
 use tokio::runtime::Runtime;
@@ -26,7 +25,7 @@ pub use types::DKGMessage;
 
 pub fn start_dkg_runtime(
     my_addr: AccountAddress,
-    dkg_dealer_sk: <DefaultDKG as DKGTrait>::DealerPrivateKey,
+    safety_rules_config: &SafetyRulesConfig,
     network_client: NetworkClient<DKGMessage>,
     network_service_events: NetworkServiceEvents<DKGMessage>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
@@ -40,8 +39,8 @@ pub fn start_dkg_runtime(
     let dkg_network_client = DKGNetworkClient::new(network_client);
 
     let dkg_epoch_manager = EpochManager::new(
+        safety_rules_config,
         my_addr,
-        dkg_dealer_sk,
         reconfig_events,
         dkg_start_events,
         self_sender,

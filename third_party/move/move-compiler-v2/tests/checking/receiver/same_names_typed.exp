@@ -1,0 +1,37 @@
+// -- Model dump before bytecode pipeline
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &b::MyOtherList): u64 {
+        select b::MyOtherList.len<&b::MyOtherList>(self)
+    }
+} // end 0x42::b
+module 0x42::a {
+    struct MyList {
+        len: u64,
+    }
+    public fun len(self: &a::MyList): u64 {
+        select a::MyList.len<&a::MyList>(self)
+    }
+} // end 0x42::a
+module 0x42::c {
+    use 0x42::a; // resolved as: 0x42::a
+    use 0x42::b; // resolved as: 0x42::b
+    private inline fun foo(f: |(a::MyList, b::MyOtherList)|,x: a::MyList,y: b::MyOtherList) {
+        (f)(x, y)
+    }
+    private fun test(x: a::MyList,y: b::MyOtherList) {
+        {
+          let (x: a::MyList, y: b::MyOtherList): (a::MyList, b::MyOtherList) = Tuple(x, y);
+          {
+            let (x: a::MyList, y: b::MyOtherList): (a::MyList, b::MyOtherList) = Tuple(x, y);
+            if Eq<u64>(Add<u64>(a::len(Borrow(Immutable)(x)), b::len(Borrow(Immutable)(y))), 1) {
+              Tuple()
+            } else {
+              Abort(1)
+            }
+          }
+        }
+    }
+} // end 0x42::c

@@ -87,6 +87,9 @@ spec:
         {{- if $.Values.metrics.destination }}
         aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
         {{- end}}
+        {{- with $.Values.fullnode.podAnnotations }}
+        {{- toYaml $.Values.fullnode.podAnnotations | nindent 8 }}
+        {{- end }}
     spec:
       securityContext:
         seccompProfile:

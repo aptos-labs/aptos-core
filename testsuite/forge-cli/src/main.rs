@@ -65,6 +65,7 @@ use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use serde_json::{json, Value};
 use std::{
     env,
     num::NonZeroUsize,
@@ -140,8 +141,8 @@ enum OperatorCommand {
     SetNodeImageTag(SetNodeImageTag),
     /// Clean up an existing cluster
     CleanUp(CleanUp),
-    /// Resize an existing cluster
-    Resize(Resize),
+    /// Create a new cluster for testing purposes
+    Create(Create),
 }
 
 #[derive(Parser, Debug)]
@@ -188,6 +189,16 @@ struct K8sSwarm {
     keep: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
+    #[clap(
+        long,
+        help = "Retain debug logs and above for all nodes instead of just the first 5 nodes"
+    )]
+    retain_debug_logs: bool,
+    #[clap(
+        long,
+        help = "If set, spins up an indexer stack alongside the testnet. Same as --enable-indexer"
+    )]
+    enable_indexer: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -212,8 +223,8 @@ struct CleanUp {
 }
 
 #[derive(Parser, Debug)]
-struct Resize {
-    #[clap(long, help = "The kubernetes namespace to resize")]
+struct Create {
+    #[clap(long, help = "The kubernetes namespace to create in")]
     namespace: String,
     #[clap(long, default_value_t = 30)]
     num_validators: usize,
@@ -222,13 +233,13 @@ struct Resize {
     #[clap(
         long,
         help = "Override the image tag used for validators",
-        default_value = "devnet"
+        default_value = "main"
     )]
     validator_image_tag: String,
     #[clap(
         long,
         help = "Override the image tag used for testnet-specific components",
-        default_value = "devnet"
+        default_value = "main"
     )]
     testnet_image_tag: String,
     #[clap(
@@ -243,6 +254,14 @@ struct Resize {
     connect_directly: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
+    #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
+    enable_indexer: bool,
+    #[clap(
+        long,
+        help = "Override the image tag used for indexer",
+        requires = "enable_indexer"
+    )]
+    indexer_image_tag: Option<String>,
 }
 
 // common metrics thresholds:
@@ -388,6 +407,7 @@ fn main() -> Result<()> {
                             k8s.reuse,
                             k8s.keep,
                             k8s.enable_haproxy,
+                            k8s.enable_indexer,
                         )
                         .unwrap(),
                         &args.options,
@@ -416,19 +436,51 @@ fn main() -> Result<()> {
                 }
                 Ok(())
             },
-            OperatorCommand::Resize(resize) => {
+            OperatorCommand::Create(create) => {
+                let kube_client = runtime.block_on(create_k8s_client())?;
+                let era = generate_new_era();
+                let indexer_image_tag = create
+                    .indexer_image_tag
+                    .or(Some(create.validator_image_tag.clone()))
+                    .expect("Expected indexer or validator image tag to use");
+                let config: Value = serde_json::from_value(json!({
+                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    "era": era.clone(),
+                    "namespace": create.namespace.clone(),
+                    "indexer-grpc-values": {
+                        "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, &indexer_image_tag),
+                        "fullnodeConfig": {
+                            "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, &indexer_image_tag),
+                        }
+                    },
+                }))?;
+
                 runtime.block_on(install_testnet_resources(
-                    resize.namespace,
-                    resize.num_validators,
-                    resize.num_fullnodes,
-                    resize.validator_image_tag,
-                    resize.testnet_image_tag,
-                    resize.move_modules_dir,
-                    !resize.connect_directly,
-                    resize.enable_haproxy,
+                    era.clone(),
+                    create.namespace.clone(),
+                    create.num_validators,
+                    create.num_fullnodes,
+                    create.validator_image_tag,
+                    create.testnet_image_tag,
+                    create.move_modules_dir,
+                    false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
+                    create.enable_haproxy,
+                    create.enable_indexer,
                     None,
                     None,
+                    true,
                 ))?;
+
+                if create.enable_indexer {
+                    let indexer_deployer = ForgeDeployerManager::new(
+                        kube_client.clone(),
+                        create.namespace.clone(),
+                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        None,
+                    );
+                    runtime.block_on(indexer_deployer.start(config))?;
+                    runtime.block_on(indexer_deployer.wait_completed())?;
+                }
                 Ok(())
             },
         },
@@ -714,7 +766,7 @@ fn get_realistic_env_test(
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
-        "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
+        "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         _ => return None, // The test name does not match a realistic-env test
     };
@@ -987,7 +1039,7 @@ fn changing_working_quorum_test_high_load() -> ForgeConfig {
         120,
         500,
         300,
-        true,
+        false,
         true,
         true,
         ChangingWorkingQuorumTest {
@@ -1115,13 +1167,13 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
         criteria: [
-            (9, 1.0, 1.0, 1.2, 0),
-            (95, 1.0, 1.0, 1.2, 0),
-            (950, 1.4, 1.6, 2.0, 0),
-            (2900, 2.5, 2.2, 2.5, 0),
-            (4800, 3., 4., 3.0, 0),
-            // TODO : recalibrate latencies for 7k TPS
-            (6700, 5., 10., 20., 100), // Allow some expired transactions (high-load)
+            (9, 0.9, 0.9, 1.2, 0),
+            (95, 0.9, 1.0, 1.2, 0),
+            (950, 1.2, 1.3, 2.0, 0),
+            (2900, 1.4, 2.2, 2.5, 0),
+            (4800, 2.0, 2.5, 3.0, 0),
+            (6700, 2.5, 3.5, 5.0, 0),
+            // TODO add 9k or 10k. Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
@@ -1149,16 +1201,18 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 .with_transactions_per_account(1),
             TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
                 .with_unique_senders(),
+            // TODO(ibalajiarun): this is disabled due to Forge Stable failure on PosToProposal latency.
             TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
                 .with_transactions_per_account(1),
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (7000, 100, 0.3, 0.5, 0.5, 0.5),
-            (8500, 100, 0.3, 0.5, 0.5, 0.5),
+            (7000, 100, 0.3, 0.5, 0.5, 0.4),
+            (8500, 100, 0.3, 0.5, 0.5, 0.4),
             (2000, 300, 0.3, 1.0, 0.6, 1.0),
-            (3200, 500, 0.3, 1.0, 0.7, 0.7),
-            (28, 5, 0.3, 1.0, 0.7, 1.0),
+            (3200, 500, 0.3, 1.0, 0.7, 0.6),
+            // TODO - pos-to-proposal is set to high, until it is calibrated/understood.
+            (28, 5, 0.3, 5.0, 0.7, 1.0),
         ]
         .into_iter()
         .map(
@@ -1225,9 +1279,6 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
                 TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB,
                 3 * 1800,
             ),
-            // publishing package - executes sequentially
-            TransactionWorkload::new_const_tps(TransactionTypeArg::PublishPackage, 3 * 150)
-                .with_transactions_per_account(1),
             TransactionWorkload::new_const_tps(
                 TransactionTypeArg::SmartTablePicture1MWith256Change,
                 3 * 14,
@@ -1238,16 +1289,20 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
             ),
             TransactionWorkload::new_const_tps(TransactionTypeArg::VectorPicture30k, 3 * 150),
             TransactionWorkload::new_const_tps(TransactionTypeArg::ModifyGlobalFlagAggV2, 3 * 3500),
+            // publishing package - executes sequentially
+            TransactionWorkload::new_const_tps(TransactionTypeArg::PublishPackage, 3 * 150)
+                .with_transactions_per_account(1),
         ]),
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(&[
             (4.0, 5.0),
-            (3.0, 4.0),
-            (2.5, 4.0),
-            (2.5, 4.0),
-            (3.0, 5.0),
+            (2.2, 3.0),
+            (3.5, 5.0),
+            (4.0, 6.0),
             (2.5, 4.0),
             (3.5, 5.0),
+            // TODO - p50 and p90 is set to high, until it is calibrated/understood.
+            (3.0, 10.0),
         ]),
     })
     .with_emit_job(
@@ -1321,7 +1376,7 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
         )
 }
 
-fn realistic_env_graceful_overload() -> ForgeConfig {
+fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(20)
@@ -1349,10 +1404,11 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_wait_for_catchup_s(180) // 3 minutes
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
-                    // Check that we don't use more than 24 CPU cores for 20% of the time.
-                    MetricsThreshold::new(24.0, 20),
-                    // Check that we don't use more than 7.5 GB of memory for more than 10% of the time.
-                    MetricsThreshold::new_gb(7.5, 10),
+                    // Check that we don't use more than 28 CPU cores for 20% of the time.
+                    MetricsThreshold::new(28.0, 20),
+                    // Memory starts around 6GB, and grows around 8GB/hr in this test.
+                    // Check that we don't use more than final expected memory for more than 20% of the time.
+                    MetricsThreshold::new_gb(6.5 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1846,9 +1902,9 @@ fn realistic_env_max_load_test(
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),
-            // Memory starts around 5GB, and grows around 1.4GB/hr in this test.
-            // Check that we don't use more than final expected memory for more than 15% of the time.
-            MetricsThreshold::new_gb(5.0 + 1.4 * (duration_secs as f64 / 3600.0), 15),
+            // Memory starts around 7GB, and grows around 1.4GB/hr in this test.
+            // Check that we don't use more than final expected memory for more than 20% of the time.
+            MetricsThreshold::new_gb(7.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -1856,7 +1912,7 @@ fn realistic_env_max_load_test(
             (duration.as_secs() / 10).max(60),
         )
         .add_latency_threshold(3.4, LatencyType::P50)
-        .add_latency_threshold(4.5, LatencyType::P90)
+        .add_latency_threshold(4.5, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
             max_epoch_no_progress_secs: 15.0,

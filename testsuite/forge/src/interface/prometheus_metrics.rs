@@ -82,7 +82,8 @@ pub async fn fetch_system_metrics(
     start_time: i64,
     end_time: i64,
 ) -> anyhow::Result<SystemMetrics> {
-    let cpu_query = r#"avg(rate(container_cpu_usage_seconds_total{container=~"validator"}[30s]))"#;
+    // CPU oscilates, so aggregate over larger period (2m) to avoid noise.
+    let cpu_query = r#"avg(rate(container_cpu_usage_seconds_total{container=~"validator"}[2m]))"#;
     let memory_query = r#"avg(container_memory_rss{container=~"validator"})"#;
 
     let swarm = swarm.read().await;

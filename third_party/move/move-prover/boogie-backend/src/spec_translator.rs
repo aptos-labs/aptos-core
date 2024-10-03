@@ -10,9 +10,9 @@ use crate::{
         boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
         boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
         boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_type,
-        boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
-        boogie_well_formed_expr_bv,
+        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_type, boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob,
+        boogie_well_formed_expr, boogie_well_formed_expr_bv,
     },
     options::BoogieOptions,
 };
@@ -846,8 +846,8 @@ impl<'env> SpecTranslator<'env> {
             Operation::SpecFunction(module_id, fun_id, memory_labels) => {
                 self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, memory_labels)
             },
-            Operation::Pack(_, _, Some(_)) => {
-                self.error(&loc, "variants not yet supported");
+            Operation::Pack(mid, sid, Some(variant)) => {
+                self.translate_pack_variant(node_id, *mid, *sid, variant, args)
             },
             Operation::Pack(mid, sid, None) => self.translate_pack(node_id, *mid, *sid, args),
             Operation::Tuple if args.len() == 1 => self.translate_exp(&args[0]),
@@ -855,13 +855,11 @@ impl<'env> SpecTranslator<'env> {
             Operation::Select(module_id, struct_id, field_id) => {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
             },
-            Operation::SelectVariants(_module_id, _struct_id, _field_ids) => {
-                // TODO(#13806): implement for variants
-                self.error(&loc, "selection from variants no yet supported");
+            Operation::SelectVariants(module_id, struct_id, field_ids) => {
+                self.translate_select(node_id, *module_id, *struct_id, field_ids[0], args);
             },
-            Operation::TestVariants(_module_id, _struct_id, _variants) => {
-                // TODO(#13806): implement for variants
-                self.error(&loc, "testing of variants no yet supported");
+            Operation::TestVariants(module_id, struct_id, variants) => {
+                self.translate_test_variants(node_id, *module_id, *struct_id, variants, args);
             },
             Operation::UpdateField(module_id, struct_id, field_id) => {
                 self.translate_update_field(node_id, *module_id, *struct_id, *field_id, args)
@@ -1045,6 +1043,30 @@ impl<'env> SpecTranslator<'env> {
         emit!(self.writer, ")");
     }
 
+    fn translate_pack_variant(
+        &self,
+        node_id: NodeId,
+        mid: ModuleId,
+        sid: StructId,
+        variant: &Symbol,
+        args: &[Exp],
+    ) {
+        let struct_env = &self.env.get_module(mid).into_struct(sid);
+        let inst = &self.get_node_instantiation(node_id);
+        emit!(
+            self.writer,
+            "{}(",
+            boogie_struct_variant_name(struct_env, inst, *variant)
+        );
+        let mut sep = "";
+        for arg in args {
+            emit!(self.writer, sep);
+            self.translate_exp(arg);
+            sep = ", ";
+        }
+        emit!(self.writer, ")");
+    }
+
     fn translate_spec_fun_call(
         &self,
         node_id: NodeId,
@@ -1195,6 +1217,38 @@ impl<'env> SpecTranslator<'env> {
         let field_env = struct_env.get_field(field_id);
         self.translate_exp(&args[0]);
         emit!(self.writer, "->{}", boogie_field_sel(&field_env));
+    }
+
+    fn translate_test_variants(
+        &self,
+        node_id: NodeId,
+        module_id: ModuleId,
+        struct_id: StructId,
+        variants: &[Symbol],
+        args: &[Exp],
+    ) {
+        let struct_env = self.env.get_module(module_id).into_struct(struct_id);
+        if struct_env.is_intrinsic() {
+            self.env.error(
+                &self.env.get_node_loc(node_id),
+                "cannot test variants of intrinsic struct",
+            );
+        }
+        let struct_type = &self.get_node_type(args[0].node_id());
+        let (_, _, _) = struct_type.skip_reference().require_struct();
+        let inst = self.env.get_node_instantiation(node_id);
+        let inst = &self.inst_slice(&inst);
+        let test_var_result = self.fresh_var_name("test_variant_var");
+        emit!(self.writer, "(var {} := ", test_var_result);
+        self.translate_exp(&args[0]);
+        emit!(self.writer, ";");
+        let mut condition = vec![];
+        for variant in variants {
+            let struct_variant_name = boogie_struct_variant_name(&struct_env, inst, *variant);
+            let call = format!("{} is {}", test_var_result, struct_variant_name);
+            condition.push(call.clone());
+        }
+        emitln!(self.writer, "{})", condition.join(" || "),);
     }
 
     fn translate_update_field(
@@ -1711,7 +1765,9 @@ impl<'env> SpecTranslator<'env> {
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let oper_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
+        let binding = self.env.get_node_type(args[0].node_id());
+        let common_type = binding.skip_reference();
+        let oper_base = match common_type {
             Type::Primitive(PrimitiveType::U8) => "Bv8",
             Type::Primitive(PrimitiveType::U16) => "Bv16",
             Type::Primitive(PrimitiveType::U32) => "Bv32",
@@ -1726,7 +1782,18 @@ impl<'env> SpecTranslator<'env> {
             let num_oper_e = global_state.get_node_num_oper(e.node_id());
             let ty_e = self.env.get_node_type(e.node_id());
             if num_oper_e != Bitwise {
-                emit!(self.writer, "$int2bv.{}(", boogie_num_type_base(&ty_e));
+                if matches!(ty_e, Type::Primitive(PrimitiveType::Num)) || ty_e == *common_type {
+                    emit!(
+                        self.writer,
+                        "$int2bv.{}(",
+                        boogie_num_type_base(common_type)
+                    );
+                } else {
+                    self.env.error(
+                        &self.env.get_node_loc(e.node_id()),
+                        "arguments of bit operations must have the same data type",
+                    );
+                }
             }
             self.translate_exp(e);
             if num_oper_e != Bitwise {

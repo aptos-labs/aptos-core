@@ -1,0 +1,142 @@
+
+Diagnostics:
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:18:9
+   │
+18 │         *&mut r.x = 5;
+   │         ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&` operators: consider removing them
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:27:9
+   │
+27 │         *&borrow_global<S>(addr).y
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:35:9
+   │
+35 │         *&mut borrow_global_mut<S>(addr).y
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:60:9
+   │
+60 │         *&mut make_S().x = 5;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:68:9
+   │
+68 │         *&mut make_S().y.a = 5;
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:82:9
+   │
+82 │         *&mut mod_S(&mut s).x = 6;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&` operators: consider removing them
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:99:9
+   │
+99 │         *&s
+   │         ^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:109:9
+    │
+109 │         *&mut s
+    │         ^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:114:9
+    │
+114 │         *&mut s.x
+    │         ^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:119:9
+    │
+119 │         *& s.y.a
+    │         ^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:129:9
+    │
+129 │         *& e.x
+    │         ^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:139:9
+    │
+139 │         *&mut e.x
+    │         ^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:144:9
+    │
+144 │         *&mut e.x = 6;
+    │         ^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:148:9
+    │
+148 │         *&mut x = 42;
+    │         ^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:153:9
+    │
+153 │         *&mut x = 5;
+    │         ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+warning: [lint] Needless pair of `*` and `&` operators: consider removing them
+    ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:170:26
+    │
+170 │         let _foo1: Foo = *&bar.foo;
+    │                          ^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
+
+
+Diagnostics:
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+   ┌─ tests/lints/model_ast_lints/needless_deref_ref_warn.move:35:15
+   │
+35 │         *&mut borrow_global_mut<S>(addr).y
+   │               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+
+
+============ bytecode verification succeeded ========

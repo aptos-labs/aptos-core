@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/ability_modifier_trailing_comma.move:4:32
+  │
+4 │     struct Foo has copy, drop, {}
+  │                                ^ Unexpected '{'. Expected a type ability, one of: 'copy', 'drop', 'store', or 'key'

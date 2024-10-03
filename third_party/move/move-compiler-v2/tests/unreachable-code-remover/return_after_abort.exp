@@ -14,16 +14,12 @@ fun m::test(): u32 {
 
 [variant baseline]
 fun m::test(): u32 {
-     var $t0: u32
+     var $t0: u32 [unused]
      var $t1: u64
      # maybe
   0: $t1 := 0
      # maybe
   1: abort($t1)
-     # no
-  2: $t0 := 0
-     # no
-  3: return $t0
 }
 
 ============ after UnreachableCodeRemover: ================

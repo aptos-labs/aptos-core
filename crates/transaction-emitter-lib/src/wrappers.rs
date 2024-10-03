@@ -5,10 +5,12 @@ use crate::{
     args::{ClusterArgs, EmitArgs},
     cluster::Cluster,
     emitter::{
-        account_minter::bulk_create_accounts, get_needed_balance_per_account_from_req,
-        local_account_generator::PrivateKeyAccountGenerator, stats::TxnStats,
-        transaction_executor::RestApiReliableTransactionSubmitter, EmitJobMode, EmitJobRequest,
-        NumAccountsMode, TxnEmitter,
+        account_minter::bulk_create_accounts,
+        get_needed_balance_per_account_from_req,
+        local_account_generator::{create_keyless_account_generator, PrivateKeyAccountGenerator},
+        stats::TxnStats,
+        transaction_executor::RestApiReliableTransactionSubmitter,
+        EmitJobMode, EmitJobRequest, NumAccountsMode, TxnEmitter,
     },
     instance::Instance,
     CreateAccountsArgs,
@@ -16,7 +18,8 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType, WorkflowProgress};
+use aptos_types::keyless::test_utils::get_sample_esk;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     sync::Arc,
@@ -102,6 +105,29 @@ pub async fn emit_transactions_with_cluster(
             .coordination_delay_between_instances(Duration::from_secs(
                 args.coordination_delay_between_instances.unwrap_or(0),
             ));
+
+    if let Some(keyless_ephem_secret_key) = &args.account_type_args.keyless_ephem_secret_key {
+        emit_job_request = emit_job_request
+            .account_type(AccountType::Keyless)
+            .keyless_ephem_secret_key(keyless_ephem_secret_key.private_key());
+        emit_job_request = emit_job_request.epk_expiry_date_secs(
+            args.account_type_args
+                .epk_expiry_date_secs
+                .expect("epk expiry should be set"),
+        );
+        emit_job_request = emit_job_request.proof_file_path(
+            args.account_type_args
+                .proof_file_path
+                .as_ref()
+                .expect("proof file path should be set"),
+        );
+        emit_job_request = emit_job_request.keyless_jwt(
+            args.account_type_args
+                .keyless_jwt
+                .as_ref()
+                .expect("jwt should be set"),
+        )
+    }
 
     let num_accounts =
         NumAccountsMode::create(args.num_accounts, args.max_transactions_per_account);
@@ -202,11 +228,24 @@ pub async fn create_accounts_command(
         emit_job_request = emit_job_request.account_minter_seed(seed);
     }
 
+    let account_generator = if let Some(jwt) = &create_accounts_args.keyless_jwt {
+        emit_job_request = emit_job_request.keyless_jwt(jwt);
+
+        create_keyless_account_generator(
+            get_sample_esk(),
+            0,
+            jwt,
+            create_accounts_args.proof_file_path.as_deref(),
+        )?
+    } else {
+        Box::new(PrivateKeyAccountGenerator)
+    };
+
     bulk_create_accounts(
         coin_source_account,
         &RestApiReliableTransactionSubmitter::new(rest_clients, 6, Duration::from_secs(10)),
         &txn_factory,
-        Box::new(PrivateKeyAccountGenerator),
+        account_generator,
         (&emit_job_request).into(),
         create_accounts_args.count,
         get_needed_balance_per_account_from_req(&emit_job_request, create_accounts_args.count),

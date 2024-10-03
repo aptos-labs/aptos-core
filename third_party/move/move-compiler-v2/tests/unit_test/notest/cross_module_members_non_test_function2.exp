@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: undeclared `0x1::B::Foo`
+   ┌─ tests/unit_test/notest/cross_module_members_non_test_function2.move:25:23
+   │
+25 │     public fun bad(): Foo {
+   │                       ^^^

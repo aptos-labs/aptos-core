@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_loc_valid.move:27:17
+   │
+24 │         let returned_ref = bump_and_pick(account, &mut b1, &mut b2);
+   │                            ----------------------------------------
+   │                            │                      │
+   │                            │                      previous mutable local borrow
+   │                            used by call result
+   ·
+27 │         assert!(b1.f != 0, 42);
+   │                 ^^--
+   │                 │
+   │                 requirement enforced here
+   │                 immutable borrow attempted here
+   ·
+30 │             (returned_ref == &(&mut b1).f) != (returned_ref == &(&mut b2).f),
+   │             ------------------------------ conflicting reference `returned_ref` used here
+
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_loc_valid.move:28:17
+   │
+24 │         let returned_ref = bump_and_pick(account, &mut b1, &mut b2);
+   │                            ----------------------------------------
+   │                            │                               │
+   │                            │                               previous mutable local borrow
+   │                            used by call result
+   ·
+28 │         assert!(b2.f != 0, 42);
+   │                 ^^--
+   │                 │
+   │                 requirement enforced here
+   │                 immutable borrow attempted here
+29 │         assert!(
+30 │             (returned_ref == &(&mut b1).f) != (returned_ref == &(&mut b2).f),
+   │             ------------------------------ conflicting reference `returned_ref` used here

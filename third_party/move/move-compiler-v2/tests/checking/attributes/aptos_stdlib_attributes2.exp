@@ -4,7 +4,7 @@ warning: unknown attribute
   ┌─ tests/checking/attributes/aptos_stdlib_attributes2.move:4:7
   │
 4 │     #[testonly]
-  │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │       ^^^^^^^^ Attribute name 'testonly' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 // -- Model dump before bytecode pipeline
 module 0x1::M {

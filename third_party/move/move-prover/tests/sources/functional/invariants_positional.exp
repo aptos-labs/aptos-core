@@ -1,0 +1,18 @@
+Move prover returns: exiting with model building errors
+error: unsupported language construct
+  ┌─ tests/sources/functional/invariants_positional.move:6:28
+  │
+6 │     struct PositionalStruct(u64, u64) has key, copy, drop;
+  │                            ^ Move 2 language construct is not enabled: positional fields
+
+error: unsupported language construct
+  ┌─ tests/sources/functional/invariants_positional.move:9:24
+  │
+9 │         invariant self.0 > 10;
+  │                        ^ Move 2 language construct is not enabled: positional field
+
+error: unsupported language construct
+   ┌─ tests/sources/functional/invariants_positional.move:10:24
+   │
+10 │         invariant self.1 < 10;
+   │                        ^ Move 2 language construct is not enabled: positional field

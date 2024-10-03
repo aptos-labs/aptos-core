@@ -40,8 +40,8 @@ pub struct FaucetArgs {
 
 #[derive(Clone, Debug)]
 pub struct FaucetManager {
-    config: RunConfig,
-    prerequisite_health_checkers: HashSet<HealthChecker>,
+    pub config: RunConfig,
+    pub prerequisite_health_checkers: HashSet<HealthChecker>,
 }
 
 impl FaucetManager {

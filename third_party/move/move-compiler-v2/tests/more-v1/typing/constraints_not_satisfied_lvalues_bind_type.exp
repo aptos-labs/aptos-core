@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: type `R` is missing required ability `copy`
+  ┌─ tests/more-v1/typing/constraints_not_satisfied_lvalues_bind_type.move:6:21
+  │
+2 │     struct CupC<T: copy> { f: T }
+  │                 - declaration of type parameter `T`
+  ·
+6 │         let x: CupC<R> = abort 0;
+  │                     ^
+  │
+  = required by instantiating type parameter `T:copy` of struct `CupC`

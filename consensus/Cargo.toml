@@ -92,6 +92,7 @@ aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
 aptos-executor-test-helpers = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
+aptos-netcore = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-safety-rules = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true, features = ["fuzzing"] }

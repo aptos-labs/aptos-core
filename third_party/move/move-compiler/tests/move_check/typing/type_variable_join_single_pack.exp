@@ -5,5 +5,11 @@ error[E01002]: unexpected token
   │                   ^^^^
   │                   │
   │                   Unexpected 'copy'
-  │                   Expected '{'
+  │                   Expected ';'
+
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/typing/type_variable_join_single_pack.move:2:19
+  │
+2 │     struct Box<T> copy, drop { f1: T, f2: T }
+  │                   ^^^^ Move 2 language construct is not enabled: struct declaration without field list
 

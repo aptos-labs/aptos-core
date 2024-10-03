@@ -39,9 +39,12 @@ require adding the field original_name.
 -  [Struct `SetMaxSupply`](#0x4_collection_SetMaxSupply)
 -  [Constants](#@Constants_0)
 -  [Function `create_fixed_collection`](#0x4_collection_create_fixed_collection)
+-  [Function `create_fixed_collection_as_owner`](#0x4_collection_create_fixed_collection_as_owner)
 -  [Function `create_unlimited_collection`](#0x4_collection_create_unlimited_collection)
+-  [Function `create_unlimited_collection_as_owner`](#0x4_collection_create_unlimited_collection_as_owner)
 -  [Function `create_untracked_collection`](#0x4_collection_create_untracked_collection)
 -  [Function `create_collection_internal`](#0x4_collection_create_collection_internal)
+-  [Function `enable_ungated_transfer`](#0x4_collection_enable_ungated_transfer)
 -  [Function `create_collection_address`](#0x4_collection_create_collection_address)
 -  [Function `create_collection_seed`](#0x4_collection_create_collection_seed)
 -  [Function `increment_supply`](#0x4_collection_increment_supply)
@@ -708,6 +711,16 @@ The collection name is over the maximum length
 
 
 
+<a id="0x4_collection_ECOLLECTION_OWNER_NOT_SUPPORTED"></a>
+
+The collection owner feature is not supported
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_ECOLLECTION_OWNER_NOT_SUPPORTED">ECOLLECTION_OWNER_NOT_SUPPORTED</a>: u64 = 11;
+</code></pre>
+
+
+
 <a id="0x4_collection_ECOLLECTION_SUPPLY_EXCEEDED"></a>
 
 The collection has reached its supply and no more tokens can be minted, unless some are burned
@@ -839,6 +852,51 @@ Beyond that, it adds supply tracking with events.
 
 </details>
 
+<a id="0x4_collection_create_fixed_collection_as_owner"></a>
+
+## Function `create_fixed_collection_as_owner`
+
+Same functionality as <code>create_fixed_collection</code>, but the caller is the owner of the collection.
+This means that the caller can transfer the collection to another address.
+This transfers ownership and minting permissions to the new address.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_create_fixed_collection_as_owner">create_fixed_collection_as_owner</a>(creator: &<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, description: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>, max_supply: u64, name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;, uri: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>): <a href="../../../aptos-framework/tests/compiler-v2-doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_create_fixed_collection_as_owner">create_fixed_collection_as_owner</a>(
+    creator: &<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>,
+    description: String,
+    max_supply: u64,
+    name: String,
+    <a href="royalty.md#0x4_royalty">royalty</a>: Option&lt;Royalty&gt;,
+    uri: String,
+): ConstructorRef {
+    <b>assert</b>!(<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_is_collection_owner_enabled">features::is_collection_owner_enabled</a>(), <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="collection.md#0x4_collection_ECOLLECTION_OWNER_NOT_SUPPORTED">ECOLLECTION_OWNER_NOT_SUPPORTED</a>));
+
+    <b>let</b> constructor_ref = <a href="collection.md#0x4_collection_create_fixed_collection">create_fixed_collection</a>(
+        creator,
+        description,
+        max_supply,
+        name,
+        <a href="royalty.md#0x4_royalty">royalty</a>,
+        uri,
+    );
+    <a href="collection.md#0x4_collection_enable_ungated_transfer">enable_ungated_transfer</a>(&constructor_ref);
+    constructor_ref
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x4_collection_create_unlimited_collection"></a>
 
 ## Function `create_unlimited_collection`
@@ -880,6 +938,49 @@ the supply of tokens.
         uri,
         <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_some">option::some</a>(supply),
     )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_collection_create_unlimited_collection_as_owner"></a>
+
+## Function `create_unlimited_collection_as_owner`
+
+Same functionality as <code>create_unlimited_collection</code>, but the caller is the owner of the collection.
+This means that the caller can transfer the collection to another address.
+This transfers ownership and minting permissions to the new address.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_create_unlimited_collection_as_owner">create_unlimited_collection_as_owner</a>(creator: &<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, description: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>, name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;, uri: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>): <a href="../../../aptos-framework/tests/compiler-v2-doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_create_unlimited_collection_as_owner">create_unlimited_collection_as_owner</a>(
+    creator: &<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>,
+    description: String,
+    name: String,
+    <a href="royalty.md#0x4_royalty">royalty</a>: Option&lt;Royalty&gt;,
+    uri: String,
+): ConstructorRef {
+    <b>assert</b>!(<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_is_collection_owner_enabled">features::is_collection_owner_enabled</a>(), <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="collection.md#0x4_collection_ECOLLECTION_OWNER_NOT_SUPPORTED">ECOLLECTION_OWNER_NOT_SUPPORTED</a>));
+
+    <b>let</b> constructor_ref = <a href="collection.md#0x4_collection_create_unlimited_collection">create_unlimited_collection</a>(
+        creator,
+        description,
+        name,
+        <a href="royalty.md#0x4_royalty">royalty</a>,
+        uri,
+    );
+    <a href="collection.md#0x4_collection_enable_ungated_transfer">enable_ungated_transfer</a>(&constructor_ref);
+    constructor_ref
 }
 </code></pre>
 
@@ -980,7 +1081,35 @@ TODO: Hide this until we bring back meaningful way to enforce burns
         <a href="royalty.md#0x4_royalty_init">royalty::init</a>(&constructor_ref, <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> <a href="royalty.md#0x4_royalty">royalty</a>))
     };
 
+    <b>let</b> transfer_ref = <a href="../../../aptos-framework/tests/compiler-v2-doc/object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(&constructor_ref);
+    <a href="../../../aptos-framework/tests/compiler-v2-doc/object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(&transfer_ref);
+
     constructor_ref
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_collection_enable_ungated_transfer"></a>
+
+## Function `enable_ungated_transfer`
+
+
+
+<pre><code><b>fun</b> <a href="collection.md#0x4_collection_enable_ungated_transfer">enable_ungated_transfer</a>(constructor_ref: &<a href="../../../aptos-framework/tests/compiler-v2-doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="collection.md#0x4_collection_enable_ungated_transfer">enable_ungated_transfer</a>(constructor_ref: &ConstructorRef) {
+    <b>let</b> transfer_ref = <a href="../../../aptos-framework/tests/compiler-v2-doc/object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(constructor_ref);
+    <a href="../../../aptos-framework/tests/compiler-v2-doc/object.md#0x1_object_enable_ungated_transfer">object::enable_ungated_transfer</a>(&transfer_ref);
 }
 </code></pre>
 

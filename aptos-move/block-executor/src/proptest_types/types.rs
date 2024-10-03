@@ -12,7 +12,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
-    delayed_fields::PanicError,
+    error::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,

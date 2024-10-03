@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unable to infer instantiation of type `S<_>` (consider providing type arguments or annotating the type)
+  ┌─ tests/ability-check/typing/ignore_inferred_resource.move:4:9
+  │
+4 │         S{};
+  │         ^^^

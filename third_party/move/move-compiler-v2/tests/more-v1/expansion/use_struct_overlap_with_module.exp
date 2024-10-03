@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/more-v1/expansion/use_struct_overlap_with_module.move:7:14
+  │
+7 │     use 0x2::X::{Self, S as X};
+  │              ^ Unused 'use' of alias 'X'. Consider removing it
+
+error: variants not allowed in this context
+  ┌─ tests/more-v1/expansion/use_struct_overlap_with_module.move:8:27
+  │
+8 │     struct A { f1: X, f2: X::S }
+  │                           ^^^^

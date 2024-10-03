@@ -3,7 +3,7 @@
 
 use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
-    consensus_observer::publisher::ConsensusPublisher,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     error::error_kind,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
@@ -127,7 +127,7 @@ pub struct InnerBuilder {
     mempool_txn_pull_timeout_ms: u64,
     aptos_db: Arc<dyn DbReader>,
     network_sender: NetworkSender,
-    verifier: ValidatorVerifier,
+    verifier: Arc<ValidatorVerifier>,
     proof_cache: ProofCache,
     backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
@@ -161,7 +161,7 @@ impl InnerBuilder {
         mempool_txn_pull_timeout_ms: u64,
         aptos_db: Arc<dyn DbReader>,
         network_sender: NetworkSender,
-        verifier: ValidatorVerifier,
+        verifier: Arc<ValidatorVerifier>,
         proof_cache: ProofCache,
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,

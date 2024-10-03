@@ -5,7 +5,9 @@
 use crate::{pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock,
+    common::{Author, Round},
+    pipeline::commit_vote::CommitVote,
+    pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
@@ -14,7 +16,7 @@ use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithVerifiedSignatures},
     validator_verifier::ValidatorVerifier,
 };
 use futures::future::BoxFuture;
@@ -66,7 +68,7 @@ fn generate_executed_item_from_ordered(
     order_vote_enabled: bool,
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
-    let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
+    let partial_commit_proof = LedgerInfoWithVerifiedSignatures::new(
         generate_commit_ledger_info(&commit_info, &ordered_proof, order_vote_enabled),
         verified_signatures,
     );
@@ -85,7 +87,7 @@ fn aggregate_commit_proof(
     validator: &ValidatorVerifier,
 ) -> LedgerInfoWithSignatures {
     let aggregated_sig = validator
-        .aggregate_signatures(verified_signatures)
+        .aggregate_signatures(verified_signatures.signatures_iter())
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
@@ -104,7 +106,7 @@ pub struct OrderedItem {
 
 pub struct ExecutedItem {
     pub executed_blocks: Vec<PipelinedBlock>,
-    pub partial_commit_proof: LedgerInfoWithPartialSignatures,
+    pub partial_commit_proof: LedgerInfoWithVerifiedSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_info: BlockInfo,
     pub ordered_proof: LedgerInfoWithSignatures,
@@ -112,7 +114,7 @@ pub struct ExecutedItem {
 
 pub struct SignedItem {
     pub executed_blocks: Vec<PipelinedBlock>,
-    pub partial_commit_proof: LedgerInfoWithPartialSignatures,
+    pub partial_commit_proof: LedgerInfoWithVerifiedSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
     pub rb_handle: Option<(Instant, DropGuard)>,
@@ -144,9 +146,10 @@ impl BufferItem {
         ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
+        unverified_signatures: PartialSignatures,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
-            unverified_signatures: PartialSignatures::empty(),
+            unverified_signatures,
             commit_proof: None,
             callback,
             ordered_blocks,
@@ -402,6 +405,13 @@ impl BufferItem {
             .last()
             .expect("Vec<PipelinedBlock> should not be empty")
             .id()
+    }
+
+    pub fn round(&self) -> Round {
+        self.get_blocks()
+            .last()
+            .expect("Vec<PipelinedBlock> should not be empty")
+            .round()
     }
 
     pub fn add_signature_if_matched(&mut self, vote: CommitVote) -> anyhow::Result<()> {

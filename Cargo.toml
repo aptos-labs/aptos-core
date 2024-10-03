@@ -29,6 +29,7 @@ members = [
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
+    "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
@@ -122,8 +123,10 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
+    "ecosystem/indexer-grpc/indexer-test-transactions",
+    "ecosystem/indexer-grpc/indexer-transaction-generator",
     "ecosystem/indexer-grpc/transaction-filter",
-    "ecosystem/nft-metadata-crawler-parser",
+    "ecosystem/nft-metadata-crawler",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
@@ -360,8 +363,10 @@ aptos-indexer-grpc-file-store-backfiller = { path = "ecosystem/indexer-grpc/inde
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
+aptos-indexer-test-transactions = { path = "ecosystem/indexer-grpc/indexer-test-transactions" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
+aptos-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-transaction-generator" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
@@ -388,7 +393,7 @@ aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
-aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
+aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
@@ -471,9 +476,12 @@ arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
 ark-bn254 = "0.4.0"
+ark-circom = { git = "https://github.com/aptos-labs/circom-compat", rev = "e3d686641a3dd9d66087a74acdc20dc2a3c24f63" }
+ark-crypto-primitives = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-groth16 = "0.4.0"
+ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
@@ -510,7 +518,7 @@ cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles"] }
+clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles", "wrap_help"] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = [
@@ -637,7 +645,7 @@ more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default_features = false }
-ntest = "0.9.0"
+ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
 num_cpus = "1.13.1"
@@ -662,7 +670,7 @@ passkey-client = { version = "0.2.0" }
 passkey-types = { version = "0.2.0" }
 pbjson = "0.5.1"
 percent-encoding = "2.1.0"
-petgraph = "0.5.1"
+petgraph = "0.6.5"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
 # We're using git deps until https://github.com/poem-web/poem/pull/829 gets formally released.
@@ -737,6 +745,7 @@ serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev =
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
+set_env = "1.3.4"
 shadow-rs = "0.16.2"
 simplelog = "0.9.0"
 smallbitvec = "2.5.1"

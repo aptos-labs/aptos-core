@@ -22,7 +22,7 @@ use aptos_sdk::{
         account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
-        LocalAccount,
+        AptosCoinType, LocalAccount,
     },
 };
 use async_trait::async_trait;
@@ -314,7 +314,7 @@ impl FunderTrait for TransferFunder {
         let account_address = self.faucet_account.read().await.address();
         let funder_balance = match self
             .get_api_client()
-            .get_account_balance_bcs(account_address, "0x1::aptos_coin::AptosCoin")
+            .get_account_balance_bcs::<AptosCoinType>(account_address)
             .await
         {
             Ok(response) => response.into_inner(),

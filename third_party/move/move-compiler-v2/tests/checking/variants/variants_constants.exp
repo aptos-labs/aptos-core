@@ -1,0 +1,57 @@
+// -- Model dump before bytecode pipeline
+module 0x815::m {
+    enum Color {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    private fun t0(): bool {
+        {
+          let c: m::Color = pack m::Color::Red();
+          Eq<u64>(select_variants m::Color.RGB.red<m::Color>(c), 1)
+        }
+    }
+    private fun t1(): bool {
+        {
+          let c: m::Color = pack m::Color::Red();
+          Eq<u64>(select_variants m::Color.RGB.red<m::Color>(c), 1)
+        }
+    }
+    private fun t2(): bool {
+        {
+          let c: m::Color = pack m::Color::Blue();
+          Eq<u64>(select_variants m::Color.RGB.red<m::Color>(c), 1)
+        }
+    }
+    private fun t3(): bool {
+        {
+          let c: m::Color = pack m::Color::Blue();
+          Eq<u64>(select_variants m::Color.RGB.red<m::Color>(c), 1)
+        }
+    }
+    private fun t4(c: &m::Color) {
+        match (c) {
+          m::Color::Red => {
+            Abort(1)
+          }
+          m::Color::Blue => {
+            Abort(2)
+          }
+        }
+
+    }
+} // end 0x815::m
+
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/checking/variants/variants_constants.move:29:16
+   │
+29 │         match (c) { Red => abort 1, Blue => abort 2 } // no error
+   │                ^
+   │
+   = missing `Color::RGB{..}`

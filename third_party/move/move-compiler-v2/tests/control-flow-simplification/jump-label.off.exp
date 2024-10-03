@@ -1,0 +1,79 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.test {
+use 0000000000000000000000000000000000000000000000000000000000000001::string;
+
+
+
+
+test<Ty0>(Arg0: vector<u8>): Ty0 /* def_idx: 0 */ {
+L1:	loc0: String
+L2:	loc1: String
+L3:	loc2: String
+B0:
+	0: Call foo<Ty0>(): String
+	1: StLoc[1](loc0: String)
+	2: CopyLoc[1](loc0: String)
+	3: StLoc[2](loc1: String)
+	4: LdConst[0](Vector(U8): [4, 98, 111, 111, 108])
+	5: Call string::utf8(vector<u8>): String
+	6: StLoc[3](loc2: String)
+	7: MoveLoc[2](loc1: String)
+	8: MoveLoc[3](loc2: String)
+	9: Eq
+	10: BrFalse(15)
+B1:
+	11: MoveLoc[0](Arg0: vector<u8>)
+	12: Call baz<bool>(vector<u8>): bool
+	13: Call bar<Ty0>(bool): Ty0
+	14: Ret
+B2:
+	15: CopyLoc[1](loc0: String)
+	16: StLoc[2](loc1: String)
+	17: LdConst[1](Vector(U8): [2, 117, 56])
+	18: Call string::utf8(vector<u8>): String
+	19: StLoc[3](loc2: String)
+	20: MoveLoc[2](loc1: String)
+	21: MoveLoc[3](loc2: String)
+	22: Eq
+	23: BrFalse(28)
+B3:
+	24: MoveLoc[0](Arg0: vector<u8>)
+	25: Call baz<bool>(vector<u8>): bool
+	26: Call bar<Ty0>(bool): Ty0
+	27: Ret
+B4:
+	28: LdConst[2](Vector(U8): [3, 117, 54, 52])
+	29: Call string::utf8(vector<u8>): String
+	30: StLoc[2](loc1: String)
+	31: MoveLoc[1](loc0: String)
+	32: MoveLoc[2](loc1: String)
+	33: Eq
+	34: BrFalse(39)
+B5:
+	35: MoveLoc[0](Arg0: vector<u8>)
+	36: Call baz<bool>(vector<u8>): bool
+	37: Call bar<Ty0>(bool): Ty0
+	38: Ret
+B6:
+	39: LdU64(0)
+	40: Abort
+}
+bar<Ty0>(Arg0: bool): Ty0 /* def_idx: 1 */ {
+B0:
+	0: LdU64(0)
+	1: Abort
+}
+baz<Ty0>(Arg0: vector<u8>): Ty0 /* def_idx: 2 */ {
+B0:
+	0: LdU64(0)
+	1: Abort
+}
+foo<Ty0>(): String /* def_idx: 3 */ {
+B0:
+	0: LdU64(0)
+	1: Abort
+}
+}
+============ bytecode verification succeeded ========

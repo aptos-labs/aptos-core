@@ -17,13 +17,18 @@ use move_stackless_bytecode::{
 pub struct UnusedAssignmentChecker {}
 
 impl UnusedAssignmentChecker {
-    /// Check if the assignment to `dst` at offset after the position given by `offset` and `after`.
+    /// Check if the assignment to `dst` is used at offset after the position given by `offset` and `after`.
     fn check_unused_assignment(
         target: &FunctionTarget,
         id: AttrId,
         offset: CodeOffset,
         dst: TempIndex,
     ) {
+        let loc = target.get_bytecode_loc(id);
+        // skip inlined code
+        if loc.is_inlined() {
+            return;
+        }
         let data = target.data;
         // only check for user defined variables
         if let Some(dst_name) = data.local_names.get(&dst) {
@@ -35,7 +40,6 @@ impl UnusedAssignmentChecker {
             let live_after = &live_var_info.after;
             let dst_name = dst_name.display(target.func_env.symbol_pool()).to_string();
             if !dst_name.starts_with('_') && live_after.get(&dst).is_none() {
-                let loc = target.get_bytecode_loc(id);
                 target
                     .global_env()
                     .diag(

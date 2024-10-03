@@ -6,7 +6,7 @@ error: invalid access specifier
 18 │         T,
    │         ^
 
-error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+error: not supported before language version `2.0`: address and wildcard access specifiers. Only resource type names can be provided.
    ┌─ tests/checking-lang-v1/v1-typing/invalid_type_acquire.move:18:9
    │
 18 │         T,
@@ -18,7 +18,7 @@ error: invalid access specifier
 19 │         u64,
    │         ^^^
 
-error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+error: not supported before language version `2.0`: address and wildcard access specifiers. Only resource type names can be provided.
    ┌─ tests/checking-lang-v1/v1-typing/invalid_type_acquire.move:19:9
    │
 19 │         u64,

@@ -10,31 +10,26 @@ B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: LdU64(0)
 	2: Gt
-	3: BrFalse(19)
+	3: BrFalse(17)
 B1:
 	4: CopyLoc[0](Arg0: u64)
 	5: LdU64(10)
 	6: Gt
-	7: BrFalse(13)
+	7: BrFalse(12)
 B2:
 	8: MoveLoc[0](Arg0: u64)
 	9: LdU64(1)
 	10: Sub
 	11: StLoc[0](Arg0: u64)
-	12: Branch(14)
 B3:
-	13: Branch(14)
+	12: MoveLoc[0](Arg0: u64)
+	13: LdU64(1)
+	14: Sub
+	15: StLoc[0](Arg0: u64)
+	16: Branch(0)
 B4:
-	14: MoveLoc[0](Arg0: u64)
-	15: LdU64(1)
-	16: Sub
-	17: StLoc[0](Arg0: u64)
-	18: Branch(0)
-B5:
-	19: Branch(20)
-B6:
-	20: MoveLoc[0](Arg0: u64)
-	21: Ret
+	17: MoveLoc[0](Arg0: u64)
+	18: Ret
 }
 while_loop(Arg0: u64): u64 /* def_idx: 1 */ {
 L1:	loc0: u64
@@ -48,14 +43,10 @@ B1:
 	5: LdU64(1)
 	6: Sub
 	7: StLoc[0](Arg0: u64)
-	8: Branch(10)
+	8: Branch(0)
 B2:
-	9: Branch(11)
-B3:
-	10: Branch(0)
-B4:
-	11: MoveLoc[0](Arg0: u64)
-	12: Ret
+	9: MoveLoc[0](Arg0: u64)
+	10: Ret
 }
 while_loop_with_break_and_continue(Arg0: u64): u64 /* def_idx: 2 */ {
 L1:	loc0: u64
@@ -63,34 +54,26 @@ B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: LdU64(0)
 	2: Gt
-	3: BrFalse(19)
+	3: BrFalse(8)
 B1:
 	4: CopyLoc[0](Arg0: u64)
 	5: LdU64(42)
 	6: Eq
-	7: BrFalse(9)
+	7: BrFalse(10)
 B2:
-	8: Branch(21)
+	8: MoveLoc[0](Arg0: u64)
+	9: Ret
 B3:
-	9: CopyLoc[0](Arg0: u64)
-	10: LdU64(21)
-	11: Eq
-	12: BrFalse(14)
+	10: CopyLoc[0](Arg0: u64)
+	11: LdU64(21)
+	12: Eq
+	13: BrTrue(0)
 B4:
-	13: Branch(0)
-B5:
 	14: MoveLoc[0](Arg0: u64)
 	15: LdU64(1)
 	16: Sub
 	17: StLoc[0](Arg0: u64)
-	18: Branch(20)
-B6:
-	19: Branch(21)
-B7:
-	20: Branch(0)
-B8:
-	21: MoveLoc[0](Arg0: u64)
-	22: Ret
+	18: Branch(0)
 }
 }
 ============ bytecode verification succeeded ========

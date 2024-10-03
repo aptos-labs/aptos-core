@@ -1,0 +1,22 @@
+
+Diagnostics:
+warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
+   ┌─ tests/lints/model_ast_lints/multi_attributes_01.move:13:13
+   │
+13 │         if ({let y = x + 1; y < 5}) {
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
+
+warning: [lint] Use the more explicit `loop` instead.
+   ┌─ tests/lints/model_ast_lints/multi_attributes_01.move:16:9
+   │
+16 │ ╭         while (true) {
+17 │ │             // do nothing
+18 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(while_true)]`.
+
+
+============ bytecode verification succeeded ========

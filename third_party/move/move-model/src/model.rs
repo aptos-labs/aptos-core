@@ -133,6 +133,11 @@ impl Loc {
         }
     }
 
+    /// Checks if `self` is an inlined location.
+    pub fn is_inlined(&self) -> bool {
+        self.inlined_from_loc.is_some()
+    }
+
     // If `self` is an inlined `Loc`, then add the same
     // inlining info to the parameter `loc`.
     fn inline_if_needed(&self, loc: Loc) -> Loc {
@@ -897,6 +902,11 @@ impl GlobalEnv {
         self.diag(Severity::Error, loc, msg)
     }
 
+    /// Adds a warning to this environment, without notes.
+    pub fn warning(&self, loc: &Loc, msg: &str) {
+        self.diag(Severity::Warning, loc, msg)
+    }
+
     /// Adds an error to this environment, with notes.
     pub fn error_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
@@ -923,6 +933,12 @@ impl GlobalEnv {
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
         self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], vec![])
+    }
+
+    /// Add a lint warning to this environment, with the `msg` and `notes`.
+    pub fn lint_diag_with_notes(&self, loc: &Loc, msg: &str, notes: Vec<String>) {
+        let lint_msg = format!("[lint] {}", msg);
+        self.diag_with_notes(Severity::Warning, loc, &lint_msg, notes)
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.

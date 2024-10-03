@@ -227,6 +227,47 @@ module 0x42::test {
         bubble_sort(v);
     }
 
+    fun test_index_then_field_select_1() {
+        let x1 = X {
+            value: true
+        };
+        let v = vector[x1];
+        let p = &mut v[0].value;
+        *p = false;
+        assert!(v[0].value == false, 0);
+    }
+
+    fun test_index_then_field_select_2() {
+        let x1 = X {
+            value: true
+        };
+        let v = &mut vector[x1];
+        let p = &mut v[0].value;
+        *p = false;
+        assert!(v[0].value == false, 0);
+    }
+
+    fun test_index_then_field_select_3() {
+        let x1 = X {
+            value: true
+        };
+        let v = &vector[x1];
+        assert!(v[0].value == true, 0);
+    }
+
+    fun inc_vec_new(x: &mut vector<u256>, index: u64) {
+        x[index] = x[index] + 1;
+    }
+
+    fun inc_vec_new_test() {
+        let x = vector[0];
+        x[0] = x[0] + 1;
+        assert!(x[0] == 1, 0);
+        let y = &mut x;
+        inc_vec_new(y, 0);
+        assert!(y[0] == 2, 0);
+    }
+
 }
 
 //# run --verbose --signers 0x1 -- 0x42::test::init
@@ -268,3 +309,11 @@ module 0x42::test {
 //# run --verbose -- 0x42::test::test_resource_with_vector
 
 //# run --verbose -- 0x42::test::call_sort
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_1
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_2
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_3
+
+//# run --verbose -- 0x42::test::inc_vec_new_test

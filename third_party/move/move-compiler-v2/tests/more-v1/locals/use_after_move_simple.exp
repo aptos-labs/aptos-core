@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/locals/use_after_move_simple.move:6:9
+  │
+6 │         move x;
+  │         ^^^^^^ attempted to move here
+7 │         let _ = move x + 1;
+  │                 ------ used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_simple.move:16:9
+   │
+16 │         move x;
+   │         ^^^^^^ attempted to move here
+17 │         let _ = x + 1;
+   │                 ----- used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_simple.move:26:9
+   │
+26 │         move x;
+   │         ^^^^^^ attempted to move here
+27 │         let _ = &x;
+   │                 -- used here

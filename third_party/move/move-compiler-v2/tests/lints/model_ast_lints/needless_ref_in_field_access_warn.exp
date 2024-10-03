@@ -1,0 +1,214 @@
+
+Diagnostics:
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `x`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:19:9
+   │
+19 │         (&s).x
+   │         ^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:27:11
+   │
+27 │         (&(&s).y).a + (&((&s).y)).a
+   │           ^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:27:9
+   │
+27 │         (&(&s).y).a + (&((&s).y)).a
+   │         ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:27:26
+   │
+27 │         (&(&s).y).a + (&((&s).y)).a
+   │                          ^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:27:23
+   │
+27 │         (&(&s).y).a + (&((&s).y)).a
+   │                       ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:35:9
+   │
+35 │         (&s).y.a + (&s.y).a + (&(&s).y).a + (&(s.y)).a
+   │         ^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:35:20
+   │
+35 │         (&s).y.a + (&s.y).a + (&(&s).y).a + (&(s.y)).a
+   │                    ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:35:33
+   │
+35 │         (&s).y.a + (&s.y).a + (&(&s).y).a + (&(s.y)).a
+   │                                 ^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:35:31
+   │
+35 │         (&s).y.a + (&s.y).a + (&(&s).y).a + (&(s.y)).a
+   │                               ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:35:45
+   │
+35 │         (&s).y.a + (&s.y).a + (&(&s).y).a + (&(s.y)).a
+   │                                             ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:43:9
+   │
+43 │         (&make_S()).y.a
+   │         ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `y`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:51:9
+   │
+51 │         (&mut make_S()).y.a + (&mut (&mut s).y).a
+   │         ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `y`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:51:37
+   │
+51 │         (&mut make_S()).y.a + (&mut (&mut s).y).a
+   │                                     ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:51:31
+   │
+51 │         (&mut make_S()).y.a + (&mut (&mut s).y).a
+   │                               ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `x`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:59:9
+   │
+59 │         (&mut s).x = 5;
+   │         ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `y`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:67:15
+   │
+67 │         (&mut (&mut s).y).a = 5;
+   │               ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:67:9
+   │
+67 │         (&mut (&mut s).y).a = 5;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:68:9
+   │
+68 │         (&mut (s.y)).a = 6;
+   │         ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:77:9
+   │
+77 │         (&mut make_S().y).a = 5;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `0`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:90:9
+   │
+90 │         (&e).0 + (&mut e).0
+   │         ^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `0`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:90:18
+   │
+90 │         (&e).0 + (&mut e).0
+   │                  ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `0`
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:98:9
+   │
+98 │         (&mut e).0 = 50;
+   │         ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
+
+
+Diagnostics:
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:51:9
+   │
+51 │         (&mut make_S()).y.a + (&mut (&mut s).y).a
+   │         ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:51:37
+   │
+51 │         (&mut make_S()).y.a + (&mut (&mut s).y).a
+   │                                     ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+   ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:90:18
+   │
+90 │         (&e).0 + (&mut e).0
+   │                  ^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+    ┌─ tests/lints/model_ast_lints/needless_ref_in_field_access_warn.move:125:18
+    │
+125 │         (&s).x + (&mut s).x
+    │                  ^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+
+
+============ bytecode verification succeeded ========

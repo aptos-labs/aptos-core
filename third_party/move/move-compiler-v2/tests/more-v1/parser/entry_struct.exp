@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid modifier
+  ┌─ tests/more-v1/parser/entry_struct.move:3:5
+  │
+3 │     entry struct S {}
+  │     ^^^^^ Invalid type declaration. 'entry' is used only on functions

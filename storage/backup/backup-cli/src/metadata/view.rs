@@ -105,6 +105,10 @@ impl MetadataView {
         self.compaction_timestamps.clone()
     }
 
+    pub fn all_state_snapshots(&self) -> &[StateSnapshotBackupMeta] {
+        &self.state_snapshot_backups
+    }
+
     pub fn select_state_snapshot(
         &self,
         target_version: Version,

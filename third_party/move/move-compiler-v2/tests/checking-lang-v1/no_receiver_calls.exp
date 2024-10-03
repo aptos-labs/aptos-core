@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: not supported before language version `2.0`: receiver style function calls
+  ┌─ tests/checking-lang-v1/no_receiver_calls.move:7:9
+  │
+7 │         t.receiver(1);
+  │         ^^^^^^^^^^^^^

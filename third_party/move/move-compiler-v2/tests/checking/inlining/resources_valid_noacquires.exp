@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: missing acquires annotation for `Token`
+   ┌─ tests/checking/inlining/resources_valid_noacquires.move:21:16
+   │
+12 │         borrow_global<T>(get_addr(ref))
+   │         ------------------------------- acquired here
+   ·
+21 │     public fun get_value(ref: &obj::ReaderRef<Token>): u64 {
+   │                ^^^^^^^^^
+22 │         obj::reader(ref).val
+   │         ---------------- from a call inlined at this callsite

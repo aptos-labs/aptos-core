@@ -32,3 +32,7 @@ rand = { workspace = true }
 [[bench]]
 name = "sorting"
 harness = false
+
+[[bench]]
+name = "maps"
+harness = false

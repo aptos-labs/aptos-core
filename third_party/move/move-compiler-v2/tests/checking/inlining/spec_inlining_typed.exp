@@ -1,0 +1,60 @@
+// -- Model dump before bytecode pipeline
+module 0x42::Test {
+    private inline fun apply(v: u64,predicate: |u64|bool): bool {
+        spec {
+          assert Ge($t0, 0);
+        }
+        ;
+        (predicate)(v)
+    }
+    public fun test_apply(x: u64) {
+        {
+          let r1: bool = {
+            let (v: u64): (u64) = Tuple(x);
+            spec {
+              assert Ge(v, 0);
+            }
+            ;
+            {
+              let (v: u64): (u64) = Tuple(v);
+              Ge<u64>(v, 0)
+            }
+          };
+          spec {
+            assert r1;
+          }
+          ;
+          if r1 {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          {
+            let r2: bool = {
+              let (v: u64): (u64) = Tuple(x);
+              spec {
+                assert Ge(v, 0);
+              }
+              ;
+              {
+                let (v: u64): (u64) = Tuple(v);
+                Neq<u64>(v, 0)
+              }
+            };
+            spec {
+              assert r2;
+            }
+            ;
+            if r2 {
+              Tuple()
+            } else {
+              Abort(2)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::Test
+
+
+============ bytecode verification succeeded ========

@@ -19,7 +19,7 @@ jobs:
   build:
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: aptos-labs/aptos-core/.github/actions/buildx-setup@main
 

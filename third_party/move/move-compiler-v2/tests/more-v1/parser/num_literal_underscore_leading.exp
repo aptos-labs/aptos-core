@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: undeclared `_0u8`
+  ┌─ tests/more-v1/parser/num_literal_underscore_leading.move:4:17
+  │
+4 │         let _ = _0u8;
+  │                 ^^^^

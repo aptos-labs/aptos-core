@@ -533,7 +533,7 @@ module aptos_framework::coin {
         let metadata = assert_paired_metadata_exists<CoinType>();
         let metadata_addr = object_address(&metadata);
         assert!(exists<PairedFungibleAssetRefs>(metadata_addr), error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
-        let burn_ref_opt = &mut borrow_global_mut<PairedFungibleAssetRefs>(metadata_addr).burn_ref_opt;
+        let burn_ref_opt = &borrow_global<PairedFungibleAssetRefs>(metadata_addr).burn_ref_opt;
         assert!(option::is_some(burn_ref_opt), error::not_found(EBURN_REF_NOT_FOUND));
         option::borrow(burn_ref_opt)
     }
@@ -1025,7 +1025,7 @@ module aptos_framework::coin {
 
         // Can only succeed once on-chain governance agreed on the upgrade.
         assert!(
-            borrow_global_mut<SupplyConfig>(@aptos_framework).allow_upgrades,
+            borrow_global<SupplyConfig>(@aptos_framework).allow_upgrades,
             error::permission_denied(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
         );
 

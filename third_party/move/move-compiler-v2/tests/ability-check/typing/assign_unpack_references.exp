@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/assign_unpack_references.move:17:33
+   │
+17 │         R { s1: S { f }, s2 } = &R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/ability-check/typing/assign_unpack_references.move:27:33
+   │
+27 │         R { s1: S { f }, s2 } = &mut R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used

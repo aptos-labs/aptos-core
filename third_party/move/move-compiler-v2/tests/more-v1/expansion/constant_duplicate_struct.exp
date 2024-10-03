@@ -1,0 +1,27 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/more-v1/expansion/constant_duplicate_struct.move:4:11
+  │
+3 │     struct C { }
+  │            - Alias previously defined here
+4 │     const C: u64 = 0;
+  │           ^ Duplicate module member or alias 'C'. Top level names in a namespace must be unique
+
+warning: unused alias
+   ┌─ tests/more-v1/expansion/constant_duplicate_struct.move:11:15
+   │
+11 │     use 0x42::mod1;
+   │               ^^^^ Unused 'use' of alias 'mod1'. Consider removing it
+
+warning: unused alias
+   ┌─ tests/more-v1/expansion/constant_duplicate_struct.move:30:15
+   │
+30 │     use 0x42::mod1;
+   │               ^^^^ Unused 'use' of alias 'mod1'. Consider removing it
+
+error: invalid name
+   ┌─ tests/more-v1/expansion/constant_duplicate_struct.move:31:26
+   │
+31 │     use 0x42::mod1::C as mod1;
+   │                          ^^^^ Invalid constant alias name 'mod1'. Constant alias names must start with 'A'..'Z'

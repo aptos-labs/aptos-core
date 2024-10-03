@@ -12,7 +12,7 @@ error: variants not allowed in this context
 27 │     fun missplaced_variant(self: Color::Red): bool {
    │                                  ^^^^^^^^^^
 
-error: undeclared struct `m::missplaced_variant`
+error: variants not allowed in this context
    ┌─ tests/checking/variants/variants_check_err.move:28:9
    │
 28 │         0x815::m::missplaced_variant::Red();

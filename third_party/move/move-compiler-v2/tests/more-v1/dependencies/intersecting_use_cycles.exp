@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: invalid 'module' declaration
+   ┌─ tests/more-v1/dependencies/intersecting_use_cycles.move:10:14
+   │
+ 5 │     fun b(): 0x2::B::S { abort 0 }
+   │              --------- '0x2::B' uses '0x2::A'
+   ·
+10 │     fun c(): 0x2::C::S { abort 0 }
+   │              ^^^^^^^^^ '0x2::C' uses '0x2::B'. This 'use' relationship creates a dependency cycle.
+   ·
+17 │     fun A(): 0x2::A::S { abort 0 }
+   │              --------- '0x2::A' uses '0x2::C'

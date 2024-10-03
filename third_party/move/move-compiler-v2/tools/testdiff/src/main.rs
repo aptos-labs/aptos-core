@@ -57,10 +57,8 @@ const V2_E2E_ROOT: &str = "move-compiler-v2/transactional-tests/tests";
 /// Ignored directories in the move_check tree.
 static IGNORED_UNIT_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
     let mut set = BTreeSet::new();
-    set.insert("expansion".to_string());
     set.insert("evm".to_string());
     set.insert("async".to_string());
-    set.insert("dependencies".to_string());
     set
 });
 
@@ -105,6 +103,7 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         ("unused-assignment/v1-liveness", "liveness"),
         ("unused-assignment/v1-commands", "commands"),
         ("checking-lang-v1/v1-typing", "typing"),
+        ("checking-lang-v1", "parser"),
         ("ability-check/v1-typing", "typing"),
         ("ability-check/v1-signer", "signer"),
         ("ability-check/v1-borrow-tests", "commands"),

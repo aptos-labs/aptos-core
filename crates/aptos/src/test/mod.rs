@@ -15,11 +15,12 @@ use crate::{
         init::{InitTool, Network},
         types::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
-            AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
-            EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, OverrideSizeCheckOption, PoolAddressArgs,
-            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
+            AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
+            EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
+            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
+            OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+            PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
+            TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -536,9 +537,10 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         consensus_public_key: bls12381::PublicKey,
         proof_of_possession: bls12381::ProofOfPossession,
+        gas_options: Option<GasOptions>,
     ) -> CliTypedResult<TransactionSummary> {
         UpdateConsensusKey {
-            txn_options: self.transaction_options(operator_index, None),
+            txn_options: self.transaction_options(operator_index, gas_options),
             operator_args: self.operator_args(pool_index),
             operator_config_file_args: OperatorConfigFileArgs {
                 operator_config_file: None,
@@ -891,6 +893,9 @@ impl CliTestFramework {
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
+            chunked_publish_option: ChunkedPublishOption {
+                chunked_publish: false,
+            },
         }
         .execute()
         .await
@@ -1043,7 +1048,7 @@ impl CliTestFramework {
                 script_path: Some(source_path),
                 compiled_script_path: None,
                 framework_package_args,
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args: vec![] },
@@ -1066,13 +1071,12 @@ impl CliTestFramework {
             txn_options: self.transaction_options(index, None),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
-                compiled_script_path: None,
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             script_function_args: ScriptFunctionArguments {
                 type_arg_vec: TypeArgVec { type_args },
@@ -1096,16 +1100,9 @@ impl CliTestFramework {
     pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
         MovePackageDir {
             dev: true,
-            package_dir: Some(self.move_dir()),
-            output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
-            override_std: None,
-            skip_fetch_latest_git_deps: true,
-            bytecode_version: None,
-            compiler_version: None,
-            language_version: None,
-            skip_attribute_checks: false,
-            check_test_code: false,
+            package_dir: Some(self.move_dir()),
+            ..MovePackageDir::new()
         }
     }
 
@@ -1204,13 +1201,12 @@ impl CliTestFramework {
                 is_multi_step,
                 compile_proposal_args: CompileScriptFunction {
                     script_path: Some(script_path),
-                    compiled_script_path: None,
                     framework_package_args: FrameworkPackageArgs {
                         framework_git_rev: None,
                         framework_local_dir: Some(Self::aptos_framework_dir()),
                         skip_fetch_latest_git_deps: false,
                     },
-                    bytecode_version: None,
+                    ..CompileScriptFunction::default()
                 },
             },
         }
@@ -1250,13 +1246,12 @@ impl CliTestFramework {
             proposal_id,
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
-                compiled_script_path: None,
                 framework_package_args: FrameworkPackageArgs {
                     framework_git_rev: None,
                     framework_local_dir: Some(Self::aptos_framework_dir()),
                     skip_fetch_latest_git_deps: false,
                 },
-                bytecode_version: None,
+                ..CompileScriptFunction::default()
             },
             rest_options: self.rest_options(),
             profile: Default::default(),

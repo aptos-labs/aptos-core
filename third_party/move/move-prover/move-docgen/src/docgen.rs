@@ -1173,19 +1173,25 @@ impl<'env> Docgen<'env> {
     fn gen_struct(&self, spec_block_map: &SpecBlockMap<'_>, struct_env: &StructEnv<'_>) {
         let name = struct_env.get_name();
         self.section_header(
-            &self.struct_title(struct_env),
+            &self.struct_or_enum_title(struct_env),
             &self.label_for_module_item(&struct_env.module_env, name),
         );
         self.increment_section_nest();
         self.doc_text(struct_env.get_doc());
-        self.code_block(&self.struct_header_display(struct_env));
+        self.code_block(&self.struct_or_enum_header_display(struct_env));
 
         if self.options.include_impl || (self.options.include_specs && self.options.specs_inlined) {
             // Include field documentation if either impls or specs are present and inlined,
             // because they are used by both.
-            self.begin_collapsed("Fields");
-            self.gen_struct_fields(struct_env);
-            self.end_collapsed();
+            if struct_env.has_variants() {
+                self.begin_collapsed("Variants");
+                self.gen_enum_inner(struct_env);
+                self.end_collapsed();
+            } else {
+                self.begin_collapsed("Fields");
+                self.gen_struct_fields(struct_env);
+                self.end_collapsed();
+            }
         }
 
         if self.options.specs_inlined {
@@ -1199,19 +1205,26 @@ impl<'env> Docgen<'env> {
         self.decrement_section_nest();
     }
 
-    /// Returns "Struct `N`" or "Resource `N`".
-    fn struct_title(&self, struct_env: &StructEnv<'_>) -> String {
+    /// Returns "Struct `N`" or "Resource `N`" or "Enum `N`".
+    fn struct_or_enum_title(&self, struct_env: &StructEnv<'_>) -> String {
         // NOTE(mengxu): although we no longer declare structs with the `resource` keyword, it
         // might be helpful in keeping `Resource N` in struct title as the boogie translator still
         // depends on the `is_resource()` predicate to add additional functions to structs declared
         // with the `key` ability.
+        let resource_or_enum = if struct_env.has_variants() {
+            if struct_env.has_memory() {
+                "Enum Resource"
+            } else {
+                "Enum"
+            }
+        } else if struct_env.has_memory() {
+            "Resource"
+        } else {
+            "Struct"
+        };
         format!(
             "{} `{}`",
-            if struct_env.has_memory() {
-                "Resource"
-            } else {
-                "Struct"
-            },
+            resource_or_enum,
             self.name_string(struct_env.get_name())
         )
     }
@@ -1229,8 +1242,8 @@ impl<'env> Docgen<'env> {
         )
     }
 
-    /// Generates code signature for a struct.
-    fn struct_header_display(&self, struct_env: &StructEnv<'_>) -> String {
+    /// Generates code signature for a struct or enum.
+    fn struct_or_enum_header_display(&self, struct_env: &StructEnv<'_>) -> String {
         let name = self.name_string(struct_env.get_name());
         let type_params = self.type_parameter_list_display(struct_env.get_type_parameters());
         let ability_tokens = self.ability_tokens(struct_env.get_abilities());
@@ -1239,12 +1252,21 @@ impl<'env> Docgen<'env> {
             .iter()
             .map(|attr| format!("{}\n", attr))
             .join("");
+        let enum_or_struct = if struct_env.has_variants() {
+            "enum"
+        } else {
+            "struct"
+        };
         if ability_tokens.is_empty() {
-            format!("{}struct {}{}", attributes_string, name, type_params)
+            format!(
+                "{}{} {}{}",
+                attributes_string, enum_or_struct, name, type_params
+            )
         } else {
             format!(
-                "{}struct {}{} has {}",
+                "{}{} {}{} has {}",
                 attributes_string,
+                enum_or_struct,
                 name,
                 type_params,
                 ability_tokens.join(", ")
@@ -1252,6 +1274,7 @@ impl<'env> Docgen<'env> {
         }
     }
 
+    /// Generates doc for struct fields.
     fn gen_struct_fields(&self, struct_env: &StructEnv<'_>) {
         let tctx = self.type_display_context_for_struct(struct_env);
         self.begin_definitions();
@@ -1266,6 +1289,40 @@ impl<'env> Docgen<'env> {
             );
         }
         self.end_definitions();
+    }
+
+    /// Generates doc for `variant` of an enum.
+    fn gen_fields_for_variant(&self, struct_env: &StructEnv<'_>, variant: Symbol) {
+        let tctx = self.type_display_context_for_struct(struct_env);
+        self.begin_definitions();
+        for field in struct_env.get_fields_of_variant(variant) {
+            self.definition_text(
+                &format!(
+                    "`{}: {}`",
+                    self.name_string(field.get_name()),
+                    field.get_type().display(&tctx)
+                ),
+                field.get_doc(),
+            );
+        }
+        self.end_definitions();
+    }
+
+    /// Generates doc for fields from all variants of an enum
+    fn gen_enum_fields(&self, struct_env: &StructEnv<'_>) {
+        self.begin_definitions();
+        self.gen_enum_inner(struct_env);
+        self.end_definitions();
+    }
+
+    fn gen_enum_inner(&self, struct_env: &StructEnv<'_>) {
+        for variant in struct_env.get_variants() {
+            self.begin_collapsed(&format!("{}", variant.display(struct_env.symbol_pool())));
+            self.begin_collapsed("Fields");
+            self.gen_fields_for_variant(struct_env, variant);
+            self.end_collapsed();
+            self.end_collapsed();
+        }
     }
 
     /// Generates documentation for a function.
@@ -1577,11 +1634,15 @@ impl<'env> Docgen<'env> {
             if spec_block_map.contains_key(&target) {
                 let name = self.name_string(struct_env.get_name());
                 self.section_header(
-                    &self.struct_title(&struct_env),
+                    &self.struct_or_enum_title(&struct_env),
                     &format!("{}_{}", section_label, name),
                 );
-                self.code_block(&self.struct_header_display(&struct_env));
-                self.gen_struct_fields(&struct_env);
+                self.code_block(&self.struct_or_enum_header_display(&struct_env));
+                if struct_env.has_variants() {
+                    self.gen_enum_fields(&struct_env);
+                } else {
+                    self.gen_struct_fields(&struct_env);
+                }
                 self.gen_spec_blocks(module_env, "", &target, spec_block_map);
             }
         }

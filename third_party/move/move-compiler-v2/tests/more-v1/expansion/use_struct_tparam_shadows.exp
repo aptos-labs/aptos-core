@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot return `S` from a function with result type `X::S`
+   ┌─ tests/more-v1/expansion/use_struct_tparam_shadows.move:12:9
+   │
+12 │         x
+   │         ^

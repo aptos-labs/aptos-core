@@ -77,3 +77,8 @@ axiom (forall limit: int :: {$1_aggregator_factory_spec_new_aggregator(limit)}
 axiom (forall limit: int :: {$1_aggregator_factory_spec_new_aggregator(limit)}
      (var agg := $1_aggregator_factory_spec_new_aggregator(limit);
      $1_aggregator_spec_aggregator_get_val(agg) == 0));
+
+// ==================================================================================
+// Native for function_info
+
+procedure $1_function_info_is_identifier(s: Vec int) returns (res: bool);

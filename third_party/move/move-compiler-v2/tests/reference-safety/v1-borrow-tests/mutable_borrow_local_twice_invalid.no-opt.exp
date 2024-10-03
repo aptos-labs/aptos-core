@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: cannot write local `r2` since it is borrowed
+  ┌─ tests/reference-safety/v1-borrow-tests/mutable_borrow_local_twice_invalid.move:6:9
+  │
+4 │         let r1 = &mut a;
+  │                  ------ previously mutably borrowed here
+5 │         let r2 = &mut a;
+6 │         *r2 = 2;
+  │         ^^^^^^^ write attempted here
+7 │         *r1 = 1;
+  │         ------- conflicting reference `r1` used here

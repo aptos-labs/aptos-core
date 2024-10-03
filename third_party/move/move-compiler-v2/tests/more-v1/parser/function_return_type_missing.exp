@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/function_return_type_missing.move:3:14
+  │
+3 │     fun f(): { }
+  │              ^
+  │              │
+  │              Unexpected '{'
+  │              Expected a type name

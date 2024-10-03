@@ -1,36 +1,6 @@
 comparison between v1 and v2 failed:
 = processed 3 tasks
 = 
-+ task 0 'publish'. lines 1-26:
-+ warning: Unused assignment to `by`. Consider removing or prefixing with an underscore: `_by`
-+    ┌─ TEMPFILE:11:16
-+    │
-+ 11 │     inline fun inc_xx(self: &mut S, by: u64) {
-+    │                ^^^^^^
-+    ·
-+ 20 │         {inc_xx(&mut s, 6); s.x} + {inc_xx(&mut s, 47); s.x} + {inc_xx(&mut s, 117); s.x}
-+    │          ----------------- from a call inlined at this callsite
-+ 
-+ warning: Unused assignment to `by`. Consider removing or prefixing with an underscore: `_by`
-+    ┌─ TEMPFILE:11:16
-+    │
-+ 11 │     inline fun inc_xx(self: &mut S, by: u64) {
-+    │                ^^^^^^
-+    ·
-+ 20 │         {inc_xx(&mut s, 6); s.x} + {inc_xx(&mut s, 47); s.x} + {inc_xx(&mut s, 117); s.x}
-+    │                                     ------------------ from a call inlined at this callsite
-+ 
-+ warning: Unused assignment to `by`. Consider removing or prefixing with an underscore: `_by`
-+    ┌─ TEMPFILE:11:16
-+    │
-+ 11 │     inline fun inc_xx(self: &mut S, by: u64) {
-+    │                ^^^^^^
-+    ·
-+ 20 │         {inc_xx(&mut s, 6); s.x} + {inc_xx(&mut s, 47); s.x} + {inc_xx(&mut s, 117); s.x}
-+    │                                                                 ------------------- from a call inlined at this callsite
-+ 
-+ 
-+ 
 = task 1 'run'. lines 28-28:
 - return values: 513
 + return values: 232

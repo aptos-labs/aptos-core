@@ -11,3 +11,11 @@ module 0x8675309::M {
         continue
     }
 } // end 0x8675309::M
+
+
+Diagnostics:
+error: missing enclosing loop statement
+  ┌─ tests/checking/typing/continue_outside_loop.move:6:9
+  │
+6 │         continue
+  │         ^^^^^^^^

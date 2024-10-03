@@ -593,7 +593,6 @@ the SignerCapability.
     <b>let</b> container = <b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
     <b>let</b> get = len(optional_auth_key) == 0;
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(source_addr);
-    <b>requires</b> source_addr != resource_addr;
     <b>aborts_if</b> len(<a href="resource_account.md#0x1_resource_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>) != 32;
     <b>include</b> <a href="account.md#0x1_account_exists_at">account::exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateResourceAccountAbortsIf">account::CreateResourceAccountAbortsIf</a>;
     <b>include</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateAccountAbortsIf">account::CreateAccountAbortsIf</a> {addr: resource_addr};

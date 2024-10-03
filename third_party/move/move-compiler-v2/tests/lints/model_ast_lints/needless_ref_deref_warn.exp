@@ -1,0 +1,20 @@
+
+Diagnostics:
+warning: [lint] Needless pair of `&` and `*` operators: consider removing them
+  ┌─ tests/lints/model_ast_lints/needless_ref_deref_warn.move:9:46
+  │
+9 │                 let pre = string::sub_string(&*k, 0, 5);
+  │                                              ^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_deref)]`.
+
+warning: [lint] Needless pair of `&` and `*` operators: consider removing them
+   ┌─ tests/lints/model_ast_lints/needless_ref_deref_warn.move:35:9
+   │
+35 │         &*x
+   │         ^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_deref)]`.
+
+
+============ bytecode verification succeeded ========

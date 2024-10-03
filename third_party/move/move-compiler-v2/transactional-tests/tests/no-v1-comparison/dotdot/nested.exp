@@ -1,0 +1,58 @@
+processed 5 tasks
+
+task 0 'publish'. lines 1-51:
+Error: compilation errors:
+ error: match not exhaustive
+   ┌─ TEMPFILE:22:16
+   │
+22 │         match (x) {
+   │                ^
+   │
+   = missing `E::V1{..}`
+   = missing `E::V2{..}`
+
+
+
+task 1 'run'. lines 53-53:
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+
+task 2 'run'. lines 55-55:
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+
+task 3 'run'. lines 57-57:
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+
+task 4 'run'. lines 59-59:
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

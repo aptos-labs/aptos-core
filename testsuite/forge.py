@@ -265,6 +265,7 @@ class ForgeContext:
     forge_test_suite: str
     forge_username: str
     forge_blocking: bool
+    forge_retain_debug_logs: str
 
     github_actions: str
     github_job_url: Optional[str]
@@ -838,10 +839,13 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_TRIGGERED_BY=forge_triggered_by,
             FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
             FORGE_USERNAME=sanitize_k8s_resource_name(context.forge_username),
+            FORGE_RETAIN_DEBUG_LOGS=context.forge_retain_debug_logs,
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
         )
+
+        log.info(f"rendered_forge_test_runner: {rendered}")
 
         with ForgeResult.with_context(context) as forge_result:
             specfile = context.filesystem.mkstemp()
@@ -1145,6 +1149,7 @@ def create_forge_command(
     forge_namespace_reuse: Optional[str],
     forge_namespace_keep: Optional[str],
     forge_enable_haproxy: Optional[str],
+    forge_enable_indexer: Optional[str],
     cargo_args: Optional[Sequence[str]],
     forge_cli_args: Optional[Sequence[str]],
     test_args: Optional[Sequence[str]],
@@ -1214,6 +1219,8 @@ def create_forge_command(
         forge_args.append("--keep")
     if forge_enable_haproxy == "true":
         forge_args.append("--enable-haproxy")
+    if forge_enable_indexer == "true":
+        forge_args.append("--enable-indexer")
 
     if test_args:
         forge_args.extend(test_args)
@@ -1326,11 +1333,13 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_NAMESPACE_KEEP")
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
+@envoption("FORGE_ENABLE_INDEXER")
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
 @envoption("FORGE_TEST_SUITE")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
 @envoption("FORGE_IMAGE_TAG")
+@envoption("FORGE_RETAIN_DEBUG_LOGS", "false")
 @envoption("IMAGE_TAG")
 @envoption("UPGRADE_IMAGE_TAG")
 @envoption("FORGE_NAMESPACE")
@@ -1370,9 +1379,11 @@ def test(
     forge_enable_failpoints: Optional[str],
     forge_enable_performance: Optional[str],
     forge_enable_haproxy: Optional[str],
+    forge_enable_indexer: Optional[str],
     forge_test_suite: str,
     forge_runner_duration_secs: str,
     forge_image_tag: Optional[str],
+    forge_retain_debug_logs: str,
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
     forge_namespace: Optional[str],
@@ -1594,12 +1605,13 @@ def test(
         forge_namespace_reuse=forge_namespace_reuse,
         forge_namespace_keep=forge_namespace_keep,
         forge_enable_haproxy=forge_enable_haproxy,
+        forge_enable_indexer=forge_enable_indexer,
         cargo_args=cargo_args,
         forge_cli_args=forge_cli_args,
         test_args=test_args,
     )
 
-    log.debug("forge_args: %s", forge_args)
+    log.info("forge_args: %s", forge_args)
 
     # use the github actor username if possible
     forge_username = os.getenv("GITHUB_ACTOR") or "unknown-username"
@@ -1620,6 +1632,7 @@ def test(
         forge_cluster=forge_cluster,
         forge_test_suite=forge_test_suite,
         forge_username=forge_username,
+        forge_retain_debug_logs=forge_retain_debug_logs,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=(

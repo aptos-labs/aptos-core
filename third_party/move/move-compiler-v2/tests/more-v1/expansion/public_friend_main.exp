@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unnecessary or extraneous item
+  ┌─ tests/more-v1/expansion/public_friend_main.move:2:1
+  │
+2 │ public(friend) fun main() {
+  │ ^^^^^^^^^^^^^^ Invalid 'public(friend)' visibility modifier. Script functions are not callable from other Move functions.

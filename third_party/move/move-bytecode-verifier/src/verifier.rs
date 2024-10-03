@@ -64,9 +64,20 @@ pub fn verify_module_with_config_for_test(
     config: &VerifierConfig,
     module: &CompiledModule,
 ) -> VMResult<()> {
+    verify_module_with_config_for_test_with_version(name, config, module, None)
+}
+
+pub fn verify_module_with_config_for_test_with_version(
+    name: &str,
+    config: &VerifierConfig,
+    module: &CompiledModule,
+    bytecode_version: Option<u32>,
+) -> VMResult<()> {
     const MAX_MODULE_SIZE: usize = 65355;
     let mut bytes = vec![];
-    module.serialize(&mut bytes).unwrap();
+    module
+        .serialize_for_version(bytecode_version, &mut bytes)
+        .unwrap();
     let now = Instant::now();
     let result = verify_module_with_config(config, module);
     eprintln!(

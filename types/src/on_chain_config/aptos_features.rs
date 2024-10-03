@@ -92,6 +92,9 @@ pub enum FeatureFlag {
     ENABLE_ENUM_TYPES = 74,
     ENABLE_RESOURCE_ACCESS_CONTROL = 75,
     REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT = 76,
+    FEDERATED_KEYLESS = 77,
+    TRANSACTION_SIMULATION_ENHANCEMENT = 78,
+    COLLECTION_OWNER = 79,
 }
 
 impl FeatureFlag {
@@ -141,6 +144,7 @@ impl FeatureFlag {
             FeatureFlag::WEBAUTHN_SIGNATURE,
             // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
             FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::FEDERATED_KEYLESS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
@@ -167,6 +171,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_ENUM_TYPES,
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
+            FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
         ]
     }
 }
@@ -292,6 +297,10 @@ impl Features {
         self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
     }
 
+    pub fn is_federated_keyless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::FEDERATED_KEYLESS)
+    }
+
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }
@@ -302,6 +311,10 @@ impl Features {
 
     pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

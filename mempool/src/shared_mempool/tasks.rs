@@ -375,7 +375,15 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
         .start_timer();
     let validation_results = transactions
         .par_iter()
-        .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
+        .map(|t| {
+            let result = smp.validator.read().validate_transaction(t.0.clone());
+            // Pre-compute the hash and length if the transaction is valid, before locking mempool
+            if result.is_ok() {
+                t.0.committed_hash();
+                t.0.txn_bytes_len();
+            }
+            result
+        })
         .collect::<Vec<_>>();
     vm_validation_timer.stop_and_record();
     {
@@ -571,7 +579,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
     };
     // Send back to callback
     let result = if callback.send(Ok(resp)).is_err() {
-        error!(LogSchema::event_log(
+        debug!(LogSchema::event_log(
             LogEntry::QuorumStore,
             LogEvent::CallbackFail
         ));

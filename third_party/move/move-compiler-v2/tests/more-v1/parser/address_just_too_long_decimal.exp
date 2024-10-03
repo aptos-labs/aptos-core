@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid address
+  ┌─ tests/more-v1/parser/address_just_too_long_decimal.move:1:9
+  │
+1 │ address 115792089237316195423570985008687907853269984665640564039457584007913129639936 {
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid address literal. The numeric value is too large. The maximum size is 32 bytes

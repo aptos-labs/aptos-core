@@ -67,7 +67,7 @@ impl LatencyMonitor {
             // Wait for the next round
             loop_ticker.next().await;
 
-            let highest_synced_version = match self.storage.get_synced_version() {
+            let highest_synced_version = match self.storage.ensure_synced_version() {
                 Ok(version) => version,
                 Err(error) => {
                     sample!(

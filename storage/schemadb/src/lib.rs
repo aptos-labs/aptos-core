@@ -106,6 +106,13 @@ impl SchemaBatch {
     }
 }
 
+#[derive(Debug)]
+enum OpenMode<'a> {
+    ReadWrite,
+    ReadOnly,
+    Secondary(&'a Path),
+}
+
 /// This DB is a schematized RocksDB wrapper where all data passed in and out are typed according to
 /// [`Schema`]s.
 #[derive(Debug)]
@@ -143,6 +150,44 @@ impl DB {
         name: &str,
         cfds: Vec<ColumnFamilyDescriptor>,
     ) -> DbResult<DB> {
+        Self::open_cf_impl(db_opts, path, name, cfds, OpenMode::ReadWrite)
+    }
+
+    /// Open db in readonly mode
+    /// Note that this still assumes there's only one process that opens the same DB.
+    /// See `open_as_secondary`
+    pub fn open_cf_readonly(
+        opts: &Options,
+        path: impl AsRef<Path>,
+        name: &str,
+        cfds: Vec<ColumnFamilyDescriptor>,
+    ) -> DbResult<DB> {
+        Self::open_cf_impl(opts, path, name, cfds, OpenMode::ReadOnly)
+    }
+
+    pub fn open_cf_as_secondary<P: AsRef<Path>>(
+        opts: &Options,
+        primary_path: P,
+        secondary_path: P,
+        name: &str,
+        cfds: Vec<ColumnFamilyDescriptor>,
+    ) -> DbResult<DB> {
+        Self::open_cf_impl(
+            opts,
+            primary_path,
+            name,
+            cfds,
+            OpenMode::Secondary(secondary_path.as_ref()),
+        )
+    }
+
+    fn open_cf_impl(
+        db_opts: &Options,
+        path: impl AsRef<Path>,
+        name: &str,
+        cfds: Vec<ColumnFamilyDescriptor>,
+        open_mode: OpenMode,
+    ) -> DbResult<DB> {
         // ignore error, since it'll fail to list cfs on the first open
         let existing_cfs = rocksdb::DB::list_cf(db_opts, path.de_unc()).unwrap_or_default();
 
@@ -161,47 +206,39 @@ impl DB {
             .collect::<Vec<_>>();
         let all_cfds = cfds.into_iter().chain(unrecognized_cfds);
 
-        let inner =
-            rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds).into_db_res()?;
-        Ok(Self::log_construct(name, inner))
-    }
+        let inner = {
+            use rocksdb::DB;
+            use OpenMode::*;
 
-    /// Open db in readonly mode
-    /// Note that this still assumes there's only one process that opens the same DB.
-    /// See `open_as_secondary`
-    pub fn open_cf_readonly(
-        opts: &Options,
-        path: impl AsRef<Path>,
-        name: &str,
-        cfs: Vec<ColumnFamilyName>,
-    ) -> DbResult<DB> {
-        let error_if_log_file_exists = false;
-        let inner =
-            rocksdb::DB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)
-                .into_db_res()?;
-
-        Ok(Self::log_construct(name, inner))
-    }
-
-    pub fn open_cf_as_secondary<P: AsRef<Path>>(
-        opts: &Options,
-        primary_path: P,
-        secondary_path: P,
-        name: &str,
-        cfs: Vec<ColumnFamilyName>,
-    ) -> DbResult<DB> {
-        let inner = rocksdb::DB::open_cf_as_secondary(
-            opts,
-            primary_path.de_unc(),
-            secondary_path.de_unc(),
-            cfs,
-        )
+            match open_mode {
+                ReadWrite => DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds),
+                ReadOnly => {
+                    DB::open_cf_descriptors_read_only(
+                        db_opts,
+                        path.de_unc(),
+                        all_cfds,
+                        false, /* error_if_log_file_exist */
+                    )
+                },
+                Secondary(secondary_path) => DB::open_cf_descriptors_as_secondary(
+                    db_opts,
+                    path.de_unc(),
+                    secondary_path,
+                    all_cfds,
+                ),
+            }
+        }
         .into_db_res()?;
-        Ok(Self::log_construct(name, inner))
+
+        Ok(Self::log_construct(name, open_mode, inner))
     }
 
-    fn log_construct(name: &str, inner: rocksdb::DB) -> DB {
-        info!(rocksdb_name = name, "Opened RocksDB.");
+    fn log_construct(name: &str, open_mode: OpenMode, inner: rocksdb::DB) -> DB {
+        info!(
+            rocksdb_name = name,
+            open_mode = ?open_mode,
+            "Opened RocksDB."
+        );
         DB {
             name: name.to_string(),
             inner,

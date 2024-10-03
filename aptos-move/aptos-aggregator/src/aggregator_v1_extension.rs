@@ -5,9 +5,10 @@ use crate::{
     bounded_math::{BoundedMath, SignedU128},
     delta_math::DeltaHistory,
     resolver::AggregatorV1Resolver,
-    types::{expect_ok, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
+    types::{DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
 };
 use aptos_types::{
+    error::expect_ok,
     state_store::{state_key::StateKey, table::TableHandle},
     PeerId,
 };

@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: function acquires global `Tester::Pair` which is currently borrowed
+   ┌─ tests/more-v1/translated_ir_tests/move/borrow_tests/imm_borrow_global_lossy_acquire_invalid.move:32:9
+   │
+29 │         let p1 = borrow_global<Pair>(addr1);
+   │                  -------------------------- struct `Tester::Pair` previously borrowed here
+   ·
+32 │         eq_helper(p1, addr2)
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+   ·
+35 │     fun eq_helper(p1: &Pair, addr2: address): bool acquires Pair {
+   │                                                             ----- access declared here

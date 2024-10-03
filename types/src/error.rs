@@ -2,7 +2,110 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Error codes that follow the Move error convention of the Aptos Framework.
+use move_binary_format::errors::PartialVMError;
+use move_core_types::vm_status::StatusCode;
+use std::fmt::Display;
+use tracing::error;
+
+/// Wrapping other errors, to add a variant that represents something that should never
+/// happen - i.e. a code invariant error, which we would generally just panic, but since
+/// we are inside of the VM, we cannot do that.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PanicError {
+    CodeInvariantError(String),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PanicOr<T: std::fmt::Debug> {
+    CodeInvariantError(String),
+    Or(T),
+}
+
+// code_invariant_error is also redefined in third-party/move-vm (for delayed fields errors).
+pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
+    let msg = format!(
+        "Code invariant broken (there is a bug in the code), {:?}",
+        message
+    );
+    error!("{}", msg);
+    PanicError::CodeInvariantError(msg)
+}
+
+pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {
+    value.map_err(|e| code_invariant_error(format!("Expected Ok, got Err({:?})", e)))
+}
+
+impl Display for PanicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PanicError::CodeInvariantError(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl From<PanicError> for PartialVMError {
+    fn from(err: PanicError) -> Self {
+        match err {
+            PanicError::CodeInvariantError(msg) => {
+                PartialVMError::new(StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR)
+                    .with_message(msg)
+            },
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> PanicOr<T> {
+    pub fn map_non_panic<E: std::fmt::Debug>(self, f: impl FnOnce(T) -> E) -> PanicOr<E> {
+        match self {
+            PanicOr::CodeInvariantError(msg) => PanicOr::CodeInvariantError(msg),
+            PanicOr::Or(value) => PanicOr::Or(f(value)),
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> From<PanicError> for PanicOr<T> {
+    fn from(err: PanicError) -> Self {
+        match err {
+            PanicError::CodeInvariantError(e) => PanicOr::CodeInvariantError(e),
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> From<&PanicOr<T>> for StatusCode {
+    fn from(err: &PanicOr<T>) -> Self {
+        match err {
+            PanicOr::CodeInvariantError(_) => {
+                StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR
+            },
+            PanicOr::Or(_) => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> From<PanicOr<T>> for PartialVMError {
+    fn from(err: PanicOr<T>) -> Self {
+        match err {
+            PanicOr::CodeInvariantError(msg) => {
+                PartialVMError::new(StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR)
+                    .with_message(msg)
+            },
+            PanicOr::Or(err) => PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                .with_message(format!("{:?}", err)),
+        }
+    }
+}
+
+pub trait NonPanic {}
+
+impl<T: std::fmt::Debug + NonPanic> From<T> for PanicOr<T> {
+    fn from(err: T) -> Self {
+        PanicOr::Or(err)
+    }
+}
+
+///
+/// Error codes that follow the Move error convention of the Aptos Framework.
+///
 
 /// Caller specified an invalid argument (http: 400)
 pub const INVALID_ARGUMENT: u64 = 0x1;

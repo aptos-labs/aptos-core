@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unexpected nested attributes
+  ┌─ tests/lints/model_ast_lints/bad_lint_attribute_06.move:2:18
+  │
+2 │     #[lint::skip(while_true(yes=1))]
+  │                  ^^^^^^^^^^^^^^^^^

@@ -476,8 +476,8 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             values
                 .iter()
                 .zip(tys)
-                .zip(field_names.iter())
-                .map(|((v, ty), n)| self.annotate_value(v, ty, limit).map(|v| (n.clone(), v)))
+                .zip(field_names)
+                .map(|((v, ty), n)| self.annotate_value(v, ty, limit).map(|v| (n, v)))
                 .collect::<anyhow::Result<Vec<_>>>()
         };
 

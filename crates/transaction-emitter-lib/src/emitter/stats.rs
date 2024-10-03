@@ -32,6 +32,7 @@ pub struct TxnStatsRate {
     pub latency: f64,           // mean latency (milliseconds)
     pub latency_samples: u64,   // number latency-measured events
     pub p50_latency: u64,       // milliseconds, 50% this or better
+    pub p70_latency: u64,       // milliseconds, 70% this or better
     pub p90_latency: u64,       // milliseconds, 90% this or better
     pub p99_latency: u64,       // milliseconds, 99% this or better
 }
@@ -40,12 +41,12 @@ impl fmt::Display for TxnStatsRate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "committed: {:.2} txn/s{}{}{}, latency: {:.2} ms, (p50: {} ms, p90: {} ms, p99: {} ms), latency samples: {}",
+            "committed: {:.2} txn/s{}{}{}, latency: {:.2} ms, (p50: {} ms, p70: {}, p90: {} ms, p99: {} ms), latency samples: {}",
             self.committed,
             if self.submitted != self.committed { format!(", submitted: {:.2} txn/s", self.submitted) } else { "".to_string()},
             if self.failed_submission != 0.0 { format!(", failed submission: {:.2} txn/s", self.failed_submission) } else { "".to_string()},
             if self.expired != 0.0 { format!(", expired: {:.2} txn/s", self.expired) } else { "".to_string()},
-            self.latency, self.p50_latency, self.p90_latency, self.p99_latency, self.latency_samples,
+            self.latency, self.p50_latency, self.p70_latency, self.p90_latency, self.p99_latency, self.latency_samples,
         )
     }
 }
@@ -65,6 +66,7 @@ impl TxnStats {
             },
             latency_samples: self.latency_samples,
             p50_latency: self.latency_buckets.percentile(50, 100),
+            p70_latency: self.latency_buckets.percentile(70, 100),
             p90_latency: self.latency_buckets.percentile(90, 100),
             p99_latency: self.latency_buckets.percentile(99, 100),
         }

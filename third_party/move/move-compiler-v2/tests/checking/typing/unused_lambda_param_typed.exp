@@ -1,0 +1,26 @@
+
+Diagnostics:
+warning: Unused anonymous function parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/checking/typing/unused_lambda_param_typed.move:7:18
+  │
+7 │         test(0, |x: u64| 1);
+  │                  ^
+
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
+    private fun unused_lambda() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed1() {
+        1;
+        Tuple()
+    }
+    private fun unused_lambda_suppressed2() {
+        1;
+        Tuple()
+    }
+} // end 0xc0ffee::m

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/invalid_named_address_assignment.move:1:14
+  │
+1 │ address Addr = 0x1; // Named address assignments are not allowed
+  │              ^
+  │              │
+  │              Unexpected '='
+  │              Expected '{'

@@ -35,6 +35,8 @@ AccountAuthenticator:
         STRUCT:
           - authenticator:
               TYPENAME: MultiKeyAuthenticator
+    4:
+      NoAccountAuthenticator: UNIT
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
@@ -68,6 +70,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: KeylessPublicKey
+    4:
+      FederatedKeyless:
+        STRUCT:
+          - public_key:
+              TYPENAME: FederatedKeylessPublicKey
 AnySignature:
   ENUM:
     0:
@@ -254,6 +261,12 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+FederatedKeylessPublicKey:
+  STRUCT:
+    - jwk_addr:
+        TYPENAME: AccountAddress
+    - pk:
+        TYPENAME: KeylessPublicKey
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:

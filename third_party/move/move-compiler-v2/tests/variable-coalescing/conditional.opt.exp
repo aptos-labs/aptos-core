@@ -18,14 +18,14 @@ fun m::test($t0: bool): u64 {
 [variant baseline]
 fun m::test($t0: bool): u64 {
      var $t1: u64
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 5
   1: label L0
   2: $t1 := 3
-  3: goto 6
-  4: label L1
-  5: $t1 := 3
-  6: label L2
-  7: return $t1
+  3: label L2
+  4: return $t1
+  5: label L1
+  6: $t1 := 3
+  7: goto 3
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -35,23 +35,23 @@ fun m::test($t0: bool): u64 {
      var $t1: u64
      # live vars: $t0
      # events: b:$t0, e:$t0
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 5
      # live vars:
   1: label L0
      # live vars:
      # events: b:$t1
   2: $t1 := 3
      # live vars: $t1
-  3: goto 6
-     # live vars:
-  4: label L1
-     # live vars:
-  5: $t1 := 3
+  3: label L2
      # live vars: $t1
-  6: label L2
+  4: return $t1
+     # live vars:
+  5: label L1
+     # live vars:
+  6: $t1 := 3
      # live vars: $t1
      # events: e:$t1
-  7: return $t1
+  7: goto 3
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -59,14 +59,14 @@ fun m::test($t0: bool): u64 {
 [variant baseline]
 fun m::test($t0: bool): u64 {
      var $t1: u64
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 5
   1: label L0
   2: $t1 := 3
-  3: goto 6
-  4: label L1
-  5: $t1 := 3
-  6: label L2
-  7: return $t1
+  3: label L2
+  4: return $t1
+  5: label L1
+  6: $t1 := 3
+  7: goto 3
 }
 
 ============ after DeadStoreElimination: ================
@@ -74,14 +74,14 @@ fun m::test($t0: bool): u64 {
 [variant baseline]
 fun m::test($t0: bool): u64 {
      var $t1: u64
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 5
   1: label L0
   2: $t1 := 3
-  3: goto 6
-  4: label L1
-  5: $t1 := 3
-  6: label L2
-  7: return $t1
+  3: label L2
+  4: return $t1
+  5: label L1
+  6: $t1 := 3
+  7: goto 3
 }
 
 
@@ -94,17 +94,17 @@ test(Arg0: bool): u64 /* def_idx: 0 */ {
 L1:	loc0: u64
 B0:
 	0: MoveLoc[0](Arg0: bool)
-	1: BrFalse(5)
+	1: BrFalse(6)
 B1:
 	2: LdU64(3)
 	3: StLoc[1](loc0: u64)
-	4: Branch(7)
 B2:
-	5: LdU64(3)
-	6: StLoc[1](loc0: u64)
+	4: MoveLoc[1](loc0: u64)
+	5: Ret
 B3:
-	7: MoveLoc[1](loc0: u64)
-	8: Ret
+	6: LdU64(3)
+	7: StLoc[1](loc0: u64)
+	8: Branch(4)
 }
 }
 ============ bytecode verification succeeded ========

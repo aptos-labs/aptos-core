@@ -4,9 +4,8 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    docgen::DocgenOptions, extended_checks, path_in_crate,
-    release_builder::RELEASE_BUNDLE_EXTENSION, release_bundle::ReleaseBundle, BuildOptions,
-    ReleaseOptions,
+    docgen::DocgenOptions, path_in_crate, release_builder::RELEASE_BUNDLE_EXTENSION,
+    release_bundle::ReleaseBundle, BuildOptions, ReleaseOptions,
 };
 use clap::ValueEnum;
 use move_command_line_common::address::NumericalAddress;
@@ -100,14 +99,8 @@ impl ReleaseTarget {
             .collect::<Vec<_>>();
         ReleaseOptions {
             build_options: BuildOptions {
-                dev: false,
                 with_srcs,
                 with_abis: true,
-                with_source_maps: false,
-                with_error_map: true,
-                named_addresses: Default::default(),
-                override_std: None,
-                install_dir: None,
                 with_docs: true,
                 docgen_options: Some(DocgenOptions {
                     include_impl: true,
@@ -120,13 +113,7 @@ impl ReleaseTarget {
                     output_format: None,
                 }),
                 skip_fetch_latest_git_deps: true,
-                bytecode_version: None,
-                compiler_version: None,
-                language_version: None,
-                skip_attribute_checks: false,
-                check_test_code: false,
-                known_attributes: extended_checks::get_all_attribute_names().clone(),
-                experiments: vec![],
+                ..BuildOptions::default()
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages

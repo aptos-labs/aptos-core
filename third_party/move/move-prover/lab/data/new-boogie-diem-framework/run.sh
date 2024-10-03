@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FRAMEWORK="../../../../documentation/examples/diem-framework/move-packages/DPN/sources"
+FRAMEWORK="../../../../move-examples/diem-framework/move-packages/DPN/sources"
 STDLIB="../../../../move-stdlib/sources"
 NURSERY="../../../../move-stdlib/nursery/sources"
 

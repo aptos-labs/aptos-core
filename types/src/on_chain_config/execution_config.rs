@@ -148,11 +148,7 @@ pub enum TransactionShufflerType {
     NoShuffling,
     DeprecatedSenderAwareV1(u32),
     SenderAwareV2(u32),
-    DeprecatedFairness {
-        sender_conflict_window_size: u32,
-        module_conflict_window_size: u32,
-        entry_fun_conflict_window_size: u32,
-    },
+    DeprecatedFairness,
     UseCaseAware {
         sender_spread_factor: usize,
         platform_use_case_spread_factor: usize,
@@ -166,6 +162,19 @@ impl TransactionShufflerType {
             sender_spread_factor: 32,
             platform_use_case_spread_factor: 0,
             user_use_case_spread_factor: 4,
+        }
+    }
+
+    pub fn user_use_case_spread_factor(&self) -> Option<usize> {
+        match self {
+            TransactionShufflerType::NoShuffling
+            | TransactionShufflerType::DeprecatedSenderAwareV1(_)
+            | TransactionShufflerType::SenderAwareV2(_)
+            | TransactionShufflerType::DeprecatedFairness => None,
+            TransactionShufflerType::UseCaseAware {
+                user_use_case_spread_factor,
+                ..
+            } => Some(*user_use_case_spread_factor),
         }
     }
 }

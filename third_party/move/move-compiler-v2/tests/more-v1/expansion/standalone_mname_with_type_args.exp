@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: undeclared `M`
+  ┌─ tests/more-v1/expansion/standalone_mname_with_type_args.move:3:21
+  │
+3 │         let _ = 0 + M<u64>;
+  │                     ^

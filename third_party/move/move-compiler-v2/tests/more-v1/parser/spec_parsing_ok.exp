@@ -1,0 +1,235 @@
+
+Diagnostics:
+error: type cannot have type arguments
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:15:30
+   │
+15 │         native fun all<T>(x: SomeCollection<T>, predicate: |T|bool): bool;
+   │                              ^^^^^^^^^^^^^^
+
+error: undeclared `0x8675309::M::SomeCollection`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:15:30
+   │
+15 │         native fun all<T>(x: SomeCollection<T>, predicate: |T|bool): bool;
+   │                              ^^^^^^^^^^^^^^
+
+error: undeclared `RET`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:48:17
+   │
+48 │         ensures RET == x + 1;
+   │                 ^^^
+
+error: undeclared `RET`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:57:17
+   │
+57 │         ensures RET == x/y;
+   │                 ^^^
+
+error: undeclared `RET`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:58:24
+   │
+58 │         ensures x/y == RET;
+   │                        ^^^
+
+error: undeclared `RET`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:69:17
+   │
+69 │         ensures RET = {let y = x; y + 1};
+   │                 ^^^
+
+error: expected `bool` but found a value of type `()`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:69:17
+   │
+69 │         ensures RET = {let y = x; y + 1};
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expression construct not supported in specifications
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:69:17
+   │
+69 │         ensures RET = {let y = x; y + 1};
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot pass `|(num, num)|num` to a function which expects argument of type `|(num, num)|bool`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:77:24
+   │
+77 │         ensures all(x, |y, z| x + y + z);
+   │                        ^^^^^^^^^^^^^^^^
+
+error: undeclared `RET`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:17
+   │
+84 │         ensures RET = x[1] && x[0..3];
+   │                 ^^^
+
+error: expected `vector<_>` but found a value of type `u64`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:23
+   │
+84 │         ensures RET = x[1] && x[0..3];
+   │                       ^
+
+error: expected `vector<_>` but found a value of type `u64`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:31
+   │
+84 │         ensures RET = x[1] && x[0..3];
+   │                               ^
+
+error: cannot use `vector<_>` with an operator which expects a value of type `bool`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:31
+   │
+84 │         ensures RET = x[1] && x[0..3];
+   │                               ^^^^^^^
+
+error: expected `bool` but found a value of type `()`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:17
+   │
+84 │         ensures RET = x[1] && x[0..3];
+   │                 ^^^^^^^^^^^^^^^^^^^^^
+
+error: expression construct not supported in specifications
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:17
+   │
+84 │         ensures RET = x[1] && x[0..3];
+   │                 ^^^^^^^^^^^^^^^^^^^^^
+
+error: undeclared `RET`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:91:27
+   │
+91 │         ensures x > 0 ==> RET == x - 1;
+   │                           ^^^
+
+error: undeclared `RET`
+   ┌─ tests/more-v1/parser/spec_parsing_ok.move:92:28
+   │
+92 │         ensures x == 0 ==> RET == x;
+   │                            ^^^
+
+error: undeclared `generic`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:112:26
+    │
+112 │         invariant update generic<u64> = 23;
+    │                          ^^^^^^^^^^^^
+
+error: expected `bool` but found a value of type `()`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:112:26
+    │
+112 │         invariant update generic<u64> = 23;
+    │                          ^^^^^^^^^^^^^^^^^
+
+error: expression construct not supported in specifications
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:112:26
+    │
+112 │         invariant update generic<u64> = 23;
+    │                          ^^^^^^^^^^^^^^^^^
+
+error: undeclared struct `M::generic`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:113:26
+    │
+113 │         invariant update Self::generic<u64> = 24;
+    │                          ^^^^^^^^^^^^^
+
+error: expected `bool` but found a value of type `()`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:113:26
+    │
+113 │         invariant update Self::generic<u64> = 24;
+    │                          ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expression construct not supported in specifications
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:113:26
+    │
+113 │         invariant update Self::generic<u64> = 24;
+    │                          ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:124:28
+    │
+124 │         requires global<X>(0x0).f == global<X>(0x1).f;
+    │                            ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:124:48
+    │
+124 │         requires global<X>(0x0).f == global<X>(0x1).f;
+    │                                                ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:125:27
+    │
+125 │         ensures global<X>(0x0).f == global<X>(0x1).f;
+    │                           ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:125:47
+    │
+125 │         ensures global<X>(0x0).f == global<X>(0x1).f;
+    │                                               ^^^
+
+error: `foo` not declared in schema
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:129:39
+    │
+129 │         include ModuleInvariant<T, T>{foo:bar, x:y};
+    │                                       ^^^
+
+error: undeclared `bar`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:129:43
+    │
+129 │         include ModuleInvariant<T, T>{foo:bar, x:y};
+    │                                           ^^^
+
+error: `x` not declared in schema
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:129:48
+    │
+129 │         include ModuleInvariant<T, T>{foo:bar, x:y};
+    │                                                ^
+
+error: undeclared `y`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:129:50
+    │
+129 │         include ModuleInvariant<T, T>{foo:bar, x:y};
+    │                                                  ^
+
+error: property `do_not_verify` is not valid in this context
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:135:9
+    │
+135 │         pragma do_not_verify, timeout = 60;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: property `timeout` is not valid in this context
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:135:9
+    │
+135 │         pragma do_not_verify, timeout = 60;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:142:37
+    │
+142 │         invariant<X: key> exists<X>(0x0) <==> exists<X>(0x0);
+    │                                     ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:142:57
+    │
+142 │         invariant<X: key> exists<X>(0x0) <==> exists<X>(0x0);
+    │                                                         ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:143:45
+    │
+143 │         invariant<X: key, Y: key> exists<X>(0x0) && exists<Y>(0x1) <==> exists<Y>(0x1) && exists<X>(0x0);
+    │                                             ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:143:63
+    │
+143 │         invariant<X: key, Y: key> exists<X>(0x0) && exists<Y>(0x1) <==> exists<Y>(0x1) && exists<X>(0x0);
+    │                                                               ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:143:83
+    │
+143 │         invariant<X: key, Y: key> exists<X>(0x0) && exists<Y>(0x1) <==> exists<Y>(0x1) && exists<X>(0x0);
+    │                                                                                   ^^^
+
+error: cannot use `u256` with an operator which expects a value of type `address`
+    ┌─ tests/more-v1/parser/spec_parsing_ok.move:143:101
+    │
+143 │         invariant<X: key, Y: key> exists<X>(0x0) && exists<Y>(0x1) <==> exists<Y>(0x1) && exists<X>(0x0);
+    │                                                                                                     ^^^

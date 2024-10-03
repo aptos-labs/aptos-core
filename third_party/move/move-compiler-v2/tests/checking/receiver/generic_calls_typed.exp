@@ -1,0 +1,47 @@
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    struct S {
+        x: #0,
+    }
+    private fun id<T>(self: m::S<#0>): m::S<#0> {
+        self
+    }
+    private inline fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
+    private fun receiver<T>(self: m::S<#0>,y: #0) {
+        select m::S.x<m::S<T>>(self) = y;
+        Tuple()
+    }
+    private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
+        Tuple()
+    }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
+    private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut m::S<#0>,y: #0) {
+        select m::S.x<&mut m::S<T>>(self) = y
+    }
+    private fun test_call_styles(s: m::S<u64>,x: u64) {
+        m::receiver<u64>(s, x);
+        m::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
+    }
+    private fun test_receiver_inference(s: m::S<u64>) {
+        {
+          let (s: m::S<u64>): (m::S<u64>) = Tuple(s);
+          {
+            let (s: m::S<u64>): (m::S<u64>) = Tuple(s);
+            m::id<u64>(s)
+          };
+          Tuple()
+        }
+    }
+} // end 0x42::m

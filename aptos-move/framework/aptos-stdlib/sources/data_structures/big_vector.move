@@ -40,17 +40,17 @@ module aptos_std::big_vector {
         v
     }
 
-    /// Destroy the vector `v`.
-    /// Aborts if `v` is not empty.
-    public fun destroy_empty<T>(v: BigVector<T>) {
-        assert!(is_empty(&v), error::invalid_argument(EVECTOR_NOT_EMPTY));
-        let BigVector { buckets, end_index: _, bucket_size: _ } = v;
+    /// Destroy the vector `self`.
+    /// Aborts if `self` is not empty.
+    public fun destroy_empty<T>(self: BigVector<T>) {
+        assert!(is_empty(&self), error::invalid_argument(EVECTOR_NOT_EMPTY));
+        let BigVector { buckets, end_index: _, bucket_size: _ } = self;
         table_with_length::destroy_empty(buckets);
     }
 
-    /// Destroy the vector `v` if T has `drop`
-    public fun destroy<T: drop>(v: BigVector<T>) {
-        let BigVector { buckets, end_index, bucket_size: _ } = v;
+    /// Destroy the vector `self` if T has `drop`
+    public fun destroy<T: drop>(self: BigVector<T>) {
+        let BigVector { buckets, end_index, bucket_size: _ } = self;
         let i = 0;
         while (end_index > 0) {
             let num_elements = vector::length(&table_with_length::remove(&mut buckets, i));
@@ -60,93 +60,93 @@ module aptos_std::big_vector {
         table_with_length::destroy_empty(buckets);
     }
 
-    /// Acquire an immutable reference to the `i`th element of the vector `v`.
+    /// Acquire an immutable reference to the `i`th element of the vector `self`.
     /// Aborts if `i` is out of bounds.
-    public fun borrow<T>(v: &BigVector<T>, i: u64): &T {
-        assert!(i < length(v), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        vector::borrow(table_with_length::borrow(&v.buckets, i / v.bucket_size), i % v.bucket_size)
+    public fun borrow<T>(self: &BigVector<T>, i: u64): &T {
+        assert!(i < length(self), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+        vector::borrow(table_with_length::borrow(&self.buckets, i / self.bucket_size), i % self.bucket_size)
     }
 
-    /// Return a mutable reference to the `i`th element in the vector `v`.
+    /// Return a mutable reference to the `i`th element in the vector `self`.
     /// Aborts if `i` is out of bounds.
-    public fun borrow_mut<T>(v: &mut BigVector<T>, i: u64): &mut T {
-        assert!(i < length(v), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        vector::borrow_mut(table_with_length::borrow_mut(&mut v.buckets, i / v.bucket_size), i % v.bucket_size)
+    public fun borrow_mut<T>(self: &mut BigVector<T>, i: u64): &mut T {
+        assert!(i < length(self), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+        vector::borrow_mut(table_with_length::borrow_mut(&mut self.buckets, i / self.bucket_size), i % self.bucket_size)
     }
 
-    /// Empty and destroy the other vector, and push each of the elements in the other vector onto the lhs vector in the
+    /// Empty and destroy the other vector, and push each of the elements in the other vector onto the self vector in the
     /// same order as they occurred in other.
     /// Disclaimer: This function is costly. Use it at your own discretion.
-    public fun append<T: store>(lhs: &mut BigVector<T>, other: BigVector<T>) {
+    public fun append<T: store>(self: &mut BigVector<T>, other: BigVector<T>) {
         let other_len = length(&other);
         let half_other_len = other_len / 2;
         let i = 0;
         while (i < half_other_len) {
-            push_back(lhs, swap_remove(&mut other, i));
+            push_back(self, swap_remove(&mut other, i));
             i = i + 1;
         };
         while (i < other_len) {
-            push_back(lhs, pop_back(&mut other));
+            push_back(self, pop_back(&mut other));
             i = i + 1;
         };
         destroy_empty(other);
     }
 
-    /// Add element `val` to the end of the vector `v`. It grows the buckets when the current buckets are full.
+    /// Add element `val` to the end of the vector `self`. It grows the buckets when the current buckets are full.
     /// This operation will cost more gas when it adds new bucket.
-    public fun push_back<T: store>(v: &mut BigVector<T>, val: T) {
-        let num_buckets = table_with_length::length(&v.buckets);
-        if (v.end_index == num_buckets * v.bucket_size) {
-            table_with_length::add(&mut v.buckets, num_buckets, vector::empty());
-            vector::push_back(table_with_length::borrow_mut(&mut v.buckets, num_buckets), val);
+    public fun push_back<T: store>(self: &mut BigVector<T>, val: T) {
+        let num_buckets = table_with_length::length(&self.buckets);
+        if (self.end_index == num_buckets * self.bucket_size) {
+            table_with_length::add(&mut self.buckets, num_buckets, vector::empty());
+            vector::push_back(table_with_length::borrow_mut(&mut self.buckets, num_buckets), val);
         } else {
-            vector::push_back(table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1), val);
+            vector::push_back(table_with_length::borrow_mut(&mut self.buckets, num_buckets - 1), val);
         };
-        v.end_index = v.end_index + 1;
+        self.end_index = self.end_index + 1;
     }
 
-    /// Pop an element from the end of vector `v`. It doesn't shrink the buckets even if they're empty.
+    /// Pop an element from the end of vector `self`. It doesn't shrink the buckets even if they're empty.
     /// Call `shrink_to_fit` explicity to deallocate empty buckets.
-    /// Aborts if `v` is empty.
-    public fun pop_back<T>(v: &mut BigVector<T>): T {
-        assert!(!is_empty(v), error::invalid_state(EVECTOR_EMPTY));
-        let num_buckets = table_with_length::length(&v.buckets);
-        let last_bucket = table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1);
+    /// Aborts if `self` is empty.
+    public fun pop_back<T>(self: &mut BigVector<T>): T {
+        assert!(!is_empty(self), error::invalid_state(EVECTOR_EMPTY));
+        let num_buckets = table_with_length::length(&self.buckets);
+        let last_bucket = table_with_length::borrow_mut(&mut self.buckets, num_buckets - 1);
         let val = vector::pop_back(last_bucket);
         // Shrink the table if the last vector is empty.
         if (vector::is_empty(last_bucket)) {
             move last_bucket;
-            vector::destroy_empty(table_with_length::remove(&mut v.buckets, num_buckets - 1));
+            vector::destroy_empty(table_with_length::remove(&mut self.buckets, num_buckets - 1));
         };
-        v.end_index = v.end_index - 1;
+        self.end_index = self.end_index - 1;
         val
     }
 
-    /// Remove the element at index i in the vector v and return the owned value that was previously stored at i in v.
+    /// Remove the element at index i in the vector v and return the owned value that was previously stored at i in self.
     /// All elements occurring at indices greater than i will be shifted down by 1. Will abort if i is out of bounds.
     /// Disclaimer: This function is costly. Use it at your own discretion.
-    public fun remove<T>(v: &mut BigVector<T>, i: u64): T {
-        let len = length(v);
+    public fun remove<T>(self: &mut BigVector<T>, i: u64): T {
+        let len = length(self);
         assert!(i < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        let num_buckets = table_with_length::length(&v.buckets);
-        let cur_bucket_index = i / v.bucket_size + 1;
-        let cur_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index - 1);
-        let res = vector::remove(cur_bucket, i % v.bucket_size);
-        v.end_index = v.end_index - 1;
+        let num_buckets = table_with_length::length(&self.buckets);
+        let cur_bucket_index = i / self.bucket_size + 1;
+        let cur_bucket = table_with_length::borrow_mut(&mut self.buckets, cur_bucket_index - 1);
+        let res = vector::remove(cur_bucket, i % self.bucket_size);
+        self.end_index = self.end_index - 1;
         move cur_bucket;
         while ({
             spec {
                 invariant cur_bucket_index <= num_buckets;
-                invariant table_with_length::spec_len(v.buckets) == num_buckets;
+                invariant table_with_length::spec_len(self.buckets) == num_buckets;
             };
             (cur_bucket_index < num_buckets)
         }) {
             // remove one element from the start of current vector
-            let cur_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index);
+            let cur_bucket = table_with_length::borrow_mut(&mut self.buckets, cur_bucket_index);
             let t = vector::remove(cur_bucket, 0);
             move cur_bucket;
             // and put it at the end of the last one
-            let prev_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index - 1);
+            let prev_bucket = table_with_length::borrow_mut(&mut self.buckets, cur_bucket_index - 1);
             vector::push_back(prev_bucket, t);
             cur_bucket_index = cur_bucket_index + 1;
         };
@@ -155,50 +155,50 @@ module aptos_std::big_vector {
         };
 
         // Shrink the table if the last vector is empty.
-        let last_bucket = table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1);
+        let last_bucket = table_with_length::borrow_mut(&mut self.buckets, num_buckets - 1);
         if (vector::is_empty(last_bucket)) {
             move last_bucket;
-            vector::destroy_empty(table_with_length::remove(&mut v.buckets, num_buckets - 1));
+            vector::destroy_empty(table_with_length::remove(&mut self.buckets, num_buckets - 1));
         };
 
         res
     }
 
-    /// Swap the `i`th element of the vector `v` with the last element and then pop the vector.
+    /// Swap the `i`th element of the vector `self` with the last element and then pop the vector.
     /// This is O(1), but does not preserve ordering of elements in the vector.
     /// Aborts if `i` is out of bounds.
-    public fun swap_remove<T>(v: &mut BigVector<T>, i: u64): T {
-        assert!(i < length(v), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        let last_val = pop_back(v);
+    public fun swap_remove<T>(self: &mut BigVector<T>, i: u64): T {
+        assert!(i < length(self), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+        let last_val = pop_back(self);
         // if the requested value is the last one, return it
-        if (v.end_index == i) {
+        if (self.end_index == i) {
             return last_val
         };
         // because the lack of mem::swap, here we swap remove the requested value from the bucket
         // and append the last_val to the bucket then swap the last bucket val back
-        let bucket = table_with_length::borrow_mut(&mut v.buckets, i / v.bucket_size);
+        let bucket = table_with_length::borrow_mut(&mut self.buckets, i / self.bucket_size);
         let bucket_len = vector::length(bucket);
-        let val = vector::swap_remove(bucket, i % v.bucket_size);
+        let val = vector::swap_remove(bucket, i % self.bucket_size);
         vector::push_back(bucket, last_val);
-        vector::swap(bucket, i % v.bucket_size, bucket_len - 1);
+        vector::swap(bucket, i % self.bucket_size, bucket_len - 1);
         val
     }
 
-    /// Swap the elements at the i'th and j'th indices in the vector v. Will abort if either of i or j are out of bounds
-    /// for v.
-    public fun swap<T>(v: &mut BigVector<T>, i: u64, j: u64) {
-        assert!(i < length(v) && j < length(v), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
-        let i_bucket_index = i / v.bucket_size;
-        let j_bucket_index = j / v.bucket_size;
-        let i_vector_index = i % v.bucket_size;
-        let j_vector_index = j % v.bucket_size;
+    /// Swap the elements at the i'th and j'th indices in the vector self. Will abort if either of i or j are out of bounds
+    /// for self.
+    public fun swap<T>(self: &mut BigVector<T>, i: u64, j: u64) {
+        assert!(i < length(self) && j < length(self), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+        let i_bucket_index = i / self.bucket_size;
+        let j_bucket_index = j / self.bucket_size;
+        let i_vector_index = i % self.bucket_size;
+        let j_vector_index = j % self.bucket_size;
         if (i_bucket_index == j_bucket_index) {
-            vector::swap(table_with_length::borrow_mut(&mut v.buckets, i_bucket_index), i_vector_index, j_vector_index);
+            vector::swap(table_with_length::borrow_mut(&mut self.buckets, i_bucket_index), i_vector_index, j_vector_index);
             return
         };
         // If i and j are in different buckets, take the buckets out first for easy mutation.
-        let bucket_i = table_with_length::remove(&mut v.buckets, i_bucket_index);
-        let bucket_j = table_with_length::remove(&mut v.buckets, j_bucket_index);
+        let bucket_i = table_with_length::remove(&mut self.buckets, i_bucket_index);
+        let bucket_j = table_with_length::remove(&mut self.buckets, j_bucket_index);
         // Get the elements from buckets by calling `swap_remove`.
         let element_i = vector::swap_remove(&mut bucket_i, i_vector_index);
         let element_j = vector::swap_remove(&mut bucket_j, j_vector_index);
@@ -211,23 +211,23 @@ module aptos_std::big_vector {
         vector::swap(&mut bucket_i, i_vector_index, last_index_in_bucket_i);
         vector::swap(&mut bucket_j, j_vector_index, last_index_in_bucket_j);
         // Add back the buckets.
-        table_with_length::add(&mut v.buckets, i_bucket_index, bucket_i);
-        table_with_length::add(&mut v.buckets, j_bucket_index, bucket_j);
+        table_with_length::add(&mut self.buckets, i_bucket_index, bucket_i);
+        table_with_length::add(&mut self.buckets, j_bucket_index, bucket_j);
     }
 
-    /// Reverse the order of the elements in the vector v in-place.
+    /// Reverse the order of the elements in the vector self in-place.
     /// Disclaimer: This function is costly. Use it at your own discretion.
-    public fun reverse<T>(v: &mut BigVector<T>) {
+    public fun reverse<T>(self: &mut BigVector<T>) {
         let new_buckets = vector[];
         let push_bucket = vector[];
-        let num_buckets = table_with_length::length(&v.buckets);
+        let num_buckets = table_with_length::length(&self.buckets);
         let num_buckets_left = num_buckets;
 
         while (num_buckets_left > 0) {
-            let pop_bucket = table_with_length::remove(&mut v.buckets, num_buckets_left - 1);
+            let pop_bucket = table_with_length::remove(&mut self.buckets, num_buckets_left - 1);
             vector::for_each_reverse(pop_bucket, |val| {
                 vector::push_back(&mut push_bucket, val);
-                if (vector::length(&push_bucket) == v.bucket_size) {
+                if (vector::length(&push_bucket) == self.bucket_size) {
                     vector::push_back(&mut new_buckets, push_bucket);
                     push_bucket = vector[];
                 };
@@ -243,61 +243,61 @@ module aptos_std::big_vector {
 
         vector::reverse(&mut new_buckets);
         let i = 0;
-        assert!(table_with_length::length(&v.buckets) == 0, 0);
+        assert!(table_with_length::length(&self.buckets) == 0, 0);
         while (i < num_buckets) {
-            table_with_length::add(&mut v.buckets, i, vector::pop_back(&mut new_buckets));
+            table_with_length::add(&mut self.buckets, i, vector::pop_back(&mut new_buckets));
             i = i + 1;
         };
         vector::destroy_empty(new_buckets);
     }
 
-    /// Return the index of the first occurrence of an element in v that is equal to e. Returns (true, index) if such an
+    /// Return the index of the first occurrence of an element in self that is equal to e. Returns (true, index) if such an
     /// element was found, and (false, 0) otherwise.
     /// Disclaimer: This function is costly. Use it at your own discretion.
-    public fun index_of<T>(v: &BigVector<T>, val: &T): (bool, u64) {
-        let num_buckets = table_with_length::length(&v.buckets);
+    public fun index_of<T>(self: &BigVector<T>, val: &T): (bool, u64) {
+        let num_buckets = table_with_length::length(&self.buckets);
         let bucket_index = 0;
         while (bucket_index < num_buckets) {
-            let cur = table_with_length::borrow(&v.buckets, bucket_index);
+            let cur = table_with_length::borrow(&self.buckets, bucket_index);
             let (found, i) = vector::index_of(cur, val);
             if (found) {
-                return (true, bucket_index * v.bucket_size + i)
+                return (true, bucket_index * self.bucket_size + i)
             };
             bucket_index = bucket_index + 1;
         };
         (false, 0)
     }
 
-    /// Return if an element equal to e exists in the vector v.
+    /// Return if an element equal to e exists in the vector self.
     /// Disclaimer: This function is costly. Use it at your own discretion.
-    public fun contains<T>(v: &BigVector<T>, val: &T): bool {
-        if (is_empty(v)) return false;
-        let (exist, _) = index_of(v, val);
+    public fun contains<T>(self: &BigVector<T>, val: &T): bool {
+        if (is_empty(self)) return false;
+        let (exist, _) = index_of(self, val);
         exist
     }
 
     /// Convert a big vector to a native vector, which is supposed to be called mostly by view functions to get an
     /// atomic view of the whole vector.
     /// Disclaimer: This function may be costly as the big vector may be huge in size. Use it at your own discretion.
-    public fun to_vector<T: copy>(v: &BigVector<T>): vector<T> {
+    public fun to_vector<T: copy>(self: &BigVector<T>): vector<T> {
         let res = vector[];
-        let num_buckets = table_with_length::length(&v.buckets);
+        let num_buckets = table_with_length::length(&self.buckets);
         let i = 0;
         while (i < num_buckets) {
-            vector::append(&mut res, *table_with_length::borrow(&v.buckets, i));
+            vector::append(&mut res, *table_with_length::borrow(&self.buckets, i));
             i = i + 1;
         };
         res
     }
 
     /// Return the length of the vector.
-    public fun length<T>(v: &BigVector<T>): u64 {
-        v.end_index
+    public fun length<T>(self: &BigVector<T>): u64 {
+        self.end_index
     }
 
     /// Return `true` if the vector `v` has no elements and `false` otherwise.
-    public fun is_empty<T>(v: &BigVector<T>): bool {
-        length(v) == 0
+    public fun is_empty<T>(self: &BigVector<T>): bool {
+        length(self) == 0
     }
 
     #[test]

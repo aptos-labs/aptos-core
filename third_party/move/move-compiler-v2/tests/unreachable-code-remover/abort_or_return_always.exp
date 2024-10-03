@@ -24,27 +24,19 @@ fun m::test($t0: bool): u64 {
      var $t1: u64
      var $t2: u64
      # maybe
-  0: if ($t0) goto 1 else goto 5
+  0: if ($t0) goto 1 else goto 4
      # maybe
   1: label L0
      # maybe
   2: $t2 := 0
      # maybe
   3: abort($t2)
-     # no
-  4: goto 8
      # maybe
-  5: label L1
+  4: label L1
      # maybe
-  6: $t1 := 1
+  5: $t1 := 1
      # maybe
-  7: return $t1
-     # no
-  8: label L2
-     # no
-  9: $t1 := 42
-     # no
- 10: return $t1
+  6: return $t1
 }
 
 ============ after UnreachableCodeRemover: ================

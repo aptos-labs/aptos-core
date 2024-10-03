@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{network::NetworkSender, network_interface::ConsensusMsg};
+use crate::{counters, network::NetworkSender, network_interface::ConsensusMsg};
 use anyhow::bail;
 use aptos_consensus_types::{
     common::Author,
@@ -36,8 +36,18 @@ impl CommitMessage {
     /// Verify the signatures on the message
     pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         match self {
-            CommitMessage::Vote(vote) => vote.verify(verifier),
-            CommitMessage::Decision(decision) => decision.verify(verifier),
+            CommitMessage::Vote(vote) => {
+                let _timer = counters::VERIFY_MSG
+                    .with_label_values(&["commit_vote"])
+                    .start_timer();
+                vote.verify(verifier)
+            },
+            CommitMessage::Decision(decision) => {
+                let _timer = counters::VERIFY_MSG
+                    .with_label_values(&["commit_decision"])
+                    .start_timer();
+                decision.verify(verifier)
+            },
             CommitMessage::Ack(_) => bail!("Unexpected ack in incoming commit message"),
             CommitMessage::Nack => bail!("Unexpected NACK in incoming commit message"),
         }

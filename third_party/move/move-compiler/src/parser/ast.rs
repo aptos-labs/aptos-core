@@ -507,16 +507,46 @@ new_name!(Var);
 pub enum Bind_ {
     // x
     Var(Var),
-    // T { f1: b1, ... fn: bn }
-    // T<t1, ... , tn> { f1: b1, ... fn: bn }
-    Unpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<(Field, Bind)>),
+    // T { f1: b1, ... fn: bn, ".."? }
+    // T<t1, ... , tn> { f1: b1, ... fn: bn, ".."? }
+    Unpack(
+        Box<NameAccessChain>,
+        Option<Vec<Type>>,
+        Vec<BindFieldOrDotDot>,
+    ),
     // T(e1, ..., en)
     // T<t1, ... , tn>(e1, ..., en)
-    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<Bind>),
+    // where each e_i is an expression or a ".."
+    PositionalUnpack(Box<NameAccessChain>, Option<Vec<Type>>, Vec<BindOrDotDot>),
 }
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
 pub type BindList = Spanned<Vec<Bind>>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedBind_(pub Bind, pub Option<Type>);
+pub type TypedBind = Spanned<TypedBind_>;
+
+// b1 [":" <Type>], ..., bn [":" <Type>]
+pub type TypedBindList = Spanned<Vec<TypedBind>>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindFieldOrDotDot_ {
+    // f : b
+    FieldBind(Field, Bind),
+    // ..
+    DotDot,
+}
+pub type BindFieldOrDotDot = Spanned<BindFieldOrDotDot_>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindOrDotDot_ {
+    // a bind
+    Bind(Bind),
+    // ..
+    DotDot,
+}
+pub type BindOrDotDot = Spanned<BindOrDotDot_>;
 
 pub type BindWithRange = Spanned<(Bind, Exp)>;
 pub type BindWithRangeList = Spanned<Vec<BindWithRange>>;
@@ -657,8 +687,8 @@ pub enum Exp_ {
 
     // { seq }
     Block(Sequence),
-    // |x1, ..., xn| e
-    Lambda(BindList, Box<Exp>), // spec only
+    // | x1 [: t1], ..., xn [: tn] | e
+    Lambda(TypedBindList, Box<Exp>),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -672,8 +702,8 @@ pub enum Exp_ {
     // ()
     Unit,
 
-    // a = e
-    Assign(Box<Exp>, Box<Exp>),
+    // a [binop]= e
+    Assign(Box<Exp>, Option<BinOp>, Box<Exp>),
 
     // return e
     Return(Option<Box<Exp>>),
@@ -1757,6 +1787,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
             },
@@ -1764,6 +1795,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
                 w.write(" = ");
@@ -1861,9 +1893,9 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e) => {
+            E::Lambda(sp!(_, tbs), e) => {
                 w.write("|");
-                bs.ast_debug(w);
+                tbs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
             },
@@ -1884,9 +1916,13 @@ impl AstDebug for Exp_ {
                 w.comma(es, |w, e| e.ast_debug(w));
                 w.write(")");
             },
-            E::Assign(lvalue, rhs) => {
+            E::Assign(lvalue, op_opt, rhs) => {
                 lvalue.ast_debug(w);
-                w.write(" = ");
+                w.write(" ");
+                if let Some(op) = op_opt {
+                    op.ast_debug(w);
+                }
+                w.write("= ");
                 rhs.ast_debug(w);
             },
             E::Return(e) => {
@@ -2039,6 +2075,29 @@ impl AstDebug for Vec<Bind> {
     }
 }
 
+impl AstDebug for BindOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindOrDotDot_ as B;
+        match self {
+            B::Bind(b) => b.ast_debug(w),
+            B::DotDot => w.write(".."),
+        }
+    }
+}
+
+impl AstDebug for BindFieldOrDotDot_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use BindFieldOrDotDot_ as B;
+        match self {
+            B::FieldBind(f, b) => {
+                w.write(&format!("{}: ", f));
+                b.ast_debug(w);
+            },
+            B::DotDot => w.write(".."),
+        }
+    }
+}
+
 impl AstDebug for Vec<Vec<Exp>> {
     fn ast_debug(&self, w: &mut AstWriter) {
         for trigger in self {
@@ -2062,9 +2121,8 @@ impl AstDebug for Bind_ {
                     w.write(">");
                 }
                 w.write("{");
-                w.comma(fields, |w, (f, b)| {
-                    w.write(&format!("{}: ", f));
-                    b.ast_debug(w);
+                w.comma(fields, |w, field| {
+                    field.ast_debug(w);
                 });
                 w.write("}");
             },
@@ -2079,6 +2137,23 @@ impl AstDebug for Bind_ {
                 w.comma(args, |w, b| b.ast_debug(w));
                 w.write(")");
             },
+        }
+    }
+}
+
+impl AstDebug for Vec<TypedBind> {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        w.comma(self, |w, b| b.ast_debug(w));
+    }
+}
+
+impl AstDebug for TypedBind_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        let TypedBind_(b, ty_opt) = self;
+        b.ast_debug(w);
+        if let Some(ty) = ty_opt {
+            w.write(":");
+            ty.ast_debug(w)
         }
     }
 }

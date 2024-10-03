@@ -1089,7 +1089,9 @@ impl<'env> Generator<'env> {
         match exp.as_ref() {
             ExpData::Temporary(_, temp) if !with_forced_temp => *temp,
             ExpData::LocalVar(id, sym) if !with_forced_temp => self.find_local(*id, *sym),
-            ExpData::Call(id, Operation::Select(..), _) if self.reference_mode() => {
+            ExpData::Call(id, Operation::Select(..) | Operation::SelectVariants(..), _)
+                if self.reference_mode() =>
+            {
                 // In reference mode, a selection is interpreted as selecting a reference to the
                 // field.
                 let ty =

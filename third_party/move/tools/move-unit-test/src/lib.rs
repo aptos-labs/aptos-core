@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod cargo_runner;
 pub mod extensions;
 pub mod test_reporter;
 pub mod test_runner;
@@ -19,13 +18,13 @@ use move_compiler::{
 };
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use move_vm_test_utils::gas_schedule::CostTable;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     marker::Send,
     sync::Mutex,
 };
+use test_reporter::UnitTestFactory;
 
 /// The default value bounding the amount of gas consumed in a test.
 const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
@@ -33,10 +32,6 @@ const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
 #[derive(Debug, Parser, Clone)]
 #[clap(author, version, about)]
 pub struct UnitTestingConfig {
-    /// Bound the gas limit for any one test. If using custom gas table, this is the max number of instructions.
-    #[clap(name = "gas_limit", short = 'i', long = "gas_limit")]
-    pub gas_limit: Option<u64>,
-
     /// A filter string to determine which unit tests to run
     #[clap(name = "filter", short = 'f', long = "filter")]
     pub filter: Option<String>,
@@ -122,11 +117,9 @@ fn format_module_id(module_id: &ModuleId) -> String {
     )
 }
 
-impl UnitTestingConfig {
-    /// Create a unit testing config for use with `register_move_unit_tests`
-    pub fn default_with_bound(bound: Option<u64>) -> Self {
+impl Default for UnitTestingConfig {
+    fn default() -> Self {
         Self {
-            gas_limit: bound.or(Some(DEFAULT_EXECUTION_BOUND)),
             filter: None,
             num_threads: 8,
             report_statistics: false,
@@ -144,7 +137,9 @@ impl UnitTestingConfig {
             evm: false,
         }
     }
+}
 
+impl UnitTestingConfig {
     pub fn with_named_addresses(
         mut self,
         named_address_values: BTreeMap<String, NumericalAddress>,
@@ -211,15 +206,16 @@ impl UnitTestingConfig {
 
     /// Public entry point to Move unit testing as a library
     /// Returns `true` if all unit tests passed. Otherwise, returns `false`.
-    pub fn run_and_report_unit_tests<W: Write + Send>(
+    pub fn run_and_report_unit_tests<W: Write + Send, F: UnitTestFactory + Send>(
         &self,
         test_plan: TestPlan,
         native_function_table: Option<NativeFunctionTable>,
         genesis_state: Option<ChangeSet>,
-        cost_table: Option<CostTable>,
         writer: W,
+        factory: F,
     ) -> Result<(W, bool)> {
         let shared_writer = Mutex::new(writer);
+        let shared_options = Mutex::new(factory);
 
         if self.list {
             for (module_id, test_plan) in &test_plan.module_tests {
@@ -237,14 +233,12 @@ impl UnitTestingConfig {
 
         writeln!(shared_writer.lock().unwrap(), "Running Move unit tests")?;
         let mut test_runner = TestRunner::new(
-            self.gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
             self.num_threads,
             self.report_storage_on_error,
             self.report_stacktrace_on_abort,
             test_plan,
             native_function_table,
             genesis_state,
-            cost_table,
             self.verbose,
             #[cfg(feature = "evm-backend")]
             self.evm,
@@ -255,7 +249,7 @@ impl UnitTestingConfig {
             test_runner.filter(filter_str)
         }
 
-        let test_results = test_runner.run(&shared_writer).unwrap();
+        let test_results = test_runner.run(&shared_writer, &shared_options).unwrap();
         if self.report_statistics {
             test_results.report_statistics(&shared_writer)?;
         }

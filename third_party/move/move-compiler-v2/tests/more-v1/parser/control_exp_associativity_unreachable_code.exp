@@ -1,0 +1,10 @@
+
+Diagnostics:
+warning: Unused parameter `cond`. Consider removing or prefixing with an underscore: `_cond`
+  ┌─ tests/more-v1/parser/control_exp_associativity_unreachable_code.move:9:11
+  │
+9 │     fun t(cond: bool): u64 {
+  │           ^^^^
+
+
+============ bytecode verification succeeded ========

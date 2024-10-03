@@ -35,7 +35,7 @@ fun m::test(): u64 {
      # maybe
   0: $t1 := false
      # maybe
-  1: if ($t1) goto 2 else goto 10
+  1: if ($t1) goto 2 else goto 9
      # maybe
   2: label L0
      # maybe
@@ -50,16 +50,12 @@ fun m::test(): u64 {
   7: $t0 := move($t2)
      # maybe
   8: return $t0
-     # no
-  9: goto 11
      # maybe
- 10: label L1
+  9: label L2
      # maybe
- 11: label L2
+ 10: $t0 := 0
      # maybe
- 12: $t0 := 0
-     # maybe
- 13: return $t0
+ 11: return $t0
 }
 
 ============ after UnreachableCodeRemover: ================
@@ -80,10 +76,9 @@ fun m::test(): u64 {
   6: $t2 := move($t3)
   7: $t0 := move($t2)
   8: return $t0
-  9: label L1
- 10: label L2
- 11: $t0 := 0
- 12: return $t0
+  9: label L2
+ 10: $t0 := 0
+ 11: return $t0
 }
 
 

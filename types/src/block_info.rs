@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{epoch_state::EpochState, on_chain_config::ValidatorSet, transaction::Version};
+use crate::{
+    epoch_state::EpochState, on_chain_config::ValidatorSet, transaction::Version,
+    validator_verifier::ValidatorVerifier,
+};
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -115,6 +118,7 @@ impl BlockInfo {
     /// transaction. Using this genesis block means transitioning to a new epoch
     /// (GENESIS_EPOCH + 1) with this `validator_set`.
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
+        let verifier: ValidatorVerifier = (&validator_set).into();
         Self {
             epoch: GENESIS_EPOCH,
             round: GENESIS_ROUND,
@@ -124,7 +128,7 @@ impl BlockInfo {
             timestamp_usecs: GENESIS_TIMESTAMP_USECS,
             next_epoch_state: Some(EpochState {
                 epoch: 1,
-                verifier: (&validator_set).into(),
+                verifier: verifier.into(),
             }),
         }
     }

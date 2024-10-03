@@ -11,17 +11,6 @@ error: type `Coin` is missing required ability `drop` (type was inferred)
   │
   = required by instantiating type parameter `T:drop` of struct `S`
 
-error: type `R<key + integer>` is missing required ability `key` (type was inferred)
-   ┌─ tests/ability-check/v1-typing/pack_constraint_not_satisfied.move:12:30
-   │
- 3 │     struct R<T: key>  { r: T }
-   │              - declaration of type parameter `T`
-   ·
-12 │         R {r: R { r: _ } } = R { r: R { r: 0 }};
-   │                              ^
-   │
-   = required by instantiating type parameter `T:key` of struct `R`
-
 error: type `R<key>` is missing required ability `key` (type was inferred)
    ┌─ tests/ability-check/v1-typing/pack_constraint_not_satisfied.move:12:30
    │
@@ -42,4 +31,5 @@ error: type `Coin` is missing required ability `drop` (type was inferred)
 13 │         S { c: S { c: Coin {} } };
    │                ^
    │
+   = required by instantiating type parameter `T:drop` of struct `S`
    = required by instantiating type parameter `T:drop` of struct `S`

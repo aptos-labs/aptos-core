@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: no function named `assert` found
+  ┌─ tests/deprecated/assert_function.move:3:9
+  │
+3 │         assert(true, 42);
+  │         ^^^^^^^^^^^^^^^^

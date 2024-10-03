@@ -58,4 +58,8 @@ impl CommitDecision {
             .verify_signatures(validator)
             .context("Failed to verify Commit Decision")
     }
+
+    pub fn into_inner(self) -> LedgerInfoWithSignatures {
+        self.ledger_info
+    }
 }

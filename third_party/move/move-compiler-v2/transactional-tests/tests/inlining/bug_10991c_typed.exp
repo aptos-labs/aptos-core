@@ -1,0 +1,41 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
+- 
+- task 0 'publish'. lines 1-11:
+- Error: error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:7:22
+-   │
+- 7 │         assert!(foo(|_: u64, y: u64, _: u64, q: u64| y + q,
+-   │                      ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:7:30
+-   │
+- 7 │         assert!(foo(|_: u64, y: u64, _: u64, q: u64| y + q,
+-   │                              ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:7:38
+-   │
+- 7 │         assert!(foo(|_: u64, y: u64, _: u64, q: u64| y + q,
+-   │                                      ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- error[E01013]: unsupported language construct
+-   ┌─ TEMPFILE:7:46
+-   │
+- 7 │         assert!(foo(|_: u64, y: u64, _: u64, q: u64| y + q,
+-   │                                              ^^^^^^ Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond
+- 
+- 
+- 
+- task 1 'run'. lines 13-13:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
+- 
++ processed 2 tasks
++ 

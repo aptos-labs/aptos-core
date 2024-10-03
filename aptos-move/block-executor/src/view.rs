@@ -19,10 +19,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
     delta_math::DeltaHistory,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
@@ -36,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::{Executable, ModulePath},
     state_store::{
         errors::StateviewError,
@@ -362,8 +359,8 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
                 .into());
             }
 
-            let last_committed_value = loop {
-                match versioned_delayed_fields.read_latest_committed_value(
+            let predicted_value = loop {
+                match versioned_delayed_fields.read_latest_predicted_value(
                     id,
                     txn_idx,
                     ReadPosition::BeforeCurrentTxn,
@@ -388,7 +385,7 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
                 compute_delayed_field_try_add_delta_outcome_first_time(
                     delta,
                     max_value,
-                    last_committed_value,
+                    predicted_value,
                 )?;
 
             captured_reads
@@ -643,7 +640,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                             ));
                         },
                         Ok(false) => {
-                            self.captured_reads.borrow_mut().mark_failure();
+                            self.captured_reads.borrow_mut().mark_failure(false);
                             return ReadResult::HaltSpeculativeExecution(
                                 "Interrupted as block execution was halted".to_string(),
                             );
@@ -655,7 +652,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                 },
                 Err(DeltaApplicationFailure) => {
                     // AggregatorV1 may have delta application failure due to speculation.
-                    self.captured_reads.borrow_mut().mark_failure();
+                    self.captured_reads.borrow_mut().mark_failure(false);
                     return ReadResult::HaltSpeculativeExecution(
                         "Delta application failure (must be speculative)".to_string(),
                     );
@@ -1064,7 +1061,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         );
                         self.mark_incorrect_use();
                         return Err(PartialVMError::new(
-                            StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                            StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
                         )
                         .with_message(format!("{}", err)));
                     },
@@ -1759,7 +1756,7 @@ mod test {
     use aptos_aggregator::{
         bounded_math::{BoundedMath, SignedU128},
         delta_math::DeltaHistory,
-        types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr, ReadPosition},
+        types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
     };
     use aptos_mvhashmap::{
         types::{MVDelayedFieldsError, TxnIndex},
@@ -1768,6 +1765,7 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
+        error::PanicOr,
         executable::Executable,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,
@@ -1813,7 +1811,7 @@ mod test {
                 .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))
         }
 
-        fn read_latest_committed_value(
+        fn read_latest_predicted_value(
             &self,
             id: &DelayedFieldID,
             _current_txn_idx: TxnIndex,

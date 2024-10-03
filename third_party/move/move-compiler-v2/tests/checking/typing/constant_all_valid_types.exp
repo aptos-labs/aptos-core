@@ -24,6 +24,9 @@ module 0x42::M {
     private fun t8(): vector<address> {
         [Address(Numerical(0000000000000000000000000000000000000000000000000000000000000000)), Address(Numerical(0000000000000000000000000000000000000000000000000000000000000001))]
     }
+    private fun t9(): u8 {
+        0
+    }
 } // end 0x42::M
 module <SELF>_0 {
     private fun t() {

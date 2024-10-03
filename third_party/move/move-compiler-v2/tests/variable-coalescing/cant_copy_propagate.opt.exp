@@ -62,16 +62,16 @@ fun m::test($t0: u64, $t1: bool) {
      var $t5: u64
      var $t6: u64
   0: $t2 := move($t0)
-  1: if ($t1) goto 2 else goto 5
+  1: if ($t1) goto 2 else goto 6
   2: label L0
   3: m::consume($t2)
-  4: goto 9
-  5: label L1
-  6: $t4 := move($t2)
-  7: $t6 := 1
-  8: $t5 := +($t4, $t6)
-  9: label L2
- 10: return ()
+  4: label L2
+  5: return ()
+  6: label L1
+  7: $t4 := move($t2)
+  8: $t6 := 1
+  9: $t5 := +($t4, $t6)
+ 10: goto 4
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -97,28 +97,28 @@ fun m::test($t0: u64, $t1: bool) {
   0: $t2 := move($t0)
      # live vars: $t1, $t2
      # events: e:$t1
-  1: if ($t1) goto 2 else goto 5
+  1: if ($t1) goto 2 else goto 6
      # live vars: $t2
   2: label L0
      # live vars: $t2
   3: m::consume($t2)
      # live vars:
-  4: goto 9
+  4: label L2
+     # live vars:
+  5: return ()
      # live vars: $t2
-  5: label L1
+  6: label L1
      # live vars: $t2
      # events: e:$t2, b:$t4
-  6: $t4 := move($t2)
+  7: $t4 := move($t2)
      # live vars: $t4
      # events: b:$t6
-  7: $t6 := 1
+  8: $t6 := 1
      # live vars: $t4, $t6
      # events: e:$t4, e:$t5, e:$t6, b:$t5
-  8: $t5 := +($t4, $t6)
+  9: $t5 := +($t4, $t6)
      # live vars:
-  9: label L2
-     # live vars:
- 10: return ()
+ 10: goto 4
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -138,16 +138,16 @@ fun m::test($t0: u64, $t1: bool) {
      var $t5: u64 [unused]
      var $t6: u64
   0: $t0 := move($t0)
-  1: if ($t1) goto 2 else goto 5
+  1: if ($t1) goto 2 else goto 6
   2: label L0
   3: m::consume($t0)
-  4: goto 9
-  5: label L1
-  6: $t0 := move($t0)
-  7: $t6 := 1
-  8: $t0 := +($t0, $t6)
-  9: label L2
- 10: return ()
+  4: label L2
+  5: return ()
+  6: label L1
+  7: $t0 := move($t0)
+  8: $t6 := 1
+  9: $t0 := +($t0, $t6)
+ 10: goto 4
 }
 
 ============ after DeadStoreElimination: ================
@@ -166,15 +166,15 @@ fun m::test($t0: u64, $t1: bool) {
      var $t4: u64 [unused]
      var $t5: u64 [unused]
      var $t6: u64
-  0: if ($t1) goto 1 else goto 4
+  0: if ($t1) goto 1 else goto 5
   1: label L0
   2: m::consume($t0)
-  3: goto 7
-  4: label L1
-  5: $t6 := 1
-  6: $t0 := +($t0, $t6)
-  7: label L2
-  8: return ()
+  3: label L2
+  4: return ()
+  5: label L1
+  6: $t6 := 1
+  7: $t0 := +($t0, $t6)
+  8: goto 3
 }
 
 
@@ -195,14 +195,14 @@ B0:
 B1:
 	2: MoveLoc[0](Arg0: u64)
 	3: Call consume(u64)
-	4: Branch(9)
 B2:
+	4: Ret
+B3:
 	5: MoveLoc[0](Arg0: u64)
 	6: LdU64(1)
 	7: Add
 	8: Pop
-B3:
-	9: Ret
+	9: Branch(4)
 }
 }
 ============ bytecode verification succeeded ========

@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: local `f1` of type `M::Box<M::Box<u64>>` does not have the `copy` ability
+   ┌─ tests/ability-check/typing/type_variable_join_threaded_unpack.move:40:44
+   │
+40 │         Container::put(&mut v, Box { f1: *&f1, f2 });
+   │                                            ^^ copy needed here because value is still in use
+41 │         f1
+   │         -- used here

@@ -6,7 +6,6 @@ use aptos_types::{on_chain_config::TransactionShufflerType, transaction::SignedT
 use sender_aware::SenderAwareShuffler;
 use std::sync::Arc;
 
-mod deprecated_fairness;
 mod sender_aware;
 mod use_case_aware;
 
@@ -45,22 +44,8 @@ pub fn create_transaction_shuffler(
             );
             Arc::new(SenderAwareShuffler::new(conflict_window_size as usize))
         },
-        DeprecatedFairness {
-            sender_conflict_window_size,
-            module_conflict_window_size,
-            entry_fun_conflict_window_size,
-        } => {
-            info!(
-                "Using fairness transaction shuffling with conflict window sizes: sender {}, module {}, entry fun {}",
-                sender_conflict_window_size,
-                module_conflict_window_size,
-                entry_fun_conflict_window_size
-            );
-            Arc::new(deprecated_fairness::FairnessShuffler {
-                sender_conflict_window_size: sender_conflict_window_size as usize,
-                module_conflict_window_size: module_conflict_window_size as usize,
-                entry_fun_conflict_window_size: entry_fun_conflict_window_size as usize,
-            })
+        DeprecatedFairness => {
+            unreachable!("DeprecatedFairness shuffler is no longer supported.")
         },
         UseCaseAware {
             sender_spread_factor,

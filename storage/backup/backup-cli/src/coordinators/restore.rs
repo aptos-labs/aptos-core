@@ -105,8 +105,11 @@ impl RestoreCoordinator {
     ///
     /// we are support the resume from any point when the restore is interrupted.
     async fn run_impl(self) -> Result<()> {
+        // if replay_all is set, we will replay all transactions from the lhs to the target version
+        let mut replay_all_mode = false;
         if self.replay_all {
-            bail!("--replay--all not supported in this version.");
+            info!("Replay all mode is enabled.");
+            replay_all_mode = true;
         }
 
         info!("This tool only guarantees resume from previous in-progress restore. \
@@ -193,7 +196,7 @@ impl RestoreCoordinator {
                 .expect("Cannot find tree snapshot before target version")
         };
 
-        let do_phase_1 = if let Some(kv_snapshot) = kv_snapshot.as_ref() {
+        let mut do_phase_1 = if let Some(kv_snapshot) = kv_snapshot.as_ref() {
             // if we have a kv snapshot, we need to restore the state between lhs and rs
             // if the version are equal, we don't need to restore phase 1. we can directly restore a snapshot with both tree and KV, and then replay txn till the target_version
             kv_snapshot.version < tree_snapshot.version
@@ -227,6 +230,8 @@ impl RestoreCoordinator {
         } else {
             None
         };
+
+        do_phase_1 = do_phase_1 && !replay_all_mode;
 
         // Restore the state kv between lhs and rs
         if do_phase_1 {
@@ -311,29 +316,36 @@ impl RestoreCoordinator {
             // phase 2.a: if the tree is not completed, we directly restore from the latest snapshot before target
             if !tree_completed {
                 // For boostrap DB to latest version, we want to use default mode
-                let restore_mode = if db_next_version > 0 {
-                    StateSnapshotRestoreMode::TreeOnly
+                let restore_mode_opt = if db_next_version > 0 {
+                    if replay_all_mode {
+                        None // the restore should already been done in the replay_all mode
+                    } else {
+                        Some(StateSnapshotRestoreMode::TreeOnly)
+                    }
                 } else {
-                    StateSnapshotRestoreMode::Default
+                    Some(StateSnapshotRestoreMode::Default)
                 };
-                info!(
-                    "Start restoring tree snapshot at {} with db_next_version {}",
-                    tree_snapshot.version, db_next_version
-                );
 
-                StateSnapshotRestoreController::new(
-                    StateSnapshotRestoreOpt {
-                        manifest_handle: tree_snapshot.manifest.clone(),
-                        version: tree_snapshot.version,
-                        validate_modules: false,
-                        restore_mode,
-                    },
-                    self.global_opt.clone(),
-                    Arc::clone(&self.storage),
-                    epoch_history.clone(),
-                )
-                .run()
-                .await?;
+                if let Some(restore_mode) = restore_mode_opt {
+                    info!(
+                        "Start restoring tree snapshot at {} with db_next_version {}",
+                        tree_snapshot.version, db_next_version
+                    );
+                    StateSnapshotRestoreController::new(
+                        StateSnapshotRestoreOpt {
+                            manifest_handle: tree_snapshot.manifest.clone(),
+                            version: tree_snapshot.version,
+                            validate_modules: false,
+                            restore_mode,
+                        },
+                        self.global_opt.clone(),
+                        Arc::clone(&self.storage),
+                        epoch_history.clone(),
+                    )
+                    .run()
+                    .await?;
+                }
+
                 replay_version = Some((
                     tree_snapshot.version + 1,
                     false, /*replay entire txn including update tree and KV*/

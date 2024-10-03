@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: invalid name
+  ┌─ tests/more-v1/expansion/invalid_struct_name.move:2:12
+  │
+2 │     struct no {}
+  │            ^^ Invalid struct name 'no'. Struct names must start with 'A'..'Z'
+
+error: invalid name
+  ┌─ tests/more-v1/expansion/invalid_struct_name.move:9:12
+  │
+9 │     struct no2 {}
+  │            ^^^ Invalid struct name 'no2'. Struct names must start with 'A'..'Z'

@@ -1,0 +1,24 @@
+Move prover returns: exiting with model building errors
+error: unsupported language construct
+  ┌─ tests/sources/functional/enum_abort.move:3:5
+  │
+3 │     enum CommonFields has copy, drop {
+  │     ^^^^ Move 2 language construct is not enabled: enum types
+
+error: unsupported language construct
+   ┌─ tests/sources/functional/enum_abort.move:41:9
+   │
+41 │         match (common) {
+   │         ^^^^^ Move 2 language construct is not enabled: match expression
+
+error: unsupported language construct
+    ┌─ tests/sources/functional/enum_abort.move:106:5
+    │
+106 │     enum CommonFields2 has drop {
+    │     ^^^^ Move 2 language construct is not enabled: enum types
+
+error: unsupported language construct
+    ┌─ tests/sources/functional/enum_abort.move:121:9
+    │
+121 │         match (_common_vector_2) {
+    │         ^^^^^ Move 2 language construct is not enabled: match expression

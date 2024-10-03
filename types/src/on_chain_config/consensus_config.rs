@@ -31,6 +31,14 @@ impl ConsensusAlgorithmConfig {
         }
     }
 
+    pub fn default_with_quorum_store_disabled() -> Self {
+        Self::JolteonV2 {
+            main: ConsensusConfigV1::default(),
+            quorum_store_enabled: false,
+            order_vote_enabled: true,
+        }
+    }
+
     pub fn default_if_missing() -> Self {
         Self::JolteonV2 {
             main: ConsensusConfigV1::default(),

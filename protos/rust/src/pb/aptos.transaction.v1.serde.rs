@@ -366,6 +366,7 @@ impl serde::Serialize for any_public_key::Type {
             Self::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
             Self::Secp256r1Ecdsa => "TYPE_SECP256R1_ECDSA",
             Self::Keyless => "TYPE_KEYLESS",
+            Self::FederatedKeyless => "TYPE_FEDERATED_KEYLESS",
         };
         serializer.serialize_str(variant)
     }
@@ -382,6 +383,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
             "TYPE_SECP256K1_ECDSA",
             "TYPE_SECP256R1_ECDSA",
             "TYPE_KEYLESS",
+            "TYPE_FEDERATED_KEYLESS",
         ];
 
         struct GeneratedVisitor;
@@ -429,6 +431,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
                     "TYPE_SECP256K1_ECDSA" => Ok(any_public_key::Type::Secp256k1Ecdsa),
                     "TYPE_SECP256R1_ECDSA" => Ok(any_public_key::Type::Secp256r1Ecdsa),
                     "TYPE_KEYLESS" => Ok(any_public_key::Type::Keyless),
+                    "TYPE_FEDERATED_KEYLESS" => Ok(any_public_key::Type::FederatedKeyless),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }

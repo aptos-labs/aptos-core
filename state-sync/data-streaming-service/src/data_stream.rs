@@ -838,16 +838,6 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                     Error::IntegerOverflow("Number of entries to remove has overflown!".into())
                 })?;
 
-            debug!(
-                (LogSchema::new(LogEntry::StreamNotification)
-                    .stream_id(self.data_stream_id)
-                    .event(LogEvent::Success)
-                    .message(&format!(
-                        "Garbage collecting {:?} items from the notification response map.",
-                        num_entries_to_remove
-                    )))
-            );
-
             // Collect all the keys that need to removed. Note: BTreeMap keys
             // are sorted, so we'll remove the lowest notification IDs. These
             // will be the oldest notifications.

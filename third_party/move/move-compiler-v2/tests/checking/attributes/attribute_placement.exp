@@ -4,85 +4,85 @@ warning: unknown attribute
   ┌─ tests/checking/attributes/attribute_placement.move:3:3
   │
 3 │ #[attr]
-  │   ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │   ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
   ┌─ tests/checking/attributes/attribute_placement.move:5:7
   │
 5 │     #[attr]
-  │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
   ┌─ tests/checking/attributes/attribute_placement.move:8:7
   │
 8 │     #[attr]
-  │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+  │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:11:7
    │
 11 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:14:7
    │
 14 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:17:7
    │
 17 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:22:3
    │
 22 │ #[attr]
-   │   ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │   ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:24:7
    │
 24 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:27:7
    │
 27 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:31:3
    │
 31 │ #[attr]
-   │   ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │   ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:33:7
    │
 33 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:36:7
    │
 36 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:39:7
    │
 39 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:44:7
    │
 44 │     #[attr]
-   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+   │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "lint::skip", "native_interface", "test", "test_only", "verify_only"}'.
 
 // -- Model dump before bytecode pipeline
 module 0x42::N {

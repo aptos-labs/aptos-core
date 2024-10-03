@@ -24,8 +24,8 @@ use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEAT
 use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::{
-        new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
-        CORE_CODE_ADDRESS,
+        new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
+        ConcurrentSupply, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
     },
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
@@ -34,7 +34,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
-    on_chain_config::{AptosVersion, OnChainConfig, ValidatorSet},
+    on_chain_config::{AptosVersion, FeatureFlag, Features, OnChainConfig, ValidatorSet},
     state_store::{state_key::StateKey, state_value::StateValue, StateView, TStateView},
     transaction::{
         signature_verified_transaction::{
@@ -44,7 +44,8 @@ use aptos_types::{
         TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
-    write_set::WriteSet,
+    write_set::{WriteOp, WriteSet, WriteSetMut},
+    AptosCoinType, CoinType,
 };
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
@@ -63,14 +64,14 @@ use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
-    move_resource::MoveResource,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    move_resource::{MoveResource, MoveStructType},
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -367,8 +368,30 @@ impl FakeExecutor {
     pub fn new_account_data_at(&mut self, addr: AccountAddress) -> AccountData {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
+
         // Mint the account 10M Aptos coins (with 8 decimals).
-        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 0);
+        self.store_and_fund_account(acc, 1_000_000_000_000_000, 0)
+    }
+
+    pub fn store_and_fund_account(
+        &mut self,
+        account: Account,
+        balance: u64,
+        seq_num: u64,
+    ) -> AccountData {
+        let features = Features::fetch_config(&self.data_store).unwrap_or_default();
+        let use_fa_balance = features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
+        let use_concurrent_balance =
+            features.is_enabled(FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE);
+
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let data = AccountData::with_account(
+            account,
+            balance,
+            seq_num,
+            use_fa_balance,
+            use_concurrent_balance,
+        );
         self.add_account_data(&data);
         data
     }
@@ -385,20 +408,60 @@ impl FakeExecutor {
     /// Adds an account to this executor's data store.
     pub fn add_account_data(&mut self, account_data: &AccountData) {
         self.data_store.add_account_data(account_data);
-        let new_added_supply = account_data.balance();
         // When a new account data with balance is initialized. The total_supply should be updated
         // correspondingly to be consistent with the global state.
         // if new_added_supply = 0, it is a noop.
-        if new_added_supply != 0 {
-            let coin_info_resource = self
-                .read_coin_info_resource()
-                .expect("coin info must exist in data store");
-            let old_supply = self.read_coin_supply().unwrap();
-            self.data_store.add_write_set(
-                &coin_info_resource
-                    .to_writeset(old_supply + (new_added_supply as u128))
+
+        if let Some(new_added_supply) = account_data.coin_balance() {
+            if new_added_supply != 0 {
+                let coin_info_resource = self
+                    .read_apt_coin_info_resource()
+                    .expect("coin info must exist in data store");
+                let old_supply = self.read_coin_supply().unwrap();
+                self.data_store.add_write_set(
+                    &coin_info_resource
+                        .to_writeset(old_supply + (new_added_supply as u128))
+                        .unwrap(),
+                )
+            }
+        }
+
+        if let Some(new_added_supply) = account_data.fungible_balance() {
+            if new_added_supply != 0 {
+                let mut fa_resource_group = self
+                    .read_resource_group::<ObjectGroupResource>(&AccountAddress::TEN)
+                    .expect("resource group must exist in data store");
+                let mut supply = bcs::from_bytes::<ConcurrentSupply>(
+                    fa_resource_group
+                        .group
+                        .get(&ConcurrentSupply::struct_tag())
+                        .unwrap(),
+                )
+                .unwrap();
+                supply
+                    .current
+                    .set(supply.current.get() + new_added_supply as u128);
+                fa_resource_group
+                    .group
+                    .insert(
+                        ConcurrentSupply::struct_tag(),
+                        bcs::to_bytes(&supply).unwrap(),
+                    )
+                    .unwrap();
+                self.data_store.add_write_set(
+                    &WriteSetMut::new(vec![(
+                        StateKey::resource_group(
+                            &AccountAddress::TEN,
+                            &ObjectGroupResource::struct_tag(),
+                        ),
+                        WriteOp::legacy_modification(
+                            bcs::to_bytes(&fa_resource_group).unwrap().into(),
+                        ),
+                    )])
+                    .freeze()
                     .unwrap(),
-            )
+                )
+            }
         }
     }
 
@@ -429,6 +492,37 @@ impl FakeExecutor {
         bcs::from_bytes(&data_blob).ok()
     }
 
+    pub fn read_resource_group<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
+        let data_blob = TStateView::get_state_value_bytes(
+            &self.data_store,
+            &StateKey::resource_group(addr, &T::struct_tag()),
+        )
+        .expect("account must exist in data store")
+        .unwrap_or_else(|| panic!("Can't fetch {} resource group for {}", T::STRUCT_NAME, addr));
+        bcs::from_bytes(&data_blob).ok()
+    }
+
+    pub fn read_resource_from_group<T: MoveResource>(
+        &self,
+        addr: &AccountAddress,
+        resource_group_tag: &StructTag,
+    ) -> Option<T> {
+        let bytes_opt = TStateView::get_state_value_bytes(
+            &self.data_store,
+            &StateKey::resource_group(addr, resource_group_tag),
+        )
+        .expect("account must exist in data store");
+
+        let group: Option<BTreeMap<StructTag, Vec<u8>>> = bytes_opt
+            .map(|bytes| bcs::from_bytes(&bytes))
+            .transpose()
+            .unwrap();
+        group
+            .and_then(|g| g.get(&T::struct_tag()).map(|b| bcs::from_bytes(b)))
+            .transpose()
+            .unwrap()
+    }
+
     /// Reads the resource `Value` for an account under the given address from
     /// this executor's data store.
     pub fn read_account_resource_at_address(
@@ -439,8 +533,11 @@ impl FakeExecutor {
     }
 
     /// Reads the CoinStore resource value for an account from this executor's data store.
-    pub fn read_coin_store_resource(&self, account: &Account) -> Option<CoinStoreResource> {
-        self.read_coin_store_resource_at_address(account.address())
+    pub fn read_apt_coin_store_resource(
+        &self,
+        account: &Account,
+    ) -> Option<CoinStoreResource<AptosCoinType>> {
+        self.read_apt_coin_store_resource_at_address(account.address())
     }
 
     /// Reads supply from CoinInfo resource value from this executor's data store.
@@ -462,16 +559,16 @@ impl FakeExecutor {
     }
 
     /// Reads the CoinInfo resource value from this executor's data store.
-    pub fn read_coin_info_resource(&self) -> Option<CoinInfoResource> {
-        self.read_resource(&AccountAddress::ONE)
+    pub fn read_apt_coin_info_resource(&self) -> Option<CoinInfoResource<AptosCoinType>> {
+        self.read_resource(&AptosCoinType::coin_info_address())
     }
 
     /// Reads the CoinStore resource value for an account under the given address from this executor's
     /// data store.
-    pub fn read_coin_store_resource_at_address(
+    pub fn read_apt_coin_store_resource_at_address(
         &self,
         addr: &AccountAddress,
-    ) -> Option<CoinStoreResource> {
+    ) -> Option<CoinStoreResource<AptosCoinType>> {
         self.read_resource(addr)
     }
 

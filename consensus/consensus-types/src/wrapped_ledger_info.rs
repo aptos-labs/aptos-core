@@ -28,11 +28,7 @@ pub struct WrappedLedgerInfo {
 
 impl Display for WrappedLedgerInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "WrappedLedgerInfo: [{}, {}]",
-            self.vote_data, self.signed_ledger_info
-        )
+        write!(f, "WrappedLedgerInfo: [{}]", self.signed_ledger_info)
     }
 }
 
@@ -75,6 +71,10 @@ impl WrappedLedgerInfo {
 
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
         &self.signed_ledger_info
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.ledger_info().ledger_info().epoch()
     }
 
     pub fn commit_info(&self) -> &BlockInfo {

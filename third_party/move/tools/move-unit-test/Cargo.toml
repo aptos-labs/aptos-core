@@ -33,6 +33,7 @@ move-symbol-pool = { path = "../../move-symbol-pool" }
 move-table-extension = { path = "../../extensions/move-table-extension" }
 move-vm-runtime = { path = "../../move-vm/runtime", features = ["testing"] }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }
+move-vm-types = { path = "../../move-vm/types" }
 
 # EVM-specific dependencies
 move-to-yul = { path = "../../evm/move-to-yul", optional = true }

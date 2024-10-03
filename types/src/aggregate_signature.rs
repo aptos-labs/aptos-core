@@ -86,12 +86,20 @@ impl PartialSignatures {
         self.signatures.is_empty()
     }
 
-    pub fn remove_signature(&mut self, validator: AccountAddress) {
-        self.signatures.remove(&validator);
+    pub fn remove_signature(&mut self, validator: AccountAddress) -> Option<bls12381::Signature> {
+        self.signatures.remove(&validator)
     }
 
     pub fn add_signature(&mut self, validator: AccountAddress, signature: bls12381::Signature) {
-        self.signatures.entry(validator).or_insert(signature);
+        self.signatures.insert(validator, signature);
+    }
+
+    pub fn unpack(self) -> BTreeMap<AccountAddress, bls12381::Signature> {
+        self.signatures
+    }
+
+    pub fn signatures_iter(&self) -> impl Iterator<Item = (&AccountAddress, &bls12381::Signature)> {
+        self.signatures.iter()
     }
 
     pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {

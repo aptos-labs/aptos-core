@@ -303,7 +303,13 @@ impl<
 
     /// Notifies the executor of new data chunks
     async fn notify_executor(&mut self, storage_data_chunk: StorageDataChunk) -> Result<(), Error> {
-        if let Err(error) = self.executor_notifier.send(storage_data_chunk).await {
+        if let Err(error) = send_and_monitor_backpressure(
+            &mut self.executor_notifier,
+            metrics::STORAGE_SYNCHRONIZER_EXECUTOR,
+            storage_data_chunk,
+        )
+        .await
+        {
             Err(Error::UnexpectedError(format!(
                 "Failed to send storage data chunk to executor: {:?}",
                 error
@@ -416,7 +422,13 @@ impl<
             StorageDataChunk::States(notification_id, state_value_chunk_with_proof);
 
         // Notify the snapshot receiver of the storage data chunk
-        if let Err(error) = state_snapshot_notifier.send(storage_data_chunk).await {
+        if let Err(error) = send_and_monitor_backpressure(
+            state_snapshot_notifier,
+            metrics::STORAGE_SYNCHRONIZER_STATE_SNAPSHOT_RECEIVER,
+            storage_data_chunk,
+        )
+        .await
+        {
             Err(Error::UnexpectedError(format!(
                 "Failed to send storage data chunk to state snapshot listener: {:?}",
                 error
@@ -452,7 +464,7 @@ pub struct StorageSynchronizerHandles {
 /// A chunk of data to be executed and/or committed to storage (i.e., states,
 /// transactions or outputs).
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum StorageDataChunk {
     States(NotificationId, StateValueChunkWithProof),
     Transactions(
@@ -537,7 +549,13 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     );
 
                     // Notify the ledger updater
-                    if let Err(error) = ledger_updater_notifier.send(notification_metadata).await {
+                    if let Err(error) = send_and_monitor_backpressure(
+                        &mut ledger_updater_notifier,
+                        metrics::STORAGE_SYNCHRONIZER_LEDGER_UPDATER,
+                        notification_metadata,
+                    )
+                    .await
+                    {
                         // Send an error notification to the driver (we failed to notify the ledger updater)
                         let error =
                             format!("Failed to notify the ledger updater! Error: {:?}", error);
@@ -631,7 +649,13 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     );
 
                     // Notify the committer of the update
-                    if let Err(error) = committer_notifier.send(notification_metadata).await {
+                    if let Err(error) = send_and_monitor_backpressure(
+                        &mut committer_notifier,
+                        metrics::STORAGE_SYNCHRONIZER_COMMITTER,
+                        notification_metadata,
+                    )
+                    .await
+                    {
                         // Send an error notification to the driver (we failed to notify the committer)
                         let error = format!("Failed to notify the committer! Error: {:?}", error);
                         handle_storage_synchronizer_error(
@@ -714,7 +738,13 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     );
 
                     // Notify the commit post-processor of the committed chunk
-                    if let Err(error) = commit_post_processor_notifier.send(notification).await {
+                    if let Err(error) = send_and_monitor_backpressure(
+                        &mut commit_post_processor_notifier,
+                        metrics::STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESSOR,
+                        notification,
+                    )
+                    .await
+                    {
                         // Send an error notification to the driver (we failed to notify the commit post-processor)
                         let error = format!(
                             "Failed to notify the commit post-processor! Error: {:?}",
@@ -1227,6 +1257,58 @@ async fn handle_storage_synchronizer_error(
 
     // Decrement the number of pending data chunks
     decrement_pending_data_chunks(pending_data_chunks.clone());
+}
+
+/// Sends the given message along the specified channel, and monitors
+/// if the channel hits backpressure (i.e., the channel is full).
+async fn send_and_monitor_backpressure<T: Clone>(
+    channel: &mut mpsc::Sender<T>,
+    channel_label: &str,
+    message: T,
+) -> Result<(), Error> {
+    match channel.try_send(message.clone()) {
+        Ok(_) => Ok(()), // The message was sent successfully
+        Err(error) => {
+            // Otherwise, try_send failed. Handle the error.
+            if error.is_full() {
+                // The channel is full, log the backpressure and update the metrics.
+                info!(
+                    LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                        "The {:?} channel is full! Backpressure will kick in!",
+                        channel_label
+                    ))
+                );
+                metrics::set_gauge(
+                    &metrics::STORAGE_SYNCHRONIZER_PIPELINE_CHANNEL_BACKPRESSURE,
+                    channel_label,
+                    1, // We hit backpressure
+                );
+
+                // Call the blocking send (we still need to send the data chunk with backpressure)
+                let result = channel.send(message).await.map_err(|error| {
+                    Error::UnexpectedError(format!(
+                        "Failed to send storage data chunk to: {:?}. Error: {:?}",
+                        channel_label, error
+                    ))
+                });
+
+                // Reset the gauge for the pipeline channel to inactive (we're done sending the message)
+                metrics::set_gauge(
+                    &metrics::STORAGE_SYNCHRONIZER_PIPELINE_CHANNEL_BACKPRESSURE,
+                    channel_label,
+                    0, // Backpressure is no longer active
+                );
+
+                result
+            } else {
+                // Otherwise, return the error (there's nothing else we can do)
+                Err(Error::UnexpectedError(format!(
+                    "Failed to try_send storage data chunk to {:?}. Error: {:?}",
+                    channel_label, error
+                )))
+            }
+        },
+    }
 }
 
 /// Sends an error notification to the driver

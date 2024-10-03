@@ -52,12 +52,8 @@ fun m::test($t0: u64): u64 {
   8: $t7 := 1
   9: $t6 := +($t3, $t7)
  10: $t3 := move($t6)
- 11: goto 14
+ 11: goto 2
  12: label L3
- 13: goto 16
- 14: label L4
- 15: goto 2
- 16: label L1
- 17: $t1 := move($t2)
- 18: return $t1
+ 13: $t1 := move($t2)
+ 14: return $t1
 }

@@ -25,7 +25,7 @@ jobs:
     name: "Build Ubuntu 20.04 binary"
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -41,7 +41,7 @@ jobs:
     name: "Build Ubuntu 22.04 binary"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -57,7 +57,7 @@ jobs:
     name: "Build Windows binary"
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - name: Build CLI

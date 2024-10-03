@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: not supported before language version `2.0`: single-argument `assert!` macro
+  ┌─ tests/checking-lang-v1/assert_one_arg.move:3:9
+  │
+3 │         assert!(false);
+  │         ^^^^^^
+
+error: not supported before language version `2.0`: single-argument `assert!` macro
+  ┌─ tests/checking-lang-v1/assert_one_arg.move:4:9
+  │
+4 │         assert!(0 != 1);
+  │         ^^^^^^
+
+error: not supported before language version `2.0`: single-argument `assert!` macro
+  ┌─ tests/checking-lang-v1/assert_one_arg.move:5:9
+  │
+5 │         assert!(x != y);
+  │         ^^^^^^
+
+error: undeclared `y`
+  ┌─ tests/checking-lang-v1/assert_one_arg.move:5:22
+  │
+5 │         assert!(x != y);
+  │                      ^

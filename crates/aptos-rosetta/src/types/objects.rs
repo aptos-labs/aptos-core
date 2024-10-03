@@ -28,7 +28,7 @@ use aptos_logger::warn;
 use aptos_rest_client::aptos_api_types::{TransactionOnChainData, U64};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource, WithdrawEvent},
+    account_config::{AccountResource, CoinStoreResourceUntyped, WithdrawEvent},
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     event::EventKey,
     fee_statement::FeeStatement,
@@ -1793,7 +1793,7 @@ async fn parse_coinstore_changes(
     events: &[ContractEvent],
     mut operation_index: u64,
 ) -> ApiResult<Vec<Operation>> {
-    let coin_store: CoinStoreResource = if let Ok(coin_store) = bcs::from_bytes(data) {
+    let coin_store: CoinStoreResourceUntyped = if let Ok(coin_store) = bcs::from_bytes(data) {
         coin_store
     } else {
         warn!(

@@ -1,0 +1,15 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    private fun continued() {
+        continue;
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+Diagnostics:
+error: missing enclosing loop statement
+  ┌─ tests/checking/inlining/continue_without_loop.move:3:2
+  │
+3 │     continue;
+  │     ^^^^^^^^

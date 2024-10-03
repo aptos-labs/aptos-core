@@ -13968,6 +13968,9 @@
           },
           {
             "$ref": "#/components/schemas/AccountSignature_MultiKeySignature"
+          },
+          {
+            "$ref": "#/components/schemas/AccountSignature_NoAccountSignature"
           }
         ],
         "discriminator": {
@@ -13976,7 +13979,8 @@
             "ed25519_signature": "#/components/schemas/AccountSignature_Ed25519Signature",
             "multi_ed25519_signature": "#/components/schemas/AccountSignature_MultiEd25519Signature",
             "single_key_signature": "#/components/schemas/AccountSignature_SingleKeySignature",
-            "multi_key_signature": "#/components/schemas/AccountSignature_MultiKeySignature"
+            "multi_key_signature": "#/components/schemas/AccountSignature_MultiKeySignature",
+            "no_account_signature": "#/components/schemas/AccountSignature_NoAccountSignature"
           }
         }
       },
@@ -14043,6 +14047,28 @@
           },
           {
             "$ref": "#/components/schemas/MultiKeySignature"
+          }
+        ]
+      },
+      "AccountSignature_NoAccountSignature": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "no_account_signature"
+                ],
+                "example": "no_account_signature"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/NoAccountSignature"
           }
         ]
       },
@@ -14752,6 +14778,17 @@
           },
           "multi_sig": {
             "$ref": "#/components/schemas/ExportedAggregateSignature"
+          }
+        }
+      },
+      "FederatedKeyless": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -15571,6 +15608,10 @@
           }
         ]
       },
+      "NoAccountSignature": {
+        "type": "object",
+        "description": "A placeholder to represent the absence of account signature"
+      },
       "PendingTransaction": {
         "type": "object",
         "description": "A transaction waiting in mempool",
@@ -15624,6 +15665,9 @@
           },
           {
             "$ref": "#/components/schemas/PublicKey_Keyless"
+          },
+          {
+            "$ref": "#/components/schemas/PublicKey_FederatedKeyless"
           }
         ],
         "discriminator": {
@@ -15632,7 +15676,8 @@
             "ed25519": "#/components/schemas/PublicKey_Ed25519",
             "secp256k1_ecdsa": "#/components/schemas/PublicKey_Secp256k1Ecdsa",
             "secp256r1_ecdsa": "#/components/schemas/PublicKey_Secp256r1Ecdsa",
-            "keyless": "#/components/schemas/PublicKey_Keyless"
+            "keyless": "#/components/schemas/PublicKey_Keyless",
+            "federated_keyless": "#/components/schemas/PublicKey_FederatedKeyless"
           }
         }
       },
@@ -15655,6 +15700,28 @@
           },
           {
             "$ref": "#/components/schemas/Ed25519"
+          }
+        ]
+      },
+      "PublicKey_FederatedKeyless": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "federated_keyless"
+                ],
+                "example": "federated_keyless"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/FederatedKeyless"
           }
         ]
       },

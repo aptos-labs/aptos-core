@@ -77,6 +77,7 @@ move-compiler/transactional-tests/tests/evaluation_order/lazy_assert.exp   move-
 move-compiler/transactional-tests/tests/evaluation_order/short_circuiting.exp   move-compiler-v2/transactional-tests/tests/evaluation_order/short_circuiting.exp
 move-compiler/transactional-tests/tests/evaluation_order/short_circuiting_invalid.exp   move-compiler-v2/transactional-tests/tests/evaluation_order/short_circuiting_invalid.exp
 move-compiler/transactional-tests/tests/evaluation_order/struct_arguments.exp   move-compiler-v2/transactional-tests/tests/evaluation_order/struct_arguments.exp
+move-compiler/transactional-tests/tests/generics/global_invalid.exp   move-compiler-v2/transactional-tests/tests/more-v1/generics/global_invalid.exp
 move-compiler/transactional-tests/tests/inlining/bug_10991.exp   move-compiler-v2/transactional-tests/tests/inlining/bug_10991.exp
 move-compiler/transactional-tests/tests/inlining/bug_10991_noparam.exp   move-compiler-v2/transactional-tests/tests/inlining/bug_10991_noparam.exp
 move-compiler/transactional-tests/tests/inlining/bug_10991_noparam2.exp   move-compiler-v2/transactional-tests/tests/inlining/bug_10991_noparam2.exp
@@ -119,5 +120,14 @@ move-compiler/transactional-tests/tests/operators/casting_operators.exp   move-c
 move-compiler/transactional-tests/tests/operators/comparison_operators.exp   move-compiler-v2/transactional-tests/tests/operators/comparison_operators.exp
 move-compiler/transactional-tests/tests/operators/precedence.exp   move-compiler-v2/transactional-tests/tests/operators/precedence.exp
 move-compiler/transactional-tests/tests/operators/shift_operators.exp   move-compiler-v2/transactional-tests/tests/operators/shift_operators.exp
+move-compiler/transactional-tests/tests/parser/byte_string.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/byte_string.exp
+move-compiler/transactional-tests/tests/parser/control_exp_associativity.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/control_exp_associativity.exp
+move-compiler/transactional-tests/tests/parser/expr_binary_operators.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/expr_binary_operators.exp
+move-compiler/transactional-tests/tests/parser/hex_and_decimal_address.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/hex_and_decimal_address.exp
+move-compiler/transactional-tests/tests/parser/hex_and_decimal_numbers.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/hex_and_decimal_numbers.exp
+move-compiler/transactional-tests/tests/parser/hexstring.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/hexstring.exp
+move-compiler/transactional-tests/tests/parser/num_literal_underscore.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/num_literal_underscore.exp
+move-compiler/transactional-tests/tests/parser/precedence.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/precedence.exp
+move-compiler/transactional-tests/tests/parser/return_not_binary.exp   move-compiler-v2/transactional-tests/tests/more-v1/parser/return_not_binary.exp
 move-compiler/transactional-tests/tests/simplifier/conditional_borrow.exp   move-compiler-v2/transactional-tests/tests/simplifier/conditional_borrow.exp
 move-compiler/transactional-tests/tests/simplifier/constant_folding_ristretto.exp   move-compiler-v2/transactional-tests/tests/simplifier/constant_folding_ristretto.exp

@@ -1,0 +1,39 @@
+
+Diagnostics:
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/more-v1/locals/assign_resource.move:5:17
+  │
+5 │         let r = R{};
+  │                 ^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/more-v1/locals/assign_resource.move:29:17
+   │
+29 │         let r = R{};
+   │                 ^^^
+
+
+Diagnostics:
+error: local `r` of type `M::R` does not have the `drop` ability
+  ┌─ tests/more-v1/locals/assign_resource.move:5:17
+  │
+5 │         let r = R{};
+  │                 ^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/assign_resource.move:12:19
+   │
+12 │         if (cond) { r = R{}; };
+   │                   ^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/assign_resource.move:18:27
+   │
+18 │         if (cond) {} else { r = R{}; };
+   │                           ^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: local `r` of type `M::R` does not have the `drop` ability
+   ┌─ tests/more-v1/locals/assign_resource.move:24:24
+   │
+24 │         while (cond) { r = R{} };
+   │                        ^^^^^^^ implicitly dropped here since it is no longer used

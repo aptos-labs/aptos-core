@@ -27,7 +27,9 @@ have a simple layout which is easily accessible in Rust.
 -  [Struct `PatchUpsertJWK`](#0x1_jwks_PatchUpsertJWK)
 -  [Resource `Patches`](#0x1_jwks_Patches)
 -  [Resource `PatchedJWKs`](#0x1_jwks_PatchedJWKs)
+-  [Resource `FederatedJWKs`](#0x1_jwks_FederatedJWKs)
 -  [Constants](#@Constants_0)
+-  [Function `patch_federated_jwks`](#0x1_jwks_patch_federated_jwks)
 -  [Function `get_patched_jwk`](#0x1_jwks_get_patched_jwk)
 -  [Function `try_get_patched_jwk`](#0x1_jwks_try_get_patched_jwk)
 -  [Function `upsert_oidc_provider`](#0x1_jwks_upsert_oidc_provider)
@@ -59,7 +61,8 @@ have a simple layout which is easily accessible in Rust.
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
-<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
+<pre><code><b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
 <b>use</b> <a href="../../../aptos-stdlib/tests/compiler-v2-doc/comparator.md#0x1_comparator">0x1::comparator</a>;
 <b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../../aptos-stdlib/tests/compiler-v2-doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
@@ -67,6 +70,7 @@ have a simple layout which is easily accessible in Rust.
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">0x1::vector</a>;
@@ -605,9 +609,55 @@ This is what applications should consume.
 
 </details>
 
+<a id="0x1_jwks_FederatedJWKs"></a>
+
+## Resource `FederatedJWKs`
+
+JWKs for federated keyless accounts are stored in this resource.
+
+
+<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> <b>has</b> drop, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
+
+
+<a id="0x1_jwks_EFEDERATED_JWKS_TOO_LARGE"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EFEDERATED_JWKS_TOO_LARGE">EFEDERATED_JWKS_TOO_LARGE</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x1_jwks_EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK">EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK</a>: u64 = 7;
+</code></pre>
+
 
 
 <a id="0x1_jwks_EISSUER_NOT_FOUND"></a>
@@ -708,6 +758,65 @@ This is what applications should consume.
 </code></pre>
 
 
+
+<a id="0x1_jwks_MAX_FEDERATED_JWKS_SIZE_BYTES"></a>
+
+We limit the size of a <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code> resource installed by a dapp owner for federated keyless accounts.
+Note: If too large, validators waste work reading it for invalid TXN signatures.
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_MAX_FEDERATED_JWKS_SIZE_BYTES">MAX_FEDERATED_JWKS_SIZE_BYTES</a>: u64 = 2048;
+</code></pre>
+
+
+
+<a id="0x1_jwks_patch_federated_jwks"></a>
+
+## Function `patch_federated_jwks`
+
+Called by a federated keyless dapp owner to install the JWKs for the federated OIDC provider (e.g., Auth0, AWS
+Cognito, etc).
+
+For type-safety, we explicitly use a <code><b>struct</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: AllProviderJWKs }</code> instead of
+reusing <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: AllProviderJWKs }</code>, which is a JWK-consensus-specific struct. We'd
+need to be careful how we read it in Rust (but BCS serialization should be the same).
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_patch_federated_jwks">patch_federated_jwks</a>(jwk_owner: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, patches: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_patch_federated_jwks">patch_federated_jwks</a>(jwk_owner: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, patches: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">Patch</a>&gt;) <b>acquires</b> <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> {
+    // Prevents accidental calls in <a href="jwks.md#0x1_jwks">0x1::jwks</a> that install federated JWKs at the Aptos framework <b>address</b>.
+    <b>assert</b>!(!<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(jwk_owner)),
+        <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK">EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK</a>)
+    );
+
+    <b>let</b> jwk_addr = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(jwk_owner);
+    <b>if</b> (!<b>exists</b>&lt;<a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a>&gt;(jwk_addr)) {
+        <b>move_to</b>(jwk_owner, <a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> { entries: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>[] } });
+    };
+
+    <b>let</b> fed_jwks = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_FederatedJWKs">FederatedJWKs</a>&gt;(jwk_addr);
+    <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&patches, |obj|{
+        <b>let</b> patch: &<a href="jwks.md#0x1_jwks_Patch">Patch</a> = obj;
+        <a href="jwks.md#0x1_jwks_apply_patch">apply_patch</a>(&<b>mut</b> fed_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, *patch);
+    });
+
+    // TODO: Can we check the size more efficiently instead of serializing it via BCS?
+    <b>let</b> num_bytes = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector_length">vector::length</a>(&<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(fed_jwks));
+    <b>assert</b>!(num_bytes &lt; <a href="jwks.md#0x1_jwks_MAX_FEDERATED_JWKS_SIZE_BYTES">MAX_FEDERATED_JWKS_SIZE_BYTES</a>, <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EFEDERATED_JWKS_TOO_LARGE">EFEDERATED_JWKS_TOO_LARGE</a>));
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_jwks_get_patched_jwk"></a>
 
@@ -1315,7 +1424,7 @@ Regenerate <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code> f
 
 ## Function `try_get_jwk_by_issuer`
 
-Get a JWK by issuer and key ID from a <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>, if it exists.
+Get a JWK by issuer and key ID from an <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>, if it exists.
 
 
 <pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_try_get_jwk_by_issuer">try_get_jwk_by_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, issuer: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;

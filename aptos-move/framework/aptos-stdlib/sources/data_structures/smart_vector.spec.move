@@ -13,7 +13,8 @@ spec aptos_std::smart_vector {
     }
 
     spec length {
-        aborts_if option::is_some(v.big_vec) && len(v.inline_vec) + big_vector::length(option::spec_borrow(v.big_vec)) > MAX_U64;
+        aborts_if option::is_some(self.big_vec) && len(self.inline_vec) + big_vector::length(option::spec_borrow(
+            self.big_vec)) > MAX_U64;
     }
 
     spec empty {
@@ -25,19 +26,19 @@ spec aptos_std::smart_vector {
     }
 
     spec destroy_empty {
-        aborts_if !(is_empty(v));
-        aborts_if len(v.inline_vec) != 0
-            || option::is_some(v.big_vec);
+        aborts_if !(is_empty(self));
+        aborts_if len(self.inline_vec) != 0
+            || option::is_some(self.big_vec);
     }
 
     spec borrow {
-        aborts_if i >= length(v);
-        aborts_if option::is_some(v.big_vec) && (
-            (len(v.inline_vec) + big_vector::length<T>(option::borrow(v.big_vec))) > MAX_U64
+        aborts_if i >= length(self);
+        aborts_if option::is_some(self.big_vec) && (
+            (len(self.inline_vec) + big_vector::length<T>(option::borrow(self.big_vec))) > MAX_U64
         );
     }
 
-    spec push_back<T: store>(v: &mut SmartVector<T>, val: T) {
+    spec push_back<T: store>(self: &mut SmartVector<T>, val: T) {
         // use aptos_std::big_vector;
         // use aptos_std::type_info;
         pragma verify = false; // TODO: set to false because of timeout
@@ -65,24 +66,24 @@ spec aptos_std::smart_vector {
 
         pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
 
-        aborts_if  option::is_some(v.big_vec)
+        aborts_if  option::is_some(self.big_vec)
             &&
-            (table_with_length::spec_len(option::borrow(v.big_vec).buckets) == 0);
-        aborts_if is_empty(v);
-        aborts_if option::is_some(v.big_vec) && (
-            (len(v.inline_vec) + big_vector::length<T>(option::borrow(v.big_vec))) > MAX_U64
+            (table_with_length::spec_len(option::borrow(self.big_vec).buckets) == 0);
+        aborts_if is_empty(self);
+        aborts_if option::is_some(self.big_vec) && (
+            (len(self.inline_vec) + big_vector::length<T>(option::borrow(self.big_vec))) > MAX_U64
         );
 
-        ensures length(v) == length(old(v)) - 1;
+        ensures length(self) == length(old(self)) - 1;
     }
 
     spec swap_remove {
         pragma verify = false; // TODO: set because of timeout
-        aborts_if i >= length(v);
-        aborts_if option::is_some(v.big_vec) && (
-            (len(v.inline_vec) + big_vector::length<T>(option::borrow(v.big_vec))) > MAX_U64
+        aborts_if i >= length(self);
+        aborts_if option::is_some(self.big_vec) && (
+            (len(self.inline_vec) + big_vector::length<T>(option::borrow(self.big_vec))) > MAX_U64
         );
-        ensures length(v) == length(old(v)) - 1;
+        ensures length(self) == length(old(self)) - 1;
     }
 
     spec swap {

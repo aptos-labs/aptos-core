@@ -15,6 +15,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
 use log::LevelFilter;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
+use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_model::{
     model::{FunctionEnv, GlobalEnv, ModuleEnv, VerificationScope},
     parse_addresses_from_options, run_model_builder_with_options,
@@ -152,7 +153,7 @@ fn run_benchmark(
     options.move_deps.append(&mut dep_dirs.to_vec());
     let skip_attribute_checks = true;
     let known_attributes = KnownAttribute::get_all_attribute_names().clone();
-    let env = run_model_builder_with_options(
+    let mut env = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
             paths: modules.to_vec(),
@@ -219,6 +220,17 @@ fn run_benchmark(
         Notice that execution is slow because we enforce single core execution.",
         config_descr
     );
+    // Need to run the pipeline to
+    let compiler_options = move_compiler_v2::Options::default()
+        .set_experiment(Experiment::OPTIMIZE, false)
+        .set_experiment(Experiment::SPEC_REWRITE, true);
+    env.set_extension(compiler_options.clone());
+    let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
+        &compiler_options,
+        true,
+        RewritingScope::Everything,
+    );
+    pipeline.run(&mut env);
     runner.bench(&env)
 }
 
