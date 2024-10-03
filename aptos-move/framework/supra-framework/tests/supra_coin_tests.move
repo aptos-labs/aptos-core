@@ -1,5 +1,6 @@
 #[test_only]
 module supra_framework::supra_coin_tests {
+    use std::features;
     use supra_framework::supra_coin;
     use supra_framework::coin;
     use supra_framework::fungible_asset::{Self, FungibleStore, Metadata};
@@ -21,7 +22,7 @@ module supra_framework::supra_coin_tests {
     fun test_apt_setup_and_mint(supra_framework: &signer) {
         let (burn_cap, mint_cap) = supra_coin::initialize_for_test(supra_framework);
         let coin = coin::mint(100, &mint_cap);
-        let fa = coin::coin_to_fungible_asset(coin);
+        let fa = coin::coin_to_fungible_asset_for_test(coin);
         primary_fungible_store::deposit(@supra_framework, fa);
         assert!(
             primary_fungible_store::balance(

@@ -156,7 +156,7 @@ pub enum EntryFunctionCall {
 
     CoinCreateCoinConversionMap {},
 
-    /// Create SUPRA pairing by passing `AptosCoin`.
+    /// Create SUPRA pairing by passing `SupraCoin`.
     CoinCreatePairing {
         coin_type: TypeTag,
     },
@@ -2099,7 +2099,7 @@ pub fn coin_create_coin_conversion_map() -> TransactionPayload {
     ))
 }
 
-/// Create SUPRA pairing by passing `AptosCoin`.
+/// Create SUPRA pairing by passing `SupraCoin`.
 pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
