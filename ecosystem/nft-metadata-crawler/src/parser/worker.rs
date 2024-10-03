@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    models::{
-        parsed_asset_uris::ParsedAssetUris,
-        parsed_asset_uris_query::ParsedAssetUrisQuery,
-    },
+    models::{parsed_asset_uris::ParsedAssetUris, parsed_asset_uris_query::ParsedAssetUrisQuery},
     parser::config::ParserConfig,
     utils::{
         counters::{
@@ -81,8 +78,7 @@ impl Worker {
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         // Deduplicate asset_uri
         // Exit if not force or if asset_uri has already been parsed
-        let prev_model =
-            ParsedAssetUrisQuery::get_by_asset_uri(&mut self.conn, &self.asset_uri);
+        let prev_model = ParsedAssetUrisQuery::get_by_asset_uri(&mut self.conn, &self.asset_uri);
         if let Some(pm) = prev_model {
             DUPLICATE_ASSET_URI_COUNT.inc();
             self.model = pm.into();
