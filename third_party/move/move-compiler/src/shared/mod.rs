@@ -415,6 +415,7 @@ pub struct Flags {
     compiler_v2: bool,
 
     /// Language version
+    #[clap(long = cli::LANGUAGE_VERSION, default_value="1")]
     language_version: LanguageVersion,
 
     /// Block v1 runs past expansion phase
