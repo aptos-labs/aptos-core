@@ -162,15 +162,17 @@ fn compile_and_run_samples_ir(
                             .equation_names
                             .push(format!("{}::{}", &identifier, func_identifier.0));
 
-                        let elapsed = executor.exec_func_record_running_time(
-                            &module_id,
-                            &func_identifier.0,
-                            vec![],
-                            func_identifier.1.clone(),
-                            iterations,
-                            ExecFuncTimerDynamicArgs::NoArgs,
-                            GasMeterType::UnmeteredGasMeter,
-                        );
+                        let elapsed = executor
+                            .exec_func_record_running_time(
+                                &module_id,
+                                &func_identifier.0,
+                                vec![],
+                                func_identifier.1.clone(),
+                                iterations,
+                                ExecFuncTimerDynamicArgs::NoArgs,
+                                GasMeterType::UnmeteredGasMeter,
+                            )
+                            .elapsed_micros;
                         gas_measurement.regular_meter.push(elapsed);
 
                         // record with abstract gas meter
