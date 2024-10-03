@@ -9,3 +9,5 @@ pub mod block_tree;
 pub mod chunk_commit_queue;
 pub mod chunk_output;
 pub mod in_memory_state_calculator_v2;
+
+pub mod transaction_chunk;

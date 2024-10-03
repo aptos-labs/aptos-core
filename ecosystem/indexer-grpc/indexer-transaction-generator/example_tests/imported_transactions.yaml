@@ -1,3 +1,20 @@
-# Empty configs to import.
-{
-}
+testnet:
+  # Transaction Stream endpoint addresss.
+  transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
+  # (Optional) The key to use with developers.aptoslabs.com
+  api_key: aptoslabs_L7pzPsqiShp_EwzUCbhb6ehTe8PSvFp6ZeUr3B3gBdGaX
+  # A map from versions to dump and their output names.
+  versions_to_import:
+    # naming: <version_descriptive_name>
+    1: 1_genesis
+    278556781: 278556781_v1_coin_register_fa_metadata
+    1255836496: 1255836496_v2_fa_metadata_
+    5979639459: 5979639459_coin_register
+    5992795934: 5992795934_fa_activities
+    5523474016: 5523474016_validator_txn
+
+mainnet:
+  transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
+  api_key: AG-KXQNVFQNX25KJYRPWNKXYBR5DK5QW5MGW # update with oncall key
+  versions_to_import:
+    308783012: 308783012_fa_transfer

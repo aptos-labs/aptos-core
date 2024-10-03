@@ -89,8 +89,8 @@ pub struct ConsensusConfig {
     pub rand_rb_config: ReliableBroadcastConfig,
     pub num_bounded_executor_tasks: u64,
     pub enable_pre_commit: bool,
-
     pub max_pending_rounds_in_commit_vote_cache: u64,
+    pub enable_round_timeout_msg: bool,
 }
 
 /// Deprecated
@@ -320,6 +320,7 @@ impl Default for ConsensusConfig {
             num_bounded_executor_tasks: 16,
             enable_pre_commit: true,
             max_pending_rounds_in_commit_vote_cache: 100,
+            enable_round_timeout_msg: false,
         }
     }
 }

@@ -5,20 +5,14 @@ use super::{
     local_account_generator::LocalAccountGenerator, parse_seed,
     transaction_executor::RestApiReliableTransactionSubmitter,
 };
-use crate::EmitJobRequest;
+use crate::{emitter::create_private_key_account_generator, EmitJobRequest};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    encoding_type::EncodingType,
-};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
-        AccountKey, LocalAccount,
-    },
+    types::{transaction::SignedTransaction, AccountKey, LocalAccount},
 };
 use aptos_transaction_generator_lib::{
     CounterState, ReliableTransactionSubmitter, RootAccountHandle,
@@ -394,7 +388,7 @@ impl<'t> AccountMinter<'t> {
                     create_and_fund_account_request(
                         source_account.clone(),
                         coins_per_seed_account,
-                        account.public_key(),
+                        account.address(),
                         txn_factory,
                     )
                 })
@@ -449,7 +443,7 @@ impl<'t> AccountMinter<'t> {
             let txn = create_and_fund_account_request(
                 root_account.clone(),
                 coins_for_source,
-                new_source_account.public_key(),
+                new_source_account.address(),
                 &self.txn_factory,
             );
             if let Err(e) = txn_executor.execute_transactions(&[txn]).await {
@@ -506,7 +500,7 @@ async fn create_and_fund_new_accounts(
                 create_and_fund_account_request(
                     source_account.clone(),
                     coins_per_new_account,
-                    account.public_key(),
+                    account.address(),
                     txn_factory,
                 )
             })
@@ -523,13 +517,12 @@ async fn create_and_fund_new_accounts(
 pub fn create_and_fund_account_request(
     creation_account: Arc<LocalAccount>,
     amount: u64,
-    pubkey: &Ed25519PublicKey,
+    address: AccountAddress,
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
-    let auth_key = AuthenticationKey::ed25519(pubkey);
-    creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::aptos_account_transfer(auth_key.account_address(), amount),
-    ))
+    creation_account.sign_with_transaction_builder(
+        txn_factory.payload(aptos_stdlib::aptos_account_transfer(address, amount)),
+    )
 }
 
 const CREATION_PARALLELISM: usize = 500;
@@ -635,7 +628,7 @@ pub async fn bulk_create_accounts(
     let mut rng = StdRng::from_seed(seed);
 
     let num_seed_accounts = (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
-    let seed_accounts = account_generator
+    let seed_accounts = create_private_key_account_generator()
         .gen_local_accounts(txn_executor, num_seed_accounts, &mut rng)
         .await?;
 

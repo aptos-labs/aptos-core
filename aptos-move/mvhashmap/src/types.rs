@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{
-    delta_change_set::DeltaOp,
-    types::{DelayedFieldsSpeculativeError, PanicOr},
-};
+use aptos_aggregator::{delta_change_set::DeltaOp, types::DelayedFieldsSpeculativeError};
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
+    error::PanicOr,
     executable::ExecutableDescriptor,
     write_set::{TransactionWrite, WriteOpKind},
 };
