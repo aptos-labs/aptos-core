@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::publishing::{module_simple, raw_module_data};
-use aptos_framework::{natives::code::PackageMetadata, KnownAttribute};
+use aptos_framework::{
+    natives::code::PackageMetadata, KnownAttribute, APTOS_METADATA_KEY, APTOS_METADATA_KEY_V1,
+};
 use aptos_sdk::{
     bcs,
     move_types::{identifier::Identifier, language_storage::ModuleId},
@@ -272,10 +274,17 @@ fn update(
                         }
                     });
                 });
-            assert!(new_module.metadata.len() == 1);
+            let mut count = 0;
             new_module.metadata.iter_mut().for_each(|metadata_holder| {
-                metadata_holder.value = bcs::to_bytes(&metadata).expect("Metadata must serialize");
-            })
+                if metadata_holder.key == APTOS_METADATA_KEY_V1
+                    || metadata_holder.key == APTOS_METADATA_KEY
+                {
+                    metadata_holder.value =
+                        bcs::to_bytes(&metadata).expect("Metadata must serialize");
+                    count += 1;
+                }
+            });
+            assert!(count == 1, "{:?}", new_module.metadata);
         }
 
         new_modules.push((original_name.clone(), new_module));
