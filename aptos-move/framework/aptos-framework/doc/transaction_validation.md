@@ -327,7 +327,9 @@ Only called during genesis to initialize system resources for this module.
                 );
             } <b>else</b> {
                 <b>assert</b>!(
-                    <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(transaction_sender),
+                    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>() && <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(
+                        transaction_sender
+                    ),
                     <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>)
                 )
             };
@@ -637,7 +639,9 @@ Only called during genesis to initialize system resources for this module.
                 );
             } <b>else</b> {
                 <b>assert</b>!(
-                    <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(secondary_address),
+                    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>() && <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(
+                        secondary_address
+                    ),
                     <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>)
                 )
             };
@@ -702,7 +706,9 @@ Only called during genesis to initialize system resources for this module.
         );
     } <b>else</b> {
         <b>assert</b>!(
-            <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(fee_payer_address),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>() && <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(
+                fee_payer_address
+            ),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>)
         )
     };
@@ -764,7 +770,9 @@ Only called during genesis to initialize system resources for this module.
             );
         } <b>else</b> {
             <b>assert</b>!(
-                <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(fee_payer_address),
+                <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_account_abstraction_enabled">features::is_account_abstraction_enabled</a>() && <a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(
+                    fee_payer_address
+                ),
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>)
             )
         };
