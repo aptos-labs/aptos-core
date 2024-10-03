@@ -793,6 +793,8 @@ fn check_all_injected(status: &Option<ChaosStatus>) -> bool {
         .map_or(false, |conditions| {
             conditions.iter().any(|c| {
                 c.r#type == ChaosConditionType::AllInjected && c.status == ConditionStatus::True
+            }) && conditions.iter().any(|c| {
+                c.r#type == ChaosConditionType::Selected && c.status == ConditionStatus::True
             })
         })
 }
