@@ -197,6 +197,7 @@ impl ConsensusObserverSubscription {
                     highest_synced_version, duration_since_highest_seen
                 )));
             }
+            return Ok(()); // We haven't timed out yet
         }
 
         // Update the highest synced version and time
@@ -715,23 +716,16 @@ mod test {
 
         // Verify that the DB is making sync progress and that the highest synced version is updated
         let mock_time_service = time_service.into_mock();
-        verify_subscription_syncing_progress(
-            &mut subscription,
-            first_synced_version,
-            mock_time_service.now(),
-        );
+        let time_now = mock_time_service.now();
+        verify_subscription_syncing_progress(&mut subscription, first_synced_version, time_now);
 
         // Elapse some amount of time (not enough to timeout)
         mock_time_service.advance(Duration::from_millis(
             consensus_observer_config.max_subscription_sync_timeout_ms / 2,
         ));
 
-        // Verify that the DB is still making sync progress
-        verify_subscription_syncing_progress(
-            &mut subscription,
-            first_synced_version,
-            mock_time_service.now(),
-        );
+        // Verify that the DB is still making sync progress (we haven't timed out yet)
+        verify_subscription_syncing_progress(&mut subscription, first_synced_version, time_now);
 
         // Elapse enough time to timeout the subscription
         mock_time_service.advance(Duration::from_millis(
@@ -739,11 +733,16 @@ mod test {
         ));
 
         // Verify that the DB is still making sync progress (the next version is higher)
-        verify_subscription_syncing_progress(
-            &mut subscription,
-            second_synced_version,
-            mock_time_service.now(),
-        );
+        let time_now = mock_time_service.now();
+        verify_subscription_syncing_progress(&mut subscription, second_synced_version, time_now);
+
+        // Elapse some amount of time (not enough to timeout)
+        mock_time_service.advance(Duration::from_millis(
+            consensus_observer_config.max_subscription_sync_timeout_ms / 2,
+        ));
+
+        // Verify that the DB is still making sync progress (we haven't timed out yet)
+        verify_subscription_syncing_progress(&mut subscription, second_synced_version, time_now);
 
         // Elapse enough time to timeout the subscription
         mock_time_service.advance(Duration::from_millis(
@@ -754,6 +753,10 @@ mod test {
         assert_matches!(
             subscription.check_syncing_progress(),
             Err(Error::SubscriptionProgressStopped(_))
+        );
+        assert_eq!(
+            subscription.highest_synced_version_and_time,
+            (second_synced_version, time_now)
         );
     }
 

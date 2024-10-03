@@ -75,6 +75,7 @@ impl ObserverFallbackManager {
                     highest_synced_version, duration_since_highest_seen
                 )));
             }
+            return Ok(()); // We haven't passed the fallback threshold yet
         }
 
         // Update the highest synced version and time
@@ -158,6 +159,18 @@ mod test {
 
         // Verify that the DB is still making sync progress (the next DB version is higher)
         let time_now = mock_time_service.now();
+        assert!(fallback_manager.check_syncing_progress().is_ok());
+        assert_eq!(
+            fallback_manager.highest_synced_version_and_time,
+            (second_synced_version, time_now)
+        );
+
+        // Elapse some amount of time (but not enough to bypass the fallback threshold)
+        mock_time_service.advance(Duration::from_secs(
+            observer_fallback_sync_threshold_secs - 1,
+        ));
+
+        // Verify that the DB is still making sync progress (the threshold hasn't been reached)
         assert!(fallback_manager.check_syncing_progress().is_ok());
         assert_eq!(
             fallback_manager.highest_synced_version_and_time,
