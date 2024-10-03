@@ -6,14 +6,14 @@ use crate::{
     delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
     resolver::DelayedFieldResolver,
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
-use aptos_types::delayed_fields::{
-    calculate_width_for_constant_string, calculate_width_for_integer_embedded_string,
-    SnapshotToStringFormula,
+use aptos_types::{
+    delayed_fields::{
+        calculate_width_for_constant_string, calculate_width_for_integer_embedded_string,
+        SnapshotToStringFormula,
+    },
+    error::{code_invariant_error, expect_ok, PanicOr},
 };
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;

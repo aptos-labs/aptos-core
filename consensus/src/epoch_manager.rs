@@ -1069,7 +1069,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
-            verifier,
+            verifier.into(),
         });
         self.epoch_state = Some(epoch_state.clone());
 

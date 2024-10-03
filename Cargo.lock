@@ -405,7 +405,6 @@ dependencies = [
 name = "aptos-aggregator"
 version = "0.1.0"
 dependencies = [
- "aptos-logger",
  "aptos-types",
  "bcs 0.1.4",
  "claims",
@@ -3083,7 +3082,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-nft-metadata-crawler-parser"
+name = "aptos-nft-metadata-crawler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -4348,6 +4347,7 @@ dependencies = [
  "strum_macros 0.24.3",
  "thiserror",
  "tokio",
+ "tracing",
  "url",
 ]
 
@@ -4595,6 +4595,24 @@ dependencies = [
  "serde",
  "serde_json",
  "warp",
+]
+
+[[package]]
+name = "aptos-workspace-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos",
+ "aptos-cached-packages",
+ "aptos-config",
+ "aptos-faucet-core",
+ "aptos-node",
+ "aptos-types",
+ "futures",
+ "rand 0.7.3",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
