@@ -24,6 +24,8 @@ module std::vector {
     /// The range in `slice` is invalid.
     const EINVALID_SLICE_RANGE: u64 = 0x20004;
 
+    const USE_MOVE_RANGE: bool = true;
+
     #[bytecode_instruction]
     /// Create an empty vector.
     native public fun empty<Element>(): vector<Element>;
@@ -107,8 +109,15 @@ module std::vector {
 
     /// Pushes all of the elements of the `other` vector into the `self` vector.
     public fun append<Element>(self: &mut vector<Element>, other: vector<Element>) {
-        reverse(&mut other);
-        reverse_append(self, other);
+        if (USE_MOVE_RANGE) {
+            let self_length = length(self);
+            let other_length = length(&other);
+            range_move(&mut other, 0, other_length, self, self_length);
+            destroy_empty(other);
+        } else {
+            reverse(&mut other);
+            reverse_append(self, other);
+        }
     }
     spec append {
         pragma intrinsic = true;
@@ -137,12 +146,18 @@ module std::vector {
     public fun split_off<Element>(self: &mut vector<Element>, at: u64): vector<Element> {
         let len = length(self);
         assert!(at <= len, EINDEX_OUT_OF_BOUNDS);
+
         let other = empty();
-        while (len > at) {
-            push_back(&mut other, pop_back(self));
-            len = len - 1;
+        if (USE_MOVE_RANGE) {
+            range_move(self, at, len - at, &mut other, 0);
+        } else {
+            while (len > at) {
+                push_back(&mut other, pop_back(self));
+                len = len - 1;
+            };
+            reverse(&mut other);
         };
-        reverse(&mut other);
+
         other
     }
 
@@ -231,10 +246,27 @@ module std::vector {
     public fun insert<Element>(self: &mut vector<Element>, i: u64, e: Element) {
         let len = length(self);
         assert!(i <= len, EINDEX_OUT_OF_BOUNDS);
-        push_back(self, e);
-        while (i < len) {
-            swap(self, i, len);
-            i = i + 1;
+
+        if (USE_MOVE_RANGE) {
+            if (i + 2 >= len) {
+                // When we are close to the end, it is cheaper to not create
+                // a temporary vector, and swap directly
+                push_back(self, e);
+                while (i < len) {
+                    swap(self, i, len);
+                    i = i + 1;
+                };
+            } else {
+                let other = singleton(e);
+                range_move(&mut other, 0, 1, self, i);
+                destroy_empty(other);
+            }
+        } else {
+            push_back(self, e);
+            while (i < len) {
+                swap(self, i, len);
+                i = i + 1;
+            };
         };
     }
     spec insert {
@@ -249,9 +281,25 @@ module std::vector {
         // i out of bounds; abort
         if (i >= len) abort EINDEX_OUT_OF_BOUNDS;
 
-        len = len - 1;
-        while (i < len) swap(self, i, { i = i + 1; i });
-        pop_back(self)
+        if (USE_MOVE_RANGE) {
+            // When we are close to the end, it is cheaper to not create
+            // a temporary vector, and swap directly
+            if (i + 3 >= len) {
+                len = len - 1;
+                while (i < len) swap(self, i, { i = i + 1; i });
+                pop_back(self)
+            } else {
+                let other = empty();
+                range_move(self, i, 1, &mut other, 0);
+                let result = pop_back(&mut other);
+                destroy_empty(other);
+                result
+            }
+        } else {
+            len = len - 1;
+            while (i < len) swap(self, i, { i = i + 1; i });
+            pop_back(self)
+        }
     }
     spec remove {
         pragma intrinsic = true;
@@ -296,9 +344,10 @@ module std::vector {
     public fun replace<Element>(self: &mut vector<Element>, i: u64, val: Element): Element {
         let last_idx = length(self);
         assert!(i < last_idx, EINDEX_OUT_OF_BOUNDS);
-        push_back(self, val);
-        swap(self, i, last_idx);
-        pop_back(self)
+        std::mem::replace(borrow_mut(self, i), val)
+        // push_back(self, val);
+        // swap(self, i, last_idx);
+        // pop_back(self)
     }
 
     /// Apply the function to each element in the vector, consuming it.
