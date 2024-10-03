@@ -213,6 +213,46 @@ fn main() {
             move_len: 10,
             repeats: 1000,
         }),
+        (378, EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 0,
+            use_simple_map: false,
+        }),
+        (8184, EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 100,
+            use_simple_map: false,
+        }),
+        (6419, EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 100,
+            use_simple_map: true,
+        }),
+        (5094, EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 0,
+            use_simple_map: false,
+        }),
+        (15838, EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            use_simple_map: false,
+        }),
+        (30962, EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            use_simple_map: true,
+        }),
+        (66878, EntryPoints::MapInsertRemove {
+            len: 1000,
+            repeats: 0,
+            use_simple_map: false,
+        }),
+        (79826, EntryPoints::MapInsertRemove {
+            len: 1000,
+            repeats: 100,
+            use_simple_map: false,
+        }),
     ];
 
     let mut failures = Vec::new();
