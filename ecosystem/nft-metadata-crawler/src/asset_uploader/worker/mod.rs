@@ -19,7 +19,7 @@ pub mod config;
 
 #[derive(Clone)]
 pub struct AssetUploaderWorkerContext {
-    asset_uploader_config: Arc<AssetUploaderWorkerConfig>,
+    config: Arc<AssetUploaderWorkerConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,9 +28,9 @@ struct UploadRequest {
 }
 
 impl AssetUploaderWorkerContext {
-    pub fn new(asset_uploader_config: AssetUploaderWorkerConfig) -> Self {
+    pub fn new(config: AssetUploaderWorkerConfig) -> Self {
         Self {
-            asset_uploader_config: Arc::new(asset_uploader_config),
+            config: Arc::new(config),
         }
     }
 
@@ -53,11 +53,11 @@ impl AssetUploaderWorkerContext {
         let res = client
             .post(format!(
                 "https://api.cloudflare.com/client/v4/accounts/{}/images/v1",
-                self.asset_uploader_config.cloudflare_account_id
+                self.config.cloudflare_account_id
             ))
             .header(
                 "Authorization",
-                format!("Bearer {}", self.asset_uploader_config.cloudflare_auth_key),
+                format!("Bearer {}", self.config.cloudflare_auth_key),
             )
             .multipart(form)
             .send()
