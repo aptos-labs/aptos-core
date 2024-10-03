@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{AssetUploaderConfig, Server},
-    models::nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
+    asset_uploader::config::AssetUploaderConfig,
+    config::Server,
+    models::parsed_asset_uris::ParsedAssetUris,
     utils::{
         constants::{MAX_ASSET_UPLOAD_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
         database::upsert_uris,
@@ -22,6 +23,8 @@ use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use tracing::{info, warn};
 use url::Url;
+
+pub mod config;
 
 #[derive(Clone)]
 pub struct AssetUploaderContext {
@@ -141,7 +144,7 @@ impl AssetUploaderContext {
                             cdn_uri = cdn_url,
                             "[Asset Uploader] Writing to Postgres"
                         );
-                        let mut model = NFTMetadataCrawlerURIs::new(url.as_ref());
+                        let mut model = ParsedAssetUris::new(url.as_ref());
                         model.set_cdn_image_uri(Some(cdn_url.clone()));
 
                         let mut conn = self_clone.pool.get().context("Failed to get connection")?;

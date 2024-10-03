@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    models::{ledger_info::LedgerInfo, nft_metadata_crawler_uris::NFTMetadataCrawlerURIs},
+    models::{ledger_info::LedgerInfo, parsed_asset_uris::ParsedAssetUris},
     schema,
 };
 use anyhow::Context;
@@ -35,7 +35,7 @@ pub fn run_migrations(pool: &Pool<ConnectionManager<PgConnection>>) {
 /// Upserts URIs into database
 pub fn upsert_uris(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    entry: &NFTMetadataCrawlerURIs,
+    entry: &ParsedAssetUris,
     ltv: i64,
 ) -> anyhow::Result<usize> {
     use schema::nft_metadata_crawler::parsed_asset_uris::dsl::*;

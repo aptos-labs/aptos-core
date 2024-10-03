@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libpq-dev \
     curl
 
-COPY --link --from=indexer-builder /aptos/dist/aptos-nft-metadata-crawler-parser /usr/local/bin/aptos-nft-metadata-crawler-parser
+COPY --link --from=indexer-builder /aptos/dist/aptos-nft-metadata-crawler /usr/local/bin/aptos-nft-metadata-crawler
 
 # The health check port
 EXPOSE 8080

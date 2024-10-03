@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::ParserConfig,
-    models::{
-        nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
-        nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
-    },
+    models::{parsed_asset_uris::ParsedAssetUris, parsed_asset_uris_query::ParsedAssetUrisQuery},
+    parser::config::ParserConfig,
     utils::{
         counters::{
             DUPLICATE_ASSET_URI_COUNT, DUPLICATE_RAW_ANIMATION_URI_COUNT,
@@ -38,7 +35,7 @@ pub struct Worker {
     max_num_retries: i32,
     gcs_client: Arc<GCSClient>,
     pubsub_message: String,
-    model: NFTMetadataCrawlerURIs,
+    model: ParsedAssetUris,
     asset_data_id: String,
     asset_uri: String,
     last_transaction_version: i64,
@@ -59,7 +56,7 @@ impl Worker {
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
     ) -> Self {
-        let model = NFTMetadataCrawlerURIs::new(asset_uri);
+        let model = ParsedAssetUris::new(asset_uri);
         let worker = Self {
             parser_config,
             conn,
@@ -81,8 +78,7 @@ impl Worker {
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         // Deduplicate asset_uri
         // Exit if not force or if asset_uri has already been parsed
-        let prev_model =
-            NFTMetadataCrawlerURIsQuery::get_by_asset_uri(&mut self.conn, &self.asset_uri);
+        let prev_model = ParsedAssetUrisQuery::get_by_asset_uri(&mut self.conn, &self.asset_uri);
         if let Some(pm) = prev_model {
             DUPLICATE_ASSET_URI_COUNT.inc();
             self.model = pm.into();
@@ -181,7 +177,7 @@ impl Worker {
             false
         } else {
             self.model.get_raw_image_uri().map_or(true, |uri| {
-                match NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
+                match ParsedAssetUrisQuery::get_by_raw_image_uri(
                     &mut self.conn,
                     &self.asset_uri,
                     &uri,
@@ -288,7 +284,7 @@ impl Worker {
             None
         } else {
             self.model.get_raw_animation_uri().and_then(|uri| {
-                match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
+                match ParsedAssetUrisQuery::get_by_raw_animation_uri(
                     &mut self.conn,
                     &self.asset_uri,
                     &uri,
