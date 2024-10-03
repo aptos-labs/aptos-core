@@ -91,10 +91,9 @@ impl AssetUploaderWorkerContext {
 
 impl Server for AssetUploaderWorkerContext {
     fn build_router(&self) -> Router {
-        let self_arc = Arc::new(self.clone());
         Router::new()
             .route("/", post(Self::handle_upload))
-            .layer(Extension(self_arc.clone()))
+            .layer(Extension(Arc::new(self.clone())))
     }
 }
 
