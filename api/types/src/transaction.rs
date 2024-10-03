@@ -558,6 +558,7 @@ pub struct BlockMetadataTransaction {
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[oai(skip_serializing_if_is_none)]
     pub extension: Option<BlockMetadataExtension>,
 }
 
