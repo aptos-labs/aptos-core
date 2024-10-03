@@ -23,11 +23,10 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{HashValue, PrivateKey};
 use aptos_types::{
-    epoch_state::EpochState, validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
 use proptest::prelude::*;
-use std::{cmp::min, collections::HashSet, sync::Arc};
+use std::{cmp::min, collections::HashSet};
 
 #[tokio::test]
 async fn test_highest_block_and_quorum_cert() {
@@ -275,7 +274,6 @@ async fn test_insert_vote() {
     ::aptos_logger::Logger::init_for_testing();
     // Set up enough different authors to support different votes for the same block.
     let (signers, validator_verifier) = random_validator_verifier(11, Some(10), false);
-    let epoch_state = Arc::new(EpochState::new(5, validator_verifier));
     let my_signer = signers[10].clone();
     let mut inserter = TreeInserter::new(my_signer);
     let block_store = inserter.block_store();
@@ -303,13 +301,13 @@ async fn test_insert_vote() {
         )
         .unwrap();
         vote.set_verified();
-        let vote_res = pending_votes.insert_vote(&vote, epoch_state.clone());
+        let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
 
         // first vote of an author is accepted
         assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u128));
         // filter out duplicates
         assert_eq!(
-            pending_votes.insert_vote(&vote, epoch_state.clone()),
+            pending_votes.insert_vote(&vote, &validator_verifier),
             VoteReceptionResult::DuplicateVote,
         );
         // qc is still not there
@@ -333,7 +331,7 @@ async fn test_insert_vote() {
     )
     .unwrap();
     vote.set_verified();
-    match pending_votes.insert_vote(&vote, epoch_state.clone()) {
+    match pending_votes.insert_vote(&vote, &validator_verifier) {
         VoteReceptionResult::NewQuorumCertificate(qc) => {
             assert_eq!(qc.certified_block().id(), block.id());
             block_store

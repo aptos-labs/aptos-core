@@ -498,15 +498,15 @@ impl LedgerInfoWithUnverifiedSignatures {
 
     fn try_aggregate(
         &mut self,
-        epoch_state: &EpochState,
+        verifier: &ValidatorVerifier,
     ) -> Result<AggregateSignature, VerifyError> {
-        self.check_voting_power(&epoch_state.verifier, true)?;
+        self.check_voting_power(verifier, true)?;
 
         let all_signatures = self
             .signatures
             .iter()
             .map(|(voter, sig)| (voter, sig.signature()));
-        epoch_state.verifier.aggregate_signatures(all_signatures)
+        verifier.aggregate_signatures(all_signatures)
     }
 
     fn filter_invalid_signatures(&mut self, verifier: &ValidatorVerifier, need_verify: bool) {
@@ -519,25 +519,22 @@ impl LedgerInfoWithUnverifiedSignatures {
     /// valid, return the LedgerInfoWithSignatures. Also merge valid unverified signatures into verified.
     pub fn aggregate_and_verify(
         &mut self,
-        epoch_state: Arc<EpochState>,
+        verifier: &ValidatorVerifier,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
-        let aggregated_sig = self.try_aggregate(&epoch_state)?;
+        let aggregated_sig = self.try_aggregate(verifier)?;
 
-        match epoch_state
-            .verifier
-            .verify_multi_signatures(self.ledger_info(), &aggregated_sig)
-        {
+        match verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig) {
             Ok(_) => {
-                self.filter_invalid_signatures(&epoch_state.verifier, false);
+                self.filter_invalid_signatures(verifier, false);
                 Ok(LedgerInfoWithSignatures::new(
                     self.ledger_info.clone(),
                     aggregated_sig,
                 ))
             },
             Err(_) => {
-                self.filter_invalid_signatures(&epoch_state.verifier, true);
+                self.filter_invalid_signatures(verifier, true);
 
-                let aggregate_sig = self.try_aggregate(&epoch_state)?;
+                let aggregate_sig = self.try_aggregate(verifier)?;
                 Ok(LedgerInfoWithSignatures::new(
                     self.ledger_info.clone(),
                     aggregate_sig,
@@ -724,7 +721,6 @@ mod tests {
         let validator_verifier =
             ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
                 .expect("Incorrect quorum size.");
-        let epoch_state = Arc::new(EpochState::new(10, validator_verifier));
 
         let mut ledger_info_with_mixed_signatures =
             LedgerInfoWithUnverifiedSignatures::new(ledger_info.clone());
@@ -778,7 +774,7 @@ mod tests {
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.check_voting_power(&epoch_state.verifier, true),
+            ledger_info_with_mixed_signatures.check_voting_power(&validator_verifier, true),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
@@ -803,12 +799,12 @@ mod tests {
         );
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&epoch_state.verifier, true)
+                .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             5
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.aggregate_and_verify(epoch_state.clone()),
+            ledger_info_with_mixed_signatures.aggregate_and_verify(&validator_verifier),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
@@ -825,7 +821,7 @@ mod tests {
             4
         );
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 4);
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[5].author(),
@@ -849,20 +845,19 @@ mod tests {
         );
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&epoch_state.verifier, true)
+                .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             5
         );
         let aggregate_sig = LedgerInfoWithSignatures::new(
             ledger_info.clone(),
-            epoch_state
-                .verifier
+            validator_verifier
                 .aggregate_signatures(partial_sig.signatures_iter())
                 .unwrap(),
         );
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .aggregate_and_verify(epoch_state.clone())
+                .aggregate_and_verify(&validator_verifier)
                 .unwrap(),
             aggregate_sig
         );
@@ -876,7 +871,7 @@ mod tests {
             ledger_info_with_mixed_signatures.verified_voters().count(),
             5
         );
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
 
         ledger_info_with_mixed_signatures.add_signature(
             validator_signers[6].author(),
@@ -886,13 +881,13 @@ mod tests {
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 6);
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&epoch_state.verifier, true)
+                .check_voting_power(&validator_verifier, true)
                 .unwrap(),
             6
         );
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .aggregate_and_verify(epoch_state.clone())
+                .aggregate_and_verify(&validator_verifier)
                 .unwrap(),
             aggregate_sig
         );
@@ -907,6 +902,6 @@ mod tests {
             5
         );
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 5);
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 2);
+        assert_eq!(validator_verifier.pessimistic_verify_set().len(), 2);
     }
 }

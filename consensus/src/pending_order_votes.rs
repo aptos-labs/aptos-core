@@ -7,9 +7,8 @@ use aptos_consensus_types::{common::Author, order_vote::OrderVote, quorum_cert::
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures},
-    validator_verifier::VerifyError,
+    validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::{collections::HashMap, sync::Arc};
 
@@ -63,7 +62,7 @@ impl PendingOrderVotes {
     pub fn insert_order_vote(
         &mut self,
         order_vote: &OrderVote,
-        epoch_state: Arc<EpochState>,
+        validator_verifier: &ValidatorVerifier,
         verified_quorum_cert: Option<QuorumCert>,
     ) -> OrderVoteReceptionResult {
         // derive data from order vote
@@ -93,7 +92,7 @@ impl PendingOrderVotes {
             OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
                 // we don't have enough votes for this ledger info yet
                 let validator_voting_power =
-                    epoch_state.verifier.get_voting_power(&order_vote.author());
+                    validator_verifier.get_voting_power(&order_vote.author());
                 if validator_voting_power.is_none() {
                     warn!(
                         "Received order vote from an unknown author: {}",
@@ -111,17 +110,17 @@ impl PendingOrderVotes {
                     );
                 }
                 li_with_sig.add_signature(order_vote.author(), order_vote.signature_with_status());
-                match li_with_sig.check_voting_power(&epoch_state.verifier, true) {
+                match li_with_sig.check_voting_power(validator_verifier, true) {
                     Ok(aggregated_voting_power) => {
                         assert!(
-                            aggregated_voting_power >= epoch_state.verifier.quorum_voting_power(),
+                            aggregated_voting_power >= validator_verifier.quorum_voting_power(),
                             "QC aggregation should not be triggered if we don't have enough votes to form a QC"
                         );
                         let verification_result = {
                             let _timer = counters::VERIFY_MSG
                                 .with_label_values(&["order_vote_aggregate_and_verify"])
                                 .start_timer();
-                            li_with_sig.aggregate_and_verify(epoch_state.clone())
+                            li_with_sig.aggregate_and_verify(validator_verifier)
                         };
                         match verification_result {
                             Ok(ledger_info_with_sig) => {
@@ -182,10 +181,9 @@ mod tests {
     use aptos_consensus_types::{order_vote::OrderVote, quorum_cert::QuorumCert};
     use aptos_crypto::{bls12381, HashValue};
     use aptos_types::{
-        aggregate_signature::PartialSignatures, block_info::BlockInfo, epoch_state::EpochState,
-        ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
+        aggregate_signature::PartialSignatures, block_info::BlockInfo, ledger_info::LedgerInfo,
+        validator_verifier::random_validator_verifier,
     };
-    use std::sync::Arc;
 
     /// Creates a random ledger info for epoch 1 and round 1.
     fn random_ledger_info() -> LedgerInfo {
@@ -200,7 +198,6 @@ mod tests {
         ::aptos_logger::Logger::init_for_testing();
         // set up 4 validators
         let (signers, verifier) = random_validator_verifier(4, Some(2), false);
-        let epoch_state = Arc::new(EpochState::new(1, verifier));
 
         let mut pending_order_votes = PendingOrderVotes::new();
 
@@ -218,7 +215,7 @@ mod tests {
         assert_eq!(
             pending_order_votes.insert_order_vote(
                 &order_vote_1_author_0,
-                epoch_state.clone(),
+                &verifier,
                 Some(qc.clone())
             ),
             OrderVoteReceptionResult::VoteAdded(1)
@@ -226,11 +223,7 @@ mod tests {
 
         // same author voting for the same thing -> OrderVoteAdded
         assert_eq!(
-            pending_order_votes.insert_order_vote(
-                &order_vote_1_author_0,
-                epoch_state.clone(),
-                None
-            ),
+            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &verifier, None),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
@@ -245,7 +238,7 @@ mod tests {
         assert_eq!(
             pending_order_votes.insert_order_vote(
                 &order_vote_2_author_1,
-                epoch_state.clone(),
+                &verifier,
                 Some(qc.clone())
             ),
             OrderVoteReceptionResult::VoteAdded(1)
@@ -260,15 +253,9 @@ mod tests {
             signers[2].sign(&li2).expect("Unable to sign ledger info"),
         );
         order_vote_2_author_2.set_verified();
-        match pending_order_votes.insert_order_vote(
-            &order_vote_2_author_2,
-            epoch_state.clone(),
-            None,
-        ) {
+        match pending_order_votes.insert_order_vote(&order_vote_2_author_2, &verifier, None) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures((_qc, li_with_sig)) => {
-                assert!(li_with_sig
-                    .check_voting_power(&epoch_state.verifier)
-                    .is_ok());
+                assert!(li_with_sig.check_voting_power(&verifier).is_ok());
             },
             _ => {
                 panic!("No QC formed.");
@@ -287,7 +274,6 @@ mod tests {
         ::aptos_logger::Logger::init_for_testing();
 
         let (signers, verifier) = random_validator_verifier(5, Some(3), false);
-        let epoch_state = Arc::new(EpochState::new(1, verifier));
         let mut pending_order_votes = PendingOrderVotes::new();
         let mut partial_signatures = PartialSignatures::empty();
         let qc = QuorumCert::dummy();
@@ -328,38 +314,35 @@ mod tests {
         );
 
         assert_eq!(
-            pending_order_votes.insert_order_vote(&vote_0, epoch_state.clone(), Some(qc.clone())),
+            pending_order_votes.insert_order_vote(&vote_0, &verifier, Some(qc.clone())),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
         vote_0.set_verified();
         assert_eq!(
-            pending_order_votes.insert_order_vote(&vote_0, epoch_state.clone(), None),
+            pending_order_votes.insert_order_vote(&vote_0, &verifier, None),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
         vote_1.set_verified();
         assert_eq!(
-            pending_order_votes.insert_order_vote(&vote_1, epoch_state.clone(), None),
+            pending_order_votes.insert_order_vote(&vote_1, &verifier, None),
             OrderVoteReceptionResult::VoteAdded(2)
         );
 
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 0);
+        assert_eq!(verifier.pessimistic_verify_set().len(), 0);
         assert_eq!(
-            pending_order_votes.insert_order_vote(&vote_2, epoch_state.clone(), None),
+            pending_order_votes.insert_order_vote(&vote_2, &verifier, None),
             OrderVoteReceptionResult::VoteAdded(2)
         );
-        assert_eq!(epoch_state.verifier.pessimistic_verify_set().len(), 1);
+        assert_eq!(verifier.pessimistic_verify_set().len(), 1);
 
-        let aggregate_sig = epoch_state
-            .verifier
+        let aggregate_sig = verifier
             .aggregate_signatures(partial_signatures.signatures_iter())
             .unwrap();
-        match pending_order_votes.insert_order_vote(&vote_3, epoch_state.clone(), None) {
+        match pending_order_votes.insert_order_vote(&vote_3, &verifier, None) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures((_qc, li_with_sig)) => {
-                assert!(li_with_sig
-                    .check_voting_power(&epoch_state.verifier)
-                    .is_ok());
+                assert!(li_with_sig.check_voting_power(&verifier).is_ok());
 
                 assert_eq!(li_with_sig.signatures().clone(), aggregate_sig.clone());
             },
@@ -368,11 +351,9 @@ mod tests {
             },
         };
 
-        match pending_order_votes.insert_order_vote(&vote_4, epoch_state.clone(), None) {
+        match pending_order_votes.insert_order_vote(&vote_4, &verifier, None) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures((_qc, li_with_sig)) => {
-                assert!(li_with_sig
-                    .check_voting_power(&epoch_state.verifier)
-                    .is_ok());
+                assert!(li_with_sig.check_voting_power(&verifier).is_ok());
 
                 assert_eq!(li_with_sig.signatures().clone(), aggregate_sig.clone());
             },

@@ -729,7 +729,7 @@ impl RoundManager {
                 timeout
             } else {
                 let timeout = TwoChainTimeout::new(
-                    self.epoch_state().epoch,
+                    self.epoch_state.epoch,
                     round,
                     self.block_store.highest_quorum_cert().as_ref().clone(),
                 );
@@ -1184,13 +1184,13 @@ impl RoundManager {
                         .observe(start.elapsed().as_secs_f64());
                     self.pending_order_votes.insert_order_vote(
                         order_vote_msg.order_vote(),
-                        self.epoch_state.clone(),
+                        &self.epoch_state.verifier,
                         Some(order_vote_msg.quorum_cert().clone()),
                     )
                 } else {
                     self.pending_order_votes.insert_order_vote(
                         order_vote_msg.order_vote(),
-                        self.epoch_state.clone(),
+                        &self.epoch_state.verifier,
                         None,
                     )
                 };
@@ -1349,7 +1349,9 @@ impl RoundManager {
         {
             return Ok(());
         }
-        let vote_reception_result = self.round_state.insert_vote(vote, self.epoch_state.clone());
+        let vote_reception_result = self
+            .round_state
+            .insert_vote(vote, &self.epoch_state.verifier);
         self.process_vote_reception_result(vote, vote_reception_result)
             .await
     }

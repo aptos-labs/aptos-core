@@ -244,11 +244,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn epoch_state(&self) -> Arc<EpochState> {
+    fn epoch_state(&self) -> &EpochState {
         self.epoch_state
             .as_ref()
             .expect("EpochManager not started yet")
-            .clone()
     }
 
     fn epoch(&self) -> u64 {
@@ -271,7 +270,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     /// Create a proposer election handler based on proposers
     fn create_proposer_election(
         &self,
-        epoch_state: Arc<EpochState>,
+        epoch_state: &EpochState,
         onchain_config: &OnChainConsensusConfig,
     ) -> Arc<dyn ProposerElection + Send + Sync> {
         let proposers = epoch_state
@@ -344,7 +343,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 };
 
                 let epoch_to_proposers = self.extract_epoch_proposers(
-                    epoch_state.clone(),
+                    epoch_state,
                     use_history_from_previous_epoch_max_count,
                     proposers,
                     (window_size + seek_len) as u64,
@@ -393,7 +392,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn extract_epoch_proposers(
         &self,
-        epoch_state: Arc<EpochState>,
+        epoch_state: &EpochState,
         use_history_from_previous_epoch_max_count: u32,
         proposers: Vec<AccountAddress>,
         needed_rounds: u64,
@@ -528,7 +527,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn initiate_new_epoch(&mut self, proof: EpochChangeProof) -> anyhow::Result<()> {
         let ledger_info = proof
-            .verify(self.epoch_state().as_ref())
+            .verify(self.epoch_state())
             .context("[EpochManager] Invalid EpochChangeProof")?;
         info!(
             LogSchema::new(LogEvent::NewEpoch).epoch(ledger_info.ledger_info().next_block_epoch()),
@@ -664,7 +663,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn init_payload_provider(
         &mut self,
-        epoch_state: Arc<EpochState>,
+        epoch_state: &EpochState,
         network_sender: NetworkSender,
         consensus_config: &OnChainConsensusConfig,
     ) -> (
@@ -723,7 +722,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         (payload_manager, payload_client, quorum_store_builder)
     }
 
-    fn set_epoch_start_metrics(&self, epoch_state: Arc<EpochState>) {
+    fn set_epoch_start_metrics(&self, epoch_state: &EpochState) {
         counters::EPOCH.set(epoch_state.epoch as i64);
         counters::CURRENT_EPOCH_VALIDATORS.set(epoch_state.verifier.len() as i64);
 
@@ -762,7 +761,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let epoch = epoch_state.epoch;
         info!(
-            epoch = epoch,
+            epoch = epoch_state.epoch,
             validators = epoch_state.verifier.to_string(),
             root_block = %recovery_data.root_block(),
             "Starting new epoch",
@@ -786,7 +785,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(epoch = epoch, "Create ProposerElection");
         let proposer_election =
-            self.create_proposer_election(epoch_state.clone(), &onchain_consensus_config);
+            self.create_proposer_election(&epoch_state, &onchain_consensus_config);
         let chain_health_backoff_config =
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
         let pipeline_backpressure_config = PipelineBackpressureConfig::new(
@@ -908,7 +907,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn create_network_sender(&mut self, epoch_state: Arc<EpochState>) -> NetworkSender {
+    fn create_network_sender(&mut self, epoch_state: &EpochState) -> NetworkSender {
         NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -920,7 +919,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn try_get_rand_config_for_new_epoch(
         &self,
         maybe_consensus_key: Option<Arc<PrivateKey>>,
-        new_epoch_state: Arc<EpochState>,
+        new_epoch_state: &EpochState,
         onchain_randomness_config: &OnChainRandomnessConfig,
         maybe_dkg_state: anyhow::Result<DKGState>,
         consensus_config: &OnChainConsensusConfig,
@@ -1069,8 +1068,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
-            verifier.into(),
+            verifier: verifier.into(),
         });
+
         self.epoch_state = Some(epoch_state.clone());
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
@@ -1093,6 +1093,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if let Err(error) = &randomness_config_move_struct {
             error!("Failed to read on-chain randomness config {}", error);
         }
+
+        self.epoch_state = Some(epoch_state.clone());
 
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
@@ -1131,7 +1133,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let rand_configs = self.try_get_rand_config_for_new_epoch(
             loaded_consensus_key.clone(),
-            epoch_state.clone(),
+            &epoch_state,
             &onchain_randomness_config,
             dkg_state,
             &consensus_config,
@@ -1163,7 +1165,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
 
         let (network_sender, payload_client, payload_manager) = self
-            .initialize_shared_component(epoch_state.clone(), &consensus_config)
+            .initialize_shared_component(&epoch_state, &consensus_config)
             .await;
 
         let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
@@ -1176,7 +1178,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
-                epoch_state.clone(),
+                epoch_state,
                 loaded_consensus_key.clone(),
                 consensus_config,
                 execution_config,
@@ -1211,16 +1213,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     async fn initialize_shared_component(
         &mut self,
-        epoch_state: Arc<EpochState>,
+        epoch_state: &EpochState,
         consensus_config: &OnChainConsensusConfig,
     ) -> (
         NetworkSender,
         Arc<dyn PayloadClient>,
         Arc<dyn TPayloadManager>,
     ) {
-        self.set_epoch_start_metrics(epoch_state.clone());
+        self.set_epoch_start_metrics(epoch_state);
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
-        let network_sender = self.create_network_sender(epoch_state.clone());
+        let network_sender = self.create_network_sender(epoch_state);
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
             .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
@@ -1341,7 +1343,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_dag_consensus_config = onchain_consensus_config.unwrap_dag_config_v1();
         let epoch_to_validators = self.extract_epoch_proposers(
-            epoch_state.clone(),
+            &epoch_state,
             onchain_dag_consensus_config.dag_ordering_causal_history_window as u32,
             epoch_state.verifier.get_ordered_account_addresses(),
             onchain_dag_consensus_config.dag_ordering_causal_history_window as u64,

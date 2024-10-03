@@ -13,7 +13,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
-use aptos_types::epoch_state::EpochState;
+use aptos_types::validator_verifier::ValidatorVerifier;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};
@@ -277,10 +277,10 @@ impl RoundState {
     pub fn insert_vote(
         &mut self,
         vote: &Vote,
-        epoch_state: Arc<EpochState>,
+        validator_verifier: &ValidatorVerifier,
     ) -> VoteReceptionResult {
         if vote.vote_data().proposed().round() == self.current_round {
-            self.pending_votes.insert_vote(vote, epoch_state)
+            self.pending_votes.insert_vote(vote, validator_verifier)
         } else {
             VoteReceptionResult::UnexpectedRound(
                 vote.vote_data().proposed().round(),
