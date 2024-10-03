@@ -24,7 +24,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
 };
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fmt::Write,
     sync::Arc,
 };
@@ -81,8 +81,26 @@ impl NativeFunctions {
     where
         I: IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
     {
+        let vector_bytecode_instruction_methods = HashSet::from([
+            "empty",
+            "length",
+            "borrow",
+            "borrow_mut",
+            "push_back",
+            "pop_back",
+            "destroy_empty",
+            "swap",
+        ]);
+
         let mut map = HashMap::new();
         for (addr, module_name, func_name, func) in natives.into_iter() {
+            if module_name.as_str() == "string"
+                && vector_bytecode_instruction_methods.contains(func_name.as_str())
+            {
+                println!("ERROR: Tried to register as native a vector bytecode_instruction method {}, skipping.", func_name.as_str());
+                continue;
+            }
+
             let modules = map.entry(addr).or_insert_with(HashMap::new);
             let funcs = modules
                 .entry(module_name.into_string())

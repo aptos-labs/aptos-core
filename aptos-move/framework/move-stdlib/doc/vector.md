@@ -24,6 +24,7 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `pop_back`](#0x1_vector_pop_back)
 -  [Function `destroy_empty`](#0x1_vector_destroy_empty)
 -  [Function `swap`](#0x1_vector_swap)
+-  [Function `range_move`](#0x1_vector_range_move)
 -  [Function `singleton`](#0x1_vector_singleton)
 -  [Function `reverse`](#0x1_vector_reverse)
 -  [Function `reverse_slice`](#0x1_vector_reverse_slice)
@@ -336,6 +337,34 @@ Aborts if <code>i</code> or <code>j</code> is out of bounds.
 
 
 <pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_swap">swap</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, j: u64);
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_vector_range_move"></a>
+
+## Function `range_move`
+
+Moves range of elements <code>[removal_position, removal_position + length)</code> from vector <code>from</code>,
+to vector <code><b>to</b></code>, inserting them starting at the <code>insert_position</code>.
+In the <code>from</code> vector, elements after the selected range are moved left to fill the hole
+(i.e. range is removed, while the order of the rest of the elements is kept)
+In the <code><b>to</b></code> vector, elements after the <code>insert_position</code> are moved the the right to make space for new elements
+(i.e. range is inserted, while the order of the rest of the elements is kept)
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_range_move">range_move</a>&lt;T&gt;(from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, removal_position: u64, length: u64, <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, insert_position: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_range_move">range_move</a>&lt;T&gt;(from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, removal_position: u64, length: u64, <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, insert_position: u64);
 </code></pre>
 
 
