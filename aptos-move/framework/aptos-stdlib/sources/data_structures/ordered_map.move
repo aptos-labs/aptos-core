@@ -17,7 +17,7 @@
 /// Uses cmp::compare for ordering, which compares primitive types natively, and uses common
 /// lexicographical sorting for complex types.
 module aptos_std::ordered_map {
-    // friend aptos_std::big_ordered_map;
+    friend aptos_std::big_ordered_map;
 
     use std::vector;
 
