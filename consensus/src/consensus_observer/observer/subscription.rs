@@ -168,7 +168,8 @@ impl ConsensusObserverSubscription {
 
     /// Verifies that the DB is continuing to sync and commit new data
     fn check_syncing_progress(&mut self) -> Result<(), Error> {
-        // Get the current synced version from storage
+        // Get the current time and synced version from storage
+        let time_now = self.time_service.now();
         let current_synced_version =
             self.db_reader
                 .get_latest_ledger_info_version()
@@ -185,14 +186,12 @@ impl ConsensusObserverSubscription {
         if current_synced_version <= highest_synced_version {
             // The synced version hasn't increased. Check if we should terminate
             // the subscription based on the last time the highest synced version was seen.
-            let time_now = self.time_service.now();
             let duration_since_highest_seen = time_now.duration_since(highest_version_timestamp);
-            if duration_since_highest_seen
-                > Duration::from_millis(
-                    self.consensus_observer_config
-                        .max_subscription_sync_timeout_ms,
-                )
-            {
+            let timeout_duration = Duration::from_millis(
+                self.consensus_observer_config
+                    .max_subscription_sync_timeout_ms,
+            );
+            if duration_since_highest_seen > timeout_duration {
                 return Err(Error::SubscriptionProgressStopped(format!(
                     "The DB is not making sync progress! Highest synced version: {}, elapsed: {:?}",
                     highest_synced_version, duration_since_highest_seen
@@ -201,7 +200,7 @@ impl ConsensusObserverSubscription {
         }
 
         // Update the highest synced version and time
-        self.highest_synced_version_and_time = (current_synced_version, self.time_service.now());
+        self.highest_synced_version_and_time = (current_synced_version, time_now);
 
         Ok(())
     }

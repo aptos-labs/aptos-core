@@ -22,7 +22,7 @@ pub struct ObserverFallbackManager {
     // The highest synced version we've seen from storage, along with the time at which it was seen
     highest_synced_version_and_time: (u64, Instant),
 
-    // The time service (used to check the last message receive time)
+    // The time service (used to check the storage update time)
     time_service: TimeService,
 }
 
@@ -47,7 +47,8 @@ impl ObserverFallbackManager {
     /// Verifies that the DB is continuing to sync and commit new data.
     /// If not, an error is returned, indicating that we should enter fallback mode.
     pub fn check_syncing_progress(&mut self) -> Result<(), Error> {
-        // Get the current synced version from storage
+        // Get the current time and synced version from storage
+        let time_now = self.time_service.now();
         let current_synced_version =
             self.db_reader
                 .get_latest_ledger_info_version()
@@ -63,7 +64,6 @@ impl ObserverFallbackManager {
             self.highest_synced_version_and_time;
         if current_synced_version <= highest_synced_version {
             // The synced version hasn't increased. Check if we should enter fallback mode.
-            let time_now = self.time_service.now();
             let duration_since_highest_seen = time_now.duration_since(highest_version_timestamp);
             let fallback_threshold = Duration::from_secs(
                 self.consensus_observer_config
@@ -78,15 +78,19 @@ impl ObserverFallbackManager {
         }
 
         // Update the highest synced version and time
-        self.highest_synced_version_and_time = (current_synced_version, self.time_service.now());
+        self.highest_synced_version_and_time = (current_synced_version, time_now);
 
         Ok(())
     }
 
-    /// Resets the syncing progress to the latest synced ledger info
+    /// Resets the syncing progress to the latest synced ledger info and current time
     pub fn reset_syncing_progress(&mut self, latest_synced_ledger_info: &LedgerInfoWithSignatures) {
+        // Get the current time and highest synced version
+        let time_now = self.time_service.now();
         let highest_synced_version = latest_synced_ledger_info.ledger_info().version();
-        self.highest_synced_version_and_time = (highest_synced_version, self.time_service.now());
+
+        // Update the highest synced version and time
+        self.highest_synced_version_and_time = (highest_synced_version, time_now);
     }
 }
 
