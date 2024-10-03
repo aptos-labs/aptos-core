@@ -1,0 +1,252 @@
+
+name: Trigger Processor Tests on JSON Change
+
+on:
+  workflow_dispatch:
+  pull_request:  # Trigger on PR-level events
+    branches:
+      - main
+
+# Grant the required permissions to request the ID token
+permissions:
+  id-token: write  # This is required for GCP authentication
+  contents: read   # Ensure the workflow has access to repository contents
+
+jobs:
+  dispatch_event:
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Rust
+        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      # Install necessary system dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install build-essential libssl-dev pkg-config
+
+      # Ensure Rust is updated
+      - name: Update Rust toolchain
+        run: rustup update
+
+      - name: Run CLI to Generate JSON Files
+        run: |
+          cd ecosystem/indexer-grpc/indexer-transaction-generator
+          cargo run -- --testing-folder ./example_tests --output-folder ../indexer-test-transactions/new_json_transactions
+
+      - name: Install jq
+        run: sudo apt-get install jq  # Ensure jq is installed for JSON processing
+
+      # TODO: improve this step to be easily maintainable and extensible
+      # Prepare Original and New JSON Files
+      - name: Prepare and Clean JSON Files
+        run: |
+          cd ecosystem/indexer-grpc/indexer-test-transactions
+          
+          for folder in json_transactions/scripted_transactions new_json_transactions/scripted_transactions; do
+            for file in $folder/*.json; do
+              echo "Processing $file..."
+              base_file=$(basename "$file")
+
+              jq 'del(.timestamp,
+                      .version,
+                      .info.hash,
+                      .info.stateChangeHash,
+                      .info.accumulatorRootHash,
+                      .info.changes[].writeResource.stateKeyHash,
+                      .info.changes[].writeResource.type.address,
+                      .info.changes[].writeResource.address,
+                      .info.changes[].writeTableItem.stateKeyHash,
+                      .info.changes[].writeTableItem.data.key,
+                      .info.changes[].writeTableItem.data.value,
+                      .epoch,
+                      .blockHeight,
+                      .sizeInfo,
+                      .user.request.sender,
+                      .user.request.expirationTimestampSecs.seconds,
+                      .user.request.signature.ed25519.publicKey,
+                      .user.request.signature.ed25519.signature)
+                  | (.info.changes[].writeResource.data |=
+                  if type == "string" then
+                    (fromjson
+                     | del(.authentication_key)
+                     | walk(if type == "object" and has("addr") then del(.addr) else . end)
+                     | tostring)
+                  else . end)' "$file" > "$folder/modified_$base_file"
+            done
+          done
+
+      # Show the Modified JSON Files Before Diff (Optional Step)
+      - name: Show Modified JSON Files (Original and New)
+        run: |
+          echo "Showing Modified Original JSON Files:"
+          cat ecosystem/indexer-grpc/indexer-test-transactions/json_transactions/scripted_transactions/modified_simple_user_script3.json
+
+          echo "Showing Modified New JSON Files:"
+          cat ecosystem/indexer-grpc/indexer-test-transactions/new_json_transactions/scripted_transactions/modified_simple_user_script3.json
+
+      # Compare New and Existing JSON Files After Modifying and Set Output if Differences Found
+      - name: Compare JSON Files
+        id: diff_check
+        run: |
+          cd ecosystem/indexer-grpc/indexer-test-transactions
+
+          # Initialize the diff flag as false
+          diff_found=false
+
+          # Loop over all modified new JSON files and compare them with existing ones in scripted_transactions
+          for file in json_transactions/scripted_transactions/*.json; do
+            base_file=$(basename "$file" .json)
+            modified_file="new_json_transactions/scripted_transactions/modified_${base_file}.json"
+            original_file="json_transactions/scripted_transactions/modified_${base_file}.json"
+            if [ -f "$original_file" ]; then
+              echo "Comparing $modified_file with $original_file..."
+
+              # Run diff and capture the output. Use || true to prevent it from stopping the script
+              diff_output=$(diff -u "$original_file" "$modified_file" || true)
+
+              if [ -n "$diff_output" ]; then
+                echo "Differences found in $base_file"
+                diff_found=true
+                echo "$diff_output"  # Output the actual differences
+              else
+                echo "No differences in $base_file"
+              fi
+            else
+              echo "No existing file found for $base_file, skipping comparison."
+            fi
+          done
+
+          # Set the output variable based on whether diffs were found
+          echo "diff_found=$diff_found" >> $GITHUB_OUTPUT
+
+      - id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Log active service account email
+        run: |
+          gcloud auth list --filter=status:ACTIVE --format="value(account)"
+      - id: 'secrets'
+        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        with:
+          secrets: |-
+            token:aptos-ci/github-actions-repository-dispatch
+
+      # Conditionally Dispatch Event to Processor Repo if Differences Found
+      - name: Dispatch Event to Processor Repo
+        if: steps.diff_check.outputs.diff_found == 'true'
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+          TOKEN: '${{ steps.secrets.outputs.token }}'
+          repository: 'aptos-labs/aptos-indexer-processors'
+          event-type: 'test-txn-json-change-detected'
+          client-payload: '{"commit_hash": "${{ github.sha }}"}'
+
+      # Poll Processor Repo for Workflow Run Status and Memorize Run ID (with improved matching)
+      - name: Poll for Workflow Run and Wait for Job Completion
+        if: steps.diff_check.outputs.diff_found == 'true'
+        id: poll_status
+        run: |
+          # Unique identifier for the run (commit_hash or UUID passed via event payload)
+          UUID="${{ github.sha }}"
+          
+          # If a run_id is already known, use it directly to check the run status
+          if [ -f ".cached_run_id" ]; then
+            run_id=$(cat .cached_run_id)
+            echo "Using cached run_id: $run_id"
+          else
+            echo "Polling for the workflow run with UUID: $UUID."
+          
+            attempts=0
+            max_attempts=5  # Reduce attempts since we memorize run_id after finding it
+            sleep_interval=30  # Time to wait between attempts (in seconds)
+          
+            while [ $attempts -lt $max_attempts ]; do
+              echo "Polling for the workflow run. Attempt $((attempts+1)) of $max_attempts..."
+          
+              # Get the workflow runs for the repository
+              response=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/aptos-labs/aptos-indexer-processors/actions/runs?event=repository_dispatch&branch=main")
+          
+              # Filter the workflow run by the unique run-name (which includes the commit_hash or UUID)
+              run_id=$(echo "$response" | jq -r ".workflow_runs[] | select(.name | test(\"$UUID\")) | .id")
+          
+              if [ -n "$run_id" ]; then
+                echo "Found workflow run with ID: $run_id"
+                echo "$run_id" > .cached_run_id  # Save the run_id to cache
+                break
+              else
+                echo "No matching workflow run found yet. Retrying in $sleep_interval seconds..."
+                attempts=$((attempts + 1))
+                sleep $sleep_interval
+              fi
+            done
+          fi
+          
+          # If we still don't have a run_id, exit the job
+          if [ -z "$run_id" ]; then
+            echo "Workflow run not found after $max_attempts attempts. Exiting."
+            exit 1
+          fi
+          
+          # Now that we have the run_id (cached or newly found), proceed to poll job status
+          jobs_url="https://api.github.com/repos/aptos-labs/aptos-indexer-processors/actions/runs/${run_id}/jobs"
+          
+          # Poll the job status until completion
+          job_completed=false
+          max_job_attempts=20  # Adjust based on how long you expect the job to run
+          job_attempts=0
+          sleep_interval=60  # Adjust polling interval as needed
+
+          while [ "$job_completed" == false ] && [ $job_attempts -lt $max_job_attempts ]; do
+            echo "Polling for job status. Attempt $((job_attempts+1)) of $max_job_attempts..."
+            jobs_response=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$jobs_url")
+          
+            # Loop through the jobs and check their status
+            for job in $(echo "$jobs_response" | jq -r '.jobs[] | @base64'); do
+              _jq() {
+                echo "${job}" | base64 --decode | jq -r "${1}"
+              }
+          
+              job_name=$(_jq '.name')
+              job_id=$(_jq '.id')
+              job_status=$(_jq '.status')
+              job_conclusion=$(_jq '.conclusion')
+          
+              echo "Checking job: $job_name (Job ID: $job_id)"
+              echo "Job status: $job_status"
+              echo "Job conclusion: $job_conclusion"
+          
+              # Check if the job has completed
+              if [ "$job_status" == "completed" ]; then
+                job_completed=true
+                if [ "$job_conclusion" == "success" ]; then
+                  echo "Job completed successfully!"
+                  exit 0  # Exit with success
+                else
+                  echo "Job failed!"
+                  exit 1  # Exit with failure
+                fi
+              fi
+            done
+          
+            # Sleep before the next polling attempt
+            echo "Job is still in progress. Waiting $sleep_interval seconds before polling again..."
+            sleep $sleep_interval
+            job_attempts=$((job_attempts + 1))
+          done
+          
+          # If the job hasn't completed within the allowed attempts, exit with an error
+          if [ "$job_completed" == false ]; then
+            echo "Job did not complete within the expected time. Exiting with failure."
+            exit 1
+          fi
