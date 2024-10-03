@@ -55,9 +55,9 @@ impl ServerConfig {
             ServerConfig::Parser(parser_config) => {
                 ServerContext::Parser(ParserContext::new(parser_config.clone(), pool).await)
             },
-            ServerConfig::AssetUploaderWorker(asset_uploader_config) => {
+            ServerConfig::AssetUploaderWorker(asset_uploader_worker_config) => {
                 ServerContext::AssetUploaderWorker(AssetUploaderWorkerContext::new(
-                    asset_uploader_config.clone(),
+                    asset_uploader_worker_config.clone(),
                 ))
             },
         }
