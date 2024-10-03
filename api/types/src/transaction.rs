@@ -589,7 +589,10 @@ impl BlockMetadataExtension {
     }
 
     pub fn is_nil(&self) -> bool {
-        matches!(self, BlockMetadataExtension::Nil(_))
+        match self {
+            BlockMetadataExtension::Nil(_) => true,
+            _ => false,
+        }
     }
 
     pub fn from_internal_txn(txn: &BlockMetadataExt) -> Self {
