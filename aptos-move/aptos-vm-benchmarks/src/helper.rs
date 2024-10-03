@@ -64,15 +64,17 @@ pub fn execute_module_txn(
 
 // sign user transaction and only records the body of the transaction
 pub fn execute_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
-    let elapsed = executor.exec_func_record_running_time(
-        module_name,
-        function_name,
-        vec![],
-        vec![],
-        10,
-        ExecFuncTimerDynamicArgs::NoArgs,
-        GasMeterType::UnmeteredGasMeter,
-    );
+    let elapsed = executor
+        .exec_func_record_running_time(
+            module_name,
+            function_name,
+            vec![],
+            vec![],
+            10,
+            ExecFuncTimerDynamicArgs::NoArgs,
+            GasMeterType::UnmeteredGasMeter,
+        )
+        .elapsed_micros;
     println!("running time (microseconds): {}", elapsed);
 }
 

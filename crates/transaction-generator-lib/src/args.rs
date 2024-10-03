@@ -44,6 +44,8 @@ pub enum TransactionTypeArg {
     CreateObjects100,
     CreateObjects100WithPayload10k,
     CreateObjectsConflict100WithPayload10k,
+    VectorSplitOffAppendLen3000Size1,
+    VectorRemoveInsertLen3000Size1,
     ResourceGroupsGlobalWriteTag1KB,
     ResourceGroupsGlobalWriteAndReadTag1KB,
     ResourceGroupsSenderWriteTag1KB,
@@ -213,6 +215,22 @@ impl TransactionTypeArg {
                 call_custom_module(EntryPoints::CreateObjectsConflict {
                     num_objects: 100,
                     object_payload_size: 10 * 1024,
+                })
+            },
+            TransactionTypeArg::VectorSplitOffAppendLen3000Size1 => {
+                call_custom_module(EntryPoints::VectorSplitOffAppend {
+                    vec_len: 3000,
+                    element_len: 1,
+                    index: 100,
+                    repeats: 1000,
+                })
+            },
+            TransactionTypeArg::VectorRemoveInsertLen3000Size1 => {
+                call_custom_module(EntryPoints::VectorRemoveInsert {
+                    vec_len: 3000,
+                    element_len: 1,
+                    index: 100,
+                    repeats: 1000,
                 })
             },
             TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB => {
