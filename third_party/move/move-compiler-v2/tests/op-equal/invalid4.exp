@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/op-equal/invalid4.move:3:15
+  │
+3 │         let x += 1;
+  │               ^^
+  │               │
+  │               Unexpected '+='
+  │               Expected ';'
