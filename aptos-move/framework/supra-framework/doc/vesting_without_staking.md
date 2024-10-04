@@ -1132,7 +1132,7 @@ Create a vesting contract with a given configurations.
 ): <b>address</b> <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_AdminStore">AdminStore</a> {
     <b>assert</b>!(!<a href="system_addresses.md#0x1_system_addresses_is_reserved_address">system_addresses::is_reserved_address</a>(withdrawal_address),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_WITHDRAWAL_ADDRESS">EINVALID_WITHDRAWAL_ADDRESS</a>),);
-    assert_account_is_registered_for_apt(withdrawal_address);
+    assert_account_is_registered_for_supra(withdrawal_address);
     <b>let</b> shareholders_address = &<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_keys">simple_map::keys</a>(&buy_ins);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders_address) &gt; 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_ENO_SHAREHOLDERS">ENO_SHAREHOLDERS</a>));
@@ -1519,7 +1519,7 @@ has already been terminated.
 ) <b>acquires</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a> {
     // Verify that the beneficiary <a href="account.md#0x1_account">account</a> is set up <b>to</b> receive SUPRA. This is a requirement so distribute() wouldn't
     // fail and <a href="block.md#0x1_block">block</a> all other accounts from receiving SUPRA <b>if</b> one beneficiary is not registered.
-    assert_account_is_registered_for_apt(new_beneficiary);
+    assert_account_is_registered_for_supra(new_beneficiary);
 
     <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting_without_staking.md#0x1_vesting_without_staking_verify_admin">verify_admin</a>(admin, vesting_contract);

@@ -110,7 +110,7 @@ spec supra_framework::supra_account {
 
     /// Check if the address existed.
     /// Check if the SupraCoin under the address existed.
-    spec assert_account_is_registered_for_apt(addr: address) {
+    spec assert_account_is_registered_for_supra(addr: address) {
         pragma aborts_if_is_partial;
         aborts_if !account::exists_at(addr);
         aborts_if !coin::spec_is_account_registered<SupraCoin>(addr);
