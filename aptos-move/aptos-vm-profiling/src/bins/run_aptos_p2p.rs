@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_language_e2e_tests::{account::AccountData, data_store::FakeDataStore};
 use aptos_types::{
     transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
@@ -48,7 +49,8 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let res = AptosVM::execute_block_no_limit(&txns, &state_store)?;
+    let txn_provider = DefaultTxnProvider::new(txns);
+    let res = AptosVM::execute_block_no_limit(&txn_provider, &state_store)?;
     for i in 0..NUM_TXNS {
         assert!(res[i as usize].status().status().unwrap().is_success());
     }

@@ -7,6 +7,7 @@ mod mock_vm_test;
 
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
+use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
@@ -72,7 +73,7 @@ impl TransactionBlockExecutor for MockVM {
 
 impl VMExecutor for MockVM {
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
@@ -81,8 +82,9 @@ impl VMExecutor for MockVM {
         let mut output_cache = HashMap::new();
         let mut outputs = vec![];
 
-        for txn in transactions {
-            let txn = txn.expect_valid();
+        for idx in 0..txn_provider.num_txns() {
+            let txn_arc = txn_provider.get_txn(idx as u32);
+            let txn = txn_arc.expect_valid();
             if matches!(txn, Transaction::StateCheckpoint(_)) {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),
