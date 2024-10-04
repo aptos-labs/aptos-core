@@ -1,6 +1,6 @@
 [package]
-name = "aptos-intent"
-description = "Generating Move Script from intent"
+name = "aptos-script-builder"
+description = "Generating Move Script from a batched Move calls"
 version = "0.1.0"
 
 # Workspace inherited keys

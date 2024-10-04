@@ -16,7 +16,7 @@ members = [
     "aptos-move/aptos-gas-profiling",
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
-    "aptos-move/aptos-intent",
+    "aptos-move/aptos-script-builder",
     "aptos-move/aptos-memory-usage-tracker",
     "aptos-move/aptos-native-interface",
     "aptos-move/aptos-release-builder",
@@ -369,7 +369,7 @@ aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-g
 aptos-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-transaction-generator" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
-aptos-intent = { path = "aptos-move/aptos-intent" }
+aptos-script-builder = { path = "aptos-move/aptos-script-builder" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-jwk-utils = { path = "crates/jwk-utils" }
