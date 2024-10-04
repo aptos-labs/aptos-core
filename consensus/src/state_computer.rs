@@ -519,8 +519,8 @@ async fn test_commit_sync_race() {
         async fn sync_for_duration(
             &self,
             _duration: std::time::Duration,
-        ) -> std::result::Result<(), Error> {
-            Ok(())
+        ) -> std::result::Result<LedgerInfoWithSignatures, Error> {
+            todo!()
         }
 
         async fn sync_to_target(
