@@ -15,7 +15,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<PipelinedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
@@ -44,6 +44,13 @@ pub trait StateComputer: Send + Sync {
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()>;
+
+    /// Best effort state synchronization for the specified duration.
+    /// This function returns the latest synced ledger info after state syncing.
+    async fn sync_for_duration(
+        &self,
+        duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError>;
 
     /// Best effort state synchronization to the given target LedgerInfo.
     /// In case of success (`Result::Ok`) the LI of storage is at the given target.
