@@ -42,6 +42,7 @@ module aptos_std::storage_slots_allocator {
             new_slot_index: u64,
             reuse_head_index: u64,
         },
+        // TODO implement variant that inlines first node?
     }
 
     struct ReservedSlot {
@@ -64,7 +65,7 @@ module aptos_std::storage_slots_allocator {
 
         for (i in 0..num_to_preallocate) {
             let slot_index = self.next_slot_index();
-            self.push_to_reuse_queue(slot_index);
+            self.push_to_reuse_queue_if_enabled(slot_index);
         };
 
         self
@@ -89,7 +90,7 @@ module aptos_std::storage_slots_allocator {
     public fun remove<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): T {
         let Link::Occupied { value } = self.slots.remove(slot_index);
 
-        self.push_to_reuse_queue(slot_index);
+        self.push_to_reuse_queue_if_enabled(slot_index);
 
         value
     }
@@ -126,7 +127,11 @@ module aptos_std::storage_slots_allocator {
         self.slot_index
     }
 
-    // splitting add into getting ReservedSlot, and then inserting it later
+    // We also provide here operations where `add()` is split into `reserve_slot`,
+    // and then doing fill_reserved_slot later.
+
+    // Similarly we have `remove_and_reserve`, and then `fill_reserved_slot` later.
+
     public fun reserve_slot<T: store>(self: &mut StorageSlotsAllocator<T>): ReservedSlot {
         if (self is StorageSlotsAllocator::Reuse<T>) {
             let slot_index = self.reuse_head_index;
@@ -158,10 +163,10 @@ module aptos_std::storage_slots_allocator {
 
     public fun free_reserved_slot<T: store>(self: &mut StorageSlotsAllocator<T>, slot: ReservedSlot) {
         let ReservedSlot { slot_index } = slot;
-        self.push_to_reuse_queue(slot_index);
+        self.push_to_reuse_queue_if_enabled(slot_index);
     }
 
-    fun push_to_reuse_queue<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64) {
+    fun push_to_reuse_queue_if_enabled<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64) {
         if (self is StorageSlotsAllocator::Reuse<T>) {
             self.slots.add(slot_index, Link::Vacant { next: self.reuse_head_index });
             self.reuse_head_index = slot_index;
