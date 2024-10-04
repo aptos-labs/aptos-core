@@ -463,7 +463,7 @@ aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
 aes-gcm = "0.10.3"
-ahash = "0.8.11"
+ahash = { version = "0.8.11", features = ["serde"] }
 atty = "0.2.14"
 nalgebra = "0.32"
 float-cmp = "0.9.0"
@@ -548,7 +548,7 @@ derivation-path = "0.2.0"
 derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
-diesel = "2.1"
+diesel = { version = "2.1", features = ["uuid"] }
 # Use the crate version once this feature gets released on crates.io:
 # https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
 diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = [

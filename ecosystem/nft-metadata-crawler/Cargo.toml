@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-metrics-core = { workspace = true }
@@ -44,3 +45,4 @@ sha256 = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
+uuid = { workspace = true }

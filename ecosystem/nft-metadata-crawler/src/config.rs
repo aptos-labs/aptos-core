@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    asset_uploader::worker::{config::AssetUploaderWorkerConfig, AssetUploaderWorkerContext},
+    asset_uploader::worker::{
+        api::AssetUploaderApiContext, config::AssetUploaderWorkerConfig, AssetUploaderWorkerContext,
+    },
     parser::{config::ParserConfig, ParserContext},
     utils::database::{establish_connection_pool, run_migrations},
 };
@@ -28,6 +30,7 @@ pub trait Server: Send + Sync {
 pub enum ServerConfig {
     Parser(ParserConfig),
     AssetUploaderWorker(AssetUploaderWorkerConfig),
+    AssetUploaderApi,
 }
 
 /// Structs to hold config from YAML
@@ -44,6 +47,7 @@ pub struct NFTMetadataCrawlerConfig {
 pub enum ServerContext {
     Parser(ParserContext),
     AssetUploaderWorker(AssetUploaderWorkerContext),
+    AssetUploaderApi(AssetUploaderApiContext),
 }
 
 impl ServerConfig {
@@ -59,6 +63,9 @@ impl ServerConfig {
                 ServerContext::AssetUploaderWorker(AssetUploaderWorkerContext::new(
                     asset_uploader_worker_config.clone(),
                 ))
+            },
+            ServerConfig::AssetUploaderApi => {
+                ServerContext::AssetUploaderApi(AssetUploaderApiContext::new(pool))
             },
         }
     }
@@ -87,9 +94,10 @@ impl RunnableConfig for NFTMetadataCrawlerConfig {
     }
 
     fn get_server_name(&self) -> String {
-        match &self.server_config {
+        match self.server_config {
             ServerConfig::Parser(_) => "parser",
             ServerConfig::AssetUploaderWorker(_) => "asset_uploader_worker",
+            ServerConfig::AssetUploaderApi => "asset_uploader_api",
         }
         .to_string()
     }
