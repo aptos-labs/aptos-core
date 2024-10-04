@@ -9,8 +9,8 @@ use aptos_framework::natives::code::{
 };
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::{
-    keyless::EphemeralCertificate,
-    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
+    keyless::{AnyKeylessPublicKey, EphemeralCertificate},
+    transaction::{authenticator::{EphemeralPublicKey, EphemeralSignature}, ExecutionStatus, TransactionPayload, TransactionStatus},
 };
 use arbitrary::Arbitrary;
 use libfuzzer_sys::Corpus;
@@ -147,6 +147,47 @@ pub struct JwtHeader {
     // Add other JWT header fields as needed
 }
 
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct FuzzingKeylessSignature {
+    exp_date_secs: u64,
+    jwt_header: JwtHeader,
+    cert: EphemeralCertificate,
+    //ephemeral_pubkey: EphemeralPublicKey,
+    //ephemeral_signature: EphemeralSignature,
+}
+
+impl FuzzingKeylessSignature {
+    pub fn exp_date_secs(&self) -> u64 {
+        self.exp_date_secs
+    }
+
+    pub fn jwt_header(&self) -> &JwtHeader {
+        &self.jwt_header
+    }
+
+    pub fn cert(&self) -> &EphemeralCertificate {
+        &self.cert
+    }
+
+    /*
+    pub fn ephemeral_pubkey(&self) -> &EphemeralPublicKey {
+        &self.ephemeral_pubkey
+    }
+
+    pub fn ephemeral_signature(&self) -> &EphemeralSignature {
+        &self.ephemeral_signature
+    }
+     */
+}
+
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
+pub enum Style {
+    Break,
+    //MatchJWT,
+    //MatchKeys,
+}
+
+//TODO: reorganize this type excluding not usefull fields. Do it after implementing JWK and Federated Keyless.
 // Used to fuzz the transaction authenticator
 #[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
 pub enum FuzzerTransactionAuthenticator {
@@ -155,9 +196,9 @@ pub enum FuzzerTransactionAuthenticator {
     },
     Keyless {
         sender: UserAccount,
-        exp_date_secs: u64,
-        jwt_header: JwtHeader,
-        cert: EphemeralCertificate,
+        style: Style,
+        any_keyless_public_key: AnyKeylessPublicKey,
+        keyless_signature: FuzzingKeylessSignature,
     },
     MultiAgent {
         sender: UserAccount,
@@ -176,9 +217,9 @@ impl FuzzerTransactionAuthenticator {
             FuzzerTransactionAuthenticator::Ed25519 { sender } => *sender,
             FuzzerTransactionAuthenticator::Keyless {
                 sender,
-                exp_date_secs: _,
-                jwt_header: _,
-                cert: _,
+                style: _,
+                any_keyless_public_key: _,
+                keyless_signature: _,
             } => *sender,
             FuzzerTransactionAuthenticator::MultiAgent {
                 sender,
@@ -193,8 +234,8 @@ impl FuzzerTransactionAuthenticator {
     }
 
     pub fn get_jwt_header_json(&self) -> Option<String> {
-        if let FuzzerTransactionAuthenticator::Keyless { jwt_header, .. } = self {
-            serde_json::to_string(jwt_header).ok()
+        if let FuzzerTransactionAuthenticator::Keyless { keyless_signature, .. } = self {
+            serde_json::to_string(&keyless_signature.jwt_header).ok()
         } else {
             None
         }

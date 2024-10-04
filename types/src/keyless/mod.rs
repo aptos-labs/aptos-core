@@ -227,6 +227,7 @@ impl Serialize for Pepper {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct IdCommitment(#[serde(with = "serde_bytes")] pub(crate) Vec<u8>);
 
 impl IdCommitment {
@@ -294,6 +295,7 @@ impl TryFrom<&[u8]> for IdCommitment {
 /// `PublicKey` struct. But the `key_name` procedural macro only works with the `[De]SerializeKey`
 /// procedural macros, which we cannot use since they force us to reimplement serialization.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct KeylessPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
     /// e.g., <https://accounts.google.com>
@@ -312,6 +314,7 @@ pub struct KeylessPublicKey {
 /// Unlike a normal keyless account, a "federated" keyless account will accept JWKs published at a
 /// specific contract address.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct FederatedKeylessPublicKey {
     pub jwk_addr: AccountAddress,
     pub pk: KeylessPublicKey,
@@ -337,6 +340,7 @@ impl TryFrom<&[u8]> for FederatedKeylessPublicKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum AnyKeylessPublicKey {
     Normal(KeylessPublicKey),
     Federated(FederatedKeylessPublicKey),

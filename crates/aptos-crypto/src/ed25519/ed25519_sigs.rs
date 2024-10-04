@@ -22,10 +22,8 @@ pub struct Ed25519Signature(pub(crate) ed25519_dalek::Signature);
 impl<'a> arbitrary::Arbitrary<'a> for Ed25519Signature {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let bytes: [u8; ED25519_SIGNATURE_LENGTH] = u.arbitrary()?;
-        Ok(Ed25519Signature(
-            ed25519_dalek::Signature::try_from(&bytes[..])
-                .map_err(|_| arbitrary::Error::IncorrectFormat)?,
-        ))
+        Ed25519Signature::from_bytes_unchecked(&bytes)
+            .map_err(|_| arbitrary::Error::IncorrectFormat)
     }
 }
 

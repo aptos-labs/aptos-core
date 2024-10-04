@@ -1215,6 +1215,7 @@ impl TryFrom<&[u8]> for EphemeralSignature {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EphemeralPublicKey {
     Ed25519 {
         public_key: Ed25519PublicKey,
@@ -1223,6 +1224,8 @@ pub enum EphemeralPublicKey {
         public_key: secp256r1_ecdsa::PublicKey,
     },
 }
+
+
 
 impl EphemeralPublicKey {
     pub fn ed25519(public_key: Ed25519PublicKey) -> Self {
