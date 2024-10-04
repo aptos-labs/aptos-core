@@ -192,12 +192,12 @@ Account does not exist.
 
 
 
-<a id="0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT"></a>
+<a id="0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_SUPRA"></a>
 
 Account is not registered to receive SUPRA.
 
 
-<pre><code><b>const</b> <a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT">EACCOUNT_NOT_REGISTERED_FOR_APT</a>: u64 = 2;
+<pre><code><b>const</b> <a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_SUPRA">EACCOUNT_NOT_REGISTERED_FOR_SUPRA</a>: u64 = 2;
 </code></pre>
 
 
@@ -454,7 +454,7 @@ This would create the recipient account first and register it to receive the Coi
 
 <pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_is_registered_for_supra">assert_account_is_registered_for_supra</a>(addr: <b>address</b>) {
     <a href="supra_account.md#0x1_supra_account_assert_account_exists">assert_account_exists</a>(addr);
-    <b>assert</b>!(<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;SupraCoin&gt;(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_APT">EACCOUNT_NOT_REGISTERED_FOR_APT</a>));
+    <b>assert</b>!(<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;SupraCoin&gt;(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="supra_account.md#0x1_supra_account_EACCOUNT_NOT_REGISTERED_FOR_SUPRA">EACCOUNT_NOT_REGISTERED_FOR_SUPRA</a>));
 }
 </code></pre>
 

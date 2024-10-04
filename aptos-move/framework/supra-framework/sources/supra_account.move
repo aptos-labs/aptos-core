@@ -20,7 +20,7 @@ module supra_framework::supra_account {
     /// Account does not exist.
     const EACCOUNT_NOT_FOUND: u64 = 1;
     /// Account is not registered to receive SUPRA.
-    const EACCOUNT_NOT_REGISTERED_FOR_APT: u64 = 2;
+    const EACCOUNT_NOT_REGISTERED_FOR_SUPRA: u64 = 2;
     /// Account opted out of receiving coins that they did not register to receive.
     const EACCOUNT_DOES_NOT_ACCEPT_DIRECT_COIN_TRANSFERS: u64 = 3;
     /// Account opted out of directly receiving NFT tokens.
