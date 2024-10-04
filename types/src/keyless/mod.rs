@@ -430,9 +430,9 @@ fn base64url_decode_as_str(b64: &str) -> anyhow::Result<String> {
 }
 
 fn seconds_from_epoch(secs: u64) -> anyhow::Result<SystemTime> {
-    Ok(UNIX_EPOCH
+    UNIX_EPOCH
         .checked_add(Duration::from_secs(secs))
-        .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + secs in seconds_from_epoch"))?)
+        .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + secs in seconds_from_epoch"))
 }
 
 #[cfg(test)]

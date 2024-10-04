@@ -22,7 +22,6 @@ aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
 aptos-db-indexer-schemas = { workspace = true }
-aptos-debugger = { workspace = true }
 aptos-dkg = { workspace = true }
 aptos-faucet-core = { workspace = true }
 aptos-forge = { workspace = true }
