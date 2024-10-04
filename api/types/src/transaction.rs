@@ -579,7 +579,7 @@ pub struct BlockMetadataExtensionRandomness {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
-#[serde(tag = "extension_type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum BlockMetadataExtension {
     V0(BlockMetadataExtensionEmpty),
