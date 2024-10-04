@@ -60,7 +60,7 @@ loop {
   loop {
     if (Not(_t3)) break;
     _t4: &Entity = self;
-    _t5: &u64 = select_variants m::Entity.id(_t4);
+    _t5: &u64 = select_variants m::Entity.Person.id(_t4);
     _t6: u64 = Deref(_t5);
     _t1: u64 = _t6;
     break[1]
@@ -71,7 +71,7 @@ loop {
     loop {
       if (Not(_t8)) break;
       _t9: &Entity = self;
-      _t10: &u64 = select_variants m::Entity.id(_t9);
+      _t10: &u64 = select_variants m::Entity.Institution.id(_t9);
       _t11: u64 = Deref(_t10);
       _t1: u64 = _t11;
       break[1]
@@ -90,7 +90,7 @@ _t2: &Entity = self;
 _t3: bool = test_variants m::Entity::Person(_t2);
 if _t3 {
   _t4: &Entity = self;
-  _t5: &u64 = select_variants m::Entity.id(_t4);
+  _t5: &u64 = select_variants m::Entity.Person.id(_t4);
   _t6: u64 = Deref(_t5);
   _t1: u64 = _t6
 } else {
@@ -98,7 +98,7 @@ if _t3 {
   _t8: bool = test_variants m::Entity::Institution(_t7);
   if _t8 {
     _t9: &Entity = self;
-    _t10: &u64 = select_variants m::Entity.id(_t9);
+    _t10: &u64 = select_variants m::Entity.Institution.id(_t9);
     _t11: u64 = Deref(_t10);
     _t1: u64 = _t11
   } else {
@@ -114,10 +114,10 @@ return _t14
 {
   let _t1: u64;
   if test_variants m::Entity::Person(self) {
-    _t1: u64 = Deref(select_variants m::Entity.id(self))
+    _t1: u64 = Deref(select_variants m::Entity.Person.id(self))
   } else {
     if test_variants m::Entity::Institution(self) {
-      _t1: u64 = Deref(select_variants m::Entity.id(self))
+      _t1: u64 = Deref(select_variants m::Entity.Institution.id(self))
     } else {
       Abort(14566554180833181697)
     }
@@ -205,7 +205,7 @@ loop {
   loop {
     if (Not(_t5)) break;
     _t6: &Entity = _t1;
-    _t7: &u64 = select_variants m::Entity.id(_t6);
+    _t7: &u64 = select_variants m::Entity.Person.id(_t6);
     _t8: u64 = Deref(_t7);
     _t9: u64 = 0;
     _t10: bool = Gt(_t8, _t9);
@@ -244,7 +244,7 @@ loop {
   loop {
     if (Not(_t5)) break;
     _t6: &Entity = _t1;
-    _t7: &u64 = select_variants m::Entity.id(_t6);
+    _t7: &u64 = select_variants m::Entity.Person.id(_t6);
     _t8: u64 = Deref(_t7);
     _t9: u64 = 0;
     _t10: bool = Gt(_t8, _t9);
@@ -278,7 +278,7 @@ return _t20
     loop {
       loop {
         if (Not(test_variants m::Entity::Person(_t1))) break;
-        if (Not(Gt(Deref(select_variants m::Entity.id(_t1)), 0))) break;
+        if (Not(Gt(Deref(select_variants m::Entity.Person.id(_t1)), 0))) break;
         {
           let m::Entity::Person{ id: _t13 } = self;
           break[1]
@@ -311,7 +311,7 @@ module 0x815::m {
     }
     fun id(self: &Entity): u64 {
         let _t1;
-        if (self is Person) _t1 = *self.id else if (self is Institution) _t1 = *self.id else abort 14566554180833181697;
+        if (self is Person) _t1 = *&self.id else if (self is Institution) _t1 = *&self.id else abort 14566554180833181697;
         _t1
     }
     fun id2(self: Entity): u64 {
@@ -320,7 +320,7 @@ module 0x815::m {
         'l0: loop {
             loop {
                 if (!(_t1 is Person)) break;
-                if (!(*_t1.id > 0)) break;
+                if (!(*&_t1.id > 0)) break;
                 let Entity::Person{id: _t13} = self;
                 break 'l0
             };
