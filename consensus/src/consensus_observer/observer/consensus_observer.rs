@@ -591,8 +591,10 @@ impl ConsensusObserver {
                 self.process_ordered_block_message(peer_network_id, ordered_block)
                     .await;
             },
-            ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
-                self.process_commit_decision_message(peer_network_id, commit_decision);
+            ConsensusObserverDirectSend::CommitDecision(_commit_decision) => {
+                // HACK: prevent us from ever committing!!
+                // self.process_commit_decision_message(peer_network_id, commit_decision);
+                return;
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
                 self.process_block_payload_message(peer_network_id, block_payload)
