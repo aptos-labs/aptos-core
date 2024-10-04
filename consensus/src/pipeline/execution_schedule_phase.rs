@@ -110,7 +110,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                 debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 match execution_futures.entry(block.id()) {
                     dashmap::mapref::entry::Entry::Occupied(mut entry) => {
-                        let fut = entry.get_mut();
+                        let fut = entry.get().clone();
                         let result = match fut.await {
                             Ok(mut result) => {
                                 if result.pre_commit_fut.is_some() {
