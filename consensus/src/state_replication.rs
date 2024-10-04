@@ -49,7 +49,7 @@ pub trait StateComputer: Send + Sync {
     /// In case of success (`Result::Ok`) the LI of storage is at the given target.
     /// In case of failure (`Result::Error`) the LI of storage remains unchanged, and the validator
     /// can assume there were no modifications to the storage made.
-    async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
+    async fn sync_to_target(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
     // Reconfigure to execute transactions for a new epoch.
     fn new_epoch(

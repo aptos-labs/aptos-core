@@ -67,7 +67,10 @@ impl StateComputer for EmptyStateComputer {
         Ok(())
     }
 
-    async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_to_target(
+        &self,
+        _target: LedgerInfoWithSignatures,
+    ) -> Result<(), StateSyncError> {
         Ok(())
     }
 
@@ -141,7 +144,10 @@ impl StateComputer for RandomComputeResultStateComputer {
         Ok(())
     }
 
-    async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_to_target(
+        &self,
+        _target: LedgerInfoWithSignatures,
+    ) -> Result<(), StateSyncError> {
         Ok(())
     }
 
