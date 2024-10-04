@@ -137,7 +137,7 @@ module supra_framework::supra_account {
 
     public fun assert_account_is_registered_for_supra(addr: address) {
         assert_account_exists(addr);
-        assert!(coin::is_account_registered<SupraCoin>(addr), error::not_found(EACCOUNT_NOT_REGISTERED_FOR_APT));
+        assert!(coin::is_account_registered<SupraCoin>(addr), error::not_found(EACCOUNT_NOT_REGISTERED_FOR_SUPRA));
     }
 
     /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
