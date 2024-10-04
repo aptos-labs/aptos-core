@@ -1119,10 +1119,10 @@ fn background_traffic_for_sweep_with_latency(criteria: &[(f32, f32)]) -> Option<
 fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![10000]),
+        workloads: Workloads::TPS(vec![10, 5000, 10000]),
         criteria: [
-            // (9, 0.9, 0.9, 1.2, 0),
-            // (4800, 2.0, 2.5, 3.0, 0),
+            (9, 0.9, 0.9, 1.2, 0),
+            (4800, 2.0, 2.5, 3.0, 0),
             (9000, 4.5, 5.5, 7.0, 0),
         ]
         // workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7000]),
