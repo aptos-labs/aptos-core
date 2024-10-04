@@ -278,6 +278,7 @@ impl<
                         .respond_to_sync_duration_notification(
                             sync_notification,
                             Err(error.clone()),
+                            None,
                         );
                 },
             }
