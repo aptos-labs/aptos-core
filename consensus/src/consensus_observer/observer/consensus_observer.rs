@@ -881,7 +881,7 @@ fn sync_to_commit_decision(
             // Sync to the commit decision
             if let Err(error) = execution_client
                 .clone()
-                .sync_to(commit_decision.commit_proof().clone())
+                .sync_to_target(commit_decision.commit_proof().clone())
                 .await
             {
                 warn!(
