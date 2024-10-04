@@ -58,8 +58,13 @@ impl ConsensusNotificationSender for DummyStateSyncNotifier {
         Ok(())
     }
 
-    async fn sync_for_duration(&self, _duration: Duration) -> Result<(), Error> {
-        unreachable!()
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, Error> {
+        Err(Error::UnexpectedErrorEncountered(
+            "sync_for_duration() is not supported by the DummyStateSyncNotifier!".into(),
+        ))
     }
 
     async fn sync_to_target(&self, _target: LedgerInfoWithSignatures) -> Result<(), Error> {
