@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    asset_uploader::worker::{
-        api::AssetUploaderApiContext, config::AssetUploaderWorkerConfig, AssetUploaderWorkerContext,
+    asset_uploader::{
+        api::AssetUploaderApiContext,
+        worker::{config::AssetUploaderWorkerConfig, AssetUploaderWorkerContext},
     },
     parser::{config::ParserConfig, ParserContext},
     utils::database::{establish_connection_pool, run_migrations},
