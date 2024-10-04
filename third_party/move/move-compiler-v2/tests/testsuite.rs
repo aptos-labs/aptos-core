@@ -106,7 +106,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Turn optimization on by default. Some configs below may turn it off.
         .set_experiment(Experiment::OPTIMIZE, true)
         .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true)
-        .set_language_version(LanguageVersion::V2_0);
+        .set_language_version(LanguageVersion::V2_1);
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -718,7 +718,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/op-equal/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone().set_language_version(LanguageVersion::V2_1),
+            options: opts.clone(),
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
