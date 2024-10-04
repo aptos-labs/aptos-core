@@ -379,8 +379,14 @@ mod test {
 
     #[test]
     fn test_clear_all_payloads() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some unverified blocks to the payload store
@@ -446,8 +452,14 @@ mod test {
 
     #[test]
     fn test_insert_block_payload() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks to the payload store
@@ -556,8 +568,14 @@ mod test {
 
     #[test]
     fn test_remove_blocks_for_epoch_round_verified() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks to the payload store for the current epoch
@@ -614,8 +632,14 @@ mod test {
 
     #[test]
     fn test_remove_blocks_for_epoch_round_unverified() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some unverified blocks to the payload store for the current epoch
@@ -671,8 +695,14 @@ mod test {
 
     #[test]
     fn test_remove_committed_blocks_verified() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some blocks to the payload store for the current epoch
@@ -740,8 +770,14 @@ mod test {
 
     #[test]
     fn test_remove_committed_blocks_unverified() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some blocks to the payload store for the current epoch
@@ -808,8 +844,14 @@ mod test {
 
     #[test]
     fn test_verify_payload_signatures() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks for the current epoch
@@ -940,8 +982,14 @@ mod test {
 
     #[test]
     fn test_verify_payload_signatures_failure() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new block payload store
-        let consensus_observer_config = ConsensusObserverConfig::default();
         let mut block_payload_store = BlockPayloadStore::new(consensus_observer_config);
 
         // Add some verified blocks for the current epoch

@@ -18,7 +18,7 @@ const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
 pub struct ConsensusObserverConfig {
     /// Whether the consensus observer is enabled
     pub observer_enabled: bool,
-    /// Whether the consensus observer publisher is enabled
+    /// Whether the consensus publisher is enabled
     pub publisher_enabled: bool,
 
     /// Maximum number of pending network messages
@@ -30,21 +30,27 @@ pub struct ConsensusObserverConfig {
 
     /// Interval (in milliseconds) to garbage collect peer state
     pub garbage_collection_interval_ms: u64,
-    /// The maximum number of concurrent subscriptions
-    pub max_concurrent_subscriptions: u64,
     /// Maximum number of blocks to keep in memory (e.g., pending blocks, ordered blocks, etc.)
     pub max_num_pending_blocks: u64,
-    /// Maximum timeout (in milliseconds) for active subscriptions
-    pub max_subscription_timeout_ms: u64,
-    /// Maximum timeout (in milliseconds) we'll wait for the synced version to
-    /// increase before terminating the active subscription.
-    pub max_synced_version_timeout_ms: u64,
     /// Interval (in milliseconds) to check progress of the consensus observer
     pub progress_check_interval_ms: u64,
+
+    /// The maximum number of concurrent subscriptions
+    pub max_concurrent_subscriptions: u64,
+    /// Maximum timeout (in milliseconds) we'll wait for the synced version to
+    /// increase before terminating the active subscription.
+    pub max_subscription_sync_timeout_ms: u64,
+    /// Maximum message timeout (in milliseconds) for active subscriptions
+    pub max_subscription_timeout_ms: u64,
     /// Interval (in milliseconds) to check for subscription related peer changes
     pub subscription_peer_change_interval_ms: u64,
     /// Interval (in milliseconds) to refresh the subscription
     pub subscription_refresh_interval_ms: u64,
+
+    /// Duration (in seconds) to require state sync to synchronize when in fallback mode
+    pub observer_fallback_duration_secs: u64,
+    /// Duration (in seconds) we'll wait for syncing progress before entering fallback mode
+    pub observer_fallback_sync_threshold_secs: u64,
 }
 
 impl Default for ConsensusObserverConfig {
@@ -56,13 +62,15 @@ impl Default for ConsensusObserverConfig {
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds
             garbage_collection_interval_ms: 60_000,            // 60 seconds
-            max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
             max_num_pending_blocks: 100,                       // 100 blocks
-            max_subscription_timeout_ms: 30_000,               // 30 seconds
-            max_synced_version_timeout_ms: 60_000,             // 60 seconds
             progress_check_interval_ms: 5_000,                 // 5 seconds
+            max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
+            max_subscription_sync_timeout_ms: 15_000,          // 15 seconds
+            max_subscription_timeout_ms: 15_000,               // 15 seconds
             subscription_peer_change_interval_ms: 60_000,      // 1 minute
             subscription_refresh_interval_ms: 300_000,         // 5 minutes
+            observer_fallback_duration_secs: 600,              // 10 minutes
+            observer_fallback_sync_threshold_secs: 30,         // 30 seconds
         }
     }
 }
