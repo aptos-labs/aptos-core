@@ -16,11 +16,11 @@ members = [
     "aptos-move/aptos-gas-profiling",
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
-    "aptos-move/aptos-script-builder",
     "aptos-move/aptos-memory-usage-tracker",
     "aptos-move/aptos-native-interface",
     "aptos-move/aptos-release-builder",
     "aptos-move/aptos-resource-viewer",
+    "aptos-move/aptos-script-builder",
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
     "aptos-move/aptos-transactional-test-harness",
@@ -369,7 +369,6 @@ aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-g
 aptos-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-transaction-generator" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
-aptos-script-builder = { path = "aptos-move/aptos-script-builder" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-jwk-utils = { path = "crates/jwk-utils" }
@@ -425,6 +424,7 @@ aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }
+aptos-script-builder = { path = "aptos-move/aptos-script-builder" }
 aptos-sdk = { path = "sdk" }
 aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
 aptos-secure-net = { path = "secure/net" }

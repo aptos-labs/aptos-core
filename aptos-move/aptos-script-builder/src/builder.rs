@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
-    file_format::{Ability, AbilitySet, FunctionHandle, SignatureToken},
+    file_format::{Ability, AbilitySet, FunctionDefinition, FunctionHandle, SignatureToken},
     CompiledModule,
 };
 use move_core_types::{
@@ -109,12 +109,16 @@ fn find_function<'a>(
     map: &'a BTreeMap<ModuleId, CompiledModule>,
     module_id: &ModuleId,
     func_name: &IdentStr,
-) -> anyhow::Result<(&'a CompiledModule, &'a FunctionHandle)> {
+) -> anyhow::Result<(
+    &'a CompiledModule,
+    &'a FunctionHandle,
+    &'a FunctionDefinition,
+)> {
     if let Some(module) = map.get(module_id) {
         for def in module.function_defs() {
             let handle = module.function_handle_at(def.function);
             if module.identifier_at(handle.name) == func_name {
-                return Ok((module, handle));
+                return Ok((module, handle, def));
             }
         }
     }
@@ -131,7 +135,7 @@ impl BatchedFunctionCallBuilder {
         if self.calls.is_empty() {
             bail!("No calls exists in the builder yet");
         }
-        let (module, handle) = find_function(&self.modules, module_id, func_name)?;
+        let (module, handle, _) = find_function(&self.modules, module_id, func_name)?;
         let mut returns = vec![];
         for (idx, sig) in module.signature_at(handle.return_).0.iter().enumerate() {
             let call_idx = (self.calls.len() - 1) as u16;
@@ -160,7 +164,16 @@ impl BatchedFunctionCallBuilder {
         params: &[BatchArgument],
         ty_args: &[TypeTag],
     ) -> anyhow::Result<()> {
-        let (module, handle) = find_function(&self.modules, module_id, func_name)?;
+        let (module, handle, def) = find_function(&self.modules, module_id, func_name)?;
+
+        if !def.visibility.is_public() {
+            bail!(
+                "{}::{} function is not public and thus not invokable in a transaction",
+                module_id,
+                func_name
+            );
+        }
+
         let param_tys = module.signature_at(handle.parameters);
         if param_tys.0.len() != params.len() {
             bail!(
