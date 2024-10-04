@@ -38,7 +38,7 @@ for example:
 -  [Function `fill_reserved_slot`](#0x1_storage_slots_allocator_fill_reserved_slot)
 -  [Function `remove_and_reserve`](#0x1_storage_slots_allocator_remove_and_reserve)
 -  [Function `free_reserved_slot`](#0x1_storage_slots_allocator_free_reserved_slot)
--  [Function `push_to_reuse_queue`](#0x1_storage_slots_allocator_push_to_reuse_queue)
+-  [Function `push_to_reuse_queue_if_enabled`](#0x1_storage_slots_allocator_push_to_reuse_queue_if_enabled)
 -  [Function `next_slot_index`](#0x1_storage_slots_allocator_next_slot_index)
 
 
@@ -288,7 +288,7 @@ for example:
 
     for (i in 0..num_to_preallocate) {
         <b>let</b> slot_index = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_next_slot_index">next_slot_index</a>();
-        self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue">push_to_reuse_queue</a>(slot_index);
+        self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue_if_enabled">push_to_reuse_queue_if_enabled</a>(slot_index);
     };
 
     self
@@ -353,7 +353,7 @@ for example:
 <pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove">remove</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): T {
     <b>let</b> Link::Occupied { value } = self.slots.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove">remove</a>(slot_index);
 
-    self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue">push_to_reuse_queue</a>(slot_index);
+    self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue_if_enabled">push_to_reuse_queue_if_enabled</a>(slot_index);
 
     value
 }
@@ -581,7 +581,7 @@ Remove storage slot, but reserve it for later.
 
 <pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_free_reserved_slot">free_reserved_slot</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">ReservedSlot</a>) {
     <b>let</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">ReservedSlot</a> { slot_index } = slot;
-    self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue">push_to_reuse_queue</a>(slot_index);
+    self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue_if_enabled">push_to_reuse_queue_if_enabled</a>(slot_index);
 }
 </code></pre>
 
@@ -589,13 +589,13 @@ Remove storage slot, but reserve it for later.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_push_to_reuse_queue"></a>
+<a id="0x1_storage_slots_allocator_push_to_reuse_queue_if_enabled"></a>
 
-## Function `push_to_reuse_queue`
+## Function `push_to_reuse_queue_if_enabled`
 
 
 
-<pre><code><b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue">push_to_reuse_queue</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64)
+<pre><code><b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue_if_enabled">push_to_reuse_queue_if_enabled</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64)
 </code></pre>
 
 
@@ -604,7 +604,7 @@ Remove storage slot, but reserve it for later.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue">push_to_reuse_queue</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64) {
+<pre><code><b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_push_to_reuse_queue_if_enabled">push_to_reuse_queue_if_enabled</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64) {
     <b>if</b> (self is StorageSlotsAllocator::Reuse&lt;T&gt;) {
         self.slots.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_add">add</a>(slot_index, Link::Vacant { next: self.reuse_head_index });
         self.reuse_head_index = slot_index;
