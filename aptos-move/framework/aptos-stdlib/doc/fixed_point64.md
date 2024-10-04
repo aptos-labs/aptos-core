@@ -144,22 +144,22 @@ The multiplied value would be too large to be held in a <code>u128</code>
 
 
 
-<a id="0x1_fixed_point64_ENEGATIVE_RESULT"></a>
-
-Abort code on calculation result is negative.
-
-
-<pre><code><b>const</b> <a href="fixed_point64.md#0x1_fixed_point64_ENEGATIVE_RESULT">ENEGATIVE_RESULT</a>: u64 = 65542;
-</code></pre>
-
-
-
 <a id="0x1_fixed_point64_ERATIO_OUT_OF_RANGE"></a>
 
 The computed ratio when converting to a <code><a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">FixedPoint64</a></code> would be unrepresentable
 
 
 <pre><code><b>const</b> <a href="fixed_point64.md#0x1_fixed_point64_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>: u64 = 131077;
+</code></pre>
+
+
+
+<a id="0x1_fixed_point64_ENEGATIVE_RESULT"></a>
+
+Abort code on calculation result is negative.
+
+
+<pre><code><b>const</b> <a href="fixed_point64.md#0x1_fixed_point64_ENEGATIVE_RESULT">ENEGATIVE_RESULT</a>: u64 = 65542;
 </code></pre>
 
 
