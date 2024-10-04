@@ -317,7 +317,10 @@ module 0xb055::OneToOneMarket {
         price: u64,
     }
     public fun borrow<In: copy + drop + store, Out: copy + drop + store>(account: &signer, amount: u64): Token::Coin<Out>
-        acquires Priceacquires Poolacquires DepositRecordacquires BorrowRecord
+        acquires Price
+        acquires Pool
+        acquires DepositRecord
+        acquires BorrowRecord
     {
         if (amount <= max_borrow_amount<In,Out>(account)) () else abort 1025;
         update_borrow_record<In,Out>(account, amount);
@@ -325,7 +328,8 @@ module 0xb055::OneToOneMarket {
         Token::withdraw<Out>(&mut pool.coin, amount)
     }
     public fun deposit<In: copy + drop + store, Out: copy + drop + store>(account: &signer, coin: Token::Coin<In>)
-        acquires Poolacquires DepositRecord
+        acquires Pool
+        acquires DepositRecord
     {
         let amount = Token::value<In>(&coin);
         update_deposit_record<In,Out>(account, amount);
@@ -352,7 +356,10 @@ module 0xb055::OneToOneMarket {
         borrow_global<DepositRecord<In, Out>>(sender).record
     }
     fun max_borrow_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer): u64
-        acquires Priceacquires Poolacquires DepositRecordacquires BorrowRecord
+        acquires Price
+        acquires Pool
+        acquires DepositRecord
+        acquires BorrowRecord
     {
         let input_deposited = deposited_amount<In,Out>(account);
         let output_deposited = borrowed_amount<In,Out>(account);

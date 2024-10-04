@@ -131,12 +131,15 @@ impl<'a> Sourcifier<'a> {
                 fun_env.get_result_type().display(&tctx)
             )
         }
-        emit!(self.writer, " ");
-        self.print_access_specifiers(&tctx, &fun_env);
+        if fun_env.get_access_specifiers().is_none() && !fun_env.is_native() {
+            // Add a space so we open the code block with " {" on the same line.
+            emit!(self.writer, " ");
+        } else {
+            self.print_access_specifiers(&tctx, &fun_env);
+        }
         if let Some(def) = def {
             // A sequence or block is already automatically printed in braces with indent
-            let requires_braces =
-                !matches!(def.as_ref(), ExpData::Sequence(..) | ExpData::Block(..));
+            let requires_braces = !Self::is_braced(def);
             let exp_sourcifier = ExpSourcifier::for_fun(self, &fun_env, def);
             if requires_braces {
                 self.print_block(|| {
@@ -154,11 +157,19 @@ impl<'a> Sourcifier<'a> {
         }
     }
 
+    fn is_braced(exp: &Exp) -> bool {
+        match exp.as_ref() {
+            ExpData::Sequence(_, exps) => exps.len() != 1 || Self::is_braced(&exps[0]),
+            ExpData::Block(..) => true,
+            _ => false,
+        }
+    }
+
     fn print_access_specifiers(&self, tctx: &TypeDisplayContext, fun: &FunctionEnv) {
         if let Some(specs) = fun.get_access_specifiers() {
-            emitln!(self.writer);
             self.writer.indent();
             for spec in specs {
+                emitln!(self.writer);
                 if spec.negated {
                     emit!(self.writer, "!")
                 }
@@ -214,11 +225,11 @@ impl<'a> Sourcifier<'a> {
                             self.sym(*sym)
                         ),
                     }
-                    emitln!(self.writer, ")")
+                    emit!(self.writer, ")")
                 }
             }
             self.writer.unindent();
-            emitln!(self.writer);
+            emitln!(self.writer)
         }
     }
 
@@ -770,16 +781,31 @@ impl<'a> ExpSourcifier<'a> {
                 self.parenthesize(context_prio, Prio::Postfix, || {
                     let struct_env = self.env().get_module(*mid).into_struct(*sid);
                     let field_env = struct_env.get_field(*fid);
+                    let result_ty = self.env().get_node_type(id);
+                    if result_ty.is_immutable_reference() {
+                        emit!(self.wr(), "&")
+                    } else if result_ty.is_mutable_reference() {
+                        emit!(self.wr(), "&mut ")
+                    }
                     self.print_exp(Prio::Postfix, false, &args[0]);
                     emit!(self.wr(), ".{}", self.sym(field_env.get_name()))
                 })
             },
-            Operation::SelectVariants(_, _, fids) => {
+            Operation::SelectVariants(mid, sid, fids) => {
                 self.parenthesize(context_prio, Prio::Postfix, || {
-                    self.print_exp(Prio::Postfix, false, &args[0]);
+                    let struct_env = self.env().get_module(*mid).into_struct(*sid);
                     // All field names are the same, so we can choose one representative
                     // on source level.
-                    emit!(self.wr(), ".{}", self.sym(fids[0].symbol()));
+                    let fid = fids[0];
+                    let field_env = struct_env.get_field(fid);
+                    let result_ty = self.env().get_node_type(id);
+                    if result_ty.is_immutable_reference() {
+                        emit!(self.wr(), "&")
+                    } else if result_ty.is_mutable_reference() {
+                        emit!(self.wr(), "&mut ")
+                    }
+                    self.print_exp(Prio::Postfix, false, &args[0]);
+                    emit!(self.wr(), ".{}", self.sym(field_env.get_name()))
                 })
             },
             Operation::TestVariants(_, _, variants) => {

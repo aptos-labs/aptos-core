@@ -59,19 +59,19 @@ module 0x815::m {
     }
     fun t0(): bool {
         let c = Color::Red{};
-        c.RGB.red == 1
+        c.red == 1
     }
     fun t1(): bool {
         let c = Color::Red{};
-        c.RGB.red == 1
+        c.red == 1
     }
     fun t2(): bool {
         let c = Color::Blue{};
-        c.RGB.red == 1
+        c.red == 1
     }
     fun t3(): bool {
         let c = Color::Blue{};
-        c.RGB.red == 1
+        c.red == 1
     }
     fun t4(c: &Color) {
         match (c) {
