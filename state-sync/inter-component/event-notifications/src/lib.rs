@@ -36,7 +36,7 @@ mod tests;
 // consumed, they will be dropped (oldest messages first). The remaining messages
 // will be retrieved using FIFO ordering.
 const EVENT_NOTIFICATION_CHANNEL_SIZE: usize = 100;
-const RECONFIG_NOTIFICATION_CHANNEL_SIZE: usize = 1;
+const RECONFIG_NOTIFICATION_CHANNEL_SIZE: usize = 1; // Note: this should be 1 to ensure only the latest reconfig is consumed
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
