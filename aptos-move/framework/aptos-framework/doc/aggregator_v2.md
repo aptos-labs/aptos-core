@@ -49,11 +49,28 @@ read, read_snapshot, read_derived_string
 -  [Function `derive_string_concat`](#0x1_aggregator_v2_derive_string_concat)
 -  [Function `copy_snapshot`](#0x1_aggregator_v2_copy_snapshot)
 -  [Function `string_concat`](#0x1_aggregator_v2_string_concat)
+-  [Function `verify_aggregator_try_add_sub`](#0x1_aggregator_v2_verify_aggregator_try_add_sub)
+-  [Function `verify_aggregator_add_sub`](#0x1_aggregator_v2_verify_aggregator_add_sub)
+-  [Function `verify_correct_read`](#0x1_aggregator_v2_verify_correct_read)
+-  [Function `verify_invalid_read`](#0x1_aggregator_v2_verify_invalid_read)
+-  [Function `verify_invalid_is_least`](#0x1_aggregator_v2_verify_invalid_is_least)
+-  [Function `verify_copy_not_yet_supported`](#0x1_aggregator_v2_verify_copy_not_yet_supported)
+-  [Function `verify_string_concat1`](#0x1_aggregator_v2_verify_string_concat1)
+-  [Function `verify_aggregator_generic`](#0x1_aggregator_v2_verify_aggregator_generic)
+-  [Function `verify_aggregator_generic_add`](#0x1_aggregator_v2_verify_aggregator_generic_add)
+-  [Function `verify_aggregator_generic_sub`](#0x1_aggregator_v2_verify_aggregator_generic_sub)
+-  [Function `verify_aggregator_invalid_type1`](#0x1_aggregator_v2_verify_aggregator_invalid_type1)
+-  [Function `verify_snapshot_invalid_type1`](#0x1_aggregator_v2_verify_snapshot_invalid_type1)
+-  [Function `verify_snapshot_invalid_type2`](#0x1_aggregator_v2_verify_snapshot_invalid_type2)
+-  [Function `verify_aggregator_valid_type`](#0x1_aggregator_v2_verify_aggregator_valid_type)
 -  [Specification](#@Specification_1)
+    -  [Struct `Aggregator`](#@Specification_1_Aggregator)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
     -  [Function `create_unbounded_aggregator`](#@Specification_1_create_unbounded_aggregator)
     -  [Function `try_add`](#@Specification_1_try_add)
+    -  [Function `add`](#@Specification_1_add)
     -  [Function `try_sub`](#@Specification_1_try_sub)
+    -  [Function `sub`](#@Specification_1_sub)
     -  [Function `is_at_least_impl`](#@Specification_1_is_at_least_impl)
     -  [Function `read`](#@Specification_1_read)
     -  [Function `snapshot`](#@Specification_1_snapshot)
@@ -64,10 +81,23 @@ read, read_snapshot, read_derived_string
     -  [Function `derive_string_concat`](#@Specification_1_derive_string_concat)
     -  [Function `copy_snapshot`](#@Specification_1_copy_snapshot)
     -  [Function `string_concat`](#@Specification_1_string_concat)
+    -  [Function `verify_aggregator_try_add_sub`](#@Specification_1_verify_aggregator_try_add_sub)
+    -  [Function `verify_aggregator_add_sub`](#@Specification_1_verify_aggregator_add_sub)
+    -  [Function `verify_invalid_read`](#@Specification_1_verify_invalid_read)
+    -  [Function `verify_invalid_is_least`](#@Specification_1_verify_invalid_is_least)
+    -  [Function `verify_copy_not_yet_supported`](#@Specification_1_verify_copy_not_yet_supported)
+    -  [Function `verify_aggregator_generic`](#@Specification_1_verify_aggregator_generic)
+    -  [Function `verify_aggregator_generic_add`](#@Specification_1_verify_aggregator_generic_add)
+    -  [Function `verify_aggregator_generic_sub`](#@Specification_1_verify_aggregator_generic_sub)
+    -  [Function `verify_aggregator_invalid_type1`](#@Specification_1_verify_aggregator_invalid_type1)
+    -  [Function `verify_snapshot_invalid_type1`](#@Specification_1_verify_snapshot_invalid_type1)
+    -  [Function `verify_snapshot_invalid_type2`](#@Specification_1_verify_snapshot_invalid_type2)
+    -  [Function `verify_aggregator_valid_type`](#@Specification_1_verify_aggregator_valid_type)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
@@ -221,7 +251,7 @@ and any calls will raise this error.
 
 <a id="0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE"></a>
 
-Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together).
+Arguments passed to concat exceed max limit of 1024 bytes (for prefix and suffix together).
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE">ECONCAT_STRING_LENGTH_TOO_LARGE</a>: u64 = 8;
@@ -709,7 +739,7 @@ Useful for when object is sometimes created via string_concat(), and sometimes d
 Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.
 snapshot passed needs to have integer type - currently supported types are u64 and u128.
 Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
-If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
+If length of prefix and suffix together exceed 1024 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
 
 Parallelism info: This operation enables parallelism.
 
@@ -778,9 +808,514 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 </details>
 
+<a id="0x1_aggregator_v2_verify_aggregator_try_add_sub"></a>
+
+## Function `verify_aggregator_try_add_sub`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_try_add_sub">verify_aggregator_try_add_sub</a>(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_try_add_sub">verify_aggregator_try_add_sub</a>(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;u64&gt; {
+    <b>let</b> agg = <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>(10);
+    <b>spec</b> {
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>(agg) == 10;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(agg) == 0;
+    };
+    <b>let</b> x = <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(&<b>mut</b> agg, 5);
+    <b>spec</b> {
+        <b>assert</b> x;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">is_at_least</a>(agg, 5);
+    };
+    <b>let</b> y = <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(&<b>mut</b> agg, 6);
+    <b>spec</b> {
+        <b>assert</b> !y;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(agg) == 5;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>(agg) == 10;
+    };
+    <b>let</b> y = <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(&<b>mut</b> agg, 4);
+    <b>spec</b> {
+        <b>assert</b> y;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(agg) == 1;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>(agg) == 10;
+    };
+    <b>let</b> x = <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(&<b>mut</b> agg, 11);
+    <b>spec</b> {
+        <b>assert</b> !x;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(agg) == 1;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>(agg) == 10;
+    };
+    <b>let</b> x = <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(&<b>mut</b> agg, 9);
+    <b>spec</b> {
+        <b>assert</b> x;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(agg) == 10;
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>(agg) == 10;
+    };
+    agg
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_aggregator_add_sub"></a>
+
+## Function `verify_aggregator_add_sub`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_add_sub">verify_aggregator_add_sub</a>(sub_value: u64, add_value: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_add_sub">verify_aggregator_add_sub</a>(sub_value: u64, add_value: u64) {
+    <b>let</b> agg = <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>(10);
+    <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>(&<b>mut</b> agg, add_value);
+    <b>spec</b> {
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(agg) == add_value;
+    };
+    <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>(&<b>mut</b> agg, sub_value);
+    <b>spec</b> {
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(agg) == add_value - sub_value;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_correct_read"></a>
+
+## Function `verify_correct_read`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_correct_read">verify_correct_read</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_correct_read">verify_correct_read</a>() {
+    <b>let</b> snapshot = <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>(42);
+    <b>spec</b> {
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_read_snapshot">spec_read_snapshot</a>(snapshot) == 42;
+    };
+    <b>let</b> derived = <a href="aggregator_v2.md#0x1_aggregator_v2_create_derived_string">create_derived_string</a>(std::string::utf8(b"42"));
+    <b>spec</b> {
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_read_derived_string">spec_read_derived_string</a>(derived).bytes == b"42";
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_invalid_read"></a>
+
+## Function `verify_invalid_read`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_invalid_read">verify_invalid_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;u8&gt;): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_invalid_read">verify_invalid_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;u8&gt;): u8 {
+    <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_invalid_is_least"></a>
+
+## Function `verify_invalid_is_least`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_invalid_is_least">verify_invalid_is_least</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;u8&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_invalid_is_least">verify_invalid_is_least</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;u8&gt;): bool {
+    <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">is_at_least</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, 0)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_copy_not_yet_supported"></a>
+
+## Function `verify_copy_not_yet_supported`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_copy_not_yet_supported">verify_copy_not_yet_supported</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_copy_not_yet_supported">verify_copy_not_yet_supported</a>() {
+    <b>let</b> snapshot = <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>(42);
+    <a href="aggregator_v2.md#0x1_aggregator_v2_copy_snapshot">copy_snapshot</a>(&snapshot);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_string_concat1"></a>
+
+## Function `verify_string_concat1`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_string_concat1">verify_string_concat1</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_string_concat1">verify_string_concat1</a>() {
+    <b>let</b> snapshot = <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>(42);
+    <b>let</b> derived = <a href="aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">derive_string_concat</a>(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+    <b>spec</b> {
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_read_derived_string">spec_read_derived_string</a>(derived).bytes ==
+            concat(b"before", concat(<a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_string_value">spec_get_string_value</a>(snapshot).bytes, b"after"));
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_aggregator_generic"></a>
+
+## Function `verify_aggregator_generic`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic">verify_aggregator_generic</a>&lt;IntElement1: <b>copy</b>, drop, IntElement2: <b>copy</b>, drop&gt;(): (<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement1&gt;, <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement2&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic">verify_aggregator_generic</a>&lt;IntElement1: <b>copy</b> + drop, IntElement2: <b>copy</b>+drop&gt;(): (<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement1&gt;,  <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement2&gt;){
+    <b>let</b> x = <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement1&gt;();
+    <b>let</b> y = <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement2&gt;();
+    (x, y)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_aggregator_generic_add"></a>
+
+## Function `verify_aggregator_generic_add`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic_add">verify_aggregator_generic_add</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic_add">verify_aggregator_generic_add</a>&lt;IntElement: <b>copy</b> + drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, value: IntElement) {
+    <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value);
+    <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least_impl">is_at_least_impl</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value);
+    // cannot specify <b>aborts_if</b> condition for generic `add`
+    // because comparison is not supported by IntElement
+    <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_aggregator_generic_sub"></a>
+
+## Function `verify_aggregator_generic_sub`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic_sub">verify_aggregator_generic_sub</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic_sub">verify_aggregator_generic_sub</a>&lt;IntElement: <b>copy</b> + drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, value: IntElement) {
+    <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value);
+    // cannot specify <b>aborts_if</b> condition for generic `sub`
+    // because comparison is not supported by IntElement
+    <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_aggregator_invalid_type1"></a>
+
+## Function `verify_aggregator_invalid_type1`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_invalid_type1">verify_aggregator_invalid_type1</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_invalid_type1">verify_aggregator_invalid_type1</a>() {
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u8&gt;();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_snapshot_invalid_type1"></a>
+
+## Function `verify_snapshot_invalid_type1`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_snapshot_invalid_type1">verify_snapshot_invalid_type1</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_snapshot_invalid_type1">verify_snapshot_invalid_type1</a>() {
+    <b>use</b> std::option;
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(42));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_snapshot_invalid_type2"></a>
+
+## Function `verify_snapshot_invalid_type2`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_snapshot_invalid_type2">verify_snapshot_invalid_type2</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_snapshot_invalid_type2">verify_snapshot_invalid_type2</a>() {
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[42]);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_verify_aggregator_valid_type"></a>
+
+## Function `verify_aggregator_valid_type`
+
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_valid_type">verify_aggregator_valid_type</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_valid_type">verify_aggregator_valid_type</a>() {
+    <b>let</b> _agg_1 = <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u64&gt;();
+    <b>spec</b> {
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>(_agg_1) == MAX_U64;
+    };
+    <b>let</b> _agg_2 = <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u128&gt;();
+    <b>spec</b> {
+        <b>assert</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>(_agg_2) == MAX_U128;
+    };
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;u64&gt;(5);
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;u128&gt;(5);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+
+<a id="0x1_aggregator_v2_spec_get_value"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): IntElement;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_get_max_value"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): IntElement;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_get_string_value"></a>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_string_value">spec_get_string_value</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;): String;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_read_snapshot"></a>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_read_snapshot">spec_read_snapshot</a>&lt;IntElement&gt;(snapshot: <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;): IntElement {
+   snapshot.value
+}
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_read_derived_string"></a>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_read_derived_string">spec_read_derived_string</a>(snapshot: <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a>): String {
+   snapshot.value
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_Aggregator"></a>
+
+### Struct `Aggregator`
+
+
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt; <b>has</b> drop, store
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>value: IntElement</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>max_value: IntElement</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
 
 
 <a id="@Specification_1_create_aggregator"></a>
@@ -794,7 +1329,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -810,7 +1345,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -826,7 +1361,23 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_add"></a>
+
+### Function `add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -842,7 +1393,23 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_sub"></a>
+
+### Function `sub`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -858,7 +1425,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -874,7 +1441,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -891,6 +1458,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt;;
+<b>ensures</b> [abstract] result.value == <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
 </code></pre>
 
 
@@ -907,6 +1476,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt;;
+<b>ensures</b> [abstract] result.value == value;
 </code></pre>
 
 
@@ -923,6 +1494,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt;;
+<b>ensures</b> [abstract] result == snapshot.value;
 </code></pre>
 
 
@@ -939,6 +1512,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == snapshot.value;
 </code></pre>
 
 
@@ -955,6 +1530,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] len(value.bytes) &gt; 1024;
+<b>ensures</b> [abstract] result.value == value;
 </code></pre>
 
 
@@ -971,6 +1548,20 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt;;
+<b>ensures</b> [abstract] result.value.bytes == concat(before.bytes, concat(<a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_string_value">spec_get_string_value</a>(snapshot).bytes, after.bytes));
+<b>aborts_if</b> [abstract] len(before.bytes) + len(after.bytes) &gt; 1024;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_AbortsIfIntElement"></a>
+
+
+<pre><code><b>schema</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt; {
+    <b>aborts_if</b> [abstract] <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement&gt;().bytes != b"u64" && <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement&gt;().bytes != b"u128";
+}
 </code></pre>
 
 
@@ -988,6 +1579,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>true</b>;
 </code></pre>
 
 
@@ -1005,6 +1597,216 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_aggregator_try_add_sub"></a>
+
+### Function `verify_aggregator_try_add_sub`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_try_add_sub">verify_aggregator_try_add_sub</a>(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;u64&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>(result) == 10;
+<b>ensures</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(result) == 10;
+<b>ensures</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>(result) == 10;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_aggregator_add_sub"></a>
+
+### Function `verify_aggregator_add_sub`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_add_sub">verify_aggregator_add_sub</a>(sub_value: u64, add_value: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_strict;
+<b>aborts_if</b> add_value &gt; 10;
+<b>aborts_if</b> sub_value &gt; add_value;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_invalid_read"></a>
+
+### Function `verify_invalid_read`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_invalid_read">verify_invalid_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;u8&gt;): u8
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_invalid_is_least"></a>
+
+### Function `verify_invalid_is_least`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_invalid_is_least">verify_invalid_is_least</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;u8&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_copy_not_yet_supported"></a>
+
+### Function `verify_copy_not_yet_supported`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_copy_not_yet_supported">verify_copy_not_yet_supported</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_aggregator_generic"></a>
+
+### Function `verify_aggregator_generic`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic">verify_aggregator_generic</a>&lt;IntElement1: <b>copy</b>, drop, IntElement2: <b>copy</b>, drop&gt;(): (<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement1&gt;, <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement2&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement1&gt;().bytes != b"u64" && <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement1&gt;().bytes != b"u128";
+<b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement2&gt;().bytes != b"u64" && <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement2&gt;().bytes != b"u128";
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_aggregator_generic_add"></a>
+
+### Function `verify_aggregator_generic_add`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic_add">verify_aggregator_generic_add</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement&gt;().bytes != b"u64" && <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement&gt;().bytes != b"u128";
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_aggregator_generic_sub"></a>
+
+### Function `verify_aggregator_generic_sub`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_generic_sub">verify_aggregator_generic_sub</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement&gt;().bytes != b"u64" && <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement&gt;().bytes != b"u128";
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_aggregator_invalid_type1"></a>
+
+### Function `verify_aggregator_invalid_type1`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_invalid_type1">verify_aggregator_invalid_type1</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_snapshot_invalid_type1"></a>
+
+### Function `verify_snapshot_invalid_type1`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_snapshot_invalid_type1">verify_snapshot_invalid_type1</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_snapshot_invalid_type2"></a>
+
+### Function `verify_snapshot_invalid_type2`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_snapshot_invalid_type2">verify_snapshot_invalid_type2</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_verify_aggregator_valid_type"></a>
+
+### Function `verify_aggregator_valid_type`
+
+
+<pre><code>#[verify_only]
+<b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_verify_aggregator_valid_type">verify_aggregator_valid_type</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

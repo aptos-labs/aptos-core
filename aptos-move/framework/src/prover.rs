@@ -161,11 +161,18 @@ impl ProverOptions {
         options.backend.custom_natives =
             Some(move_prover_boogie_backend::options::CustomNativeOptions {
                 template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
-                module_instance_names: vec![(
-                    "0x1::object".to_string(),
-                    "object_instances".to_string(),
-                    true,
-                )],
+                module_instance_names: vec![
+                    (
+                        "0x1::object".to_string(),
+                        "object_instances".to_string(),
+                        true,
+                    ),
+                    (
+                        "0x1::aggregator_v2".to_string(),
+                        "aggregator_v2_instances".to_string(),
+                        true,
+                    ),
+                ],
             });
         let mut writer = StandardStream::stderr(ColorChoice::Auto);
         if compiler_version.unwrap_or_default() == CompilerVersion::V1 {
