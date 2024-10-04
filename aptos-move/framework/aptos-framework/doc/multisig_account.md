@@ -2090,7 +2090,7 @@ account.
     // Rotate the <a href="account.md#0x1_account">account</a>'s auth key <b>to</b> 0x0, which effectively revokes control via auth key.
     <b>let</b> multisig_address = address_of(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, <a href="multisig_account.md#0x1_multisig_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
-    // This also needs <b>to</b> revoke <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability or rotation capability that <b>exists</b> for the <a href="account.md#0x1_account">account</a> <b>to</b>
+    // This also needs <b>to</b> revoke <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> or rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> that <b>exists</b> for the <a href="account.md#0x1_account">account</a> <b>to</b>
     // completely remove all access <b>to</b> the <a href="account.md#0x1_account">account</a>.
     <b>if</b> (<a href="account.md#0x1_account_is_signer_capability_offered">account::is_signer_capability_offered</a>(multisig_address)) {
         <a href="account.md#0x1_account_revoke_any_signer_capability">account::revoke_any_signer_capability</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
@@ -2168,7 +2168,7 @@ account.
     // Rotate the <a href="account.md#0x1_account">account</a>'s auth key <b>to</b> 0x0, which effectively revokes control via auth key.
     <b>let</b> multisig_address = address_of(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, <a href="multisig_account.md#0x1_multisig_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>);
-    // This also needs <b>to</b> revoke <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability or rotation capability that <b>exists</b> for the <a href="account.md#0x1_account">account</a> <b>to</b>
+    // This also needs <b>to</b> revoke <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> or rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> that <b>exists</b> for the <a href="account.md#0x1_account">account</a> <b>to</b>
     // completely remove all access <b>to</b> the <a href="account.md#0x1_account">account</a>.
     <b>if</b> (<a href="account.md#0x1_account_is_signer_capability_offered">account::is_signer_capability_offered</a>(multisig_address)) {
         <a href="account.md#0x1_account_revoke_any_signer_capability">account::revoke_any_signer_capability</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
