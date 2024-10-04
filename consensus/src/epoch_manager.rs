@@ -1063,10 +1063,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
-        let epoch_state = Arc::new(EpochState {
-            epoch: payload.epoch(),
-            verifier: (&validator_set).into(),
-        });
+        let epoch_state = Arc::new(EpochState::new(payload.epoch(), (&validator_set).into()));
 
         self.epoch_state = Some(epoch_state.clone());
 
@@ -1484,6 +1481,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ConsensusMsg::ProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
+            | ConsensusMsg::RoundTimeoutMsg(_)
             | ConsensusMsg::OrderVoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)

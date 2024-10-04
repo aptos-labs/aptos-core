@@ -29,6 +29,7 @@ members = [
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
+    "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
@@ -125,7 +126,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-test-transactions",
     "ecosystem/indexer-grpc/indexer-transaction-generator",
     "ecosystem/indexer-grpc/transaction-filter",
-    "ecosystem/nft-metadata-crawler-parser",
+    "ecosystem/nft-metadata-crawler",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
@@ -392,7 +393,7 @@ aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
-aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
+aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
@@ -475,9 +476,12 @@ arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
 ark-bn254 = "0.4.0"
+ark-circom = { git = "https://github.com/aptos-labs/circom-compat", rev = "e3d686641a3dd9d66087a74acdc20dc2a3c24f63" }
+ark-crypto-primitives = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-groth16 = "0.4.0"
+ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
@@ -741,6 +745,7 @@ serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev =
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
+set_env = "1.3.4"
 shadow-rs = "0.16.2"
 simplelog = "0.9.0"
 smallbitvec = "2.5.1"

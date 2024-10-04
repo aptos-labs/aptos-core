@@ -1,0 +1,73 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/locals/use_after_move_if_else.move:4:25
+  │
+4 │         if (cond) { _ = move x } else { _ = move x };
+  │                         ^^^^^^ attempted to move here
+5 │         let _ = move x + 1;
+  │                 ------ used here
+
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/locals/use_after_move_if_else.move:4:45
+  │
+4 │         if (cond) { _ = move x } else { _ = move x };
+  │                                             ^^^^^^ attempted to move here
+5 │         let _ = move x + 1;
+  │                 ------ used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if_else.move:10:25
+   │
+10 │         if (cond) { _ = move x } else { _ = x };
+   │                         ^^^^^^ attempted to move here
+11 │         let _ = move x + 1;
+   │                 ------ used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if_else.move:16:25
+   │
+16 │         if (cond) { _ = move x } else { _ = move x };
+   │                         ^^^^^^ attempted to move here
+17 │         let _ = x + 1;
+   │                 ----- used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if_else.move:16:45
+   │
+16 │         if (cond) { _ = move x } else { _ = move x };
+   │                                             ^^^^^^ attempted to move here
+17 │         let _ = x + 1;
+   │                 ----- used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if_else.move:23:25
+   │
+23 │         if (cond) { _ = move x } else { _ = x };
+   │                         ^^^^^^ attempted to move here
+24 │         let _ = x + 1;
+   │                 ----- used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if_else.move:29:25
+   │
+29 │         if (cond) { _ = move x } else { _ = move x };
+   │                         ^^^^^^ attempted to move here
+30 │         let _ = &x;
+   │                 -- used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if_else.move:29:45
+   │
+29 │         if (cond) { _ = move x } else { _ = move x };
+   │                                             ^^^^^^ attempted to move here
+30 │         let _ = &x;
+   │                 -- used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if_else.move:35:25
+   │
+35 │         if (cond) { _ = move x } else { _ = x };
+   │                         ^^^^^^ attempted to move here
+36 │         let _ = &x;
+   │                 -- used here

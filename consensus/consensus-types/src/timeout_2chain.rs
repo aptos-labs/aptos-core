@@ -266,7 +266,7 @@ impl TwoChainTimeoutWithPartialSignatures {
         let (partial_sig, ordered_rounds) = self
             .signatures
             .get_partial_sig_with_rounds(verifier.address_to_validator_index());
-        let aggregated_sig = verifier.aggregate_signatures(&partial_sig)?;
+        let aggregated_sig = verifier.aggregate_signatures(partial_sig.signatures_iter())?;
         Ok(TwoChainTimeoutCertificate {
             timeout: self.timeout.clone(),
             signatures_with_rounds: AggregateSignatureWithRounds::new(
@@ -406,7 +406,7 @@ mod tests {
         use aptos_types::{
             aggregate_signature::PartialSignatures,
             block_info::BlockInfo,
-            ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
+            ledger_info::{LedgerInfo, LedgerInfoWithVerifiedSignatures},
             validator_verifier::random_validator_verifier,
         };
 
@@ -415,7 +415,7 @@ mod tests {
         let quorum_size = validators.quorum_voting_power() as usize;
         let generate_quorum = |round, num_of_signature| {
             let vote_data = VoteData::new(BlockInfo::random(round), BlockInfo::random(0));
-            let mut ledger_info = LedgerInfoWithPartialSignatures::new(
+            let mut ledger_info = LedgerInfoWithVerifiedSignatures::new(
                 LedgerInfo::new(BlockInfo::empty(), vote_data.hash()),
                 PartialSignatures::empty(),
             );

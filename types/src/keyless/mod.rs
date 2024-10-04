@@ -28,6 +28,7 @@ mod configuration;
 mod groth16_sig;
 mod groth16_vk;
 mod openid_sig;
+pub mod proof_simulation;
 pub mod test_utils;
 mod zkp_sig;
 
@@ -436,9 +437,9 @@ fn base64url_decode_as_str(b64: &str) -> anyhow::Result<String> {
 }
 
 fn seconds_from_epoch(secs: u64) -> anyhow::Result<SystemTime> {
-    Ok(UNIX_EPOCH
+    UNIX_EPOCH
         .checked_add(Duration::from_secs(secs))
-        .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + secs in seconds_from_epoch"))?)
+        .ok_or_else(|| anyhow::anyhow!("Overflowed on UNIX_EPOCH + secs in seconds_from_epoch"))
 }
 
 #[cfg(test)]
