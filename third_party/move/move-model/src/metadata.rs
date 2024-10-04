@@ -236,6 +236,16 @@ impl LanguageVersion {
         }
     }
 
+    /// The latest language version.
+    pub fn latest() -> Self {
+        LanguageVersion::V2_1
+    }
+
+    /// The latest stable language version.
+    pub fn latest_stable() -> Self {
+        LanguageVersion::V2_0
+    }
+
     /// Whether the language version is equal to greater than `ver`
     pub fn is_at_least(&self, ver: LanguageVersion) -> bool {
         *self >= ver

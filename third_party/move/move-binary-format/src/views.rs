@@ -349,6 +349,10 @@ impl<'a, T: ModuleAccess> StructDefinitionView<'a, T> {
         self.struct_handle_view.abilities()
     }
 
+    pub fn handle_idx(&self) -> StructHandleIndex {
+        self.struct_def.struct_handle
+    }
+
     pub fn is_native(&self) -> bool {
         match &self.struct_def.field_information {
             StructFieldInformation::Native => true,
@@ -489,6 +493,10 @@ impl<'a, T: ModuleAccess> FunctionDefinitionView<'a, T> {
             function_def,
             function_handle_view,
         }
+    }
+
+    pub fn handle_idx(&self) -> FunctionHandleIndex {
+        self.function_def.function
     }
 
     pub fn visibility(&self) -> Visibility {

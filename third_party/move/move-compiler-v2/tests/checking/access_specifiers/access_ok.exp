@@ -122,17 +122,14 @@ module 0x42::m {
     }
     fun f10(x: u64)
         acquires *(m::make_up_address(x))
-
     {
     }
     fun f11()
         !reads *(0x42)
         !reads *(0x43)
-
     {
     }
     fun f12()
-
     {
     }
     fun f2()
@@ -161,16 +158,18 @@ module 0x42::m {
     }
     fun f8()
         acquires *(0x42)
-
     {
     }
     fun f9(a: address)
         acquires *(a)
-
     {
     }
     fun f_multiple()
-        acquires Rreads Rwrites Twrites Sreads G<u64>
+        acquires R
+        reads R
+        writes T
+        writes S
+        reads G<u64>
     {
     }
     fun make_up_address(x: u64): address {
