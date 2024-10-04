@@ -12,19 +12,24 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_executor_types::{execution_output::ExecutionOutput, ExecutorError, LedgerUpdateOutput};
+use aptos_executor_types::{chunk_output::ChunkOutput, state_checkpoint_output::StateCheckpointOutput, ExecutorError, LedgerUpdateOutput, StateComputeResult};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{DbReader, ExecutedTrees};
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
+use itertools::Chunk;
 use std::{
+    cell::OnceCell,
     collections::{hash_map::Entry, HashMap},
+    iter::Once,
     sync::{mpsc::Receiver, Arc, Weak},
 };
+use aptos_types::proof::accumulator::InMemoryTransactionAccumulator;
+use aptos_types::transaction::Version;
 
 pub struct Block {
     pub id: HashValue,
-    pub output: ExecutionOutput,
+    pub output: BlockOutput,
     children: Mutex<Vec<Arc<Block>>>,
     block_lookup: Arc<BlockLookup>,
 }
@@ -42,13 +47,6 @@ impl Drop for Block {
 impl Block {
     fn add_child(&self, child: Arc<Self>) {
         self.children.lock().push(child)
-    }
-
-    pub fn num_persisted_transactions(&self) -> LeafCount {
-        self.output
-            .get_ledger_update()
-            .txn_accumulator()
-            .num_leaves()
     }
 
     pub fn ensure_has_child(&self, child_id: HashValue) -> Result<()> {
@@ -148,7 +146,7 @@ impl BlockLookup {
     fn fetch_or_add_block(
         self: &Arc<Self>,
         id: HashValue,
-        output: ExecutionOutput,
+        output: BlockOutput,
         parent_id: Option<HashValue>,
     ) -> Result<Arc<Block>> {
         let (block, existing, parent_block) = self
@@ -224,11 +222,7 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let output = ExecutionOutput::new_with_ledger_update(
-            ledger_view.state().clone(),
-            None,
-            LedgerUpdateOutput::new_empty(ledger_view.txn_accumulator().clone()),
-        );
+        let output = BlockOutput::new_empty_at_ledger_info(ledger_view, ledger_info);
 
         block_lookup.fetch_or_add_block(id, output, None)
     }
@@ -250,17 +244,7 @@ impl BlockTree {
                     .original_reconfiguration_block_id(committed_block_id),
                 "Updated with a new root block as a virtual block of reconfiguration block"
             );
-            let output = ExecutionOutput::new_with_ledger_update(
-                last_committed_block.output.state().clone(),
-                None,
-                LedgerUpdateOutput::new_empty(
-                    last_committed_block
-                        .output
-                        .get_ledger_update()
-                        .txn_accumulator()
-                        .clone(),
-                ),
-            );
+            let output = last_committed_block.output.new_empty_following_this();
             self.block_lookup
                 .fetch_or_add_block(epoch_genesis_id, output, None)?
         } else {
@@ -271,7 +255,8 @@ impl BlockTree {
             last_committed_block
         };
         root.output
-            .state()
+            .expect_state_checkpoint_output()
+            .result_state
             .current
             .log_generation("block_tree_base");
         let old_root = {
@@ -289,7 +274,7 @@ impl BlockTree {
         &self,
         parent_block_id: HashValue,
         id: HashValue,
-        output: ExecutionOutput,
+        output: BlockOutput,
     ) -> Result<Arc<Block>> {
         self.block_lookup
             .fetch_or_add_block(id, output, Some(parent_block_id))
@@ -297,5 +282,124 @@ impl BlockTree {
 
     pub fn root_block(&self) -> Arc<Block> {
         self.root.lock().clone()
+    }
+}
+
+pub(crate) struct BlockOutput {
+    pub chunk_output: ChunkOutput,
+    pub state_checkpoint_output: OnceCell<StateCheckpointOutput>,
+    pub ledger_update_output: OnceCell<LedgerUpdateOutput>,
+}
+
+impl BlockOutput {
+    pub fn new(chunk_output: ChunkOutput) -> Self {
+        Self {
+            chunk_output,
+            state_checkpoint_output: OnceCell::new(),
+            ledger_update_output: OnceCell::new(),
+        }
+    }
+
+    pub fn new_empty_at_ledger_info(ledger_view: ExecutedTrees, ledger_info: &LedgerInfo) -> Self {
+        let ExecutedTrees {
+            state,
+            transaction_accumulator,
+        } = ledger_view;
+
+        let chunk_output = ChunkOutput::new_empty_at_ledger_info(&state, ledger_info);
+        let state_checkpoint_output = OnceCell::new();
+        state_checkpoint_output
+            .set(StateCheckpointOutput::new_empty(&state))
+            .unwrap();
+        let ledger_update_output = OnceCell::new();
+        ledger_update_output
+            .set(LedgerUpdateOutput::new_empty(transaction_accumulator))
+            .unwrap();
+
+        Self {
+            chunk_output,
+            state_checkpoint_output,
+            ledger_update_output,
+        }
+    }
+
+    pub fn new_empty_following_this(&self) -> Self {
+        assert!(self.is_complete());
+
+        let chunk_output = self.chunk_output.new_empty_following_this();
+        let state_checkpoint_output = OnceCell::new();
+        state_checkpoint_output
+            .set(StateCheckpointOutput::new_empty(
+                &self.expect_state_checkpoint_output().result_state,
+            ))
+            .unwrap();
+        let ledger_update_output = OnceCell::new();
+        ledger_update_output
+            .set(LedgerUpdateOutput::new_empty(
+                self.expect_ledger_update_output()
+                    .transaction_accumulator
+                    .clone(),
+            ))
+            .unwrap();
+
+        Self {
+            chunk_output,
+            state_checkpoint_output,
+            ledger_update_output,
+        }
+    }
+
+    pub fn has_state_checkpoint_output(&self) -> bool {
+        self.state_checkpoint_output.get().is_some()
+    }
+
+    pub fn expect_state_checkpoint_output(&self) -> &StateCheckpointOutput {
+        self.state_checkpoint_output
+            .get()
+            .expect("StateCheckpointOutput not set.")
+    }
+
+    pub fn set_state_checkpoint_output_once(&self, output: StateCheckpointOutput) {
+        self.state_checkpoint_output.set(output).unwrap();
+    }
+
+    pub fn has_ledger_update_output(&self) -> bool {
+        self.ledger_update_output.get().is_some()
+    }
+
+    pub fn expect_ledger_update_output(&self) -> &LedgerUpdateOutput {
+        self.ledger_update_output
+            .get()
+            .expect("LedgerUpdateOutput not set.")
+    }
+
+    pub fn set_ledger_update_output_once(&self, output: LedgerUpdateOutput) {
+        self.ledger_update_output.set(output).unwrap();
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.has_state_checkpoint_output() && self.has_ledger_update_output()
+    }
+
+    pub fn ends_epoch(&self) -> bool {
+        self.chunk_output.ends_epoch()
+    }
+
+    pub fn as_state_compute_result(&self, parent_accumulator: &InMemoryTransactionAccumulator) -> StateComputeResult {
+        assert!(self.is_complete());
+        let accumulator = &self.expect_ledger_update_output().transaction_accumulator;
+        StateComputeResult::new(
+            accumulator.root_hash(),
+            accumulator.frozen_subtree_roots().to_vec(),
+            self.chunk_output.next_version(),
+            parent_accumulator.frozen_subtree_roots().to_vec(),
+            self.chunk_output.first_version,
+            self.chunk_output.next_epoch_state.clone(),
+            self.chunk_output.statuses_for_input_txns.clone(),
+            self.expect_ledger_update_output().transaction_info_hashes.clone(),
+            // FIXME(aldenhu): move to first stage
+            self.expect_ledger_update_output().subscribable_events.clone(),
+            self.chunk_output.block_end_info.clone(),
+        )
     }
 }

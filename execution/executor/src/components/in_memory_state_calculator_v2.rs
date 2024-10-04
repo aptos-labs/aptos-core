@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::OTHER_TIMERS};
+use crate::metrics::OTHER_TIMERS;
 use anyhow::{ensure, Result};
-use aptos_crypto::{hash::CryptoHash, };
+use aptos_crypto::hash::CryptoHash;
 use aptos_executor_types::{
-    parsed_transaction_output::TransactionsWithParsedOutput,
+    chunk_output::ChunkOutput, parsed_transaction_output::TransactionsWithParsedOutput,
     state_checkpoint_output::StateCheckpointOutput, ProofReader,
 };
 use aptos_logger::info;
@@ -28,7 +28,6 @@ use dashmap::DashMap;
 use itertools::zip_eq;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use aptos_executor_types::chunk_output::ChunkOutput;
 
 /// Helper class for calculating state changes after a block of transactions are executed.
 pub struct InMemoryStateCalculatorV2 {}

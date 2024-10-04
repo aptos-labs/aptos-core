@@ -5,16 +5,15 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    chunk_output::ChunkOutput,
+    chunk_output::ChunkOutput, parsed_transaction_output::TransactionsWithParsedOutput,
     state_checkpoint_output::StateCheckpointOutput, ChunkCommitNotification, LedgerUpdateOutput,
 };
-use aptos_storage_interface::{ExecutedTrees};
+use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionOutputProvider, TransactionToCommit},
 };
 use itertools::izip;
-use crate::parsed_transaction_output::TransactionsWithParsedOutput;
 
 #[derive(Debug)]
 pub struct ExecutedChunk {
@@ -89,17 +88,20 @@ impl ExecutedChunk {
     pub fn into_chunk_commit_notification(self) -> ChunkCommitNotification {
         let reconfiguration_occurred = self.has_reconfiguration();
         let Self {
-            chunk_output: ChunkOutput {
-                to_commit: TransactionsWithParsedOutput {
-                    transactions: committed_transactions,
+            chunk_output:
+                ChunkOutput {
+                    to_commit:
+                        TransactionsWithParsedOutput {
+                            transactions: committed_transactions,
+                            ..
+                        },
                     ..
                 },
-                ..
-            },
-            ledger_update_output: LedgerUpdateOutput {
-                subscribable_events,
-                ..
-            },
+            ledger_update_output:
+                LedgerUpdateOutput {
+                    subscribable_events,
+                    ..
+                },
             ..
         } = self;
 

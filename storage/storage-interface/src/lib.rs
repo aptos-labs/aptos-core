@@ -50,7 +50,7 @@ pub mod state_view;
 use crate::state_delta::StateDelta;
 use aptos_scratchpad::SparseMerkleTree;
 pub use aptos_types::block_info::BlockHeight;
-use aptos_types::{state_store::state_key::prefix::StateKeyPrefix};
+use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
 pub use errors::AptosDbError;
 pub use executed_trees::ExecutedTrees;
 

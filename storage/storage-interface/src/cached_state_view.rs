@@ -86,6 +86,8 @@ pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
+    version: Option<Version>,
+
     /// A readable snapshot in the persistent storage.
     snapshot: Option<(Version, HashValue)>,
 
@@ -151,7 +153,7 @@ impl CachedStateView {
         id: StateViewId,
         reader: Arc<dyn DbReader>,
         next_version: Version,
-        speculative_state: SparseMerkleTree<StateValue>,
+        speculative_state: &SparseMerkleTree<StateValue>,
         proof_fetcher: Arc<AsyncProofFetcher>,
     ) -> Result<Self> {
         // n.b. Freeze the state before getting the state snapshot, otherwise it's possible that
@@ -165,6 +167,7 @@ impl CachedStateView {
 
         Ok(Self::new_impl(
             id,
+            next_version.checked_sub(1),
             snapshot,
             speculative_state,
             proof_fetcher,
@@ -173,17 +176,23 @@ impl CachedStateView {
 
     pub fn new_impl(
         id: StateViewId,
+        version: Option<Version>,
         snapshot: Option<(Version, HashValue)>,
         speculative_state: FrozenSparseMerkleTree<StateValue>,
         proof_fetcher: Arc<AsyncProofFetcher>,
     ) -> Self {
         Self {
             id,
+            version,
             snapshot,
             speculative_state,
             sharded_state_cache: ShardedStateCache::default(),
             proof_fetcher,
         }
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.version.map_or(0, |v| v + 1)
     }
 
     pub fn prime_cache_by_write_set<'a, T: IntoIterator<Item = &'a WriteSet> + Send>(
@@ -270,6 +279,16 @@ pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
     pub sharded_state_cache: ShardedStateCache,
     pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
+}
+
+impl StateCache {
+    pub fn new_empty(state: &SparseMerkleTree<StateValue>) -> Self {
+        Self {
+            frozen_base: state.freeze(state),
+            sharded_state_cache: ShardedStateCache::default(),
+            proofs: HashMap::new(),
+        }
+    }
 }
 
 impl TStateView for CachedStateView {

@@ -2,16 +2,21 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::ensure;
-use anyhow::Result;
-use aptos_storage_interface::cached_state_view::StateCache;
-use aptos_types::epoch_state::EpochState;
-use aptos_types::transaction::{BlockEndInfo, TransactionStatus};
 use crate::parsed_transaction_output::TransactionsWithParsedOutput;
+use anyhow::{ensure, Result};
+use aptos_scratchpad::SparseMerkleTree;
+use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
+use aptos_types::{
+    epoch_state::EpochState,
+    ledger_info::LedgerInfo,
+    state_store::state_value::StateValue,
+    transaction::{BlockEndInfo, TransactionStatus, Version},
+};
 
 // FIXME(aldenhu): check debug impls
 #[derive(Debug)]
 pub struct ChunkOutput {
+    pub first_version: Version,
     // Statuses of the input transactions, in the same order as the input transactions.
     // Contains BlockMetadata/Validator transactions,
     // but doesn't contain StateCheckpoint/BlockEpilogue, as those get added during execution
@@ -34,6 +39,37 @@ pub struct ChunkOutput {
 }
 
 impl ChunkOutput {
+    pub fn new_empty_at_ledger_info(parent_state: &StateDelta, ledger_info: &LedgerInfo) -> Self {
+        assert!(parent_state.current_version == Some(ledger_info.version()),);
+        Self {
+            first_version: parent_state.next_version(),
+            statuses_for_input_txns: vec![],
+            to_commit: TransactionsWithParsedOutput::new_empty(),
+            to_discard: TransactionsWithParsedOutput::new_empty(),
+            to_retry: TransactionsWithParsedOutput::new_empty(),
+            state_cache: StateCache::new_empty(&parent_state.current),
+            block_end_info: None,
+            next_epoch_state: ledger_info.next_epoch_state().cloned(),
+        }
+    }
+
+    pub fn new_empty_following_this(&self) -> Self {
+        Self {
+            first_version: self.next_version(),
+            statuses_for_input_txns: vec![],
+            to_commit: TransactionsWithParsedOutput::new_empty(),
+            to_discard: TransactionsWithParsedOutput::new_empty(),
+            to_retry: TransactionsWithParsedOutput::new_empty(),
+            state_cache: StateCache::new_empty(&self.state_cache.frozen_base.smt),
+            block_end_info: None,
+            next_epoch_state: self.next_epoch_state.clone(),
+        }
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.first_version + self.to_commit.len() as Version
+    }
+
     pub fn ends_epoch(&self) -> bool {
         self.next_epoch_state.is_some()
     }

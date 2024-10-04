@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    components::{chunk_proof::ChunkProof},
+    components::{chunk_proof::ChunkProof, make_chunk_output::MakeChunkOutput},
     metrics::{CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
 };
 use anyhow::Result;
+use aptos_executor_types::chunk_output::ChunkOutput;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::cached_state_view::CachedStateView;
@@ -18,7 +19,6 @@ use aptos_vm::VMExecutor;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
-use aptos_executor_types::chunk_output::ChunkOutput;
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -141,7 +141,8 @@ impl TransactionChunkWithProof for TransactionOutputListWithProof {
             proof: txn_infos_with_proof,
         } = self;
 
-        let chunk_out = ChunkOutput::by_transaction_output(transactions_and_outputs, state_view)?;
+        let chunk_out =
+            MakeChunkOutput::by_transaction_output(transactions_and_outputs, state_view)?;
         let chunk_proof = ChunkProof {
             txn_infos_with_proof,
             verified_target_li,

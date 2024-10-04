@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+use crate::components::make_chunk_output::MakeChunkOutput;
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutedChunk;
@@ -26,7 +27,6 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use std::sync::Arc;
-use crate::components::make_chunk_output::MakeChunkOutput;
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,

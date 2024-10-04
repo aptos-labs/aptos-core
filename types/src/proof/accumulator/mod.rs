@@ -293,7 +293,7 @@ where
     }
 
     /// Returns the set of frozen subtree roots in this accumulator
-    pub fn frozen_subtree_roots(&self) -> &Vec<HashValue> {
+    pub fn frozen_subtree_roots(&self) -> &[HashValue] {
         &self.frozen_subtree_roots
     }
 

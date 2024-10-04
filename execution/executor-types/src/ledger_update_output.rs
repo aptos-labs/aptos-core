@@ -9,10 +9,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     proof::accumulator::InMemoryTransactionAccumulator,
-    transaction::{
-        TransactionInfo,
-        Version,
-    },
+    transaction::{TransactionInfo, Version},
 };
 use std::sync::Arc;
 

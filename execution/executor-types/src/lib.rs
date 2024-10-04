@@ -46,7 +46,6 @@ use std::{
 pub mod chunk_output;
 mod error;
 mod executed_chunk;
-pub mod execution_output;
 mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
@@ -527,7 +526,9 @@ pub struct ProofReader<'a> {
 
 impl<'a> ProofReader<'a> {
     pub fn new(proofs: &'a HashMap<HashValue, SparseMerkleProofExt>) -> Self {
-        ProofReader { proofs: Some(proofs) }
+        ProofReader {
+            proofs: Some(proofs),
+        }
     }
 
     pub fn new_empty() -> Self {

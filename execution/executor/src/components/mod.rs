@@ -4,13 +4,11 @@
 
 #![forbid(unsafe_code)]
 
-pub mod apply_chunk_output;
 pub mod block_tree;
 pub mod chunk_commit_queue;
+pub mod chunk_proof;
 pub mod in_memory_state_calculator_v2;
-
-mod chunk_proof;
-mod speculative_state;
-pub mod transaction_chunk;
 pub mod make_chunk_output;
-mod make_state_checkpoint;
+pub mod make_ledger_update;
+pub mod make_state_checkpoint;
+pub mod transaction_chunk;

@@ -5,9 +5,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{
-        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree,
-    },
+    components::{block_tree::BlockTree, make_chunk_output::MakeChunkOutput},
     logging::{LogEntry, LogSchema},
     metrics::{
         COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
@@ -17,8 +15,9 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
-    BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult,
+    chunk_output::ChunkOutput, execution_output::ExecutionOutput,
+    state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
+    ExecutorResult, StateComputeResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -39,8 +38,9 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
-use aptos_executor_types::chunk_output::ChunkOutput;
-use crate::components::make_chunk_output::MakeChunkOutput;
+use crate::components::block_tree::BlockOutput;
+use crate::components::make_ledger_update::MakeLedgerUpdate;
+use crate::components::make_state_checkpoint::MakeStateCheckpoint;
 
 pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
@@ -83,6 +83,7 @@ where
         }
     }
 
+    /* FIXME(aldenhu): remove
     pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
         self.inner
             .read()
@@ -90,6 +91,7 @@ where
             .expect("BlockExecutor is not reset")
             .root_smt()
     }
+     */
 
     fn maybe_initialize(&self) -> Result<()> {
         if self.inner.read().is_none() {
@@ -203,15 +205,12 @@ where
         })
     }
 
+    /* FIXME(aldenhu): remove?
     fn root_smt(&self) -> SparseMerkleTree<StateValue> {
         self.block_tree.root_block().output.state().current.clone()
     }
-}
+     */
 
-impl<V> BlockExecutorInner<V>
-where
-    V: TransactionBlockExecutor,
-{
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
     }
@@ -221,7 +220,7 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput> {
+    ) -> ExecutorResult<()> {
         let _timer = EXECUTE_BLOCK.start_timer();
         let ExecutableBlock {
             block_id,
@@ -240,17 +239,16 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
-        let (state, epoch_state, state_checkpoint_output) =
-            if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
+        let (chunk_output, state_checkpoint_output) =
+            if parent_block_id != committed_block_id && parent_output.ends_epoch() {
                 // ignore reconfiguration suffix, even if the block is non-empty
                 info!(
                     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                     "reconfig_descendant_block_received"
                 );
                 (
-                    parent_output.state().clone(),
-                    parent_output.epoch_state().clone(),
-                    StateCheckpointOutput::default(),
+                    parent_output.chunk_output.new_empty_following_this(),
+                    parent_output.expect_state_checkpoint_output().new_empty_following_this(),
                 )
             } else {
                 let state_view = {
@@ -260,8 +258,8 @@ where
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
-                        parent_output.next_version(),
-                        parent_output.state().current.clone(),
+                        parent_output.chunk_output.next_version(),
+                        &parent_output.expect_state_checkpoint_output().result_state.current,
                         Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
                     )?
                 };
@@ -273,37 +271,49 @@ where
                             "Injected error in vm_execute_block"
                         )))
                     });
-                    V::execute_transaction_block(transactions, state_view, onchain_config.clone(), Some(block_id))?
+                    V::execute_transaction_block(
+                        transactions,
+                        state_view,
+                        onchain_config.clone(),
+                        Some(block_id),
+                    )?
                 };
                 chunk_output.ensure_is_block()?;
 
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
+                    MakeStateCheckpoint::make(
+                        &chunk_output,
+                        &parent_output.expect_state_checkpoint_output().result_state,
+                        None, /* known_state_checkpoints */
+                        true, /* is_block */
+                    )
                 })?
             };
+
+        let output = BlockOutput::new(chunk_output);
+        // TODO(aldenhu): move to next stage (maybe new separate stage)
+        output.set_state_checkpoint_output_once(state_checkpoint_output);
 
         let _ = self.block_tree.add_block(
             parent_block_id,
             block_id,
-            ExecutionOutput::new(state, epoch_state),
+            output,
         )?;
-        Ok(state_checkpoint_output)
+        Ok(())
     }
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
         let _timer = UPDATE_LEDGER.start_timer();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "ledger_update"
         );
-        let committed_block_id = self.committed_block_id();
         let mut block_vec = self
             .block_tree
             .get_blocks_opt(&[block_id, parent_block_id])?;
@@ -314,32 +324,20 @@ where
         // At this point of time two things must happen
         // 1. The block tree must also have the current block id with or without the ledger update output.
         // 2. We must have the ledger update output of the parent block.
-        let parent_output = parent_block.output.get_ledger_update();
-        let parent_accumulator = parent_output.txn_accumulator();
-        let current_output = block_vec.pop().expect("Must exist").unwrap();
+        let block = block_vec.pop().expect("Must exist").unwrap();
         parent_block.ensure_has_child(block_id)?;
-        if current_output.output.has_ledger_update() {
-            return Ok(current_output
+
+        if block.output.has_ledger_update_output() {
+            return Ok(block
                 .output
-                .get_ledger_update()
                 .as_state_compute_result(
-                    parent_accumulator,
-                    current_output.output.epoch_state().clone(),
+                    &parent_block.output.expect_ledger_update_output().transaction_accumulator,
                 ));
         }
 
-        let output =
-            if parent_block_id != committed_block_id && parent_block.output.has_reconfiguration() {
-                info!(
-                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                    "reconfig_descendant_block_received"
-                );
-                parent_output.reconfig_suffix()
-            } else {
-                let (output, _, _) = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
-                    ApplyChunkOutput::calculate_ledger_update(
-                        state_checkpoint_output,
-                        parent_accumulator.clone(),
+        let ledger_update_output = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+                    MakeLedgerUpdate::make(
+
                     )
                 })?;
                 output
@@ -347,9 +345,9 @@ where
 
         let state_compute_result = output.as_state_compute_result(
             parent_accumulator,
-            current_output.output.epoch_state().clone(),
+            block.output.epoch_state().clone(),
         );
-        current_output.output.set_ledger_update(output);
+        block.output.set_ledger_update(output);
         Ok(state_compute_result)
     }
 

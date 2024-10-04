@@ -105,6 +105,16 @@ impl StateDelta {
         std::mem::swap(self, &mut rhs);
         rhs
     }
+
+    pub fn new_at_current(&self) -> Self {
+        Self {
+            base: self.current.clone(),
+            base_version: self.current_version,
+            current: self.current.clone(),
+            current_version: self.current_version,
+            updates_since_base: create_empty_sharded_state_updates(),
+        }
+    }
 }
 
 impl Default for StateDelta {

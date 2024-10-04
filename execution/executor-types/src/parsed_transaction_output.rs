@@ -163,7 +163,8 @@ impl TransactionsWithParsedOutput {
     }
 
     pub fn ends_with_state_checkpoint(&self) -> bool {
-        self.get_last_checkpoint_index().map_or(false, |idx| idx + 1 == self.len())
+        self.get_last_checkpoint_index()
+            .map_or(false, |idx| idx + 1 == self.len())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Transaction, &ParsedTransactionOutput)> {

@@ -1,30 +1,38 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::iter;
-use std::sync::Arc;
-use aptos_crypto::HashValue;
-use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
-use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
-use aptos_types::block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions};
-use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
-use aptos_vm::VMExecutor;
-use anyhow::{anyhow, Result};
-use aptos_executor_service::local_executor_helper::SHARDED_BLOCK_EXECUTOR;
-use aptos_executor_service::remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR};
-use aptos_executor_types::chunk_output::ChunkOutput;
-use aptos_executor_types::parsed_transaction_output::TransactionsWithParsedOutput;
-use aptos_executor_types::{ParsedTransactionOutput};
-use aptos_logger::error;
-use aptos_types::epoch_state::EpochState;
-use aptos_types::on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet};
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
-use aptos_types::state_store::state_value::StateValue;
-use aptos_types::state_store::TStateView;
-use aptos_types::transaction::{BlockEndInfo, BlockOutput, Transaction, TransactionOutput, TransactionStatus};
-use aptos_types::write_set::WriteSet;
 use crate::metrics::{update_counters_for_processed_chunk, EXECUTOR_ERRORS, OTHER_TIMERS};
+use anyhow::{anyhow, Result};
+use aptos_crypto::HashValue;
+use aptos_executor_service::{
+    local_executor_helper::SHARDED_BLOCK_EXECUTOR,
+    remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
+};
+use aptos_executor_types::{
+    chunk_output::ChunkOutput, parsed_transaction_output::TransactionsWithParsedOutput,
+    ParsedTransactionOutput,
+};
+use aptos_logger::error;
+use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
+use aptos_types::{
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableTransactions, PartitionedTransactions},
+    },
+    epoch_state::EpochState,
+    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        TStateView,
+    },
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
+        Transaction, TransactionOutput, TransactionStatus, Version,
+    },
+    write_set::WriteSet,
+};
+use aptos_vm::VMExecutor;
+use std::{iter, sync::Arc};
 
 pub(crate) struct MakeChunkOutput;
 
@@ -99,7 +107,7 @@ impl MakeChunkOutput {
             state_cache: state_view.into_state_cache(),
             block_end_info: None,
         }
-            .parse(append_state_checkpoint_to_block)
+        .parse(append_state_checkpoint_to_block)
     }
 
     pub fn by_transaction_output(
@@ -121,6 +129,7 @@ impl MakeChunkOutput {
         state_view.prime_cache_by_write_set(write_set)?;
 
         RawChunkOutputParser {
+            first_version: state_view.next_version(),
             transactions,
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
@@ -209,6 +218,8 @@ impl MakeChunkOutput {
 }
 
 struct RawChunkOutputParser {
+    /// version of the first transaction in the chunk
+    pub first_version: Version,
     /// Input transactions.
     pub transactions: Vec<Transaction>,
     /// Raw VM output.
@@ -224,6 +235,7 @@ struct RawChunkOutputParser {
 impl RawChunkOutputParser {
     fn parse(self, append_state_checkpoint_to_block: Option<HashValue>) -> Result<ChunkOutput> {
         let Self {
+            first_version,
             mut transactions,
             transaction_outputs,
             state_cache,
@@ -262,6 +274,7 @@ impl RawChunkOutputParser {
             .then(|| Self::expect_next_epoch_state(&to_commit)?);
 
         Ok(ChunkOutput {
+            first_version,
             statuses_for_input_txns,
             to_commit,
             to_discard,
@@ -356,10 +369,15 @@ impl RawChunkOutputParser {
             if let Some(block_id) = append_state_checkpoint_to_block {
                 let state_checkpoint_txn = match block_end_info {
                     None => Transaction::StateCheckpoint(block_id),
-                    Some(block_end_info) => Transaction::block_epilogue(block_id, block_end_info.clone())
+                    Some(block_end_info) => {
+                        Transaction::block_epilogue(block_id, block_end_info.clone())
+                    },
                 };
 
-                to_commit.push(state_checkpoint_txn, TransactionOutput::empty_success().into());
+                to_commit.push(
+                    state_checkpoint_txn,
+                    TransactionOutput::empty_success().into(),
+                );
             }
         }; // else: not adding block epilogue at epoch ending.
 

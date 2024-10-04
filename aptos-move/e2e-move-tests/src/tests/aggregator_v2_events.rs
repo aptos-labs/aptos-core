@@ -103,13 +103,7 @@ fn run(data: Vec<(u64, String, Option<u64>)>) -> AggV2TestHarness {
         .into_iter()
         .zip(event_values)
         .for_each(|(output, event_value)| {
-            let (
-                _write_set,
-                events,
-                _gas_used,
-                _status,
-                _aux_data,
-            ) = output.unpack();
+            let (_write_set, events, _gas_used, _status, _aux_data) = output.unpack();
             let mut events: Vec<_> = events
                 .into_iter()
                 .filter(|e| e.type_tag() == &event_v1_tag || e.type_tag() == &event_v2_tag)

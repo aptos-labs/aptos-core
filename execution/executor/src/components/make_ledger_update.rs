@@ -3,39 +3,28 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{
-    components::{
-        in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
-    },
-    metrics::{OTHER_TIMERS},
-};
-use anyhow::{Result};
+use crate::metrics::OTHER_TIMERS;
+use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{
-    parsed_transaction_output::TransactionsWithParsedOutput,
-    should_forward_to_subscription_service,
-    state_checkpoint_output::{StateCheckpointOutput},
-    LedgerUpdateOutput, ParsedTransactionOutput,
+    chunk_output::ChunkOutput, parsed_transaction_output::TransactionsWithParsedOutput,
+    should_forward_to_subscription_service, LedgerUpdateOutput, ParsedTransactionOutput,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::{state_delta::StateDelta, };
 use aptos_types::{
     contract_event::ContractEvent,
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
-    transaction::{
-        TransactionInfo,
-    },
+    transaction::TransactionInfo,
 };
 use itertools::{izip, Itertools};
 use rayon::prelude::*;
-use std::{sync::Arc};
-use aptos_executor_types::chunk_output::ChunkOutput;
+use std::sync::Arc;
 
-pub struct UpdateLedger;
+pub struct MakeLedgerUpdate;
 
-impl UpdateLedger {
-    pub fn calculate_ledger_update(
+impl MakeLedgerUpdate {
+    pub fn make(
         chunk_output: &ChunkOutput,
         state_checkpoint_hashes: &[Option<HashValue>],
         base_txn_accumulator: &InMemoryTransactionAccumulator,
@@ -144,8 +133,9 @@ mod tests {
         );
         let event_2 =
             ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_2".to_vec());
-        let txns_n_outputs =
-            TransactionsWithParsedOutput::new(vec![Transaction::dummy(), Transaction::dummy()], vec![
+        let txns_n_outputs = TransactionsWithParsedOutput::new(
+            vec![Transaction::dummy(), Transaction::dummy()],
+            vec![
                 ParsedTransactionOutput::from(TransactionOutput::new(
                     WriteSet::default(),
                     vec![event_0.clone()],
@@ -160,7 +150,8 @@ mod tests {
                     TransactionStatus::Keep(ExecutionStatus::Success),
                     TransactionAuxiliaryData::default(),
                 )),
-            ]);
+            ],
+        );
         let state_updates_vec = vec![
             ShardedStateUpdates::default(),
             ShardedStateUpdates::default(),

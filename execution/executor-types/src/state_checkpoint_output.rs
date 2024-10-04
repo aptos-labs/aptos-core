@@ -5,14 +5,11 @@
 
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
-use aptos_storage_interface::{
-    state_delta::StateDelta,
-};
-use aptos_types::{
-    state_store::ShardedStateUpdates,
-};
+use aptos_storage_interface::state_delta::StateDelta;
+use aptos_types::state_store::ShardedStateUpdates;
 use itertools::zip_eq;
 
+// FIXME(aldenhu): remove Default?
 #[derive(Debug, Default)]
 pub struct StateCheckpointOutput {
     /// includes state updates between the last checkpoint version and the current version
@@ -36,6 +33,20 @@ impl StateCheckpointOutput {
             state_checkpoint_hashes,
             state_updates_before_last_checkpoint,
         }
+    }
+
+    pub fn new_empty(parent_state: &StateDelta) -> Self {
+        Self {
+            result_state: parent_state.new_at_current(),
+            // FIXME(aldenhu): is this right? try to comprehend "the tail"
+            state_updates_before_last_checkpoint: None,
+            per_version_state_updates: vec![],
+            state_checkpoint_hashes: vec![],
+        }
+    }
+
+    pub fn new_empty_following_this(&self) -> Self {
+        Self::new_empty(&self.result_state)
     }
 
     pub fn check_and_update_state_checkpoint_hashes(
@@ -64,5 +75,4 @@ impl StateCheckpointOutput {
             Ok(())
         })
     }
-
 }
