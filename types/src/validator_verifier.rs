@@ -286,34 +286,26 @@ impl ValidatorVerifier {
         &self,
         message: &T,
         signatures: BTreeMap<AccountAddress, SignatureWithStatus>,
-        need_verify: bool,
     ) -> BTreeMap<AccountAddress, SignatureWithStatus> {
-        if !need_verify {
-            signatures
-                .iter()
-                .for_each(|(_voter, sig)| sig.set_verified());
-            signatures
-        } else {
-            signatures
-                .into_iter()
-                .collect_vec()
-                .into_par_iter()
-                .with_min_len(4) // At least 4 signatures are verified in each task
-                .filter_map(|(account_address, signature)| {
-                    if signature.is_verified()
-                        || self
-                            .verify(account_address, message, signature.signature())
-                            .is_ok()
-                    {
-                        signature.set_verified();
-                        Some((account_address, signature))
-                    } else {
-                        self.add_pessimistic_verify_set(account_address);
-                        None
-                    }
-                })
-                .collect()
-        }
+        signatures
+            .into_iter()
+            .collect_vec()
+            .into_par_iter()
+            .with_min_len(4) // At least 4 signatures are verified in each task
+            .filter_map(|(account_address, signature)| {
+                if signature.is_verified()
+                    || self
+                        .verify(account_address, message, signature.signature())
+                        .is_ok()
+                {
+                    signature.set_verified();
+                    Some((account_address, signature))
+                } else {
+                    self.add_pessimistic_verify_set(account_address);
+                    None
+                }
+            })
+            .collect()
     }
 
     // Generates a multi signature or aggregate signature

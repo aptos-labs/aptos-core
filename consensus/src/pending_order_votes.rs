@@ -177,9 +177,9 @@ impl PendingOrderVotes {
 
 #[cfg(test)]
 mod tests {
-    use super::{OrderVoteReceptionResult, PendingOrderVotes};
+    use super::{OrderVoteReceptionResult, OrderVoteStatus, PendingOrderVotes};
     use aptos_consensus_types::{order_vote::OrderVote, quorum_cert::QuorumCert};
-    use aptos_crypto::{bls12381, HashValue};
+    use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
     use aptos_types::{
         aggregate_signature::PartialSignatures, block_info::BlockInfo, ledger_info::LedgerInfo,
         validator_verifier::random_validator_verifier,
@@ -280,6 +280,7 @@ mod tests {
 
         // create random vote from validator[0]
         let li = random_ledger_info();
+        let li_hash = li.hash();
         let vote_0 = OrderVote::new_with_signature(
             signers[0].author(),
             li.clone(),
@@ -324,7 +325,6 @@ mod tests {
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
-        vote_1.set_verified();
         assert_eq!(
             pending_order_votes.insert_order_vote(&vote_1, &verifier, None),
             OrderVoteReceptionResult::VoteAdded(2)
@@ -336,6 +336,19 @@ mod tests {
             OrderVoteReceptionResult::VoteAdded(2)
         );
         assert_eq!(verifier.pessimistic_verify_set().len(), 1);
+        let (_, order_vote_status) = pending_order_votes
+            .li_digest_to_votes
+            .get(&li_hash)
+            .unwrap();
+        match order_vote_status {
+            OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
+                assert_eq!(li_with_sig.verified_voters().count(), 2);
+                assert_eq!(li_with_sig.unverified_voters().count(), 0);
+            },
+            _ => {
+                panic!("QC should not be formed yet.");
+            },
+        }
 
         let aggregate_sig = verifier
             .aggregate_signatures(partial_signatures.signatures_iter())

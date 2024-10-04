@@ -509,10 +509,9 @@ impl LedgerInfoWithUnverifiedSignatures {
         verifier.aggregate_signatures(all_signatures)
     }
 
-    fn filter_invalid_signatures(&mut self, verifier: &ValidatorVerifier, need_verify: bool) {
+    fn filter_invalid_signatures(&mut self, verifier: &ValidatorVerifier) {
         let signatures = mem::take(&mut self.signatures);
-        self.signatures =
-            verifier.filter_invalid_signatures(self.ledger_info(), signatures, need_verify);
+        self.signatures = verifier.filter_invalid_signatures(self.ledger_info(), signatures);
     }
 
     /// Try to aggregate all signatures if the voting power is enough. If the aggregated signature is
@@ -525,14 +524,15 @@ impl LedgerInfoWithUnverifiedSignatures {
 
         match verifier.verify_multi_signatures(self.ledger_info(), &aggregated_sig) {
             Ok(_) => {
-                self.filter_invalid_signatures(verifier, false);
+                // We are not marking all the signatures as "verified" here, as two malicious
+                // voters can collude and create a valid aggregated signature.
                 Ok(LedgerInfoWithSignatures::new(
                     self.ledger_info.clone(),
                     aggregated_sig,
                 ))
             },
             Err(_) => {
-                self.filter_invalid_signatures(verifier, true);
+                self.filter_invalid_signatures(verifier);
 
                 let aggregate_sig = self.try_aggregate(verifier)?;
                 Ok(LedgerInfoWithSignatures::new(

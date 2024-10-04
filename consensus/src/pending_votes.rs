@@ -418,12 +418,10 @@ impl fmt::Display for PendingVotes {
                 VoteStatus::NotEnoughVotes(li) => {
                     write!(
                         f,
-                        "LI {} has {} verified votes {:?}, {} unverified votes {:?}",
+                        "LI {} has {} verified votes, {} unverified votes",
                         li_digest,
                         li.verified_voters().count(),
-                        li.verified_voters().collect::<Vec<_>>(),
                         li.unverified_voters().count(),
-                        li.unverified_voters().collect::<Vec<_>>()
                     )?;
                 },
             }
@@ -449,7 +447,7 @@ impl fmt::Display for PendingVotes {
 
 #[cfg(test)]
 mod tests {
-    use super::{PendingVotes, VoteReceptionResult};
+    use super::{PendingVotes, VoteReceptionResult, VoteStatus};
     use aptos_consensus_types::{
         block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
@@ -561,6 +559,7 @@ mod tests {
         let mut li = random_ledger_info();
         let vote_data = random_vote_data();
         li.set_consensus_data_hash(vote_data.hash());
+        let li_hash = li.hash();
 
         let mut partial_sigs = PartialSignatures::empty();
 
@@ -631,6 +630,16 @@ mod tests {
         );
 
         assert_eq!(validator_verifier.pessimistic_verify_set().len(), 1);
+        let (_, vote_status) = pending_votes.li_digest_to_votes.get(&li_hash).unwrap();
+        match vote_status {
+            VoteStatus::NotEnoughVotes(li_with_sig) => {
+                assert_eq!(li_with_sig.verified_voters().count(), 2);
+                assert_eq!(li_with_sig.unverified_voters().count(), 0);
+            },
+            _ => {
+                panic!("QC should not be formed yet.");
+            },
+        }
 
         partial_sigs.add_signature(signers[3].author(), vote_3.signature().clone());
         let aggregated_sig = validator_verifier
