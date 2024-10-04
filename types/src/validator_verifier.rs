@@ -25,7 +25,6 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
-    sync::Arc,
 };
 use thiserror::Error;
 
@@ -130,7 +129,10 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
 /// Supports validation of signatures for known authors with individual voting powers. This struct
 /// can be used for all signature verification operations including block and network signature
 /// verification, respectively.
-#[derive(Clone, Debug, Derivative, Serialize)]
+// Note: The "Clone" trait has been removed intentionally for ValidatorVerifier to ensure that the same
+// view of ValidatorVerifier is used across the system. In case a ValidatorVerifier needs to be cloned,
+// please use Arc<ValidatorVerifier> instead.
+#[derive(Debug, Derivative, Serialize)]
 #[derivative(PartialEq, Eq)]
 pub struct ValidatorVerifier {
     /// A vector of each validator's on-chain account address to its pubkeys and voting power.
@@ -151,7 +153,7 @@ pub struct ValidatorVerifier {
     /// will be verified individually bypassing the optimization.
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
-    pessimistic_verify_set: Arc<DashSet<AccountAddress>>,
+    pessimistic_verify_set: DashSet<AccountAddress>,
 }
 
 /// Reconstruct fields from the raw data upon deserialization.
@@ -190,7 +192,7 @@ impl ValidatorVerifier {
             quorum_voting_power,
             total_voting_power,
             address_to_validator_index,
-            pessimistic_verify_set: Arc::new(DashSet::new()),
+            pessimistic_verify_set: DashSet::new(),
         }
     }
 
@@ -230,8 +232,8 @@ impl ValidatorVerifier {
         self.pessimistic_verify_set.insert(author);
     }
 
-    pub fn pessimistic_verify_set(&self) -> Arc<DashSet<AccountAddress>> {
-        self.pessimistic_verify_set.clone()
+    pub fn pessimistic_verify_set(&self) -> &DashSet<AccountAddress> {
+        &self.pessimistic_verify_set
     }
 
     /// Helper method to initialize with a single author and public key with quorum voting power 1.

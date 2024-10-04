@@ -310,7 +310,7 @@ dependencies = [
  "dashmap",
  "diesel",
  "diesel-async",
- "dirs",
+ "dirs 5.0.1",
  "futures",
  "hex",
  "itertools 0.13.0",
@@ -328,6 +328,7 @@ dependencies = [
  "move-ir-types",
  "move-model",
  "move-package",
+ "move-prover-boogie-backend",
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
@@ -342,6 +343,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "server-framework",
+ "set_env",
  "shadow-rs",
  "tempfile",
  "thiserror",
@@ -403,7 +405,6 @@ dependencies = [
 name = "aptos-aggregator"
 version = "0.1.0"
 dependencies = [
- "aptos-logger",
  "aptos-types",
  "bcs 0.1.4",
  "claims",
@@ -1195,6 +1196,7 @@ dependencies = [
  "aptos-config",
  "aptos-db-indexer-schemas",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-resource-viewer",
  "aptos-rocksdb-options",
@@ -1205,6 +1207,7 @@ dependencies = [
  "bytes",
  "dashmap",
  "move-core-types",
+ "once_cell",
  "rand 0.7.3",
 ]
 
@@ -3079,7 +3082,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-nft-metadata-crawler-parser"
+name = "aptos-nft-metadata-crawler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -4344,6 +4347,7 @@ dependencies = [
  "strum_macros 0.24.3",
  "thiserror",
  "tokio",
+ "tracing",
  "url",
 ]
 
@@ -4591,6 +4595,24 @@ dependencies = [
  "serde",
  "serde_json",
  "warp",
+]
+
+[[package]]
+name = "aptos-workspace-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos",
+ "aptos-cached-packages",
+ "aptos-config",
+ "aptos-faucet-core",
+ "aptos-node",
+ "aptos-types",
+ "futures",
+ "rand 0.7.3",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -7332,11 +7354,20 @@ dependencies = [
 
 [[package]]
 name = "dirs"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
+dependencies = [
+ "dirs-sys 0.3.7",
+]
+
+[[package]]
+name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
 dependencies = [
- "dirs-sys",
+ "dirs-sys 0.4.1",
 ]
 
 [[package]]
@@ -7347,6 +7378,17 @@ checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if",
  "dirs-sys-next",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b1d1d91c932ef41c0f2663aa8b0ca0342d444d842c06914aa0a7e352d0bada6"
+dependencies = [
+ "libc",
+ "redox_users",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -15187,6 +15229,15 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.18",
  "warp",
+]
+
+[[package]]
+name = "set_env"
+version = "1.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51864fb62fd09b8a7d931a11832bfbbda5297425cfc9ce04b54bc86c945c58eb"
+dependencies = [
+ "dirs 4.0.0",
 ]
 
 [[package]]

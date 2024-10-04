@@ -673,7 +673,7 @@ mod tests {
         let validator_verifier =
             ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
                 .expect("Incorrect quorum size.");
-        let epoch_state = Arc::new(EpochState::new(10, validator_verifier.clone()));
+        let epoch_state = Arc::new(EpochState::new(10, validator_verifier));
 
         let mut ledger_info_with_mixed_signatures =
             LedgerInfoWithUnverifiedSignatures::new(ledger_info.clone());
@@ -732,7 +732,7 @@ mod tests {
             2
         );
         assert_eq!(
-            ledger_info_with_mixed_signatures.check_voting_power(&validator_verifier, true),
+            ledger_info_with_mixed_signatures.check_voting_power(&epoch_state.verifier, true),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
@@ -761,7 +761,7 @@ mod tests {
         );
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&validator_verifier, true)
+                .check_voting_power(&epoch_state.verifier, true)
                 .unwrap(),
             5
         );
@@ -815,13 +815,14 @@ mod tests {
         );
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&validator_verifier, true)
+                .check_voting_power(&epoch_state.verifier, true)
                 .unwrap(),
             5
         );
         let aggregate_sig = LedgerInfoWithSignatures::new(
             ledger_info.clone(),
-            validator_verifier
+            epoch_state
+                .verifier
                 .aggregate_signatures(partial_sig.signatures_iter())
                 .unwrap(),
         );
@@ -855,7 +856,7 @@ mod tests {
         assert_eq!(ledger_info_with_mixed_signatures.all_voters().count(), 6);
         assert_eq!(
             ledger_info_with_mixed_signatures
-                .check_voting_power(&validator_verifier, true)
+                .check_voting_power(&epoch_state.verifier, true)
                 .unwrap(),
             6
         );

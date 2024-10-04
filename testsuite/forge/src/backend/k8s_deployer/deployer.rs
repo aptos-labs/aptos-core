@@ -5,9 +5,8 @@ use super::{
     DEFAULT_FORGE_DEPLOYER_IMAGE_TAG, FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME,
     FORGE_DEPLOYER_VALUES_ENV_VAR_NAME,
 };
-use crate::{
-    k8s_wait_indexer_strategy, maybe_create_k8s_resource, wait_log_job, K8sApi, ReadWrite, Result,
-};
+use crate::{maybe_create_k8s_resource, wait_log_job, K8sApi, ReadWrite, Result};
+use again::RetryPolicy;
 use aptos_logger::info;
 use k8s_openapi::api::{
     batch::v1::Job,
@@ -18,7 +17,7 @@ use kube::{
     api::{ObjectMeta, PostParams},
     ResourceExt,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 /// The ForgeDeployerManager is responsible for managing the lifecycle of forge deployers, which deploy the
 /// forge components to the k8s cluster.
@@ -240,11 +239,14 @@ impl ForgeDeployerManager {
      * Wait for the deployer job to complete.
      */
     pub async fn wait_completed(&self) -> Result<()> {
+        // retry for ~10 min at a fixed interval. Note the actual job may take longer than this to complete, but the last attempt to tail the logs will succeed before then
+        // Ideally the deployer itself knows to fail fast depending on the workloads' health
+        let retry_policy = RetryPolicy::fixed(Duration::from_secs(10)).with_max_retries(6 * 10);
         wait_log_job(
             self.jobs_api.clone(),
             &self.namespace,
             self.get_name(),
-            k8s_wait_indexer_strategy(),
+            retry_policy,
         )
         .await
     }

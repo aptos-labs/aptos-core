@@ -194,8 +194,9 @@ pub fn new_test_context_inner(
 
     // Configure the testing depending on which API version we're testing.
     let runtime_handle = tokio::runtime::Handle::current();
-    let poem_address = attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true)
-        .expect("Failed to attach poem to runtime");
+    let poem_address =
+        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+            .expect("Failed to attach poem to runtime");
     let api_specific_config = ApiSpecificConfig::V1(poem_address);
 
     TestContext::new(
@@ -477,6 +478,26 @@ impl TestContext {
         ])
         .await;
         multisig_address
+    }
+
+    pub async fn create_multisig_account_with_existing_account(
+        &mut self,
+        account: &mut LocalAccount,
+        owners: Vec<AccountAddress>,
+        signatures_required: u64,
+        initial_balance: u64,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = account.sign_with_transaction_builder(
+            factory
+                .create_multisig_account_with_existing_account(owners, signatures_required)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![
+            txn,
+            self.account_transfer_to(account, account.address(), initial_balance),
+        ])
+        .await;
     }
 
     pub async fn create_multisig_transaction(

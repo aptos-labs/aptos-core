@@ -6,10 +6,10 @@ use crate::{
     utils::module_hash,
     BlockStateStats,
 };
-use aptos_aggregator::types::{code_invariant_error, DelayedFieldValue};
+use aptos_aggregator::types::DelayedFieldValue;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{code_invariant_error, PanicError},
     executable::{Executable, ExecutableDescriptor, ModulePath},
     write_set::TransactionWrite,
 };
