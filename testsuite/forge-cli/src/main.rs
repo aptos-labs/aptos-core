@@ -603,6 +603,8 @@ fn get_test_suite(
         return Ok(test_suite);
     } else if let Some(test_suite) = get_dag_test(test_name, duration, test_cmd) {
         return Ok(test_suite);
+    } else if let Some(test_suite) = get_indexer_test(test_name) {
+        return Ok(test_suite);
     }
 
     // Otherwise, check the test name against the ungrouped test suites
@@ -687,6 +689,15 @@ fn get_land_blocking_test(
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to an indexer test
+fn get_indexer_test(test_name: &str) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "indexer_test" => indexer_test(),
+        _ => return None, // The test name does not match an indexer test
     };
     Some(test)
 }
@@ -2365,6 +2376,99 @@ fn multiregion_benchmark_test() -> ForgeConfig {
                 .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
                 .add_chain_progress(RELIABLE_PROGRESS_THRESHOLD.clone()),
         )
+}
+
+/// Workload sweep with multiple stressful workloads for indexer
+fn indexer_test() -> ForgeConfig {
+    // Define all the workloads and their corresponding success criteria upfront
+    // The TransactionTypeArg is the workload per phase
+    // The structure of the success criteria is generally (min_tps, latencies...). See below for the exact definition.
+    let workloads_and_criteria = vec![
+        (
+            TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
+            (7000, 0.5, 0.5, 0.5),
+        ),
+        (
+            TransactionWorkload::new(TransactionTypeArg::NoOp, 20000).with_num_modules(100),
+            (8500, 0.5, 0.5, 0.5),
+        ),
+        (
+            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
+                .with_transactions_per_account(1),
+            (2000, 0.5, 0.5, 0.5),
+        ),
+        (
+            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
+                .with_unique_senders(),
+            (3200, 0.5, 0.5, 0.5),
+        ),
+        (
+            TransactionWorkload::new(TransactionTypeArg::PublishPackage, 200)
+                .with_transactions_per_account(1),
+            (28, 0.5, 0.5, 0.5),
+        ),
+        (
+            TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 100),
+            (100, 0.5, 0.5, 0.5),
+        ),
+        (
+            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture30KWith200Change, 100),
+            (100, 0.5, 0.5, 0.5),
+        ),
+        (
+            TransactionWorkload::new(
+                TransactionTypeArg::TokenV1NFTMintAndTransferSequential,
+                1000,
+            ),
+            (500, 0.5, 0.5, 0.5),
+        ),
+        (
+            TransactionWorkload::new(TransactionTypeArg::TokenV1FTMintAndTransfer, 1000),
+            (500, 0.5, 0.5, 0.5),
+        ),
+    ];
+    let num_sweep = workloads_and_criteria.len();
+
+    let workloads = Workloads::TRANSACTIONS(
+        workloads_and_criteria
+            .iter()
+            .map(|(w, _)| w.clone())
+            .collect(),
+    );
+    let criteria = workloads_and_criteria
+        .iter()
+        .map(|(_, c)| {
+            let (
+                min_tps,
+                indexer_fullnode_processed_batch,
+                indexer_cache_worker_processed_batch,
+                indexer_data_service_all_chunks_sent,
+            ) = c.to_owned();
+            SuccessCriteria::new(min_tps).add_latency_breakdown_threshold(
+                LatencyBreakdownThreshold::new_strict(vec![
+                    (
+                        LatencyBreakdownSlice::IndexerFullnodeProcessedBatch,
+                        indexer_fullnode_processed_batch,
+                    ),
+                    (
+                        LatencyBreakdownSlice::IndexerCacheWorkerProcessedBatch,
+                        indexer_cache_worker_processed_batch,
+                    ),
+                    (
+                        LatencyBreakdownSlice::IndexerDataServiceAllChunksSent,
+                        indexer_data_service_all_chunks_sent,
+                    ),
+                ]),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    realistic_env_sweep_wrap(4, 4, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads,
+        criteria,
+        background_traffic: background_traffic_for_sweep(num_sweep),
+    })
 }
 
 /// This test runs a constant-TPS benchmark where the network includes
