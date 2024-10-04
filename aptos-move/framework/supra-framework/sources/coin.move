@@ -21,8 +21,8 @@ module supra_framework::coin {
     use aptos_std::type_info::{Self, TypeInfo, type_name};
     use supra_framework::create_signer;
 
-	friend supra_framework::supra_coin;
     friend supra_framework::genesis;
+    friend supra_framework::supra_coin;
     friend supra_framework::transaction_fee;
 
     //
@@ -294,7 +294,7 @@ module supra_framework::coin {
         };
     }
 
-    /// Create SUPRA pairing by passing `AptosCoin`.
+    /// Create SUPRA pairing by passing `SupraCoin`.
     public entry fun create_pairing<CoinType>(
         supra_framework: &signer
     ) acquires CoinConversionMap, CoinInfo {
@@ -382,9 +382,32 @@ module supra_framework::coin {
     public fun coin_to_fungible_asset<CoinType>(
         coin: Coin<CoinType>
     ): FungibleAsset acquires CoinConversionMap, CoinInfo {
+        // TODO: Replace the below code with a call to `coin_to_fungible_asset_internal`
+        // once we fully support `FungibleAsset`s. The below guard is used because we need to
+        // preserve the function signature but want to keep the feature flag active to avoid
+        // breaking the tests. The `else` branch will never be taken in the production code
+        // as this feature is set by default.
+        if (features::coin_to_fungible_asset_migration_feature_enabled()) {
+            abort error::unavailable(ECOIN_TO_FUNGIBLE_ASSET_FEATURE_NOT_ENABLED)
+        } else {
+            coin_to_fungible_asset_internal(coin)
+        }
+    }
+
+    fun coin_to_fungible_asset_internal<CoinType>(
+        coin: Coin<CoinType>
+    ): FungibleAsset acquires CoinConversionMap, CoinInfo {
         let metadata = ensure_paired_metadata<CoinType>();
         let amount = burn_internal(coin);
         fungible_asset::mint_internal(metadata, amount)
+    }
+
+    /// A public wrapper around `coin_to_fungible_asset_internal` for use by external tests.
+    #[test_only]
+    public fun coin_to_fungible_asset_for_test<CoinType>(
+        coin: Coin<CoinType>
+    ): FungibleAsset acquires CoinConversionMap, CoinInfo {
+        coin_to_fungible_asset_internal(coin)
     }
 
     /// Conversion from fungible asset to coin. Not public to push the migration to FA.
@@ -567,8 +590,7 @@ module supra_framework::coin {
         AggregatableCoin<CoinType> {
             value: aggregator,
         }
-    }
-	
+    }    
 
     /// Returns true if the value of aggregatable coin is zero.
     public(friend) fun is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
@@ -687,7 +709,7 @@ module supra_framework::coin {
             if (coin.value == 0) {
                 destroy_zero(coin);
             } else {
-                fungible_asset::deposit(store, coin_to_fungible_asset(coin));
+                fungible_asset::deposit(store, coin_to_fungible_asset_internal(coin));
             };
             // Note:
             // It is possible the primary fungible store may already exist before this function call.
@@ -705,6 +727,21 @@ module supra_framework::coin {
 
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
     public entry fun migrate_to_fungible_store<CoinType>(
+        account: &signer
+    ) acquires CoinStore, CoinConversionMap, CoinInfo {
+        // TODO: Replace the below code with a call to `migrate_to_fungible_store_internal`
+        // once we fully support `FungibleAsset`s. The below guard is used because we need to
+        // preserve the function signature but want to keep the feature flag active to avoid
+        // breaking the tests. The `else` branch will never be taken in the production code
+        // as this feature is set by default.
+        if (features::coin_to_fungible_asset_migration_feature_enabled()) {
+            abort error::unavailable(ECOIN_TO_FUNGIBLE_ASSET_FEATURE_NOT_ENABLED)
+        } else {
+            migrate_to_fungible_store_internal<CoinType>(account)
+        }
+    }
+
+    fun migrate_to_fungible_store_internal<CoinType>(
         account: &signer
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
         maybe_convert_to_fungible_store<CoinType>(signer::address_of(account));
@@ -910,7 +947,7 @@ module supra_framework::coin {
                 account_addr,
                 option::destroy_some(metadata)
             )) {
-                primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
+                primary_fungible_store::deposit(account_addr, coin_to_fungible_asset_internal(coin));
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
             };
@@ -943,7 +980,7 @@ module supra_framework::coin {
                 account_addr,
                 option::destroy_some(metadata)
             )) {
-                let fa = coin_to_fungible_asset(coin);
+                let fa = coin_to_fungible_asset_internal(coin);
                 let metadata = fungible_asset::asset_metadata(&fa);
                 let store = primary_fungible_store::primary_store(account_addr, metadata);
                 fungible_asset::deposit_internal(object::object_address(&store), fa);
@@ -1062,14 +1099,14 @@ module supra_framework::coin {
         system_addresses::assert_supra_framework(account);
         initialize_internal(account, name, symbol, decimals, monitor_supply, true)
     }
-	
-	public(friend) fun initialize_with_parallelizable_supply_with_limit<CoinType>(
+    
+    public(friend) fun initialize_with_parallelizable_supply_with_limit<CoinType>(
         account: &signer,
         name: string::String,
         symbol: string::String,
         decimals: u8,
         monitor_supply: bool,
-		limit: u128,
+        limit: u128,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         system_addresses::assert_supra_framework(account);
         initialize_internal_with_limit(account, name, symbol, decimals, monitor_supply, true, limit)
@@ -1108,14 +1145,15 @@ module supra_framework::coin {
 
         (BurnCapability<CoinType> {}, FreezeCapability<CoinType> {}, MintCapability<CoinType> {})
     }
-	 fun initialize_internal_with_limit<CoinType>(
+
+     fun initialize_internal_with_limit<CoinType>(
         account: &signer,
         name: string::String,
         symbol: string::String,
         decimals: u8,
         monitor_supply: bool,
         parallelizable: bool,
-		limit: u128,
+        limit: u128,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         let account_addr = signer::address_of(account);
 
@@ -1543,7 +1581,7 @@ module supra_framework::coin {
 
         let coins_minted = mint<FakeMoney>(100, &mint_cap);
         deposit(source_addr, coins_minted);
-        let fa_minted = coin_to_fungible_asset(mint<FakeMoney>(200, &mint_cap));
+        let fa_minted = coin_to_fungible_asset_internal(mint<FakeMoney>(200, &mint_cap));
         primary_fungible_store::deposit(source_addr, fa_minted);
 
         // Burn coin only with both stores
@@ -1798,7 +1836,7 @@ module supra_framework::coin {
     #[test(other = @0x123)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
     fun test_migration_coin_store_with_non_coin_type(other: signer) acquires CoinConversionMap, CoinStore, CoinInfo {
-        migrate_to_fungible_store<String>(&other);
+        migrate_to_fungible_store_internal<String>(&other);
     }
 
     #[test(framework = @supra_framework)]
@@ -1896,7 +1934,7 @@ module supra_framework::coin {
         let aggregatable_coin = initialize_aggregatable_coin<FakeMoney>(&framework);
         collect_into_aggregatable_coin<FakeMoney>(framework_addr, 50, &mut aggregatable_coin);
 
-        let fa_minted = coin_to_fungible_asset(mint<FakeMoney>(100, &mint_cap));
+        let fa_minted = coin_to_fungible_asset_internal(mint<FakeMoney>(100, &mint_cap));
         primary_fungible_store::deposit(framework_addr, fa_minted);
         assert!(balance<FakeMoney>(framework_addr) == 150, 0);
         assert!(*option::borrow(&supply<FakeMoney>()) == 200, 0);
@@ -1961,7 +1999,7 @@ module supra_framework::coin {
         assert!(fungible_asset::decimals(ensure_paired_metadata<FakeMoney>()) == decimals<FakeMoney>(), 0);
 
         let minted_coin = mint(100, &mint_cap);
-        let converted_fa = coin_to_fungible_asset(minted_coin);
+        let converted_fa = coin_to_fungible_asset_internal(minted_coin);
 
         // check and get refs
         assert!(paired_mint_ref_exists<FakeMoney>(), 0);
@@ -1991,7 +2029,7 @@ module supra_framework::coin {
         assert!(balance<FakeMoney>(account_addr) == 199, 0);
         assert!(primary_fungible_store::balance(account_addr, ensure_paired_metadata<FakeMoney>()) == 199, 0);
 
-        let fa = coin_to_fungible_asset(withdrawn_coin);
+        let fa = coin_to_fungible_asset_internal(withdrawn_coin);
         fungible_asset::burn(&burn_ref, fa);
 
         // Return and check the refs
@@ -2021,7 +2059,7 @@ module supra_framework::coin {
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
         create_coin_store<FakeMoney>(aaron);
         let coin = mint(100, &mint_cap);
-        let fa = coin_to_fungible_asset(mint(100, &mint_cap));
+        let fa = coin_to_fungible_asset_internal(mint(100, &mint_cap));
         primary_fungible_store::deposit(aaron_addr, fa);
         deposit_to_coin_store(aaron_addr, coin);
         assert!(coin_balance<FakeMoney>(aaron_addr) == 100, 0);
@@ -2081,7 +2119,7 @@ module supra_framework::coin {
         assert!(coin_balance<FakeMoney>(account_addr) == 100, 0);
         assert!(balance<FakeMoney>(account_addr) == 100, 0);
 
-        let fa = coin_to_fungible_asset(coin);
+        let fa = coin_to_fungible_asset_internal(coin);
         primary_fungible_store::deposit(account_addr, fa);
         assert!(coin_store_exists<FakeMoney>(account_addr), 0);
         assert!(primary_fungible_store::balance(account_addr, ensure_paired_metadata<FakeMoney>()) == 100, 0);
@@ -2125,7 +2163,7 @@ module supra_framework::coin {
         assert!(supply<FakeMoney>() == option::some(150), 0);
         assert!(coin_supply<FakeMoney>() == option::some(100), 0);
         assert!(fungible_asset::supply(ensure_paired_metadata<FakeMoney>()) == option::some(50), 0);
-        let fa_from_coin = coin_to_fungible_asset(coin);
+        let fa_from_coin = coin_to_fungible_asset_internal(coin);
         assert!(supply<FakeMoney>() == option::some(150), 0);
         assert!(coin_supply<FakeMoney>() == option::some(0), 0);
         assert!(fungible_asset::supply(ensure_paired_metadata<FakeMoney>()) == option::some(150), 0);
@@ -2210,7 +2248,7 @@ module supra_framework::coin {
         assert!(is_account_registered<FakeMoney>(account_addr), 0);
 
         // Deposit FA to bob to created primary fungible store without `MigrationFlag`.
-        primary_fungible_store::deposit(bob_addr, coin_to_fungible_asset(mint<FakeMoney>(100, &mint_cap)));
+        primary_fungible_store::deposit(bob_addr, coin_to_fungible_asset_internal(mint<FakeMoney>(100, &mint_cap)));
         assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
         register<FakeMoney>(bob);
         assert!(coin_store_exists<FakeMoney>(bob_addr), 0);
@@ -2235,7 +2273,7 @@ module supra_framework::coin {
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
 
         let coin = mint<FakeMoney>(100, &mint_cap);
-        primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
+        primary_fungible_store::deposit(account_addr, coin_to_fungible_asset_internal(coin));
         assert!(coin_balance<FakeMoney>(account_addr) == 0, 0);
         assert!(balance<FakeMoney>(account_addr) == 100, 0);
         let coin = withdraw<FakeMoney>(account, 50);

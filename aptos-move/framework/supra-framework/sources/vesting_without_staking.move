@@ -628,8 +628,7 @@ module supra_framework::vesting_without_staking {
     /// Create a salt for generating the resource accounts that will be holding the VestingContract.
     /// This address should be deterministic for the same admin and vesting contract creation nonce.
     fun create_vesting_contract_account(admin: &signer, contract_creation_seed: vector<u8>,)
-        : (signer,
-        SignerCapability) acquires AdminStore {
+        : (signer, SignerCapability) acquires AdminStore {
         let admin_store = borrow_global_mut<AdminStore>(signer::address_of(admin));
         let seed = bcs::to_bytes(&signer::address_of(admin));
         vector::append(&mut seed, bcs::to_bytes(&admin_store.nonce));

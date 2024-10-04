@@ -164,7 +164,7 @@ module supra_framework::supra_coin {
     #[test_only]
     public fun mint_apt_fa_for_test(amount: u64): FungibleAsset acquires MintCapStore {
         ensure_initialized_with_apt_fa_metadata_for_test();
-        coin::coin_to_fungible_asset(
+        coin::coin_to_fungible_asset_for_test(
             coin::mint(
                 amount,
                 &borrow_global<MintCapStore>(@supra_framework).mint_cap
