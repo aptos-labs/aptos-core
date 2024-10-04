@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // Useful constants for enabling consensus observer on different node types
-const ENABLE_ON_VALIDATORS: bool = false;
-const ENABLE_ON_VALIDATOR_FULLNODES: bool = false;
+const ENABLE_ON_VALIDATORS: bool = true;
+const ENABLE_ON_VALIDATOR_FULLNODES: bool = true;
 const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
@@ -62,15 +62,15 @@ impl Default for ConsensusObserverConfig {
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds
             garbage_collection_interval_ms: 60_000,            // 60 seconds
-            max_num_pending_blocks: 100,                       // 100 blocks
+            max_num_pending_blocks: 10,                        // 10 blocks only
             progress_check_interval_ms: 5_000,                 // 5 seconds
             max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
-            max_subscription_sync_timeout_ms: 15_000,          // 15 seconds
-            max_subscription_timeout_ms: 15_000,               // 15 seconds
+            max_subscription_sync_timeout_ms: 10_000,          // 10 seconds
+            max_subscription_timeout_ms: 10_000,               // 10 seconds
             subscription_peer_change_interval_ms: 60_000,      // 1 minute
             subscription_refresh_interval_ms: 300_000,         // 5 minutes
-            observer_fallback_duration_secs: 600,              // 10 minutes
-            observer_fallback_sync_threshold_secs: 30,         // 30 seconds
+            observer_fallback_duration_secs: 20,               // 20 seconds
+            observer_fallback_sync_threshold_secs: 20,         // 20 seconds
         }
     }
 }
