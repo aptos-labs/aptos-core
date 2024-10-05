@@ -408,19 +408,17 @@ module supra_framework::vesting_without_staking {
         let next_period_to_vest = last_vested_period + 1;
         let last_completed_period = (timestamp::now_seconds() - vesting_schedule.start_timestamp_secs)
             / vesting_schedule.period_duration;
+
         // Index is 0-based while period is 1-based so we need to subtract 1.
-        while (last_completed_period >= next_period_to_vest && vesting_record.left_amount
-            > 0) {
+        while (last_completed_period >= next_period_to_vest && vesting_record.left_amount > 0) {
             let schedule_index = next_period_to_vest - 1;
             let vesting_fraction = if (schedule_index < vector::length(schedule)) {
                 *vector::borrow(schedule, schedule_index)
             } else {
                 // Last vesting schedule fraction will repeat until the grant runs out.
-                *vector::borrow(schedule, vector::length(schedule) - 1) };
+                *vector::borrow(schedule, vector::length(schedule) - 1)
+            };
             vest_transfer(vesting_record, signer_cap, beneficiary, vesting_fraction);
-            //update last_vested_period for the shareholder
-            vesting_record.last_vested_period = next_period_to_vest;
-            next_period_to_vest = next_period_to_vest + 1;
 
             emit_event(&mut vesting_contract.vest_events,
                 VestEvent {
@@ -430,7 +428,11 @@ module supra_framework::vesting_without_staking {
                     period_vested: next_period_to_vest,
                 },
             );
+            next_period_to_vest = next_period_to_vest + 1;
         };
+
+        //update last_vested_period for the shareholder
+        vesting_record.last_vested_period = next_period_to_vest - 1;
     }
 
     fun vest_transfer(
