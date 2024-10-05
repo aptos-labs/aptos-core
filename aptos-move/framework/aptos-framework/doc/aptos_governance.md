@@ -109,6 +109,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 <b>use</b> <a href="governance_proposal.md#0x1_governance_proposal">0x1::governance_proposal</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="randomness_config.md#0x1_randomness_config">0x1::randomness_config</a>;
 <b>use</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg">0x1::reconfiguration_with_dkg</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
@@ -1261,6 +1262,7 @@ Return proposal_id when a proposal is successfully created.
     metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     is_multi_step_proposal: bool,
 ): u64 <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(proposer);
     <b>let</b> proposer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(proposer);
     <b>assert</b>!(
         <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(stake_pool) == proposer_address,
@@ -1492,6 +1494,7 @@ cannot vote on the proposal even after partial governance voting is enabled.
     voting_power: u64,
     should_pass: bool,
 ) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(voter);
     <b>let</b> voter_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(voter);
     <b>assert</b>!(<a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(stake_pool) == voter_address, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_ENOT_DELEGATED_VOTER">ENOT_DELEGATED_VOTER</a>));
 
