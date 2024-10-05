@@ -68,8 +68,12 @@ spec aptos_framework::resource_account {
         seed: vector<u8>,
         optional_auth_key: vector<u8>,
     ) {
+        use aptos_framework::permissioned_signer;
+        use aptos_framework::create_signer;
         let source_addr = signer::address_of(origin);
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
+        let resource = create_signer::spec_create_signer(resource_addr);
+        aborts_if permissioned_signer::spec_is_permissioned_signer(resource);
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit;
     }
 
@@ -116,6 +120,8 @@ spec aptos_framework::resource_account {
         resource_signer_cap: account::SignerCapability,
         optional_auth_key: vector<u8>,
     ) {
+        use aptos_framework::permissioned_signer;
+        aborts_if permissioned_signer::spec_is_permissioned_signer(resource);
         let resource_addr = signer::address_of(resource);
         /// [high-level-req-1]
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIf;
@@ -172,6 +178,8 @@ spec aptos_framework::resource_account {
         resource: &signer,
         source_addr: address,
     ) : account::SignerCapability  {
+        use aptos_framework::permissioned_signer;
+        aborts_if permissioned_signer::spec_is_permissioned_signer(resource);
         /// [high-level-req-6]
         aborts_if !exists<Container>(source_addr);
         let resource_addr = signer::address_of(resource);

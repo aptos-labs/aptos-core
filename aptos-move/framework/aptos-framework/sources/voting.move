@@ -34,6 +34,7 @@ module aptos_framework::voting {
 
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::permissioned_signer;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
     use aptos_std::from_bcs;
@@ -189,6 +190,7 @@ module aptos_framework::voting {
     }
 
     public fun register<ProposalType: store>(account: &signer) {
+        permissioned_signer::assert_master_signer(account);
         let addr = signer::address_of(account);
         assert!(!exists<VotingForum<ProposalType>>(addr), error::already_exists(EVOTING_FORUM_ALREADY_REGISTERED));
 

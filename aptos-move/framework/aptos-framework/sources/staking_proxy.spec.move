@@ -125,9 +125,12 @@ spec aptos_framework::staking_proxy {
     }
 
     spec schema SetStakePoolOperator {
+        use aptos_framework::permissioned_signer;
+
         owner: &signer;
         new_operator: address;
 
+        aborts_if permissioned_signer::spec_is_permissioned_signer(owner);
         let owner_address = signer::address_of(owner);
         let ownership_cap = borrow_global<stake::OwnerCapability>(owner_address);
         let pool_address = ownership_cap.pool_address;
@@ -169,9 +172,12 @@ spec aptos_framework::staking_proxy {
     }
 
     spec schema SetStakePoolVoterAbortsIf {
+        use aptos_framework::permissioned_signer;
+
         owner: &signer;
         new_voter: address;
 
+        aborts_if permissioned_signer::spec_is_permissioned_signer(owner);
         let owner_address = signer::address_of(owner);
         let ownership_cap = global<stake::OwnerCapability>(owner_address);
         let pool_address = ownership_cap.pool_address;
