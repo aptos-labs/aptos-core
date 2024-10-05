@@ -1498,7 +1498,7 @@ The last step of genesis.
 <td>3</td>
 <td>The Supra coin should be initialized during genesis and only the Supra framework account should own the mint and burn capabilities for the SUPRA token.</td>
 <td>Critical</td>
-<td>Both mint and burn capabilities are wrapped inside the stake::SupraCoinCapabilities and transaction_fee::SupraCoinCapabilities resources which are stored under the aptos framework account.</td>
+<td>Both mint and burn capabilities are wrapped inside the stake::SupraCoinCapabilities and transaction_fee::SupraCoinCapabilities resources which are stored under the supra framework account.</td>
 <td>Formally verified via <a href="#high-level-req-3">initialize_supra_coin</a>.</td>
 </tr>
 

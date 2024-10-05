@@ -1,7 +1,7 @@
 spec supra_framework::reconfiguration {
     /// <high-level-req>
     /// No.: 1
-    /// Requirement: The Configuration resource is stored under the Aptos framework account with initial values upon
+    /// Requirement: The Configuration resource is stored under the Supra framework account with initial values upon
     /// module's initialization.
     /// Criticality: Medium
     /// Implementation: The Configuration resource may only be initialized with specific values and published under the

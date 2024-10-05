@@ -49,7 +49,7 @@ module supra_framework::managed_coin {
         coin::burn(to_burn, &capabilities.burn_cap);
     }
 
-    /// Initialize new coin `CoinType` in Aptos Blockchain.
+    /// Initialize new coin `CoinType` in Supra Blockchain.
     /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
     public entry fun initialize<CoinType>(
         account: &signer,

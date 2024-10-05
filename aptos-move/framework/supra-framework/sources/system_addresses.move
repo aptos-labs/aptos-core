@@ -75,7 +75,7 @@ module supra_framework::system_addresses {
         addr == @vm_reserved
     }
 
-    /// Return true if `addr` is either the VM address or an Aptos Framework address.
+    /// Return true if `addr` is either the VM address or an Supra Framework address.
     public fun is_reserved_address(addr: address): bool {
         is_supra_framework_address(addr) || is_vm_address(addr)
     }

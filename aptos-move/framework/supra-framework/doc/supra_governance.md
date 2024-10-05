@@ -4,7 +4,7 @@
 # Module `0x1::supra_governance`
 
 
-AptosGovernance represents the on-chain governance of the Supra network. Voting power is calculated based on the
+SupraGovernance represents the on-chain governance of the Supra network. Voting power is calculated based on the
 current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
 the stake pool's lockup needs to be at least as long as the proposal's duration.
 

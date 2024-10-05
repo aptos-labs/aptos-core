@@ -53,7 +53,7 @@ module supra_framework::jwks {
         providers: vector<OIDCProvider>,
     }
 
-    /// An JWK variant that represents the JWKs which were observed but not yet supported by Aptos.
+    /// An JWK variant that represents the JWKs which were observed but not yet supported by Supra.
     /// Observing `UnsupportedJWK`s means the providers adopted a new key type/format, and the system should be updated.
     struct UnsupportedJWK has copy, drop, store {
         id: vector<u8>,

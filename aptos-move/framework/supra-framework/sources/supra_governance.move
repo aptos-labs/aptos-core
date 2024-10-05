@@ -1,5 +1,5 @@
 ///
-/// AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
+/// SupraGovernance represents the on-chain governance of the Supra network. Voting power is calculated based on the
 /// current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
 /// the stake pool's lockup needs to be at least as long as the proposal's duration.
 ///
@@ -149,7 +149,7 @@ module supra_framework::supra_governance {
         simple_map::add(signer_caps, signer_address, signer_cap);
     }
 
-    /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
+    /// Initializes the state for Supra Governance. Can only be called during Genesis with a signer
     /// for the supra_framework (0x1) account.
     /// This function is private because it's called directly from the vm.
     fun initialize(
@@ -481,7 +481,7 @@ module supra_framework::supra_governance {
     }
 
     /// `force_end_epoch()` equivalent but only called in testnet,
-    /// where the core resources account exists and has been granted power to mint Aptos coins.
+    /// where the core resources account exists and has been granted power to mint Supra coins.
     public entry fun force_end_epoch_test_only(supra_framework: &signer) acquires GovernanceResponsbility {
         let core_signer = get_signer_testnet_only(supra_framework, @0x1);
         system_addresses::assert_supra_framework(&core_signer);
@@ -495,7 +495,7 @@ module supra_framework::supra_governance {
         reconfigure(supra_framework);
     }
 
-    /// Only called in testnet where the core resources account exists and has been granted power to mint Aptos coins.
+    /// Only called in testnet where the core resources account exists and has been granted power to mint Supra coins.
     public fun get_signer_testnet_only(
         core_resources: &signer, signer_address: address): signer acquires GovernanceResponsbility {
         system_addresses::assert_core_resource(core_resources);

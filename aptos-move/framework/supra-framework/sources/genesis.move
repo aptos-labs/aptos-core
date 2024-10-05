@@ -3,7 +3,7 @@ module supra_framework::genesis {
     use std::fixed_point32;
     use std::vector;
     use std::option;
-    use std::string::{Self, String};
+    use std::string::{String};
 
     use aptos_std::simple_map;
     use supra_framework::supra_account;
@@ -191,7 +191,7 @@ module supra_framework::genesis {
         timestamp::set_time_has_started(&supra_framework_account, genesis_timestamp_in_microseconds);
     }
 
-    /// Genesis step 2: Initialize Aptos coin.
+    /// Genesis step 2: Initialize Supra coin.
     fun initialize_supra_coin(supra_framework: &signer) {
         let (burn_cap, mint_cap) = supra_coin::initialize(supra_framework);
         coin::create_coin_conversion_map(supra_framework);

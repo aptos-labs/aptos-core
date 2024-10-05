@@ -39,7 +39,7 @@ module supra_framework::supra_coin {
         inner: vector<DelegatedMintCapability>,
     }
 
-    /// Can only called during genesis to initialize the Aptos coin.
+    /// Can only called during genesis to initialize the Supra coin.
     public(friend) fun initialize(supra_framework: &signer): (BurnCapability<SupraCoin>, MintCapability<SupraCoin>) {
         system_addresses::assert_supra_framework(supra_framework);
 
@@ -52,7 +52,7 @@ module supra_framework::supra_coin {
 			MAX_SUPRA_COIN_SUPPLY,
         );
 
-        // Aptos framework needs mint cap to mint coins to initial validators. This will be revoked once the validators
+        // Supra framework needs mint cap to mint coins to initial validators. This will be revoked once the validators
         // have been initialized.
         move_to(supra_framework, MintCapStore { mint_cap });
 

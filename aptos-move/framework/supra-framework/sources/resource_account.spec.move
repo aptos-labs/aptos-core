@@ -16,7 +16,7 @@ spec supra_framework::resource_account {
     /// Enforcement: Formally verified via [high-level-req-2](rotate_account_authentication_key_and_store_capability).
     ///
     /// No.: 3
-    /// Requirement: The resource account is registered for the Aptos coin.
+    /// Requirement: The resource account is registered for the Supra coin.
     /// Criticality: High
     /// Implementation: The create_resource_account_and_fund ensures the newly created resource account is registered to
     /// receive the SupraCoin.

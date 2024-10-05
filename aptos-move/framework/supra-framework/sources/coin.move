@@ -124,7 +124,7 @@ module supra_framework::coin {
 
     /// Represents a coin with aggregator as its value. This allows to update
     /// the coin in every transaction avoiding read-modify-write conflicts. Only
-    /// used for gas fees distribution by Aptos Framework (0x1).
+    /// used for gas fees distribution by Supra Framework (0x1).
     struct AggregatableCoin<phantom CoinType> has store {
         /// Amount of aggregatable coin this address has.
         value: Aggregator,
@@ -584,7 +584,7 @@ module supra_framework::coin {
     //
 
     /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
-    /// only be called by Aptos Framework (0x1) account for now because of `create_aggregator`.
+    /// only be called by Supra Framework (0x1) account for now because of `create_aggregator`.
     public(friend) fun initialize_aggregatable_coin<CoinType>(supra_framework: &signer): AggregatableCoin<CoinType> {
         let aggregator = aggregator_factory::create_aggregator(supra_framework, MAX_U64);
         AggregatableCoin<CoinType> {

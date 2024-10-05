@@ -1,7 +1,7 @@
 spec supra_framework::consensus_config {
     /// <high-level-req>
     /// No.: 1
-    /// Requirement: During genesis, the Aptos framework account should be assigned the consensus config resource.
+    /// Requirement: During genesis, the Supra framework account should be assigned the consensus config resource.
     /// Criticality: Medium
     /// Implementation: The consensus_config::initialize function calls the assert_supra_framework function to ensure
     /// that the signer is the supra_framework and then assigns the ConsensusConfig resource to it.

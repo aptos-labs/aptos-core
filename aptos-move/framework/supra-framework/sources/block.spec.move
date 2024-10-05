@@ -6,12 +6,12 @@ spec supra_framework::block {
     /// Criticality: High
     /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
     /// that the following conditions are met (1) the BlockResource resource is created, indicating its existence within
-    /// the module's context, and moved under the Aptos framework account, (2) the block height is set to zero during
+    /// the module's context, and moved under the Supra framework account, (2) the block height is set to zero during
     /// initialization, and (3) the epoch interval is greater than zero.
     /// Enforcement: Formally Verified via [high-level-req-1](Initialize).
     ///
     /// No.: 2
-    /// Requirement: Only the Aptos framework address may execute the following functionalities: (1) initialize
+    /// Requirement: Only the Supra framework address may execute the following functionalities: (1) initialize
     /// BlockResource, and (2) update the epoch interval.
     /// Criticality: Critical
     /// Implementation: The initialize and  update_epoch_interval_microsecs functions ensure that only supra_framework

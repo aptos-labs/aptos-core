@@ -1,5 +1,5 @@
 /// This module provides foundations to create aggregators. Currently only
-/// Aptos Framework (0x1) can create them, so this module helps to wrap
+/// Supra Framework (0x1) can create them, so this module helps to wrap
 /// the constructor of `Aggregator` struct so that only a system account
 /// can initialize one. In the future, this might change and aggregators
 /// can be enabled for the public.
@@ -17,7 +17,7 @@ module supra_framework::aggregator_factory {
     const EAGGREGATOR_FACTORY_NOT_FOUND: u64 = 1;
 
     /// Creates new aggregators. Used to control the numbers of aggregators in the
-    /// system and who can create them. At the moment, only Aptos Framework (0x1)
+    /// system and who can create them. At the moment, only Supra Framework (0x1)
     /// account can.
     struct AggregatorFactory has key {
         phantom_table: Table<address, u128>,
@@ -46,7 +46,7 @@ module supra_framework::aggregator_factory {
     /// This is currently a function closed for public. This can be updated in the future by on-chain governance
     /// to allow any signer to call.
     public fun create_aggregator(account: &signer, limit: u128): Aggregator acquires AggregatorFactory {
-        // Only Aptos Framework (0x1) account can call this for now.
+        // Only Supra Framework (0x1) account can call this for now.
         system_addresses::assert_supra_framework(account);
         create_aggregator_internal(limit)
     }

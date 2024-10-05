@@ -1,7 +1,7 @@
 spec supra_framework::chain_id {
     /// <high-level-req>
     /// No.: 1
-    /// Requirement: During genesis, the ChainId resource should be created and moved under the Aptos framework account
+    /// Requirement: During genesis, the ChainId resource should be created and moved under the Supra framework account
     /// with the specified chain id.
     /// Criticality: Medium
     /// Implementation: The chain_id::initialize function is responsible for generating the ChainId resource and then

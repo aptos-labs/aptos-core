@@ -8,7 +8,7 @@ spec supra_framework::timestamp {
     /// Enforcement: Formally verified via [high-level-req-1](module).
     ///
     /// No.: 2
-    /// Requirement: The global wall clock resource should only be owned by the Aptos framework.
+    /// Requirement: The global wall clock resource should only be owned by the Supra framework.
     /// Criticality: High
     /// Implementation: The function set_time_has_started ensures that only the supra_framework account can possess the
     /// CurrentTimeMicroseconds resource using the assert_supra_framework function.

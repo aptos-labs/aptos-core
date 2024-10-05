@@ -1,14 +1,14 @@
 spec supra_framework::gas_schedule {
     /// <high-level-req>
     /// No.: 1
-    /// Requirement: During genesis, the Aptos framework account should be assigned the gas schedule resource.
+    /// Requirement: During genesis, the Supra framework account should be assigned the gas schedule resource.
     /// Criticality: Medium
     /// Implementation: The gas_schedule::initialize function calls the assert_supra_framework function to ensure that
     /// the signer is the supra_framework and then assigns the GasScheduleV2 resource to it.
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Requirement: Only the Aptos framework account should be allowed to update the gas schedule resource.
+    /// Requirement: Only the Supra framework account should be allowed to update the gas schedule resource.
     /// Criticality: Critical
     /// Implementation: The gas_schedule::set_gas_schedule function calls the assert_supra_framework function to ensure
     /// that the signer is the aptos framework account.

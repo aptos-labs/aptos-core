@@ -3,7 +3,7 @@ spec supra_framework::chain_status {
     /// No.: 1
     /// Requirement: The end of genesis mark should persist throughout the entire life of the chain.
     /// Criticality: Medium
-    /// Implementation: The Aptos framework account should never drop the GenesisEndMarker resource.
+    /// Implementation: The Supra framework account should never drop the GenesisEndMarker resource.
     /// Enforcement: Audited that GenesisEndMarker is published at the end of genesis and never removed. Formally
     /// verified via [high-level-req-1](set_genesis_end) that GenesisEndMarker is published.
     ///

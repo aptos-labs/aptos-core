@@ -2,26 +2,26 @@ spec supra_framework::aggregator_factory {
     use supra_framework::aggregator;
     /// <high-level-req>
     /// No.: 1
-    /// Requirement: During the module's initialization, it guarantees that the Aptos framework is the caller and that the
-    /// AggregatorFactory resource will move under the Aptos framework account.
+    /// Requirement: During the module's initialization, it guarantees that the Supra framework is the caller and that the
+    /// AggregatorFactory resource will move under the Supra framework account.
     /// Criticality: High
     /// Implementation: The initialize function is responsible for establishing the initial state of the module by
     /// creating the AggregatorFactory resource, indicating its presence within the module's context. Subsequently, the
-    /// resource transfers to the Aptos framework account.
+    /// resource transfers to the Supra framework account.
     /// Enforcement: Formally verified via [high-level-req-1](initialize_aggregator_factory).
     ///
     /// No.: 2
     /// Requirement: To create a new aggregator instance, the aggregator factory must already be initialized and exist
-    /// under the Aptos account.
+    /// under the Supra account.
     /// Criticality: High
     /// Implementation: The create_aggregator_internal function asserts that AggregatorFactory exists for the Aptos
     /// account.
     /// Enforcement: Formally verified via [high-level-req-2](CreateAggregatorInternalAbortsIf).
     ///
     /// No.: 3
-    /// Requirement: Only the Aptos framework address may create an aggregator instance currently.
+    /// Requirement: Only the Supra framework address may create an aggregator instance currently.
     /// Criticality: Low
-    /// Implementation: The create_aggregator function ensures that the address calling it is the Aptos framework
+    /// Implementation: The create_aggregator function ensures that the address calling it is the Supra framework
     /// address.
     /// Enforcement: Formally verified via [high-level-req-3](create_aggregator).
     ///

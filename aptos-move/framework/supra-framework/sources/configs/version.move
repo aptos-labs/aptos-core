@@ -28,8 +28,8 @@ module supra_framework::version {
         system_addresses::assert_supra_framework(supra_framework);
 
         move_to(supra_framework, Version { major: initial_version });
-        // Give aptos framework account capability to call set version. This allows on chain governance to do it through
-        // control of the aptos framework account.
+        // Give supra framework account capability to call set version. This allows on chain governance to do it through
+        // control of the supra framework account.
         move_to(supra_framework, SetVersionCapability {});
     }
 

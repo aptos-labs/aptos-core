@@ -265,7 +265,7 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    /// Initialize new coin `CoinType` in Aptos Blockchain.
+    /// Initialize new coin `CoinType` in Supra Blockchain.
     /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
     ManagedCoinInitialize {
         coin_type: TypeTag,
@@ -888,7 +888,7 @@ pub enum EntryFunctionCall {
     SupraGovernanceForceEndEpoch {},
 
     /// `force_end_epoch()` equivalent but only called in testnet,
-    /// where the core resources account exists and has been granted power to mint Aptos coins.
+    /// where the core resources account exists and has been granted power to mint Supra coins.
     SupraGovernanceForceEndEpochTestOnly {},
 
     /// Manually reconfigure. Called at the end of a governance txn that alters on-chain configs.
@@ -2420,7 +2420,7 @@ pub fn managed_coin_burn(coin_type: TypeTag, amount: u64) -> TransactionPayload 
     ))
 }
 
-/// Initialize new coin `CoinType` in Aptos Blockchain.
+/// Initialize new coin `CoinType` in Supra Blockchain.
 /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
 pub fn managed_coin_initialize(
     coin_type: TypeTag,
@@ -4331,7 +4331,7 @@ pub fn supra_governance_force_end_epoch() -> TransactionPayload {
 }
 
 /// `force_end_epoch()` equivalent but only called in testnet,
-/// where the core resources account exists and has been granted power to mint Aptos coins.
+/// where the core resources account exists and has been granted power to mint Supra coins.
 pub fn supra_governance_force_end_epoch_test_only() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(

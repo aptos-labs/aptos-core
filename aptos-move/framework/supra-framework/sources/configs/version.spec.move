@@ -2,14 +2,14 @@ spec supra_framework::version {
     /// <high-level-req>
     /// No.: 1
     /// Requirement: During genesis, the Version resource should be initialized with the initial version and stored along
-    /// with its capability under the aptos framework account.
+    /// with its capability under the supra framework account.
     /// Criticality: Medium
     /// Implementation: The initialize function ensures that the signer is the aptos framework account and stores the
     /// Version and SetVersionCapability resources in it.
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Requirement: The version should be updateable after initialization, but only by the Aptos framework account and
+    /// Requirement: The version should be updateable after initialization, but only by the Supra framework account and
     /// with an increasing version number.
     /// Criticality: Medium
     /// Implementation: The version number for the blockchain should be updatable whenever necessary. This functionality

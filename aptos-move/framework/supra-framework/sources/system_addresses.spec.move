@@ -9,7 +9,7 @@ spec supra_framework::system_addresses {
     /// Enforcement: Formally verified via [high-level-req-1](AbortsIfNotCoreResource).
     ///
     /// No.: 2
-    /// Requirement: Asserting that a provided address corresponds to the Aptos Framework Resources address should always
+    /// Requirement: Asserting that a provided address corresponds to the Supra Framework Resources address should always
     /// yield a true result when matched.
     /// Criticality: High
     /// Implementation: The assert_supra_framework function ensures that the provided signer belongs to the

@@ -1,8 +1,8 @@
 spec supra_framework::supra_account {
     /// <high-level-req>
     /// No.: 1
-    /// Requirement: During the creation of an Aptos account the following rules should hold: (1) the authentication key
-    /// should be 32 bytes in length, (2) an Aptos account should not already exist for that authentication key, and (3)
+    /// Requirement: During the creation of an Supra account the following rules should hold: (1) the authentication key
+    /// should be 32 bytes in length, (2) an Supra account should not already exist for that authentication key, and (3)
     /// the address of the authentication key should not be equal to a reserved address (0x0, 0x1, or 0x3).
     /// Criticality: Critical
     /// Implementation: The authentication key which is passed in as an argument to create_account should satisfy all
@@ -10,7 +10,7 @@ spec supra_framework::supra_account {
     /// Enforcement: Formally verified via [high-level-req-1](CreateAccountAbortsIf).
     ///
     /// No.: 2
-    /// Requirement: After creating an Aptos account, the account should become registered to receive SupraCoin.
+    /// Requirement: After creating an Supra account, the account should become registered to receive SupraCoin.
     /// Criticality: Critical
     /// Implementation: The create_account function creates a new account for the particular address and registers
     /// SupraCoin.
@@ -49,7 +49,7 @@ spec supra_framework::supra_account {
     /// Enforcement: Formally verified via [high-level-req-6](deposit_coins).
     ///
     /// No.: 7
-    /// Requirement: When performing a batch transfer of Aptos Coin and/or a batch transfer of a custom coin type, it
+    /// Requirement: When performing a batch transfer of Supra Coin and/or a batch transfer of a custom coin type, it
     /// should ensure that the vector containing destination addresses and the vector containing the corresponding
     /// amounts are equal in length.
     /// Criticality: Low

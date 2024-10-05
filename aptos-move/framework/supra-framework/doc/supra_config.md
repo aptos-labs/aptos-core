@@ -3,29 +3,25 @@
 
 # Module `0x1::supra_config`
 
-Maintains the consensus config for the blockchain. The config is stored in a
+Maintains protocol configuation settings specific to Supra. The config is stored in a
 Reconfiguration, and may be updated by root.
 
 
 -  [Resource `SupraConfig`](#0x1_supra_config_SupraConfig)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_supra_config_initialize)
--  [Function `set`](#0x1_supra_config_set)
 -  [Function `set_for_next_epoch`](#0x1_supra_config_set_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_supra_config_on_new_epoch)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
-    -  [Function `set`](#@Specification_1_set)
     -  [Function `set_for_next_epoch`](#@Specification_1_set_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
-<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
-<b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
+<pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
@@ -93,43 +89,6 @@ Publishes the SupraConfig config.
     <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="supra_config.md#0x1_supra_config_EINVALID_CONFIG">EINVALID_CONFIG</a>));
     <b>move_to</b>(supra_framework, <a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a> { config });
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_supra_config_set"></a>
-
-## Function `set`
-
-Deprecated by <code><a href="supra_config.md#0x1_supra_config_set_for_next_epoch">set_for_next_epoch</a>()</code>.
-
-WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
-
-TODO: update all the tests that reference this function, then disable this function.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="supra_config.md#0x1_supra_config_set">set</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="supra_config.md#0x1_supra_config_set">set</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(<a href="account.md#0x1_account">account</a>);
-    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="supra_config.md#0x1_supra_config_EINVALID_CONFIG">EINVALID_CONFIG</a>));
-
-    <b>let</b> config_ref = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a>&gt;(@supra_framework).config;
-    *config_ref = config;
-
-    // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so validator nodes can sync on the updated configs.
-    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
 }
 </code></pre>
 
@@ -279,37 +238,6 @@ Aborts if StateStorageUsage already exists.
 // This enforces <a id="high-level-req-3.1" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> !(len(config) &gt; 0);
 <b>ensures</b> <b>global</b>&lt;<a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a>&gt;(addr) == <a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a> { config };
-</code></pre>
-
-
-
-<a id="@Specification_1_set"></a>
-
-### Function `set`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="supra_config.md#0x1_supra_config_set">set</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
-
-
-Ensure the caller is admin and <code><a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a></code> should exist.
-When setting now time must be later than last_reconfiguration_time.
-
-
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
-<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
-<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
-<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_supra_framework_address">system_addresses::is_supra_framework_address</a>(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a>&gt;(@supra_framework);
-// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
-<b>aborts_if</b> !(len(config) &gt; 0);
-<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>();
-<b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
-<b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@supra_framework);
-<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;SupraCoin&gt;&gt;(@supra_framework);
-<b>ensures</b> <b>global</b>&lt;<a href="supra_config.md#0x1_supra_config_SupraConfig">SupraConfig</a>&gt;(@supra_framework).config == config;
 </code></pre>
 
 

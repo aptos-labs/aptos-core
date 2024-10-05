@@ -2,7 +2,7 @@ spec supra_framework::staking_config {
     /// <high-level-req>
     /// No.: 1
     /// Requirement: The ability to initialize the staking config and staking rewards resources, as well as the ability to
-    /// update the staking config and staking rewards should only be available to the Aptos framework account.
+    /// update the staking config and staking rewards should only be available to the Supra framework account.
     /// Criticality: Medium
     /// Implementation: The function initialize and initialize_rewards are used to initialize the StakingConfig and
     /// StakingRewardConfig resources. Updating the resources, can be done using the update_required_stake,
