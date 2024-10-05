@@ -384,6 +384,7 @@ spec aptos_framework::coin {
     }
 
     spec initialize {
+        aborts_if permissioned_signer::spec_is_permissioned_signer(account);
         let account_addr = signer::address_of(account);
         /// [high-level-req-1.2]
         aborts_if type_info::type_of<CoinType>().account_address != account_addr;
@@ -402,6 +403,7 @@ spec aptos_framework::coin {
     monitor_supply: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         use aptos_framework::aggregator_factory;
+        aborts_if permissioned_signer::spec_is_permissioned_signer(account);
         let addr = signer::address_of(account);
         aborts_if addr != @aptos_framework;
         aborts_if monitor_supply && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
@@ -434,6 +436,7 @@ spec aptos_framework::coin {
     monitor_supply: bool,
     parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+        aborts_if permissioned_signer::spec_is_permissioned_signer(account);
         include InitializeInternalSchema<CoinType> {
             name: name.bytes,
             symbol: symbol.bytes

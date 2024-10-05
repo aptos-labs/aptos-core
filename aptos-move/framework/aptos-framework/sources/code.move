@@ -13,6 +13,7 @@ module aptos_framework::code {
     use std::string;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object};
+    use aptos_framework::permissioned_signer;
 
     // ----------------------------------------------------------------------
     // Code Publishing
@@ -145,6 +146,7 @@ module aptos_framework::code {
     /// Publishes a package at the given signer's address. The caller must provide package metadata describing the
     /// package.
     public fun publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) acquires PackageRegistry {
+        permissioned_signer::assert_master_signer(owner);
         // Disallow incompatible upgrade mode. Governance can decide later if this should be reconsidered.
         assert!(
             pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy,
@@ -206,6 +208,7 @@ module aptos_framework::code {
     }
 
     public fun freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) acquires PackageRegistry {
+        permissioned_signer::assert_master_signer(publisher);
         let code_object_addr = object::object_address(&code_object);
         assert!(exists<PackageRegistry>(code_object_addr), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
         assert!(
