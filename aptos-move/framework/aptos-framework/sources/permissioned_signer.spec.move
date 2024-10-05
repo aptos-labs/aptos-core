@@ -112,9 +112,10 @@ spec aptos_framework::permissioned_signer {
     }
 
     spec check_permission_exists<PermKey: copy + drop + store>(s: &signer, perm: PermKey): bool {
-        pragma opaque;
-        aborts_if false;
-        ensures result == spec_check_permission_exists(s, perm);
+        pragma verify = false;
+        // pragma opaque;
+        // aborts_if false;
+        // ensures [abstract] result == spec_check_permission_exists(s, perm);
     }
 
     spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool {

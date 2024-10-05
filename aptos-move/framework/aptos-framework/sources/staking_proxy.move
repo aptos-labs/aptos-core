@@ -1,10 +1,30 @@
 module aptos_framework::staking_proxy {
+    use std::error;
     use std::signer;
     use std::vector;
 
+    use aptos_framework::permissioned_signer;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
     use aptos_framework::vesting;
+
+    struct StakeProxyPermission has copy, drop, store {}
+
+    /// Signer does not have permission to perform stake proxy logic.
+    const ENO_STAKE_PERMISSION: u64 = 28;
+
+    /// Permissions
+    inline fun check_signer_permission(s: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(s, StakeProxyPermission {}),
+            error::permission_denied(ENO_STAKE_PERMISSION),
+        );
+    }
+
+    /// Grant permission to mutate staking on behalf of the master signer.
+    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, StakeProxyPermission {})
+    }
 
     public entry fun set_operator(owner: &signer, old_operator: address, new_operator: address) {
         set_vesting_contract_operator(owner, old_operator, new_operator);
@@ -19,6 +39,7 @@ module aptos_framework::staking_proxy {
     }
 
     public entry fun set_vesting_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         let vesting_contracts = &vesting::vesting_contracts(owner_address);
         vector::for_each_ref(vesting_contracts, |vesting_contract| {
@@ -31,6 +52,7 @@ module aptos_framework::staking_proxy {
     }
 
     public entry fun set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         if (staking_contract::staking_contract_exists(owner_address, old_operator)) {
             let current_commission_percentage = staking_contract::commission_percentage(owner_address, old_operator);
@@ -39,6 +61,7 @@ module aptos_framework::staking_proxy {
     }
 
     public entry fun set_stake_pool_operator(owner: &signer, new_operator: address) {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         if (stake::stake_pool_exists(owner_address)) {
             stake::set_operator(owner, new_operator);
@@ -46,6 +69,7 @@ module aptos_framework::staking_proxy {
     }
 
     public entry fun set_vesting_contract_voter(owner: &signer, operator: address, new_voter: address) {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         let vesting_contracts = &vesting::vesting_contracts(owner_address);
         vector::for_each_ref(vesting_contracts, |vesting_contract| {
@@ -57,6 +81,7 @@ module aptos_framework::staking_proxy {
     }
 
     public entry fun set_staking_contract_voter(owner: &signer, operator: address, new_voter: address) {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         if (staking_contract::staking_contract_exists(owner_address, operator)) {
             staking_contract::update_voter(owner, operator, new_voter);
@@ -64,6 +89,7 @@ module aptos_framework::staking_proxy {
     }
 
     public entry fun set_stake_pool_voter(owner: &signer, new_voter: address) {
+        check_signer_permission(owner);
         if (stake::stake_pool_exists(signer::address_of(owner))) {
             stake::set_delegated_voter(owner, new_voter);
         };

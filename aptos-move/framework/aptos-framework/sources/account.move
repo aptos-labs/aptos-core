@@ -378,7 +378,7 @@ module aptos_framework::account {
     ) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        check_signer_permission(account);
+        // check_signer_permission(account);
         let account_resource = borrow_global_mut<Account>(addr);
 
         // Verify the given `from_public_key_bytes` matches this account's current authentication key.

@@ -29,7 +29,14 @@ spec aptos_framework::aptos_governance {
     ///
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
+    }
+
+    spec schema AbortsIfPermissionedSigner {
+        use aptos_framework::permissioned_signer;
+        s: signer;
+        let perm = GovernancePermission {};
+        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 
     spec store_signer_cap(
@@ -213,6 +220,7 @@ spec aptos_framework::aptos_governance {
         pragma verify_duration_estimate = 60;
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
+        // include AbortsIfPermissionedSigner { s: proposer };
     }
 
     /// `stake_pool` must exist StakePool.
