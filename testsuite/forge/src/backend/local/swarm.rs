@@ -39,6 +39,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tempfile::TempDir;
+use aptos_sdk::crypto::ed25519::Ed25519PublicKey;
 
 #[derive(Debug)]
 pub enum SwarmDirectory {
@@ -166,6 +167,11 @@ impl LocalSwarm {
             .with_init_genesis_config(init_genesis_config)
             .build(rng)?;
 
+        let root_sk_bytes = root_key.to_bytes();
+        let root_pk = Ed25519PublicKey::from(&root_key);
+        let root_pk_bytes = root_pk.to_bytes();
+        println!("root_sk_hex={}", hex::encode(root_sk_bytes));
+        println!("root_pk_hex={}", hex::encode(root_pk_bytes));
         // Get the initial version to start the nodes with, either the one provided or fallback to
         // using the latest version
         let initial_version_actual = initial_version.unwrap_or_else(|| {
