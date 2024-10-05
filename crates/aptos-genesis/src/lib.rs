@@ -135,9 +135,10 @@ impl GenesisInfo {
     }
 
     fn generate_genesis_txn(&self) -> Transaction {
-        aptos_vm_genesis::encode_genesis_transaction(
+        aptos_vm_genesis::encode_genesis_transaction_for_testnet(
             self.root_key.clone(),
             &self.validators,
+            &[],
             &[],
             &[],
             &self.framework,

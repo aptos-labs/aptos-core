@@ -20,6 +20,11 @@ const STAKING_CONTRACT_DOMAIN_SEPARATOR: &[u8] = b"supra_framework::staking_cont
 const VESTING_POOL_DOMAIN_SEPARATOR: &[u8] = b"supra_framework::vesting";
 const PBO_MODULE_SALT: &str = "supra_framework::pbo_delegation_pool";
 
+/// This seed value is required to calculate vesting pool address.
+/// This constant must match the value contained in the respective Move module
+/// `supra_framework::genesis::VESTING_CONTRACT_SEED` (genesis.move:40).
+pub const VESTING_CONTRACT_SEED: &'static [u8; 27] = b"VESTING_WIHOUT_STAKING_SEED";
+
 /// A wrapper struct that gives better error messages when the account address
 /// can't be deserialized in a human readable format
 ///

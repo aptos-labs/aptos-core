@@ -126,10 +126,11 @@ impl MainnetGenesisInfo {
     }
 
     fn generate_genesis_txn(&self) -> Transaction {
-        aptos_vm_genesis::encode_aptos_mainnet_genesis_transaction(
+        aptos_vm_genesis::encode_supra_mainnet_genesis_transaction(
             &self.accounts,
             &[],
             None,
+            &[],
             &[],
             &[],
             &self.framework,
