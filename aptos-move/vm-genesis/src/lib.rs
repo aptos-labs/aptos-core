@@ -49,7 +49,7 @@ use aptos_vm::{
 use aptos_vm_types::{
     change_set::VMChangeSet,
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
-    module_write_set::ModuleWriteSet,
+    module_write_set::{ModuleWrite, ModuleWriteSet},
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -867,13 +867,13 @@ fn publish_framework(
     }
 }
 
-fn code_to_write_ops_for_loader_v2_publishing(
+fn code_to_writes_for_loader_v2_publishing(
     genesis_runtime_environment: &RuntimeEnvironment,
     genesis_features: &Features,
     genesis_state_view: &GenesisStateView,
     addr: AccountAddress,
     code: Vec<Bytes>,
-) -> VMResult<BTreeMap<StateKey, WriteOp>> {
+) -> VMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
     let module_storage = genesis_state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = genesis_state_view.as_move_resolver();
 
@@ -903,7 +903,7 @@ fn publish_framework_with_loader_v2(
     let mut state_view = GenesisStateView::new();
 
     // First, publish modules.
-    let mut write_ops = BTreeMap::new();
+    let mut writes = BTreeMap::new();
     for pack in &framework.packages {
         let modules = pack.sorted_code_and_modules();
 
@@ -913,7 +913,7 @@ fn publish_framework_with_loader_v2(
             .map(|(c, _)| c.to_vec().into())
             .collect::<Vec<_>>();
 
-        let package_write_ops = code_to_write_ops_for_loader_v2_publishing(
+        let package_writes = code_to_writes_for_loader_v2_publishing(
             genesis_runtime_environment,
             genesis_vm.genesis_features(),
             &state_view,
@@ -930,10 +930,10 @@ fn publish_framework_with_loader_v2(
 
         // Add write ops so that we can later create a module write set. Also add them to the state
         // view so that modules in subsequent packages can link to them.
-        write_ops.extend(package_write_ops.clone());
-        state_view.add_module_write_ops(package_write_ops);
+        writes.extend(package_writes.clone());
+        state_view.add_module_write_ops(package_writes);
     }
-    let module_write_set = ModuleWriteSet::new(true, write_ops);
+    let module_write_set = ModuleWriteSet::new(true, writes);
 
     // At this point we processed all packages, and the state view contains all the code. We can
     // run package initialization.

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::module_and_script_storage::{
-    code_storage::TAptosCodeStorage, module_storage::TAptosModuleStorage,
+    code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
 };
 use ambassador::Delegate;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView};
@@ -21,19 +21,6 @@ use move_vm_runtime::{
 };
 use move_vm_types::{code_storage::ModuleBytesStorage, module_storage_error};
 use std::sync::Arc;
-
-/// Same as [module_storage_error], but works with state keys and is kept as a partial VM error.
-macro_rules! aptos_module_storage_error {
-    ($state_key:ident, $err:ident) => {
-        move_binary_format::errors::PartialVMError::new(
-            move_core_types::vm_status::StatusCode::STORAGE_ERROR,
-        )
-        .with_message(format!(
-            "Unexpected storage error for module at {:?}: {:?}",
-            $state_key, $err
-        ))
-    };
-}
 
 /// Avoids orphan rule to implement [ModuleBytesStorage] for [StateView].
 struct StateViewAdapter<'s, S> {
@@ -76,9 +63,7 @@ impl<'s, S: StateView> AptosCodeStorageAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> TAptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
-    type Key = StateKey;
-
+impl<'s, S: StateView> AptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
     fn fetch_state_value_metadata(
         &self,
         address: &AccountAddress,
@@ -91,20 +76,9 @@ impl<'s, S: StateView> TAptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
             .map_err(|e| module_storage_error!(address, module_name, e).to_partial())?
             .map(|s| s.into_metadata()))
     }
-
-    fn fetch_module_size_by_state_key(
-        &self,
-        state_key: &Self::Key,
-    ) -> PartialVMResult<Option<usize>> {
-        Ok(self
-            .state_view()
-            .get_state_value(state_key)
-            .map_err(|e| aptos_module_storage_error!(state_key, e))?
-            .map(|s| s.size()))
-    }
 }
 
-impl<'s, S: StateView> TAptosCodeStorage<StateKey> for AptosCodeStorageAdapter<'s, S> {}
+impl<'s, S: StateView> AptosCodeStorage for AptosCodeStorageAdapter<'s, S> {}
 
 /// Allows to treat the state view as a code storage with scripts and modules. The main use case is
 /// when a transaction or a Move function has to be executed outside the long-living environment or
@@ -122,37 +96,5 @@ impl<'s, S: StateView> AsAptosCodeStorage<'s, S> for S {
         runtime_environment: &'s RuntimeEnvironment,
     ) -> AptosCodeStorageAdapter<S> {
         AptosCodeStorageAdapter::new(self, runtime_environment)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use claims::{assert_none, assert_ok, assert_some_eq};
-
-    #[test]
-    fn test_aptos_code_storage() {
-        let mut state_view = FakeDataStore::default();
-
-        let state_key_1 = StateKey::raw(&[1]);
-        state_view.set_legacy(state_key_1.clone(), vec![]);
-
-        let state_key_2 = StateKey::raw(&[2]);
-        state_view.set_legacy(state_key_2.clone(), vec![1, 2, 3, 4, 5]);
-
-        let state_key_3 = StateKey::raw(&[3]);
-
-        let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let code_storage = state_view.as_aptos_code_storage(&runtime_environment);
-
-        let size_1 = assert_ok!(code_storage.fetch_module_size_by_state_key(&state_key_1));
-        assert_some_eq!(size_1, 0);
-
-        let size_2 = assert_ok!(code_storage.fetch_module_size_by_state_key(&state_key_2));
-        assert_some_eq!(size_2, 5);
-
-        let size_3 = assert_ok!(code_storage.fetch_module_size_by_state_key(&state_key_3));
-        assert_none!(size_3);
     }
 }

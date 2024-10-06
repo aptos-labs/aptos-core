@@ -15,7 +15,8 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::{
-    module_and_script_storage::code_storage::TAptosCodeStorage,
+    module_and_script_storage::code_storage::AptosCodeStorage,
+    module_write_set::ModuleWrite,
     resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
@@ -87,7 +88,7 @@ pub trait ExecutorTask: Sync {
             ResourceTag = <Self::Txn as Transaction>::Tag,
             Layout = MoveTypeLayout,
         >),
-        code_storage: &impl TAptosCodeStorage<<Self::Txn as Transaction>::Key>,
+        code_storage: &impl AptosCodeStorage,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
@@ -112,7 +113,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn module_write_set(
         &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, ModuleWrite<<Self::Txn as Transaction>::Value>>;
 
     fn aggregator_v1_write_set(
         &self,

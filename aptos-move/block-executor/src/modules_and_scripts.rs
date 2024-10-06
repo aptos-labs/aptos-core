@@ -16,7 +16,7 @@ use aptos_types::{
     vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
 };
 use aptos_vm_types::module_and_script_storage::{
-    code_storage::TAptosCodeStorage, module_storage::TAptosModuleStorage,
+    code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -32,16 +32,14 @@ use move_vm_runtime::{
 use move_vm_types::{module_cyclic_dependency_error, module_linker_error};
 use std::{collections::HashSet, sync::Arc};
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosCodeStorage<T::Key>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosCodeStorage
     for LatestView<'a, T, S, X>
 {
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosModuleStorage
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
     for LatestView<'a, T, S, X>
 {
-    type Key = T::Key;
-
     fn fetch_state_value_metadata(
         &self,
         address: &AccountAddress,
@@ -52,14 +50,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosModul
             .map_err(|e| e.to_partial())?
             .into_versioned()
             .map(|(_, entry)| entry.state_value_metadata().clone()))
-    }
-
-    fn fetch_module_size_by_state_key(&self, key: &Self::Key) -> PartialVMResult<Option<usize>> {
-        Ok(self
-            .read_module_storage_by_key(key)
-            .map_err(|e| e.to_partial())?
-            .into_versioned()
-            .map(|(_, entry)| entry.bytes().len()))
     }
 }
 

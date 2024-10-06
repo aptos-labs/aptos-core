@@ -32,7 +32,8 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, output::VMOutput, resolver::ResourceGroupSize,
+    abstract_write_op::AbstractResourceWriteOp, module_write_set::ModuleWrite, output::VMOutput,
+    resolver::ResourceGroupSize,
 };
 use move_core_types::{
     language_storage::StructTag,
@@ -191,7 +192,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
+    fn module_write_set(&self) -> BTreeMap<StateKey, ModuleWrite<WriteOp>> {
         self.vm_output
             .lock()
             .as_ref()
