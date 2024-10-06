@@ -12,6 +12,7 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
+use aptos_vm_types::module_write_set::ModuleWrite;
 use bytes::Bytes;
 use claims::assert_some;
 use move_core_types::language_storage::ModuleId;
@@ -36,10 +37,13 @@ impl GenesisStateView {
             .insert(StateKey::module_id(module_id), blob.to_vec());
     }
 
-    pub(crate) fn add_module_write_ops(&mut self, module_write_ops: BTreeMap<StateKey, WriteOp>) {
-        for (state_key, write_op) in module_write_ops {
+    pub(crate) fn add_module_write_ops(
+        &mut self,
+        module_write_ops: BTreeMap<StateKey, ModuleWrite<WriteOp>>,
+    ) {
+        for (state_key, write) in module_write_ops {
             assert!(state_key.is_module_path());
-            let bytes = assert_some!(write_op.bytes(), "Modules cannot be deleted");
+            let bytes = assert_some!(write.write_op().bytes(), "Modules cannot be deleted");
             self.state_data.insert(state_key, bytes.to_vec());
         }
     }

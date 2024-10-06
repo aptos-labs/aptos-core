@@ -15,6 +15,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
+    language_storage::ModuleId,
     metadata::Metadata,
     vm_status::StatusCode,
 };
@@ -23,6 +24,20 @@ use std::{
     collections::{btree_map, BTreeMap},
     sync::Arc,
 };
+
+/// Represents a verified module pundle that can be extracted from [StagingModuleStorage].
+pub struct VerifiedModuleBundle<K: Ord, V: Clone> {
+    bundle: BTreeMap<K, V>,
+}
+
+impl<K: Ord, V: Clone> IntoIterator for VerifiedModuleBundle<K, V> {
+    type IntoIter = btree_map::IntoIter<K, V>;
+    type Item = (K, V);
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.bundle.into_iter()
+    }
+}
 
 /// An implementation of [ModuleBytesStorage] that stores some additional staged changes. If used
 /// by [ModuleStorage], the most recent version of a module will be fetched.
@@ -230,17 +245,17 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         Ok(staged_module_storage)
     }
 
-    pub fn release_verified_module_bundle(
-        &self,
-    ) -> impl Iterator<Item = (&AccountAddress, &IdentStr, Bytes)> {
+    pub fn release_verified_module_bundle(self) -> VerifiedModuleBundle<ModuleId, Bytes> {
         let staged_module_bytes = &self.borrow_storage().byte_storage().staged_module_bytes;
-        staged_module_bytes
-            .iter()
-            .flat_map(|(addr, account_storage)| {
-                account_storage
-                    .iter()
-                    .map(move |(name, bytes)| (addr, name.as_ident_str(), bytes.clone()))
-            })
+
+        let mut bundle = BTreeMap::new();
+        for (addr, account_storage) in staged_module_bytes {
+            for (name, bytes) in account_storage {
+                bundle.insert(ModuleId::new(*addr, name.clone()), bytes.clone());
+            }
+        }
+
+        VerifiedModuleBundle { bundle }
     }
 }
 

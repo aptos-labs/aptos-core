@@ -7,7 +7,7 @@ use crate::{
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
     module_and_script_storage::module_storage::AptosModuleStorage,
-    module_write_set::ModuleWriteSet,
+    module_write_set::{ModuleWrite, ModuleWriteSet},
     resolver::ExecutorView,
 };
 use aptos_aggregator::{
@@ -799,16 +799,19 @@ pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimizatio
     let mut module_write_ops = BTreeMap::new();
 
     for (state_key, write_op) in write_set {
-        if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
-            module_write_ops.insert(state_key, write_op);
-        } else {
-            // TODO[agg_v1](fix) While everything else must be a resource, first
-            // version of aggregators is implemented as a table item. Revisit when
-            // we split MVHashMap into data and aggregators.
-
-            // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
-            resource_write_set.insert(state_key, AbstractResourceWriteOp::Write(write_op));
+        if let StateKeyInner::AccessPath(ap) = state_key.inner() {
+            if let Some(module_id) = ap.get_module_id() {
+                module_write_ops.insert(state_key, ModuleWrite::new(module_id, write_op));
+                continue;
+            }
         }
+
+        // TODO[agg_v1](fix) While everything else must be a resource, first
+        // version of aggregators is implemented as a table item. Revisit when
+        // we split MVHashMap into data and aggregators.
+
+        // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
+        resource_write_set.insert(state_key, AbstractResourceWriteOp::Write(write_op));
     }
 
     // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context

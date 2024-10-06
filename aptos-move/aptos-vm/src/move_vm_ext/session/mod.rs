@@ -24,21 +24,22 @@ use aptos_types::{
     transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
 };
 use aptos_vm_types::{
-    change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
-    module_write_set::ModuleWriteSet, storage::change_set_configs::ChangeSetConfigs,
+    change_set::VMChangeSet,
+    module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::{ModuleWrite, ModuleWriteSet},
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
-    account_address::AccountAddress,
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
-    identifier::IdentStr,
-    language_storage::StructTag,
+    language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
     move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session, ModuleStorage,
+    VerifiedModuleBundle,
 };
 use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use std::{
@@ -382,7 +383,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut resource_group_write_set = BTreeMap::new();
 
         let mut has_modules_published_to_special_address = false;
-        let mut module_write_ops = BTreeMap::new();
+        let mut module_writes = BTreeMap::new();
 
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
@@ -404,9 +405,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 if addr.is_special() {
                     has_modules_published_to_special_address = true;
                 }
-                let state_key = StateKey::module(&addr, &name);
+
+                let module_id = ModuleId::new(addr, name);
+                let state_key = StateKey::module_id(&module_id);
                 let op = woc.convert_module(&state_key, blob_op, false)?;
-                module_write_ops.insert(state_key, op);
+                module_writes.insert(state_key, ModuleWrite::new(module_id, op));
             }
         }
 
@@ -475,7 +478,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         )?;
 
         let module_write_set =
-            ModuleWriteSet::new(has_modules_published_to_special_address, module_write_ops);
+            ModuleWriteSet::new(has_modules_published_to_special_address, module_writes);
 
         Ok((change_set, module_write_set))
     }
@@ -483,14 +486,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
 /// Converts module bytes and their compiled representation extracted from publish request into
 /// write ops. Only used by V2 loader implementation.
-pub fn convert_modules_into_write_ops<'a>(
+pub fn convert_modules_into_write_ops(
     resolver: &impl AptosMoveResolver,
     features: &Features,
     module_storage: &impl AptosModuleStorage,
-    staged_modules: impl Iterator<Item = (&'a AccountAddress, &'a IdentStr, Bytes)>,
-) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
+    verified_module_bundle: VerifiedModuleBundle<ModuleId, Bytes>,
+) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
     let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
-    woc.convert_modules_into_write_ops(module_storage, staged_modules)
+    woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
 }
 
 impl<'r, 'l> Deref for SessionExt<'r, 'l> {

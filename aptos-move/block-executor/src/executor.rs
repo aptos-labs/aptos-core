@@ -232,7 +232,9 @@ where
                         .module_storage()
                         .write_pending(k, idx_to_execute)
                 } else {
-                    versioned_cache.modules().write(k, idx_to_execute, v);
+                    versioned_cache
+                        .modules()
+                        .write(k, idx_to_execute, v.into_write_op());
                 }
             }
 
@@ -1126,13 +1128,15 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (key, write_op) in output.module_write_set().into_iter() {
+        for (key, write) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
-                let entry =
-                    ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
+                let entry = ModuleStorageEntry::from_transaction_write(
+                    runtime_environment,
+                    write.into_write_op(),
+                )?;
                 unsync_map.publish_module_storage_entry(key, Arc::new(entry));
             } else {
-                unsync_map.write_module(key, write_op);
+                unsync_map.write_module(key, write.into_write_op());
             }
         }
 

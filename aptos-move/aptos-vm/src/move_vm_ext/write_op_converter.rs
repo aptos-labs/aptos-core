@@ -11,6 +11,7 @@ use aptos_types::{
 use aptos_vm_types::{
     abstract_write_op::GroupWrite,
     module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWrite,
     resource_group_adapter::{
         check_size_and_existence_match, decrement_size_for_remove_tag, group_tagged_resource_size,
         increment_size_for_add_tag,
@@ -19,10 +20,8 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    account_address::AccountAddress,
     effects::{Op as MoveStorageOp, Op},
-    identifier::IdentStr,
-    language_storage::StructTag,
+    language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -78,13 +77,16 @@ impl<'r> WriteOpConverter<'r> {
         }
     }
 
-    pub(crate) fn convert_modules_into_write_ops<'a>(
+    pub(crate) fn convert_modules_into_write_ops(
         &self,
         module_storage: &impl AptosModuleStorage,
-        staged_modules: impl Iterator<Item = (&'a AccountAddress, &'a IdentStr, Bytes)>,
-    ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
-        let mut write_ops = BTreeMap::new();
-        for (addr, name, bytes) in staged_modules {
+        verified_module_bundle: impl Iterator<Item = (ModuleId, Bytes)>,
+    ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
+        let mut writes = BTreeMap::new();
+        for (module_id, bytes) in verified_module_bundle {
+            let addr = module_id.address();
+            let name = module_id.name();
+
             let module_exists = module_storage
                 .check_module_exists(addr, name)
                 .map_err(|e| e.to_partial())?;
@@ -102,10 +104,10 @@ impl<'r> WriteOpConverter<'r> {
                 false,
             )?;
 
-            let state_key = StateKey::module(addr, name);
-            write_ops.insert(state_key, write_op);
+            let state_key = StateKey::module_id(&module_id);
+            writes.insert(state_key, ModuleWrite::new(module_id, write_op));
         }
-        Ok(write_ops)
+        Ok(writes)
     }
 
     pub(crate) fn convert_resource(
@@ -422,10 +424,10 @@ mod tests {
         let woc = WriteOpConverter::new(&resolver, true);
 
         let modules = vec![
-            (a.self_addr(), a.self_name(), a_bytes.clone()),
-            (b.self_addr(), b.self_name(), b_bytes.clone()),
-            (c.self_addr(), c.self_name(), c_bytes.clone()),
-            (d.self_addr(), d.self_name(), d_bytes.clone()),
+            (a.self_id(), a_bytes.clone()),
+            (b.self_id(), b_bytes.clone()),
+            (c.self_id(), c_bytes.clone()),
+            (d.self_id(), d_bytes.clone()),
         ];
 
         let results =
@@ -435,27 +437,36 @@ mod tests {
         // For `a`, `b`, and `c`, since they exist, metadata is inherited
         // the write op is a creation.
 
-        let a_write_op = assert_some!(results.get(&a_state_key));
-        assert!(a_write_op.is_modification());
-        assert_eq!(assert_some!(a_write_op.bytes()), &a_bytes);
-        assert_eq!(a_write_op.metadata(), &a_state_value.into_metadata());
+        let a_write = assert_some!(results.get(&a_state_key));
+        assert!(a_write.write_op().is_modification());
+        assert_eq!(assert_some!(a_write.write_op().bytes()), &a_bytes);
+        assert_eq!(
+            a_write.write_op().metadata(),
+            &a_state_value.into_metadata()
+        );
 
-        let b_write_op = assert_some!(results.get(&b_state_key));
-        assert!(b_write_op.is_modification());
-        assert_eq!(assert_some!(b_write_op.bytes()), &b_bytes);
-        assert_eq!(b_write_op.metadata(), &b_state_value.into_metadata());
+        let b_write = assert_some!(results.get(&b_state_key));
+        assert!(b_write.write_op().is_modification());
+        assert_eq!(assert_some!(b_write.write_op().bytes()), &b_bytes);
+        assert_eq!(
+            b_write.write_op().metadata(),
+            &b_state_value.into_metadata()
+        );
 
-        let c_write_op = assert_some!(results.get(&c_state_key));
-        assert!(c_write_op.is_modification());
-        assert_eq!(assert_some!(c_write_op.bytes()), &c_bytes);
-        assert_eq!(c_write_op.metadata(), &c_state_value.into_metadata());
+        let c_write = assert_some!(results.get(&c_state_key));
+        assert!(c_write.write_op().is_modification());
+        assert_eq!(assert_some!(c_write.write_op().bytes()), &c_bytes);
+        assert_eq!(
+            c_write.write_op().metadata(),
+            &c_state_value.into_metadata()
+        );
 
         // Since `d` does not exist, its metadata is a placeholder.
-        let d_write_op = assert_some!(results.get(&d_state_key));
-        assert!(d_write_op.is_creation());
-        assert_eq!(assert_some!(d_write_op.bytes()), &d_bytes);
+        let d_write = assert_some!(results.get(&d_state_key));
+        assert!(d_write.write_op().is_creation());
+        assert_eq!(assert_some!(d_write.write_op().bytes()), &d_bytes);
         assert_eq!(
-            d_write_op.metadata(),
+            d_write.write_op().metadata(),
             &StateValueMetadata::placeholder(&current_time)
         )
     }
