@@ -17,6 +17,7 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
 };
+use aptos_vm_types::module_write_set::ModuleWrite;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -328,7 +329,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
-    pub(crate) fn module_write_set(&self, txn_idx: TxnIndex) -> Option<BTreeMap<T::Key, T::Value>> {
+    pub(crate) fn module_write_set(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<BTreeMap<T::Key, ModuleWrite<T::Value>>> {
         self.outputs[txn_idx as usize]
             .load()
             .as_ref()

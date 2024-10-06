@@ -45,7 +45,7 @@ pub use storage::{
         unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
     },
     module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
-    publishing::StagingModuleStorage,
+    publishing::{StagingModuleStorage, VerifiedModuleBundle},
 };
 
 // TODO(loader_v2): Temporary infra to still have loader V1 to test, run

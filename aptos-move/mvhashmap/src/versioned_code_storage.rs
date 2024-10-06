@@ -8,6 +8,7 @@ use aptos_types::{
     error::PanicError, executable::ModulePath, vm::modules::ModuleStorageEntry,
     write_set::TransactionWrite,
 };
+use aptos_vm_types::module_write_set::ModuleWrite;
 use crossbeam::utils::CachePadded;
 use dashmap::{mapref::entry::Entry, DashMap};
 use move_binary_format::file_format::CompiledScript;
@@ -79,14 +80,17 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedCodeStorage<K> {
         &self,
         idx_to_publish: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
-        writes: impl Iterator<Item = (K, V)>,
+        writes: impl Iterator<Item = (K, ModuleWrite<V>)>,
     ) -> Result<(), PanicError> {
         // In case of module publishing, flush script cache. This is the simplest thing to do for
         // now and can be improved if needed.
         self.script_cache.clear();
 
         for (key, write) in writes {
-            let entry = ModuleStorageEntry::from_transaction_write(runtime_environment, write)?;
+            let entry = ModuleStorageEntry::from_transaction_write(
+                runtime_environment,
+                write.into_write_op(),
+            )?;
             self.module_storage
                 .write_published(&key, idx_to_publish, entry);
         }

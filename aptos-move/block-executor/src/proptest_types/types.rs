@@ -26,7 +26,8 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_types::{
-    module_and_script_storage::code_storage::TAptosCodeStorage,
+    module_and_script_storage::code_storage::AptosCodeStorage,
+    module_write_set::ModuleWrite,
     resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
     resource_group_adapter::{
         decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
@@ -34,7 +35,9 @@ use aptos_vm_types::{
 };
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
+use move_core_types::{
+    ident_str, identifier::IdentStr, language_storage::ModuleId, value::MoveTypeLayout,
+};
 use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
@@ -891,7 +894,7 @@ where
         &self,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
-        _code_storage: &impl TAptosCodeStorage<K>,
+        _code_storage: &impl AptosCodeStorage,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
@@ -1131,11 +1134,15 @@ where
             .collect()
     }
 
-    fn module_write_set(&self) -> BTreeMap<K, ValueType> {
+    fn module_write_set(&self) -> BTreeMap<K, ModuleWrite<ValueType>> {
         self.writes
             .iter()
             .filter(|(k, _)| k.is_module_path())
-            .cloned()
+            .map(|(k, v)| {
+                let dummy_id = ModuleId::new(AccountAddress::ONE, ident_str!("dummy").to_owned());
+                let write = ModuleWrite::new(dummy_id, v.clone());
+                (k.clone(), write)
+            })
             .collect()
     }
 
