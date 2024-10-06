@@ -312,6 +312,17 @@ pub fn get_compilation_metadata_from_compiled_module(
     }
 }
 
+/// Extract compilation metadata from a compiled script
+pub fn get_compilation_metadata_from_compiled_script(
+    module: &CompiledScript,
+) -> Option<CompilationMetadata> {
+    if let Some(data) = find_metadata_in_script(module, COMPILATION_METADATA_KEY) {
+        bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
+    } else {
+        None
+    }
+}
+
 // This is mostly a copy paste of the existing function
 // get_metadata_from_compiled_module. In the API types there is a unifying trait for
 // modules and scripts called Bytecode that could help eliminate this duplication,
@@ -613,11 +624,23 @@ fn check_module_complexity(module: &CompiledModule) -> Result<(), MetaDataValida
         check_ident_complexity(module, &mut meter, handle.name)?;
     }
     for def in module.struct_defs() {
-        if let StructFieldInformation::Declared(fields) = &def.field_information {
-            for field in fields {
-                check_ident_complexity(module, &mut meter, field.name)?;
-                check_sigtok_complexity(module, &mut meter, &field.signature.0)?
-            }
+        match &def.field_information {
+            StructFieldInformation::Native => {},
+            StructFieldInformation::Declared(fields) => {
+                for field in fields {
+                    check_ident_complexity(module, &mut meter, field.name)?;
+                    check_sigtok_complexity(module, &mut meter, &field.signature.0)?
+                }
+            },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                for variant in variants {
+                    check_ident_complexity(module, &mut meter, variant.name)?;
+                    for field in &variant.fields {
+                        check_ident_complexity(module, &mut meter, field.name)?;
+                        check_sigtok_complexity(module, &mut meter, &field.signature.0)?
+                    }
+                }
+            },
         }
     }
     for def in module.function_defs() {

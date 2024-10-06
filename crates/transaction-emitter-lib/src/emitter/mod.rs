@@ -9,7 +9,9 @@ pub mod transaction_executor;
 
 use crate::emitter::{
     account_minter::{bulk_create_accounts, SourceAccountManager},
-    local_account_generator::create_account_generator,
+    local_account_generator::{
+        create_keyless_account_generator, create_private_key_account_generator,
+    },
     stats::{DynamicStatsTracking, TxnStats},
     submission_worker::SubmissionWorker,
     transaction_executor::RestApiReliableTransactionSubmitter,
@@ -17,6 +19,7 @@ use crate::emitter::{
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
@@ -100,7 +103,11 @@ pub enum EmitJobMode {
     },
     WaveTps {
         average_tps: usize,
+        // amount of traffic that is oscilating:
+        // 1.0 means it oscilates between [0, 2 * average_tps]
+        // 0.3 means it oscilates between [0.7 * average_tps, 1.3 * average_tps]
         wave_ratio: f32,
+        // number of waves within the wait_millis interval (which is txn_expiration_time + 180s)
         num_waves: usize,
     },
 }
@@ -151,7 +158,6 @@ pub struct EmitJobRequest {
     mode: EmitJobMode,
 
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
-    account_type: AccountType,
 
     max_gas_per_txn: u64,
     init_max_gas_per_txn: Option<u64>,
@@ -184,6 +190,17 @@ pub struct EmitJobRequest {
     tps_wait_after_expiration_secs: Option<u64>,
 
     account_minter_seed: Option<[u8; 32]>,
+
+    account_type: AccountType,
+
+    // Arguments for Keyless Load Testing
+    keyless_ephem_secret_key: Option<[u8; 32]>,
+
+    proof_file_path: Option<String>,
+
+    epk_expiry_date_secs: Option<u64>,
+
+    keyless_jwt: Option<String>,
 }
 
 impl Default for EmitJobRequest {
@@ -194,7 +211,6 @@ impl Default for EmitJobRequest {
                 mempool_backlog: 3000,
             },
             transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
-            account_type: AccountType::Local,
             max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             init_max_gas_per_txn: None,
@@ -215,6 +231,11 @@ impl Default for EmitJobRequest {
             tps_wait_after_expiration_secs: None,
             account_minter_seed: None,
             coins_per_account_override: None,
+            account_type: AccountType::Local,
+            keyless_ephem_secret_key: None,
+            proof_file_path: None,
+            epk_expiry_date_secs: None,
+            keyless_jwt: None,
         }
     }
 }
@@ -236,6 +257,11 @@ impl EmitJobRequest {
 
     pub fn max_gas_per_txn(mut self, max_gas_per_txn: u64) -> Self {
         self.max_gas_per_txn = max_gas_per_txn;
+        self
+    }
+
+    pub fn init_expiration_multiplier(mut self, init_expiration_multiplier: f64) -> Self {
+        self.init_expiration_multiplier = init_expiration_multiplier;
         self
     }
 
@@ -294,6 +320,31 @@ impl EmitJobRequest {
 
     pub fn account_type(mut self, account_type: AccountType) -> Self {
         self.account_type = account_type;
+        self
+    }
+
+    pub fn keyless_ephem_secret_key_from_seed(mut self, seed_string: &str) -> Self {
+        self.keyless_ephem_secret_key = Some(parse_seed(seed_string));
+        self
+    }
+
+    pub fn keyless_ephem_secret_key(mut self, keyless_ephem_secret_key: Ed25519PrivateKey) -> Self {
+        self.keyless_ephem_secret_key = Some(keyless_ephem_secret_key.to_bytes());
+        self
+    }
+
+    pub fn proof_file_path(mut self, proof_file_path: &str) -> Self {
+        self.proof_file_path = Some(proof_file_path.to_owned());
+        self
+    }
+
+    pub fn epk_expiry_date_secs(mut self, epk_expiry_date_secs: u64) -> Self {
+        self.epk_expiry_date_secs = Some(epk_expiry_date_secs);
+        self
+    }
+
+    pub fn keyless_jwt(mut self, keyless_jwt: &str) -> Self {
+        self.keyless_jwt = Some(keyless_jwt.to_owned());
         self
     }
 
@@ -716,8 +767,25 @@ impl TxnEmitter {
             .with_transaction_expiration_time(init_expiration_time);
         let init_retries: usize =
             usize::try_from(init_expiration_time / req.init_retry_interval.as_secs()).unwrap();
-
-        let account_generator = create_account_generator(req.account_type);
+        let account_generator = match req.account_type {
+            AccountType::Local => create_private_key_account_generator(),
+            AccountType::Keyless => {
+                let ephem_sk = Ed25519PrivateKey::try_from(
+                    req.keyless_ephem_secret_key
+                        .expect("keyless_ephem_secret_key to not be None")
+                        .as_ref(),
+                )?;
+                create_keyless_account_generator(
+                    ephem_sk,
+                    req.epk_expiry_date_secs
+                        .expect("epk_expiry_date_secs to not be None"),
+                    req.keyless_jwt
+                        .as_deref()
+                        .expect("keyless_jwt to not be None"),
+                    req.proof_file_path.as_deref(),
+                )?
+            },
+        };
 
         let mut all_accounts = bulk_create_accounts(
             root_account.clone(),
@@ -911,6 +979,7 @@ impl TxnEmitter {
     }
 }
 
+#[allow(dead_code)]
 fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
@@ -924,7 +993,7 @@ fn pick_client(clients: &Vec<RestClient>) -> &RestClient {
 /// we were able to fetch last.
 async fn wait_for_accounts_sequence(
     start_time: Instant,
-    clients: &Vec<RestClient>,
+    client: &RestClient,
     account_seqs: &HashMap<AccountAddress, (u64, u64)>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
@@ -934,7 +1003,6 @@ async fn wait_for_accounts_sequence(
 
     let mut sum_of_completion_timestamps_millis = 0u128;
     loop {
-        let client = pick_client(clients);
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {
                 let millis_elapsed = start_time.elapsed().as_millis();

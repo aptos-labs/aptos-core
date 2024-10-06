@@ -1,0 +1,12 @@
+
+Diagnostics:
+warning: unused type parameter
+  ┌─ tests/more-v1/typing/unused_non_phantom_param.move:2:18
+  │
+2 │     struct S<T1, T2> {
+  │                  ^^
+  │                  │
+  │                  Unused type parameter `T2`. Consider declaring it as phantom
+
+
+============ bytecode verification succeeded ========

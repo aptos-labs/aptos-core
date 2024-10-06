@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 720
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -48,7 +48,7 @@ jobs:
           CVC5_EXE: /home/runner/bin/cvc5
           DOTNET_ROOT: /home/runner/.dotnet
           BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: lcov_unit
           path: lcov_unit.info
@@ -60,7 +60,7 @@ jobs:
     timeout-minutes: 720 # incremented from 240 due to execution time limit hit in cron
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -79,7 +79,7 @@ jobs:
           CVC5_EXE: /home/runner/bin/cvc5
           DOTNET_ROOT: /home/runner/.dotnet
           BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: lcov_smoke
           path: lcov_smoke.info
@@ -95,11 +95,11 @@ jobs:
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           name: lcov_unit
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: lcov_smoke
       - name: Upload coverage to Codecov

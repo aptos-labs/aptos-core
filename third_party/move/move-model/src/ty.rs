@@ -981,6 +981,24 @@ impl Type {
         }
     }
 
+    /// Drop reference, consuming the type.
+    pub fn drop_reference(self) -> Type {
+        if let Type::Reference(_, bt) = self {
+            *bt
+        } else {
+            self
+        }
+    }
+
+    /// If this is a reference, return its kind.
+    pub fn try_reference_kind(&self) -> Option<ReferenceKind> {
+        if let Type::Reference(k, _) = self {
+            Some(*k)
+        } else {
+            None
+        }
+    }
+
     /// If this is a struct type, replace the type instantiation.
     pub fn replace_struct_instantiation(&self, inst: &[Type]) -> Type {
         match self {
@@ -1434,13 +1452,16 @@ pub trait AbilityContext {
 
 /// A trait to provide context information for unification.
 pub trait UnificationContext: AbilityContext {
-    /// Get the field map for a struct, with field types instantiated. Also returns a boolean
-    /// whether the struct has variants, and therefore the returned fields are those common
-    /// between variants.
-    fn get_struct_field_map(
+    /// Get information about the given struct field. Returns a list
+    /// of optional variant and type for the field in that variant,
+    /// or, if the struct is not a variant, None and type.
+    /// If the field is not defined returns an empty list.
+    /// The 2nd return value indicates whether the type is a variant struct.
+    fn get_struct_field_decls(
         &self,
         id: &QualifiedInstId<StructId>,
-    ) -> (BTreeMap<Symbol, Type>, bool);
+        field_name: Symbol,
+    ) -> (Vec<(Option<Symbol>, Type)>, bool);
 
     /// For a given type, return a receiver style function of the given name, if available.
     /// If the function is generic it will be instantiated with fresh type variables.
@@ -1482,11 +1503,12 @@ impl ReceiverFunctionInstance {
 pub struct NoUnificationContext;
 
 impl UnificationContext for NoUnificationContext {
-    fn get_struct_field_map(
+    fn get_struct_field_decls(
         &self,
         _id: &QualifiedInstId<StructId>,
-    ) -> (BTreeMap<Symbol, Type>, bool) {
-        (BTreeMap::new(), false)
+        _field_name: Symbol,
+    ) -> (Vec<(Option<Symbol>, Type)>, bool) {
+        (vec![], false)
     }
 
     fn get_receiver_function(
@@ -1697,24 +1719,30 @@ impl Substitution {
                     .map(|_| ())
                     .map_err(|e| e.redirect(loc.clone())),
                 (Constraint::SomeStruct(constr_field_map), Type::Struct(mid, sid, inst)) => {
-                    let (field_map, _) =
-                        context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
-                    // The actual struct must have all the fields in the constraint, with same
-                    // type.
-                    for (field_name, field_ty) in constr_field_map {
-                        if let Some(declared_field_type) = field_map.get(field_name) {
-                            self.unify(
-                                context,
-                                variance,
-                                WideningOrder::RightToLeft,
-                                field_ty,
-                                declared_field_type,
-                            )
-                            .map(|_| ())
-                            .map_err(|e| e.redirect(loc.clone()))?
-                        } else {
+                    let sid = &mid.qualified_inst(*sid, inst.clone());
+                    for (field_name, expected_type) in constr_field_map {
+                        let (mut field_decls, _) = context.get_struct_field_decls(sid, *field_name);
+                        if field_decls.is_empty() {
                             return constraint_unsatisfied_error();
                         }
+                        // All available definitions must have the same type, before instantiation.
+                        let (_, decl_type) = field_decls.pop().unwrap();
+                        if field_decls
+                            .into_iter()
+                            .any(|(_, other_ty)| decl_type != other_ty)
+                        {
+                            return constraint_unsatisfied_error();
+                        }
+                        // The given declared type must unify with the expected type
+                        self.unify(
+                            context,
+                            variance,
+                            WideningOrder::RightToLeft,
+                            expected_type,
+                            &decl_type,
+                        )
+                        .map(|_| ())
+                        .map_err(|e| e.redirect(loc.clone()))?
                     }
                     Ok(())
                 },
@@ -2479,6 +2507,8 @@ pub enum ErrorMessageContext {
     Assignment,
     /// The error appears in the argument list of a function.
     Argument,
+    /// The error appears in the argument list of a positional constructor.
+    PositionalUnpackArgument,
     /// The error appears in a type argument.
     TypeArgument,
     /// The error appears in the argument of a receiver style function.
@@ -2530,6 +2560,10 @@ impl ErrorMessageContext {
             ),
             Argument | ReceiverArgument => format!(
                 "cannot pass `{}` to a function which expects argument of type `{}`",
+                actual, expected
+            ),
+            PositionalUnpackArgument => format!(
+                "cannot match {} to a struct field of type {}",
                 actual, expected
             ),
             OperatorArgument => format!(
@@ -2598,6 +2632,16 @@ impl ErrorMessageContext {
                 },
                 actual
             ),
+            PositionalUnpackArgument => format!(
+                "the struct/variant has {} {} but {} were provided",
+                expected,
+                if for_type_args {
+                    pluralize("type argument", expected)
+                } else {
+                    pluralize("field", expected)
+                },
+                actual
+            ),
             ReceiverArgument => {
                 if for_type_args {
                     format!(
@@ -2652,6 +2696,10 @@ impl ErrorMessageContext {
                 "the function takes {} but {} was provided",
                 expected, actual
             ),
+            PositionalUnpackArgument => format!(
+                "the struct/variant has {} but {} were provided",
+                expected, actual
+            ),
             Return => format!(
                 "the function returns {} but {} was provided",
                 expected, actual
@@ -2672,6 +2720,10 @@ impl ErrorMessageContext {
         match self {
             Argument | ReceiverArgument => format!(
                 "the function takes a reference but `{}` was provided",
+                actual
+            ),
+            PositionalUnpackArgument => format!(
+                "the struct/variant has a reference field but `{}` was provided",
                 actual
             ),
             OperatorArgument => {
@@ -2948,50 +3000,69 @@ impl TypeUnificationError {
         let mut hints = vec![];
         // Determine why this constraint did not match for better error message
         let msg = if let Type::Struct(mid, sid, inst) = ty {
-            let (actual_field_map, has_variants) =
-                unification_context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
-            let missing_fields = field_map
-                .keys()
-                .filter(|n| !actual_field_map.contains_key(n))
-                .collect::<Vec<_>>();
-            if !missing_fields.is_empty() {
-                // Primary error is missing fields
-                let fields =
-                    Self::print_fields(display_context.env, missing_fields.into_iter().cloned());
-                let str = ty.display(display_context);
-                if has_variants {
-                    hints.push(format!("field must be declared in all variants of `{}` to be accessible without match expression", str))
-                }
-                format!(
-                    "{} not declared in {} `{}`",
-                    fields,
-                    if has_variants {
-                        "all variants of"
-                    } else {
-                        "struct"
-                    },
-                    str
-                )
-            } else {
-                // Primary error is a type mismatch
-                let fields = field_map
-                    .iter()
-                    .filter_map(|(n, ty)| {
-                        let actual_ty = actual_field_map.get(n)?;
-                        if ty != actual_ty {
-                            Some(format!(
-                                "field `{}` has type `{}` instead of `{}`",
-                                n.display(display_context.env.symbol_pool()),
-                                ty.display(display_context),
-                                actual_ty.display(display_context)
-                            ))
+            let mut errors = vec![];
+            let sid = mid.qualified_inst(*sid, inst.clone());
+            for (field_name, expected_type) in field_map {
+                let field_str = field_name
+                    .display(display_context.env.symbol_pool())
+                    .to_string();
+                let (mut field_decls, is_variant) =
+                    unification_context.get_struct_field_decls(&sid, *field_name);
+                if field_decls.is_empty() {
+                    errors.push(format!(
+                        "field `{}` not declared in {} `{}`",
+                        field_str,
+                        if is_variant {
+                            "any of the variants of enum"
                         } else {
-                            None
-                        }
-                    })
-                    .join(" and ");
-                format!("{} in `{}`", fields, ty.display(display_context))
+                            "struct"
+                        },
+                        ty.display(display_context)
+                    ))
+                } else {
+                    let (variant_opt, decl_type) = field_decls.pop().unwrap();
+                    let different_type_variants = field_decls
+                        .into_iter()
+                        .filter_map(|(variant_opt, other_ty)| {
+                            if other_ty != decl_type {
+                                Some((variant_opt, other_ty))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect_vec();
+                    if !different_type_variants.is_empty() {
+                        errors.push(format!(
+                            "cannot select field `{}` since it has different \
+                            types in variants of enum `{}`",
+                            field_str,
+                            ty.display(display_context)
+                        ));
+                        let diff_str = iter::once((variant_opt, decl_type))
+                            .chain(different_type_variants)
+                            .map(|(variant_opt, decl_type)| {
+                                format!(
+                                    "type `{}` in variant `{}`",
+                                    decl_type.display(display_context),
+                                    variant_opt
+                                        .unwrap()
+                                        .display(display_context.env.symbol_pool())
+                                )
+                            })
+                            .join(" and ");
+                        hints.push(format!("field `{}` has {}", field_str, diff_str))
+                    } else {
+                        // type error
+                        errors.push(format!(
+                            "field `{}` has type `{}` instead of expected type `{}`",
+                            field_str,
+                            decl_type.display(display_context),
+                            expected_type.display(display_context)
+                        ))
+                    }
+                }
             }
+            errors.join(", ")
         } else {
             format!(
                 "expected a struct{} but found `{}`",

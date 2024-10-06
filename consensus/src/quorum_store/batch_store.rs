@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedBatchInfo};
+use aptos_consensus_types::proof_of_store::SignedBatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::prelude::*;
@@ -332,17 +332,8 @@ impl BatchStore {
 
     pub fn update_certified_timestamp(&self, certified_time: u64) {
         trace!("QS: batch reader updating time {:?}", certified_time);
-        let prev_time = self
-            .last_certified_time
+        self.last_certified_time
             .fetch_max(certified_time, Ordering::SeqCst);
-        // Note: prev_time may be equal to certified_time due to state-sync
-        // at the epoch boundary.
-        assert!(
-            prev_time <= certified_time,
-            "Decreasing executed block timestamp reported to BatchReader {} {}",
-            prev_time,
-            certified_time,
-        );
 
         let expired_keys = self.clear_expired_payload(certified_time);
         if let Err(e) = self.db.delete_batches(expired_keys) {
@@ -427,7 +418,9 @@ pub trait BatchReader: Send + Sync {
 
     fn get_batch(
         &self,
-        proof: ProofOfStore,
+        digest: HashValue,
+        expiration: u64,
+        signers: Vec<PeerId>,
     ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>;
 
     fn update_certified_timestamp(&self, certified_time: u64);
@@ -457,28 +450,30 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
 
     fn get_batch(
         &self,
-        proof: ProofOfStore,
+        digest: HashValue,
+        expiration: u64,
+        signers: Vec<PeerId>,
     ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
         let (tx, rx) = oneshot::channel();
         let batch_store = self.batch_store.clone();
         let batch_requester = self.batch_requester.clone();
         tokio::spawn(async move {
-            if let Ok(mut value) = batch_store.get_batch_from_local(proof.digest()) {
+            if let Ok(mut value) = batch_store.get_batch_from_local(&digest) {
                 if tx
                     .send(Ok(value.take_payload().expect("Must have payload")))
                     .is_err()
                 {
                     debug!(
                         "Receiver of local batch not available for digest {}",
-                        proof.digest()
+                        digest,
                     )
                 };
             } else {
                 // Quorum store metrics
                 counters::MISSED_BATCHES_COUNT.inc();
-                let subscriber_rx = batch_store.subscribe(*proof.digest());
+                let subscriber_rx = batch_store.subscribe(digest);
                 if let Some((batch_info, payload)) = batch_requester
-                    .request_batch(proof, tx, subscriber_rx)
+                    .request_batch(digest, expiration, signers, tx, subscriber_rx)
                     .await
                 {
                     batch_store.persist(vec![PersistedValue::new(batch_info, Some(payload))]);

@@ -1,0 +1,18 @@
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/typing/assign_nested2.move:12:13
+   │
+12 │         let r_ref = &mut r;
+   │             ^^^^^ Unused assignment or binding for local 'r_ref'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_r_ref')
+
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/typing/assign_nested2.move:13:13
+   │
+13 │         let s = S { f: 0 };
+   │             ^ Unused assignment or binding for local 's'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_s')
+
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/typing/assign_nested2.move:14:13
+   │
+14 │         (_, x, _, _) = four();
+   │             ^ Unused assignment or binding for local 'x'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_x')
+

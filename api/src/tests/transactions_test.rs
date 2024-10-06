@@ -5,6 +5,7 @@
 use super::new_test_context;
 use crate::tests::{
     new_test_context_with_config, new_test_context_with_db_sharding_and_internal_indexer,
+    new_test_context_with_sharding_and_delayed_internal_indexer,
 };
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
 use aptos_config::config::{GasEstimationStaticOverride, NodeConfig};
@@ -21,7 +22,7 @@ use aptos_types::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
         EntryFunction, Script, SignedTransaction,
     },
-    utility_coin::APTOS_COIN_TYPE,
+    utility_coin::{AptosCoinType, CoinType},
 };
 use move_core_types::{
     identifier::Identifier,
@@ -492,6 +493,34 @@ async fn test_get_transaction_by_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_transaction_by_hash_with_delayed_internal_indexer() {
+    let mut context = new_test_context_with_sharding_and_delayed_internal_indexer(
+        current_function_name!(),
+        Some(1),
+    );
+
+    let mut account = context.gen_account();
+    let txn = context.create_user_account(&account).await;
+    context.commit_block(&vec![txn.clone()]).await;
+    let txn1 = context.account_transfer_to(
+        &mut account,
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+        1,
+    );
+    context.commit_block(&vec![txn1.clone()]).await;
+    let committed_hash = txn1.committed_hash().to_hex_literal();
+
+    let _ = context
+        .get_indexer_reader()
+        .unwrap()
+        .wait_for_internal_indexer(1);
+    let resp = context
+        .get(&format!("/transactions/by_hash/{}", committed_hash))
+        .await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_transaction_by_hash_not_found() {
     let mut context = new_test_context(current_function_name!());
 
@@ -757,6 +786,10 @@ async fn test_account_transaction_with_context(mut context: TestContext) {
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn]).await;
 
+    if let Some(indexer_reader) = context.context.indexer_reader.as_ref() {
+        indexer_reader.wait_for_internal_indexer(2).unwrap();
+    }
+
     let txns = context
         .get(
             format!(
@@ -875,7 +908,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_address() {
         "0x1222",
         "Coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -894,7 +927,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_module_name() {
         "0x1",
         "CoinInvalid",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -913,7 +946,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_name() {
         "0x1",
         "Coin",
         "transfer_invalid",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -932,7 +965,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function_arguments() {
         "0x1",
         "Coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u8).unwrap(), // invalid type
@@ -951,7 +984,7 @@ async fn test_get_txn_execute_failed_by_missing_entry_function_arguments() {
         "0x1",
         "Coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             // missing arguments
@@ -974,7 +1007,7 @@ async fn test_get_txn_execute_failed_by_entry_function_validation() {
         "0x1",
         "Coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
@@ -997,7 +1030,7 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_module_name() {
         "0x1",
         "coin",
         "transfer::what::what",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
@@ -1020,7 +1053,7 @@ async fn test_get_txn_execute_failed_by_entry_function_invalid_function_name() {
         "0x1",
         "coin::coin",
         "transfer",
-        vec![APTOS_COIN_TYPE.clone()],
+        vec![AptosCoinType::type_tag()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
@@ -1561,7 +1594,7 @@ async fn test_simulation_failure_with_detail_error() {
                 Identifier::new("MemeCoin").unwrap(),
             ),
             Identifier::new("transfer").unwrap(),
-            vec![APTOS_COIN_TYPE.clone()],
+            vec![AptosCoinType::type_tag()],
             vec![
                 bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
                 bcs::to_bytes(&1u64).unwrap(),

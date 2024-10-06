@@ -794,6 +794,7 @@ export function moveFunction_VisibilityToJSON(object: MoveFunction_Visibility): 
 export interface MoveStruct {
   name?: string | undefined;
   isNative?: boolean | undefined;
+  isEvent?: boolean | undefined;
   abilities?: MoveAbility[] | undefined;
   genericTypeParams?: MoveStructGenericTypeParam[] | undefined;
   fields?: MoveStructField[] | undefined;
@@ -954,6 +955,7 @@ export enum AnyPublicKey_Type {
   TYPE_SECP256K1_ECDSA = 2,
   TYPE_SECP256R1_ECDSA = 3,
   TYPE_KEYLESS = 4,
+  TYPE_FEDERATED_KEYLESS = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -974,6 +976,9 @@ export function anyPublicKey_TypeFromJSON(object: any): AnyPublicKey_Type {
     case 4:
     case "TYPE_KEYLESS":
       return AnyPublicKey_Type.TYPE_KEYLESS;
+    case 5:
+    case "TYPE_FEDERATED_KEYLESS":
+      return AnyPublicKey_Type.TYPE_FEDERATED_KEYLESS;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -993,6 +998,8 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
       return "TYPE_SECP256R1_ECDSA";
     case AnyPublicKey_Type.TYPE_KEYLESS:
       return "TYPE_KEYLESS";
+    case AnyPublicKey_Type.TYPE_FEDERATED_KEYLESS:
+      return "TYPE_FEDERATED_KEYLESS";
     case AnyPublicKey_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -7241,7 +7248,7 @@ export const MoveFunction = {
 };
 
 function createBaseMoveStruct(): MoveStruct {
-  return { name: "", isNative: false, abilities: [], genericTypeParams: [], fields: [] };
+  return { name: "", isNative: false, isEvent: false, abilities: [], genericTypeParams: [], fields: [] };
 }
 
 export const MoveStruct = {
@@ -7251,6 +7258,9 @@ export const MoveStruct = {
     }
     if (message.isNative === true) {
       writer.uint32(16).bool(message.isNative);
+    }
+    if (message.isEvent === true) {
+      writer.uint32(48).bool(message.isEvent);
     }
     if (message.abilities !== undefined && message.abilities.length !== 0) {
       writer.uint32(26).fork();
@@ -7292,6 +7302,13 @@ export const MoveStruct = {
           }
 
           message.isNative = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isEvent = reader.bool();
           continue;
         case 3:
           if (tag === 24) {
@@ -7369,6 +7386,7 @@ export const MoveStruct = {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       isNative: isSet(object.isNative) ? globalThis.Boolean(object.isNative) : false,
+      isEvent: isSet(object.isEvent) ? globalThis.Boolean(object.isEvent) : false,
       abilities: globalThis.Array.isArray(object?.abilities)
         ? object.abilities.map((e: any) => moveAbilityFromJSON(e))
         : [],
@@ -7389,6 +7407,9 @@ export const MoveStruct = {
     if (message.isNative === true) {
       obj.isNative = message.isNative;
     }
+    if (message.isEvent === true) {
+      obj.isEvent = message.isEvent;
+    }
     if (message.abilities?.length) {
       obj.abilities = message.abilities.map((e) => moveAbilityToJSON(e));
     }
@@ -7408,6 +7429,7 @@ export const MoveStruct = {
     const message = createBaseMoveStruct();
     message.name = object.name ?? "";
     message.isNative = object.isNative ?? false;
+    message.isEvent = object.isEvent ?? false;
     message.abilities = object.abilities?.map((e) => e) || [];
     message.genericTypeParams = object.genericTypeParams?.map((e) => MoveStructGenericTypeParam.fromPartial(e)) || [];
     message.fields = object.fields?.map((e) => MoveStructField.fromPartial(e)) || [];

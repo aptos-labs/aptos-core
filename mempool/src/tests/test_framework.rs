@@ -4,8 +4,11 @@
 
 use crate::{
     core_mempool::CoreMempool,
-    shared_mempool::{start_shared_mempool, types::MultiBatchId},
-    tests::{common, common::TestTransaction},
+    shared_mempool::{
+        start_shared_mempool,
+        types::{MempoolMessageId, MempoolSenderBucket},
+    },
+    tests::common::{self, TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -232,12 +235,7 @@ impl MempoolNode {
                 .collect();
             let expected: Vec<_> = txns
                 .iter()
-                .map(|txn| {
-                    (
-                        TestTransaction::get_address(txn.address),
-                        txn.sequence_number,
-                    )
-                })
+                .map(|txn| (txn.address, txn.sequence_number))
                 .collect();
             Err((actual, expected))
         } else {
@@ -254,9 +252,12 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
         let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
-        let batch_id = MultiBatchId::from_timeline_ids(&vec![1].into(), &vec![10].into());
+        let message_id_in_request = MempoolMessageId::from_timeline_ids(vec![(
+            0 as MempoolSenderBucket,
+            (vec![1].into(), vec![10].into()),
+        )]);
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: batch_id.clone(),
+            message_id: message_id_in_request.clone(),
             transactions: sign_transactions(txns),
         };
         let data = protocol_id.to_bytes(&msg).unwrap();
@@ -310,12 +311,12 @@ impl MempoolNode {
             }
         };
         if let MempoolSyncMsg::BroadcastTransactionsResponse {
-            request_id,
+            message_id: message_id_in_response,
             retry,
             backoff,
         } = response
         {
-            assert_eq!(batch_id, request_id);
+            assert_eq!(message_id_in_response, message_id_in_request);
             assert!(!retry);
             assert!(!backoff);
         } else {
@@ -374,9 +375,9 @@ impl MempoolNode {
         };
         assert_eq!(peer_id, expected_peer_id);
         let mempool_message = common::decompress_and_deserialize(&data.to_vec());
-        let request_id = match mempool_message {
+        let message_id = match mempool_message {
             MempoolSyncMsg::BroadcastTransactionsRequest {
-                request_id,
+                message_id,
                 transactions,
             } => {
                 if !block_only_contains_transactions(&transactions, expected_txns) {
@@ -386,12 +387,7 @@ impl MempoolNode {
                         .collect();
                     let expected_txns: Vec<_> = expected_txns
                         .iter()
-                        .map(|txn| {
-                            (
-                                TestTransaction::get_address(txn.address),
-                                txn.sequence_number,
-                            )
-                        })
+                        .map(|txn| (txn.address, txn.sequence_number))
                         .collect();
 
                     panic!(
@@ -399,15 +395,14 @@ impl MempoolNode {
                         txns, expected_txns
                     );
                 }
-                request_id
+                message_id
             },
             MempoolSyncMsg::BroadcastTransactionsRequestWithReadyTime {
-                request_id,
+                message_id,
                 transactions,
-                priority: _,
             } => {
                 let transactions: Vec<_> =
-                    transactions.iter().map(|(txn, _)| txn.clone()).collect();
+                    transactions.iter().map(|(txn, _, _)| txn.clone()).collect();
                 if !block_only_contains_transactions(&transactions, expected_txns) {
                     let txns: Vec<_> = transactions
                         .iter()
@@ -415,12 +410,7 @@ impl MempoolNode {
                         .collect();
                     let expected_txns: Vec<_> = expected_txns
                         .iter()
-                        .map(|txn| {
-                            (
-                                TestTransaction::get_address(txn.address),
-                                txn.sequence_number,
-                            )
-                        })
+                        .map(|txn| (txn.address, txn.sequence_number))
                         .collect();
 
                     panic!(
@@ -428,14 +418,14 @@ impl MempoolNode {
                         txns, expected_txns
                     );
                 }
-                request_id
+                message_id
             },
             MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                 panic!("We aren't supposed to be getting as response here");
             },
         };
         let response = MempoolSyncMsg::BroadcastTransactionsResponse {
-            request_id,
+            message_id,
             retry,
             backoff,
         };
@@ -681,8 +671,14 @@ fn mpsc_channel<T>() -> (
 }
 
 /// Creates a single [`TestTransaction`] with the given `seq_num`.
-pub const fn test_transaction(seq_num: u64) -> TestTransaction {
-    TestTransaction::new(1, seq_num, 1)
+pub fn test_transaction(seq_num: u64) -> TestTransaction {
+    TestTransaction {
+        address: TestTransaction::get_address(1),
+        sequence_number: seq_num,
+        gas_price: 1,
+        account_seqno: 0,
+        script: None,
+    }
 }
 
 /// Tells us if a [`SignedTransaction`] block contains only the [`TestTransaction`]s
@@ -718,7 +714,7 @@ pub fn block_contains_any_transaction(
 fn block_contains_transaction(block: &[SignedTransaction], txn: &TestTransaction) -> bool {
     block.iter().any(|signed_txn| {
         signed_txn.sequence_number() == txn.sequence_number
-            && signed_txn.sender() == TestTransaction::get_address(txn.address)
+            && signed_txn.sender() == txn.address
             && signed_txn.gas_unit_price() == txn.gas_price
     })
 }

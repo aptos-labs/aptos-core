@@ -41,9 +41,10 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("optimize")),
         experiments: &[
             (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
             (Experiment::ACQUIRES_CHECK, false),
         ],
-        language_version: LanguageVersion::V2_0,
+        language_version: LanguageVersion::V2_1,
         include: &[], // all tests except those excluded below
         exclude: &["/operator_eval/"],
     },
@@ -54,7 +55,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
             (Experiment::OPTIMIZE, false),
             (Experiment::ACQUIRES_CHECK, false),
         ],
-        language_version: LanguageVersion::V2_0,
+        language_version: LanguageVersion::V2_1,
         include: &[], // all tests except those excluded below
         exclude: &["/operator_eval/"],
     },
@@ -63,10 +64,11 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("optimize-no-simplify")),
         experiments: &[
             (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
             (Experiment::AST_SIMPLIFY, false),
             (Experiment::ACQUIRES_CHECK, false),
         ],
-        language_version: LanguageVersion::V2_0,
+        language_version: LanguageVersion::V2_1,
         include: &[], // all tests except those excluded below
         exclude: &["/operator_eval/"],
     },
@@ -82,7 +84,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         name: "operator-eval-lang-2",
         runner: |p| run(p, get_config_by_name("operator-eval-lang-2")),
         experiments: &[(Experiment::OPTIMIZE, true)],
-        language_version: LanguageVersion::V2_0,
+        language_version: LanguageVersion::V2_1,
         include: &["/operator_eval/"],
         exclude: &[],
     },
@@ -96,10 +98,15 @@ const SEPARATE_BASELINE: &[&str] = &[
     "constants/large_vectors.move",
     // Printing bytecode is different depending on optimizations
     "no-v1-comparison/print_bytecode.move",
+    "bug_14243_stack_size.move",
     // The output of the tests could be different depending on the language version
     "/operator_eval/",
-    // Creates different code if optimized
+    // Creates different code if optimized or not
     "no-v1-comparison/enum/enum_field_select.move",
+    "no-v1-comparison/enum/enum_field_select_different_offsets.move",
+    "no-v1-comparison/assert_one.move",
+    // Flaky redundant unused assignment error
+    "no-v1-comparison/enum/enum_scoping.move",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

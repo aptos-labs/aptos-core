@@ -87,6 +87,8 @@ pub async fn execute_nft_txns<'t>(creator: LocalAccount, info: &mut AptosPublicI
     Ok(())
 }
 
+// TODO(grao): Old indexer is not used anymore, cleanup corresponding code and tests.
+#[ignore]
 #[tokio::test]
 async fn test_old_indexer() {
     if aptos_indexer::should_skip_pg_tests() {

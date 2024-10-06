@@ -52,7 +52,7 @@ mod type_loader;
 
 use crate::loader::modules::{StructVariantInfo, VariantFieldInfo};
 pub use function::LoadedFunction;
-pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, Scope};
+pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
 use move_binary_format::file_format::{
     StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
@@ -311,7 +311,7 @@ impl Loader {
         let hash_value: [u8; 32] = sha3_256.finalize().into();
 
         let mut scripts = self.scripts.write();
-        let main = match scripts.get(&hash_value) {
+        let script = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
                 let ver_script = self.deserialize_and_verify_script(
@@ -320,7 +320,7 @@ impl Loader {
                     data_store,
                     module_store,
                 )?;
-                let script = Script::new(ver_script, &hash_value, module_store, &self.name_cache)?;
+                let script = Script::new(ver_script, module_store, &self.name_cache)?;
                 scripts.insert(hash_value, script)
             },
         };
@@ -330,15 +330,17 @@ impl Loader {
             .map(|ty| self.load_type(ty, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
 
+        let main = script.entry_point();
         Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args).map_err(|e| {
             e.with_message(format!(
                 "Failed to verify type arguments for script {}",
-                &main.name
+                main.name()
             ))
             .finish(Location::Script)
         })?;
 
         Ok(LoadedFunction {
+            owner: LoadedFunctionOwner::Script(script),
             ty_args,
             function: main,
         })
@@ -384,11 +386,11 @@ impl Loader {
         function_name: &IdentStr,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<Arc<Function>> {
-        // Need to load the module first, before resolving the function.
+    ) -> VMResult<(Arc<Module>, Arc<Function>)> {
+        // Need to load the module first, before resolving it and the function.
         self.load_module(module_id, data_store, module_store)?;
         module_store
-            .resolve_function_by_name(function_name, module_id)
+            .resolve_module_and_function_by_name(module_id, function_name)
             .map_err(|err| err.finish(Location::Undefined))
     }
 
@@ -487,7 +489,7 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<LoadedFunction> {
-        let function = self.load_function_without_type_args(
+        let (module, function) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
@@ -527,7 +529,11 @@ impl Loader {
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
-        Ok(LoadedFunction { ty_args, function })
+        Ok(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args,
+            function,
+        })
     }
 
     // Loading verifies the module if it was never loaded.
@@ -540,7 +546,7 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<LoadedFunction> {
-        let function = self.load_function_without_type_args(
+        let (module, function) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
@@ -562,7 +568,11 @@ impl Loader {
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
-        Ok(LoadedFunction { ty_args, function })
+        Ok(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args,
+            function,
+        })
     }
 
     // Entry point for module publishing (`MoveVM::publish_module_bundle`).
@@ -1080,20 +1090,6 @@ impl Loader {
         }
         Ok(())
     }
-
-    //
-    // Internal helpers
-    //
-
-    fn get_script(&self, hash: &ScriptHash) -> Arc<Script> {
-        Arc::clone(
-            self.scripts
-                .read()
-                .scripts
-                .get(hash)
-                .expect("Script hash on Function must exist"),
-        )
-    }
 }
 
 //
@@ -1156,36 +1152,85 @@ impl<'a> Resolver<'a> {
     //
     // Function resolution
     //
+}
 
-    pub(crate) fn function_from_handle(
-        &self,
-        idx: FunctionHandleIndex,
-    ) -> PartialVMResult<Arc<Function>> {
-        let idx = match &self.binary {
-            BinaryType::Module(module) => module.function_at(idx.0),
-            BinaryType::Script(script) => script.function_at(idx.0),
-        };
-        self.module_store.function_at(idx)
-    }
+macro_rules! build_loaded_function {
+    ($function_name:ident, $idx_ty:ty, $get_function_handle:ident) => {
+        pub(crate) fn $function_name(
+            &self,
+            idx: $idx_ty,
+            verified_ty_args: Vec<Type>,
+        ) -> PartialVMResult<LoadedFunction> {
+            let (owner, function) = match &self.binary {
+                BinaryType::Module(module) => {
+                    let handle = module.$get_function_handle(idx.0);
+                    match handle {
+                        FunctionHandle::Local(function) => (
+                            LoadedFunctionOwner::Module(module.clone()),
+                            function.clone(),
+                        ),
+                        FunctionHandle::Remote { module, name } => {
+                            let (module, function) = self
+                                .module_store()
+                                .resolve_module_and_function_by_name(module, name)?;
+                            (LoadedFunctionOwner::Module(module), function)
+                        },
+                    }
+                },
+                BinaryType::Script(script) => {
+                    let handle = script.$get_function_handle(idx.0);
+                    match handle {
+                        FunctionHandle::Local(_) => {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            )
+                            .with_message("Scripts never have local functions".to_string()));
+                        },
+                        FunctionHandle::Remote { module, name } => {
+                            let (module, function) = self
+                                .module_store()
+                                .resolve_module_and_function_by_name(module, name)?;
+                            (LoadedFunctionOwner::Module(module), function)
+                        },
+                    }
+                },
+            };
+            Ok(LoadedFunction {
+                owner,
+                ty_args: verified_ty_args,
+                function,
+            })
+        }
+    };
+}
 
-    pub(crate) fn function_from_instantiation(
-        &self,
-        idx: FunctionInstantiationIndex,
-    ) -> PartialVMResult<Arc<Function>> {
-        let func_inst = match &self.binary {
-            BinaryType::Module(module) => module.function_instantiation_at(idx.0),
-            BinaryType::Script(script) => script.function_instantiation_at(idx.0),
-        };
-        self.module_store.function_at(&func_inst.handle)
-    }
+impl<'a> Resolver<'a> {
+    build_loaded_function!(
+        build_loaded_function_from_handle_and_ty_args,
+        FunctionHandleIndex,
+        function_at
+    );
 
-    pub(crate) fn function_from_name(
+    build_loaded_function!(
+        build_loaded_function_from_instantiation_and_ty_args,
+        FunctionInstantiationIndex,
+        function_instantiation_handle_at
+    );
+
+    pub(crate) fn build_loaded_function_from_name_and_ty_args(
         &self,
         module_id: &ModuleId,
-        func_name: &IdentStr,
-    ) -> PartialVMResult<Arc<Function>> {
-        self.module_store
-            .resolve_function_by_name(func_name, module_id)
+        function_name: &IdentStr,
+        verified_ty_args: Vec<Type>,
+    ) -> PartialVMResult<LoadedFunction> {
+        let (module, function) = self
+            .module_store
+            .resolve_module_and_function_by_name(module_id, function_name)?;
+        Ok(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args: verified_ty_args,
+            function,
+        })
     }
 
     pub(crate) fn instantiate_generic_function(
@@ -1194,24 +1239,23 @@ impl<'a> Resolver<'a> {
         idx: FunctionInstantiationIndex,
         ty_args: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
-        let func_inst = match &self.binary {
+        let instantiation = match &self.binary {
             BinaryType::Module(module) => module.function_instantiation_at(idx.0),
             BinaryType::Script(script) => script.function_instantiation_at(idx.0),
         };
 
         if let Some(gas_meter) = gas_meter {
-            for ty in &func_inst.instantiation {
+            for ty in instantiation {
                 gas_meter
                     .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
             }
         }
 
         let ty_builder = self.loader().ty_builder();
-        let mut instantiation = vec![];
-        for ty in &func_inst.instantiation {
-            let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
-            instantiation.push(ty);
-        }
+        let instantiation = instantiation
+            .iter()
+            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
+            .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(instantiation)
     }
 
@@ -1640,11 +1684,7 @@ impl Loader {
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
             Type::Vector(ty) => {
-                let el_ty_tag = if self.vm_config.pseudo_meter_vector_ty_to_ty_tag_construction {
-                    self.type_to_type_tag_impl(ty, gas_context)?
-                } else {
-                    self.type_to_type_tag(ty)?
-                };
+                let el_ty_tag = self.type_to_type_tag_impl(ty, gas_context)?;
                 TypeTag::Vector(Box::new(el_ty_tag))
             },
             Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(

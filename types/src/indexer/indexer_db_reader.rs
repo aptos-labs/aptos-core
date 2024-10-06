@@ -21,6 +21,8 @@ pub enum Order {
 }
 
 pub trait IndexerReader: Send + Sync {
+    fn is_internal_indexer_enabled(&self) -> bool;
+
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>>;
 
     fn get_events(
@@ -58,4 +60,16 @@ pub trait IndexerReader: Send + Sync {
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
 
     fn get_latest_internal_indexer_ledger_version(&self) -> Result<Option<Version>>;
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    fn wait_for_internal_indexer(&self, version: Version) -> Result<()> {
+        while self
+            .get_latest_internal_indexer_ledger_version()?
+            .map_or(true, |v| v < version)
+        {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+
+        Ok(())
+    }
 }

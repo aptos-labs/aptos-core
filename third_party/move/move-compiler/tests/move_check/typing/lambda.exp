@@ -40,7 +40,7 @@ error[E04007]: incompatible types
 error[E04007]: incompatible types
    ┌─ tests/move_check/typing/lambda.move:61:9
    │
-61 │         x(1)
+61 │         x(1) // expected to be not a function
    │         ^ Expected a function type but found 'u64'
 
 error[E04007]: incompatible types

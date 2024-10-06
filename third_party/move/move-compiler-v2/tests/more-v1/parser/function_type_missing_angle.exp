@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/function_type_missing_angle.move:3:19
+  │
+3 │     fun fn<T1, T2 () { }
+  │           -       ^ Expected '>'
+  │           │
+  │           To match this '<'

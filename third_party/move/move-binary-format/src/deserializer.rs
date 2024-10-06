@@ -13,7 +13,7 @@ use std::{collections::HashSet, convert::TryInto, io::Read};
 impl CompiledScript {
     /// Deserializes a &[u8] slice into a `CompiledScript` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -38,7 +38,7 @@ impl CompiledScript {
 impl CompiledModule {
     /// Deserialize a &[u8] slice into a `CompiledModule` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -750,7 +750,7 @@ fn build_common_tables(
                 if binary.version() < VERSION_7 {
                     return Err(
                         PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                            "Struct variants not applicable in bytecode version {}",
+                            "Enum types not available for bytecode version {}",
                             binary.version()
                         )),
                     );
@@ -1384,7 +1384,7 @@ fn load_struct_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<StructDef
             } else {
                 return Err(
                     PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                        "Struct variants not supported in version {}",
+                        "Enum types not supported in version {}",
                         cursor.version()
                     )),
                 );
@@ -1641,7 +1641,7 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             {
                 return Err(
                     PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                        "Struct variant operations not available before bytecode version {}",
+                        "Enum type operations not available before bytecode version {}",
                         VERSION_7
                     )),
                 );

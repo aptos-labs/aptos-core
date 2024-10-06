@@ -14,7 +14,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
-    aggregate_signature::{AggregateSignature, PartialSignatures},
+    aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
@@ -37,10 +37,6 @@ impl MockBatchRequester {
 
 #[async_trait::async_trait]
 impl QuorumStoreSender for MockBatchRequester {
-    async fn send_batch_request(&self, _request: BatchRequest, _recipients: Vec<Author>) {
-        unimplemented!()
-    }
-
     async fn request_batch(
         &self,
         _request: BatchRequest,
@@ -48,10 +44,6 @@ impl QuorumStoreSender for MockBatchRequester {
         _timeout: Duration,
     ) -> anyhow::Result<BatchResponse> {
         Ok(self.return_value.clone())
-    }
-
-    async fn send_batch(&self, _batch: Batch, _recipients: Vec<Author>) {
-        unimplemented!()
     }
 
     async fn send_signed_batch_info_msg(
@@ -97,16 +89,16 @@ async fn test_batch_request_exists() {
         1_000,
         1_000,
         MockBatchRequester::new(batch_response),
-        ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key()),
+        ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key())
+            .into(),
     );
 
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )
@@ -158,7 +150,7 @@ fn create_ledger_info_with_timestamp(
         ValidatorVerifier::new_with_quorum_voting_power(validator_infos, NUM_SIGNERS as u128)
             .expect("Incorrect quorum size.");
     let aggregated_signature = validator_verifier
-        .aggregate_signatures(&partial_signature)
+        .aggregate_signatures(partial_signature.signatures_iter())
         .unwrap();
     let ledger_info_with_signatures =
         LedgerInfoWithSignatures::new(ledger_info, aggregated_signature);
@@ -193,17 +185,16 @@ async fn test_batch_request_not_exists_not_expired() {
         retry_interval_ms,
         1_000,
         MockBatchRequester::new(batch_response),
-        validator_verifier,
+        validator_verifier.into(),
     );
 
     let request_start = Instant::now();
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )
@@ -242,17 +233,16 @@ async fn test_batch_request_not_exists_expired() {
         retry_interval_ms,
         1_000,
         MockBatchRequester::new(batch_response),
-        validator_verifier,
+        validator_verifier.into(),
     );
 
     let request_start = Instant::now();
     let (_, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
-            ProofOfStore::new(
-                batch.batch_info().clone(),
-                AggregateSignature::new(vec![u8::MAX].into(), None),
-            ),
+            *batch.digest(),
+            batch.expiration(),
+            vec![AccountAddress::random()],
             tx,
             subscriber_rx,
         )

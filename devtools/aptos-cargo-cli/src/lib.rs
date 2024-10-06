@@ -34,8 +34,12 @@ const RELEVANT_FILE_PATHS_FOR_EXECUTION_PERFORMANCE_TESTS: [&str; 5] = [
     "execution/aptos-executor-benchmark",
     "testsuite/single_node_performance.py",
 ];
-const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
-    ["aptos-move/aptos-release-builder", "aptos-move/framework"];
+const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 4] = [
+    ".github",
+    "testsuite",
+    "aptos-move/aptos-release-builder",
+    "aptos-move/framework",
+];
 
 // Relevant packages to monitor when deciding to run the targeted tests
 const RELEVANT_PACKAGES_FOR_COMPILER_V2: [&str; 2] = ["aptos-framework", "e2e-move-tests"];
@@ -71,6 +75,7 @@ pub enum AptosCargoCommand {
     AffectedPackages(CommonArgs),
     ChangedFiles(CommonArgs),
     Check(CommonArgs),
+    CheckMergeBase(CommonArgs),
     Xclippy(CommonArgs),
     Fmt(CommonArgs),
     Nextest(CommonArgs),
@@ -99,6 +104,7 @@ impl AptosCargoCommand {
             AptosCargoCommand::AffectedPackages(args) => args,
             AptosCargoCommand::ChangedFiles(args) => args,
             AptosCargoCommand::Check(args) => args,
+            AptosCargoCommand::CheckMergeBase(args) => args,
             AptosCargoCommand::Xclippy(args) => args,
             AptosCargoCommand::Fmt(args) => args,
             AptosCargoCommand::Nextest(args) => args,
@@ -162,6 +168,10 @@ impl AptosCargoCommand {
                 // Calculate and display the changed files
                 let (_, _, changed_files) = package_args.identify_changed_files()?;
                 output_changed_files(changed_files)
+            },
+            AptosCargoCommand::CheckMergeBase(_) => {
+                // Check the merge base
+                package_args.check_merge_base()
             },
             AptosCargoCommand::TargetedCLITests(_) => {
                 // Run the targeted CLI tests (if necessary).

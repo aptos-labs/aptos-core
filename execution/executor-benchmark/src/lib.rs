@@ -26,9 +26,8 @@ use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::{BlockExecutor, TransactionBlockExecutor},
     metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS, APTOS_PROCESSED_TXNS_OUTPUT_SIZE,
+        COMMIT_BLOCKS, EXECUTE_BLOCK, OTHER_TIMERS, PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
+        VM_EXECUTE_BLOCK,
     },
 };
 use aptos_jellyfish_merkle::metrics::{
@@ -40,7 +39,7 @@ use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
-    TransactionType::{self, NonConflictingCoinTransfer},
+    TransactionType::{self, CoinTransfer},
 };
 use aptos_types::on_chain_config::Features;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
@@ -136,7 +135,7 @@ pub fn run_benchmark<V>(
 
         let mut num_accounts_to_skip = 0;
         for (transaction_type, _) in &transaction_mix {
-            if let NonConflictingCoinTransfer{..} = transaction_type {
+            if matches!(transaction_type, CoinTransfer { non_conflicting, .. } if *non_conflicting) {
                 // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
                 // `3*block_size` addresses is required:
                 // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
@@ -166,7 +165,7 @@ pub fn run_benchmark<V>(
         ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
     });
 
-    let version = db.reader.get_synced_version().unwrap();
+    let version = db.reader.expect_synced_version();
 
     let (pipeline, block_sender) =
         Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
@@ -174,7 +173,8 @@ pub fn run_benchmark<V>(
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let Some(mix) = &transaction_mix {
         for (transaction_type, _) in mix {
-            if let NonConflictingCoinTransfer { .. } = transaction_type {
+            if matches!(transaction_type, CoinTransfer { non_conflicting, .. } if *non_conflicting)
+            {
                 // In case of non-conflicting coin transfer,
                 // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
                 // at least `block_size` number of accounts, all as signer only.
@@ -235,8 +235,7 @@ pub fn run_benchmark<V>(
     );
 
     if !pipeline_config.skip_commit {
-        let num_txns =
-            db.reader.get_synced_version().unwrap() - version - num_blocks_created as u64;
+        let num_txns = db.reader.expect_synced_version() - version - num_blocks_created as u64;
         overall_measuring.print_end("Overall", num_txns);
 
         if verify_sequence_numbers {
@@ -260,7 +259,7 @@ fn init_workload<V>(
 where
     V: TransactionBlockExecutor + 'static,
 {
-    let version = db.reader.get_synced_version().unwrap();
+    let version = db.reader.expect_synced_version();
     let (pipeline, block_sender) = Pipeline::<V>::new(
         BlockExecutor::new(db.clone()),
         version,
@@ -428,6 +427,8 @@ struct GasMeasurement {
     pub io_gas: f64,
     pub execution_gas: f64,
 
+    pub storage_fee: f64,
+
     pub approx_block_output: f64,
 
     pub gas_count: u64,
@@ -449,10 +450,16 @@ impl GasMeasurement {
     pub fn now() -> GasMeasurement {
         let gas = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_sum()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_sum();
+
         let io_gas = Self::sequential_gas_counter(GasType::IO_GAS).get_sample_sum()
             + Self::parallel_gas_counter(GasType::IO_GAS).get_sample_sum();
         let execution_gas = Self::sequential_gas_counter(GasType::EXECUTION_GAS).get_sample_sum()
             + Self::parallel_gas_counter(GasType::EXECUTION_GAS).get_sample_sum();
+
+        let storage_fee = Self::sequential_gas_counter(GasType::STORAGE_FEE).get_sample_sum()
+            + Self::parallel_gas_counter(GasType::STORAGE_FEE).get_sample_sum()
+            - (Self::sequential_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum()
+                + Self::parallel_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum());
 
         let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
             + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
@@ -478,6 +485,7 @@ impl GasMeasurement {
             effective_block_gas,
             io_gas,
             execution_gas,
+            storage_fee,
             approx_block_output,
             gas_count,
             speculative_abort_count,
@@ -492,6 +500,7 @@ impl GasMeasurement {
             effective_block_gas: end.effective_block_gas - self.effective_block_gas,
             io_gas: end.io_gas - self.io_gas,
             execution_gas: end.execution_gas - self.execution_gas,
+            storage_fee: end.storage_fee - self.storage_fee,
             approx_block_output: end.approx_block_output - self.approx_block_output,
             gas_count: end.gas_count - self.gas_count,
             speculative_abort_count: end.speculative_abort_count - self.speculative_abort_count,
@@ -526,29 +535,29 @@ struct ExecutionTimeMeasurement {
 
 impl ExecutionTimeMeasurement {
     pub fn now() -> Self {
-        let output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE
+        let output_size = PROCESSED_TXNS_OUTPUT_SIZE
             .with_label_values(&["execution"])
             .get_sample_sum();
 
         let partitioning_total = BLOCK_PARTITIONING_SECONDS.get_sample_sum();
-        let execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
-        let vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+        let execution_total = EXECUTE_BLOCK.get_sample_sum();
+        let vm_only = VM_EXECUTE_BLOCK.get_sample_sum();
 
         let by_other = OTHER_LABELS
             .iter()
             .map(|(_prefix, _top_level, other_label)| {
                 (
                     *other_label,
-                    APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    OTHER_TIMERS
                         .with_label_values(&[other_label])
                         .get_sample_sum(),
                 )
             })
             .collect::<HashMap<_, _>>();
-        let ledger_update_total = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.get_sample_sum();
-        let commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
+        let ledger_update_total = UPDATE_LEDGER.get_sample_sum();
+        let commit_total = COMMIT_BLOCKS.get_sample_sum();
 
-        let vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+        let vm_time = VM_EXECUTE_BLOCK.get_sample_sum();
 
         Self {
             output_size,
@@ -643,6 +652,11 @@ impl OverallMeasuring {
             "{} GPT: {} gas/txn",
             prefix,
             delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
+        );
+        info!(
+            "{} Storage fee: {} octas/txn",
+            prefix,
+            delta_gas.storage_fee / (delta_gas.gas_count as f64).max(1.0)
         );
         info!(
             "{} approx_output: {} bytes/s",

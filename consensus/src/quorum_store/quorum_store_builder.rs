@@ -3,7 +3,7 @@
 
 use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
-    consensus_observer::publisher::ConsensusPublisher,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     error::error_kind,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
@@ -127,7 +127,7 @@ pub struct InnerBuilder {
     mempool_txn_pull_timeout_ms: u64,
     aptos_db: Arc<dyn DbReader>,
     network_sender: NetworkSender,
-    verifier: ValidatorVerifier,
+    verifier: Arc<ValidatorVerifier>,
     proof_cache: ProofCache,
     backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
@@ -161,7 +161,7 @@ impl InnerBuilder {
         mempool_txn_pull_timeout_ms: u64,
         aptos_db: Arc<dyn DbReader>,
         network_sender: NetworkSender,
-        verifier: ValidatorVerifier,
+        verifier: Arc<ValidatorVerifier>,
         proof_cache: ProofCache,
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
@@ -365,6 +365,7 @@ impl InnerBuilder {
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
+            self.config.enable_opt_quorum_store,
         );
         spawn_named!(
             "proof_manager",
@@ -444,6 +445,7 @@ impl InnerBuilder {
                 // TODO: remove after splitting out clean requests
                 self.coordinator_tx.clone(),
                 consensus_publisher,
+                self.verifier.get_ordered_account_addresses(),
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

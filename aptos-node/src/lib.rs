@@ -20,15 +20,13 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{
-    merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
-};
+use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
 use clap::Parser;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
@@ -211,11 +209,21 @@ pub struct AptosHandle {
     _indexer_db_runtime: Option<Runtime>,
 }
 
-/// Start an Aptos node
 pub fn start(
     config: NodeConfig,
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
+) -> anyhow::Result<()> {
+    start_and_report_ports(config, log_file, create_global_rayon_pool, None, None)
+}
+
+/// Start an Aptos node
+pub fn start_and_report_ports(
+    config: NodeConfig,
+    log_file: Option<PathBuf>,
+    create_global_rayon_pool: bool,
+    api_port_tx: Option<oneshot::Sender<u16>>,
+    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<()> {
     // Setup panic handler
     aptos_crash_handler::setup_panic_handler();
@@ -254,8 +262,13 @@ pub fn start(
     }
 
     // Set up the node environment and start it
-    let _node_handle =
-        setup_environment_and_start_node(config, remote_log_receiver, Some(logger_filter_update))?;
+    let _node_handle = setup_environment_and_start_node(
+        config,
+        remote_log_receiver,
+        Some(logger_filter_update),
+        api_port_tx,
+        indexer_grpc_port_tx,
+    )?;
     let term = Arc::new(AtomicBool::new(false));
     while !term.load(Ordering::Acquire) {
         thread::park();
@@ -599,6 +612,8 @@ pub fn setup_environment_and_start_node(
     mut node_config: NodeConfig,
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
+    api_port_tx: Option<oneshot::Sender<u16>>,
+    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<AptosHandle> {
     // Log the node config at node startup
     node_config.log_all_configs();
@@ -607,7 +622,7 @@ pub fn setup_environment_and_start_node(
     let mut admin_service = services::start_admin_service(&node_config);
 
     // Set up the storage database and any RocksDB checkpoints
-    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt) =
+    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
 
     admin_service.set_aptos_db(db_rw.clone().into());
@@ -689,7 +704,15 @@ pub fn setup_environment_and_start_node(
         indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
-    ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id, indexer_db_opt)?;
+    ) = services::bootstrap_api_and_indexer(
+        &node_config,
+        db_rw.clone(),
+        chain_id,
+        indexer_db_opt,
+        update_receiver,
+        api_port_tx,
+        indexer_grpc_port_tx,
+    )?;
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
@@ -702,17 +725,6 @@ pub fn setup_environment_and_start_node(
             mempool_client_receiver,
             peers_and_metadata,
         );
-
-    // Ensure consensus key in secure DB.
-    if !matches!(
-        node_config
-            .consensus
-            .safety_rules
-            .initial_safety_rules_config,
-        InitialSafetyRulesConfig::None
-    ) {
-        aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
-    }
 
     // Create the DKG runtime and get the VTxn pool
     let (vtxn_pool, dkg_runtime) =
@@ -731,9 +743,16 @@ pub fn setup_environment_and_start_node(
     state_sync_runtimes.block_until_initialized();
     debug!("State sync initialization complete.");
 
-    // Create the consensus observer publisher (if enabled)
-    let (consensus_publisher_runtime, consensus_publisher) =
-        consensus::create_consensus_publisher(&node_config, &consensus_observer_network_interfaces);
+    // Create the consensus observer and publisher (if enabled)
+    let (consensus_observer_runtime, consensus_publisher_runtime, consensus_publisher) =
+        consensus::create_consensus_observer_and_publisher(
+            &node_config,
+            consensus_observer_network_interfaces,
+            consensus_notifier.clone(),
+            consensus_to_mempool_sender.clone(),
+            db_rw.clone(),
+            consensus_observer_reconfig_subscription,
+        );
 
     // Create the consensus runtime (if enabled)
     let consensus_runtime = consensus::create_consensus_runtime(
@@ -746,17 +765,6 @@ pub fn setup_environment_and_start_node(
         vtxn_pool,
         consensus_publisher.clone(),
         &mut admin_service,
-    );
-
-    // Create the consensus observer runtime (if enabled)
-    let consensus_observer_runtime = consensus::create_consensus_observer_runtime(
-        &node_config,
-        consensus_observer_network_interfaces,
-        consensus_publisher,
-        consensus_notifier,
-        consensus_to_mempool_sender,
-        db_rw,
-        consensus_observer_reconfig_subscription,
     );
 
     Ok(AptosHandle {

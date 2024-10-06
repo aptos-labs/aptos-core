@@ -31,11 +31,22 @@ on:
         required: false
         type: string
         description: The Forge k8s cluster to be used for test
-      FORGE_ENABLE_HAPROXY:
+      FORGE_ENABLE_INDEXER:
         required: false
-        default: false
         type: boolean
-        description: enable haproxy for the forge test
+        description: Whether to use indexer
+      FORGE_NUM_VALIDATORS:
+        required: false
+        type: string
+        description: Number of validators to use for the forge test
+      FORGE_NUM_VALIDATOR_FULLNODES:
+        required: false
+        type: string
+        description: Number of validator fullnodes to use for the forge test
+      FORGE_RETAIN_DEBUG_LOGS:
+        required: false
+        type: boolean
+        description: Retain debug logs for all nodes
 
 permissions:
   contents: read
@@ -55,7 +66,10 @@ jobs:
           echo "FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}"
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
           echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
-          echo "FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}"
+          echo "FORGE_ENABLE_INDEXER: ${{ inputs.FORGE_ENABLE_INDEXER }}"
+          echo "FORGE_NUM_VALIDATORS: ${{ inputs.FORGE_NUM_VALIDATORS }}"
+          echo "FORGE_NUM_VALIDATOR_FULLNODES: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}"
+          echo "FORGE_RETAIN_DEBUG_LOGS: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}"
     outputs:
       gitSha: ${{ inputs.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
@@ -63,8 +77,10 @@ jobs:
       forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS || 600 }}
       forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
       forgeClusterName: ${{ inputs.FORGE_CLUSTER_NAME }}
-      forgeEnableHaproxy: ${{ inputs.FORGE_ENABLE_HAPROXY }}
-
+      forgeEnableIndexer: ${{ inputs.FORGE_ENABLE_INDEXER }}
+      forgeNumValidators: ${{ inputs.FORGE_NUM_VALIDATORS }}
+      forgeNumValidatorFullnodes: ${{ inputs.FORGE_NUM_VALIDATOR_FULLNODES }}
+      forgeRetainDebugLogs: ${{ inputs.FORGE_RETAIN_DEBUG_LOGS }}
   adhoc-forge-test:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     needs: [determine-forge-run-metadata]
@@ -76,4 +92,7 @@ jobs:
       FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }}
       FORGE_RUNNER_DURATION_SECS: ${{ fromJSON(needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs) }} # fromJSON converts to integer
       FORGE_CLUSTER_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeClusterName }}
-      FORGE_ENABLE_HAPROXY: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableHaproxy }}
+      FORGE_ENABLE_INDEXER: ${{ needs.determine-forge-run-metadata.outputs.forgeEnableIndexer == 'true' }}
+      FORGE_NUM_VALIDATORS: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidators }}
+      FORGE_NUM_VALIDATOR_FULLNODES: ${{ needs.determine-forge-run-metadata.outputs.forgeNumValidatorFullnodes }}
+      FORGE_RETAIN_DEBUG_LOGS: ${{ needs.determine-forge-run-metadata.outputs.forgeRetainDebugLogs == 'true' }}

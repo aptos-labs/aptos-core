@@ -3,9 +3,9 @@
 
 use crate::{
     consensus_observer::{
-        network_message::{BlockTransactionPayload, ConsensusObserverMessage},
-        payload_store::BlockPayloadStatus,
-        publisher::ConsensusPublisher,
+        network::observer_message::{BlockTransactionPayload, ConsensusObserverMessage},
+        observer::payload_store::BlockPayloadStatus,
+        publisher::consensus_publisher::ConsensusPublisher,
     },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
@@ -13,7 +13,8 @@ use crate::{
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload, ProofWithData, Round},
-    proof_of_store::ProofOfStore,
+    payload::{BatchPointer, DataFetchFut, TDataInfo},
+    proof_of_store::BatchInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -22,11 +23,13 @@ use aptos_executor_types::{
 };
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use async_trait::async_trait;
-use futures::channel::mpsc::Sender;
+use futures::{channel::mpsc::Sender, FutureExt};
+use itertools::Itertools;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
+    ops::Deref,
     sync::Arc,
 };
 use tokio::sync::oneshot;
@@ -42,6 +45,11 @@ pub trait TPayloadManager: Send + Sync {
     /// Prefetch the data for a payload. This is used to ensure that the data for a payload is
     /// available when block is executed.
     fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
+
+    /// Check if the transactions corresponding are available. This is specific to payload
+    /// manager implementations. For optimistic quorum store, we only check if optimistic
+    /// batches are available locally.
+    fn check_payload_availability(&self, block: &Block) -> bool;
 
     /// Get the transactions in a block's payload. This function returns a vector of transactions.
     async fn get_transactions(
@@ -64,6 +72,10 @@ impl TPayloadManager for DirectMempoolPayloadManager {
     fn notify_commit(&self, _block_timestamp: u64, _payloads: Vec<Payload>) {}
 
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+
+    fn check_payload_availability(&self, _block: &Block) -> bool {
+        true
+    }
 
     async fn get_transactions(
         &self,
@@ -91,6 +103,7 @@ pub struct QuorumStorePayloadManager {
     batch_reader: Arc<dyn BatchReader>,
     coordinator_tx: Sender<CoordinatorCommand>,
     maybe_consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    ordered_authors: Vec<PeerId>,
 }
 
 impl QuorumStorePayloadManager {
@@ -98,16 +111,18 @@ impl QuorumStorePayloadManager {
         batch_reader: Arc<dyn BatchReader>,
         coordinator_tx: Sender<CoordinatorCommand>,
         maybe_consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        ordered_authors: Vec<PeerId>,
     ) -> Self {
         Self {
             batch_reader,
             coordinator_tx,
             maybe_consensus_publisher,
+            ordered_authors,
         }
     }
 
     fn request_transactions(
-        proofs: Vec<ProofOfStore>,
+        batches: Vec<(BatchInfo, Vec<PeerId>)>,
         block_timestamp: u64,
         batch_reader: Arc<dyn BatchReader>,
     ) -> Vec<(
@@ -115,17 +130,23 @@ impl QuorumStorePayloadManager {
         oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
     )> {
         let mut receivers = Vec::new();
-        for pos in proofs {
+        for (batch_info, responders) in batches {
             trace!(
-                "QSE: requesting pos {:?}, digest {}, time = {}",
-                pos,
-                pos.digest(),
+                "QSE: requesting batch {:?}, time = {}",
+                batch_info,
                 block_timestamp
             );
-            if block_timestamp <= pos.expiration() {
-                receivers.push((*pos.digest(), batch_reader.get_batch(pos)));
+            if block_timestamp <= batch_info.expiration() {
+                receivers.push((
+                    *batch_info.digest(),
+                    batch_reader.get_batch(
+                        *batch_info.digest(),
+                        batch_info.expiration(),
+                        responders,
+                    ),
+                ));
             } else {
-                debug!("QSE: skipped expired pos {}", pos.digest());
+                debug!("QSE: skipped expired batch {}", batch_info.digest());
             }
         }
         receivers
@@ -167,6 +188,9 @@ impl TPayloadManager for QuorumStorePayloadManager {
                         )
                         .collect::<Vec<_>>()
                 },
+                Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                    opt_quorum_store_payload.into_inner().get_all_batch_infos()
+                },
             })
             .collect();
 
@@ -184,13 +208,24 @@ impl TPayloadManager for QuorumStorePayloadManager {
     }
 
     fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
+        // This is deprecated.
+        // TODO(ibalajiarun): Remove this after migrating to OptQuorumStore type
         let request_txns_and_update_status =
             move |proof_with_status: &ProofWithData, batch_reader: Arc<dyn BatchReader>| {
                 if proof_with_status.status.lock().is_some() {
                     return;
                 }
                 let receivers = Self::request_transactions(
-                    proof_with_status.proofs.clone(),
+                    proof_with_status
+                        .proofs
+                        .iter()
+                        .map(|proof| {
+                            (
+                                proof.info().clone(),
+                                proof.shuffled_signers(&self.ordered_authors),
+                            )
+                        })
+                        .collect(),
                     timestamp,
                     batch_reader,
                 );
@@ -199,6 +234,33 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     .lock()
                     .replace(DataStatus::Requested(receivers));
             };
+
+        fn prefetch_helper<T: TDataInfo>(
+            data_pointer: &BatchPointer<T>,
+            batch_reader: Arc<dyn BatchReader>,
+            timestamp: u64,
+            ordered_authors: &[PeerId],
+        ) {
+            let mut data_fut = data_pointer.data_fut.lock();
+            if data_fut.is_some() {
+                return;
+            }
+
+            let batches_and_responders = data_pointer
+                .batch_summary
+                .iter()
+                .map(|proof| {
+                    let signers = proof.signers(ordered_authors);
+                    // TODO(ibalajiarun): Add block author to signers
+                    (proof.info().clone(), signers)
+                })
+                .collect();
+            let fut =
+                request_txns_from_quorum_store(batches_and_responders, timestamp, batch_reader)
+                    .boxed()
+                    .shared();
+            *data_fut = Some(DataFetchFut { fut, iteration: 0 })
+        }
 
         match payload {
             Payload::InQuorumStore(proof_with_status) => {
@@ -216,7 +278,91 @@ impl TPayloadManager for QuorumStorePayloadManager {
             Payload::DirectMempool(_) => {
                 unreachable!()
             },
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                prefetch_helper(
+                    opt_qs_payload.opt_batches(),
+                    self.batch_reader.clone(),
+                    timestamp,
+                    &self.ordered_authors,
+                );
+                prefetch_helper(
+                    opt_qs_payload.proof_with_data(),
+                    self.batch_reader.clone(),
+                    timestamp,
+                    &self.ordered_authors,
+                )
+            },
         };
+    }
+
+    fn check_payload_availability(&self, block: &Block) -> bool {
+        let Some(payload) = block.payload() else {
+            return true;
+        };
+
+        match payload {
+            Payload::DirectMempool(_) => {
+                unreachable!("QuorumStore doesn't support DirectMempool payload")
+            },
+            Payload::InQuorumStore(_) => true,
+            Payload::InQuorumStoreWithLimit(_) => true,
+            Payload::QuorumStoreInlineHybrid(inline_batches, proofs, _) => {
+                fn update_availability_metrics<'a>(
+                    batch_reader: &Arc<dyn BatchReader>,
+                    is_proof_label: &str,
+                    batch_infos: impl Iterator<Item = &'a BatchInfo>,
+                ) {
+                    for (author, chunk) in &batch_infos.chunk_by(|info| info.author()) {
+                        let (available_count, missing_count) = chunk
+                            .map(|info| batch_reader.exists(info.digest()))
+                            .fold((0, 0), |(available_count, missing_count), item| {
+                                if item.is_some() {
+                                    (available_count + 1, missing_count)
+                                } else {
+                                    (available_count, missing_count + 1)
+                                }
+                            });
+                        counters::CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS
+                            .with_label_values(&[
+                                &author.to_hex_literal(),
+                                is_proof_label,
+                                "available",
+                            ])
+                            .inc_by(available_count as u64);
+                        counters::CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS
+                            .with_label_values(&[
+                                &author.to_hex_literal(),
+                                is_proof_label,
+                                "missing",
+                            ])
+                            .inc_by(missing_count as u64);
+                    }
+                }
+
+                update_availability_metrics(
+                    &self.batch_reader,
+                    "false",
+                    inline_batches.iter().map(|(batch_info, _)| batch_info),
+                );
+                update_availability_metrics(
+                    &self.batch_reader,
+                    "true",
+                    proofs.proofs.iter().map(|proof| proof.info()),
+                );
+
+                // The payload is considered available because it contains only proofs that guarantee network availabiliy
+                // or inlined transactions.
+                true
+            },
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                for batch in opt_qs_payload.opt_batches().deref() {
+                    if self.batch_reader.exists(batch.digest()).is_none() {
+                        return false;
+                    }
+                }
+                true
+            },
+        }
     }
 
     async fn get_transactions(
@@ -229,8 +375,13 @@ impl TPayloadManager for QuorumStorePayloadManager {
 
         let transaction_payload = match payload {
             Payload::InQuorumStore(proof_with_data) => {
-                let transactions =
-                    process_payload(proof_with_data, self.batch_reader.clone(), block).await?;
+                let transactions = process_payload(
+                    proof_with_data,
+                    self.batch_reader.clone(),
+                    block,
+                    &self.ordered_authors,
+                )
+                .await?;
                 BlockTransactionPayload::new_in_quorum_store(
                     transactions,
                     proof_with_data.proofs.clone(),
@@ -241,6 +392,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     &proof_with_data.proof_with_data,
                     self.batch_reader.clone(),
                     block,
+                    &self.ordered_authors,
                 )
                 .await?;
                 BlockTransactionPayload::new_in_quorum_store_with_limit(
@@ -255,8 +407,13 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 max_txns_to_execute,
             ) => {
                 let all_transactions = {
-                    let mut all_txns =
-                        process_payload(proof_with_data, self.batch_reader.clone(), block).await?;
+                    let mut all_txns = process_payload(
+                        proof_with_data,
+                        self.batch_reader.clone(),
+                        block,
+                        &self.ordered_authors,
+                    )
+                    .await?;
                     all_txns.append(
                         &mut inline_batches
                             .iter()
@@ -277,6 +434,34 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     inline_batches,
                 )
             },
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                let opt_batch_txns = process_payload_helper(
+                    opt_qs_payload.opt_batches(),
+                    self.batch_reader.clone(),
+                    block,
+                    &self.ordered_authors,
+                )
+                .await?;
+                let proof_batch_txns = process_payload_helper(
+                    opt_qs_payload.proof_with_data(),
+                    self.batch_reader.clone(),
+                    block,
+                    &self.ordered_authors,
+                )
+                .await?;
+                let inline_batch_txns = opt_qs_payload.inline_batches().transactions();
+                let all_txns = [opt_batch_txns, proof_batch_txns, inline_batch_txns].concat();
+                BlockTransactionPayload::new_opt_quorum_store(
+                    all_txns,
+                    opt_qs_payload.proof_with_data().deref().clone(),
+                    opt_qs_payload.max_txns_to_execute(),
+                    [
+                        opt_qs_payload.opt_batches().deref().clone(),
+                        opt_qs_payload.inline_batches().batch_infos(),
+                    ]
+                    .concat(),
+                )
+            },
             _ => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,
@@ -291,7 +476,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 block.gen_block_info(HashValue::zero(), 0, None),
                 transaction_payload.clone(),
             );
-            consensus_publisher.publish_message(message).await;
+            consensus_publisher.publish_message(message);
         }
 
         Ok((
@@ -334,13 +519,13 @@ async fn get_transactions_for_observer(
     };
 
     // If the payload is valid, publish it to any downstream observers
-    let transaction_payload = block_payload.transaction_payload;
+    let transaction_payload = block_payload.transaction_payload();
     if let Some(consensus_publisher) = consensus_publisher {
         let message = ConsensusObserverMessage::new_block_payload_message(
             block.gen_block_info(HashValue::zero(), 0, None),
             transaction_payload.clone(),
         );
-        consensus_publisher.publish_message(message).await;
+        consensus_publisher.publish_message(message);
     }
 
     // Return the transactions and the transaction limit
@@ -350,10 +535,89 @@ async fn get_transactions_for_observer(
     ))
 }
 
+async fn request_txns_from_quorum_store(
+    batches_and_responders: Vec<(BatchInfo, Vec<PeerId>)>,
+    timestamp: u64,
+    batch_reader: Arc<dyn BatchReader>,
+) -> ExecutorResult<Vec<SignedTransaction>> {
+    let mut vec_ret = Vec::new();
+    let receivers = QuorumStorePayloadManager::request_transactions(
+        batches_and_responders,
+        timestamp,
+        batch_reader,
+    );
+    for (digest, rx) in receivers {
+        match rx.await {
+            Err(e) => {
+                // We probably advanced epoch already.
+                warn!(
+                    "Oneshot channel to get a batch was dropped with error {:?}",
+                    e
+                );
+                return Err(DataNotFound(digest));
+            },
+            Ok(Ok(data)) => {
+                vec_ret.push(data);
+            },
+            Ok(Err(e)) => {
+                return Err(e);
+            },
+        }
+    }
+    let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
+    Ok(ret)
+}
+
+async fn process_payload_helper<T: TDataInfo>(
+    data_ptr: &BatchPointer<T>,
+    batch_reader: Arc<dyn BatchReader>,
+    block: &Block,
+    ordered_authors: &[PeerId],
+) -> ExecutorResult<Vec<SignedTransaction>> {
+    let (iteration, fut) = {
+        let data_fut_guard = data_ptr.data_fut.lock();
+        let data_fut = data_fut_guard.as_ref().expect("must be initialized");
+        (data_fut.iteration, data_fut.fut.clone())
+    };
+
+    let result = fut.await;
+    // If error, reschedule before returning the result
+    if result.is_err() {
+        let mut data_fut_guard = data_ptr.data_fut.lock();
+        let data_fut = data_fut_guard.as_mut().expect("must be initialized");
+        // Protection against race, check the iteration number before rescheduling.
+        if data_fut.iteration == iteration {
+            let batches_and_responders = data_ptr
+                .batch_summary
+                .iter()
+                .map(|proof| {
+                    let mut signers = proof.signers(ordered_authors);
+                    if let Some(author) = block.author() {
+                        signers.push(author);
+                    }
+                    (proof.info().clone(), signers)
+                })
+                .collect();
+            data_fut.fut = request_txns_from_quorum_store(
+                batches_and_responders,
+                block.timestamp_usecs(),
+                batch_reader,
+            )
+            .boxed()
+            .shared();
+            data_fut.iteration = iteration + 1;
+        }
+    }
+    result
+}
+
+/// This is deprecated. Use `process_payload_helper` instead after migrating to
+/// OptQuorumStore payload
 async fn process_payload(
     proof_with_data: &ProofWithData,
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
+    ordered_authors: &[PeerId],
 ) -> ExecutorResult<Vec<SignedTransaction>> {
     let status = proof_with_data.status.lock().take();
     match status.expect("Should have been updated before.") {
@@ -384,7 +648,16 @@ async fn process_payload(
                             e
                         );
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
-                            proof_with_data.proofs.clone(),
+                            proof_with_data
+                                .proofs
+                                .iter()
+                                .map(|proof| {
+                                    (
+                                        proof.info().clone(),
+                                        proof.shuffled_signers(ordered_authors),
+                                    )
+                                })
+                                .collect(),
                             block.timestamp_usecs(),
                             batch_reader.clone(),
                         );
@@ -400,7 +673,16 @@ async fn process_payload(
                     },
                     Ok(Err(e)) => {
                         let new_receivers = QuorumStorePayloadManager::request_transactions(
-                            proof_with_data.proofs.clone(),
+                            proof_with_data
+                                .proofs
+                                .iter()
+                                .map(|proof| {
+                                    (
+                                        proof.info().clone(),
+                                        proof.shuffled_signers(ordered_authors),
+                                    )
+                                })
+                                .collect(),
                             block.timestamp_usecs(),
                             batch_reader.clone(),
                         );
@@ -449,6 +731,10 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
 
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {
         // noop
+    }
+
+    fn check_payload_availability(&self, _block: &Block) -> bool {
+        unreachable!("this method isn't used in ConsensusObserver")
     }
 
     async fn get_transactions(

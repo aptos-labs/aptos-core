@@ -6,8 +6,9 @@ use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
-    consensus_observer::publisher::ConsensusPublisher, network_interface::ConsensusMsg,
-    persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
+    network_interface::ConsensusMsg, persistent_liveness_storage::StorageWriteProxy,
+    quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
@@ -31,9 +32,12 @@ use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
 use aptos_validator_transaction_pool::VTxnPoolState;
-use futures::channel::{mpsc, mpsc::Sender};
+use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use std::{sync::Arc, time::Instant};
-use tokio::runtime::{Handle, Runtime};
+use tokio::{
+    runtime::{Handle, Runtime},
+    sync::watch::Receiver as WatchReceiver,
+};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -45,6 +49,9 @@ pub fn bootstrap_api_and_indexer(
     db_rw: DbReaderWriter,
     chain_id: ChainId,
     internal_indexer_db: Option<InternalIndexerDB>,
+    update_receiver: Option<WatchReceiver<u64>>,
+    api_port_tx: Option<oneshot::Sender<u16>>,
+    indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
     Option<Runtime>,
@@ -67,11 +74,15 @@ pub fn bootstrap_api_and_indexer(
         None => (None, None),
     };
 
-    let (db_indexer_runtime, txn_event_reader) =
-        match bootstrap_internal_indexer_db(node_config, db_rw.clone(), internal_indexer_db) {
-            Some((runtime, db_indexer)) => (Some(runtime), Some(db_indexer)),
-            None => (None, None),
-        };
+    let (db_indexer_runtime, txn_event_reader) = match bootstrap_internal_indexer_db(
+        node_config,
+        db_rw.clone(),
+        internal_indexer_db,
+        update_receiver,
+    ) {
+        Some((runtime, db_indexer)) => (Some(runtime), Some(db_indexer)),
+        None => (None, None),
+    };
 
     let indexer_readers = IndexerReaders::new(indexer_async_v2, txn_event_reader);
 
@@ -88,6 +99,7 @@ pub fn bootstrap_api_and_indexer(
             db_rw.reader.clone(),
             mempool_client_sender.clone(),
             indexer_reader.clone(),
+            api_port_tx,
         )?)
     } else {
         None
@@ -100,6 +112,7 @@ pub fn bootstrap_api_and_indexer(
         db_rw.reader.clone(),
         mempool_client_sender.clone(),
         indexer_reader,
+        indexer_grpc_port_tx,
     );
 
     // Create the indexer runtime

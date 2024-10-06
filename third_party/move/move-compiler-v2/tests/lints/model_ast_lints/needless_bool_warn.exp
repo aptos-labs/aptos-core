@@ -1,0 +1,56 @@
+
+Diagnostics:
+warning: [lint] This if-else can be replaced with just the condition
+  ┌─ tests/lints/model_ast_lints/needless_bool_warn.move:7:9
+  │
+7 │         if (foo()) true else false
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
+
+warning: [lint] This if-else can be replaced with just the negation of the condition
+   ┌─ tests/lints/model_ast_lints/needless_bool_warn.move:11:9
+   │
+11 │ ╭         if (foo()) { false }
+12 │ │         else {
+13 │ │             // because la blah blah
+14 │ │             true
+15 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
+
+warning: [lint] This if-else can be replaced with just returning the condition
+   ┌─ tests/lints/model_ast_lints/needless_bool_warn.move:19:9
+   │
+19 │ ╭         if (foo()) {
+20 │ │             return true
+21 │ │         } else {
+22 │ │             return false
+23 │ │         }
+   │ ╰─────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
+
+warning: [lint] This if-else can be replaced with just returning the negation of the condition
+   ┌─ tests/lints/model_ast_lints/needless_bool_warn.move:28:13
+   │
+28 │ ╭             if (foo()) {
+29 │ │                 return false
+30 │ │             } else {
+31 │ │                 return true
+32 │ │             }
+   │ ╰─────────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
+
+warning: [lint] This if-else has the same bool expression in both branches, consider rewriting the code to remove this redundancy
+   ┌─ tests/lints/model_ast_lints/needless_bool_warn.move:38:9
+   │
+38 │         if (x) { return false } else { return false }
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
+
+
+============ bytecode verification succeeded ========

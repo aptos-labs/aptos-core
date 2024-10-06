@@ -94,8 +94,10 @@ MOVE_CRATES="\
   -p move-bytecode-verifier\
   -p move-binary-format\
   -p move-compiler\
+  -p move-compiler-transactional-tests\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
+  -p move-ir-compiler-transactional-tests\
   -p move-prover-boogie-backend\
   -p move-prover\
   -p move-transactional-test-runner\
@@ -148,7 +150,7 @@ if [ ! -z "$CHECK" ]; then
 fi
 
 CARGO_OP_PARAMS="--profile $MOVE_PR_PROFILE"
-CARGO_NEXTEST_PARAMS="--profile $MOVE_PR_NEXTEST_PROFILE --cargo-profile $MOVE_PR_PROFILE"
+CARGO_NEXTEST_PARAMS="--profile $MOVE_PR_NEXTEST_PROFILE --cargo-profile $MOVE_PR_PROFILE $MOVE_PR_NEXTEST_ARGS"
 
 # Artifact generation needs to be run before testing as tests may depend on its result
 if [ ! -z "$GEN_ARTIFACTS" ]; then

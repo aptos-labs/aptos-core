@@ -5,9 +5,7 @@
 
 use crate::{
     common::NUM_STATE_SHARDS,
-    db_options::{
-        gen_state_kv_cfds, state_kv_db_column_families, state_kv_db_new_key_column_families,
-    },
+    db_options::gen_state_kv_cfds,
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -121,22 +119,26 @@ impl StateKvDb {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_kv_db__commit"])
             .start_timer();
-        THREAD_MANAGER.get_io_pool().scope(|s| {
+        {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["state_kv_db__commit_shards"])
                 .start_timer();
-            let mut batches = sharded_state_kv_batches.into_iter();
-            for shard_id in 0..NUM_STATE_SHARDS {
-                let state_kv_batch = batches
-                    .next()
-                    .expect("Not sufficient number of sharded state kv batches");
-                s.spawn(move |_| {
-                    // TODO(grao): Consider propagating the error instead of panic, if necessary.
-                    self.commit_single_shard(version, shard_id as u8, state_kv_batch)
-                        .unwrap_or_else(|err| panic!("Failed to commit shard {shard_id}: {err}."));
-                });
-            }
-        });
+            THREAD_MANAGER.get_io_pool().scope(|s| {
+                let mut batches = sharded_state_kv_batches.into_iter();
+                for shard_id in 0..NUM_STATE_SHARDS {
+                    let state_kv_batch = batches
+                        .next()
+                        .expect("Not sufficient number of sharded state kv batches");
+                    s.spawn(move |_| {
+                        // TODO(grao): Consider propagating the error instead of panic, if necessary.
+                        self.commit_single_shard(version, shard_id as u8, state_kv_batch)
+                            .unwrap_or_else(|err| {
+                                panic!("Failed to commit shard {shard_id}: {err}.")
+                            });
+                    });
+                }
+            });
+        }
 
         {
             let _timer = OTHER_TIMERS_SECONDS
@@ -264,11 +266,7 @@ impl StateKvDb {
                 &gen_rocksdb_options(state_kv_db_config, true),
                 path,
                 name,
-                if enable_sharding {
-                    state_kv_db_new_key_column_families()
-                } else {
-                    state_kv_db_column_families()
-                },
+                gen_state_kv_cfds(state_kv_db_config, enable_sharding),
             )?
         } else {
             DB::open_cf(

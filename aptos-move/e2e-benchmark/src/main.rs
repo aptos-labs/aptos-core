@@ -123,8 +123,8 @@ fn main() {
         (29000, EntryPoints::InitializeVectorPicture {
             length: 30 * 1024,
         }),
-        (4510, EntryPoints::VectorPicture { length: 30 * 1024 }),
-        (4400, EntryPoints::VectorPictureRead { length: 30 * 1024 }),
+        (5900, EntryPoints::VectorPicture { length: 30 * 1024 }),
+        (5870, EntryPoints::VectorPictureRead { length: 30 * 1024 }),
         (33580, EntryPoints::SmartTablePicture {
             length: 30 * 1024,
             num_points_per_txn: 200,

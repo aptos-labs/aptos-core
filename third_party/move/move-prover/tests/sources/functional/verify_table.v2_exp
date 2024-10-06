@@ -14,8 +14,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/verify_table.move:27: add_fail
    =         t = <redacted>
    =     at tests/sources/functional/verify_table.move:28: add_fail
-   =         return = <redacted>
-   =     at tests/sources/functional/verify_table.move:23: add_fail
    =         result = <redacted>
    =     at tests/sources/functional/verify_table.move:29: add_fail
    =     at tests/sources/functional/verify_table.move:31: add_fail (spec)

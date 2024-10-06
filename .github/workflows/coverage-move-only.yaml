@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 60
     runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: prepare move lang prover tooling.
         shell: bash
@@ -53,11 +53,11 @@ jobs:
       - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info --ignore-run-fail -p aptos-framework -p "move*"
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: lcov_unit
           path: lcov_unit.info
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: lcov_unit
       - name: Upload coverage to Codecov

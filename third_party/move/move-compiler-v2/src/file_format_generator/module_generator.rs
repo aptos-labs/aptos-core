@@ -122,17 +122,17 @@ impl ModuleGenerator {
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let options = module_env.env.get_extension::<Options>().expect("options");
         let language_version = options.language_version.unwrap_or_default();
+        let compiler_version = options.compiler_version.unwrap_or(CompilerVersion::V2_0);
         let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
-        let compilation_metadata =
-            CompilationMetadata::new(CompilerVersion::V2_0, language_version);
+        let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {
             key: COMPILATION_METADATA_KEY.to_vec(),
             value: bcs::to_bytes(&compilation_metadata)
                 .expect("Serialization of CompilationMetadata should succeed"),
         };
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_NEXT,
+            version: file_format_common::VERSION_MAX,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
             metadata: vec![metadata],
             ..Default::default()
@@ -277,7 +277,13 @@ impl ModuleGenerator {
         self.source_map
             .add_struct_field_mapping(struct_def_idx, variant_idx, ctx.env.to_ir_loc(field_loc))
             .expect(SOURCE_MAP_OK);
-        let name = self.name_index(ctx, field_loc, field_env.get_name());
+        let mut field_symbol = field_env.get_name();
+        let field_name = ctx.symbol_to_str(field_symbol);
+        // Append `_` if this is a positional field (digits), as the binary format expects proper identifiers
+        if field_name.starts_with(|c: char| c.is_ascii_digit()) {
+            field_symbol = ctx.env.symbol_pool().make(&format!("_{}", field_name));
+        }
+        let name = self.name_index(ctx, field_loc, field_symbol);
         let signature =
             FF::TypeSignature(self.signature_token(ctx, field_loc, &field_env.get_type()));
         FF::FieldDefinition { name, signature }
@@ -1095,8 +1101,8 @@ impl<'env> ModuleContext<'env> {
                 if *mid == fun.module_env.get_id() =>
                     {
                         result.insert(*sid);
-                    },
-                _ => {},
+                    }
+                _ => {}
             }
         }
         result

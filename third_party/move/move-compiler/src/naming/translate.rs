@@ -678,7 +678,7 @@ fn struct_def(
 fn struct_fields(context: &mut Context, _loc: Loc, elayout: E::StructLayout) -> N::StructFields {
     match elayout {
         E::StructLayout::Native(loc) => N::StructFields::Native(loc),
-        E::StructLayout::Singleton(em) => {
+        E::StructLayout::Singleton(em, _) => {
             N::StructFields::Defined(em.map(|_f, (idx, t)| (idx, type_(context, t))))
         },
         E::StructLayout::Variants(_) => {
@@ -942,7 +942,7 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::Loop(el) => NE::Loop(exp(context, *el)),
         EE::Block(seq) => NE::Block(sequence(context, seq)),
         EE::Lambda(args, body) => {
-            let bind_opt = bind_list(context, args);
+            let bind_opt = bind_typed_list(context, args);
             match bind_opt {
                 None => {
                     assert!(context.env.has_errors());
@@ -1043,6 +1043,15 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
                 ));
             }
             let nes = call_args(context, rhs);
+            if nes.value.len() == 1 {
+                context.env.add_diag(diag!(
+                    Syntax::UnsupportedLanguageItem,
+                    (
+                        mloc,
+                        "single-parameter assert! macro not supported by this compiler"
+                    )
+                ));
+            }
             NE::Builtin(sp(mloc, BF::Assert(true)), nes)
         },
         EE::Call(sp!(mloc, _), CallKind::Receiver, ..) => {
@@ -1107,8 +1116,8 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
             assert!(context.env.has_errors());
             NE::UnresolvedError
         },
-        // Matches variants only allowed in Move 2
-        EE::Match(..) => {
+        // Variants only allowed in Move 2
+        EE::Match(..) | EE::Test(..) => {
             panic!("ICE unexpected Move 2 construct")
         },
         // Matches variants only allowed in specs (we handle the allowed ones above)
@@ -1163,7 +1172,8 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
                 NL::Var(v)
             }
         },
-        EL::Unpack(tn, etys_opt, efields) => {
+        EL::Unpack(tn, etys_opt, efields, dotdot) => {
+            assert!(dotdot.is_none(), "\"..\" syntax only supported in Move 2");
             let msg = match case {
                 C::Bind => "deconstructing binding",
                 C::Assign => "deconstructing assignment",
@@ -1181,6 +1191,7 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
                 nfields.expect("ICE fields were already unique"),
             )
         },
+        EL::PositionalUnpack(_, _, _) => panic!("positional fields only allowed in v2"),
         EL::Var(_, _) => panic!("unexpected specification construct"),
     };
     Some(sp(loc, nl_))
@@ -1188,6 +1199,10 @@ fn lvalue(context: &mut Context, case: LValueCase, sp!(loc, l_): E::LValue) -> O
 
 fn bind_list(context: &mut Context, ls: E::LValueList) -> Option<N::LValueList> {
     lvalue_list(context, LValueCase::Bind, ls)
+}
+
+fn bind_typed_list(context: &mut Context, ls: E::TypedLValueList) -> Option<N::LValueList> {
+    typed_lvalue_list(context, ls)
 }
 
 fn assign_list(context: &mut Context, ls: E::LValueList) -> Option<N::LValueList> {
@@ -1203,6 +1218,30 @@ fn lvalue_list(
         loc,
         b_.into_iter()
             .map(|inner| lvalue(context, case, inner))
+            .collect::<Option<_>>()?,
+    ))
+}
+
+fn typed_lvalue_list(
+    context: &mut Context,
+    sp!(loc, b_): E::TypedLValueList,
+) -> Option<N::LValueList> {
+    let case = LValueCase::Bind;
+    Some(sp(
+        loc,
+        b_.into_iter()
+            .map(|sp!(loc, E::TypedLValue_(inner, opt_ty))| {
+                if opt_ty.is_some() {
+                    context.env.add_diag(diag!(
+                        Syntax::UnsupportedLanguageItem,
+                        (
+                            loc,
+                            "Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond"
+                        )
+                    ))
+                }
+                lvalue(context, case, inner)
+            })
             .collect::<Option<_>>()?,
     ))
 }

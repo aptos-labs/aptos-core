@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
@@ -23,9 +23,9 @@ class Flow(Flag):
     # Tests that are run manually when using a smaller representative mode.
     # (i.e. for measuring speed of the machine)
     REPRESENTATIVE = auto()
-    # Tests used for previewnet evaluation
+    # Tests used for mainnet hardware evaluation
     MAINNET = auto()
-    # Tests used for previewnet evaluation
+    # Tests used for mainnet hardware evaluation
     MAINNET_LARGE_DB = auto()
     # Tests for Agg V2 performance
     AGG_V2 = auto()
@@ -64,7 +64,7 @@ NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v5"
+CODE_PERF_VERSION = "v6"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
@@ -87,6 +87,13 @@ if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
 else:
     DB_CONFIG_FLAGS = "--enable-storage-sharding"
+
+if os.environ.get("DISABLE_FA_APT"):
+    FEATURE_FLAGS = ""
+    SKIP_NATIVE = False
+else:
+    FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE"
+    SKIP_NATIVE = True
 
 if os.environ.get("ENABLE_PRUNER"):
     DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"
@@ -139,50 +146,50 @@ CALIBRATED_TPS_INDEX = -1
 CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	min_ratio	max_ratio	median
+# (or if from log:
+#    transaction_type module_working_set_size executor_type  block_size expected_tps tps
+# )
 CALIBRATION = """
-no-op	1	VM	0.896	1.057	41218.8
-no-op	1000	VM	0.902	1.030	22359.4
-coin-transfer	1	VM	0.891	1.056	28721.7
-coin-transfer	1	native	0.848	1.157	40469.1
-account-generation	1	VM	0.888	1.030	22359.4
-account-generation	1	native	0.717	1.153	33440.0
-account-resource32-b	1	VM	0.934	1.074	36855.5
-modify-global-resource	1	VM	0.940	1.033	3082.9
-modify-global-resource	10	VM	0.918	1.017	17905.3
-publish-package	1	VM	0.950	1.040	143.9
-mix_publish_transfer	1	VM	0.967	1.163	2173.8
-batch100-transfer	1	VM	0.859	1.021	667.8
-batch100-transfer	1	native	0.784	1.222	1862.1
-vector-picture30k	1	VM	0.935	1.023	138.5
-vector-picture30k	20	VM	0.819	1.038	1347.9
-smart-table-picture30-k-with200-change	1	VM	0.959	1.054	21.4
-smart-table-picture30-k-with200-change	20	VM	0.923	1.057	182.6
-modify-global-resource-agg-v2	1	VM	0.893	1.030	39728.8
-modify-global-flag-agg-v2	1	VM	0.972	1.022	6111.4
-modify-global-bounded-agg-v2	1	VM	0.926	1.103	10494.1
-modify-global-milestone-agg-v2	1	VM	0.912	1.030	29251.9
-resource-groups-global-write-tag1-kb	1	VM	0.886	1.061	9389.9
-resource-groups-global-write-and-read-tag1-kb	1	VM	0.882	1.018	6446.3
-resource-groups-sender-write-tag1-kb	1	VM	0.841	1.163	22359.4
-resource-groups-sender-multi-change1-kb	1	VM	0.826	1.107	17562.1
-token-v1ft-mint-and-transfer	1	VM	0.892	1.027	1347.9
-token-v1ft-mint-and-transfer	20	VM	0.889	1.021	12114.8
-token-v1nft-mint-and-transfer-sequential	1	VM	0.899	1.027	812.9
-token-v1nft-mint-and-transfer-sequential	20	VM	0.888	1.015	7881.5
-coin-init-and-mint	1	VM	0.870	1.024	30932.7
-coin-init-and-mint	20	VM	0.866	1.055	25786.3
-fungible-asset-mint	1	VM	0.873	1.033	25331.5
-fungible-asset-mint	20	VM	0.887	1.055	22763.8
-no-op5-signers	1	VM	0.904	1.038	41978.3
-token-v2-ambassador-mint	1	VM	0.869	1.025	17905.3
-token-v2-ambassador-mint	20	VM	0.878	1.024	17562.1
-liquidity-pool-swap	1	VM	0.931	1.032	975.7
-liquidity-pool-swap	20	VM	0.918	1.009	8359.6
-liquidity-pool-swap-stable	1	VM	0.901	1.016	957.5
-liquidity-pool-swap-stable	20	VM	0.925	1.022	8035.3
-deserialize-u256	1	VM	0.899	1.036	39728.8
-no-op-fee-payer	1	VM	0.922	1.022	2392.0
-no-op-fee-payer	50	VM	0.898	1.028	27699.5
+no-op	1	VM	0.822	1.047	38275.3
+no-op	1000	VM	0.775	1.033	22763.8
+apt-fa-transfer	1	VM	0.770	1.059	27699.5
+account-generation	1	VM	0.735	1.026	22763.8
+account-resource32-b	1	VM	0.718	1.049	33440.0
+modify-global-resource	1	VM	0.868	1.019	2819.9
+modify-global-resource	10	VM	0.877	1.018	17562.1
+publish-package	1	VM	0.944	1.037	143.9
+mix_publish_transfer	1	VM	0.953	1.124	2131.6
+batch100-transfer	1	VM	0.768	1.027	770.7
+vector-picture30k	1	VM	0.944	1.036	112.2
+vector-picture30k	20	VM	0.835	1.020	1140.7
+smart-table-picture30-k-with200-change	1	VM	0.955	1.051	21.8
+smart-table-picture30-k-with200-change	20	VM	0.926	1.065	185.9
+modify-global-resource-agg-v2	1	VM	0.792	1.060	33440.0
+modify-global-flag-agg-v2	1	VM	0.921	1.014	5199.3
+modify-global-bounded-agg-v2	1	VM	0.906	1.103	8866.4
+modify-global-milestone-agg-v2	1	VM	0.804	1.033	27699.5
+resource-groups-global-write-tag1-kb	1	VM	0.915	1.074	9039.0
+resource-groups-global-write-and-read-tag1-kb	1	VM	0.938	1.016	6221.0
+resource-groups-sender-write-tag1-kb	1	VM	0.835	1.134	19680.6
+resource-groups-sender-multi-change1-kb	1	VM	0.896	1.071	16553.6
+token-v1ft-mint-and-transfer	1	VM	0.894	1.029	1276.2
+token-v1ft-mint-and-transfer	20	VM	0.897	1.024	11901.1
+token-v1nft-mint-and-transfer-sequential	1	VM	0.923	1.025	798.6
+token-v1nft-mint-and-transfer-sequential	20	VM	0.873	1.024	7732.8
+coin-init-and-mint	1	VM	0.779	1.055	29251.9
+coin-init-and-mint	20	VM	0.827	1.077	24885.0
+fungible-asset-mint	1	VM	0.773	1.023	23174.5
+fungible-asset-mint	20	VM	0.803	1.047	21567.9
+no-op5-signers	1	VM	0.854	1.078	37561.3
+token-v2-ambassador-mint	1	VM	0.848	1.022	16553.6
+token-v2-ambassador-mint	20	VM	0.811	1.044	16228.8
+liquidity-pool-swap	1	VM	0.922	1.027	975.7
+liquidity-pool-swap	20	VM	0.881	1.014	8359.6
+liquidity-pool-swap-stable	1	VM	0.890	1.013	957.5
+liquidity-pool-swap-stable	20	VM	0.916	1.019	8035.3
+deserialize-u256	1	VM	0.842	1.060	37561.3
+no-op-fee-payer	1	VM	0.908	1.029	2131.6
+no-op-fee-payer	50	VM	0.890	1.038	27205.9
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
@@ -191,8 +198,8 @@ no-op-fee-payer	50	VM	0.898	1.028	27699.5
 TESTS = [
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("account-resource32-b"), included_in=Flow.CONTINUOUS),
@@ -200,7 +207,7 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("mix_publish_transfer"), key_extra=RunGroupKeyExtra(
-        transaction_type_override="publish-package coin-transfer",
+        transaction_type_override="publish-package apt-fa-transfer",
         transaction_weights_override="1 500",
     ), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
@@ -269,12 +276,12 @@ TESTS = [
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
 
     # setting separately for previewnet, as we run on a different number of cores.
-    RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer"), key_extra=RunGroupKeyExtra(smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=23000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=130 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
-    RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
+    RunGroupConfig(expected_tps=26000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("apt-fa-transfer"), key_extra=RunGroupKeyExtra(smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=20000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=140 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=15400 if NUM_ACCOUNTS < 5000000 else 6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    # RunGroupConfig(expected_tps=17000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
+    # RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
 ]
 # fmt: on
 
@@ -332,6 +339,7 @@ class RunResults:
     io_gps: float
     execution_gps: float
     gpt: float
+    storage_fee_pt: float
     output_bps: float
     fraction_in_execution: float
     fraction_of_execution_in_vm: float
@@ -369,6 +377,7 @@ def extract_run_results(
         io_gps = 0
         execution_gps = 0
         gpt = 0
+        storage_fee_pt = 0
         output_bps = 0
         fraction_in_execution = 0
         fraction_of_execution_in_vm = 0
@@ -386,6 +395,12 @@ def extract_run_results(
             get_only(re.findall(prefix + r" executionGPS: (\d+\.?\d*) gas/s", output))
         )
         gpt = float(get_only(re.findall(prefix + r" GPT: (\d+\.?\d*) gas/txn", output)))
+        storage_fee_pt = float(
+            get_only(
+                re.findall(prefix + r" Storage fee: (\-?\d+\.?\d*) octas/txn", output)
+            )
+        )
+
         output_bps = float(
             get_only(re.findall(prefix + r" output: (\d+\.?\d*) bytes/s", output))
         )
@@ -410,6 +425,7 @@ def extract_run_results(
         io_gps=io_gps,
         execution_gps=execution_gps,
         gpt=gpt,
+        storage_fee_pt=storage_fee_pt,
         output_bps=output_bps,
         fraction_in_execution=fraction_in_execution,
         fraction_of_execution_in_vm=fraction_of_execution_in_vm,
@@ -451,6 +467,7 @@ def print_table(
                 "io g/s",
                 "exe g/s",
                 "g/t",
+                "fee/t",
                 "out B/s",
             ]
         )
@@ -488,6 +505,7 @@ def print_table(
             row.append(int(round(result.single_node_result.io_gps)))
             row.append(int(round(result.single_node_result.execution_gps)))
             row.append(int(round(result.single_node_result.gpt)))
+            row.append(int(round(result.single_node_result.storage_fee_pt)))
             row.append(int(round(result.single_node_result.output_bps)))
         rows.append(row)
 
@@ -529,7 +547,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -551,12 +569,15 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         if SELECTED_FLOW not in test.included_in:
             continue
 
-        if test.key in calibrated_expected_tps:
-            expected_tps = calibrated_expected_tps[test.key]
-        else:
-            print(f"WARNING: Couldn't find {test.key} in calibration results")
-            assert test.expected_tps is not None, test
+        if SKIP_NATIVE and test.key.executor_type == "native":
+            continue
+
+        if test.expected_tps is not None:
+            print(f"WARNING: using uncalibrated TPS for {test.key}")
             expected_tps = test.expected_tps
+        else:
+            assert test.key in calibrated_expected_tps, test
+            expected_tps = calibrated_expected_tps[test.key]
         cur_block_size = int(min([expected_tps, MAX_BLOCK_SIZE]))
 
         print(f"Testing {test.key}")
@@ -589,7 +610,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             * (1 if test.key_extra.smaller_working_set else NUM_BLOCKS)
         )
 
-        common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{executor_type_str} {txn_emitter_prefix_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         number_of_threads_results = {}
 
@@ -671,6 +692,19 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 results,
                 by_levels=True,
                 single_field=("g/s", lambda r: int(round(r.gps))),
+            )
+            print_table(
+                results,
+                by_levels=False,
+                single_field=("gas/txn", lambda r: int(round(r.gpt))),
+            )
+            print_table(
+                results,
+                by_levels=False,
+                single_field=(
+                    "storage fee/txn",
+                    lambda r: int(round(r.storage_fee_pt)),
+                ),
             )
             print_table(
                 results,

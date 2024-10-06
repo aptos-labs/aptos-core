@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: cannot move local `r` since it is still in use
+   ┌─ tests/more-v1/translated_ir_tests/move/commands/join_failure.move:8:22
+   │
+ 8 │             R{ f } = move r;
+   │                      ^^^^^^ attempted to move here
+   ·
+13 │         R{ f: _ } = move r;
+   │                     ------ used here

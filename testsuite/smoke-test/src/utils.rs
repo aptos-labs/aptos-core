@@ -3,20 +3,75 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib;
+use aptos_config::{
+    config::{NodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
+    network_id::NetworkId,
+};
 use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{Client as RestClient, Client};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
+use aptos_types::{
+    network_address::{NetworkAddress, Protocol},
+    on_chain_config::{OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig},
+};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use rand::random;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, net::Ipv4Addr, sync::Arc, time::Duration};
 
 pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
 pub const MAX_CONNECTIVITY_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to gain connectivity
 pub const MAX_HEALTHY_WAIT_SECS: u64 = 120; // The max time we'll wait for nodes to become healthy
+
+pub fn add_node_to_seeds(
+    dest_config: &mut NodeConfig,
+    seed_config: &NodeConfig,
+    network_id: NetworkId,
+    peer_role: PeerRole,
+) {
+    let dest_network_config = dest_config
+        .full_node_networks
+        .iter_mut()
+        .find(|network| network.network_id == network_id)
+        .unwrap();
+    let seed_network_config = seed_config
+        .full_node_networks
+        .iter()
+        .find(|network| network.network_id == network_id)
+        .unwrap();
+
+    let seed_peer_id = seed_network_config.peer_id();
+    let seed_key = seed_network_config.identity_key().public_key();
+
+    let seed_peer = if peer_role != PeerRole::Downstream {
+        // For upstreams, we know the address, but so don't duplicate the keys in the config (lazy way)
+        // TODO: This is ridiculous, we need a better way to manipulate these `NetworkAddress`s
+        let address = seed_network_config.listen_address.clone();
+        let port_protocol = address
+            .as_slice()
+            .iter()
+            .find(|protocol| matches!(protocol, Protocol::Tcp(_)))
+            .unwrap();
+        let address = NetworkAddress::from_protocols(vec![
+            Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)),
+            port_protocol.clone(),
+            Protocol::NoiseIK(seed_key),
+            Protocol::Handshake(HANDSHAKE_VERSION),
+        ])
+        .unwrap();
+
+        Peer::new(vec![address], HashSet::new(), peer_role)
+    } else {
+        // For downstreams, we don't know the address, but we know the keys
+        let mut seed_keys = HashSet::new();
+        seed_keys.insert(seed_key);
+        Peer::new(vec![], seed_keys, peer_role)
+    };
+
+    dest_network_config.seeds.insert(seed_peer_id, seed_peer);
+}
 
 pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
     let mut info = swarm.aptos_public_info();
@@ -218,6 +273,14 @@ pub async fn get_current_version(rest_client: &RestClient) -> u64 {
         .unwrap()
         .inner()
         .version
+}
+
+pub async fn get_on_chain_resource<T: OnChainConfig>(rest_client: &Client) -> T {
+    let maybe_response = rest_client
+        .get_account_resource_bcs::<T>(CORE_CODE_ADDRESS, T::struct_tag().to_string().as_str())
+        .await;
+    let response = maybe_response.unwrap();
+    response.into_inner()
 }
 
 #[cfg(test)]

@@ -265,7 +265,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
         if detailed_counters {
             if let Ok(size) = bcs::serialized_size(output.get_transaction_output()) {
-                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE
+                metrics::PROCESSED_TXNS_OUTPUT_SIZE
                     .with_label_values(&[process_type])
                     .observe(size as f64);
             }
@@ -301,18 +301,23 @@ pub fn update_counters_for_processed_chunk<T, O>(
                 ),
             },
             TransactionStatus::Discard(discard_status_code) => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(15)),
-                    warn!(
-                        "Txn being discarded is {:?} with status code {:?}",
-                        txn, discard_status_code
-                    )
-                );
                 (
                     // Specialize duplicate txns for alerts
                     if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_OLD {
                         "discard_sequence_number_too_old"
+                    } else if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_NEW {
+                        "discard_sequence_number_too_new"
+                    } else if *discard_status_code == StatusCode::TRANSACTION_EXPIRED {
+                        "discard_transaction_expired"
                     } else {
+                        // Only log if it is an interesting discard
+                        sample!(
+                            SampleRate::Duration(Duration::from_secs(15)),
+                            warn!(
+                                "[sampled] Txn being discarded is {:?} with status code {:?}",
+                                txn, discard_status_code
+                            )
+                        );
                         "discard"
                     },
                     "error_code",
@@ -337,12 +342,12 @@ pub fn update_counters_for_processed_chunk<T, O>(
             None => "unknown",
         };
 
-        metrics::APTOS_PROCESSED_TXNS_COUNT
+        metrics::PROCESSED_TXNS_COUNT
             .with_label_values(&[process_type, kind, state])
             .inc();
 
         if !error_code.is_empty() {
-            metrics::APTOS_PROCESSED_FAILED_TXNS_REASON_COUNT
+            metrics::PROCESSED_FAILED_TXNS_REASON_COUNT
                 .with_label_values(&[
                     detailed_counters_label,
                     process_type,
@@ -361,20 +366,20 @@ pub fn update_counters_for_processed_chunk<T, O>(
                     match account_authenticator {
                         AccountAuthenticator::Ed25519 { .. } => {
                             signature_count += 1;
-                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                            metrics::PROCESSED_TXNS_AUTHENTICATOR
                                 .with_label_values(&[process_type, "Ed25519"])
                                 .inc();
                         },
                         AccountAuthenticator::MultiEd25519 { signature, .. } => {
                             let count = signature.signatures().len();
                             signature_count += count;
-                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                            metrics::PROCESSED_TXNS_AUTHENTICATOR
                                 .with_label_values(&[process_type, "Ed25519_in_MultiEd25519"])
                                 .inc_by(count as u64);
                         },
                         AccountAuthenticator::SingleKey { authenticator } => {
                             signature_count += 1;
-                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                            metrics::PROCESSED_TXNS_AUTHENTICATOR
                                 .with_label_values(&[
                                     process_type,
                                     &format!("{}_in_SingleKey", authenticator.signature().name()),
@@ -384,7 +389,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
                         AccountAuthenticator::MultiKey { authenticator } => {
                             for (_, signature) in authenticator.signatures() {
                                 signature_count += 1;
-                                metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                metrics::PROCESSED_TXNS_AUTHENTICATOR
                                     .with_label_values(&[
                                         process_type,
                                         &format!("{}_in_MultiKey", signature.name()),
@@ -392,27 +397,32 @@ pub fn update_counters_for_processed_chunk<T, O>(
                                     .inc();
                             }
                         },
+                        AccountAuthenticator::NoAccountAuthenticator => {
+                            metrics::PROCESSED_TXNS_AUTHENTICATOR
+                                .with_label_values(&[process_type, "NoAccountAuthenticator"])
+                                .inc();
+                        },
                     };
                 }
 
-                metrics::APTOS_PROCESSED_TXNS_NUM_AUTHENTICATORS
+                metrics::PROCESSED_TXNS_NUM_AUTHENTICATORS
                     .with_label_values(&[process_type])
                     .observe(signature_count as f64);
             }
 
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
+                    metrics::PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "script", state])
                         .inc();
                 },
                 aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
+                    metrics::PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "function", state])
                         .inc();
 
                     let is_core = function.module().address() == &CORE_CODE_ADDRESS;
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_MODULE
+                    metrics::PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_MODULE
                         .with_label_values(&[
                             detailed_counters_label,
                             process_type,
@@ -428,7 +438,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
                         ])
                         .inc();
                     if is_core && detailed_counters {
-                        metrics::APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_CORE_METHOD
+                        metrics::PROCESSED_USER_TXNS_ENTRY_FUNCTION_BY_CORE_METHOD
                             .with_label_values(&[
                                 process_type,
                                 function.module().name().as_str(),
@@ -439,14 +449,14 @@ pub fn update_counters_for_processed_chunk<T, O>(
                     }
                 },
                 aptos_types::transaction::TransactionPayload::Multisig(_) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
+                    metrics::PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "multisig", state])
                         .inc();
                 },
 
                 // Deprecated.
                 aptos_types::transaction::TransactionPayload::ModuleBundle(_) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
+                    metrics::PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "deprecated_module_bundle", state])
                         .inc();
                 },
@@ -465,7 +475,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
                 ),
                 ContractEvent::V2(_v2) => (false, "event".to_string()),
             };
-            metrics::APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS
+            metrics::PROCESSED_USER_TXNS_CORE_EVENTS
                 .with_label_values(&[
                     detailed_counters_label,
                     process_type,

@@ -163,7 +163,7 @@ module aptos_framework::account {
     const EACCOUNT_ALREADY_USED: u64 = 16;
     /// Offerer address doesn't exist
     const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 = 17;
-    /// The specified rotation capablity offer does not exist at the specified offerer address
+    /// The specified rotation capability offer does not exist at the specified offerer address
     const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
     // The signer capability is not offered to any address
     const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
@@ -310,7 +310,7 @@ module aptos_framework::account {
     /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
     /// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
     /// `OriginatingAddress[new_addr_a]` -> `addr_a`
-    /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+    /// Alice has had a bad day: her laptop blew up and she needs to reset her account on a new one.
     /// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
     ///
     /// But Bob likes to mess with Alice.
@@ -517,7 +517,7 @@ module aptos_framework::account {
     public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
         assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let addr = signer::address_of(account);
-        let account_resource = borrow_global_mut<Account>(addr);
+        let account_resource = borrow_global<Account>(addr);
         assert!(
             option::contains(&account_resource.rotation_capability_offer.for, &to_be_revoked_address),
             error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
@@ -587,7 +587,7 @@ module aptos_framework::account {
     public entry fun revoke_signer_capability(account: &signer, to_be_revoked_address: address) acquires Account {
         assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let addr = signer::address_of(account);
-        let account_resource = borrow_global_mut<Account>(addr);
+        let account_resource = borrow_global<Account>(addr);
         assert!(
             option::contains(&account_resource.signer_capability_offer.for, &to_be_revoked_address),
             error::not_found(ENO_SUCH_SIGNER_CAPABILITY)
@@ -842,7 +842,7 @@ module aptos_framework::account {
         signed_message_bytes: vector<u8>,
         message: T,
     ) acquires Account {
-        let account_resource = borrow_global_mut<Account>(account);
+        let account_resource = borrow_global<Account>(account);
         // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
         if (account_scheme == ED25519_SCHEME) {
             let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key);

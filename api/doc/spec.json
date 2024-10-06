@@ -13968,6 +13968,9 @@
           },
           {
             "$ref": "#/components/schemas/AccountSignature_MultiKeySignature"
+          },
+          {
+            "$ref": "#/components/schemas/AccountSignature_NoAccountSignature"
           }
         ],
         "discriminator": {
@@ -13976,7 +13979,8 @@
             "ed25519_signature": "#/components/schemas/AccountSignature_Ed25519Signature",
             "multi_ed25519_signature": "#/components/schemas/AccountSignature_MultiEd25519Signature",
             "single_key_signature": "#/components/schemas/AccountSignature_SingleKeySignature",
-            "multi_key_signature": "#/components/schemas/AccountSignature_MultiKeySignature"
+            "multi_key_signature": "#/components/schemas/AccountSignature_MultiKeySignature",
+            "no_account_signature": "#/components/schemas/AccountSignature_NoAccountSignature"
           }
         }
       },
@@ -14043,6 +14047,28 @@
           },
           {
             "$ref": "#/components/schemas/MultiKeySignature"
+          }
+        ]
+      },
+      "AccountSignature_NoAccountSignature": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "no_account_signature"
+                ],
+                "example": "no_account_signature"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/NoAccountSignature"
           }
         ]
       },
@@ -14243,6 +14269,79 @@
           }
         }
       },
+      "BlockMetadataExtension": {
+        "type": "object",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty"
+          },
+          {
+            "$ref": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "v0": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty",
+            "v1": "#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness"
+          }
+        }
+      },
+      "BlockMetadataExtensionEmpty": {
+        "type": "object"
+      },
+      "BlockMetadataExtensionRandomness": {
+        "type": "object",
+        "properties": {
+          "randomness": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
+      "BlockMetadataExtension_BlockMetadataExtensionEmpty": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "v0"
+                ],
+                "example": "v0"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/BlockMetadataExtensionEmpty"
+          }
+        ]
+      },
+      "BlockMetadataExtension_BlockMetadataExtensionRandomness": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "v1"
+                ],
+                "example": "v1"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/BlockMetadataExtensionRandomness"
+          }
+        ]
+      },
       "BlockMetadataTransaction": {
         "type": "object",
         "description": "A block metadata transaction\n\nThis signifies the beginning of a block, and contains information\nabout the specific block",
@@ -14339,6 +14438,17 @@
           },
           "timestamp": {
             "$ref": "#/components/schemas/U64"
+          },
+          "block_metadata_extension": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BlockMetadataExtension"
+              },
+              {
+                "description": "If some, it means the internal txn type is `aptos_types::transaction::Transaction::BlockMetadataExt`.\nOtherwise, it is `aptos_types::transaction::Transaction::BlockMetadata`.\n\nNOTE: we could have introduced a new APT txn type to represent the corresponding internal type,\nbut that is a breaking change to the ecosystem.\n\nNOTE: `oai` does not support `flatten` together with `skip_serializing_if`.",
+                "default": null
+              }
+            ]
           }
         }
       },
@@ -14752,6 +14862,17 @@
           },
           "multi_sig": {
             "$ref": "#/components/schemas/ExportedAggregateSignature"
+          }
+        }
+      },
+      "FederatedKeyless": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -15282,6 +15403,7 @@
         "required": [
           "name",
           "is_native",
+          "is_event",
           "abilities",
           "generic_type_params",
           "fields"
@@ -15293,6 +15415,10 @@
           "is_native": {
             "type": "boolean",
             "description": "Whether the struct is a native struct of Move"
+          },
+          "is_event": {
+            "type": "boolean",
+            "description": "Whether the struct is marked with the #[event] annotation"
           },
           "abilities": {
             "type": "array",
@@ -15566,6 +15692,10 @@
           }
         ]
       },
+      "NoAccountSignature": {
+        "type": "object",
+        "description": "A placeholder to represent the absence of account signature"
+      },
       "PendingTransaction": {
         "type": "object",
         "description": "A transaction waiting in mempool",
@@ -15619,6 +15749,9 @@
           },
           {
             "$ref": "#/components/schemas/PublicKey_Keyless"
+          },
+          {
+            "$ref": "#/components/schemas/PublicKey_FederatedKeyless"
           }
         ],
         "discriminator": {
@@ -15627,7 +15760,8 @@
             "ed25519": "#/components/schemas/PublicKey_Ed25519",
             "secp256k1_ecdsa": "#/components/schemas/PublicKey_Secp256k1Ecdsa",
             "secp256r1_ecdsa": "#/components/schemas/PublicKey_Secp256r1Ecdsa",
-            "keyless": "#/components/schemas/PublicKey_Keyless"
+            "keyless": "#/components/schemas/PublicKey_Keyless",
+            "federated_keyless": "#/components/schemas/PublicKey_FederatedKeyless"
           }
         }
       },
@@ -15650,6 +15784,28 @@
           },
           {
             "$ref": "#/components/schemas/Ed25519"
+          }
+        ]
+      },
+      "PublicKey_FederatedKeyless": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "federated_keyless"
+                ],
+                "example": "federated_keyless"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/FederatedKeyless"
           }
         ]
       },

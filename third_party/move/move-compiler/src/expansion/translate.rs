@@ -9,7 +9,10 @@ use crate::{
     diagnostics::{codes::DeprecatedItem, Diagnostic},
     expansion::{
         aliases::{AliasMap, AliasSet},
-        ast::{self as E, Address, Fields, ModuleAccess_, ModuleIdent, ModuleIdent_, SpecId},
+        ast::{
+            self as E, Address, Fields, LValueOrDotDot_, LValue_, ModuleAccess_, ModuleIdent,
+            ModuleIdent_, SequenceItem_, SpecId,
+        },
         byte_string, hex_string,
     },
     parser::ast::{
@@ -1424,8 +1427,8 @@ fn struct_layout(
 ) -> E::StructLayout {
     match parsed_layout {
         P::StructLayout::Native(loc) => E::StructLayout::Native(loc),
-        P::StructLayout::Singleton(fields) => {
-            E::StructLayout::Singleton(struct_fields(context, fields))
+        P::StructLayout::Singleton(fields, is_positional) => {
+            E::StructLayout::Singleton(struct_fields(context, fields), is_positional)
         },
         P::StructLayout::Variants(variants) => {
             let mut previous_variants = BTreeMap::new();
@@ -1461,6 +1464,7 @@ fn struct_layout(
                             loc: v.loc,
                             name: v.name,
                             fields: struct_fields(context, v.fields),
+                            is_positional: v.is_positional,
                         }
                     })
                     .collect(),
@@ -2611,10 +2615,10 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         PE::Loop(ploop) => EE::Loop(exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
         PE::Lambda(pbs, pe) => {
-            let bs_opt = bind_list(context, pbs);
+            let tbs_opt = typed_bind_list(context, pbs);
             let e = exp_(context, *pe);
-            match bs_opt {
-                Some(bs) => EE::Lambda(bs, Box::new(e)),
+            match tbs_opt {
+                Some(tbs) => EE::Lambda(tbs, Box::new(e)),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
@@ -2650,7 +2654,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             EE::ExpList(exps(context, pes))
         },
 
-        PE::Assign(lvalue, rhs) => {
+        PE::Assign(lvalue, op_opt, rhs) => {
             let l_opt = lvalues(context, *lvalue);
             let er = exp(context, *rhs);
             match l_opt {
@@ -2658,9 +2662,101 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
                 },
-                Some(LValue::Assigns(al)) => EE::Assign(al, er),
-                Some(LValue::Mutate(el)) => EE::Mutate(el, er),
-                Some(LValue::FieldMutate(edotted)) => EE::FieldMutate(edotted, er),
+                Some(LValue::Assigns(al)) => match op_opt {
+                    Some(op) => {
+                        if al.value.len() == 1 {
+                            match &al.value[0] {
+                                // x += e (similarly for other binary operators)
+                                // =>
+                                // { let t = e; x = x + t; }
+                                sp!(var_loc, LValue_::Var(module_access, ty_opt)) => {
+                                    let x = sp(
+                                        *var_loc,
+                                        EE::Name(module_access.clone(), ty_opt.clone()),
+                                    );
+                                    // t, let t = e;
+                                    let (t, bind) =
+                                        let_symbol_eq_exp(er.loc, Symbol::from("$t"), *er);
+                                    // x + t;
+                                    let rhs_expanded =
+                                        sp(loc, EE::BinopExp(Box::new(x), op, Box::new(t)));
+                                    // x = x + t;
+                                    let assign = sp(loc, EE::Assign(al, Box::new(rhs_expanded)));
+                                    // { let t = e; x = x + t; }
+                                    let sequence =
+                                        VecDeque::from([bind, sp(loc, SequenceItem_::Seq(assign))]);
+                                    EE::Block(sequence)
+                                },
+                                _ => {
+                                    context.env.add_diag(diag!(Syntax::InvalidLValue, (loc, "Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment")));
+                                    EE::UnresolvedError
+                                },
+                            }
+                        } else {
+                            context.env.add_diag(diag!(Syntax::InvalidLValue, (loc, "Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment")));
+                            EE::UnresolvedError
+                        }
+                    },
+                    None => EE::Assign(al, er),
+                },
+                Some(LValue::Mutate(el)) => {
+                    match op_opt {
+                        // *e1 += e2
+                        // =>
+                        // { let t2 = e2; let t1 = e1; *t1 = *t1 + t2 }
+                        Some(op) => {
+                            // t2, let t2 = e2;
+                            let (tmp2, bind2) = let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
+                            // t1, let t1 = e1;
+                            let (tmp1, bind1) =
+                                let_symbol_eq_exp(el.loc, Symbol::from("$t1"), match &el.value {
+                                    EE::Index(..) => sp(el.loc, EE::Borrow(true, el)),
+                                    _ => *el,
+                                });
+                            // *t1
+                            let deref_tmp1 = sp(loc, EE::Dereference(Box::new(tmp1.clone())));
+                            // *t1 + t2
+                            let rhs_expanded =
+                                sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
+                            // *t1 = *t1 + t2
+                            let assign =
+                                sp(loc, EE::Mutate(Box::new(tmp1), Box::new(rhs_expanded)));
+                            // { let t2 = e2; let t1 = e1; *t1 = *t1 + t2 }
+                            let sequence =
+                                VecDeque::from([bind2, bind1, sp(loc, SequenceItem_::Seq(assign))]);
+                            EE::Block(sequence)
+                        },
+                        None => EE::Mutate(el, er),
+                    }
+                },
+                Some(LValue::FieldMutate(edotted)) => match op_opt {
+                    // e1.f += e2
+                    // =>
+                    // { let t2 = e2; let t1 = &mut e1.f; *t1 = *t1 + t2 }
+                    Some(op) => {
+                        let lhs_loc = edotted.loc;
+                        // t2, let t2 = e2;
+                        let (tmp2, bind2) = let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
+                        // e1.f
+                        let e = sp(lhs_loc, EE::ExpDotted(edotted));
+                        // &mut e1.f
+                        let e_mut = sp(lhs_loc, EE::Borrow(true, Box::new(e)));
+                        // t1, let t1 = &mut e1.f;
+                        let (tmp1, bind1) = let_symbol_eq_exp(lhs_loc, Symbol::from("$t1"), e_mut);
+                        // *t1
+                        let deref_tmp1 = sp(loc, EE::Dereference(Box::new(tmp1.clone())));
+                        // *t1 + t2
+                        let rhs_expanded =
+                            sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
+                        // *t1 = *t1 + t2
+                        let assign = sp(loc, EE::Mutate(Box::new(tmp1), Box::new(rhs_expanded)));
+                        // { let t2 = e2; let t1 = &mut e1.f; *t1 = *t1 + t2 }
+                        let sequence =
+                            VecDeque::from([bind2, bind1, sp(loc, SequenceItem_::Seq(assign))]);
+                        EE::Block(sequence)
+                    },
+                    None => EE::FieldMutate(edotted, er),
+                },
             }
         },
         PE::Return(pe_opt) => {
@@ -2698,6 +2794,10 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             },
         },
         PE::Cast(e, ty) => EE::Cast(exp(context, *e), type_(context, ty)),
+        PE::Test(e, tys) => EE::Test(
+            exp(context, *e),
+            tys.into_iter().map(|ty| type_(context, ty)).collect(),
+        ),
         PE::Index(e, i) => {
             if context.env.flags().lang_v2() || context.in_spec_context {
                 EE::Index(exp(context, *e), exp(context, *i))
@@ -2878,6 +2978,24 @@ fn fields<T>(
 // LValues
 //**************************************************************************************************
 
+fn typed_bind_list(
+    context: &mut Context,
+    sp!(loc, pbs_): P::TypedBindList,
+) -> Option<E::TypedLValueList> {
+    let bs_: Option<Vec<E::TypedLValue>> = pbs_
+        .into_iter()
+        .map(|tpb| typed_bind(context, tpb))
+        .collect();
+    Some(sp(loc, bs_?))
+}
+
+fn typed_bind(context: &mut Context, sp!(loc, tpb_): P::TypedBind) -> Option<E::TypedLValue> {
+    let P::TypedBind_(pb, opt_type) = tpb_;
+    let b = bind(context, pb)?;
+    let ot = opt_type.map(|ty| type_(context, ty));
+    Some(sp(loc, E::TypedLValue_(b, ot)))
+}
+
 fn bind_list(context: &mut Context, sp!(loc, pbs_): P::BindList) -> Option<E::LValueList> {
     let bs_: Option<Vec<E::LValue>> = pbs_.into_iter().map(|pb| bind(context, pb)).collect();
     Some(sp(loc, bs_?))
@@ -2907,7 +3025,12 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                 && is_valid_struct_constant_or_schema_name(v.value().as_str())
             {
                 // Interpret as an unqualified module access
-                EL::Unpack(sp(v.loc(), ModuleAccess_::Name(v.0)), None, Fields::new())
+                EL::Unpack(
+                    sp(v.loc(), ModuleAccess_::Name(v.0)),
+                    None,
+                    Fields::new(),
+                    None,
+                )
             } else {
                 check_valid_local_name(context, &v);
                 EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
@@ -2922,12 +3045,62 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                 Some(DeprecatedItem::Struct),
             )?;
             let tys_opt = optional_types(context, ptys_opt);
-            let vfields: Option<Vec<(Field, E::LValue)>> = pfields
+            let mut dotdot = None;
+            let mut vfields = vec![];
+            for (i, pfield) in pfields.iter().enumerate() {
+                match &pfield.value {
+                    P::BindFieldOrDotDot_::FieldBind(field, pbind) => {
+                        let lval = bind(context, pbind.clone())?;
+                        vfields.push((*field, lval));
+                    },
+                    P::BindFieldOrDotDot_::DotDot => {
+                        if i != pfields.len() - 1 {
+                            context.env.add_diag(diag!(
+                                Syntax::UnexpectedToken,
+                                (pfield.loc, "`..` must be at the end in a named field list")
+                            ));
+                        } else {
+                            dotdot = Some(sp(pfield.loc, E::DotDot_));
+                        }
+                    },
+                }
+            }
+            let fields = fields(context, loc, "deconstruction binding", "binding", vfields);
+            EL::Unpack(tn, tys_opt, fields, dotdot)
+        },
+        PB::PositionalUnpack(ptn, ptys_opt, pargs) => {
+            let tn = name_access_chain(
+                context,
+                Access::ApplyPositional,
+                *ptn,
+                Some(DeprecatedItem::Struct),
+            )?;
+            let tys_opt = optional_types(context, ptys_opt);
+            let mut dot_seen = false;
+            let fields: Option<Vec<E::LValueOrDotDot>> = pargs
                 .into_iter()
-                .map(|(f, pb)| Some((f, bind(context, pb)?)))
+                .map(|pb_or_dotdot| {
+                    let sp!(loc, pb_or_dotdot_) = pb_or_dotdot;
+                    match pb_or_dotdot_ {
+                        P::BindOrDotDot_::Bind(pb) => {
+                            bind(context, pb).map(|b| sp(b.loc, LValueOrDotDot_::LValue(b)))
+                        },
+                        P::BindOrDotDot_::DotDot => {
+                            if dot_seen {
+                                context.env.add_diag(diag!(
+                                    Syntax::UnexpectedToken,
+                                    (loc, "there can be at most one `..` per struct or variant pattern")
+                                ));
+                                None
+                            } else {
+                                dot_seen = true;
+                                Some(sp(loc, LValueOrDotDot_::DotDot))
+                            }
+                        },
+                    }
+                })
                 .collect();
-            let fields = fields(context, loc, "deconstruction binding", "binding", vfields?);
-            EL::Unpack(tn, tys_opt, fields)
+            EL::PositionalUnpack(tn, tys_opt, Spanned::new(loc, fields?))
         },
     };
     Some(sp(loc, b_))
@@ -3037,7 +3210,9 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
             )?;
             let tys_opt = optional_types(context, ptys_opt);
             let efields = assign_unpack_fields(context, loc, pfields)?;
-            EL::Unpack(en, tys_opt, efields)
+            // we have not implemented .. in the LHS of an assignment
+            // and the `pfields` doesn't have a `..` in it, so we use `None` here
+            EL::Unpack(en, tys_opt, efields, None)
         },
         _ => {
             context.env.add_diag(diag!(
@@ -3169,7 +3344,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Lambda(ls, er) => {
             unbound_names_exp(unbound, er);
             // remove anything in `ls`
-            unbound_names_binds(unbound, ls);
+            unbound_names_typed_binds(unbound, ls);
         },
         EE::Quant(_, rs, trs, cr_opt, er) => {
             unbound_names_exp(unbound, er);
@@ -3193,6 +3368,7 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         | EE::UnaryExp(_, e)
         | EE::Borrow(_, e)
         | EE::Cast(e, _)
+        | EE::Test(e, _)
         | EE::Annotate(e, _) => unbound_names_exp(unbound, e),
         EE::FieldMutate(ed, er) => {
             unbound_names_exp(unbound, er);
@@ -3245,6 +3421,12 @@ fn unbound_names_binds(unbound: &mut UnboundNames, sp!(_, ls_): &E::LValueList) 
         .for_each(|l| unbound_names_bind(unbound, l))
 }
 
+fn unbound_names_typed_binds(unbound: &mut UnboundNames, sp!(_, ls_): &E::TypedLValueList) {
+    ls_.iter()
+        .rev()
+        .for_each(|sp!(_loc, E::TypedLValue_(l, _opt_ty))| unbound_names_bind(unbound, l))
+}
+
 fn unbound_names_binds_with_range(
     unbound: &mut UnboundNames,
     sp!(_, rs_): &E::LValueWithRangeList,
@@ -3265,9 +3447,24 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
         EL::Var(sp!(_, E::ModuleAccess_::ModuleAccess(..)), _) => {
             // Qualified vars are not considered in unbound set.
         },
-        EL::Unpack(_, _, efields) => efields
+        EL::Unpack(_, _, efields, _hasdotdot) => efields
             .iter()
             .for_each(|(_, _, (_, l))| unbound_names_bind(unbound, l)),
+        EL::PositionalUnpack(_, _, ls) => {
+            let loc = ls.loc;
+            let ls = ls
+                .value
+                .iter()
+                .filter_map(|l| {
+                    if let sp!(_, LValueOrDotDot_::LValue(l)) = l {
+                        Some(l.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            unbound_names_binds(unbound, &sp(loc, ls))
+        },
     }
 }
 
@@ -3286,9 +3483,24 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
         EL::Var(sp!(_, E::ModuleAccess_::ModuleAccess(..)), _) => {
             // Qualified vars are not considered in unbound set.
         },
-        EL::Unpack(_, _, efields) => efields
+        EL::Unpack(_, _, efields, _) => efields
             .iter()
             .for_each(|(_, _, (_, l))| unbound_names_assign(unbound, l)),
+        EL::PositionalUnpack(_, _, ls) => {
+            let loc = ls.loc;
+            let ls = ls
+                .value
+                .iter()
+                .filter_map(|l| {
+                    if let sp!(_, LValueOrDotDot_::LValue(l)) = l {
+                        Some(l.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            unbound_names_assigns(unbound, &sp(loc, ls))
+        },
     }
 }
 
@@ -3542,4 +3754,24 @@ fn restricted_name_error(case: NameCase, loc: Loc, restricted: &str) -> Diagnost
         restricted = restricted,
     );
     diag!(NameResolution::ReservedName, (loc, msg))
+}
+
+//**************************************************************************************************
+// Utility functions
+//**************************************************************************************************
+
+/// Returns expansion expressions `(t, let t = e)` where `t` is a variable named `symbol`
+fn let_symbol_eq_exp(loc: Loc, symbol: Symbol, e: E::Exp) -> (E::Exp, E::SequenceItem) {
+    // t
+    let tmp_name = sp(loc, symbol);
+    let mod_acc = ModuleAccess_::Name(tmp_name);
+    let tmp_ = E::Exp_::Name(sp(loc, mod_acc.clone()), None);
+    let tmp = sp(loc, tmp_);
+    // let t = e;
+    let lval_ = LValue_::Var(sp(loc, mod_acc), None);
+    let lval = sp(loc, lval_);
+    let lvals = sp(loc, vec![lval]);
+    let bind_ = SequenceItem_::Bind(lvals, e);
+    let bind = sp(loc, bind_);
+    (tmp, bind)
 }

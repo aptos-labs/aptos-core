@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/more-v1/locals/use_after_move_if.move:4:25
+  │
+4 │         if (cond) { _ = move x };
+  │                         ^^^^^^ attempted to move here
+5 │         let _ = move x + 1;
+  │                 ------ used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if.move:10:25
+   │
+10 │         if (cond) { _ = move x };
+   │                         ^^^^^^ attempted to move here
+11 │         let _ = x + 1;
+   │                 ----- used here
+
+error: cannot move local `x` since it is still in use
+   ┌─ tests/more-v1/locals/use_after_move_if.move:16:25
+   │
+16 │         if (cond) { _ = move x };
+   │                         ^^^^^^ attempted to move here
+17 │         let _ = &x;
+   │                 -- used here

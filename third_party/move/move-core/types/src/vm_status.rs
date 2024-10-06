@@ -565,7 +565,9 @@ pub enum StatusCode {
     SEQUENCE_NUMBER_TOO_BIG = 24,
     // The gas currency is not registered as a TransactionFee currency
     BAD_TRANSACTION_FEE_CURRENCY = 25,
-    // The feature requested is intended for a future Diem version instead of the current one
+    // DEPRECATED. The feature requested is intended for a future Diem version instead of the current
+    // This code is deprecated as it is discarded. Use the verification error code
+    // FEATURE_NOT_ENABLED instead.
     FEATURE_UNDER_GATING = 26,
     // The number of secondary signer addresses is different from the number of secondary
     // public keys provided.
@@ -587,6 +589,7 @@ pub enum StatusCode {
     GAS_PARAMS_MISSING = 38,
     REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS = 39,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH = 40,
+
     // Reserved error code for future use
     RESERVED_VALIDATION_ERROR_6 = 41,
     RESERVED_VALIDATION_ERROR_7 = 42,
@@ -729,12 +732,14 @@ pub enum StatusCode {
     TEST_VARIANT_TYPE_MISMATCH_ERROR = 1129,
     // A variant list is empty
     ZERO_VARIANTS_ERROR = 1130,
+    // A feature is not enabled.
+    FEATURE_NOT_ENABLED = 1131,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_2 = 1131,
-    RESERVED_VERIFICATION_ERROR_3 = 1132,
-    RESERVED_VERIFICATION_ERROR_4 = 1133,
-    RESERVED_VERIFICATION_ERROR_5 = 1134,
+    RESERVED_VERIFICATION_ERROR_2 = 1132,
+    RESERVED_VERIFICATION_ERROR_3 = 1133,
+    RESERVED_VERIFICATION_ERROR_4 = 1134,
+    RESERVED_VERIFICATION_ERROR_5 = 1135,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
@@ -758,11 +763,17 @@ pub enum StatusCode {
     TYPE_RESOLUTION_FAILURE = 2021,
     DUPLICATE_NATIVE_FUNCTION = 2022,
     // code invariant error while handling delayed materialization, should never happen,
-    // always indicates a code bug.
-    // Delayed materialization includes handling of Resource Groups and Delayed Fields.
-    // Unlike regular CODE_INVARIANT_ERROR, this is a signal to BlockSTM,
-    // which it might do something about (i.e. fallback to sequential execution)
-    DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR = 2023,
+    // always indicates a code bug. Delayed materialization includes handling of
+    // Resource Groups and Delayed Fields. Unlike regular CODE_INVARIANT_ERROR, this
+    // is a signal to BlockSTM, which it might do something about (i.e. fallback to
+    // sequential execution).
+    // Note: This status is created both from third_party (move) and block executor
+    // (aptos-move in the adapter). In the later case, it can now also represent more
+    // general invariant violations beyond delayed fields, due to the convenience of
+    // handling such issues with asserts (e.g. by falling back to sequential execution).
+    // TODO: can be audited and broken down into specific types, once implementation
+    // is also not duplicated.
+    DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR = 2023,
     // Speculative error means that there was an issue because of speculative
     // reads provided to the transaction, and the transaction needs to
     // be re-executed.

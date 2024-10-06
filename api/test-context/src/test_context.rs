@@ -10,7 +10,7 @@ use aptos_api_types::{
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{
-        NodeConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+        NodeConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     keys::ConfigKey,
@@ -40,10 +40,11 @@ use aptos_types::{
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
+    indexer::indexer_db_reader::IndexerReader,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction,
-        TransactionPayload, TransactionStatus,
+        TransactionPayload, TransactionStatus, Version,
     },
 };
 use aptos_vm::AptosVM;
@@ -53,6 +54,7 @@ use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
 use serde_json::{json, Value};
 use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use tokio::sync::watch::channel;
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
@@ -95,8 +97,17 @@ impl ApiSpecificConfig {
 
 pub fn new_test_context(
     test_name: String,
+    node_config: NodeConfig,
+    use_db_with_indexer: bool,
+) -> TestContext {
+    new_test_context_inner(test_name, node_config, use_db_with_indexer, None)
+}
+
+pub fn new_test_context_inner(
+    test_name: String,
     mut node_config: NodeConfig,
     use_db_with_indexer: bool,
+    end_version: Option<u64>,
 ) -> TestContext {
     // Speculative logging uses a global variable and when many instances use it together, they
     // panic, so we disable this to run tests.
@@ -118,32 +129,44 @@ pub fn new_test_context(
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let (validator_identity, _, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
-
+    let (sender, recver) = channel::<Version>(0);
     let (db, db_rw) = if use_db_with_indexer {
-        DbReaderWriter::wrap(AptosDB::new_for_test_with_indexer(
+        let mut aptos_db = AptosDB::new_for_test_with_indexer(
             &tmp_dir,
             node_config.storage.rocksdb_configs.enable_storage_sharding,
-        ))
+        );
+        if node_config
+            .indexer_db_config
+            .is_internal_indexer_db_enabled()
+        {
+            aptos_db.add_version_update_subscriber(sender).unwrap();
+        }
+        DbReaderWriter::wrap(aptos_db)
     } else {
-        DbReaderWriter::wrap(
-            AptosDB::open(
-                StorageDirPaths::from_path(&tmp_dir),
-                false,                       /* readonly */
-                NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-                RocksdbConfigs {
-                    enable_storage_sharding: node_config
-                        .storage
-                        .rocksdb_configs
-                        .enable_storage_sharding,
-                    ..Default::default()
-                },
-                false, /* indexer */
-                BUFFERED_STATE_TARGET_ITEMS,
-                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-                None,
-            )
-            .unwrap(),
+        let mut aptos_db = AptosDB::open(
+            StorageDirPaths::from_path(&tmp_dir),
+            false,                       /* readonly */
+            NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
+            RocksdbConfigs {
+                enable_storage_sharding: node_config
+                    .storage
+                    .rocksdb_configs
+                    .enable_storage_sharding,
+                ..Default::default()
+            },
+            false, /* indexer */
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
         )
+        .unwrap();
+        if node_config
+            .indexer_db_config
+            .is_internal_indexer_db_enabled()
+        {
+            aptos_db.add_version_update_subscriber(sender).unwrap();
+        }
+        DbReaderWriter::wrap(aptos_db)
     };
     let ret =
         db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
@@ -154,8 +177,12 @@ pub fn new_test_context(
     node_config
         .storage
         .set_data_dir(tmp_dir.path().to_path_buf());
-    let mock_indexer_service =
-        MockInternalIndexerDBService::new_for_test(db_rw.reader.clone(), &node_config);
+    let mock_indexer_service = MockInternalIndexerDBService::new_for_test(
+        db_rw.reader.clone(),
+        &node_config,
+        recver,
+        end_version,
+    );
 
     let context = Context::new(
         ChainId::test(),
@@ -167,8 +194,9 @@ pub fn new_test_context(
 
     // Configure the testing depending on which API version we're testing.
     let runtime_handle = tokio::runtime::Handle::current();
-    let poem_address = attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true)
-        .expect("Failed to attach poem to runtime");
+    let poem_address =
+        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+            .expect("Failed to attach poem to runtime");
     let api_specific_config = ApiSpecificConfig::V1(poem_address);
 
     TestContext::new(
@@ -425,6 +453,10 @@ impl TestContext {
         .await;
     }
 
+    pub fn get_indexer_reader(&self) -> Option<&Arc<dyn IndexerReader>> {
+        self.context.get_indexer_reader()
+    }
+
     pub async fn create_multisig_account(
         &mut self,
         account: &mut LocalAccount,
@@ -446,6 +478,26 @@ impl TestContext {
         ])
         .await;
         multisig_address
+    }
+
+    pub async fn create_multisig_account_with_existing_account(
+        &mut self,
+        account: &mut LocalAccount,
+        owners: Vec<AccountAddress>,
+        signatures_required: u64,
+        initial_balance: u64,
+    ) {
+        let factory = self.transaction_factory();
+        let txn = account.sign_with_transaction_builder(
+            factory
+                .create_multisig_account_with_existing_account(owners, signatures_required)
+                .expiration_timestamp_secs(u64::MAX),
+        );
+        self.commit_block(&vec![
+            txn,
+            self.account_transfer_to(account, account.address(), initial_balance),
+        ])
+        .await;
     }
 
     pub async fn create_multisig_transaction(
@@ -560,6 +612,16 @@ impl TestContext {
 
     pub fn get_latest_ledger_info(&self) -> aptos_api_types::LedgerInfo {
         self.context.get_latest_ledger_info::<BasicError>().unwrap()
+    }
+
+    pub fn get_latest_storage_ledger_info(&self) -> aptos_api_types::LedgerInfo {
+        self.context
+            .get_latest_storage_ledger_info::<BasicError>()
+            .unwrap()
+    }
+
+    pub fn get_indexer_readers(&self) -> Option<&Arc<dyn IndexerReader>> {
+        self.context.get_indexer_reader()
     }
 
     pub fn get_transactions(&self, start: u64, limit: u16) -> Vec<TransactionOnChainData> {

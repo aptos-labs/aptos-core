@@ -10,10 +10,8 @@ use crate::{
     },
     logging::{LogEntry, LogSchema},
     metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS,
-        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+        COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
+        TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
     },
 };
 use anyhow::Result;
@@ -25,6 +23,7 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
@@ -96,6 +95,8 @@ where
     V: TransactionBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "committed_block_id"]);
+
         self.maybe_initialize().expect("Failed to initialize.");
         self.inner
             .read()
@@ -105,6 +106,8 @@ where
     }
 
     fn reset(&self) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "reset"]);
+
         *self.inner.write() = Some(BlockExecutorInner::new(self.db.clone())?);
         Ok(())
     }
@@ -115,6 +118,8 @@ where
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "execute_and_state_checkpoint"]);
+
         self.maybe_initialize()?;
         self.inner
             .read()
@@ -129,6 +134,8 @@ where
         parent_block_id: HashValue,
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "ledger_update"]);
+
         self.maybe_initialize()?;
         self.inner
             .read()
@@ -137,20 +144,33 @@ where
             .ledger_update(block_id, parent_block_id, state_checkpoint_output)
     }
 
-    fn commit_blocks_ext(
+    fn pre_commit_block(
         &self,
-        block_ids: Vec<HashValue>,
-        ledger_info_with_sigs: LedgerInfoWithSignatures,
-        save_state_snapshots: bool,
+        block_id: HashValue,
+        parent_block_id: HashValue,
     ) -> ExecutorResult<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "pre_commit_block"]);
+
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .commit_blocks_ext(block_ids, ledger_info_with_sigs, save_state_snapshots)
+            .pre_commit_block(block_id, parent_block_id)
+    }
+
+    fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "commit_ledger"]);
+
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .commit_ledger(ledger_info_with_sigs)
     }
 
     fn finish(&self) {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "finish"]);
+
         *self.inner.write() = None;
     }
 }
@@ -193,7 +213,7 @@ where
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
-        let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
+        let _timer = EXECUTE_BLOCK.start_timer();
         let ExecutableBlock {
             block_id,
             transactions,
@@ -213,6 +233,7 @@ where
         let committed_block_id = self.committed_block_id();
         let (state, epoch_state, state_checkpoint_output) =
             if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
+                // ignore reconfiguration suffix, even if the block is non-empty
                 info!(
                     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                     "reconfig_descendant_block_received"
@@ -224,9 +245,8 @@ where
                 )
             } else {
                 let state_view = {
-                    let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                        .with_label_values(&["verified_state_view"])
-                        .start_timer();
+                    let _timer = OTHER_TIMERS.timer_with(&["verified_state_view"]);
+
                     info!("next_version: {}", parent_output.next_version());
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
@@ -238,7 +258,7 @@ where
                 };
 
                 let chunk_output = {
-                    let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
+                    let _timer = VM_EXECUTE_BLOCK.start_timer();
                     fail_point!("executor::vm_execute_block", |_| {
                         Err(ExecutorError::from(anyhow::anyhow!(
                             "Injected error in vm_execute_block"
@@ -247,9 +267,7 @@ where
                     V::execute_transaction_block(transactions, state_view, onchain_config.clone())?
                 };
 
-                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                    .with_label_values(&["state_checkpoint"])
-                    .start_timer();
+                let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
                     chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
@@ -270,7 +288,7 @@ where
         parent_block_id: HashValue,
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
-        let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.start_timer();
+        let _timer = UPDATE_LEDGER.start_timer();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "ledger_update"
@@ -329,98 +347,77 @@ where
         Ok(state_compute_result)
     }
 
-    fn commit_blocks_ext(
+    fn pre_commit_block(
         &self,
-        block_ids: Vec<HashValue>,
-        ledger_info_with_sigs: LedgerInfoWithSignatures,
-        sync_commit: bool,
+        block_id: HashValue,
+        parent_block_id: HashValue,
     ) -> ExecutorResult<()> {
-        let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
+        let _timer = COMMIT_BLOCKS.start_timer();
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+            "pre_commit_block",
+        );
 
-        // Ensure the block ids are not empty
-        if block_ids.is_empty() {
-            return Err(anyhow::anyhow!("Cannot commit 0 blocks!").into());
+        let mut blocks = self.block_tree.get_blocks(&[parent_block_id, block_id])?;
+        let block = blocks.pop().expect("guaranteed");
+        let parent_block = blocks.pop().expect("guaranteed");
+
+        let result_in_memory_state = block.output.state().clone();
+
+        fail_point!("executor::pre_commit_block", |_| {
+            Err(anyhow::anyhow!("Injected error in pre_commit_block.").into())
+        });
+
+        let ledger_update = block.output.get_ledger_update();
+        if !ledger_update.transactions_to_commit().is_empty() {
+            let _timer = SAVE_TRANSACTIONS.start_timer();
+            self.db.writer.pre_commit_ledger(
+                ledger_update.transactions_to_commit(),
+                ledger_update.first_version(),
+                parent_block.output.state().base_version,
+                false,
+                result_in_memory_state,
+                // TODO(grao): Avoid this clone.
+                ledger_update.state_updates_until_last_checkpoint.clone(),
+                Some(&ledger_update.sharded_state_cache),
+            )?;
+            TRANSACTIONS_SAVED.observe(ledger_update.num_txns() as f64);
         }
 
+        Ok(())
+    }
+
+    fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()> {
+        let _timer = OTHER_TIMERS.timer_with(&["commit_ledger"]);
+
+        let block_id = ledger_info_with_sigs.ledger_info().consensus_block_id();
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+            "commit_ledger"
+        );
+
         // Check for any potential retries
-        let mut committed_block = self.block_tree.root_block();
+        // TODO: do we still have such retries?
+        let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
             return Ok(());
         }
 
-        // Ensure the last block id matches the ledger info block id to commit
-        let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
-        info!(
-            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
-            "commit_block"
-        );
-        let last_block_id = *block_ids.last().unwrap();
-        if last_block_id != block_id_to_commit {
-            // This should not happen. If it does, we need to panic!
-            panic!(
-                "Block id to commit ({:?}) does not match last block id ({:?})!",
-                block_id_to_commit, last_block_id
-            );
-        }
+        // Confirm the block to be committed is tracked in the tree.
+        self.block_tree.get_block(block_id)?;
 
-        let blocks = self.block_tree.get_blocks(&block_ids)?;
-
-        let mut first_version = committed_block
-            .output
-            .get_ledger_update()
-            .txn_accumulator()
-            .num_leaves();
-
-        let to_commit = blocks
-            .iter()
-            .map(|block| block.output.get_ledger_update().to_commit.len())
-            .sum();
-        let target_version = ledger_info_with_sigs.ledger_info().version();
-        if first_version + to_commit as u64 != target_version + 1 {
-            return Err(ExecutorError::BadNumTxnsToCommit {
-                first_version,
-                to_commit,
-                target_version,
-            });
-        }
         fail_point!("executor::commit_blocks", |_| {
             Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
         });
 
-        for (i, block) in blocks.iter().enumerate() {
-            let txns_to_commit = block.output.get_ledger_update().transactions_to_commit();
+        let target_version = ledger_info_with_sigs.ledger_info().version();
+        self.db
+            .writer
+            .commit_ledger(target_version, Some(&ledger_info_with_sigs), None)?;
 
-            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
-            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
-
-            let result_in_memory_state = block.output.state().clone();
-            self.db.writer.save_transactions(
-                txns_to_commit,
-                first_version,
-                committed_block.output.state().base_version,
-                if i == blocks.len() - 1 {
-                    Some(&ledger_info_with_sigs)
-                } else {
-                    None
-                },
-                sync_commit,
-                result_in_memory_state,
-                // TODO(grao): Avoid this clone.
-                block
-                    .output
-                    .get_ledger_update()
-                    .state_updates_until_last_checkpoint
-                    .clone(),
-                Some(&block.output.get_ledger_update().sharded_state_cache),
-            )?;
-            first_version += txns_to_commit.len() as u64;
-            committed_block = block.clone();
-        }
-        self.block_tree
-            .prune(ledger_info_with_sigs.ledger_info())
-            .expect("Failure pruning block tree.");
+        self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
 
         Ok(())
     }

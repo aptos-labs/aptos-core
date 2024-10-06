@@ -5,7 +5,7 @@
 use move_command_line_common::testing::{
     add_update_baseline_fix, format_diff, get_compiler_exp_extension, read_env_update_baseline,
 };
-use move_unit_test::{self, UnitTestingConfig};
+use move_unit_test::{self, test_reporter::UnitTestFactoryWithCostTable, UnitTestingConfig};
 use regex::RegexBuilder;
 use std::{
     fs,
@@ -59,8 +59,8 @@ fn run_test_with_modifiers(
                     test_plan.unwrap(),
                     None,
                     None,
-                    None,
                     buffer,
+                    UnitTestFactoryWithCostTable::new(None, None),
                 )?,
                 modified_exp_path,
             ))
@@ -75,7 +75,13 @@ fn run_test_with_modifiers(
     }
 
     results.push((
-        unit_test_config.run_and_report_unit_tests(test_plan.unwrap(), None, None, None, buffer)?,
+        unit_test_config.run_and_report_unit_tests(
+            test_plan.unwrap(),
+            None,
+            None,
+            buffer,
+            UnitTestFactoryWithCostTable::new(None, None),
+        )?,
         path.with_extension(exp_ext),
     ));
 
@@ -89,7 +95,6 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
     let source_files = vec![path.to_str().unwrap().to_owned()];
     let unit_test_config = UnitTestingConfig {
         num_threads: 1,
-        gas_limit: Some(1000),
         source_files,
         dep_files: move_stdlib::move_stdlib_files(),
         named_address_values: move_stdlib::move_stdlib_named_addresses()
@@ -98,7 +103,7 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
         verbose: true,
         report_stacktrace_on_abort: true,
 
-        ..UnitTestingConfig::default_with_bound(None)
+        ..UnitTestingConfig::default()
     };
 
     let regex = RegexBuilder::new(r"(┌─ ).+/([^/]+)$")
