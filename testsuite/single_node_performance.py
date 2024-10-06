@@ -150,10 +150,10 @@ CALIBRATION_SEPARATOR = "	"
 #    transaction_type module_working_set_size executor_type  block_size expected_tps tps
 # )
 CALIBRATION = """
-no-op	1	VM	0.822	1.047	38275.3
-no-op	1000	VM	0.775	1.033	22763.8
-apt-fa-transfer	1	VM	0.770	1.059	27699.5
-account-generation	1	VM	0.735	1.026	22763.8
+no-op	1	VM	0.822	1.047	37975.3
+no-op	1000	VM	0.775	1.033	22963.8
+apt-fa-transfer	1	VM	0.770	1.059	27299.5
+account-generation	1	VM	0.735	1.026	22663.8
 account-resource32-b	1	VM	0.718	1.049	33440.0
 modify-global-resource	1	VM	0.868	1.019	2819.9
 modify-global-resource	10	VM	0.877	1.018	17562.1
@@ -164,7 +164,7 @@ vector-picture30k	1	VM	0.944	1.036	112.2
 vector-picture30k	20	VM	0.835	1.020	1140.7
 smart-table-picture30-k-with200-change	1	VM	0.955	1.051	21.8
 smart-table-picture30-k-with200-change	20	VM	0.926	1.065	185.9
-modify-global-resource-agg-v2	1	VM	0.792	1.060	33440.0
+modify-global-resource-agg-v2	1	VM	0.792	1.060	32740.0
 modify-global-flag-agg-v2	1	VM	0.921	1.014	5199.3
 modify-global-bounded-agg-v2	1	VM	0.906	1.103	8866.4
 modify-global-milestone-agg-v2	1	VM	0.804	1.033	27699.5
@@ -177,11 +177,11 @@ token-v1ft-mint-and-transfer	20	VM	0.897	1.024	11901.1
 token-v1nft-mint-and-transfer-sequential	1	VM	0.923	1.025	798.6
 token-v1nft-mint-and-transfer-sequential	20	VM	0.873	1.024	7732.8
 coin-init-and-mint	1	VM	0.779	1.055	29251.9
-coin-init-and-mint	20	VM	0.827	1.077	24885.0
-fungible-asset-mint	1	VM	0.773	1.023	23174.5
+coin-init-and-mint	20	VM	0.827	1.077	24185.0
+fungible-asset-mint	1	VM	0.773	1.023	23274.5
 fungible-asset-mint	20	VM	0.803	1.047	21567.9
 no-op5-signers	1	VM	0.854	1.078	37561.3
-token-v2-ambassador-mint	1	VM	0.848	1.022	16553.6
+token-v2-ambassador-mint	1	VM	0.848	1.022	15753.6
 token-v2-ambassador-mint	20	VM	0.811	1.044	16228.8
 liquidity-pool-swap	1	VM	0.922	1.027	975.7
 liquidity-pool-swap	20	VM	0.881	1.014	8359.6
@@ -238,7 +238,7 @@ TESTS = [
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    
+
     RunGroupConfig(key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
@@ -256,7 +256,7 @@ TESTS = [
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
 
     RunGroupConfig(key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
-   
+
     RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
@@ -267,7 +267,7 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("liquidity-pool-swap-stable", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(key=RunGroupKey("deserialize-u256"), included_in=Flow.CONTINUOUS),
-    
+
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS),
