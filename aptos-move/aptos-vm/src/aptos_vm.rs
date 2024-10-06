@@ -2198,10 +2198,12 @@ impl AptosVM {
 
         // All Move executions satisfy the read-before-write property. Thus, we need to read each
         // access path that the write set is going to update.
-        for state_key in module_write_set.write_ops().keys() {
+        for (state_key, write) in module_write_set.writes() {
             if self.features().is_loader_v2_enabled() {
                 // It is sufficient to simply get the size in order to enforce read-before-write.
-                module_storage.fetch_module_size_by_state_key(state_key)?;
+                module_storage
+                    .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                    .map_err(|e| e.to_partial())?;
             } else {
                 executor_view.get_module_state_value(state_key)?;
             }

@@ -9,8 +9,8 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript,
-    file_format_common, CompiledModule,
+    access::ModuleAccess, compatibility::Compatibility, errors::VMResult,
+    file_format::CompiledScript, file_format_common, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
@@ -201,8 +201,11 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             StagingModuleStorage::create(&sender, &module_storage, module_bundle)
                 .expect("All modules should publish")
                 .release_verified_module_bundle()
-                .for_each(|(addr, name, bytes)| {
-                    adapter.storage.add_module_bytes(addr, name, bytes);
+                .into_iter()
+                .for_each(|(module_id, bytes)| {
+                    adapter
+                        .storage
+                        .add_module_bytes(module_id.address(), module_id.name(), bytes);
                 });
         } else {
             adapter
@@ -294,8 +297,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     )
                 )
             })?;
-            for (addr, name, bytes) in staging_module_storage.release_verified_module_bundle() {
-                self.storage.add_module_bytes(addr, name, bytes);
+            for (module_id, bytes) in staging_module_storage
+                .release_verified_module_bundle()
+                .into_iter()
+            {
+                self.storage
+                    .add_module_bytes(module_id.address(), module.name(), bytes);
             }
             Ok((None, module))
         } else {

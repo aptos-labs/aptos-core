@@ -4,7 +4,7 @@
 use crate::{
     abstract_write_op::AbstractResourceWriteOp,
     change_set::{ChangeSetInterface, VMChangeSet},
-    module_write_set::ModuleWriteSet,
+    module_write_set::{ModuleWrite, ModuleWriteSet},
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::AggregatorV1Resolver,
@@ -76,8 +76,8 @@ impl VMOutput {
         self.change_set.resource_write_set()
     }
 
-    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
-        self.module_write_set.write_ops()
+    pub fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
+        self.module_write_set.writes()
     }
 
     pub fn delayed_field_change_set(
@@ -125,9 +125,9 @@ impl VMOutput {
     pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
         self.change_set.concrete_write_set_iter().chain(
             self.module_write_set
-                .write_ops()
+                .writes()
                 .iter()
-                .map(|(k, v)| (k, Some(v))),
+                .map(|(k, v)| (k, Some(v.write_op()))),
         )
     }
 
