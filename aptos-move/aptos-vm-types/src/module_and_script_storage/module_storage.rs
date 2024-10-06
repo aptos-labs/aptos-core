@@ -27,10 +27,4 @@ pub trait TAptosModuleStorage: ModuleStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>>;
-
-    /// Returns module size in bytes if it exists, and [None] otherwise.
-    fn fetch_module_size_by_state_key(
-        &self,
-        state_key: &Self::Key,
-    ) -> PartialVMResult<Option<usize>>;
 }

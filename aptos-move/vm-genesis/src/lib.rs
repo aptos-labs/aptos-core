@@ -873,7 +873,7 @@ fn code_to_write_ops_for_loader_v2_publishing(
     genesis_state_view: &GenesisStateView,
     addr: AccountAddress,
     code: Vec<Bytes>,
-) -> VMResult<BTreeMap<StateKey, WriteOp>> {
+) -> VMResult<BTreeMap<StateKey, (ModuleId, WriteOp)>> {
     let module_storage = genesis_state_view.as_aptos_code_storage(genesis_runtime_environment);
     let resolver = genesis_state_view.as_move_resolver();
 

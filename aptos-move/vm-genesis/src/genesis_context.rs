@@ -36,8 +36,8 @@ impl GenesisStateView {
             .insert(StateKey::module_id(module_id), blob.to_vec());
     }
 
-    pub(crate) fn add_module_write_ops(&mut self, module_write_ops: BTreeMap<StateKey, WriteOp>) {
-        for (state_key, write_op) in module_write_ops {
+    pub(crate) fn add_module_write_ops(&mut self, module_write_ops: BTreeMap<StateKey, (ModuleId, WriteOp)>) {
+        for (state_key, (_, write_op)) in module_write_ops {
             assert!(state_key.is_module_path());
             let bytes = assert_some!(write_op.bytes(), "Modules cannot be deleted");
             self.state_data.insert(state_key, bytes.to_vec());

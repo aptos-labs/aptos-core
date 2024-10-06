@@ -46,6 +46,9 @@ use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
 };
+use aptos_block_executor::cross_block_caches::maybe_initialize_module_cache;
+use move_core_types::language_storage::ModuleId;
+use move_vm_runtime::WithRuntimeEnvironment;
 
 pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -191,7 +194,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
+    fn module_write_set(&self) -> BTreeMap<StateKey, (ModuleId, WriteOp)> {
         self.vm_output
             .lock()
             .as_ref()

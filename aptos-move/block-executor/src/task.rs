@@ -25,6 +25,7 @@ use std::{
     fmt::Debug,
     sync::Arc,
 };
+use move_core_types::language_storage::ModuleId;
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -112,7 +113,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn module_write_set(
         &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, (ModuleId, <Self::Txn as Transaction>::Value)>;
 
     fn aggregator_v1_write_set(
         &self,

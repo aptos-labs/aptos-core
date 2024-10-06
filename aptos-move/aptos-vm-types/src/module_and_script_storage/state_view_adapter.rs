@@ -91,17 +91,6 @@ impl<'s, S: StateView> TAptosModuleStorage for AptosCodeStorageAdapter<'s, S> {
             .map_err(|e| module_storage_error!(address, module_name, e).to_partial())?
             .map(|s| s.into_metadata()))
     }
-
-    fn fetch_module_size_by_state_key(
-        &self,
-        state_key: &Self::Key,
-    ) -> PartialVMResult<Option<usize>> {
-        Ok(self
-            .state_view()
-            .get_state_value(state_key)
-            .map_err(|e| aptos_module_storage_error!(state_key, e))?
-            .map(|s| s.size()))
-    }
 }
 
 impl<'s, S: StateView> TAptosCodeStorage<StateKey> for AptosCodeStorageAdapter<'s, S> {}

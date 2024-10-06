@@ -46,6 +46,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use move_core_types::language_storage::ModuleId;
 
 pub mod respawned_session;
 pub mod session_id;
@@ -404,9 +405,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 if addr.is_special() {
                     has_modules_published_to_special_address = true;
                 }
-                let state_key = StateKey::module(&addr, &name);
+                let id = ModuleId::new(addr, name);
+                let state_key = StateKey::module_id(&id);
                 let op = woc.convert_module(&state_key, blob_op, false)?;
-                module_write_ops.insert(state_key, op);
+                module_write_ops.insert(state_key, (id, op));
             }
         }
 
@@ -488,7 +490,7 @@ pub fn convert_modules_into_write_ops<'a>(
     features: &Features,
     module_storage: &impl AptosModuleStorage,
     staged_modules: impl Iterator<Item = (&'a AccountAddress, &'a IdentStr, Bytes)>,
-) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
+) -> PartialVMResult<BTreeMap<StateKey, (ModuleId, WriteOp)>> {
     let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
     woc.convert_modules_into_write_ops(module_storage, staged_modules)
 }

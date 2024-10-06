@@ -47,19 +47,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAptosModul
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        Ok(self
-            .read_module_storage(address, module_name)
-            .map_err(|e| e.to_partial())?
-            .into_versioned()
-            .map(|(_, entry)| entry.state_value_metadata().clone()))
-    }
+        if let Some(entry) = get_cached(address, module_name) {
+            return Ok(Some(entry.state_value_metadata().clone()));
+        }
 
-    fn fetch_module_size_by_state_key(&self, key: &Self::Key) -> PartialVMResult<Option<usize>> {
-        Ok(self
-            .read_module_storage_by_key(key)
-            .map_err(|e| e.to_partial())?
-            .into_versioned()
-            .map(|(_, entry)| entry.bytes().len()))
+        self.read_module_storage(address, module_name, |read| {
+                read.as_versioned().map(|(_, entry)| entry.state_value_metadata().clone())
+            })
+            .map_err(|e| e.to_partial())
     }
 }
 
@@ -159,6 +154,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<bool> {
+        if get_cached(address, module_name).is_some() {
+            return Ok(true);
+        }
+
         let exists = self
             .read_module_storage(address, module_name)?
             .into_versioned()
@@ -171,10 +170,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>> {
-        Ok(self
-            .read_module_storage(address, module_name)?
-            .into_versioned()
-            .map(|(_, entry)| entry.bytes().clone()))
+        if let Some(entry) = get_cached(address, module_name) {
+            return Ok(Some(entry.bytes().clone()));
+        }
+
+        self
+            .read_module_storage(address, module_name, |read| {
+                read.as_versioned().map(|(_, entry)| entry.bytes().clone())
+            })
     }
 
     fn fetch_module_size_in_bytes(
@@ -182,10 +185,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>> {
-        Ok(self
-            .read_module_storage(address, module_name)?
-            .into_versioned()
-            .map(|(_, entry)| entry.bytes().len()))
+        if let Some(entry) = get_cached(address, module_name) {
+            return Ok(Some(entry.size_in_bytes()));
+        }
+
+        self
+            .read_module_storage(address, module_name, |read| {
+                read.as_versioned().map(|(_, entry)| entry.bytes().len())
+            })
     }
 
     fn fetch_module_metadata(
@@ -193,10 +200,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Vec<Metadata>>> {
-        Ok(self
-            .read_module_storage(address, module_name)?
-            .into_versioned()
-            .map(|(_, entry)| entry.metadata().to_vec()))
+        if let Some(entry) = get_cached(address, module_name) {
+            return Ok(Some(entry.metadata().to_vec()));
+        }
+
+        self
+            .read_module_storage(address, module_name, |read| {
+                read.as_versioned().map(|(_, entry)| entry.metadata().to_vec())
+            })
     }
 
     fn fetch_deserialized_module(
@@ -204,10 +215,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<CompiledModule>>> {
-        Ok(self
-            .read_module_storage(address, module_name)?
-            .into_versioned()
-            .map(|(_, entry)| entry.as_compiled_module()))
+        if let Some(entry) = get_cached(address, module_name) {
+            return Ok(Some(entry.as_compiled_module()));
+        }
+
+        self
+            .read_module_storage(address, module_name, |read| {
+                read.as_versioned().map(|(_, entry)| entry.as_compiled_module())
+            })
     }
 
     fn fetch_verified_module(
@@ -215,6 +230,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStora
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>> {
+        if let Some(entry) = get_cached(address, module_name) {
+            return Ok(Some(entry.try_as_verified_module().unwrap()));
+        }
+
         let _timer = FETCH_VERIFIED_MODULE_FROM_MODULE_STORAGE_SECONDS.start_timer();
 
         let (version, entry) = match self

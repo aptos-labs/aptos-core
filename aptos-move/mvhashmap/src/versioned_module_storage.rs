@@ -9,6 +9,128 @@ use dashmap::DashMap;
 use derivative::Derivative;
 use move_binary_format::errors::VMResult;
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::collections::HashMap;
+use aptos_crypto::_once_cell::sync::{Lazy, OnceCell};
+use aptos_types::state_store::state_key::StateKey;
+use aptos_types::state_store::StateView;
+use aptos_types::vm::modules::ModuleStorageEntry;
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
+use move_core_types::account_address::AccountAddress;
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
+use move_core_types::language_storage::ModuleId;
+use move_vm_runtime::{ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
+
+static MODULE_CACHE: OnceCell<Option<hashbrown::HashMap<ModuleId, ModuleStorageEntry>>> = OnceCell::new();
+
+pub fn initialize_module_cache(state_view: &impl StateView, runtime_environment: &RuntimeEnvironment) {
+    if MODULE_CACHE.get().is_some() {
+        return;
+    }
+
+    let module_storage = state_view.as_aptos_code_storage(runtime_environment);
+    let ordered_module_names = [
+        // Move stdlib.
+        ident_str!("vector"),
+        ident_str!("signer"),
+        ident_str!("error"),
+        ident_str!("hash"),
+        ident_str!("features"),
+        ident_str!("bcs"),
+        ident_str!("option"),
+        ident_str!("string"),
+        ident_str!("fixed_point32"),
+
+        // Aptos stdlib.
+        ident_str!("type_info"),
+        ident_str!("ed25519"),
+        ident_str!("from_bcs"),
+        ident_str!("multi_ed25519"),
+        ident_str!("table"),
+        ident_str!("bls12381"),
+        ident_str!("math64"),
+        ident_str!("fixed_point64"),
+        ident_str!("math128"),
+        ident_str!("math_fixed64"),
+        ident_str!("table_with_length"),
+        ident_str!("copyable_any"),
+        ident_str!("simple_map"),
+        ident_str!("bn254_algebra"),
+        ident_str!("crypto_algebra"),
+        ident_str!("aptos_hash"),
+
+        // Framework.
+        ident_str!("guid"),
+        ident_str!("system_addresses"),
+        ident_str!("chain_id"),
+        ident_str!("timestamp"),
+        ident_str!("event"),
+        ident_str!("create_signer"),
+        ident_str!("account"),
+        ident_str!("aggregator"),
+        ident_str!("aggregator_factory"),
+        ident_str!("optional_aggregator"),
+        ident_str!("transaction_context"),
+        ident_str!("randomness"),
+        ident_str!("object"),
+        ident_str!("aggregator_v2"),
+        ident_str!("function_info"),
+        ident_str!("fungible_asset"),
+        ident_str!("dispatchable_fungible_asset"),
+        ident_str!("primary_fungible_store"),
+        ident_str!("coin"),
+        ident_str!("aptos_coin"),
+        ident_str!("aptos_account"),
+        ident_str!("chain_status"),
+        ident_str!("staking_config"),
+        ident_str!("stake"),
+        ident_str!("transaction_fee"),
+        ident_str!("transaction_validation"),
+        ident_str!("reconfiguration_state"),
+        ident_str!("state_storage"),
+        ident_str!("storage_gas"),
+        ident_str!("reconfiguration"),
+        ident_str!("config_buffer"),
+        ident_str!("randomness_api_v0_config"),
+        ident_str!("randomness_config"),
+        ident_str!("randomness_config_seqnum"),
+        ident_str!("keyless_account"),
+        ident_str!("consensus_config"),
+        ident_str!("execution_config"),
+        ident_str!("validator_consensus_info"),
+        ident_str!("dkg"),
+        ident_str!("gas_schedule"),
+        ident_str!("util"),
+        ident_str!("gas_schedule"),
+        ident_str!("jwk_consensus_config"),
+        ident_str!("jwks"),
+        ident_str!("reconfiguration_with_dkg"),
+        ident_str!("block"),
+        ident_str!("code"),
+    ];
+
+    let mut framework = hashbrown::HashMap::new();
+    for module_name in ordered_module_names {
+        let id = ModuleId::new(AccountAddress::ONE, module_name.to_owned());
+        let state_value = assert_ok!(state_view.get_state_value(&StateKey::module_id(&id)));
+        let module = assert_ok!(module_storage.fetch_verified_module(&AccountAddress::ONE, module_name));
+        if let (Some(state_value), Some(module)) = (state_value, module) {
+            let entry = ModuleStorageEntry::from_state_value_and_verified_module(state_value, module);
+            framework.insert(id, entry);
+        }
+    }
+
+    if !framework.is_empty() {
+        MODULE_CACHE.set(Some(framework)).unwrap();
+    }
+}
+
+pub fn get_cached(address: &AccountAddress, module_name: &IdentStr) -> Option<&'static ModuleStorageEntry> {
+    if let Some(cache) = MODULE_CACHE.get() {
+        return cache.as_ref().unwrap().get(&(address, module_name));
+    }
+    None
+}
 
 /// Represents a version of a module - either written by some transaction, or fetched from storage.
 pub type ModuleVersion = Result<TxnIndex, StorageVersion>;

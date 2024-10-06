@@ -27,6 +27,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use std::{collections::BTreeMap, sync::Arc};
+use move_core_types::language_storage::ModuleId;
 
 pub(crate) struct WriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,
@@ -82,7 +83,7 @@ impl<'r> WriteOpConverter<'r> {
         &self,
         module_storage: &impl AptosModuleStorage,
         staged_modules: impl Iterator<Item = (&'a AccountAddress, &'a IdentStr, Bytes)>,
-    ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
+    ) -> PartialVMResult<BTreeMap<StateKey, (ModuleId, WriteOp)>> {
         let mut write_ops = BTreeMap::new();
         for (addr, name, bytes) in staged_modules {
             let module_exists = module_storage
@@ -102,8 +103,9 @@ impl<'r> WriteOpConverter<'r> {
                 false,
             )?;
 
-            let state_key = StateKey::module(addr, name);
-            write_ops.insert(state_key, write_op);
+            let module_id = ModuleId::new(*addr, name.to_owned());
+            let state_key = StateKey::module_id(&module_id);
+            write_ops.insert(state_key, (module_id, write_op));
         }
         Ok(write_ops)
     }
@@ -438,24 +440,24 @@ mod tests {
         let a_write_op = assert_some!(results.get(&a_state_key));
         assert!(a_write_op.is_modification());
         assert_eq!(assert_some!(a_write_op.bytes()), &a_bytes);
-        assert_eq!(a_write_op.metadata(), &a_state_value.into_metadata());
+        assert_eq!(a_write_op.1.metadata(), &a_state_value.into_metadata());
 
         let b_write_op = assert_some!(results.get(&b_state_key));
         assert!(b_write_op.is_modification());
         assert_eq!(assert_some!(b_write_op.bytes()), &b_bytes);
-        assert_eq!(b_write_op.metadata(), &b_state_value.into_metadata());
+        assert_eq!(b_write_op.1.metadata(), &b_state_value.into_metadata());
 
         let c_write_op = assert_some!(results.get(&c_state_key));
         assert!(c_write_op.is_modification());
         assert_eq!(assert_some!(c_write_op.bytes()), &c_bytes);
-        assert_eq!(c_write_op.metadata(), &c_state_value.into_metadata());
+        assert_eq!(c_write_op.1.metadata(), &c_state_value.into_metadata());
 
         // Since `d` does not exist, its metadata is a placeholder.
         let d_write_op = assert_some!(results.get(&d_state_key));
         assert!(d_write_op.is_creation());
         assert_eq!(assert_some!(d_write_op.bytes()), &d_bytes);
         assert_eq!(
-            d_write_op.metadata(),
+            d_write_op.1.metadata(),
             &StateValueMetadata::placeholder(&current_time)
         )
     }

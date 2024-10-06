@@ -107,11 +107,7 @@ use move_core_types::{
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{
-    logging::expect_no_verification_errors,
-    module_traversal::{TraversalContext, TraversalStorage},
-    RuntimeEnvironment, WithRuntimeEnvironment,
-};
+use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::{TraversalContext, TraversalStorage}, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
 use once_cell::sync::OnceCell;
@@ -2187,7 +2183,7 @@ impl AptosVM {
         &self,
         executor_view: &dyn ExecutorView,
         resource_group_view: &dyn ResourceGroupView,
-        module_storage: &impl AptosModuleStorage,
+        module_storage: &impl ModuleStorage,
         change_set: &VMChangeSet,
         module_write_set: &ModuleWriteSet,
     ) -> PartialVMResult<()> {
@@ -2198,10 +2194,10 @@ impl AptosVM {
 
         // All Move executions satisfy the read-before-write property. Thus, we need to read each
         // access path that the write set is going to update.
-        for state_key in module_write_set.write_ops().keys() {
+        for (state_key, (id, _)) in module_write_set.write_ops() {
             if self.features().is_loader_v2_enabled() {
                 // It is sufficient to simply get the size in order to enforce read-before-write.
-                module_storage.fetch_module_size_by_state_key(state_key)?;
+                module_storage.fetch_module_size_in_bytes(id.address(), id.name()).map_err(|e| e.to_partial())?;
             } else {
                 executor_view.get_module_state_value(state_key)?;
             }

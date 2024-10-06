@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    change_set::WriteOpInfo, module_and_script_storage::module_storage::AptosModuleStorage,
+    change_set::WriteOpInfo,
     resolver::ExecutorView,
 };
 use aptos_types::{
@@ -12,6 +12,8 @@ use aptos_types::{
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
 use std::collections::BTreeMap;
+use move_core_types::language_storage::ModuleId;
+use move_vm_runtime::ModuleStorage;
 
 #[must_use]
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -20,7 +22,7 @@ pub struct ModuleWriteSet {
     // is used for performance reasons, as otherwise we would need traverse
     // the write ops and deserializes access paths.
     has_writes_to_special_address: bool,
-    write_ops: BTreeMap<StateKey, WriteOp>,
+    write_ops: BTreeMap<StateKey, (ModuleId, WriteOp)>,
 }
 
 impl ModuleWriteSet {
@@ -33,7 +35,7 @@ impl ModuleWriteSet {
 
     pub fn new(
         has_writes_to_special_address: bool,
-        write_ops: BTreeMap<StateKey, WriteOp>,
+        write_ops: BTreeMap<StateKey, (ModuleId, WriteOp)>,
     ) -> Self {
         Self {
             has_writes_to_special_address,
@@ -42,10 +44,10 @@ impl ModuleWriteSet {
     }
 
     pub fn into_write_ops(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
-        self.write_ops.into_iter()
+        self.write_ops.into_iter().map(|(k, (_, op))| (k, op))
     }
 
-    pub fn write_ops(&self) -> &BTreeMap<StateKey, WriteOp> {
+    pub fn write_ops(&self) -> &BTreeMap<StateKey, (ModuleId, WriteOp)> {
         &self.write_ops
     }
 
@@ -54,22 +56,23 @@ impl ModuleWriteSet {
     }
 
     pub fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
-        self.write_ops.iter().map(|(k, v)| (k, v.write_op_size()))
+        self.write_ops.iter().map(|(k, (_, v))| (k, v.write_op_size()))
     }
 
     pub fn write_op_info_iter_mut<'a>(
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
-        module_storage: &'a impl AptosModuleStorage,
+        module_storage: &'a impl ModuleStorage,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        self.write_ops.iter_mut().map(move |(key, op)| {
+        self.write_ops.iter_mut().map(move |(key, (id, op))| {
             let prev_size = if module_storage
                 .runtime_environment()
                 .vm_config()
                 .use_loader_v2
             {
                 module_storage
-                    .fetch_module_size_by_state_key(key)?
+                    .fetch_module_size_in_bytes(id.address(), id.name())
+                    .map_err(|e| e.to_partial())?
                     .unwrap_or(0) as u64
             } else {
                 executor_view.get_module_state_value_size(key)?.unwrap_or(0)

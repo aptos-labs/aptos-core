@@ -28,6 +28,7 @@ use std::{
     iter::{empty, Iterator},
     sync::Arc,
 };
+use move_core_types::language_storage::ModuleId;
 
 type TxnInput<T> = CapturedReads<T>;
 
@@ -328,7 +329,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
-    pub(crate) fn module_write_set(&self, txn_idx: TxnIndex) -> Option<BTreeMap<T::Key, T::Value>> {
+    pub(crate) fn module_write_set(&self, txn_idx: TxnIndex) -> Option<BTreeMap<T::Key, (ModuleId, T::Value)>> {
         self.outputs[txn_idx as usize]
             .load()
             .as_ref()

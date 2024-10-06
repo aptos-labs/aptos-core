@@ -23,6 +23,7 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::BTreeMap;
+use move_core_types::language_storage::ModuleId;
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -76,7 +77,7 @@ impl VMOutput {
         self.change_set.resource_write_set()
     }
 
-    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+    pub fn module_write_set(&self) -> &BTreeMap<StateKey, (ModuleId, WriteOp)> {
         self.module_write_set.write_ops()
     }
 
@@ -127,7 +128,7 @@ impl VMOutput {
             self.module_write_set
                 .write_ops()
                 .iter()
-                .map(|(k, v)| (k, Some(v))),
+                .map(|(k, (_, v))| (k, Some(v))),
         )
     }
 

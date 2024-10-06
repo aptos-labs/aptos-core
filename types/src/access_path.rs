@@ -161,6 +161,14 @@ impl AccessPath {
         }
     }
 
+    pub fn get_module_id(&self) -> Option<ModuleId> {
+        match self.get_path() {
+            Path::Resource(_) => None,
+            Path::ResourceGroup(_) => None,
+            Path::Code(id) => Some(id),
+        }
+    }
+
     pub fn is_code(&self) -> bool {
         matches!(self.get_path(), Path::Code(_))
     }

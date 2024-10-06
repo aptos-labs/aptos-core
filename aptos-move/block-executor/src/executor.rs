@@ -222,7 +222,7 @@ where
                     .write(k, idx_to_execute, incarnation, v, maybe_layout);
             }
 
-            for (k, v) in output.module_write_set().into_iter() {
+            for (k, (_, v)) in output.module_write_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
                     needs_suffix_validation = true;
                 }
@@ -594,7 +594,7 @@ where
                         versioned_cache.code_storage().write_published_modules(
                             txn_idx,
                             runtime_environment,
-                            module_write_set.into_iter(),
+                            module_write_set.into_iter().map(|(k, (_, v))| (k, v)),
                         )?;
                     }
                 }
@@ -622,7 +622,7 @@ where
                     versioned_cache.code_storage().write_published_modules(
                         txn_idx,
                         runtime_environment,
-                        module_write_set.into_iter(),
+                        module_write_set.into_iter().map(|(k, (_, v))| (k, v)),
                     )?;
                     scheduler.finish_execution_during_commit(txn_idx)?;
                 }
@@ -1126,7 +1126,7 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (key, write_op) in output.module_write_set().into_iter() {
+        for (key, (_, write_op)) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
                 let entry =
                     ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
