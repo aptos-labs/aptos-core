@@ -7,7 +7,7 @@ on:
     branches:
       - main
 
-# Grant the required permissions to request the ID token
+# the required permissions to request the ID token
 permissions:
   id-token: write  # This is required for GCP authentication
   contents: read   # Ensure the workflow has access to repository contents
@@ -19,7 +19,9 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
-      
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
       - name: Set up Rust
         uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
@@ -82,49 +84,65 @@ jobs:
             done
           done
 
-      # Show the Modified JSON Files Before Diff (Optional Step)
-      - name: Show Modified JSON Files (Original and New)
-        run: |
-          echo "Showing Modified Original JSON Files:"
-          cat ecosystem/indexer-grpc/indexer-test-transactions/json_transactions/scripted_transactions/modified_simple_user_script3.json
-
-          echo "Showing Modified New JSON Files:"
-          cat ecosystem/indexer-grpc/indexer-test-transactions/new_json_transactions/scripted_transactions/modified_simple_user_script3.json
-
-      # Compare New and Existing JSON Files After Modifying and Set Output if Differences Found
-      - name: Compare JSON Files
+      - name: Compare JSON Files Across Multiple Folders
         id: diff_check
         run: |
-          cd ecosystem/indexer-grpc/indexer-test-transactions
-
-          # Initialize the diff flag as false
+          # Initialize the flags
           diff_found=false
-
-          # Loop over all modified new JSON files and compare them with existing ones in scripted_transactions
-          for file in json_transactions/scripted_transactions/*.json; do
-            base_file=$(basename "$file" .json)
-            modified_file="new_json_transactions/scripted_transactions/modified_${base_file}.json"
-            original_file="json_transactions/scripted_transactions/modified_${base_file}.json"
-            if [ -f "$original_file" ]; then
-              echo "Comparing $modified_file with $original_file..."
-
-              # Run diff and capture the output. Use || true to prevent it from stopping the script
-              diff_output=$(diff -u "$original_file" "$modified_file" || true)
-
-              if [ -n "$diff_output" ]; then
-                echo "Differences found in $base_file"
-                diff_found=true
-                echo "$diff_output"  # Output the actual differences
+          new_file_found=false
+          new_files=""
+          
+          # Loop over all subdirectories inside json_transactions
+          for folder in json_transactions/*/; do
+            for file in $folder/*.json; do
+              base_file=$(basename "$file" .json)
+              modified_file="new_json_transactions/$folder/modified_${base_file}.json"
+              original_file="$folder/modified_${base_file}.json"
+          
+              if [ -f "$original_file" ]; then
+                echo "Comparing $modified_file with $original_file..."
+          
+                # Run diff and capture the output
+                diff_output=$(diff -u "$original_file" "$modified_file" || true)
+          
+                if [ -n "$diff_output" ]; then
+                  echo "Differences found in $base_file"
+                  diff_found=true
+                  echo "$diff_output"
+                else
+                  echo "No differences in $base_file"
+                fi
               else
-                echo "No differences in $base_file"
+                echo "New file detected: $base_file"
+                new_file_found=true
+                new_files="$new_files\n$base_file"  # Append new file to list of new files
               fi
-            else
-              echo "No existing file found for $base_file, skipping comparison."
-            fi
+            done
           done
-
-          # Set the output variable based on whether diffs were found
+          
+          # Print all new files if found
+          if [ "$new_file_found" = "true" ]; then
+            echo "New files detected:"
+            echo -e "$new_files"
+          fi
+          
+          # Set output flags
           echo "diff_found=$diff_found" >> $GITHUB_OUTPUT
+          echo "new_file_found=$new_file_found" >> $GITHUB_OUTPUT
+          echo "new_files=$new_files" >> $GITHUB_OUTPUT  # Store new files as output
+
+      - name: Handle New Files and Differences
+        run: |
+          if [ "${{ steps.diff_check.outputs.new_file_found }}" == "true" ]; then
+            echo "::error::New JSON files detected:"
+            echo "${{ steps.diff_check.outputs.new_files }}"  # Print all new files
+            exit 0  # Fail the workflow to enforce manual review
+          elif [ "${{ steps.diff_check.outputs.diff_found }}" == "true" ]; then
+            echo "Differences detected. Proceeding with dispatch event."
+          else
+            echo "No differences or new files detected."
+            exit 0  # Proceed successfully only if no new files or differences are found
+          fi
 
       - id: auth
         uses: "google-github-actions/auth@v2"
@@ -151,7 +169,8 @@ jobs:
           event-type: 'test-txn-json-change-detected'
           client-payload: '{"commit_hash": "${{ github.sha }}"}'
 
-      # Poll Processor Repo for Workflow Run Status and Memorize Run ID (with improved matching)
+      # Poll Processor Repo for Workflow Run Status and Memorize Run ID to check the job st atus
+
       - name: Poll for Workflow Run and Wait for Job Completion
         if: steps.diff_check.outputs.diff_found == 'true'
         id: poll_status
@@ -177,7 +196,7 @@ jobs:
               response=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/aptos-labs/aptos-indexer-processors/actions/runs?event=repository_dispatch&branch=main")
           
-              # Filter the workflow run by the unique run-name (which includes the commit_hash or UUID)
+              # Filter the workflow run by the unique run-name commit hash
               run_id=$(echo "$response" | jq -r ".workflow_runs[] | select(.name | test(\"$UUID\")) | .id")
           
               if [ -n "$run_id" ]; then
@@ -203,7 +222,7 @@ jobs:
           
           # Poll the job status until completion
           job_completed=false
-          max_job_attempts=20  # Adjust based on how long you expect the job to run
+          max_job_attempts=20  
           job_attempts=0
           sleep_interval=60  # Adjust polling interval as needed
 
