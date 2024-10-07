@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    versioned_code_storage::VersionedCodeStorage, versioned_data::VersionedData,
+    code_cache::SyncCodeCache, versioned_data::VersionedData,
     versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
     versioned_modules::VersionedModules,
 };
@@ -17,11 +17,9 @@ use std::{fmt::Debug, hash::Hash};
 pub mod code_cache;
 pub mod types;
 pub mod unsync_map;
-pub mod versioned_code_storage;
 pub mod versioned_data;
 pub mod versioned_delayed_fields;
 pub mod versioned_group_data;
-pub mod versioned_module_storage;
 pub mod versioned_modules;
 
 #[cfg(test)]
@@ -41,7 +39,8 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
-    code_storage: VersionedCodeStorage,
+
+    code_cache: SyncCodeCache,
 }
 
 impl<
@@ -62,7 +61,7 @@ impl<
             delayed_fields: VersionedDelayedFields::empty(),
             modules: VersionedModules::empty(),
 
-            code_storage: VersionedCodeStorage::empty(),
+            code_cache: SyncCodeCache::empty(),
         }
     }
 
@@ -71,7 +70,7 @@ impl<
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),
             num_delayed_fields: self.delayed_fields.num_keys(),
-            num_modules: self.modules.num_keys() + self.code_storage.module_storage().num_keys(),
+            num_modules: self.modules.num_keys() + self.code_cache.module_cache().num_keys(),
             base_resources_size: self.data.total_base_value_size(),
             base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
         }
@@ -96,8 +95,8 @@ impl<
         &self.modules
     }
 
-    pub fn code_storage(&self) -> &VersionedCodeStorage {
-        &self.code_storage
+    pub fn code_cache(&self) -> &SyncCodeCache {
+        &self.code_cache
     }
 }
 
