@@ -30,7 +30,7 @@ use aptos_types::{
     transaction::{EntryFunction, TransactionPayload},
 };
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
-use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, value::MoveValue};
 use rand::{rngs::StdRng, SeedableRng};
 use sha3::{Digest, Sha3_512};
 use std::path::Path;
@@ -57,7 +57,9 @@ fn test_modify_gas_schedule_check_hash() {
         "set_for_next_epoch_check_hash",
         vec![],
         vec![
-            bcs::to_bytes(&CORE_CODE_ADDRESS).unwrap(),
+            MoveValue::Signer(CORE_CODE_ADDRESS)
+                .simple_serialize()
+                .unwrap(),
             bcs::to_bytes(&old_hash).unwrap(),
             bcs::to_bytes(&bcs::to_bytes(&gas_schedule).unwrap()).unwrap(),
         ],
@@ -66,7 +68,9 @@ fn test_modify_gas_schedule_check_hash() {
     harness
         .executor
         .exec("reconfiguration_with_dkg", "finish", vec![], vec![
-            bcs::to_bytes(&CORE_CODE_ADDRESS).unwrap(),
+            MoveValue::Signer(CORE_CODE_ADDRESS)
+                .simple_serialize()
+                .unwrap(),
         ]);
 
     let (_, gas_params) = harness.get_gas_params();
