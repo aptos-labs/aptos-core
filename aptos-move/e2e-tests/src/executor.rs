@@ -65,7 +65,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    move_resource::{MoveResource, MoveStructType},
+    move_resource::{MoveResource, MoveStructType}, value::MoveValue,
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -989,13 +989,13 @@ impl FakeExecutor {
             let mut arg = args.clone();
             match &dynamic_args {
                 ExecFuncTimerDynamicArgs::DistinctSigners => {
-                    arg.insert(0, bcs::to_bytes(&extra_accounts.pop().unwrap()).unwrap());
+                    arg.insert(0, MoveValue::Signer(extra_accounts.pop().unwrap()).simple_serialize().unwrap());
                 },
                 ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(signers) => {
                     for signer in signers.iter().rev() {
-                        arg.insert(0, bcs::to_bytes(&signer).unwrap());
+                        arg.insert(0, MoveValue::Signer(*signer).simple_serialize().unwrap());
                     }
-                    arg.insert(0, bcs::to_bytes(&extra_accounts.pop().unwrap()).unwrap());
+                    arg.insert(0, MoveValue::Signer(extra_accounts.pop().unwrap()).simple_serialize().unwrap());
                 },
                 _ => {},
             }
