@@ -59,7 +59,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: PUSH_METRICS_ENDPOINT
-              value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup_verify" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)"
+              value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup_verify" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)&extra_label=chain_name={{ $.Values.chain.label | default $.Values.chain.name }}"
             {{- end }}
             {{- include "backup.backupEnvironment" (dict "config" $.Values.backup.config "era" $.Values.chain.era) | nindent 12 }}
             {{- with .Values.backup_verify }}
