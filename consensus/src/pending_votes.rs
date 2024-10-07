@@ -126,6 +126,9 @@ impl TwoChainTimeoutVotes {
             *reason_voting_power.entry(reason_key).or_default() +=
                 verifier.get_voting_power(&author).unwrap_or_default() as u128;
         }
+        // The aggregated timeout reason is the reason with the most voting power received from
+        // at least f+1 peers by voting power. If such voting power does not exist, then the
+        // reason is unknown.
         let aggregated_reason = reason_voting_power
             .into_iter()
             .max_by_key(|(_, voting_power)| *voting_power)

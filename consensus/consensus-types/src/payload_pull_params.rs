@@ -7,6 +7,7 @@ use std::{collections::HashSet, time::Duration};
 #[derive(Clone)]
 pub struct OptQSPayloadPullParams {
     pub exclude_authors: HashSet<Author>,
+    pub minimum_batch_age_usecs: u64,
 }
 
 pub struct PayloadPullParameters {

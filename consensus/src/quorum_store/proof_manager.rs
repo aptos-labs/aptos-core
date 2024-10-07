@@ -43,9 +43,10 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
+        batch_expiry_gap_when_init_usecs: u64, 
     ) -> Self {
         Self {
-            batch_proof_queue: BatchProofQueue::new(my_peer_id, batch_store),
+            batch_proof_queue: BatchProofQueue::new(my_peer_id, batch_store, batch_expiry_gap_when_init_usecs),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -139,6 +140,7 @@ impl ProofManager {
                                 request.soft_max_txns_after_filtering,
                                 request.return_non_full,
                                 request.block_timestamp,
+                                Some(params.minimum_batch_age_usecs),
                             );
 
                         (opt_batches, opt_payload_size)
