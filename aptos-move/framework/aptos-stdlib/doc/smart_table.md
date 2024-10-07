@@ -1479,6 +1479,7 @@ map_spec_has_key = spec_contains;
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
 </code></pre>
 
 
@@ -1495,6 +1496,7 @@ map_spec_has_key = spec_contains;
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
 </code></pre>
 
 
