@@ -31,7 +31,7 @@ use aptos_consensus_types::{
     pipeline::commit_vote::CommitVote,
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
@@ -42,6 +42,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
+use fail::fail_point;
 use futures::{
     channel::{
         mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
@@ -697,6 +698,17 @@ impl BufferManager {
         }
     }
 
+    fn get_commit_message(commit_vote: CommitVote) -> CommitMessage {
+        fail_point!("consensus::create_invalid_commit_vote", |_| {
+            CommitMessage::Vote(CommitVote::new_with_signature(
+                commit_vote.author(),
+                commit_vote.ledger_info().clone(),
+                bls12381::Signature::dummy_signature(),
+            ))
+        });
+        CommitMessage::Vote(commit_vote)
+    }
+
     /// If the signing response is successful, advance the item to Signed and broadcast commit votes.
     async fn process_signing_response(&mut self, response: SigningResponse) {
         let SigningResponse {
@@ -726,7 +738,7 @@ impl BufferManager {
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let commit_vote = signed_item_mut.commit_vote.clone();
-                let commit_vote = CommitMessage::Vote(commit_vote);
+                let commit_vote = Self::get_commit_message(commit_vote);
                 signed_item_mut.rb_handle = self
                     .do_reliable_broadcast(commit_vote)
                     .map(|handle| (Instant::now(), handle));
