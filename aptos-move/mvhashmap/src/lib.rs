@@ -41,7 +41,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
-    code_storage: VersionedCodeStorage<K>,
+    code_storage: VersionedCodeStorage,
 }
 
 impl<
@@ -71,7 +71,7 @@ impl<
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),
             num_delayed_fields: self.delayed_fields.num_keys(),
-            num_modules: self.modules.num_keys(),
+            num_modules: self.modules.num_keys() + self.code_storage.module_storage().num_keys(),
             base_resources_size: self.data.total_base_value_size(),
             base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
         }
@@ -96,7 +96,7 @@ impl<
         &self.modules
     }
 
-    pub fn code_storage(&self) -> &VersionedCodeStorage<K> {
+    pub fn code_storage(&self) -> &VersionedCodeStorage {
         &self.code_storage
     }
 }

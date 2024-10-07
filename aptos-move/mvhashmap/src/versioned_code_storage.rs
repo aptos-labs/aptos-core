@@ -2,23 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{scripts::ScriptCacheEntry, versioned_module_storage::VersionedModuleStorage};
-use aptos_types::{executable::ModulePath, vm::modules::ModuleStorageEntry};
+use aptos_types::vm::modules::ModuleStorageEntry;
 use crossbeam::utils::CachePadded;
 use dashmap::{mapref::entry::Entry, DashMap};
 use move_binary_format::file_format::CompiledScript;
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::Script;
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::sync::Arc;
 
 /// Code storage, that holds script cache and (versioned) module storage.
-pub struct VersionedCodeStorage<K> {
+pub struct VersionedCodeStorage {
     /// Caches deserialized and verified scripts. In the current cache
     /// implementation it is flushed on any module upgrade.
+    // TODO(loader-V2): do we need to flush?
     script_cache: DashMap<[u8; 32], CachePadded<ScriptCacheEntry>>,
     /// Stores modules and pending code publishes observed by the Block-STM.
-    module_storage: VersionedModuleStorage<K, ModuleStorageEntry>,
+    module_storage: VersionedModuleStorage<ModuleId, ModuleStorageEntry>,
 }
 
-impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedCodeStorage<K> {
+impl VersionedCodeStorage {
     /// Returns a new empty versioned code storage.
     pub(crate) fn empty() -> Self {
         Self {
@@ -68,7 +70,7 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedCodeStorage<K> {
         }
     }
 
-    pub fn module_storage(&self) -> &VersionedModuleStorage<K, ModuleStorageEntry> {
+    pub fn module_storage(&self) -> &VersionedModuleStorage<ModuleId, ModuleStorageEntry> {
         &self.module_storage
     }
 }

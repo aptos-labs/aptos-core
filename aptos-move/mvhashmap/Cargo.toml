@@ -23,6 +23,7 @@ claims = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
 derivative = { workspace = true }
+hashbrown = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }
