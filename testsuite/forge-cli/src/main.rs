@@ -1061,6 +1061,7 @@ fn realistic_env_sweep_wrap(
         .with_initial_fullnode_count(num_fullnodes)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
+            config.consensus.chain_health_backoff = vec![];
         }))
         .add_network_test(wrap_with_realistic_env(test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements

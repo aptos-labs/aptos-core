@@ -39,7 +39,7 @@ use fail::fail_point;
 use futures::{channel::oneshot, pin_mut, stream::FuturesUnordered, task::noop_waker, Future, FutureExt, StreamExt};
 use lru::LruCache;
 use serde::Serialize;
-use std::{borrow::Borrow, mem::Discriminant, pin::Pin, sync::Arc, task::{self, Poll}, time::Duration};
+use std::{borrow::Borrow, mem::Discriminant, ops::Deref, pin::Pin, sync::Arc, task::{self, Poll}, time::Duration};
 use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
@@ -983,12 +983,19 @@ impl RoundManager {
         {
             let vote_data = vote.vote_data().clone();
             let ledger_info = vote.ledger_info().clone();
-            let mut fake_partial_signature = PartialSignatures::empty();
-            fake_partial_signature.add_signature(
-                self.proposal_generator.author(),
-                vote.signature().clone(),
-            );
-            let fake_aggregate_signature = self.epoch_state.verifier.aggregate_signatures(&fake_partial_signature)?;
+            // let mut fake_partial_signature = PartialSignatures::empty();
+            // fake_partial_signature.add_signature(
+            //     self.proposal_generator.author(),
+            //     vote.signature().clone(),
+            // );
+            // let fake_aggregate_signature = self.epoch_state.verifier.aggregate_signatures(&fake_partial_signature)?;
+            let highest_oc = self.block_store.highest_ordered_cert();
+            let fake_aggregate_signature = highest_oc.ledger_info().deref().signatures().clone();
+            // let num_validators = self.epoch_state().verifier.len() as u16;
+            // let mut all_ones = BitVec::with_num_bits(num_validators);
+            // (0..num_validators).for_each(|i| all_ones.set(i));
+            // let fake_aggregate_signature = AggregateSignature::new(all_ones, None);
+
             let signed_ledger_info = LedgerInfoWithSignatures::new(ledger_info, fake_aggregate_signature);
             let fake_quorum_cert = QuorumCert::new(vote_data, signed_ledger_info);
             let result = VoteReceptionResult::NewQuorumCertificate(Arc::new(fake_quorum_cert));
