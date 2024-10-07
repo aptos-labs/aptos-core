@@ -14,11 +14,10 @@ use aptos_forge::{
 use aptos_logger::info;
 use rand::{self, rngs::SmallRng, Rng, SeedableRng};
 use std::{
-    sync::{
+    panic, sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
-    },
-    time::{Duration, Instant},
+    }, time::{Duration, Instant}
 };
 
 pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
