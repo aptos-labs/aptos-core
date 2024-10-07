@@ -4,34 +4,52 @@
 
 use super::proposer_election::ProposerElection;
 use crate::{
-    block_storage::{tracing::{observe_block, BlockStage}, BlockReader}, counters::{
+    block_storage::{
+        tracing::{observe_block, BlockStage},
+        BlockReader,
+    },
+    counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, EXECUTION_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
         PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED, PROPOSER_DELAY_PROPOSAL,
         PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS, PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING,
         PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
-    }, payload_client::{PayloadClient, PayloadPullParameters}, util::time_service::TimeService
+    },
+    payload_client::{PayloadClient, PayloadPullParameters},
+    util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{
     ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
 };
 use aptos_consensus_types::{
-    block::Block, block_data::BlockData, common::{Author, Payload, PayloadFilter, Round}, pipelined_block::ExecutionSummary, quorum_cert::QuorumCert, request_response::PayloadTxns, utils::PayloadTxnsSize
+    block::Block,
+    block_data::BlockData,
+    common::{Author, Payload, PayloadFilter, Round},
+    pipelined_block::ExecutionSummary,
+    quorum_cert::QuorumCert,
+    request_response::PayloadTxns,
+    utils::PayloadTxnsSize,
 };
 use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
 use aptos_storage_interface::DbReader;
-use aptos_types::{on_chain_config::{OnChainRandomnessConfig, ValidatorTxnConfig}, transaction::Transaction, validator_txn::ValidatorTransaction};
+use aptos_types::{
+    on_chain_config::{OnChainRandomnessConfig, ValidatorTxnConfig},
+    transaction::Transaction,
+    validator_txn::ValidatorTransaction,
+};
 use aptos_validator_transaction_pool as vtxn_pool;
 use aptos_vm::AptosVM;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
 use futures::future::BoxFuture;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+};
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
@@ -364,7 +382,10 @@ impl ProposalGenerator {
 
         let skip_non_rand_blocks = self.onchain_randomness_config.skip_non_rand_blocks();
 
-        let (validator_txns, payload, payload_txns, timestamp) = if hqc.certified_block().has_reconfiguration() {
+        let (validator_txns, payload, payload_txns, timestamp) = if hqc
+            .certified_block()
+            .has_reconfiguration()
+        {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
             (
@@ -486,7 +507,12 @@ impl ProposalGenerator {
                 payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
             }
 
-            (validator_txns, payload, payload_txns, timestamp.as_micros() as u64)
+            (
+                validator_txns,
+                payload,
+                payload_txns,
+                timestamp.as_micros() as u64,
+            )
         };
 
         let PayloadTxns {
@@ -508,10 +534,12 @@ impl ProposalGenerator {
         // Check if the block contains any randomness transaction
         let maybe_require_randomness = skip_non_rand_blocks.then(|| {
             ref_txns.par_iter().any(|txns| {
-                self.validator.read().check_randomness_in_batch(txns.as_ref())
-            })
-            |
-            inline_txns.par_iter().any(|txn| self.validator.read().check_randomness(txn))
+                self.validator
+                    .read()
+                    .check_randomness_in_batch(txns.as_ref())
+            }) | inline_txns
+                .par_iter()
+                .any(|txn| self.validator.read().check_randomness(txn))
         });
 
         observe_block(timestamp, BlockStage::CHECKED_RAND);

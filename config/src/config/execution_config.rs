@@ -78,7 +78,7 @@ impl Default for ExecutionConfig {
             genesis: None,
             genesis_file_location: PathBuf::new(),
             // use min of (num of cores/2, DEFAULT_CONCURRENCY_LEVEL) as default concurrency level
-            concurrency_level: 0,
+            concurrency_level: 24,
             num_proof_reading_threads: 32,
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,

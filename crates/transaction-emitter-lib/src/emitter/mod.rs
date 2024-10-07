@@ -208,7 +208,7 @@ impl Default for EmitJobRequest {
             txn_expiration_time_secs: 60,
             init_expiration_multiplier: 3.0,
             init_retry_interval: Duration::from_secs(10),
-            num_accounts_mode: NumAccountsMode::TransactionsPerAccount(20),
+            num_accounts_mode: NumAccountsMode::TransactionsPerAccount(10),
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: None,
             expected_gas_per_transfer: EXPECTED_GAS_PER_TRANSFER,

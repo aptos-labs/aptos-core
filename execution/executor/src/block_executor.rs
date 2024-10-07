@@ -310,9 +310,9 @@ where
         // At this point of time two things must happen
         // 1. The block tree must also have the current block id with or without the ledger update output.
         // 2. We must have the ledger update output of the parent block.
-        let parent_output = parent_block.output.get_ledger_update();
+        let parent_output = parent_block.output.get_ledger_update()?;
         let parent_accumulator = parent_output.txn_accumulator();
-        let current_output = block_vec.pop().expect("Must exist").unwrap();
+        let current_output = block_vec.pop().expect("Must exist").ok_or(ExecutorError::BlockNotFound(block_id))?;
         parent_block.ensure_has_child(block_id)?;
         if current_output.output.has_ledger_update() {
             info!(
@@ -322,6 +322,7 @@ where
             return Ok(current_output
                 .output
                 .get_ledger_update()
+                .unwrap()
                 .as_state_compute_result(
                     parent_accumulator,
                     current_output.output.epoch_state().clone(),
@@ -378,7 +379,7 @@ where
             Err(anyhow::anyhow!("Injected error in pre_commit_block.").into())
         });
 
-        let ledger_update = block.output.get_ledger_update();
+        let ledger_update = block.output.get_ledger_update()?;
         if !ledger_update.transactions_to_commit().is_empty() {
             let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
             self.db.writer.pre_commit_ledger(
