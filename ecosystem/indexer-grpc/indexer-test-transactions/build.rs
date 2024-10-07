@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use std::{env, fs, path::Path};
 
 const IMPORTED_MAINNET_TXNS: &str = "imported_mainnet_txns";
@@ -14,7 +17,12 @@ impl TransactionCodeBuilder {
         Self::default()
     }
 
-    pub fn add_directory(mut self, dir_name: &str, module_name: &str, generate_name_function: bool) -> Self {
+    pub fn add_directory(
+        mut self,
+        dir_name: &str,
+        module_name: &str,
+        generate_name_function: bool,
+    ) -> Self {
         let json_dir = Path::new("json_transactions").join(dir_name);
         let mut all_constants = String::new();
 
@@ -101,7 +109,7 @@ fn main() {
     // Using the builder pattern to construct the code
     let code = TransactionCodeBuilder::new()
         .add_directory(IMPORTED_MAINNET_TXNS, IMPORTED_MAINNET_TXNS, false)
-        .add_directory(IMPORTED_TESTNET_TXNS, IMPORTED_TESTNET_TXNS,false)
+        .add_directory(IMPORTED_TESTNET_TXNS, IMPORTED_TESTNET_TXNS, false)
         .add_directory(SCRIPTED_TRANSACTIONS_TXNS, SCRIPTED_TRANSACTIONS_TXNS, true)
         .add_transaction_name_function()
         .build();
