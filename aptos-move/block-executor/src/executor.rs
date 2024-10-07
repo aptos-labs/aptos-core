@@ -1165,7 +1165,7 @@ where
                 let (id, write_op) = write.unpack();
                 let entry =
                     ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
-                unsync_map.write_module_storage_entry(id, Arc::new(entry));
+                unsync_map.code_cache().cache_module(id, Arc::new(entry));
             } else {
                 #[allow(deprecated)]
                 unsync_map.write_module(key, write.into_write_op());

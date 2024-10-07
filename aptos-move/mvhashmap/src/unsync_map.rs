@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scripts::ScriptCacheEntry,
+    code_cache::UnsyncCodeCache,
     types::{GroupReadResult, UnsyncGroupError, ValueWithLayout},
     BlockStateStats,
 };
@@ -12,16 +12,10 @@ use aptos_crypto::hash::HashValue;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     executable::ModulePath,
-    vm::modules::ModuleStorageEntry,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use move_binary_format::file_format::CompiledScript;
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    value::MoveTypeLayout,
-};
-use move_vm_runtime::Script;
+use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -52,9 +46,8 @@ pub struct UnsyncMap<
     #[deprecated]
     module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
 
-    // Code caches for loader V2 implementation: module storage and script cache.
-    module_storage: RefCell<hashbrown::HashMap<ModuleId, Arc<ModuleStorageEntry>>>,
-    script_cache: RefCell<HashMap<[u8; 32], ScriptCacheEntry>>,
+    // Code caches for loader V2 implementation: contains modules and scripts.
+    code_cache: UnsyncCodeCache,
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
@@ -72,8 +65,7 @@ impl<
         Self {
             resource_map: RefCell::new(HashMap::new()),
             module_map: RefCell::new(HashMap::new()),
-            module_storage: RefCell::new(hashbrown::HashMap::new()),
-            script_cache: RefCell::new(HashMap::new()),
+            code_cache: UnsyncCodeCache::empty(),
             group_cache: RefCell::new(HashMap::new()),
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
@@ -93,9 +85,14 @@ impl<
         Self::default()
     }
 
+    /// Returns the code cache stored in this [UnsyncMap].
+    pub fn code_cache(&self) -> &UnsyncCodeCache {
+        &self.code_cache
+    }
+
     pub fn stats(&self) -> BlockStateStats {
         #[allow(deprecated)]
-        let num_modules = self.module_map.borrow().len() + self.module_storage.borrow().len();
+        let num_modules = self.module_map.borrow().len() + self.code_cache.num_modules();
         BlockStateStats {
             num_resources: self.resource_map.borrow().len(),
             num_resource_groups: self.group_cache.borrow().len(),
@@ -287,46 +284,6 @@ impl<
             .map(|entry| entry.0.clone())
     }
 
-    pub fn fetch_module(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> Option<Arc<ModuleStorageEntry>> {
-        self.module_storage
-            .borrow()
-            .get(&(address, module_name))
-            .cloned()
-    }
-
-    pub fn get_deserialized_script(&self, hash: &[u8; 32]) -> Option<Arc<CompiledScript>> {
-        Some(self.script_cache.borrow().get(hash)?.as_compiled_script())
-    }
-
-    pub fn cache_deserialized_script(&self, hash: [u8; 32], compiled_script: Arc<CompiledScript>) {
-        use ScriptCacheEntry::*;
-        self.script_cache
-            .borrow_mut()
-            .insert(hash, Deserialized(compiled_script));
-    }
-
-    pub fn get_verified_script(
-        &self,
-        hash: &[u8; 32],
-    ) -> Option<Result<Arc<Script>, Arc<CompiledScript>>> {
-        use ScriptCacheEntry::*;
-        Some(match self.script_cache.borrow().get(hash)? {
-            Verified(script) => Ok(script.clone()),
-            Deserialized(compiled_script) => Err(compiled_script.clone()),
-        })
-    }
-
-    pub fn cache_verified_script(&self, hash: [u8; 32], script: Arc<Script>) {
-        use ScriptCacheEntry::*;
-        self.script_cache
-            .borrow_mut()
-            .insert(hash, Verified(script));
-    }
-
     pub fn fetch_delayed_field(&self, id: &I) -> Option<DelayedFieldValue> {
         self.delayed_field_map.borrow().get(id).cloned()
     }
@@ -343,10 +300,6 @@ impl<
         self.module_map
             .borrow_mut()
             .insert(key, (Arc::new(value), None));
-    }
-
-    pub fn write_module_storage_entry(&self, module_id: ModuleId, entry: Arc<ModuleStorageEntry>) {
-        self.module_storage.borrow_mut().insert(module_id, entry);
     }
 
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
