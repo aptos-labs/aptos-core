@@ -157,4 +157,12 @@ module std::bcs_tests {
 
         assert!(std::cmp::compare(&bytes_val, &bytes_other).is_lt());
     }
+
+    #[test(s1 = @0x123)]
+    fun test_signer_serialization(s1: signer) {
+        assert!(
+            bcs::to_bytes(&s1) == bcs::to_bytes(&@0x123),
+            1
+        );
+    }
 }

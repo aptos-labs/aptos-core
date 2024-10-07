@@ -64,6 +64,8 @@ module aptos_std::from_bcs {
     /// Note that this function does not put any constraint on `T`. If code uses this function to
     /// deserialize a linear value, its their responsibility that the data they deserialize is
     /// owned.
+    ///
+    /// Function would abort if T has signer in it.
     public(friend) native fun from_bytes<T>(bytes: vector<u8>): T;
     friend aptos_std::any;
     friend aptos_std::copyable_any;
@@ -87,5 +89,11 @@ module aptos_std::from_bcs {
     fun test_address_fail() {
         let bad_vec = b"01";
         to_address(bad_vec);
+    }
+
+    #[test(s1 = @0x123)]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
+    fun test_signer_roundtrip(s1: signer) {
+        from_bytes<signer>(bcs::to_bytes(&s1));
     }
 }
