@@ -11,7 +11,10 @@ use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, language_storage::ModuleId, value::MoveValue,
 };
-use std::str::FromStr;
+use std::{
+    path::PathBuf,
+    str::FromStr
+};
 
 fn load_module(builder: &mut BatchedFunctionCallBuilder, harness: &MoveHarness, module_name: &str) {
     let module = ModuleId::from_str(module_name).unwrap();
@@ -230,4 +233,27 @@ fn chained_deposit_invalid_copy() {
             ],
         )
         .is_err());
+}
+
+#[test]
+fn test_module() {
+    let mut h = MoveHarness::new();
+    let account = h.new_account_at(AccountAddress::ONE);
+    let module_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("tests")
+        .join("test_modules");
+    h.publish_package_cache_building(&account, &module_path);
+
+    // Create a copyable value and copy it twice
+
+    // Create a droppable value and never use it.
+
+    // Create a value and pass by reference
+
+    // Create a value and pass by mutable reference and then mutate.
+
+    // Create a value and pass it to a generic function
+
+    // Create a copyable value with generics and pass it over.
 }
