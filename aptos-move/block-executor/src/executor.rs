@@ -406,10 +406,7 @@ where
 
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
-            && read_set.validate_module_reads(
-                versioned_cache.code_storage().module_storage(),
-                idx_to_validate,
-            )
+            && read_set.validate_module_reads(versioned_cache.code_cache())
     }
 
     fn update_transaction_on_abort(
@@ -589,7 +586,6 @@ where
                         if !module_write_set.is_empty() {
                             executed_at_commit = true;
                             Self::publish_module_writes(
-                                txn_idx,
                                 module_write_set,
                                 versioned_cache,
                                 runtime_environment,
@@ -620,7 +616,6 @@ where
                 if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
                     if !module_write_set.is_empty() {
                         Self::publish_module_writes(
-                            txn_idx,
                             module_write_set,
                             versioned_cache,
                             runtime_environment,
@@ -708,7 +703,6 @@ where
     }
 
     fn publish_module_writes(
-        txn_idx: TxnIndex,
         module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         runtime_environment: &RuntimeEnvironment,
@@ -722,9 +716,9 @@ where
             let (id, write_op) = write.unpack();
             let entry = ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
             versioned_cache
-                .code_storage()
-                .module_storage()
-                .write_published(id, txn_idx, entry);
+                .code_cache()
+                .module_cache()
+                .cache_module(id, Arc::new(entry));
         }
 
         // In case framework got upgraded, this should detect it and flush the cache.
