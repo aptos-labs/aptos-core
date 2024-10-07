@@ -22,7 +22,10 @@ use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
+    vm::{
+        modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
+        scripts::ScriptCacheEntry,
+    },
 };
 use aptos_vm_types::module_and_script_storage::{
     code_storage::AptosCodeStorage, module_storage::AptosModuleStorage,
@@ -78,32 +81,34 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
         &self,
         serialized_script: &[u8],
     ) -> VMResult<Arc<CompiledScript>> {
-        let hash = compute_code_hash(serialized_script);
+        use ScriptCacheEntry::*;
 
-        let maybe_compiled_script = match &self.latest_view {
+        let hash = compute_code_hash(serialized_script);
+        let entry = match &self.latest_view {
             ViewState::Sync(state) => state
                 .versioned_map
                 .code_storage()
-                .get_deserialized_script(&hash),
-            ViewState::Unsync(state) => state.unsync_map.get_deserialized_script(&hash),
+                .fetch_cached_script(&hash),
+            ViewState::Unsync(state) => state.unsync_map.code_cache().fetch_cached_script(&hash),
         };
 
-        Ok(match maybe_compiled_script {
-            Some(compiled_script) => compiled_script,
+        Ok(match entry {
+            Some(Verified(script)) => script.as_compiled_script(),
+            Some(Deserialized(compiled_script)) => compiled_script,
             None => {
                 let compiled_script = Arc::new(
                     self.runtime_environment
                         .deserialize_into_script(serialized_script)?,
                 );
 
+                let entry = Deserialized(compiled_script.clone());
                 match &self.latest_view {
-                    ViewState::Sync(state) => state
-                        .versioned_map
-                        .code_storage()
-                        .cache_deserialized_script(hash, compiled_script.clone()),
-                    ViewState::Unsync(state) => state
-                        .unsync_map
-                        .cache_deserialized_script(hash, compiled_script.clone()),
+                    ViewState::Sync(state) => {
+                        state.versioned_map.code_storage().cache_script(hash, entry)
+                    },
+                    ViewState::Unsync(state) => {
+                        state.unsync_map.code_cache().cache_script(hash, entry)
+                    },
                 }
                 compiled_script
             },
@@ -111,19 +116,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
     }
 
     fn verify_and_cache_script(&self, serialized_script: &[u8]) -> VMResult<Arc<Script>> {
-        let hash = compute_code_hash(serialized_script);
+        use ScriptCacheEntry::*;
 
-        let maybe_verified_script = match &self.latest_view {
+        let hash = compute_code_hash(serialized_script);
+        let entry = match &self.latest_view {
             ViewState::Sync(state) => state
                 .versioned_map
                 .code_storage()
-                .get_verified_script(&hash),
-            ViewState::Unsync(state) => state.unsync_map.get_verified_script(&hash),
+                .fetch_cached_script(&hash),
+            ViewState::Unsync(state) => state.unsync_map.code_cache().fetch_cached_script(&hash),
         };
 
-        let compiled_script = match maybe_verified_script {
-            Some(Ok(script)) => return Ok(script),
-            Some(Err(compiled_script)) => compiled_script,
+        let compiled_script = match entry {
+            Some(Verified(script)) => return Ok(script),
+            Some(Deserialized(compiled_script)) => compiled_script,
             None => self.deserialize_and_cache_script(serialized_script)?,
         };
 
@@ -146,14 +152,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> CodeStorage
             .build_verified_script(locally_verified_script, &immediate_dependencies)?;
         let script = Arc::new(script);
 
+        let entry = Verified(script.clone());
         match &self.latest_view {
-            ViewState::Sync(state) => state
-                .versioned_map
-                .code_storage()
-                .cache_verified_script(hash, script.clone()),
-            ViewState::Unsync(state) => {
-                state.unsync_map.cache_verified_script(hash, script.clone())
-            },
+            ViewState::Sync(state) => state.versioned_map.code_storage().cache_script(hash, entry),
+            ViewState::Unsync(state) => state.unsync_map.code_cache().cache_script(hash, entry),
         }
         Ok(script)
     }
@@ -349,18 +351,24 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     .borrow_mut()
                     .module_storage_reads
                     .insert(ModuleId::new(*address, module_name.to_owned()));
-                Ok(match state.unsync_map.fetch_module(address, module_name) {
-                    // For sequential execution, indices do not matter, but we still return
-                    // them to have uniform interfaces.
-                    Some(entry) => ModuleStorageRead::before_txn_idx(self.txn_idx, entry),
-                    None => {
-                        let key = T::Key::from_address_and_module_name(address, module_name);
-                        match self.get_base_module_storage_entry(&key)? {
-                            Some(entry) => ModuleStorageRead::storage_version(entry),
-                            None => ModuleStorageRead::DoesNotExist,
-                        }
+                Ok(
+                    match state
+                        .unsync_map
+                        .code_cache()
+                        .fetch_cached_module(address, module_name)
+                    {
+                        // For sequential execution, indices do not matter, but we still return
+                        // them to have uniform interfaces.
+                        Some(entry) => ModuleStorageRead::before_txn_idx(self.txn_idx, entry),
+                        None => {
+                            let key = T::Key::from_address_and_module_name(address, module_name);
+                            match self.get_base_module_storage_entry(&key)? {
+                                Some(entry) => ModuleStorageRead::storage_version(entry),
+                                None => ModuleStorageRead::DoesNotExist,
+                            }
+                        },
                     },
-                })
+                )
             },
         }
     }
@@ -463,7 +471,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             ViewState::Unsync(state) => {
                 state
                     .unsync_map
-                    .write_module_storage_entry(id, verified_entry);
+                    .code_cache()
+                    .cache_module(id, verified_entry);
             },
         }
         Ok(module)
