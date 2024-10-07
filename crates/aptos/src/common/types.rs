@@ -1501,12 +1501,12 @@ pub struct ChangeSummary {
 pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
-    pub faucet_url: Option<reqwest::Url>,
+    faucet_url: Option<reqwest::Url>,
 
     /// Auth token to bypass faucet ratelimits. You can also set this as an environment
     /// variable with FAUCET_AUTH_TOKEN.
     #[clap(long, env)]
-    pub faucet_auth_token: Option<String>,
+    faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
@@ -1623,7 +1623,7 @@ pub struct TransactionOptions {
     #[clap(flatten)]
     pub(crate) gas_options: GasOptions,
     #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
+    pub prompt_options: PromptOptions,
 
     /// If this option is set, simulate the transaction locally.
     #[clap(long)]
@@ -2037,7 +2037,7 @@ pub struct MultisigAccountWithSequenceNumber {
     pub(crate) sequence_number: u64,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct TypeArgVec {
     /// TypeTag arguments separated by spaces.
     ///
@@ -2076,7 +2076,7 @@ impl TryInto<Vec<TypeTag>> for TypeArgVec {
     }
 }
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Debug, Default, Parser)]
 pub struct ArgWithTypeVec {
     /// Arguments combined with their type separated by spaces.
     ///
@@ -2242,7 +2242,7 @@ impl TryInto<ViewRequest> for EntryFunctionArguments {
 }
 
 /// Common options for constructing a script payload
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct ScriptFunctionArguments {
     #[clap(flatten)]
     pub(crate) type_arg_vec: TypeArgVec,

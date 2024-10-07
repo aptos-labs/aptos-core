@@ -765,11 +765,17 @@ pub enum StatusCode {
     TYPE_RESOLUTION_FAILURE = 2021,
     DUPLICATE_NATIVE_FUNCTION = 2022,
     // code invariant error while handling delayed materialization, should never happen,
-    // always indicates a code bug.
-    // Delayed materialization includes handling of Resource Groups and Delayed Fields.
-    // Unlike regular CODE_INVARIANT_ERROR, this is a signal to BlockSTM,
-    // which it might do something about (i.e. fallback to sequential execution)
-    DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR = 2023,
+    // always indicates a code bug. Delayed materialization includes handling of
+    // Resource Groups and Delayed Fields. Unlike regular CODE_INVARIANT_ERROR, this
+    // is a signal to BlockSTM, which it might do something about (i.e. fallback to
+    // sequential execution).
+    // Note: This status is created both from third_party (move) and block executor
+    // (aptos-move in the adapter). In the later case, it can now also represent more
+    // general invariant violations beyond delayed fields, due to the convenience of
+    // handling such issues with asserts (e.g. by falling back to sequential execution).
+    // TODO: can be audited and broken down into specific types, once implementation
+    // is also not duplicated.
+    DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR = 2023,
     // Speculative error means that there was an issue because of speculative
     // reads provided to the transaction, and the transaction needs to
     // be re-executed.

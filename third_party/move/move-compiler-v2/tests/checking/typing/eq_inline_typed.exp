@@ -1,0 +1,18 @@
+
+Diagnostics:
+warning: Unused parameter `f`. Consider removing or prefixing with an underscore: `_f`
+  ┌─ tests/checking/typing/eq_inline_typed.move:3:20
+  │
+3 │     inline fun foo(f: |&u64|) {
+  │                    ^
+
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    private inline fun foo(f: |&u64|) {
+        Tuple()
+    }
+    private fun g() {
+        Tuple();
+        Tuple()
+    }
+} // end 0x42::m

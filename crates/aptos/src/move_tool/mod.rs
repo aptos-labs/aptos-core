@@ -78,7 +78,7 @@ pub use stored_package::*;
 use tokio::task;
 use url::Url;
 
-mod aptos_debug_natives;
+pub mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
 mod fmt;
@@ -174,7 +174,7 @@ impl MoveTool {
     }
 }
 
-#[derive(Parser, Default)]
+#[derive(Default, Parser)]
 pub struct FrameworkPackageArgs {
     /// Git revision or branch for the Aptos framework
     ///
@@ -379,12 +379,12 @@ pub struct CompilePackage {
     /// If set, package metadata should be generated and stored in the package's build directory.
     /// This metadata can be used to construct a transaction to publish a package.
     #[clap(long)]
-    pub(crate) save_metadata: bool,
+    pub save_metadata: bool,
 
     #[clap(flatten)]
-    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
-    pub(crate) move_options: MovePackageDir,
+    pub move_options: MovePackageDir,
 }
 
 #[async_trait]
@@ -726,7 +726,7 @@ pub struct IncludedArtifactsArgs {
     /// is the size of bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4
     /// as much.
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
-    pub(crate) included_artifacts: IncludedArtifacts,
+    pub included_artifacts: IncludedArtifacts,
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain
@@ -848,7 +848,7 @@ impl FromStr for IncludedArtifacts {
     }
 }
 
-pub(crate) fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
+pub fn experiments_from_opt_level(optlevel: &Option<OptimizationLevel>) -> Vec<String> {
     match optlevel {
         None | Some(OptimizationLevel::Default) => {
             vec![format!("{}=on", Experiment::OPTIMIZE.to_string())]
@@ -2056,11 +2056,11 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
 #[derive(Parser)]
 pub struct RunScript {
     #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+    pub txn_options: TransactionOptions,
     #[clap(flatten)]
-    pub(crate) compile_proposal_args: CompileScriptFunction,
+    pub compile_proposal_args: CompileScriptFunction,
     #[clap(flatten)]
-    pub(crate) script_function_args: ScriptFunctionArguments,
+    pub script_function_args: ScriptFunctionArguments,
 }
 
 #[async_trait]

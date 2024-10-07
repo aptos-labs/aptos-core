@@ -1,0 +1,29 @@
+
+Diagnostics:
+note: unused schema X::Foo
+  ┌─ tests/more-v1/expansion/use_spec_schema.move:3:5
+  │
+3 │ ╭     spec schema Foo<T> {
+4 │ │         ensures true;
+5 │ │     }
+  │ ╰─────^
+
+note: unused schema X::Bar
+  ┌─ tests/more-v1/expansion/use_spec_schema.move:7:5
+  │
+7 │ ╭     spec schema Bar<T> {
+8 │ │         ensures true;
+9 │ │     }
+  │ ╰─────^
+
+error: the `apply` schema weaving operator can only be used inside a `spec module` block
+   ┌─ tests/more-v1/expansion/use_spec_schema.move:19:9
+   │
+19 │         apply Foo<S> to t;
+   │         ^^^^^^^^^^^^^^^^^^
+
+error: the `apply` schema weaving operator can only be used inside a `spec module` block
+   ┌─ tests/more-v1/expansion/use_spec_schema.move:20:9
+   │
+20 │         apply Baz<S> to t;
+   │         ^^^^^^^^^^^^^^^^^^

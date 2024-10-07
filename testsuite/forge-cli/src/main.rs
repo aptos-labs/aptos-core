@@ -65,6 +65,7 @@ use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use serde_json::{json, Value};
 use std::{
     env,
     num::NonZeroUsize,
@@ -140,8 +141,8 @@ enum OperatorCommand {
     SetNodeImageTag(SetNodeImageTag),
     /// Clean up an existing cluster
     CleanUp(CleanUp),
-    /// Resize an existing cluster
-    Resize(Resize),
+    /// Create a new cluster for testing purposes
+    Create(Create),
 }
 
 #[derive(Parser, Debug)]
@@ -193,6 +194,11 @@ struct K8sSwarm {
         help = "Retain debug logs and above for all nodes instead of just the first 5 nodes"
     )]
     retain_debug_logs: bool,
+    #[clap(
+        long,
+        help = "If set, spins up an indexer stack alongside the testnet. Same as --enable-indexer"
+    )]
+    enable_indexer: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -217,8 +223,8 @@ struct CleanUp {
 }
 
 #[derive(Parser, Debug)]
-struct Resize {
-    #[clap(long, help = "The kubernetes namespace to resize")]
+struct Create {
+    #[clap(long, help = "The kubernetes namespace to create in")]
     namespace: String,
     #[clap(long, default_value_t = 30)]
     num_validators: usize,
@@ -227,13 +233,13 @@ struct Resize {
     #[clap(
         long,
         help = "Override the image tag used for validators",
-        default_value = "devnet"
+        default_value = "main"
     )]
     validator_image_tag: String,
     #[clap(
         long,
         help = "Override the image tag used for testnet-specific components",
-        default_value = "devnet"
+        default_value = "main"
     )]
     testnet_image_tag: String,
     #[clap(
@@ -248,6 +254,14 @@ struct Resize {
     connect_directly: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
+    #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
+    enable_indexer: bool,
+    #[clap(
+        long,
+        help = "Override the image tag used for indexer",
+        requires = "enable_indexer"
+    )]
+    indexer_image_tag: Option<String>,
 }
 
 // common metrics thresholds:
@@ -393,6 +407,7 @@ fn main() -> Result<()> {
                             k8s.reuse,
                             k8s.keep,
                             k8s.enable_haproxy,
+                            k8s.enable_indexer,
                         )
                         .unwrap(),
                         &args.options,
@@ -421,19 +436,51 @@ fn main() -> Result<()> {
                 }
                 Ok(())
             },
-            OperatorCommand::Resize(resize) => {
+            OperatorCommand::Create(create) => {
+                let kube_client = runtime.block_on(create_k8s_client())?;
+                let era = generate_new_era();
+                let indexer_image_tag = create
+                    .indexer_image_tag
+                    .or(Some(create.validator_image_tag.clone()))
+                    .expect("Expected indexer or validator image tag to use");
+                let config: Value = serde_json::from_value(json!({
+                    "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+                    "era": era.clone(),
+                    "namespace": create.namespace.clone(),
+                    "indexer-grpc-values": {
+                        "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, &indexer_image_tag),
+                        "fullnodeConfig": {
+                            "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, &indexer_image_tag),
+                        }
+                    },
+                }))?;
+
                 runtime.block_on(install_testnet_resources(
-                    resize.namespace,
-                    resize.num_validators,
-                    resize.num_fullnodes,
-                    resize.validator_image_tag,
-                    resize.testnet_image_tag,
-                    resize.move_modules_dir,
-                    !resize.connect_directly,
-                    resize.enable_haproxy,
+                    era.clone(),
+                    create.namespace.clone(),
+                    create.num_validators,
+                    create.num_fullnodes,
+                    create.validator_image_tag,
+                    create.testnet_image_tag,
+                    create.move_modules_dir,
+                    false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
+                    create.enable_haproxy,
+                    create.enable_indexer,
                     None,
                     None,
+                    true,
                 ))?;
+
+                if create.enable_indexer {
+                    let indexer_deployer = ForgeDeployerManager::new(
+                        kube_client.clone(),
+                        create.namespace.clone(),
+                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        None,
+                    );
+                    runtime.block_on(indexer_deployer.start(config))?;
+                    runtime.block_on(indexer_deployer.wait_completed())?;
+                }
                 Ok(())
             },
         },

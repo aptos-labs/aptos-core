@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/unexpected_token_after_ability_modifier.move:4:25
+  │
+4 │     struct Foo has copy & drop {}
+  │                         ^
+  │                         │
+  │                         Unexpected '&'
+  │                         Expected one of: ',', '{', or ';'

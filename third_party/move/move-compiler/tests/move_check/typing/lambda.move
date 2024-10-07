@@ -58,7 +58,7 @@ module 0x8675309::M {
     }
 
     public fun wrong_local_call_no_fun(x: u64) {
-        x(1)
+        x(1) // expected to be not a function
     }
 
     public fun wrong_lambda_inferred_type() {

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: undeclared `_76`
+  ┌─ tests/more-v1/parser/num_literal_underscore_leading_no_type_suffix.move:4:17
+  │
+4 │         let _ = _76;
+  │                 ^^^

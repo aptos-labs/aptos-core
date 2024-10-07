@@ -92,6 +92,18 @@ impl ProcessorManager {
             ProcessorName::ParquetFungibleAssetProcessor => {
                 bail!("ParquetFungibleAssetProcessor is not supported in the localnet")
             },
+            ProcessorName::ParquetTransactionMetadataProcessor => {
+                bail!("ParquetTransactionMetadataProcessor is not supported in the localnet")
+            },
+            ProcessorName::ParquetAnsProcessor => {
+                bail!("ParquetAnsProcessor is not supported in the localnet")
+            },
+            ProcessorName::ParquetEventsProcessor => {
+                bail!("ParquetEventsProcessor is not supported in the localnet")
+            },
+            ProcessorName::ParquetTokenV2Processor => {
+                bail!("ParquetTokenV2Processor is not supported in the localnet")
+            },
             ProcessorName::StakeProcessor => {
                 ProcessorConfig::StakeProcessor(StakeProcessorConfig {
                     query_retries: Default::default(),

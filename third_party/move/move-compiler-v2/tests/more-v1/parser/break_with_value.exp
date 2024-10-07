@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/break_with_value.move:3:22
+  │
+3 │         loop { break 0 };
+  │                      ^
+  │                      │
+  │                      Unexpected '0'
+  │                      Expected the end of an expression
+  │
+  = 'break' with a value is not yet supported
