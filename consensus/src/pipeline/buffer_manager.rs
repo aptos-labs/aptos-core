@@ -209,7 +209,6 @@ impl BufferManager {
             .max_delay(Duration::from_secs(5));
 
         let (tx, rx) = unbounded();
-        let validators = epoch_state.verifier.get_ordered_account_addresses();
         Self {
             author,
 
@@ -227,7 +226,7 @@ impl BufferManager {
 
             reliable_broadcast: ReliableBroadcast::new(
                 author,
-                validators,
+                epoch_state.verifier.get_ordered_account_addresses(),
                 commit_msg_tx.clone(),
                 rb_backoff_policy,
                 TimeService::real(),

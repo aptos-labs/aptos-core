@@ -333,7 +333,7 @@ impl TExecutionClient for ExecutionProxyClient {
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled();
         self.execution_proxy.new_epoch(
-            &epoch_state.clone(),
+            &epoch_state,
             payload_manager,
             transaction_shuffler,
             block_executor_onchain_config,
