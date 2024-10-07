@@ -162,9 +162,16 @@ fn build_test_info(
 
     let mut arguments = Vec::new();
     for param in function.get_parameters_ref() {
-        let Parameter(var, _ty, var_loc) = &param;
+        let Parameter(var, ty, var_loc) = &param;
 
         match test_annotation_params.get(var) {
+            Some(MoveValue::Address(addr)) => arguments.push(match ty {
+                Type::Primitive(PrimitiveType::Signer) => MoveValue::Signer(*addr),
+                Type::Reference(_, inner) if **inner == Type::Primitive(PrimitiveType::Signer) => {
+                    MoveValue::Signer(*addr)
+                },
+                _ => MoveValue::Address(*addr),
+            }),
             Some(value) => arguments.push(value.clone()),
             None => {
                 let missing_param_msg = "Missing test parameter assignment in test. Expected a \

@@ -137,3 +137,13 @@ fn nested_typed_struct_deserialization() {
         })
     );
 }
+
+#[test]
+fn signer_deserialization() {
+    let v = MoveValue::Signer(AccountAddress::ZERO);
+    let bytes = v.simple_serialize().unwrap();
+    assert_eq!(
+        MoveValue::simple_deserialize(&bytes, &crate::value::MoveTypeLayout::Signer).unwrap(),
+        v
+    );
+}
