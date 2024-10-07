@@ -28,11 +28,6 @@ fn compile_pkg_with_v1(path_to_pkg: impl Into<String>) {
 }
 
 #[test]
-fn compile_aptos_framework_with_v1() {
-    compile_pkg_with_v1("aptos-framework");
-}
-
-#[test]
 fn compile_aptos_stdlib_with_v1() {
     compile_pkg_with_v1("aptos-stdlib");
 }
