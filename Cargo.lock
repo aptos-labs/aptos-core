@@ -3694,6 +3694,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "e2e-move-tests",
+ "getrandom 0.2.11",
  "hex",
  "move-binary-format",
  "move-bytecode-verifier",

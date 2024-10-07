@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ArgumentOperation, BatchArgument, BatchedFunctionCall, PreviousResult, APTOS_INTENT_KEY,
+    ArgumentOperation, BatchArgument, BatchedFunctionCall, PreviousResult, APTOS_SCRIPT_BUILDER_KEY,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -22,15 +22,23 @@ use std::collections::BTreeMap;
 #[derive(Default)]
 struct Context {
     script: CompiledScript,
+    // Arguments to the compiled script.
     args: Vec<Vec<u8>>,
+    // Type arguments to the compiled script.
     ty_args: Vec<TypeTag>,
+    // (nth move call) -> (starting position of its return values in the local pool)
     returned_val_to_local: Vec<u16>,
+    // (nth move call) -> (starting position of its arguments in the argument pool)
     args_to_local: Vec<u16>,
-
+    // (nth move call) -> how many return values it got
     return_counts: Vec<u16>,
+    // Number of signers at the beginning of arugment pool
     signer_counts: u16,
+    // Local signature pool of the script. We will use this pool to replace the pool in CompiledScript.
     locals: Vec<SignatureToken>,
+    // Parameter signature pool of the script. We will use this pool to replace the pool in CompiledScript.
     parameters: Vec<SignatureToken>,
+    // Pool to count distinct number of generic type arguments in the calls.
     ty_args_to_idx: BTreeMap<TypeTag, u16>,
 }
 
@@ -63,6 +71,7 @@ fn instantiate(token: &SignatureToken, subst_mapping: &BTreeMap<u16, u16>) -> Si
 }
 
 impl Context {
+    // Add signers to the beginning of the script's parameter pool
     fn add_signers(&mut self, signer_counts: u16) -> PartialVMResult<()> {
         for _ in 0..signer_counts {
             self.parameters
@@ -72,11 +81,15 @@ impl Context {
         Ok(())
     }
 
+    // Iterate through the batched calls and convert all arguments in the BatchedFunctionCall into
+    // arguments to the script.
     fn allocate_parameters(&mut self, calls: &[BatchedFunctionCall]) -> PartialVMResult<()> {
         let mut total_args_count = self.parameters.len() as u16;
         for call in calls {
             self.args_to_local.push(total_args_count);
             for arg in call.args.iter() {
+                // Only the serialized arguments need to be allocated as input to the script.
+                // Return values from previous calls will be stored in the locals.
                 if let BatchArgument::Raw(bytes) = arg {
                     if total_args_count == TableIndex::MAX {
                         return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
@@ -89,19 +102,26 @@ impl Context {
         Ok(())
     }
 
+    // Generate instructions for invoking one batched call.
     fn compile_batched_call(
         &mut self,
         call: &BatchedFunctionCall,
         func_id: FunctionHandleIndex,
     ) -> PartialVMResult<()> {
         let func_handle = self.script.function_handle_at(func_id).clone();
+
+        // Allocate generic type parameters to the script
+        //
+        // Creates mapping from local type argument index to type argument index in the script
         let mut subst_mapping = BTreeMap::new();
         for (idx, ty_param) in call.ty_args.iter().enumerate() {
             subst_mapping.insert(
                 idx as u16,
                 if let Some(stored_idx) = self.ty_args_to_idx.get(ty_param) {
+                    // Type argument would be de-duped to help type equality check.
                     *stored_idx
                 } else {
+                    // Type argument is not yet seen, allocate a new type argument in the script.
                     let new_call_idx = self.ty_args.len() as u16;
                     if new_call_idx == TableIndex::MAX {
                         return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
@@ -128,10 +148,12 @@ impl Context {
                         if *return_idx >= self.return_counts[*call_idx as usize] {
                             return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
                         }
+                        // Locals will need to be offset by:
+                        // 1. The parameters to the script (signer + arguments)
+                        // 2. All the previously returned values prior to the call.
                         let local_idx =
                             (*idx + *return_idx + self.args.len() as u16 + self.signer_counts)
                                 as u8;
-                        // TODO: Check return_idx is in range.
                         self.script.code.code.push(match operation_type {
                             ArgumentOperation::Borrow => Bytecode::ImmBorrowLoc(local_idx),
                             ArgumentOperation::BorrowMut => Bytecode::MutBorrowLoc(local_idx),
@@ -141,9 +163,11 @@ impl Context {
                     }
                 },
                 BatchArgument::Signer(i) => {
+                    // Signer will always appear at the beginning of locals. No offsets needed.
                     self.script.code.code.push(Bytecode::CopyLoc(*i as u8));
                 },
                 BatchArgument::Raw(_) => {
+                    // A new serialized argument to the script. Push the type to the parameter pool of the script.
                     let type_ = &self.script.signature_at(func_handle.parameters).0[idx];
                     let inst_ty = if call.ty_args.is_empty() {
                         type_.clone()
@@ -166,12 +190,14 @@ impl Context {
             }
             let fi_idx =
                 FunctionInstantiationIndex(self.script.function_instantiations.len() as u16);
+
+            // Generic call type arguments will always be instantiated with script's type parameters.
             let inst_sig = subst_mapping
                 .values()
                 .map(|idx| SignatureToken::TypeParameter(*idx))
                 .collect();
 
-            let type_parameters = self.add_signature(Signature(inst_sig))?;
+            let type_parameters = self.import_signature(Signature(inst_sig))?;
             self.script
                 .function_instantiations
                 .push(FunctionInstantiation {
@@ -212,7 +238,7 @@ impl Context {
         Ok(())
     }
 
-    fn add_signature(&mut self, sig: Signature) -> PartialVMResult<SignatureIndex> {
+    fn import_signature(&mut self, sig: Signature) -> PartialVMResult<SignatureIndex> {
         Ok(SignatureIndex(match self
             .script
             .signatures()
@@ -258,21 +284,21 @@ pub fn generate_script_from_batched_calls(
             script_builder.import_call_by_name(&call.function, target_module)
         })
         .collect::<PartialVMResult<Vec<_>>>()?;
-    context.script = script_builder.into_inner();
+    context.script = script_builder.into_script();
     context.add_signers(signer_count)?;
     context.allocate_parameters(calls)?;
     for (call, fh_idx) in calls.iter().zip(call_idxs.into_iter()) {
         context.compile_batched_call(call, fh_idx)?;
     }
     context.script.code.code.push(Bytecode::Ret);
-    context.script.parameters = context.add_signature(Signature(context.parameters.clone()))?;
-    context.script.code.locals = context.add_signature(Signature(context.locals.clone()))?;
+    context.script.parameters = context.import_signature(Signature(context.parameters.clone()))?;
+    context.script.code.locals = context.import_signature(Signature(context.locals.clone()))?;
     move_bytecode_verifier::verify_script(&context.script).map_err(|err| {
         err.to_partial()
             .with_message(format!("{:?}", context.script))
     })?;
     context.script.metadata.push(Metadata {
-        key: APTOS_INTENT_KEY.to_owned(),
+        key: APTOS_SCRIPT_BUILDER_KEY.to_owned(),
         value: vec![],
     });
     let mut bytes = vec![];

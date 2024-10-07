@@ -14,6 +14,8 @@ use move_core_types::{
 };
 use std::collections::{btree_map::Entry, BTreeMap};
 
+/// Structure to support incremental additions to an existing `CompiledScript`.
+/// For incremental construction, start with `CompiledScript::new()`.
 pub struct CompiledScriptBuilder {
     script: CompiledScript,
     address_pool: BTreeMap<AccountAddress, usize>,
@@ -24,6 +26,8 @@ pub struct CompiledScriptBuilder {
     signature_pool: BTreeMap<Signature, usize>,
 }
 
+/// Checks `idx_map` for key `idx` and returns it if present; otherwise, calls `val` to obtain a new
+/// value, which is appended to `pool` and the resulting index stored in `idx_map` for later use.
 fn get_or_add_impl<T, I, F>(
     pool: &mut Vec<T>,
     idx_map: &mut BTreeMap<I, usize>,
@@ -48,6 +52,8 @@ where
     }
 }
 
+/// Check if `val` is in `idx_map` and returns it if present. Otherwise, append `val` to `pool` and the
+/// resulting index stored in `idx_map` for later use.
 fn get_or_add<T: Ord + Clone>(
     pool: &mut Vec<T>,
     idx_map: &mut BTreeMap<T, usize>,
@@ -304,7 +310,7 @@ impl CompiledScriptBuilder {
         Err(PartialVMError::new(StatusCode::LOOKUP_FAILED))
     }
 
-    pub fn into_inner(self) -> CompiledScript {
+    pub fn into_script(self) -> CompiledScript {
         self.script
     }
 }

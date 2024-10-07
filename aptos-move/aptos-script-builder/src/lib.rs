@@ -4,7 +4,7 @@
 
 pub use crate::{
     builder::{BatchArgumentWASM, BatchedFunctionCallBuilder},
-    decompiler::{generate_intent_payload, generate_intent_payload_wasm},
+    decompiler::{generate_batched_call_payload, generate_batched_call_payload_wasm},
 };
 use move_core_types::{
     identifier::Identifier,
@@ -19,8 +19,8 @@ mod decompiler;
 #[cfg(test)]
 pub mod tests;
 
-// CompiledScript generated from intents will have this key in its metadata to distinguish from other scripts.
-pub static APTOS_INTENT_KEY: &[u8] = "aptos::intent".as_bytes();
+// CompiledScript generated from script builder will have this key in its metadata to distinguish from other scripts.
+pub static APTOS_SCRIPT_BUILDER_KEY: &[u8] = "aptos::script_builder".as_bytes();
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreviousResult {

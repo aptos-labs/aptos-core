@@ -30,7 +30,7 @@ fn simple_builder() {
     let mut builder = BatchedFunctionCallBuilder::single_signer();
     load_module(&mut builder, &h, "0x1::aptos_account");
     builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::aptos_account".to_string(),
             "transfer".to_string(),
             vec![],
@@ -62,7 +62,7 @@ fn simple_builder() {
     assert_eq!(h.read_aptos_balance(bob.address()), 1_000_000_000_000_010);
 
     assert_eq!(
-        crate::decompiler::generate_intent_payload_serialized(&script).unwrap(),
+        crate::decompiler::generate_batched_call_payload_serialized(&script).unwrap(),
         expected_calls
     );
 }
@@ -77,7 +77,7 @@ fn chained_deposit() {
     load_module(&mut builder, &h, "0x1::coin");
     load_module(&mut builder, &h, "0x1::primary_fungible_store");
     let mut returns_1 = builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::coin".to_string(),
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
@@ -88,7 +88,7 @@ fn chained_deposit() {
         )
         .unwrap();
     let mut returns_2 = builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::coin".to_string(),
             "coin_to_fungible_asset".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
@@ -96,7 +96,7 @@ fn chained_deposit() {
         )
         .unwrap();
     builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::primary_fungible_store".to_string(),
             "deposit".to_string(),
             vec![],
@@ -127,7 +127,7 @@ fn chained_deposit() {
 
     assert_eq!(h.read_aptos_balance(bob.address()), 1_000_000_000_000_010);
     assert_eq!(
-        crate::decompiler::generate_intent_payload_serialized(&script).unwrap(),
+        crate::decompiler::generate_batched_call_payload_serialized(&script).unwrap(),
         expected_calls
     );
 }
@@ -141,7 +141,7 @@ fn chained_deposit_mismatch() {
     load_module(&mut builder, &h, "0x1::coin");
     load_module(&mut builder, &h, "0x1::primary_fungible_store");
     let mut returns_1 = builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::coin".to_string(),
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
@@ -152,7 +152,7 @@ fn chained_deposit_mismatch() {
         )
         .unwrap();
     assert!(builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::primary_fungible_store".to_string(),
             "deposit".to_string(),
             vec![],
@@ -178,7 +178,7 @@ fn chained_deposit_invalid_copy() {
     load_module(&mut builder, &h, "0x1::coin");
     load_module(&mut builder, &h, "0x1::primary_fungible_store");
     let mut returns_1 = builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::coin".to_string(),
             "withdraw".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
@@ -189,7 +189,7 @@ fn chained_deposit_invalid_copy() {
         )
         .unwrap();
     let mut returns_2 = builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::coin".to_string(),
             "coin_to_fungible_asset".to_string(),
             vec!["0x1::aptos_coin::AptosCoin".to_string()],
@@ -198,7 +198,7 @@ fn chained_deposit_invalid_copy() {
         .unwrap();
     let return_val = returns_2.pop().unwrap();
     assert!(builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::primary_fungible_store".to_string(),
             "deposit".to_string(),
             vec![],
@@ -215,7 +215,7 @@ fn chained_deposit_invalid_copy() {
         .is_err());
 
     assert!(builder
-        .add_batched_call(
+        .add_batched_call_wasm(
             "0x1::primary_fungible_store".to_string(),
             "deposit".to_string(),
             vec![],

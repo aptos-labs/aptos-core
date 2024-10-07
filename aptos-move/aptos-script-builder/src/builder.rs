@@ -42,11 +42,13 @@ pub struct BatchedFunctionCallBuilder {
     calls: Vec<BatchedFunctionCall>,
     num_signers: u16,
     modules: BTreeMap<ModuleId, CompiledModule>,
+    // (nth move call, position in the returned call results) -> (Type of the value, Ability of the value).
     type_of_returns: BTreeMap<(u16, u16), (TypeTag, AbilitySet)>,
 }
 
 #[wasm_bindgen]
 impl BatchedFunctionCallBuilder {
+    // Create a builder with one signer needed for script. This should be the default configuration.
     pub fn single_signer() -> Self {
         Self {
             calls: vec![],
@@ -56,6 +58,7 @@ impl BatchedFunctionCallBuilder {
         }
     }
 
+    // Create a builder with one signer needed for script. This would be needed for multi-agent transaction where multiple signers are present.
     pub fn multi_signer(signer_count: u16) -> Self {
         Self {
             calls: vec![],
@@ -65,7 +68,9 @@ impl BatchedFunctionCallBuilder {
         }
     }
 
-    pub fn add_batched_call(
+    #[wasm_bindgen(js_name = add_batched_call)]
+    // Add a call to the script builder. Script builder will check the type compatibility of the call and returns error.
+    pub fn add_batched_call_wasm(
         &mut self,
         module: String,
         function: String,
@@ -73,7 +78,7 @@ impl BatchedFunctionCallBuilder {
         args: Vec<BatchArgumentWASM>,
     ) -> Result<Vec<BatchArgumentWASM>, String> {
         Ok(self
-            .add_batched_call_impl(
+            .add_batched_call(
                 module,
                 function,
                 ty_args,
@@ -85,6 +90,7 @@ impl BatchedFunctionCallBuilder {
             .collect())
     }
 
+    // Consume the builder and generate a serialized script with calls in the builder.
     pub fn generate_batched_calls(self) -> Result<Vec<u8>, String> {
         crate::codegen::generate_script_from_batched_calls(
             &self.calls,
@@ -94,6 +100,7 @@ impl BatchedFunctionCallBuilder {
         .map_err(|err| format!("{:?}", err))
     }
 
+    // Load up a module from a remote endpoint. Will need to invoke this function prior to the call.
     pub async fn load_module(
         &mut self,
         api_url: String,
@@ -105,6 +112,7 @@ impl BatchedFunctionCallBuilder {
     }
 }
 
+// Given a module, return the handle and definition of a provided function name
 fn find_function<'a>(
     map: &'a BTreeMap<ModuleId, CompiledModule>,
     module_id: &ModuleId,
@@ -126,6 +134,8 @@ fn find_function<'a>(
 }
 
 impl BatchedFunctionCallBuilder {
+    // Generate the return values for a function call. Those returned values could be passed
+    // as an arugment to a future function call.
     fn return_values(
         &mut self,
         module_id: &ModuleId,
@@ -157,6 +167,7 @@ impl BatchedFunctionCallBuilder {
         Ok(returns)
     }
 
+    // Check if the arguments could be used to invoke a function.
     fn check_parameters(
         &self,
         module_id: &ModuleId,
@@ -259,6 +270,7 @@ impl BatchedFunctionCallBuilder {
         Ok(())
     }
 
+    // Normalize signature token into type tag so they can be compared in different modules.
     fn type_tag_from_signature(
         module: &CompiledModule,
         tok: &SignatureToken,
@@ -275,6 +287,7 @@ impl BatchedFunctionCallBuilder {
             SignatureToken::U256 => TypeTag::U256,
             SignatureToken::Signer => TypeTag::Signer,
             SignatureToken::MutableReference(_) | SignatureToken::Reference(_) => {
+                // TODO: This forbids returning references from a call, which is not necessary. Remove the constraint later.
                 bail!("Unexpected reference type in the return value")
             },
             SignatureToken::Struct(idx) => {
@@ -310,7 +323,11 @@ impl BatchedFunctionCallBuilder {
         })
     }
 
-    fn add_batched_call_impl(
+    pub fn insert_module(&mut self, module: CompiledModule) {
+        self.modules.insert(module.self_id(), module);
+    }
+
+    pub fn add_batched_call(
         &mut self,
         module: String,
         function: String,
@@ -331,11 +348,6 @@ impl BatchedFunctionCallBuilder {
             args,
         });
         self.return_values(&module, &function, &ty_args)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn insert_module(&mut self, module: CompiledModule) {
-        self.modules.insert(module.self_id(), module);
     }
 
     async fn load_module_impl(
