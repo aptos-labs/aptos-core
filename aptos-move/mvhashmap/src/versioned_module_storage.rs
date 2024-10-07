@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::types::{ShiftedTxnIndex, StorageVersion, TxnIndex};
-use aptos_types::{executable::ModulePath, vm::modules::ModuleStorageEntryInterface};
-use claims::{assert_none, assert_some};
+use aptos_types::vm::modules::ModuleStorageEntryInterface;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use derivative::Derivative;
@@ -90,14 +89,16 @@ pub struct VersionedModuleStorage<K, M> {
     entries: DashMap<K, VersionedEntry<M>>,
 }
 
-impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
-    VersionedModuleStorage<K, M>
-{
+impl<K: Debug + Hash + Clone + Eq, M: ModuleStorageEntryInterface> VersionedModuleStorage<K, M> {
     /// Returns a new empty versioned module storage.
     pub(crate) fn empty() -> Self {
         Self {
             entries: DashMap::new(),
         }
+    }
+
+    pub(crate) fn num_keys(&self) -> usize {
+        self.entries.len()
     }
 
     /// Returns the module entry from the module storage. If the entry does not exist,
@@ -145,18 +146,6 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
         })
     }
 
-    /// Removes an existing entry at a given index.
-    pub fn remove(&self, key: &K, txn_idx: TxnIndex) {
-        let mut versioned_entry = self
-            .entries
-            .get_mut(key)
-            .expect("Versioned entry should always exist before removal");
-        let removed = versioned_entry
-            .versions
-            .remove(&ShiftedTxnIndex::new(txn_idx));
-        assert_some!(removed, "Entry should always exist before removal");
-    }
-
     /// Marks an entry in module storage as "pending", i.e., yet to be published. The
     /// implementation simply treats pending writes as non-existent modules, so that transactions
     /// with higher indices observe non-existent modules and deterministically fail with a
@@ -172,18 +161,16 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath, M: ModuleStorageEntryInterface>
 
     /// Writes a published module to the storage, which is also visible for the transactions with
     /// higher indices.
-    pub fn write_published(&self, key: &K, idx_to_publish: TxnIndex, entry: M) {
+    pub fn write_published(&self, key: K, idx_to_publish: TxnIndex, entry: M) {
         let mut versioned_entry = self
             .entries
-            .get_mut(key)
-            .expect("Versioned entry must always exist before publishing");
+            .entry(key)
+            .or_insert_with(VersionedEntry::empty);
 
-        let prev = versioned_entry.versions.insert(
+        versioned_entry.versions.insert(
             ShiftedTxnIndex::new(idx_to_publish),
             CachePadded::new(Some(Arc::new(entry))),
         );
-        let prev = assert_some!(prev);
-        assert_none!(prev.as_ref());
     }
 
     /// Write the new module storage entry to the specified key-index pair unless the existing
@@ -230,7 +217,7 @@ mod test {
         state_value::{StateValue, StateValueMetadata},
     };
     use bytes::Bytes;
-    use claims::{assert_err_eq, assert_matches, assert_none, assert_ok};
+    use claims::{assert_err_eq, assert_matches, assert_none, assert_ok, assert_some};
     use move_binary_format::errors::{Location, PartialVMError};
     use move_core_types::{metadata::Metadata, vm_status::StatusCode};
     use move_vm_runtime::RuntimeEnvironment;
@@ -387,7 +374,8 @@ mod test {
         assert_matches!(read, ModuleStorageRead::Versioned(Err(StorageVersion), ..));
 
         // Transaction 6 removes its writes, and so 0x1::bar becomes visible for all transactions.
-        module_storage.remove(&state_key("0x1::bar"), 6);
+        // TODO(loader_v2): Fix this test! Commented out because removal is removed.
+        // module_storage.remove(&state_key("0x1::bar"), 6);
 
         let read = module_storage.get(&state_key("0x1::bar"), 7);
         assert_matches!(read, ModuleStorageRead::Versioned(Err(StorageVersion), ..));
@@ -395,8 +383,8 @@ mod test {
         assert_matches!(read, ModuleStorageRead::Versioned(Err(StorageVersion), ..));
 
         // Now transactions 5 and 7 actually publish.
-        module_storage.write_published(&state_key("0x1::foo"), 5, TestEntry::new(false, 1));
-        module_storage.write_published(&state_key("0x1::buz"), 7, TestEntry::new(false, 2));
+        module_storage.write_published(state_key("0x1::foo"), 5, TestEntry::new(false, 1));
+        module_storage.write_published(state_key("0x1::buz"), 7, TestEntry::new(false, 2));
 
         // Transactions below see no change at all.
         let read =
@@ -430,7 +418,7 @@ mod test {
         );
 
         module_storage.write_pending(state_key("0x1::bar"), 6);
-        module_storage.write_published(&state_key("0x1::bar"), 6, TestEntry::new(false, 1));
+        module_storage.write_published(state_key("0x1::bar"), 6, TestEntry::new(false, 1));
 
         // Module storage stores two modules, 0x1::foo at storage version, 0x1::bar published by
         // transaction 6.

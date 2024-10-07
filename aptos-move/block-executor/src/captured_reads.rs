@@ -22,6 +22,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
+    executable::ModulePath,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::ModuleStorageEntry,
@@ -29,7 +30,10 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    value::MoveTypeLayout,
+};
 use std::{
     collections::{
         hash_map::{
@@ -302,12 +306,13 @@ impl DelayedFieldRead {
 pub(crate) struct CapturedReads<T: Transaction> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
+    delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
+
     /// Captured module reads if V1 loader is used.
+    #[deprecated]
     pub(crate) module_reads: Vec<T::Key>,
     /// Captured module reads if V2 loader is used.
-    module_storage_reads: HashMap<T::Key, ModuleStorageRead<ModuleStorageEntry>>,
-
-    delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
+    module_storage_reads: hashbrown::HashMap<ModuleId, ModuleStorageRead<ModuleStorageEntry>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -484,18 +489,19 @@ impl<T: Transaction> CapturedReads<T> {
     /// Returns the captured read of a module storage entry if it exists, and [None] otherwise.
     pub(crate) fn get_captured_module_storage_read(
         &self,
-        key: &T::Key,
+        address: &AccountAddress,
+        module_id: &IdentStr,
     ) -> Option<&ModuleStorageRead<ModuleStorageEntry>> {
-        self.module_storage_reads.get(key)
+        self.module_storage_reads.get(&(address, module_id))
     }
 
     /// Captures the read of a module storage entry.
     pub(crate) fn capture_module_storage_read(
         &mut self,
-        key: T::Key,
+        module_id: ModuleId,
         read: ModuleStorageRead<ModuleStorageEntry>,
     ) {
-        self.module_storage_reads.insert(key, read);
+        self.module_storage_reads.insert(module_id, read);
     }
 
     pub(crate) fn capture_delayed_field_read(
@@ -612,7 +618,7 @@ impl<T: Transaction> CapturedReads<T> {
     ///      also have the same version X.
     pub(crate) fn validate_module_reads(
         &self,
-        module_storage: &VersionedModuleStorage<T::Key, ModuleStorageEntry>,
+        module_storage: &VersionedModuleStorage<ModuleId, ModuleStorageEntry>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         let _timer = TASK_VALIDATE_MODULES_SECONDS.start_timer();
@@ -623,8 +629,8 @@ impl<T: Transaction> CapturedReads<T> {
         // Only successful module storage reads are captured. In case there were no base value,
         // and fetching it returned an error, the error is not recorded. Hence, it is safe here
         // to simply treat such errors as a non-existent value.
-        self.module_storage_reads.iter().all(|(k, previous_read)| {
-            let current_read = module_storage.get(k, idx_to_validate);
+        self.module_storage_reads.iter().all(|(id, previous_read)| {
+            let current_read = module_storage.get(id, idx_to_validate);
             previous_read == &current_read
         })
     }
@@ -738,11 +744,13 @@ impl<T: Transaction> CapturedReads<T> {
         }
 
         // TODO(loader_v2): Test summaries are the same.
+        #[allow(deprecated)]
         for key in &self.module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
-        for key in self.module_storage_reads.keys() {
-            ret.insert(InputOutputKey::Resource(key.clone()));
+        for id in self.module_storage_reads.keys() {
+            let key = T::Key::from_address_and_module_name(id.address(), id.name());
+            ret.insert(InputOutputKey::Resource(key));
         }
 
         for (key, read) in &self.delayed_field_reads {
@@ -771,10 +779,13 @@ impl<T: Transaction> CapturedReads<T> {
 #[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct UnsyncReadSet<T: Transaction> {
     pub(crate) resource_reads: HashSet<T::Key>,
-    pub(crate) module_reads: HashSet<T::Key>,
-    pub(crate) module_storage_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
     pub(crate) delayed_field_reads: HashSet<T::Identifier>,
+
+    // Module reads: legacy V1 and new V2 sets.
+    #[deprecated]
+    pub(crate) module_reads: HashSet<T::Key>,
+    pub(crate) module_storage_reads: HashSet<ModuleId>,
 }
 
 impl<T: Transaction> UnsyncReadSet<T> {
@@ -793,11 +804,13 @@ impl<T: Transaction> UnsyncReadSet<T> {
         }
 
         // TODO(loader_v2): Test summaries are the same if we switch.
+        #[allow(deprecated)]
         for key in &self.module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
-        for key in &self.module_storage_reads {
-            ret.insert(InputOutputKey::Resource(key.clone()));
+        for id in &self.module_storage_reads {
+            let key = T::Key::from_address_and_module_name(id.address(), id.name());
+            ret.insert(InputOutputKey::Resource(key));
         }
 
         for key in &self.delayed_field_reads {

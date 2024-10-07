@@ -11,13 +11,16 @@ use aptos_aggregator::types::DelayedFieldValue;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
-    executable::{Executable, ModulePath},
+    executable::ModulePath,
     vm::modules::ModuleStorageEntry,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use move_binary_format::file_format::CompiledScript;
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    value::MoveTypeLayout,
+};
 use move_vm_runtime::Script;
 use serde::Serialize;
 use std::{
@@ -25,7 +28,6 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     hash::Hash,
-    marker::PhantomData,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -38,49 +40,44 @@ pub struct UnsyncMap<
     K: ModulePath,
     T: Hash + Clone + Debug + Eq + Serialize,
     V: TransactionWrite,
-    X: Executable,
     I: Copy,
 > {
-    // Only use Arc to provide unified interfaces with the MVHashMap / concurrent setting. This
-    // simplifies the trait-based integration for executable caching. TODO: better representation.
+    // Only use Arc to provide unified interfaces with the MVHashMap.
     resource_map: RefCell<HashMap<K, ValueWithLayout<V>>>,
-    // Optional hash can store the hash of the module to avoid re-computations.
-    module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
     group_cache: RefCell<HashMap<K, RefCell<(HashMap<T, ValueWithLayout<V>>, ResourceGroupSize)>>>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 
-    // Code caches for loader V2 implementations: module storage and script cache.
-    module_storage: RefCell<HashMap<K, Arc<ModuleStorageEntry>>>,
+    // Optional hash can store the hash of the module to avoid re-computations. This map is used by
+    // V1 loader and will be removed in the future.
+    #[deprecated]
+    module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
+
+    // Code caches for loader V2 implementation: module storage and script cache.
+    module_storage: RefCell<hashbrown::HashMap<ModuleId, Arc<ModuleStorageEntry>>>,
     script_cache: RefCell<HashMap<[u8; 32], ScriptCacheEntry>>,
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
-
-    // TODO(loader_v2):
-    //   Remove phantom data when we use X: Executable (or other trait) to pass
-    //   here for modules.
-    phantom_data: PhantomData<X>,
 }
 
 impl<
         K: ModulePath + Hash + Clone + Eq,
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
-        X: Executable,
         I: Hash + Clone + Copy + Eq,
-    > Default for UnsyncMap<K, T, V, X, I>
+    > Default for UnsyncMap<K, T, V, I>
 {
     fn default() -> Self {
+        #[allow(deprecated)]
         Self {
             resource_map: RefCell::new(HashMap::new()),
             module_map: RefCell::new(HashMap::new()),
-            module_storage: RefCell::new(HashMap::new()),
+            module_storage: RefCell::new(hashbrown::HashMap::new()),
             script_cache: RefCell::new(HashMap::new()),
             group_cache: RefCell::new(HashMap::new()),
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
             total_base_delayed_field_size: AtomicU64::new(0),
-            phantom_data: PhantomData,
         }
     }
 }
@@ -89,20 +86,21 @@ impl<
         K: ModulePath + Hash + Clone + Eq + Debug,
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
-        X: Executable,
         I: Hash + Clone + Copy + Eq,
-    > UnsyncMap<K, T, V, X, I>
+    > UnsyncMap<K, T, V, I>
 {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn stats(&self) -> BlockStateStats {
+        #[allow(deprecated)]
+        let num_modules = self.module_map.borrow().len() + self.module_storage.borrow().len();
         BlockStateStats {
             num_resources: self.resource_map.borrow().len(),
             num_resource_groups: self.group_cache.borrow().len(),
             num_delayed_fields: self.delayed_field_map.borrow().len(),
-            num_modules: self.module_map.borrow().len() + self.module_storage.borrow().len(),
+            num_modules,
             base_resources_size: self.total_base_resource_size.load(Ordering::Relaxed),
             base_delayed_fields_size: self.total_base_delayed_field_size.load(Ordering::Relaxed),
         }
@@ -280,15 +278,24 @@ impl<
         })
     }
 
+    #[deprecated]
     pub fn fetch_module_for_loader_v1(&self, key: &K) -> Option<Arc<V>> {
+        #[allow(deprecated)]
         self.module_map
             .borrow()
             .get(key)
             .map(|entry| entry.0.clone())
     }
 
-    pub fn fetch_module(&self, key: &K) -> Option<Arc<ModuleStorageEntry>> {
-        self.module_storage.borrow().get(key).cloned()
+    pub fn fetch_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> Option<Arc<ModuleStorageEntry>> {
+        self.module_storage
+            .borrow()
+            .get(&(address, module_name))
+            .cloned()
     }
 
     pub fn get_deserialized_script(&self, hash: &[u8; 32]) -> Option<Arc<CompiledScript>> {
@@ -330,22 +337,16 @@ impl<
             .insert(key, ValueWithLayout::Exchanged(value, layout));
     }
 
+    #[deprecated]
     pub fn write_module(&self, key: K, value: V) {
+        #[allow(deprecated)]
         self.module_map
             .borrow_mut()
             .insert(key, (Arc::new(value), None));
     }
 
-    pub fn write_module_storage_entry(&self, key: K, entry: Arc<ModuleStorageEntry>) {
-        self.module_storage.borrow_mut().insert(key, entry);
-    }
-
-    pub fn publish_module_storage_entry(&self, key: K, entry: Arc<ModuleStorageEntry>) {
-        // Flush the script cache if there is a module upgrade.
-        let mut script_cache = self.script_cache.borrow_mut();
-        script_cache.clear();
-
-        self.module_storage.borrow_mut().insert(key, entry);
+    pub fn write_module_storage_entry(&self, module_id: ModuleId, entry: Arc<ModuleStorageEntry>) {
+        self.module_storage.borrow_mut().insert(module_id, entry);
     }
 
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
@@ -375,11 +376,10 @@ impl<
 mod test {
     use super::*;
     use crate::types::test::{KeyType, TestValue};
-    use aptos_types::executable::ExecutableTestType;
     use claims::{assert_err, assert_err_eq, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
 
     fn finalize_group_as_hashmap(
-        map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>,
+        map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ()>,
         key: &KeyType<Vec<u8>>,
     ) -> HashMap<usize, ValueWithLayout<TestValue>> {
         map.finalize_group(key).0.collect()
@@ -389,7 +389,7 @@ mod test {
     #[test]
     fn group_commit_idx() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         map.set_group_base_values(
             ap.clone(),
@@ -478,7 +478,7 @@ mod test {
     #[test]
     fn set_base_twice() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         assert_ok!(map.set_group_base_values(
             ap.clone(),
@@ -494,7 +494,7 @@ mod test {
     #[test]
     fn group_op_without_base() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(10, true), None));
     }
@@ -503,7 +503,7 @@ mod test {
     #[test]
     fn group_no_path_exists() {
         let ap = KeyType(b"/foo/b".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         let _ = map.finalize_group(&ap).0.collect::<Vec<_>>();
     }
@@ -511,7 +511,7 @@ mod test {
     #[test]
     fn group_size() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         assert_eq!(map.get_group_size(&ap), GroupReadResult::Uninitialized);
 
@@ -597,7 +597,7 @@ mod test {
     #[test]
     fn group_value() {
         let ap = KeyType(b"/foo/f".to_vec());
-        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
+        let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ()>::new();
 
         // Uninitialized before group is set, TagNotFound afterwards
         assert_err_eq!(

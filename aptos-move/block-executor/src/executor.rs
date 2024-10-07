@@ -230,12 +230,7 @@ where
                 if prev_modified_keys.remove(&k).is_none() {
                     needs_suffix_validation = true;
                 }
-                if runtime_environment.vm_config().use_loader_v2 {
-                    versioned_cache
-                        .code_storage()
-                        .module_storage()
-                        .write_pending(k, idx_to_execute)
-                } else {
+                if !runtime_environment.vm_config().use_loader_v2 {
                     versioned_cache
                         .modules()
                         .write(k, idx_to_execute, v.into_write_op());
@@ -339,12 +334,7 @@ where
             match kind {
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
                 Module => {
-                    if runtime_environment.vm_config().use_loader_v2 {
-                        versioned_cache
-                            .code_storage()
-                            .module_storage()
-                            .remove(&k, idx_to_execute);
-                    } else {
+                    if !runtime_environment.vm_config().use_loader_v2 {
                         versioned_cache.modules().remove(&k, idx_to_execute);
                     }
                 },
@@ -724,19 +714,17 @@ where
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
         let mut writes_to_special_address = false;
-        for (key, write) in module_write_set {
+        for (_, write) in module_write_set {
             if write.module_address().is_special() {
                 writes_to_special_address = true;
             }
 
-            let entry = ModuleStorageEntry::from_transaction_write(
-                runtime_environment,
-                write.into_write_op(),
-            )?;
+            let (id, write_op) = write.unpack();
+            let entry = ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
             versioned_cache
                 .code_storage()
                 .module_storage()
-                .write_published(&key, txn_idx, entry);
+                .write_published(id, txn_idx, entry);
         }
 
         // In case framework got upgraded, this should detect it and flush the cache.
@@ -1148,7 +1136,7 @@ where
 
     fn apply_output_sequential(
         runtime_environment: &RuntimeEnvironment,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         output: &E::Output,
         resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
@@ -1174,12 +1162,12 @@ where
                     flush_cross_block_framework_cache();
                 }
 
-                let entry = ModuleStorageEntry::from_transaction_write(
-                    runtime_environment,
-                    write.into_write_op(),
-                )?;
-                unsync_map.publish_module_storage_entry(key, Arc::new(entry));
+                let (id, write_op) = write.unpack();
+                let entry =
+                    ModuleStorageEntry::from_transaction_write(runtime_environment, write_op)?;
+                unsync_map.write_module_storage_entry(id, Arc::new(entry));
             } else {
+                #[allow(deprecated)]
                 unsync_map.write_module(key, write.into_write_op());
             }
         }
@@ -1340,6 +1328,7 @@ where
 
                     #[allow(clippy::collapsible_if)]
                     if !runtime_environment.vm_config().use_loader_v2 {
+                        #[allow(deprecated)]
                         if last_input_output.check_and_append_module_rw_conflict(
                             sequential_reads.module_reads.iter(),
                             output.module_write_set().keys(),

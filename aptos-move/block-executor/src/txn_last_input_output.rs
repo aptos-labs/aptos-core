@@ -146,6 +146,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
             };
 
+            #[allow(deprecated)]
             if self.check_and_append_module_rw_conflict(
                 input.module_reads.iter(),
                 written_modules.keys(),
