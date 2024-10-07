@@ -63,7 +63,7 @@ fn native_to_bytes(
     };
     // serialize value
     let val = ref_to_val.read_ref()?;
-    let serialized_value = match ValueSerDeContext::new()
+    let serialized_value = match ValueSerDeContext::new_legacy_signer()
         .with_func_args_deserialization(context.function_value_extension())
         .serialize(&val, &layout)?
     {

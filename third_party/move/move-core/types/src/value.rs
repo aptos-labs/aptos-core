@@ -465,6 +465,13 @@ impl MoveStructLayout {
             },
         }
     }
+
+    pub fn signer() -> Self {
+        MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::Address], vec![
+            MoveTypeLayout::Address,
+            MoveTypeLayout::Address,
+        ]])
+    }
 }
 
 impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
@@ -486,7 +493,22 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
                 AccountAddress::deserialize(deserializer).map(MoveValue::Address)
             },
             MoveTypeLayout::Signer => {
-                AccountAddress::deserialize(deserializer).map(MoveValue::Signer)
+                let (_, fields) = MoveStructLayout::signer()
+                    .deserialize(deserializer)?
+                    .into_optional_variant_and_fields();
+
+                // Runtime representation of signer looks following:
+                // enum signer {
+                //     Master { account: address },
+                //     Permissioned { account: address, permissions_address: address },
+                // }
+                //
+                // The first field always refers to the account address.
+
+                Ok(MoveValue::Signer(match fields[0] {
+                    MoveValue::Address(addr) => addr,
+                    _ => return Err(D::Error::custom("signer deserialization error")),
+                }))
             },
             MoveTypeLayout::Struct(ty) => Ok(MoveValue::Struct(ty.deserialize(deserializer)?)),
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
@@ -691,7 +713,14 @@ impl serde::Serialize for MoveValue {
             MoveValue::U128(i) => serializer.serialize_u128(*i),
             MoveValue::U256(i) => i.serialize(serializer),
             MoveValue::Address(a) => a.serialize(serializer),
-            MoveValue::Signer(a) => a.serialize(serializer),
+            MoveValue::Signer(a) => {
+                // Runtime representation of signer looks following:
+                // enum signer {
+                //     Master { account: address },
+                //     Permissioned { account: address, permissions_address: address },
+                // }
+                MoveStruct::new_variant(0, vec![MoveValue::Address(*a)]).serialize(serializer)
+            },
             MoveValue::Vector(v) => {
                 let mut t = serializer.serialize_seq(Some(v.len()))?;
                 for val in v {

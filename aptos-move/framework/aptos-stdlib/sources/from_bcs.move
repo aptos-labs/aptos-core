@@ -88,4 +88,12 @@ module aptos_std::from_bcs {
         let bad_vec = b"01";
         to_address(bad_vec);
     }
+
+    #[test(s1 = @0x123)]
+    fun test_signer_roundtrip(s1: signer) {
+        assert!(
+            from_bytes<signer>(bcs::to_bytes(&s1)) == s1,
+            1
+        )
+    }
 }

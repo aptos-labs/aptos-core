@@ -1,7 +1,23 @@
 module std::signer {
+    /// signer is a builtin move type that represents an address that has been verfied by the VM.
+    ///
+    /// VM Runtime representation is equivalent to following:
+    /// enum signer {
+    ///     Master { account: address },
+    ///     Permissioned { account: address, permissions_address: address },
+    /// }
+    ///
+    /// for bcs serialization:
+    /// struct signer {
+    ///     account: address,
+    /// }
+    /// ^ The descrepency is needed to maintain backwards compatibility of signer serialization
+    /// semantics.
+    ///
     /// Borrows the address of the signer
     /// Conceptually, you can think of the `signer` as being a struct wrapper around an
     /// address
+    ///
     /// ```
     /// struct signer has drop { addr: address }
     /// ```
