@@ -596,13 +596,15 @@ where
                 // writes as well.
                 if runtime_environment.vm_config().use_loader_v2 {
                     if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
-                        executed_at_commit = true;
-                        Self::publish_module_writes(
-                            txn_idx,
-                            module_write_set,
-                            versioned_cache,
-                            runtime_environment,
-                        )?;
+                        if !module_write_set.is_empty() {
+                            executed_at_commit = true;
+                            Self::publish_module_writes(
+                                txn_idx,
+                                module_write_set,
+                                versioned_cache,
+                                runtime_environment,
+                            )?;
+                        }
                     }
                 }
 
@@ -626,13 +628,15 @@ where
             // decrease the validation index to make sure the subsequent transactions see changes.
             if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
                 if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
-                    Self::publish_module_writes(
-                        txn_idx,
-                        module_write_set,
-                        versioned_cache,
-                        runtime_environment,
-                    )?;
-                    scheduler.finish_execution_during_commit(txn_idx)?;
+                    if !module_write_set.is_empty() {
+                        Self::publish_module_writes(
+                            txn_idx,
+                            module_write_set,
+                            versioned_cache,
+                            runtime_environment,
+                        )?;
+                        scheduler.finish_execution_during_commit(txn_idx)?;
+                    }
                 }
             }
 
