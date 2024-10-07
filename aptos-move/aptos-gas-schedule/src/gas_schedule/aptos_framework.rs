@@ -6,7 +6,7 @@
 use crate::{
     gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23},
+    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_25},
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
@@ -19,6 +19,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
     [
         [account_create_address_base: InternalGas, "account.create_address.base", 1102],
         [account_create_signer_base: InternalGas, "account.create_signer.base", 1102],
+
+        // Permissioned signer gas parameters_
+        [permission_address_base: InternalGas, { RELEASE_V1_25 => "permissioned_signer.permission_address.base"}, 1102],
+        [is_permissioned_signer_base: InternalGas, { RELEASE_V1_25 => "permissioned_signer.is_permissioned_signer.base"}, 1102],
+        [signer_from_permissioned_handle_base: InternalGas, { RELEASE_V1_25 => "permissioned_signer.signer_from_permissioned_handle.base"}, 1102],
 
         // BN254 algebra gas parameters begin.
         // Generated at time 1701559125.5498126 by `scripts/algebra-gas/update_bn254_algebra_gas_params.py` with gas_per_ns=209.10511688369482.
