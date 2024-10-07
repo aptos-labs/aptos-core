@@ -8,6 +8,7 @@ use std::{collections::HashSet, time::Duration};
 pub struct OptQSPayloadPullParams {
     pub opt_batch_txns_pct: u8,
     pub exclude_authors: HashSet<Author>,
+    pub minimum_batch_age_usecs: u64,
 }
 
 pub struct PayloadPullParameters {

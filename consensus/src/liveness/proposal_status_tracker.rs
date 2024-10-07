@@ -81,7 +81,7 @@ impl ExponentialWindowFailureTracker {
     fn get_exclude_authors(&self) -> HashSet<Author> {
         let mut exclude_authors = HashSet::new();
 
-        let limit = self.window / 2;
+        let limit = self.window;
         for round_reason in self.past_round_statuses.iter().rev().take(limit) {
             if let NewRoundReason::Timeout(RoundTimeoutReason::PayloadUnavailable {
                 missing_authors,
@@ -140,6 +140,7 @@ impl TOptQSPullParamsProvider for OptQSPullParamsProvider {
         Some(OptQSPayloadPullParams {
             opt_batch_txns_pct,
             exclude_authors,
+            minimum_batch_age_usecs: 50_000_000,
         })
     }
 }
