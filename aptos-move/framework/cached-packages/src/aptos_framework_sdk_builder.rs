@@ -804,6 +804,15 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    /// Revoke all storable permission handle of the signer immediately.
+    PermissionedSignerRevokeAllHandles {},
+
+    /// Revoke a specific storable permission handle immediately. This would disallow owner of
+    /// the storable permission handle to derive signer from it anymore.
+    PermissionedSignerRevokePermissionStorageAddress {
+        permissions_storage_addr: AccountAddress,
+    },
+
     /// Creates a new resource account and rotates the authentication key to either
     /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
     /// or the source accounts current auth key.
@@ -1583,6 +1592,10 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => object_code_deployment_publish(metadata_serialized, code),
+            PermissionedSignerRevokeAllHandles {} => permissioned_signer_revoke_all_handles(),
+            PermissionedSignerRevokePermissionStorageAddress {
+                permissions_storage_addr,
+            } => permissioned_signer_revoke_permission_storage_address(permissions_storage_addr),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -3862,6 +3875,41 @@ pub fn object_code_deployment_publish(
     ))
 }
 
+/// Revoke all storable permission handle of the signer immediately.
+pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("permissioned_signer").to_owned(),
+        ),
+        ident_str!("revoke_all_handles").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Revoke a specific storable permission handle immediately. This would disallow owner of
+/// the storable permission handle to derive signer from it anymore.
+pub fn permissioned_signer_revoke_permission_storage_address(
+    permissions_storage_addr: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("permissioned_signer").to_owned(),
+        ),
+        ident_str!("revoke_permission_storage_address").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&permissions_storage_addr).unwrap()],
+    ))
+}
+
 /// Creates a new resource account and rotates the authentication key to either
 /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
 /// or the source accounts current auth key.
@@ -6132,6 +6180,30 @@ mod decoder {
         }
     }
 
+    pub fn permissioned_signer_revoke_all_handles(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::PermissionedSignerRevokeAllHandles {})
+        } else {
+            None
+        }
+    }
+
+    pub fn permissioned_signer_revoke_permission_storage_address(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::PermissionedSignerRevokePermissionStorageAddress {
+                    permissions_storage_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7172,6 +7244,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "object_code_deployment_publish".to_string(),
             Box::new(decoder::object_code_deployment_publish),
+        );
+        map.insert(
+            "permissioned_signer_revoke_all_handles".to_string(),
+            Box::new(decoder::permissioned_signer_revoke_all_handles),
+        );
+        map.insert(
+            "permissioned_signer_revoke_permission_storage_address".to_string(),
+            Box::new(decoder::permissioned_signer_revoke_permission_storage_address),
         );
         map.insert(
             "resource_account_create_resource_account".to_string(),

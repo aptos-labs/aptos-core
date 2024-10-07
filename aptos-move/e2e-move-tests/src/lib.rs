@@ -48,6 +48,9 @@ pub(crate) fn build_package(
     let mut options = options;
     if get_move_compiler_v2_from_env() {
         options.compiler_version = Some(CompilerVersion::latest_stable());
+        options.language_version = options
+            .compiler_version
+            .map(|v| v.infer_stable_language_version());
     }
     BuiltPackage::build(package_path.to_owned(), options)
 }
@@ -61,5 +64,10 @@ pub(crate) fn build_package_with_compiler_version(
     let mut options = options;
     options.language_version = Some(compiler_version.infer_stable_language_version());
     options.compiler_version = Some(compiler_version);
+    if options.compiler_version.unwrap() != CompilerVersion::V1 {
+        options.language_version = Some(move_model::metadata::LanguageVersion::latest_stable());
+    } else {
+        options.language_version = Some(move_model::metadata::LanguageVersion::V1);
+    }
     BuiltPackage::build(package_path.to_owned(), options)
 }

@@ -186,9 +186,9 @@ if [ ! -z "$INTEGRATION_TEST" ]; then
   echo "*************** [move-pr] Running integration tests"
   (
     cd $BASE
-    MOVE_COMPILER_V2=false cargo build $CARGO_OP_PARAMS \
+    MOVE_COMPILER_V2=false MOVE_LANGUAGE_V2=true cargo build $CARGO_OP_PARAMS \
        $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
-    MOVE_COMPILER_V2=false cargo nextest run $CARGO_NEXTEST_PARAMS \
+    MOVE_COMPILER_V2=false MOVE_LANGUAGE_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
        $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi

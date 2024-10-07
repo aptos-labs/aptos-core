@@ -1,11 +1,11 @@
-//# run --args @0x1
+//# run --signers 0x1
 main(s: signer) {
 label b0:
     return;
 }
 // DEPRECATED signers can now be passed in as addrs
 
-//# run --args @0x0 @0x2
+//# run --signers 0x0 --signers 0x2
 main(s: signer, s2: signer) {
 label b0:
     return;
