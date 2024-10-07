@@ -6,7 +6,7 @@
 use crate::validator_signer::ValidatorSigner;
 use crate::{
     account_address::AccountAddress, aggregate_signature::AggregateSignature,
-    on_chain_config::ValidatorSet,
+    ledger_info::SignatureWithStatus, on_chain_config::ValidatorSet,
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
@@ -21,6 +21,7 @@ use derivative::Derivative;
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -154,6 +155,10 @@ pub struct ValidatorVerifier {
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     pessimistic_verify_set: DashSet<AccountAddress>,
+    /// This is the feature flag indicating whether the optimistic signature verification feature is enabled.
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    optimistic_sig_verification: bool,
 }
 
 /// Reconstruct fields from the raw data upon deserialization.
@@ -193,6 +198,7 @@ impl ValidatorVerifier {
             total_voting_power,
             address_to_validator_index,
             pessimistic_verify_set: DashSet::new(),
+            optimistic_sig_verification: false,
         }
     }
 
@@ -228,6 +234,10 @@ impl ValidatorVerifier {
         ))
     }
 
+    pub fn set_optimistic_sig_verification_flag(&mut self, flag: bool) {
+        self.optimistic_sig_verification = flag;
+    }
+
     pub fn add_pessimistic_verify_set(&self, author: AccountAddress) {
         self.pessimistic_verify_set.insert(author);
     }
@@ -255,6 +265,47 @@ impl ValidatorVerifier {
                 .map_err(|_| VerifyError::InvalidMultiSignature),
             None => Err(VerifyError::UnknownAuthor),
         }
+    }
+
+    pub fn optimistic_verify<T: Serialize + CryptoHash>(
+        &self,
+        author: AccountAddress,
+        message: &T,
+        signature_with_status: &SignatureWithStatus,
+    ) -> std::result::Result<(), VerifyError> {
+        if (!self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author))
+            && !signature_with_status.is_verified()
+        {
+            self.verify(author, message, signature_with_status.signature())?;
+            signature_with_status.set_verified();
+        }
+        Ok(())
+    }
+
+    pub fn filter_invalid_signatures<T: Send + Sync + Serialize + CryptoHash>(
+        &self,
+        message: &T,
+        signatures: BTreeMap<AccountAddress, SignatureWithStatus>,
+    ) -> BTreeMap<AccountAddress, SignatureWithStatus> {
+        signatures
+            .into_iter()
+            .collect_vec()
+            .into_par_iter()
+            .with_min_len(4) // At least 4 signatures are verified in each task
+            .filter_map(|(account_address, signature)| {
+                if signature.is_verified()
+                    || self
+                        .verify(account_address, message, signature.signature())
+                        .is_ok()
+                {
+                    signature.set_verified();
+                    Some((account_address, signature))
+                } else {
+                    self.add_pessimistic_verify_set(account_address);
+                    None
+                }
+            })
+            .collect()
     }
 
     // Generates a multi signature or aggregate signature
@@ -424,6 +475,19 @@ impl ValidatorVerifier {
             });
         }
         Ok(aggregated_voting_power)
+    }
+
+    pub fn aggregate_signature_authors(
+        &self,
+        aggregated_signature: &AggregateSignature,
+    ) -> Vec<&AccountAddress> {
+        let mut authors = vec![];
+        for index in aggregated_signature.get_signers_bitvec().iter_ones() {
+            if let Some(validator) = self.validator_infos.get(index) {
+                authors.push(&validator.address);
+            }
+        }
+        authors
     }
 
     /// Returns the public key for this address.
