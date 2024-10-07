@@ -11,6 +11,7 @@ use aptos_aggregator::{
     types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_mvhashmap::{
+    code_cache::SyncCodeCache,
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
         ValueWithLayout, Version,
@@ -18,14 +19,13 @@ use aptos_mvhashmap::{
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
-    versioned_module_storage::{ModuleStorageRead, VersionedModuleStorage},
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
     executable::ModulePath,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction,
-    vm::modules::ModuleStorageEntry,
+    vm::modules::{ModuleStorageEntry, ModuleStorageEntryInterface},
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
@@ -311,8 +311,8 @@ pub(crate) struct CapturedReads<T: Transaction> {
     /// Captured module reads if V1 loader is used.
     #[deprecated]
     pub(crate) module_reads: Vec<T::Key>,
-    /// Captured module reads if V2 loader is used.
-    module_storage_reads: hashbrown::HashMap<ModuleId, ModuleStorageRead<ModuleStorageEntry>>,
+    /// Captured read modules if V2 loader is used.
+    module_cache_reads: hashbrown::HashMap<ModuleId, Option<Arc<ModuleStorageEntry>>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
     /// inconsistency), the transaction output is irrelevant (must be discarded and transaction
@@ -487,21 +487,21 @@ impl<T: Transaction> CapturedReads<T> {
     }
 
     /// Returns the captured read of a module storage entry if it exists, and [None] otherwise.
-    pub(crate) fn get_captured_module_storage_read(
+    pub(crate) fn get_captured_module_read(
         &self,
         address: &AccountAddress,
         module_id: &IdentStr,
-    ) -> Option<&ModuleStorageRead<ModuleStorageEntry>> {
-        self.module_storage_reads.get(&(address, module_id))
+    ) -> Option<&Option<Arc<ModuleStorageEntry>>> {
+        self.module_cache_reads.get(&(address, module_id))
     }
 
     /// Captures the read of a module storage entry.
-    pub(crate) fn capture_module_storage_read(
+    pub(crate) fn capture_module_read(
         &mut self,
         module_id: ModuleId,
-        read: ModuleStorageRead<ModuleStorageEntry>,
+        read: Option<Arc<ModuleStorageEntry>>,
     ) {
-        self.module_storage_reads.insert(module_id, read);
+        self.module_cache_reads.insert(module_id, read);
     }
 
     pub(crate) fn capture_delayed_field_read(
@@ -612,26 +612,20 @@ impl<T: Transaction> CapturedReads<T> {
         })
     }
 
-    /// Re-reads the captured read keys, and checks if the reads are still the same:
+    /// Re-reads the captured modules, and checks if the reads are still the same:
     ///   1. All modules that did not exist, still do not exist.
-    ///   2. For all captured reads of existing modules from version X, all new reads
-    ///      also have the same version X.
-    pub(crate) fn validate_module_reads(
-        &self,
-        module_storage: &VersionedModuleStorage<ModuleId, ModuleStorageEntry>,
-        idx_to_validate: TxnIndex,
-    ) -> bool {
+    ///   2. All modules that existed, have the same hash (i.e., has not changed).
+    pub(crate) fn validate_module_reads(&self, code_cache: &SyncCodeCache) -> bool {
         let _timer = TASK_VALIDATE_MODULES_SECONDS.start_timer();
         if self.non_delayed_field_speculative_failure {
             return false;
         }
 
-        // Only successful module storage reads are captured. In case there were no base value,
-        // and fetching it returned an error, the error is not recorded. Hence, it is safe here
-        // to simply treat such errors as a non-existent value.
-        self.module_storage_reads.iter().all(|(id, previous_read)| {
-            let current_read = module_storage.get(id, idx_to_validate);
-            previous_read == &current_read
+        self.module_cache_reads.iter().all(|(id, previous_read)| {
+            let previous_hash = previous_read.as_ref().map(|e| *e.hash());
+            code_cache
+                .module_cache()
+                .check_cached_module_against_previously_read_hash(id, previous_hash)
         })
     }
 
@@ -748,7 +742,7 @@ impl<T: Transaction> CapturedReads<T> {
         for key in &self.module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
-        for id in self.module_storage_reads.keys() {
+        for id in self.module_cache_reads.keys() {
             let key = T::Key::from_address_and_module_name(id.address(), id.name());
             ret.insert(InputOutputKey::Resource(key));
         }
