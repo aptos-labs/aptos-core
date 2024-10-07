@@ -8,6 +8,7 @@ use crate::{
         PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
+    cross_block_caches::flush_cross_block_framework_cache,
     errors::*,
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
@@ -48,7 +49,10 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
-use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
+use aptos_vm_types::{
+    change_set::randomly_check_layout_matches, module_write_set::ModuleWrite,
+    resolver::ResourceGroupSize,
+};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
@@ -593,10 +597,11 @@ where
                 if runtime_environment.vm_config().use_loader_v2 {
                     if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
                         executed_at_commit = true;
-                        versioned_cache.code_storage().write_published_modules(
+                        Self::publish_module_writes(
                             txn_idx,
+                            module_write_set,
+                            versioned_cache,
                             runtime_environment,
-                            module_write_set.into_iter(),
                         )?;
                     }
                 }
@@ -621,10 +626,11 @@ where
             // decrease the validation index to make sure the subsequent transactions see changes.
             if !executed_at_commit && runtime_environment.vm_config().use_loader_v2 {
                 if let Some(module_write_set) = last_input_output.module_write_set(txn_idx) {
-                    versioned_cache.code_storage().write_published_modules(
+                    Self::publish_module_writes(
                         txn_idx,
+                        module_write_set,
+                        versioned_cache,
                         runtime_environment,
-                        module_write_set.into_iter(),
                     )?;
                     scheduler.finish_execution_during_commit(txn_idx)?;
                 }
@@ -703,6 +709,35 @@ where
                 }
                 return Ok(());
             }
+        }
+        Ok(())
+    }
+
+    fn publish_module_writes(
+        txn_idx: TxnIndex,
+        module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        runtime_environment: &RuntimeEnvironment,
+    ) -> Result<(), PanicError> {
+        let mut writes_to_special_address = false;
+        for (key, write) in module_write_set {
+            if write.module_address().is_special() {
+                writes_to_special_address = true;
+            }
+
+            let entry = ModuleStorageEntry::from_transaction_write(
+                runtime_environment,
+                write.into_write_op(),
+            )?;
+            versioned_cache
+                .code_storage()
+                .module_storage()
+                .write_published(&key, txn_idx, entry);
+        }
+
+        // In case framework got upgraded, this should detect it and flush the cache.
+        if writes_to_special_address {
+            flush_cross_block_framework_cache();
         }
         Ok(())
     }
@@ -1130,6 +1165,11 @@ where
 
         for (key, write) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
+                // In case the framework gets upgraded, we need to flush the cache.
+                if write.module_address().is_special() {
+                    flush_cross_block_framework_cache();
+                }
+
                 let entry = ModuleStorageEntry::from_transaction_write(
                     runtime_environment,
                     write.into_write_op(),

@@ -1,18 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    scripts::ScriptCacheEntry, types::TxnIndex, versioned_module_storage::VersionedModuleStorage,
-};
-use aptos_types::{
-    error::PanicError, executable::ModulePath, vm::modules::ModuleStorageEntry,
-    write_set::TransactionWrite,
-};
-use aptos_vm_types::module_write_set::ModuleWrite;
+use crate::{scripts::ScriptCacheEntry, versioned_module_storage::VersionedModuleStorage};
+use aptos_types::{executable::ModulePath, vm::modules::ModuleStorageEntry};
 use crossbeam::utils::CachePadded;
 use dashmap::{mapref::entry::Entry, DashMap};
 use move_binary_format::file_format::CompiledScript;
-use move_vm_runtime::{RuntimeEnvironment, Script};
+use move_vm_runtime::Script;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 /// Code storage, that holds script cache and (versioned) module storage.
@@ -72,29 +66,6 @@ impl<K: Debug + Hash + Clone + Eq + ModulePath> VersionedCodeStorage<K> {
                 e.insert(CachePadded::new(Verified(script)));
             }
         }
-    }
-
-    /// Writes multiple published modules to the storage, making them visible for the transactions
-    /// with higher indices. Also flushes the script cache.
-    pub fn write_published_modules<V: TransactionWrite>(
-        &self,
-        idx_to_publish: TxnIndex,
-        runtime_environment: &RuntimeEnvironment,
-        writes: impl Iterator<Item = (K, ModuleWrite<V>)>,
-    ) -> Result<(), PanicError> {
-        // In case of module publishing, flush script cache. This is the simplest thing to do for
-        // now and can be improved if needed.
-        self.script_cache.clear();
-
-        for (key, write) in writes {
-            let entry = ModuleStorageEntry::from_transaction_write(
-                runtime_environment,
-                write.into_write_op(),
-            )?;
-            self.module_storage
-                .write_published(&key, idx_to_publish, entry);
-        }
-        Ok(())
     }
 
     pub fn module_storage(&self) -> &VersionedModuleStorage<K, ModuleStorageEntry> {

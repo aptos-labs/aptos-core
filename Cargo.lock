@@ -674,6 +674,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-cached-packages",
  "aptos-drop-helper",
  "aptos-infallible",
  "aptos-logger",
@@ -693,6 +694,7 @@ dependencies = [
  "dashmap",
  "derivative",
  "fail",
+ "hashbrown 0.14.3",
  "itertools 0.13.0",
  "move-binary-format",
  "move-core-types",
