@@ -16,6 +16,7 @@ aptos-block-partitioner = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-transaction-orderer = { workspace = true }
 aptos-streaming-partitioner = { workspace = true }
+aptos-fanout-partitioner = { workspace = true }
 aptos-types = { workspace = true }
 clap = { workspace = true }
 rand = "0.8"

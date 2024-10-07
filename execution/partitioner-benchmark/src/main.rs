@@ -4,6 +4,7 @@
 mod clustered_txns_generator;
 
 use std::time::Instant;
+use aptos_fanout_partitioner::fanout::FanoutPartitioner;
 use clap::Parser;
 use aptos_block_partitioner::v3::V3NaivePartitioner;
 use aptos_block_partitioner::BlockPartitioner;
@@ -85,6 +86,7 @@ fn main() {
             max_window_size: args.v3_reorderer_max_window_size,
         }),
         "v3-fennel" => Box::new(V3FennelBasedPartitioner { print_debug_stats: args.debug_logs }),
+        "fanout" => Box::new(FanoutPartitioner { print_debug_stats: args.debug_logs }),
         _ => {
             error!("Unsupported partitioner type: {}", args.partitioner_type);
             return;
