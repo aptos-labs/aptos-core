@@ -16,6 +16,7 @@ use crate::{
     }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes}, pending_votes::VoteReceptionResult, persistent_liveness_storage::PersistentLivenessStorage, quorum_store::types::BatchMsg, rand::rand_gen::types::{FastShare, RandConfig, Share, TShare}, state_computer::SyncStateComputeResultFut, util::is_vtxn_expected
 };
 use anyhow::{bail, ensure, Context};
+use aptos_bitvec::BitVec;
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
@@ -29,7 +30,7 @@ use aptos_logger::prelude::*;
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, block_info::BlockInfo, epoch_state::EpochState, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, on_chain_config::{
+    aggregate_signature::{AggregateSignature, PartialSignatures}, block_info::BlockInfo, epoch_state::EpochState, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
     }, randomness::RandMetadata, validator_verifier::ValidatorVerifier, PeerId
@@ -983,12 +984,10 @@ impl RoundManager {
         {
             let vote_data = vote.vote_data().clone();
             let ledger_info = vote.ledger_info().clone();
-            let mut fake_partial_signature = PartialSignatures::empty();
-            fake_partial_signature.add_signature(
-                self.proposal_generator.author(),
-                vote.signature().clone(),
-            );
-            let fake_aggregate_signature = self.epoch_state.verifier.aggregate_signatures(&fake_partial_signature)?;
+            let num_validators = self.epoch_state().verifier.len() as u16;
+            let mut all_ones = BitVec::with_num_bits(num_validators);
+            (0..num_validators).for_each(|i| all_ones.set(i));
+            let fake_aggregate_signature = AggregateSignature::new(all_ones, None);
             let signed_ledger_info = LedgerInfoWithSignatures::new(ledger_info, fake_aggregate_signature);
             let fake_quorum_cert = QuorumCert::new(vote_data, signed_ledger_info);
             let result = VoteReceptionResult::NewQuorumCertificate(Arc::new(fake_quorum_cert));
